@@ -4,20 +4,16 @@ import type { NewGameRecord } from '../lib/new-game/record';
 import { parseReplayUrl, parseReplayViewpoint } from '../lib/replay-fetcher';
 
 /**
- * Round 89 (lane H, #105), stage H4c (user ruling 13.11.2026, H12a): the address names what is open, so a reload brings it back.
- * A game is `?game=<id>`; a replay loaded by link or id is `?replay=<id>`, the id of the replay with `?p2` when it is seen from
- * player 2's side, the form the `?replay=` deep link has always read; a replay from a file has none (no address can fetch it).
- * The address is written with `replaceState`, so the Back button leaves the app as today and does not walk through every replay
- * loaded. The app reads it once at start: a saved game opens at its tip, a game this browser does not hold is named for the start
- * page's notice. The embedded view (the host owns the address) and a shared branch (`#branch=` wins over the query, as in
- * `useEmbedHost`) are neither read nor written. A `?replay=` link that already names the loaded replay stays as it was written.
+ * The address names what is open, so a reload brings it back: a game is `?game=<id>`; a replay loaded by link or id is `?replay=<id>`
+ * (with `?p2` when seen from player 2's side); a replay from a file has none. Written with `replaceState`, so Back leaves the app
+ * and does not walk through every replay loaded. Read once at start: a saved game opens at its tip, an unknown game is named for the
+ * start page's notice. The embedded view (the host owns the address) and a shared branch (`#branch=` wins, as in `useEmbedHost`)
+ * are neither read nor written. A `?replay=` link that already names the loaded replay stays as written.
  */
 
 export interface OpenAddressInputs {
   embed: boolean;
-  /** `?game=` as the address held it at start. */
   requestedGame: string | null;
-  /** The id of the replay data that is open (a game's data carries the game's id), if any. */
   replayId: string | null;
   viewpoint: 'p1' | 'p2' | undefined;
   /** Whether that replay came by link or id (a file, a game and a host message do not name an address). */
@@ -27,12 +23,10 @@ export interface OpenAddressInputs {
 
 const sharedBranchInAddress = (): boolean => window.location.hash.startsWith('#branch=');
 
-/** Whether a `?replay=` value, in whatever form it was written, names this replay seen from this side. */
 function namesReplay(written: string, id: string, viewpoint: 'p1' | 'p2'): boolean {
   return parseReplayUrl(written) === id.toLowerCase() && parseReplayViewpoint(written) === viewpoint;
 }
 
-/** What the address should hold for what is open: the parameter to set, or null for none. */
 function wanted({ replayId, viewpoint, byLink }: OpenAddressInputs, written: string | null): ['game' | 'replay', string] | null {
   if (!replayId) return null;
   if (replayId.startsWith('newgame-')) return ['game', replayId];

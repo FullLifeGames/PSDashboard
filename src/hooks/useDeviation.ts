@@ -17,7 +17,6 @@ import { useVariationNotice } from './useVariationNotice';
 
 type Branch = ReturnType<typeof useBranch>;
 
-/** The choices a deviation executes once its rebuild landed. */
 type DeviationPrefill = { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] };
 
 export interface LeadSelection { p1: string[]; p2: string[]; bring?: boolean }
@@ -43,18 +42,14 @@ export interface DeviationInputs {
   setPendingConfirm: (confirm: { message: string; proceed: () => void } | null) => void;
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
   setDraftChoices: (draft: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }) => void;
-  /** A rebuild really starts (after any replace confirm): the notice of a finished play-out ends here (round 77, C7). */
+  /** A rebuild really starts (after any replace confirm): the notice of a finished play-out ends here. */
   onDeviate?: () => void;
-  /** Round 89 (#105): a new game's dice seed; its lead start runs on it. */
   gameSeed?: string;
-  /** Round 89 (#105): the new game's record; its lead options come from it. */
   gameRecord?: NewGameRecord | null;
 }
 
-/** One shared preparation session for rebuilds and refreshes: the progress
- *  line, the abort handle, and the iframe reload key's session counter.
- *  The HANDLES object is render-stable (state reads go through the ref) so
- *  the refresh effect does not cancel itself when `begin` re-renders. */
+/** One shared preparation session for rebuilds and refreshes (progress line, abort handle, iframe reload key's counter). The HANDLES
+ *  object is render-stable (state reads go through the ref), so the refresh effect does not cancel itself when `begin` re-renders. */
 function useBranchSession() {
   const [branchPreparing, setBranchPreparing] = useState(false);
   const [branchProgress, setBranchProgress] = useState<{ turn: number; target: number } | null>(null);
@@ -104,15 +99,11 @@ export interface RebuildContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   setBranchDivergence: (notice: string | null) => void;
   landPointer: (startTurn: number) => void;
-  /** The rebuild kept no turn (round 77, D1); without it the notice goes to the divergence line. */
+  /** The rebuild kept no turn; without it the notice goes to the divergence line. */
   reportEnded?: (notice: string) => void;
-  /** Round 89 (#105): the dice seed of a new game's lead start. */
   seed?: string;
 }
 
-/** The async heart of rebuildAt, once the plan (start turn, kept history)
- *  is fixed: build teams + locks, start the branch, surface divergence,
- *  land the pointer for an entry-less start. */
 export async function executeRebuild(
   ctx: RebuildContext,
   startTurn: number,
@@ -147,9 +138,8 @@ export async function executeRebuild(
       } else if (!abortController.signal.aborted) {
         ctx.branchWindowOpenRef.current = true;
         ctx.setBranchDivergence(divergenceNoticeFor(ctx.branch.getBattle(), startTurn, turnEntryCount(replayHistory.filter(entry => !entry.leadChoices))));
-        // The pointer lands where the sim now stands; the tip-follow effect
-        // covers replayed histories (and the turn-0 lead entry, which is
-        // seeded by startBranch), this covers the entry-less start.
+        // The pointer lands where the sim now stands: the tip-follow effect covers replayed histories (and the turn-0 lead entry,
+        // which startBranch seeds), this covers the entry-less start.
         if (replayHistory.length === 0 && startTurn > 0) {
           ctx.landPointer(startTurn);
         }
@@ -160,7 +150,6 @@ export async function executeRebuild(
   }
 }
 
-/** The replace-confirm text: the caller's lead-in, then the variation about to go. */
 function replaceVariationMessage(leadIn: string, span: { startTurn: number; length: number }): string {
   const turnCount = span.length;
   return `${leadIn}: replace the existing variation ` +
@@ -177,13 +166,8 @@ export function useDeviation(inputs: DeviationInputs) {
   const { variationSpan } = timeline;
   const { variationNotice, setVariationNotice, reportVariationEnded } = useVariationNotice(timeline, branch.history.length, snapshots.length);
 
-  /**
-   * Rebuilds the live sim at `position` and prefills the pickers: the proven
-   * team-edit-refresh path (reconstruct to the variation start + replay the
-   * kept history entries), the single road every deviation takes. Only an
-   * EXECUTED move truncates — callers invoke this at execute time, never
-   * for navigation.
-   */
+  /** Rebuilds the live sim at `position` and prefills the pickers via the team-edit-refresh path (reconstruct to the variation
+   *  start, replay the kept history): the one road every deviation takes. Only an EXECUTED move truncates: call it at execute time. */
   const rebuildAt = useCallback(async (
     position: TimelinePosition,
     prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null,
@@ -195,15 +179,13 @@ export function useDeviation(inputs: DeviationInputs) {
     const startTurn = insideVariation ? variationSpan!.startTurn : position.turn;
     const keepTurns = insideVariation ? keptEntries(variationSpan!, position) : 0;
     const replayHistory = keptHistorySlice(branch.history, keepTurns);
-    // Turn-0 variation: startBranch needs leads — the caller's (fresh lead
-    // branch) or the recorded lead entry's (truncation/refresh rebuild).
+    // Turn-0 variation: startBranch needs leads, the caller's (fresh lead branch) or the recorded lead entry's (truncation/refresh rebuild).
     if (startTurn === 0 && !leadOverride && !replayHistory[0]?.leadChoices) return;
     onDeviate?.();
     await executeRebuild({
       replayData, snapshots, observations, sources,
-      // Bring-limited replays (VGC 4 of 6): the interactive branch fields
-      // only what the real game brought. The T0 picker carries its own
-      // selection; per-side fail-open when the protocol does not pin a side.
+      // Bring-limited replays (VGC 4 of 6) field only what the real game brought; the T0 picker carries its own selection;
+      // per side fail-open when the protocol does not pin a side.
       bringOnly: startTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, branch, acquireRuntime, branchWindowOpenRef, setBranchDivergence,
       reportEnded: reportVariationEnded, seed: gameSeed,
@@ -232,8 +214,7 @@ export function useDeviation(inputs: DeviationInputs) {
     branch.setChoice(side, choice, activeSlot);
   }, [timeline.liveTip, draftChoices, setDraftChoices, branch]);
 
-  // Round 84 (turn dock): the dock hands over the effective choices (the played seed under the user's picks); without them the
-  // bare draft goes, as before.
+  // The dock hands over the effective choices (the played seed under the user's picks); without them the bare draft goes.
   const handleExecuteDraft = useCallback((choices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] } = draftChoices) => {
     requests.requestDeviation({ p1Choices: choices.p1, p2Choices: choices.p2 });
   }, [requests, draftChoices]);
@@ -248,9 +229,7 @@ export function useDeviation(inputs: DeviationInputs) {
   };
 }
 
-/** The lead picker's options and the real game's selection as its default. */
 function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, replayGameType: string | null, replayData: ReplayData | null, game: NewGameRecord | null | undefined) {
-  // Round 89 (#105): a new game offers its record's teams.
   const leadOptions = useMemo(
     () => (game ? gameLeadOptions(game) : buildLeadOptions(snapshots, replayData ? replayRules(replayData) : { gen: 9, mod: undefined })),
     [snapshots, replayData, game],
@@ -262,7 +241,6 @@ function useLeadDefaults(snapshots: TurnSnapshot[], bringCount: number | null, r
   return { leadOptions, defaultLeadSelection };
 }
 
-/** The score overlay dies with the variation entries it belonged to. */
 function dropVariationOverlay(timeline: DeviationTimeline, kind: ReturnType<typeof classifyDeviation>, turn: number) {
   if (kind === 'replace' || kind === 'open') {
     timeline.setVariationScores([]);
@@ -271,10 +249,7 @@ function dropVariationOverlay(timeline: DeviationTimeline, kind: ReturnType<type
   }
 }
 
-/**
- * The executor refused the picked turn. The rebuild already replaced the variation, so put it back
- * (round 77, A-2): the old one when there was one, no variation at all otherwise.
- */
+/** The executor refused the picked turn after the rebuild replaced the variation: put the old one back, or none when there was none. */
 function useUndoRefusedDeviation(args: {
   timeline: DeviationTimeline;
   variationSpan: DeviationTimeline['variationSpan'];
@@ -296,9 +271,6 @@ function useUndoRefusedDeviation(args: {
   }, [timeline, variationSpan, rebuildAt, branch, setVariationNotice, branchWindowOpenRef]);
 }
 
-/** The chess rules of leaving the line: an explicit deviation request from
- *  the viewed position, and the turn-0 lead variation, both guarded by the
- *  replace confirm. */
 function useDeviationRequests(args: {
   timeline: DeviationTimeline;
   rebuildAt: (position: TimelinePosition, prefill: { p1Choices: (BranchSlotChoice | null)[]; p2Choices: (BranchSlotChoice | null)[] } | null, leadOverride?: LeadSelection) => Promise<void>;
@@ -347,11 +319,7 @@ function useDeviationRequests(args: {
     run();
   }, [timeline, variationSpan, rebuildAt, branch, setPendingConfirm, setBranchDivergence, undoRefusedDeviation]);
 
-  /**
-   * Turn-0 branching: replace the game's leads and play from team preview.
-   * Same chess rules as any deviation — an existing variation is replaced
-   * only after the confirm.
-   */
+  /** Turn-0 branching: replaces the game's leads and plays from team preview; an existing variation goes only after the confirm. */
   const startLeadVariation = useCallback((leads: LeadSelection, opts?: { onStart?: () => void }) => {
     const run = () => {
       opts?.onStart?.();

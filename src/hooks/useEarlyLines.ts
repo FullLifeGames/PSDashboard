@@ -4,7 +4,6 @@ import { earlyLineJobs, earlyLineProgress, earlyLineSettings } from '../componen
 import type { EvalGraphState } from './evaluation/graph-sweep';
 import { keptPlayed } from './evaluation/sweep-core';
 
-/** What the stage reads of the app: the report's analyses, the graph, the evaluation's two calls and the position of a turn. */
 export interface EarlyLinesInputs {
   replayId: string | null;
   /** The report's own per-turn analyses (`gameAnalyses`); null until the report exists. */
@@ -19,7 +18,6 @@ export interface EarlyLinesInputs {
   searchLines(position: string, settings: EvalSettings & { ruleset: StaticRuleset }): Promise<EvalLine[]>;
   /** Writes the lines into the stored result `base` of `turn` (graph, memory and store); false when the result moved on. */
   attachLines(turn: number, base: EvalResult, lines: EvalLine[], cacheKey: string): boolean;
-  /** Stops the pool's running search (the evaluation's cancel). */
   cancel(): void;
   positionFor(turn: number): Promise<string>;
   cacheKeyFor(turn: number): string;
@@ -56,13 +54,10 @@ async function searchTurns(inputs: { current: EarlyLinesInputs }, signal: AbortS
 }
 
 /**
- * Round 89 (#104), step G13 (ruling G2b, kept by G7a): the early singles turns run the matrix, which keeps no lines. After the game
- * report (the sweep is over, the analyses exist) this stage runs one tree search per graded turn and keeps only `lines` (the
- * score, the grade and the ranking of the turn stay the sweep's), so every graded turn of the Game review has its lines. Step G14b
- * (ruling G9a, option L): the search carries the line pass (extra iterations aimed at the rows the card shows), and the stage covers
- * the tree turns of singles and every turn of doubles and VGC as well, since their lines from the sweep stand on thin second turns.
- * Auto mode only; an explicit mode keeps the user's choice. A new sweep, a new replay and a Stop end the stage; the next analysis
- * picks up the turns that have not had the pass.
+ * After the game report this stage runs one tree search per graded turn and keeps only `lines` (score, grade and ranking stay the
+ * sweep's), because early singles turns run the matrix, which keeps no lines. The search carries the line pass (extra iterations aimed
+ * at the rows the card shows); the stage covers the tree turns of singles and every turn of doubles and VGC. Auto mode only. A new
+ * sweep, a new replay and a Stop end the stage; the next analysis picks up the turns without the pass.
  */
 export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesProgress | null; lineComing: (turn: number) => LineComing } {
   const { replayId, analyses, graph, prefsMode } = inputs;
@@ -97,16 +92,14 @@ export function useEarlyLines(inputs: EarlyLinesInputs): { progress: EarlyLinesP
   }, [pending, replayId]);
 
   const counts = useMemo(() => earlyLineProgress({ analyses, results: graph.results, settings: graph.settings }), [analyses, graph.results, graph.settings]);
-  // The feedback harness waits for the stage before it takes its dump (`test/e2e-feedback/sweep-wait.ts`): the stage starts the moment
-  // the sweep ends, so a dump taken at any other point holds the lines of however many turns the stage had reached (round 89, G13b).
-  // Written in the same commit as the debug handle (`useGameAnalysis`), so the two never disagree. Singles and doubles alike (G14b:
-  // the pass covers every graded turn of a game in Auto).
+  // The feedback harness waits for the stage before it takes its dump (`test/e2e-feedback/sweep-wait.ts`): the stage starts the
+  // moment the sweep ends, so a dump at any other point holds the lines of however many turns it had reached.
   useEffect(() => {
     (window as Window & { __psEarlyLines?: unknown }).__psEarlyLines = { active, done: counts.done, total: counts.total };
   }, [active, counts.done, counts.total]);
   const stop = inputs.cancel;
   const progress = useMemo(() => (pending && running ? { ...counts, stop } : null), [pending, running, counts, stop]);
-  // Round 89 (G13b): the card of a turn the stage is about to search says so instead of sending the user to analyze it again.
+  // The card of a turn the stage is about to search says so instead of sending the user to analyze it again.
   const searching = useMemo(
     () => (active ? new Set(earlyLineJobs({ analyses, results: graph.results, settings: graph.settings }).map(job => job.turn)) : null),
     [active, analyses, graph.results, graph.settings],

@@ -3,14 +3,10 @@ import type { NewGameRecord } from '../lib/new-game/record';
 import { gameAdoptSnapshot, restoreGamePositions } from './branch/game-rebuild';
 
 /**
- * Round 89 (lane H, #105): the positions of a new game come from its record, never from a 'replay' job: the main line's positions
- * land in the exact store as the turns are promoted, and a position the store lacks (a reloaded game, an edited team) is rebuilt
- * from the record's entries, which stores them all.
- *
- * NG-2: only a rebuild in flight is shared. The exact store empties whenever its identity moves (the sets fingerprint, the bring
- * worlds) while the record stays the same, and a rebuild that failed must not stay the answer: a settled rebuild is forgotten, so a
- * missing turn rebuilds again. One sweep (`acquireAll`) rebuilds at most once, so a record that cannot be rebuilt costs one try per
- * Analyze game, not one per turn.
+ * The positions of a new game come from its record, never from a 'replay' job: the main line's positions land in the exact store as
+ * the turns are promoted, and a missing position (a reloaded game, an edited team) is rebuilt from the record's entries. Only a
+ * rebuild in flight is shared: a settled one is forgotten, so a missing turn rebuilds again. One sweep (`acquireAll`) rebuilds at
+ * most once, so a record that cannot be rebuilt costs one try per Analyze game, not one per turn.
  */
 export function useGamePositions(args: {
   record: NewGameRecord | null;

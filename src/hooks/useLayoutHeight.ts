@@ -3,11 +3,10 @@ import { useCallback, useRef } from 'react';
 const PROPERTY = '--ps-layout-h';
 
 /**
- * Round 84 (turn dock), A7b (ruling 9a): the two columns of the workspace share one grid row that follows the left column's
- * content up to the layout's own height. The layout fills the window below the top bar (a flex item, so its height does not
- * depend on the columns); this hook writes that height onto the layout element as `--ps-layout-h`, and layout.css caps the left
- * column with it. A ResizeObserver follows the window; no React state. A height of 0 (no layout box yet) writes nothing, so the
- * stylesheet's fallback of 100% stays. A window without the observer (jsdom) gets the first measurement only.
+ * The two columns of the workspace share one grid row that follows the left column's content up to the layout's own height: this hook
+ * writes the layout element's height (a flex item below the top bar) as `--ps-layout-h`, and layout.css caps the left column with it.
+ * A height of 0 (no layout box yet) writes nothing, so the stylesheet's fallback of 100% stays. A window without a ResizeObserver
+ * (jsdom) gets the first measurement only.
  */
 export function useLayoutHeight(): (element: HTMLElement | null) => void {
   const observer = useRef<ResizeObserver | null>(null);

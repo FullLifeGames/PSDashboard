@@ -16,12 +16,11 @@ const replaceMessage = (turn: number, span: { startTurn: number; length: number 
 interface AskedReplace { line: EvalLine; turn: number; span: { startTurn: number; length: number } }
 
 /**
- * Round 89 (#104), step G3: the click on ▶ Play. The line is the history of a variation (`lineHistory`), and the variation
- * restore every saved variation takes (`restoreVariation`) rebuilds the game at the graded turn and plays it with the dice the line
- * names. An existing variation goes only after the replace confirm; the pointer follows the new tip, where Let it play out
- * continues with the simulator's own dice. Step G4b: the confirm is the hook's own `confirm`, which the clicked line's block shows
- * (the dock's banner stood out of sight from the right column); it is derived from the variation in hand, so a question about a
- * variation that has since changed is gone without an effect.
+ * The click on ▶ Play: the line is the history of a variation (`lineHistory`), and the variation restore every saved variation takes
+ * (`restoreVariation`) rebuilds the game at the graded turn and plays it with the dice the line names. An existing variation goes
+ * only after the replace confirm; the pointer follows the new tip, where Let it play out continues with the simulator's own dice. The
+ * confirm is the hook's own `confirm`, shown by the clicked line's block (the dock's banner is out of sight from the right column);
+ * it is derived from the variation in hand, so a question about a variation that has since changed is gone without an effect.
  */
 export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn: number) => void; confirm: LineConfirm | null } {
   const { restoreVariation } = app.board.deviation;
@@ -57,7 +56,6 @@ export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn
   return { onPlay, confirm };
 }
 
-/** The host of the Lines section: the game's rules, the field at the graded turn's start and ▶ Play. */
 export function useLinesHost(app: AppController, replayData: ReplayData): LinesHost {
   const { onPlay, confirm } = usePlayLine(app);
   const winPaths = useWinPaths(app, replayData);

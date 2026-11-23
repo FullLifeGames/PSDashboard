@@ -4,11 +4,8 @@ import type { BranchSimState } from './useBranch';
 import { askDice, type DiceOffers } from '../lib/branch-dice-offers';
 import { wordsOf } from '../lib/branch-dice';
 
-/**
- * Round 82 (forced dice), step A7a: the dice the engine offers for the position the panel shows. The engine's offers read the live
- * battle on copies, so they exist only where the panel has the branch's battle (the live tip) and only while a tray shows the dice
- * ("Dice · What if" open). The answer lands after the lazy chunk loads, like the damage preview; `null` means the panel is still asking.
- */
+/** The dice the engine offers for the position the panel shows: they read the live battle on copies, so they exist only on the live
+ *  tip while a tray shows the dice ("Dice · What if" open); `null` means the panel is still asking. */
 
 type Battle = LiveHit['battle'];
 
@@ -16,17 +13,15 @@ type Battle = LiveHit['battle'];
 const pickKey = (choice: BranchSlotChoice | null): string =>
   choice === null ? '-' : choice.kind === 'move' ? `m:${choice.moveId}:${choice.targetLoc ?? ''}:${choice.modifier ?? ''}` : `s:${choice.speciesId}`;
 
-/** Which position and which picks an answer belongs to. */
 function askKey(simState: BranchSimState): string {
   return JSON.stringify([simState.log.length, simState.p1Choices.map(pickKey), simState.p2Choices.map(pickKey)]);
 }
 
-/** The offers with the reader of names the chips use. */
 export interface DiceView extends DiceOffers { words: DieWords }
 
 export function useDiceOffers(args: {
   enabled: boolean; simState: BranchSimState | null; getBattle: (() => Battle | null) | undefined;
-  /** The replay's log at a stored position of the main line (step A7b): the log's dice are read from its lines. */
+  /** The replay's log at a stored position of the main line: the log's dice are read from its lines. */
   replayLog?: string;
 }): DiceView | null {
   const { enabled, simState, getBattle, replayLog } = args;

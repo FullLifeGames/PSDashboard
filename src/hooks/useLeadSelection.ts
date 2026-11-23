@@ -1,13 +1,9 @@
 import { useState } from 'react';
 import type { LeadOption } from '../lib/lead-options';
 
-/**
- * Each side's picked leads (and, in bring-limited formats, the whole
- * brought selection). A recorded variation choice wins; otherwise the real
- * game's choice preselects: leads first (slot order), then the rest of the
- * bring. A click toggles; a click past the limit replaces the OLDEST pick,
- * so swapping one Pokémon never needs a deselect first.
- */
+/** Each side's picked leads (and, in bring-limited formats, the whole brought selection). A recorded variation choice wins, else the
+ *  real game's choice preselects: leads first (slot order), then the rest of the bring. A click toggles; a click past the limit
+ *  replaces the OLDEST pick, so swapping one Pokémon never needs a deselect first. */
 export function useLeadSelection(args: {
   p1Options: LeadOption[];
   p2Options: LeadOption[];
@@ -27,8 +23,7 @@ export function useLeadSelection(args: {
     ].slice(0, maxPicks).map(option => option.species);
   const [p1Leads, setP1Leads] = useState<string[]>(() => initialFor(p1Options, pickedLeads?.p1));
   const [p2Leads, setP2Leads] = useState<string[]>(() => initialFor(p2Options, pickedLeads?.p2));
-  // Returning to T0 after the variation recorded a choice: mirror it in
-  // place (render adjustment, not an effect — the props settle mid-render).
+  // Returning to T0 after the variation recorded a choice: mirror it in place (a render adjustment, not an effect).
   const pickedKey = JSON.stringify(pickedLeads ?? null);
   const [seenPickedKey, setSeenPickedKey] = useState(pickedKey);
   if (pickedKey !== seenPickedKey) {

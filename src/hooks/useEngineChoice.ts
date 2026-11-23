@@ -21,11 +21,7 @@ function storeSelectedId(id: string): void {
   }
 }
 
-/**
- * Round 77 (user gate 28.10.2026, 4a and 5a): the engines on offer and the one chosen. The worker
- * client reads the choice at every evaluation; a switch drops the evaluation and the game graph of
- * the engine before, whose results stay apart in the cache.
- */
+/** The engines on offer and the one chosen: a switch drops the evaluation and the game graph of the engine before (its results stay apart in the cache). */
 export function useEngineChoice(onSwitch: () => void) {
   const [added, setAdded] = useState(loadAddedEngines);
   const [selectedId, setSelectedId] = useState(readSelectedId);

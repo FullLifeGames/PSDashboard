@@ -32,14 +32,12 @@ interface RefreshContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   isCancelled: () => boolean;
   clearRequest: () => void;
-  /** The rebuild kept no turn: the variation is gone (round 77, D1). */
+  /** The rebuild kept no turn: the variation is gone. */
   reportEnded: (notice: string) => void;
-  /** A new game's dice seed (round 89, #105): a variation refreshed from turn 0 starts the game's own battle again. */
+  /** A new game's dice seed: a variation refreshed from turn 0 starts the game's own battle again. */
   seed?: string;
 }
 
-/** The refresh run: rebuild the variation with the edited team knowledge,
- *  replaying the same history and pending choices. */
 async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
   const abortController = ctx.session.begin();
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -78,10 +76,8 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
   }
 }
 
-/** "What if it had …" and team edits: the pending refresh request rebuilds
- *  the VARIATION, wherever the pointer wanders — its start turn, never the
- *  currently viewed position. Without a live runtime (fresh hypothetical),
- *  the viewed turn IS the target. */
+/** Rebuilds the VARIATION from its start turn, wherever the pointer wanders; without a live runtime (fresh hypothetical) the
+ *  viewed turn is the target. */
 export function useBranchRefresh(args: {
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
@@ -98,7 +94,7 @@ export function useBranchRefresh(args: {
   request: BranchRefreshRequest | null;
   clearRequest: () => void;
   reportEnded: (notice: string) => void;
-  /** A new game's dice seed (round 89, #105); a replay passes none. */
+  /** A new game's dice seed; a replay passes none. */
   gameSeed?: string;
 }) {
   const {
@@ -111,8 +107,7 @@ export function useBranchRefresh(args: {
     const refreshTurn = (branching ? variationStartTurn : null) ?? viewTurn;
     void runRefresh({
       replayData, snapshots, observations, sources, refreshTurn,
-      // Bring-limited replays keep their trim through team-edit refreshes
-      // too (a T0 variation re-seeds it from its lead entry).
+      // Bring-limited replays keep their trim through team-edit refreshes (a T0 variation re-seeds it from its lead entry).
       bringOnly: refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, startBranch, acquireRuntime, branchWindowOpenRef,
       isCancelled: () => cancelled,

@@ -24,15 +24,9 @@ function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefO
 }
 
 /**
- * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn,
- * with the execute side (turns, forced interludes, choice recording) and the
- * session side (rebuild, battle access, teardown) composed over shared refs.
- *
- * Round 88 (T314, #55): `bench` is the bring-limited game's bench lists (`replayBench`). Round 89 (ADR 0024): the rebuild plays the
- * brought bodies of the world the user plays (both teams trimmed to the bring count, or neither), so the battle's party is
- * usually the bench already; where it holds more bodies, the state the pickers and the dock read offers only the bodies the bring
- * allows, so the What-if and its forced replacements never name a body that stayed home. Round 88 (M3): `engineSimState` is the
- * unfiltered state of that battle, for the engine's own choices (a ranked line, the play-out, a forced replacement).
+ * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn. `bench` is the bring-limited game's bench lists
+ * (`replayBench`): the rebuild plays the brought bodies of the world the user plays (ADR 0024), and the state the pickers and the
+ * dock read offers only the bodies the bring allows. `engineSimState` is the unfiltered state, for the engine's own choices.
  */
 export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefObject<(() => Promise<void>) | null>) {
   const [branching, setBranching] = useState(false);
@@ -54,8 +48,6 @@ export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefOb
   const p1ChoicesRef = useRef<(BranchSlotChoice | null)[]>([]);
   const p2ChoicesRef = useRef<(BranchSlotChoice | null)[]>([]);
   const startLogLengthRef = useRef(0);
-  // Both bundles are render-stable: refs and state setters never change
-  // identity, so every callback below keeps the stability it had inline.
   const refs = useMemo<BranchRefs>(() => ({
     executingRef, branchEngineRef, streamsRef, battleStreamRef, logRef, choiceErrorsRef, p1ChoicesRef, p2ChoicesRef, startLogLengthRef, afterTurnRef,
   }), [afterTurnRef, executingRef, branchEngineRef, streamsRef, battleStreamRef, logRef, choiceErrorsRef, p1ChoicesRef, p2ChoicesRef, startLogLengthRef]);
@@ -77,11 +69,11 @@ export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefOb
     p2ChoicesRef.current = [];
   }, []);
 
-  /** Round 84 (turn dock): the pending picks of both sides right now. The dock's engine fill reads them where its result lands, when a render's copy is stale. */
+  /** The pending picks of both sides right now: the dock's engine fill reads them where its result lands, when a render's copy is stale. */
   const getChoices = useCallback(() => ({ p1: p1ChoicesRef.current as readonly (BranchSlotChoice | null)[], p2: p2ChoicesRef.current as readonly (BranchSlotChoice | null)[] }), []);
 
-  // executeTurn hands its failure to the caller: a deviation that replaced a variation needs it to roll back
-  // (round 77, A-2). The tracked setter records what the executor reported last.
+  // executeTurn hands its failure to the caller: a deviation that replaced a variation needs it to roll back. The tracked setter
+  // records what the executor reported last.
   const lastExecuteErrorRef = useRef<string | null>(null);
   const trackedSetters = useMemo(() => ({
     ...setters,
@@ -93,7 +85,7 @@ export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefOb
   const { executeTurn: runTurn, setChoice, recordChoice, executePending: runPending } = useBranchExecute(refs, trackedSetters, clearChoices);
   /** Runs the pending choices; resolves to the executor's error text, or null when the turn ran or nothing was due. */
   const executeTurn = useReportingExecutor(runTurn, lastExecuteErrorRef);
-  /** Round 84 (A7a): Execute of the dock: the forced replacement it holds, else the turn. Same result as `executeTurn`. */
+  /** Execute of the dock: the forced replacement it holds, else the turn. Same result as `executeTurn`. */
   const executePending = useReportingExecutor(runPending, lastExecuteErrorRef);
   const { startBranch: startBranchRaw, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
   const startBranch = useLeadPromotion(startBranchRaw, afterTurnRef);

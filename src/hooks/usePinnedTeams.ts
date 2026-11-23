@@ -11,15 +11,12 @@ function hashText(text: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-/**
- * Round 77 (user gate 28.10.2026, 3a): the teams a reported session built, pinned for its reproduction, so
- * every rebuild plays the reported sets instead of today's Smogon guess. The pin belongs to its replay (a new
- * one drops it by derivation), and its marker joins the sets fingerprint: stored positions and cached
- * evaluations never mix pinned and inferred sets.
- */
+/** The teams a reported session built, pinned for its reproduction so every rebuild plays the reported sets, not today's Smogon guess.
+ *  The pin belongs to its replay, and its marker joins the sets fingerprint: stored positions and evaluations never mix pinned and
+ *  inferred sets. */
 export function usePinnedTeams(replayId: string | null, gameTeams: PinnedTeams | null = null) {
   const [pinned, setPinned] = useState<{ replayId: string; teams: PinnedTeams } | null>(null);
-  // Round 89 (#105): a new game plays its record's teams, exactly as typed; they stand in for a reproduction's pin.
+  // A new game plays its record's teams, exactly as typed; they stand in for a reproduction's pin.
   const teams = gameTeams ?? (pinned && pinned.replayId === replayId ? pinned.teams : null);
   const marker = useMemo(() => (teams ? hashText(JSON.stringify(teams)) : null), [teams]);
   const setTeams = useCallback((next: PinnedTeams | null) => {

@@ -16,8 +16,6 @@ import { branchFrameLog } from '../lib/branch-log';
 import { manualMove, toId } from '@fulllifegames/replay-core';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 
-/** The refresh request that re-runs the branch with the edited teams and the
- *  hypothetical move seeded as the acting slot's pending choice. */
 function seededRefreshRequest(args: {
   nextP1: NonNullable<ReplayContext['knowledge']['effectiveP1Info']>;
   nextP2: NonNullable<ReplayContext['knowledge']['effectiveP2Info']>;
@@ -45,8 +43,7 @@ function seededRefreshRequest(args: {
   };
 }
 
-/** "What if it had …": a team edit plus the normal branch refresh, with the
- *  hypothetical move pre-seeded as that slot's pending choice. */
+/** "What if it had ...": a team edit plus the normal branch refresh. */
 function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   const { effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info } = ctx.knowledge;
   const { setPendingBranchRefresh } = ctx.refreshQueue;
@@ -59,10 +56,8 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   ) => {
     const sideInfo = side === 'p1' ? effectiveP1Info : effectiveP2Info;
     if (!sideInfo) return;
-    // The hypothetical seeds a pending choice where the sim will stand after
-    // the refresh: the live tip, or — with no variation — the viewed turn
-    // (the refresh flow rebuilds there). Mid-variation views stay inert; the
-    // seeded slot would belong to the tip, not the viewed position.
+    // The hypothetical seeds a pending choice where the sim will stand after the refresh: the live tip, or the viewed turn when
+    // there is no variation. Mid-variation views stay inert: the seeded slot would belong to the tip.
     if (variationSpan !== null && !liveTip) return;
 
     const pokemon = sideInfo.pokemon.map(entry => {
@@ -86,7 +81,7 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   }, [effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, simState, history, liveTip, variationSpan, setPendingBranchRefresh]);
 }
 
-/** Round 89 (#104, G13): the early-lines stage after the game report; its progress goes to the Game review's header. */
+/** The early-lines stage after the game report; its progress goes to the Game review's header. */
 function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analyses: ReturnType<typeof useGameAnalysis>['gameAnalyses']) {
   const { evaluation } = ctx;
   const { replayData, snapshots } = ctx.replay;
@@ -106,7 +101,6 @@ function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analys
   });
 }
 
-/** Per-turn and game-level analysis plus the branch iframe's derived log. */
 function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: EngineController) {
   const { replayData, snapshots } = ctx.replay;
   const { evaluation } = ctx;
@@ -116,8 +110,6 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   const { simState, history, branching, variationStartTurn } = ctx.branch;
   const { branchSession } = board.deviation;
 
-  // Per-turn and game-level analysis (reads, turn card, lead analysis,
-  // game report, the feedback harness's window handle).
   const { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses } = useGameAnalysis({
     replayData, snapshots, evaluation, analysisTurn, sweepAlignment, replayGen,
   });
@@ -125,7 +117,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   const { progress: earlyLines, lineComing } = useEarlyLinesStage(ctx, engine, gameAnalyses);
 
   const simLines = simState?.log;
-  // Round 82 (forced dice), step A7b: the display lines of the forced dice join the frame's log, never the battle's own.
+  // The display lines of the forced dice join the frame's log, never the battle's own.
   const simLog = useMemo(() => {
     if (!simLines || simLines.length === 0) return '';
     return branchFrameLog(simLines, history.flatMap(entry => entry.dieLines ?? []));
@@ -133,34 +125,29 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;
-  // Session + branch start, NOT the viewed turn: the pointer moves constantly
-  // on the unified timeline, and a viewTurn-keyed reload would remount the
-  // sim iframe on every navigation and every executed turn (tip advance).
+  // Keyed on session and branch start, not the viewed turn: a viewTurn key would remount the sim iframe on every navigation and executed turn.
   const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
   return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, earlyLines, lineComing, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
 }
 
-/**
- * The App controller: the full pre-split App() wiring in four layers.
- * Hook call order matches the original top-to-bottom order exactly.
- */
+/** The App controller: the App() wiring in four layers; the hook call order is fixed. */
 export function useAppController() {
   const ctx = useReplayContext();
   const transients = useTransients(ctx.replay.replayData?.id);
   const board = useTimelineController(ctx, transients);
   const engine = useEngineController(ctx, transients, board);
   const handleHypotheticalMove = useHypotheticalMove(ctx, board);
-  // Round 84 (A7a): the dock's Execute also sends a forced replacement the engine filled.
+  // The dock's Execute also sends a forced replacement the engine filled.
   const { executePending } = ctx.branch;
   const handleExecuteTurn = useCallback(async () => {
     await executePending();
   }, [executePending]);
   const analysis = useAnalysisSurface(ctx, board, engine);
   const support = useSupport({ ctx, transients, board });
-  // Round 89 (#105, H5): a game's share link opens the game, its branch and the sharer's turn.
+  // A game's share link opens the game, its branch and the sharer's turn.
   const sharedGame = useOpenSharedGame({ ctx, board });
-  // Round 89 (#105, H8): a reload while the tip turn waits for its replacement plays that turn again.
+  // A reload while the tip turn waits for its replacement plays that turn again.
   useRestorePendingTurn({ ctx, board }, sharedGame.opening || ctx.shared.sharedGame !== null);
   return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support, sharedGame };
 }

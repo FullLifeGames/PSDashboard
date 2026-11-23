@@ -8,12 +8,9 @@ type GetBattle = ReturnType<typeof useBranch>['getBattle'];
 type Report = (turn: number, target: number) => void;
 
 /**
- * The unified timeline's exactness promise, without a button: when the
- * pointer DWELLS on a main-line turn whose exact position is unknown, the
- * app quietly reconstructs it in the background (the same healed path
- * Evaluate acquires through) and the pickers upgrade in place. Scrubbing
- * stays free — the timer only fires once the user settles, and never while
- * the sim, an evaluation, or a play-out is busy (the dwellEnabled input).
+ * Quietly reconstructs a main-line turn's exact position in the background when the pointer dwells on it (the same healed path
+ * Evaluate acquires through), so the pickers upgrade in place. Scrubbing stays free: the timer fires once the user settles, never
+ * while the sim, an evaluation or a play-out is busy (`dwellEnabled`).
  */
 function useDwellReconstruction(args: {
   replayData: ReplayData | null;
@@ -30,8 +27,8 @@ function useDwellReconstruction(args: {
     if (!replayData || !dwellEnabled || smogonPending) return;
     const key = exactKeyFor(viewTurn);
     if (!key || hasStored(key) || hasFailed(key)) return;
-    // Round 82 (A7e): one acquisition at a time. A turn the pointer settled on while another runs waits for it: the effect runs
-    // again when the acquisition ends (`exactAcquiringTurn` is a dependency) instead of dropping the turn for good.
+    // One acquisition at a time: a turn the pointer settled on while another runs waits (the effect runs again when
+    // `exactAcquiringTurn` changes) instead of being dropped.
     if (exactAcquiringTurn !== null) return;
     const turn = viewTurn;
     const timer = window.setTimeout(() => {
@@ -40,8 +37,7 @@ function useDwellReconstruction(args: {
       setExactAcquiringTurn(turn);
       void acquireExact(turn, () => {})
         .catch(() => {
-          // The approximation stays usable — the sim still validates on
-          // execute. Remember the failure so a diverging replay does not
+          // The approximation stays usable (the sim validates on execute). Remember the failure so a diverging replay does not
           // re-run the reconstruction on every render tick.
           markFailed(key);
         })
@@ -55,12 +51,8 @@ function useDwellReconstruction(args: {
   return exactAcquiringTurn;
 }
 
-/**
- * The acquisition surface the evaluation and picker layers read: the live
- * branch battle, the healed main-line position behind Evaluate (stored or
- * reconstructed in the worker), the sweep's streamed pass, and the dwell
- * upgrade — all over the one position source.
- */
+/** The acquisition surface the evaluation and picker layers read, all over the one position source: the live branch battle, the
+ *  healed main-line position behind Evaluate, the sweep's streamed pass and the dwell upgrade. */
 export function useEvalAcquire(inputs: {
   replayData: ReplayData | null;
   source: PositionSource;

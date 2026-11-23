@@ -10,26 +10,21 @@ interface EmbedHostOptions {
 }
 
 export interface EmbedHostState {
-  /** `?embed=1` — the app is framed by another site and hides its chrome. */
+  /** `?embed=1`: the app is framed by another site and hides its chrome. */
   embed: boolean;
-  /** `?replay=<id|url>` — replay to load on startup. */
+  /** `?replay=<id|url>`: replay to load on startup. */
   requestedReplay: string | null;
-  /** `?turn=<n>` — the turn to open that replay on (read once; null for no turn, a non-number, or a link a share link or a held game overrides). */
+  /** `?turn=<n>`: the turn to open that replay on (read once; null for no turn, a non-number, or a link a share link or a held game overrides). */
   requestedTurn: number | null;
-  /** `?game=<id>` — the saved game the address names (opened by `useOpenAddress`; round 89, #105). */
+  /** `?game=<id>`: the saved game the address names (opened by `useOpenAddress`). */
   requestedGame: string | null;
 }
 
 /**
- * Lets another site drive the app: `?replay=` deep links auto-load a replay,
- * `&turn=<n>` opens it on that turn (`useRequestedTurn`), `?embed=1` strips the chrome for iframe use, and the host page can post
- * `{ type: 'ps-load-replay', replay }` where `replay` is an id, a URL, a raw
- * protocol log, or a full exported replay HTML document. The app answers with
- * `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error`.
- *
- * These message types are disjoint from the internal replay viewer protocol
- * (`ps-turn`, `ps-seek-turn`, `ps-append-log`, `ps-replay-ready`), so both
- * listeners can share the window.
+ * Lets another site drive the app: `?replay=` auto-loads a replay, `&turn=<n>` opens it on that turn (`useRequestedTurn`), `?embed=1`
+ * strips the chrome, and the host page can post `{ type: 'ps-load-replay', replay }` (an id, a URL, a raw protocol log or an exported
+ * replay HTML). The app answers with `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error`; these types are disjoint from the
+ * internal viewer protocol (`ps-turn`, `ps-seek-turn`, `ps-append-log`, `ps-replay-ready`), so both listeners share the window.
  */
 export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): EmbedHostState {
   const [config] = useState<EmbedHostState>(() => {
@@ -49,7 +44,7 @@ export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): 
 
   useEffect(() => {
     if (!config.requestedReplay || autoLoadedRef.current) return;
-    // A #branch= share link owns the view — don't fetch a replay behind it.
+    // A #branch= share link owns the view: no replay fetch behind it.
     if (window.location.hash.startsWith('#branch=')) return;
     autoLoadedRef.current = true;
     void loadReplay(config.requestedReplay);
@@ -71,7 +66,7 @@ export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): 
             ? { type: 'ps-replay-loaded', id: result.data.id, format: result.data.formatid }
             : { type: 'ps-replay-error', message: result.error ?? 'Unknown error' }, '*');
         } catch {
-          // The host window is gone — nothing to answer.
+          // The host window is gone: nothing to answer.
         }
       })();
     };

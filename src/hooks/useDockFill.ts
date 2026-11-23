@@ -19,7 +19,6 @@ export interface DockFillInputs {
   executing: boolean;
   branchPreparing: boolean;
   playOutActive: boolean;
-  /** The game type has an evaluation at all (singles and doubles). */
   evalAvailable: boolean;
   evaluation: Pick<Evaluation, 'status' | 'result' | 'resultTag' | 'prefs' | 'graph' | 'stopped'>;
   /** The evaluation status as the timeline reads it: a finished result of another position counts as stale. */
@@ -28,7 +27,6 @@ export interface DockFillInputs {
   historyLength: number;
   /** A replay turn only: the picker state shown is another position's while the viewed one resolves. */
   stale?: boolean;
-  /** Names the variation: a new variation at the same turn is a new position. */
   sessionKey: string;
   handleEvaluate: (options?: EvaluateOptions) => void;
   /** The picks of both sides now: the branch's at the tip, the picker's effective choices (logged action under the user's picks) at a replay turn. */
@@ -39,52 +37,31 @@ export interface DockFillInputs {
   executeTurn: (choices: SideChoices) => unknown;
 }
 
-/** The slot whose tray is open: the fill leaves it alone. */
 export interface HeldSlot { side: Side; slot: number }
 
-/** Which slots hold the engine's choice. */
 export interface EngineMarks { p1: boolean[]; p2: boolean[] }
 
-/** What the dock reads of the fill. */
 export interface DockFillView {
   /** The fill is under way for this position: the untouched chips hold a placeholder. */
   pending: boolean;
-  /** The game analysis runs, so the engine cannot fill the untouched chips now. */
   busy: boolean;
-  /** An Execute is queued and runs after the fill. */
   waits: boolean;
   engine: EngineMarks;
-  /** Execute pressed while the fill is pending: the turn runs once the fill landed. */
   queueExecute: () => void;
-  /**
-   * The user chose in a slot: it is no longer the engine's. Round 89 (#153, Hard mode): with the setting on and the pick given, the
-   * opponent's engine slots are written again with the reply that hurts the user's side most (the pick's own handler, never an effect).
-   */
+  /** The user chose in a slot: it is no longer the engine's. Hard mode on and the pick given: the opponent's engine slots take the
+   *  reply that hurts the user's side most. */
   onUserChoice: (side: Side, slot: number, pick?: BranchSlotChoice) => void;
-  /**
-   * Round 89 (#153, HM3b): what the fill chose for each slot, as it chose it and frozen for the position (a slot held open takes its deferred
-   * pick; a slot the user had set before the fill landed holds null). Empty before the fill landed. The dock offers "Back to the engine's
-   * pick" where a user pick differs from it.
-   */
+  /** What the fill chose per slot, frozen for the position (null where a held slot waits or the user set the slot first). Empty before the fill landed. */
   picks: SideChoices;
-  /**
-   * "Back to the engine's pick" for one slot: marks the slot as the engine's again, answers for the opponent (Hard mode on: its engine slots
-   * take the reply to the restored pick, as after any pick; off: the opponent's fill as at the start) and returns the choice the dock writes
-   * into the slot; null when the fill chose nothing for it. Called from the click's handler, never from an effect.
-   */
+  /** "Back to the engine's pick" for one slot: marks it the engine's again, answers for the opponent and returns the choice the dock
+   *  writes, null when the fill chose nothing. Called from a click handler, never an effect. */
   restore: (side: Side, slot: number) => BranchSlotChoice | null;
   /** A replay turn: what the fill wrote, slot by slot (null where it wrote nothing); null at the tip and before the fill landed. */
   choices: SideChoices | null;
-  /** The user clicked a chip: at a replay turn this starts the fill for the position (Q19 b). A no-op at the tip. */
   arm: () => void;
-  /** The dock reports its open tray (null when none): the fill never writes that slot, whenever the result lands. */
   holdTray: (open: HeldSlot | null) => void;
-  /**
-   * Round 84 (A7a, ruling 1a): the engine's pick for a slot whose tray was open when the result landed, by slot (null elsewhere).
-   * The chip and the tile show it as the engine's pick; the slot takes it when `release` runs.
-   */
+  /** The engine's pick for a slot whose tray was open when the result landed (null elsewhere); the slot takes it on `release`. */
   deferred: SideChoices;
-  /** The tray of a slot closed (Done, a click beside, Escape, a chip): the slot takes its deferred pick unless the user chose there. */
   release: (side: Side, slot: number) => void;
 }
 
@@ -95,29 +72,23 @@ interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices
 
 const NO_CHOICES: SideChoices = { p1: [], p2: [] };
 
-/** `list` with `value` at `slot`, grown to reach it. */
 const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
 
 const slotCount = (state: BranchSimState, side: Side): number => (side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots)?.length ?? 1;
 
-/**
- * Whether the fill may run now: `open` leaves the game analysis out (the chips say it is busy), `eligible` adds it. The tip of a
- * variation fills at once; a replay turn (Q19 b) only after the user's first click on a chip of that position (`armedKey`), and
- * once its picker resolved (`stale` is false).
- */
+/** Whether the fill may run now: `open` leaves the game analysis out, `eligible` adds it. A replay turn runs only after the user's
+ *  first click on a chip of that position (`armedKey`) and once its picker resolved (`stale` is false). */
 function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; open: boolean; eligible: boolean } {
   const { simState, liveTip, branching, executing, branchPreparing, playOutActive, evalAvailable, evaluation } = inputs;
   // `historyLength` separates the position after a forced replacement from the turn before it.
   const key = `${inputs.sessionKey}:${inputs.evalViewKey}:${inputs.historyLength}`;
-  // Round 84 (A7a, ruling 2a): a forced replacement at the live tip is filled like any slot (the evaluation prices the open request);
-  // a replay turn never stands at one.
+  // A forced replacement at the live tip is filled like any slot (the evaluation prices the open request); a replay turn never stands at one.
   const forced = !liveTip && !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch);
   const reachable = !!simState && !simState.ended && !forced && evalAvailable && !executing && !branchPreparing && !playOutActive;
   const open = reachable && (liveTip ? branching : armedKey === key && !inputs.stale);
   return { key, open, eligible: open && !evaluation.graph.running };
 }
 
-/** The marks the fill left and the Execute queued behind it, in state for the chips and mirrored in refs for the callbacks of a run. */
 function useFillMarks() {
   const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES, picks: NO_CHOICES });
   const [queued, setQueued] = useState<string | null>(null);
@@ -133,7 +104,6 @@ function useFillMarks() {
   return { settled, queued, settledRef, heldRef, commit, queue, unqueue, holdTray };
 }
 
-/** The user chose in a slot: it is no longer the engine's, and the pick held back for it is gone. */
 function useOnUserChoice({ settledRef, commit }: Pick<FillMarks, 'settledRef' | 'commit'>) {
   return useCallback((side: Side, slot: number) => {
     const current = settledRef.current;
@@ -149,21 +119,14 @@ function useOnUserChoice({ settledRef, commit }: Pick<FillMarks, 'settledRef' | 
 
 type FillMarks = ReturnType<typeof useFillMarks>;
 
-/**
- * Round 89 (#153, Hard mode): the side in hand is the one whose slots the user set, provided the other side holds no pick of the
- * user's: that other side is the opponent. Both sides set, or neither, leave no opponent to play a reply.
- */
+/** The side in hand is the one whose slots the user set while the other side holds none of the user's picks; both or neither set: no opponent. */
 function handSide(touched: Record<Side, (BranchSlotChoice | null)[]>): Side | null {
   const set = (['p1', 'p2'] as const).filter(side => touched[side].some(Boolean));
   return set.length === 1 ? set[0] : null;
 }
 
-/**
- * The opponent's ranked choices with the reply that hurts the side in hand most first: the row the picks stand for (`rowOfChoices`),
- * its worst reply (`worstReply`). A choice no ranked row stands for leaves the ranking as the engine made it. The fill maps the first
- * choice that fits the pickers, so a reply that does not map (or clashes) gives way to the next one. Null when no ranked row stands for
- * the picks: nothing to answer.
- */
+/** The opponent's ranked choices with the reply that hurts the side in hand most first (`rowOfChoices`, `worstReply`); a choice no
+ *  ranked row stands for keeps the engine's ranking, and a reply that does not map gives way to the next. Null when no row fits the picks. */
 function answersTo(result: EvalResult, state: BranchSimState, hand: Side, picks: (BranchSlotChoice | null)[], touched: (BranchSlotChoice | null)[]): RankedChoice[] | null {
   const opponent: Side = hand === 'p1' ? 'p2' : 'p1';
   const row = rowOfChoices(hand, result.perSide[hand], state, picks, touched);
@@ -171,18 +134,14 @@ function answersTo(result: EvalResult, state: BranchSimState, hand: Side, picks:
   return reply ? [reply, ...result.perSide[opponent]] : null;
 }
 
-/** What a fill's callbacks read of the position at the moment they fire, and the result the fill of this position used. */
 type LatestFill = MutableRefObject<{
   key: string; eligible: boolean; simState: BranchSimState | null; getChoices: DockFillInputs['getChoices']; setChoice: DockFillInputs['setChoice'];
   executeTurn: DockFillInputs['executeTurn']; queued: string | null; liveTip: boolean; hardMode: boolean;
 }>;
 type FillResult = MutableRefObject<{ key: string; result: EvalResult } | null>;
 
-/**
- * Round 89 (#153, Hard mode): a pick of the user after the fill rewrites the opponent's engine slots with the reply that hurts the
- * user's side most, read from the result the fill used. The user's slots are those with a choice that no fill wrote; when the other side
- * holds a pick of the user's too, nobody is the opponent and nothing is written. Returns the handler the pick calls.
- */
+/** A user pick after the fill rewrites the opponent's engine slots with the reply that hurts the user's side most (read from the
+ *  result the fill used); when both sides hold user picks, nobody is the opponent and nothing is written. */
 function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: FillMarks['settledRef'], commit: FillMarks['commit']) {
   return (side: Side, slot: number, pick: BranchSlotChoice): void => {
     const now = latest.current;
@@ -192,18 +151,15 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
     const state = now.simState;
     const opponent: Side = side === 'p1' ? 'p2' : 'p1';
     const choices = now.getChoices();
-    // the user's slots: a slot with a choice that no fill wrote; the pick is the one that just came
     const userSlots = (key: Side): (BranchSlotChoice | null)[] => (
       Array.from({ length: slotCount(state, key) }, (_, index) => (current.marks[key][index] ? null : choices[key][index] ?? null))
     );
     const touched = userSlots(side).map((choice, index) => (index === slot ? pick : choice));
-    // both sides hold picks of the user: nobody is the opponent
     if (userSlots(opponent).some(Boolean)) return;
     const standing = (index: number) => choices[side][index] ?? current.choices[side][index] ?? null;
     const picks = touched.map((choice, index) => choice ?? (current.marks[side][index] ? standing(index) : null));
     const ranked = answersTo(fill.result, state, side, picks, touched);
     if (!ranked) return;
-    // the opponent's slots are all the engine's: nothing there is touched, so the reply decides the joint choice
     const { filled } = pickFillParts(opponent, ranked, state, Array.from({ length: slotCount(state, opponent) }, () => null), []);
     if (filled.every(choice => choice === null)) return;
     if (now.liveTip) filled.forEach((choice, index) => { if (choice) now.setChoice(opponent, choice, index); });
@@ -215,12 +171,8 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
   };
 }
 
-/**
- * Round 89 (#153, HM3b): "Back to the engine's pick" for one slot. The slot is the engine's again (mark, no deferred pick), and the
- * opponent answers: with the setting on its engine slots take the reply to the restored pick (`refill`, the rule of any pick); off,
- * the engine slots the fill wrote return to their fill as at the start, where they differ. Slots the user set are left alone. Returns the
- * choice for the dock to write into the slot, null when the fill chose nothing for it.
- */
+/** Back to the engine's pick: the slot is the engine's again and the opponent answers. Hard mode on, its engine slots take the reply
+ *  to the restored pick (`refill`); off, they return to their fill as at the start. Slots the user set stay. */
 function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], commit: FillMarks['commit'], refill: ReturnType<typeof useRefill>) {
   return (side: Side, slot: number): BranchSlotChoice | null => {
     const now = latest.current;
@@ -236,7 +188,6 @@ function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], com
       refill(side, slot, own);
       return own;
     }
-    // the opponent's engine slots return to the fill as at the start
     const back = current.picks[opponent].map((pick, index) => (pick && current.marks[opponent][index] && !sameChoice(current.choices[opponent][index], pick) ? pick : null));
     if (now.liveTip) back.forEach((pick, index) => { if (pick) now.setChoice(opponent, pick, index); });
     commit({ ...current, marks, deferred, choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
@@ -244,14 +195,10 @@ function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], com
   };
 }
 
-/** What the fill wrote, side by side: the marks, the choices, the picks held slots take later, and the sides' choices as they now stand. */
 interface FillWrite { written: EngineMarks; wrote: SideChoices; deferred: SideChoices; merged: SideChoices }
 
-/**
- * The fill of one result: both sides take the first ranked choice that maps and agrees with their touched slots, and the picks go into
- * the branch at the live tip. Round 89 (#153, Hard mode): the side in hand (`handSide`) fills first, and the opponent's ranking then
- * starts with the reply that hurts its choice most (`answersTo`).
- */
+/** The fill of one result: both sides take the first ranked choice that maps and agrees with their touched slots; the side in hand
+ *  fills first (`handSide`) and the opponent's ranking starts with the reply that hurts its choice most (`answersTo`). */
 function fillSides(now: LatestFill['current'], state: BranchSimState, result: EvalResult, held: HeldSlot | null): FillWrite {
   const choices = now.getChoices();
   const out: FillWrite = { written: { p1: [], p2: [] }, wrote: { p1: [], p2: [] }, deferred: { p1: [], p2: [] }, merged: { p1: [], p2: [] } };
@@ -262,7 +209,6 @@ function fillSides(now: LatestFill['current'], state: BranchSimState, result: Ev
   const ranking: Record<Side, RankedChoice[]> = { p1: result.perSide.p1, p2: result.perSide.p2 };
   for (const side of hand === 'p2' ? (['p2', 'p1'] as const) : (['p1', 'p2'] as const)) {
     const touched = touchedBy[side];
-    // Round 84: the slot whose tray is open stays as it is, like a touched one.
     const isHeld = touched.map((_, slot) => held?.side === side && held.slot === slot);
     const { filled, deferred } = pickFillParts(side, ranking[side], state, touched, isHeld);
     out.written[side] = filled.map(choice => choice !== null);
@@ -276,7 +222,6 @@ function fillSides(now: LatestFill['current'], state: BranchSimState, result: Ev
   return out;
 }
 
-/** Writes the result into the untouched slots of both sides, then runs an Execute that waited for it; `release` hands a held slot its deferred pick. */
 function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, marks: FillMarks) {
   const { simState, getChoices, setChoice, executeTurn } = inputs;
   const { settledRef, heldRef, queued, commit, unqueue } = marks;
@@ -284,7 +229,6 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
   const { liveTip } = inputs;
   const hardMode = !!inputs.evaluation.prefs.hardMode;
   const latest = useRef({ key, eligible, simState, getChoices, setChoice, executeTurn, queued, liveTip, hardMode });
-  // The result the fill of this position used: a pick of the user reads it again (Hard mode).
   const fillResultRef = useRef<{ key: string; result: EvalResult } | null>(null);
   useEffect(() => {
     latest.current = { key, eligible, simState, getChoices, setChoice, executeTurn, queued, liveTip, hardMode };
@@ -330,13 +274,11 @@ type Apply = ReturnType<typeof useFillApply>['apply'];
 
 /** The view's own effects start the evaluation of a live position in these cases (`useEvalHousekeeping`); the fill leaves the run to them. */
 function startedByHousekeeping(liveTip: boolean, prefs: Pick<Evaluation['prefs'], 'auto' | 'autoAnalyze'>, status: Evaluation['status']): boolean {
-  // Those effects serve live positions only; a replay turn is never started by them.
   if (!liveTip) return false;
   if (prefs.auto && status === 'stale') return true;
   return prefs.autoAnalyze && (status === 'idle' || status === 'stale');
 }
 
-/** The trigger only acts: a run for the position, or the result of a run another trigger started (Auto, the walk). */
 function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, running: boolean, apply: Apply, settledRef: FillMarks['settledRef']) {
   const { evaluation, liveEvalStatus, evalViewKey, handleEvaluate, liveTip } = inputs;
   const attemptRef = useRef<string | null>(null);
@@ -348,19 +290,17 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
     const stoppedHere = stoppedAt(key);
     if (settledRef.current.key === key) return;
     if (!eligible) {
-      // A run that the game analysis (or anything else) stopped starts again once the fill may run.
       attemptRef.current = null;
       return;
     }
-    // Round 89 (SB-7): a run the user stopped with a partial result has answered; its result so far fills like a finished one.
+    // A run the user stopped with a partial result has answered: its result so far fills like a finished one.
     const answer = current.foreign ? null : fillAnswer(evaluation.status, !!evaluation.stopped, evaluation.result, attempted, current.result);
     if (answer) {
       apply(key, answer);
       return;
     }
-    // Round 89 (SB-10): a position the user stopped stays stopped, also after a game analysis took the run and gave it back.
+    // A position the user stopped stays stopped, also after a game analysis took the run and gave it back.
     if (stoppedHere) return;
-    // A foreign run is no run for this position: the fill starts its own, which supersedes it.
     if (attemptRef.current === key || (running && !current.foreign)) return;
     // With Auto or "always on", the housekeeping effects of the view start this run; its result comes through the branch above.
     if (!current.foreign && startedByHousekeeping(liveTip, evaluation.prefs, liveEvalStatus)) return;
@@ -370,18 +310,14 @@ function useFillTrigger(inputs: DockFillInputs, key: string, eligible: boolean, 
   }, [key, eligible, attempted, running, evaluation.status, evaluation.stopped, evaluation.result, evaluation.prefs, liveEvalStatus, liveTip, handleEvaluate, apply, settledRef, updateBase, stoppedAt]);
 }
 
-/** What the dock reads of a fill that landed for this position (nothing before). A replay turn reads its choices from the view. */
 function landedView(landed: Settled | null, liveTip: boolean): Pick<DockFillView, 'engine' | 'choices' | 'deferred'> {
   return {
     engine: landed?.marks ?? NO_MARKS, choices: landed && !liveTip ? landed.choices : null, deferred: landed?.deferred ?? NO_CHOICES,
   };
 }
 
-/**
- * Whether the fill is under way for this position, and whether a run is. Round 84 (A7i): the run of the request before stands done
- * under the same tag in the first render of a new key; the position counts as begun once a run was seen under way while the fill
- * could start, and until then that finished result is no answer, so `pending` holds from the first render of the key.
- */
+/** The run of the request before stands done under the same tag in the first render of a new key, so `pending` holds from that
+ *  render: the position counts as begun once a run was seen under way while the fill could start. */
 function useFillPending(inputs: DockFillInputs, key: string, eligible: boolean, done: boolean) {
   const { evaluation } = inputs;
   const attempted = evaluation.resultTag === inputs.evalViewKey;
@@ -393,19 +329,15 @@ function useFillPending(inputs: DockFillInputs, key: string, eligible: boolean, 
 }
 
 /**
- * Round 84 (turn dock): the engine fill. Once per position the hook asks the evaluation for the position and writes the best
- * ranked choice into every slot the user has not touched, nor holds open. At the live tip of a variation it starts at once and
- * writes into the branch; at a replay turn it starts with the user's first click on a chip and keeps its choices in the view
- * (`choices`), under the draft and over the logged seed. It never starts while the game analysis
- * runs (a single evaluation stops its sweep), during a play-out, or for a game type without evaluation,
- * and it never sets the Auto preference. An Execute pressed while the run is pending waits and runs after the fill.
- * The fill applies where the result lands (`onResult`); the marks it leaves are state read by the chips.
+ * The engine fill: once per position it writes the best ranked choice into every slot the user has not touched nor holds open. At
+ * the live tip it starts at once and writes into the branch; at a replay turn it starts with the user's first click on a chip and
+ * keeps its choices in the view (`choices`). It never starts while the game analysis runs (a single evaluation stops its sweep),
+ * during a play-out or without evaluation for the game type, and never sets the Auto preference.
  */
 export function useDockFill(inputs: DockFillInputs): DockFillView {
   const { evaluation } = inputs;
   const [armedKey, setArmedKey] = useState<string | null>(null);
   const { key, open, eligible } = gate(inputs, armedKey);
-  // The click that arms the fill belongs to its position: another turn needs its own, and so does a return.
   if (armedKey !== null && armedKey !== key) setArmedKey(null);
   const marks = useFillMarks();
   const { settled, queued, settledRef, queue, unqueue, holdTray } = marks;
@@ -419,8 +351,8 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   }, [dropMark, refill]);
   useFillTrigger(inputs, key, eligible, running, apply, settledRef);
 
-  // A queued Execute lives as long as its run is pending: a run that failed or that something stopped takes it along, so a later
-  // Evaluate by hand never executes the turn. Reconciled in render, like the other state that follows the position.
+  // A queued Execute lives as long as its run is pending: a failed or stopped run takes it along, so a later Evaluate by hand never
+  // executes the turn. Reconciled in render, like the other state that follows the position.
   const waits = queued === key && pending;
   if (queued !== null && !waits) unqueue();
 

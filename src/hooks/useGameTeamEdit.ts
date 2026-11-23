@@ -4,12 +4,11 @@ import { teamOfInfo } from '../lib/new-game/edit-team';
 import type { NewGameRecord } from '../lib/new-game/record';
 
 /**
- * Round 89 (lane H, #105), stage H4: Edit Player, Edit Opp and Import/Export Sets on a new game. The editor hands over the side's `OpponentTeamInfo`;
- * the game takes it as sets (`teamOfInfo`), stops the live branch (its runtime stands on the old teams), plays the record again on
- * the new teams (`editTeams`) and says where the main line ends when an entry no longer applies. A replay keeps its own path.
- * Round 89, H14a (user ruling 13.11.2026): a dry run (`planTeams`) comes first; an edit that makes played turns invalid asks before it
- * cuts, naming the turns that fall away and the variation that goes, and Cancel changes nothing. The editor (or the sets panel) stays
- * mounted under the question, hidden while `hold` is true, so Cancel returns to it with the text as typed; it closes only when the edit applies.
+ * Edit Player, Edit Opp and Import/Export Sets on a new game: the game takes the editor's `OpponentTeamInfo` as sets (`teamOfInfo`),
+ * stops the live branch (its runtime stands on the old teams), plays the record again on the new teams (`editTeams`) and says where
+ * the main line ends when an entry no longer applies. A dry run (`planTeams`) comes first: an edit that invalidates played turns
+ * asks before it cuts and Cancel changes nothing. The editor stays mounted under the question, hidden while `hold` is true, so
+ * Cancel returns to it with the text as typed; it closes only when the edit applies. A replay keeps its own path.
  */
 
 type Teams = { p1: ReturnType<typeof teamOfInfo>; p2: ReturnType<typeof teamOfInfo> };
@@ -19,9 +18,7 @@ interface Inputs {
   /** A dry run of the edit: how many turns the game would keep. Changes nothing. */
   planTeams: (teams: Teams) => Promise<{ kept: number; error: string | null } | null>;
   editTeams: (teams: Teams) => Promise<{ kept: number; error: string | null } | null>;
-  /** Whether a variation is open (the edit stops it). */
   variationOpen: boolean;
-  /** Stops the live branch and returns the pointer to the main line. */
   stopBranch: () => void;
   close: () => void;
 }
@@ -29,7 +26,6 @@ interface Inputs {
 /** "its first turn", "its first 3 turns", "no turn" (an edit that ends the line before its first turn). */
 const keptTurns = (kept: number): string => (kept === 0 ? 'no turn' : kept === 1 ? 'its first turn' : `its first ${kept} turns`);
 
-/** The question of a cut (H14a): how many turns fall away, how many the game keeps, and whether the open variation goes. */
 function cutQuestion(falling: number, kept: number, variationOpen: boolean): string {
   const turns = falling === 1 ? '1 played turn invalid. It falls' : `${falling} played turns invalid. They fall`;
   return `This edit makes ${turns} away: the game keeps ${keptTurns(kept)}${variationOpen ? ', and the open variation goes' : ''}.`;
@@ -46,7 +42,6 @@ export function useGameTeamEdit({ record, planTeams, editTeams, variationOpen, s
   const [asked, setAsked] = useState<{ teams: Teams; message: string; close: () => void } | null>(null);
   /** True from the click until the edit applies, fails or is cancelled: the editor stays open but hidden. */
   const [hold, setHold] = useState(false);
-  /** Closes the editor, stops the branch and plays the record again on the teams; says where the line ends when an entry no longer applies. */
   const apply = useCallback((teams: Teams, closeEditor: () => void) => {
     setHold(false);
     closeEditor();
@@ -58,11 +53,8 @@ export function useGameTeamEdit({ record, planTeams, editTeams, variationOpen, s
       }
     }, (failure: unknown) => setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`));
   }, [editTeams, stopBranch]);
-  /**
-   * Plays the record again on the sides given (a side that is null keeps the record's own sets); false when no game is open. A plan
-   * that cuts played turns asks first (nothing changes until the answer, the editor stays open under it), any other edit applies and
-   * closes the editor (`closeEditor`, default the hook's own `close`).
-   */
+  /** Plays the record again on the sides given (a null side keeps the record's own sets); false when no game is open. A plan that
+   *  cuts played turns asks first (nothing changes until the answer), any other edit applies and closes the editor (`closeEditor`). */
   const editSides = useCallback((next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }, closeEditor: () => void = close): boolean => {
     if (!record) return false;
     const teams = {

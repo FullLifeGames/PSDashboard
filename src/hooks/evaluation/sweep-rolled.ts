@@ -8,15 +8,11 @@ import { loadCachedResult } from './sweep-replacements';
 import { aborted, isCancelled, type SweepEnv } from './sweep-types';
 
 /**
- * Round 86 (T304): the sweep's last stage, after the replacement points. The report names the game's biggest roll (a missed sure kill of the
- * winner) and says what a hit would have left. The roll comes from the report's own walk over the swept graph, the replay worker plays
- * the turn again with the die turned over, and the engine evaluates the copy's next root once, at the engine the actual next root ran
- * (the card of the turn that follows, as the replacement round prices its request). A game with no named roll costs nothing. The result
- * rides in the graph (`rollFlip`), so the report is complete when `graph.running` turns false. A copy the log cannot give, a worker
- * that fails and an evaluation that fails are silent: the sentence then speaks without the number.
+ * The sweep's last stage, after the replacement points: replays the report's biggest roll (a missed sure kill of the winner) with
+ * the die turned over and evaluates the copy's next root once, at the engine the actual next root ran. The result rides in the graph
+ * (`rollFlip`), so the report is complete when `graph.running` turns false; a missing roll, copy, worker or evaluation is a silent gap.
  */
 
-/** The copy's result under the copy's key, in memory and in the store. */
 function remember(env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string, result: EvalResult): void {
   env.cacheRef.current.set(key, { result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false });
   void saveStoredEval({
@@ -45,11 +41,8 @@ async function searchCopy(
   }
 }
 
-/**
- * The copy of the roll's turn: the turn's start position through the worker. The pool of the sweep gives its workers back first: a long
- * game ends its sweep with twelve of them and the replay worker alive (573756: about 6.2 GB in the renderer), and the copy's worker as
- * one more took the whole page down, so the feedback test hung for 40 minutes. The evaluation after it refills the pool.
- */
+/** The copy of the roll's turn through the worker, after the sweep's pool gives its workers back: a long game ends its sweep with
+ *  twelve of them and the replay worker alive (about 6.2 GB in the renderer), and one more took the page down. */
 async function copyOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll): Promise<'abort' | RolledCopyOutcome | null> {
   try {
     // A run that took over owns the pool now: only the run that still holds it gives it back.
@@ -77,8 +70,8 @@ async function flipOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll
   const copy = await copyOf(env, params, roll);
   if (copy === 'abort' || copy === null) return copy;
   if (copy.stage === 'ended' && copy.terminal !== null) {
-    // Round 88 (T326, #62): the end's score is cached too (a result with no search behind it: interval 0, depth 0, no ranked choices), so a
-    // second sweep of a game that ends in its biggest roll plays no copy and rebuilds no position.
+    // The end's score is cached too (a result with no search behind it: interval 0, depth 0, no ranked choices), so a second sweep of a
+    // game that ends in its biggest roll plays no copy and rebuilds no position.
     remember(env, engine, key, storeKey, { score: copy.terminal, interval: 0, depthCompleted: 0, perSide: { p1: [], p2: [] } });
     return { turn: roll.turn, score: copy.terminal };
   }

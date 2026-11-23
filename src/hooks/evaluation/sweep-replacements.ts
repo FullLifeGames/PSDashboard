@@ -4,14 +4,10 @@ import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cac
 import type { TurnEvalSettings } from './prefs';
 import { aborted, isCancelled, type SweepEnv } from './sweep-types';
 
-/**
- * Round 79 (T290): the sweep's last stage, after the lead. Every request round the protocol shows (a knockout and the replacement
- * the player picked) is priced once, at the position the reconstruction held when the request opened, with the engine the turn
- * that follows ran. The record lands under that turn's card. Nothing here grades, and a round without a position, a search or a
- * card is a silent gap: the turns, the report and the verdicts never read this stage.
- */
+/** The sweep's last stage, after the lead: prices each replacement request round once, at the position the reconstruction held, with
+ *  the engine of the turn that follows. Nothing is graded; a round without a position, a search or a card is a silent gap. */
 
-/** The in-memory entry, else the persisted one (the run's prefetch, or one read when no prefetch could run). Round 86 (T304): the copy's evaluation reads it too. */
+/** The in-memory entry, else the persisted one (the run's prefetch, or one read when no prefetch could run). */
 export async function loadCachedResult(
   env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -52,7 +48,7 @@ async function searchReplacement(
   }
 }
 
-/** One round: from the cache, else searched. 'abort' = the run changed hands. */
+/** 'abort' = the run changed hands. */
 async function replacementOf(env: SweepEnv, round: ReplacementRound): Promise<'abort' | ReplacementEvalData | null> {
   const { replacementKeyFor } = env.params;
   // The card of turn t + 1 sits at index t; the engine is the one that card's turn ran.
