@@ -1,7 +1,8 @@
 import { test, expect, describe } from 'vitest';
-import type { TurnAnalysis } from '../src/analysis';
+import type { TurnAnalysis, SideAnalysis } from '../src/analysis';
 import { buildGameReport } from '../src/report';
 import type { RankedChoice } from '../src/types';
+import { buildScene, GAMES, READERS, type Scene } from './read-against-click-builder';
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
@@ -369,5 +370,296 @@ describe('the biggest roll in the game report (T304)', () => {
     const report = buildGameReport(game(), names, 'p1', true, new Set([3]), { turn: 2, score: 0.9 });
     expect(report.summary).toContain('Stone Edge (80%) missed. After the miss Alpha stood at 75%.');
     expect(report.summary).not.toContain('A hit would');
+  });
+});
+
+describe('luck-report', () => {
+  const names: [string, string] = ['Alpha', 'Beta'];
+
+  const sideOf = (extra: Partial<SideAnalysis> = {}): SideAnalysis =>
+    ({ playedRaw: null, played: null, best: null, safe: null, regret: 0, ...extra });
+
+  const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
+    turn, scoreBefore, scoreAfter, swing: scoreAfter !== null ? scoreAfter - scoreBefore : null,
+    playedOutcome: null, decisionDelta: null, chanceDelta: null, attribution: 'quiet',
+    p1: sideOf(), p2: sideOf(), ...over,
+  });
+
+  const none = { p1: false, p2: false };
+  const forP1 = { p1: true, p2: false };
+  const forP2 = { p1: false, p2: true };
+
+  describe('T22 report: the luck ledger in two parts', () => {
+    test('649664 shape: the rolls hold under half of the ledger, so no "The rolls decided it" and the luck line names only what the rolls gave', () => {
+      // The big swing sits before the favor boundary (turn 4), so it stays in the ledger.
+      const report = buildGameReport([
+        mk(1, -0.3, -0.1, { chanceDelta: 0.3, rolledFor: forP1 }),
+        mk(2, -0.1, -0.2, { chanceDelta: -0.05, rolledFor: none }),
+        mk(3, -0.2, 0.25, { attribution: 'chance', chanceDelta: 0.45, rolledFor: forP2 }),
+        mk(4, 0.25, 0.55, { chanceDelta: 0.1, rolledFor: none }),
+        mk(5, 0.55, 0.85, { rolledFor: none }),
+      ], names, 'p1');
+      expect(report.summary).not.toContain('The rolls decided it');
+      expect(report.winPath?.factor).not.toBe('variance');
+      expect(report.chanceSplit?.rolled).toBeCloseTo(0.3);
+      expect(report.chanceSplit?.reRead).toBeCloseTo(0.5);
+      expect(report.summary).toContain('The rolls gave Alpha +15%.');
+    });
+
+    test('the rolls carry at least half the ledger the same way: the rolls decided it', () => {
+      const report = buildGameReport([
+        mk(1, 0.1, -0.25, { attribution: 'chance', chanceDelta: -0.35, rolledFor: forP2 }),
+        mk(2, -0.25, -0.45, { chanceDelta: -0.15, rolledFor: none }),
+        mk(3, -0.45, -0.75, { rolledFor: none }),
+      ], names, 'p2');
+      expect(report.summary).toContain('The rolls decided it');
+      expect(report.winPath?.factor).toBe('variance');
+    });
+
+    test('573756 shape: the rolls went the other way, the luck line says what they gave the other side', () => {
+      const report = buildGameReport([
+        mk(1, 0.1, 0.3, { chanceDelta: 0.24, rolledFor: forP1 }),
+        mk(2, 0.3, -0.4, { attribution: 'chance', chanceDelta: -0.7, rolledFor: forP1 }),
+        mk(3, -0.4, -0.8, { chanceDelta: -0.6, rolledFor: none }),
+        mk(4, -0.8, -0.9, { rolledFor: none }),
+      ], names, 'p2');
+      expect(report.summary).not.toContain('The rolls decided it');
+      expect(report.summary).toContain('The rolls gave Alpha +12%.');
+    });
+
+    test('doubles (2663093831 shape): luck toward the loser, under half rolled, names only the rolls', () => {
+      const pair = sideOf({ playedSlots: [{ kind: 'move', name: 'Heat Wave', targetLoc: null }, { kind: 'move', name: 'Protect', targetLoc: null }] });
+      const report = buildGameReport([
+        mk(1, 0, 0.3, { p1: pair, p2: pair, chanceDelta: 0.35, rolledFor: none }),
+        mk(2, 0.3, 0.2, { p1: pair, p2: pair, chanceDelta: 0.15, rolledFor: forP1 }),
+        mk(3, 0.2, -0.6, { p1: pair, p2: pair, rolledFor: none }),
+        mk(4, -0.6, -0.9, { p1: pair, p2: pair, rolledFor: none }),
+      ], names, 'p2');
+      expect(report.summary).toContain('The rolls gave Alpha +8%.');
+      expect(report.summary).not.toContain('Luck ran');
+    });
+
+    test('a ledger without a single roll says the rolls gave nothing', () => {
+      const report = buildGameReport([
+        mk(1, 0, 0.4, { chanceDelta: 0.4, rolledFor: none }),
+        mk(2, 0.4, 0.8, { rolledFor: none }),
+      ], names, 'p1');
+      expect(report.summary).toContain('The rolls favored neither side.');
+    });
+
+    test('without rolledFor the report keeps its anchor gates and writes no split', () => {
+      const report = buildGameReport([
+        mk(1, 0.1, -0.15, { attribution: 'chance', chanceDelta: -0.3 }),
+        mk(2, -0.15, -0.4, { chanceDelta: -0.17 }),
+        mk(3, -0.4, -0.7),
+      ], names, 'p2');
+      expect(report.summary).toContain('The rolls decided it');
+      expect(report.chanceSplit).toBeUndefined();
+    });
+  });
+
+  describe('T22 report: the tip and the denied end read the same rolls', () => {
+    test('the tip turn speaks "on a roll" only with a roll toward the winner, a marker the other way no longer suffices', () => {
+      // Turn 2 produced the boundary score: the tip turn.
+      const turns = (rolledFor: { p1: boolean; p2: boolean }) => [
+        mk(1, 0.1, 0.05, { rolledFor: none }),
+        mk(2, 0.05, -0.4, { attribution: 'chance', chanceDelta: -0.3, rolledFor }),
+        mk(3, -0.4, -0.75, { rolledFor: none }),
+      ];
+      expect(buildGameReport(turns(forP2), names, 'p2', true, new Set()).summary).toContain("on a roll that went Beta's way");
+      expect(buildGameReport(turns(forP1), names, 'p2', true, new Set([2])).summary).not.toContain('on a roll');
+    });
+
+    test('573756 t73 shape: the denied end needs a roll against the near-decided side', () => {
+      const near = { species: 'Garchomp', odds: 0.95, removes: 'Corviknight', click: { move: 'firefang' }, announce: true };
+      const played = { choice: 'move firefang', label: 'Fire Fang', worstCase: 0, expected: 0, ev: 0, punishedBy: null };
+      const turns = (rolledFor: { p1: boolean; p2: boolean }) => [
+        mk(1, -0.5, 0.1, { attribution: 'chance', chanceDelta: 0.4, p2: sideOf({ played, nearDecided: near }), rolledFor }),
+        ...Array.from({ length: 9 }, (_, index) => mk(index + 2, 0.1, -0.2 - index * 0.08, { rolledFor: none })),
+      ];
+      expect(buildGameReport(turns(forP1), names, 'p2', true, new Set([1])).deniedEnd?.turn).toBe(1);
+      expect(buildGameReport(turns(forP2), names, 'p2', true, new Set([1])).deniedEnd).toBeUndefined();
+    });
+  });
+});
+
+const scene = (overrides: Partial<Scene> & Pick<Scene, 'kind' | 'playedCell' | 'safeCell'>, reader: Scene['reader']): Scene => ({ reader, ...overrides });
+
+describe.each(GAMES)('%s', (_game, make) => {
+  describe.each(READERS)('read by %s', reader => {
+    const build = (overrides: Partial<Scene> & Pick<Scene, 'kind' | 'playedCell' | 'safeCell'>) => buildScene(make, scene(overrides, reader));
+    const other = reader === 'p1' ? 'p2' : 'p1';
+
+    test('a gamble whose played cell trails the safe cell by a point is no read (648453 t8; red before: riskPaidOff true, p2-read)', () => {
+      const { analysis } = build({ kind: 'gamble', playedCell: 0.189, safeCell: 0.19 });
+      const side = analysis[reader];
+      expect(side.riskPayoff).toBeGreaterThanOrEqual(0.08);
+      expect(side.riskPaidOff).toBeUndefined();
+      expect(side.safeAgainstClick).toEqual({ against: analysis[other].played!.label, playedValue: 0.189, safeValue: 0.19 });
+      expect(analysis.attribution).toBe('quiet');
+    });
+
+    test('a gamble whose played cell beats the safe cell is a read and carries both cells', () => {
+      const { analysis } = build({ kind: 'gamble', playedCell: 0.3, safeCell: 0.19 });
+      const side = analysis[reader];
+      expect(side.riskPaidOff).toBe(true);
+      expect(side.safeAgainstClick).toEqual({ against: analysis[other].played!.label, playedValue: 0.3, safeValue: 0.19 });
+      expect(analysis.attribution).toBe(`${reader}-read`);
+    });
+
+    test('a mistake paid three turns later against a safe cell that read better is the reader\'s decision (2663093831 t8)', () => {
+      const { analysis } = build({ kind: 'mistake', playedCell: 0.072, safeCell: 0.327, window: true });
+      const side = analysis[reader];
+      expect(side.tier).toBe('mistake');
+      expect(side.riskPayoffTurn).toBe(2);
+      expect(side.riskPaidOff).toBeUndefined();
+      expect(side.riskUnpunished).toBe(true);
+      expect(side.safeAgainstClick).toEqual({ against: analysis[other].played!.label, playedValue: 0.072, safeValue: 0.327 });
+      expect(analysis.attribution).toBe(`${reader}-decision`);
+    });
+
+    test('that mistake lists as a misplay with riskUnpunished, no read, and its regret in the decision total', () => {
+      const { analysis, names } = build({ kind: 'mistake', playedCell: 0.072, safeCell: 0.327, window: true });
+      const report = buildGameReport([analysis], names, null);
+      expect(report.reads.filter(read => read.side === reader)).toEqual([]);
+      const misplays = report.misplays.filter(misplay => misplay.side === reader);
+      expect(misplays).toHaveLength(1);
+      expect(misplays[0]).toMatchObject({ turn: 8, side: reader, riskUnpunished: true });
+      expect(report.decisionTotals[reader]).toBeCloseTo(analysis[reader].regret!, 9);
+    });
+
+    test('the same mistake with a played cell that beats the safe cell stays a read and an excused regret', () => {
+      const { analysis, names } = build({ kind: 'mistake', playedCell: 0.4, safeCell: 0.327, window: true });
+      expect(analysis[reader].riskPaidOff).toBe(true);
+      expect(analysis.attribution).toBe(`${reader}-read`);
+      const report = buildGameReport([analysis], names, null);
+      expect(report.reads.filter(read => read.side === reader)).toHaveLength(1);
+      expect(report.decisionTotals[reader]).toBe(0);
+    });
+
+    test('an inaccuracy risk against a safe cell that read better earns no credit and shows no read (2663093831 t6)', () => {
+      const { analysis } = build({ kind: 'inaccuracy', playedCell: 0.325, safeCell: 0.454 });
+      const side = analysis[reader];
+      expect(side.tier).toBe('inaccuracy');
+      expect(side.riskPaidOff).toBeUndefined();
+      expect(side.riskUnpunished).toBeUndefined();
+      expect(side.safeAgainstClick).toMatchObject({ playedValue: 0.325, safeValue: 0.454 });
+      expect(analysis.attribution).toBe('quiet');
+    });
+
+    test('an inaccuracy risk that beat the safe cell keeps its credit', () => {
+      const { analysis } = build({ kind: 'inaccuracy', playedCell: 0.454, safeCell: 0.325 });
+      expect(analysis[reader].riskPaidOff).toBe(true);
+      expect(analysis.attribution).toBe(`${reader}-read`);
+    });
+
+    test('a gap of 0.005 fails and a gap of 0.01 passes', () => {
+      expect(build({ kind: 'gamble', playedCell: 0.205, safeCell: 0.2 }).analysis[reader].riskPaidOff).toBeUndefined();
+      expect(build({ kind: 'gamble', playedCell: 0.21, safeCell: 0.2 }).analysis[reader].riskPaidOff).toBe(true);
+      expect(build({ kind: 'gamble', playedCell: 0.2, safeCell: 0.2 }).analysis[reader].riskPaidOff).toBeUndefined();
+    });
+
+    test('a side that lost ground with a failing read keeps no credit either (2663093831 t1)', () => {
+      const { analysis } = build({ kind: 'inaccuracy', playedCell: 0.325, safeCell: 0.454, lostGround: 0.15 });
+      expect(analysis[reader].riskPaidOff).toBeUndefined();
+      expect(analysis[reader].safeAgainstClick).toBeDefined();
+      expect(analysis.attribution).not.toBe(`${reader}-read`);
+    });
+
+    test('fail open: a result without a matrix keeps today\'s rule and writes no field', () => {
+      const { analysis } = build({ kind: 'gamble', playedCell: 0.189, safeCell: 0.19, noMatrix: true });
+      expect(analysis[reader].riskPaidOff).toBe(true);
+      expect(analysis[reader].safeAgainstClick).toBeUndefined();
+      expect(analysis.attribution).toBe(`${reader}-read`);
+    });
+  });
+});
+
+describe('doubles: a hidden slot of the opponent\'s click', () => {
+  const doubles = GAMES[1][1];
+  test.each(READERS)('read by %s: no clicked column, so today\'s credit stays and no field is written', reader => {
+    const { analysis } = buildScene(doubles, { kind: 'gamble', reader, playedCell: 0.189, safeCell: 0.19, hiddenClick: true });
+    expect(analysis[reader].riskPaidOff).toBe(true);
+    expect(analysis[reader].safeAgainstClick).toBeUndefined();
+  });
+});
+
+describe('win-reason-order', () => {
+  const names: [string, string] = ['Alpha', 'Beta'];
+
+  const ranked = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
+    ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: null });
+
+  const quietSide = (): SideAnalysis => ({ playedRaw: null, played: null, best: null, safe: null, regret: 0 });
+
+  const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
+    turn, scoreBefore, scoreAfter,
+    swing: scoreAfter !== null ? scoreAfter - scoreBefore : null,
+    playedOutcome: null, decisionDelta: null, chanceDelta: null,
+    attribution: 'quiet', p1: quietSide(), p2: quietSide(),
+    ...over,
+  });
+
+  const read = (label: string, choiceStr: string, payoff: number): SideAnalysis => ({
+    playedRaw: null,
+    played: ranked(choiceStr, label, 0.1),
+    best: ranked('move safe', 'Safe', 0.2),
+    safe: null,
+    regret: 0.05,
+    riskUnpunished: true,
+    riskPayoff: payoff,
+    riskPaidOff: true,
+  });
+
+  /** Round 63 (T18): the order of the game report's winner story. */
+  describe('T18 point 4: the reads examples read in turn order', () => {
+    test('singles, 655336: the bigger payoff on turn 27 is named after the read on turn 13', () => {
+      const analyses: TurnAnalysis[] = [];
+      for (let turn = 1; turn <= 28; turn++) {
+        const before = 0.02 * turn;
+        const p1 = turn === 13 ? read('Dragon Dance', 'move dragondance', 0.31)
+          : turn === 27 ? read('Dragon Claw', 'move dragonclaw', 0.75) : quietSide();
+        analyses.push(mk(turn, before, before + 0.02, { p1 }));
+      }
+      const report = buildGameReport(analyses, names, 'p1');
+      expect(report.summary).toContain('Alpha won it on reads: Dragon Dance on turn 13 (+16%) and Dragon Claw on turn 27 (+38%).');
+      // The report's read list keeps its own order and content.
+      expect(report.reads.map(entry => entry.turn)).toEqual([13, 27]);
+    });
+
+    test('doubles: two combo reads keep the turn order the same way', () => {
+      const report = buildGameReport([
+        mk(1, 0.05, 0.1, { p1: read('Breaking Swipe + Make It Rain', 'move breakingswipe, move makeitrain', 0.12) }),
+        mk(2, 0.1, 0.15),
+        mk(3, 0.15, 0.3, { p1: read('Hyper Voice + Life Dew', 'move hypervoice, move lifedew', 0.4) }),
+        mk(4, 0.3, 0.6),
+      ], names, 'p1');
+      expect(report.summary).toContain('Alpha won it on reads: Breaking Swipe + Make It Rain on turn 1 (+6%) and Hyper Voice + Life Dew on turn 3 (+20%).');
+    });
+  });
+
+  /**
+   * Decision 16, the tip sentence: since round 50 a conversion needs the bar
+   * to hold for the winner from its turn on, so it can never name a turn
+   * before the tip. This pins that order: a sweep the bar dropped again is no
+   * conversion, and the report's "From turn N" never precedes "tipped on turn M".
+   */
+  describe('T18: the conversion never comes before the tip', () => {
+    const swept = (species: string): SideAnalysis => ({ ...quietSide(), decided: { species, announce: true } });
+
+    test('a decided sweep before a dip under the favor line does not convert before the tip', () => {
+      const report = buildGameReport([
+        mk(1, 0.1, 0.8),
+        mk(2, 0.8, 0.85, { p1: swept('Dragonite') }),
+        mk(3, 0.85, -0.05),
+        mk(4, -0.05, 0.75),
+        mk(5, 0.75, 0.9, { p1: swept('Dragonite') }),
+        mk(6, 0.9, 1),
+      ], names, 'p1');
+      expect(report.turningPoint).toBe(4);
+      expect(report.conversion?.turn).toBe(5);
+      const summary = report.summary;
+      expect(summary.indexOf('tipped for good on turn 4')).toBeLessThan(summary.indexOf('From turn 5'));
+    });
   });
 });
