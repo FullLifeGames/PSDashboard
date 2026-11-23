@@ -6,9 +6,8 @@ import {
 } from './branch-dice-support';
 
 /**
- * Round 82 (forced dice), step A6: `executeBranchChoices` takes the forced dice of both sides from the slot choices and plays
- * the turn through the dice module. A turn without a forced die plays the code of today; a turn that pauses for a switch
- * (U-turn and its kin) keeps its dice for the rest of the turn.
+ * `executeBranchChoices` takes the forced dice of both sides from the slot choices and plays the turn through the dice module. A turn
+ * without a forced die plays the plain path; a turn that pauses for a switch (U-turn and its kin) keeps its dice for the rest of the turn.
  */
 await loadSimMods('gen9championsou');
 
@@ -27,7 +26,6 @@ const SINGLES: Board = {
   die: { slot: 'p2a', target: 'p1a' },
 };
 
-/** Doubles: the same, with a partner on each side who splashes; Snorlax aims at Pikachu's partner. */
 const DOUBLES: Board = {
   format: 'gen9doublescustomgame',
   p1: [mon('Pikachu', ['tackle']), mon('Eevee', ['splash'])], p2: [mon('Snorlax', ['megakick']), mon('Chansey', ['splash'])],
@@ -62,7 +60,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('a forced d
         expect(damaged(forced.lines, board.die.target), `${seed} ${happens}`).toBe(happens);
         const report = (forced.result as { dice?: DiceReport }).dice;
         expect(report?.forced.map(entry => entry.took), `${seed} ${happens}`).toEqual(['applied']);
-        // the stream stands where the turn without the forced die left it (decision D8)
+        // the stream stands where the turn without the forced die left it
         expect(forced.seed, `${seed} ${happens}`).toBe(natural.seed);
       }
     }

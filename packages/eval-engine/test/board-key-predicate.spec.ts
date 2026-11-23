@@ -10,14 +10,10 @@ import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, verdictOf, type Holder, type Lineup } from './board-key-support';
 
 /**
- * Round 89 (#149, step A8-6): a field that every reader in the Dex tests only as "zero or not" is keyed as that predicate. The turns
- * a body has stood on the field (`activeTurns`) is read by Stakeout, Mountaineer, Rebound, Speed Boost, Slow Start, Truant, Electrify,
- * Taunt, Octolock and a partial trap, each of them as `activeTurns` against 0 (a foe that came in this turn, a body past its first
- * turn). The key then splits a board at 0 and keeps 1, 2 and 17 together. This spec holds the predicate to the simulator in every rule
- * set the corpus plays, singles and doubles: every Dex entry the scan names as a reader of the field, placed on each holder of the
- * board, plays the same hit (and the same end of the turn) at 1, 4 and 17, and the key of the board is the same; at 0 against 3 the
- * plays differ (the teeth), so the predicate is no blanket. A simulator whose entry compares the field with a number turns the row
- * red, and the field is keyed whole again.
+ * A field that every reader in the Dex tests only as "zero or not" is keyed as that predicate: `activeTurns` is read by Stakeout,
+ * Mountaineer, Rebound, Speed Boost, Slow Start, Truant, Electrify, Taunt, Octolock and a partial trap, each against 0, so the key splits
+ * a board at 0 and keeps 1, 2 and 17 together. Each reader, placed on each holder, plays the same hit and end of turn at 1, 4 and 17; at
+ * 0 against 3 the plays differ (the teeth). A simulator entry that compares the field with a number turns the row red.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -30,7 +26,6 @@ const setTurns = (battle: Battle, turns: number): void => {
   for (const side of battle.sides) for (const body of side.active) if (body) body.activeTurns = turns;
 };
 
-/** The end of the turn of a board, played without a memo. */
 function freshEnd(battle: Battle): string {
   const copy = copyOf(battle);
   return JSON.stringify(playResiduals(copy, slotsOf(copy)));

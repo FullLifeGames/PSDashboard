@@ -19,9 +19,8 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320, cause 2): the rule that says whether a standing stage
- * moves the 1v1 race of a pair in favour of the side it helps. The scenes on real boards are in boost-bite.drops.spec.ts
- * and boost-bite.drops.spec.ts, held to the simulator; this spec holds the rule itself to its table.
+ * The rule that says whether a standing stage moves the 1v1 race of a pair in favour of the side it helps; the scenes on real boards are
+ * in the boost-bite specs, held to the simulator.
  */
 
 const race = (partial: Partial<Race>): Race => ({
@@ -38,7 +37,7 @@ describe('a boost counts when the holder wins the race with it and the stage mad
       race({ turnsMine: 1, turnsFoe: 1, foeFirst: true, mineSurvives: false }), race({ turnsMine: 2, turnsFoe: 1, foeFirst: true, mineSurvives: false }), false],
     ['a later KO of me in a race I still lose', race({ turnsMine: 5, turnsFoe: 4 }), race({ turnsMine: 5, turnsFoe: 2 }), false],
     ['a race won either way at the same speed: the stage changed nothing', race({ turnsMine: 2 }), race({ turnsMine: 2 }), false],
-    // T248 (round 73): a stage that only makes a won race safer decides the race at a lower HP, so it counts (the HP enters through the gate only).
+    // A stage that only makes a won race safer decides the race at a lower HP, so it counts (the HP enters through the gate only).
     ['a win either way, only safer: the foe\'s clock is longer, mine is not', race({ turnsMine: 2, turnsFoe: 4 }), race({ turnsMine: 2, turnsFoe: 3 }), true],
     ['a win beyond the horizon is a stall war', race({ turnsMine: BITE_TURNS + 1 }), race({ turnsMine: BITE_TURNS + 3 }), false],
     ['nobody wins with the stage', race({}), race({}), false],
@@ -163,14 +162,12 @@ const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species
 const GARCHOMP = (extra: Partial<PokemonSet> = {}) => set('Garchomp', ['crunch', 'splash'], extra);
 const KILLER = () => set('Jolteon', ['icebeam', 'splash']);
 
-/** One turn of the simulator: both sides click their first move (the lead of a doubles side at the foe's first slot). */
 function turn(battle: Battle): void {
   const doubles = battle.gameType === 'doubles';
   battle.choose('p1', doubles ? 'move 1 1, move 1' : 'move 1');
   battle.choose('p2', doubles ? 'move 1 1, move 1' : 'move 1');
 }
 
-/** The score of the board with the holder's stages as they stand, and with the raises taken off. */
 function scores(battle: Battle, holder: Pokemon): { raised: number; plain: number } {
   const raised = evaluatePosition(battle, createMatchupCache('standard'));
   const held = { ...holder.boosts };
@@ -277,7 +274,6 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
 });
 
 describe('doubles: one foe on the field that moves first and KOs the holder', () => {
-  /** Garchomp +2 Attack at 5% with a Splashing partner against `first` and a Snorlax; the other foe never attacks. */
   function board(first: PokemonSet): { battle: Battle; holder: Pokemon } {
     const battle = battleOf(DOUBLES, [GARCHOMP(), splash('Snorlax')], [first, splash('Clefable')]);
     const holder = battle.sides[0].active[0]!;
@@ -308,12 +304,11 @@ describe('doubles: one foe on the field that moves first and KOs the holder', ()
 });
 
 /**
- * Round 76 (12a, after T258): a foe that hits through the holder's own Attack (Foul Play reads the target's stat, so the
- * Dex entry names the holder as the stat's owner) hits an idle holder harder with a raised stage, and the coverage term
- * read that hit at the holder's raised stage (gen9ou-2658675932 turn 2: the bench Umbreon's Foul Play against a Great
- * Tusk at +4 that the active Dragonite KOs first). A body that never acts is read on its drops as the defender too: the
- * stage is moot to every pair term, whether it stands on the attacker or the defender side of the pair. Singles,
- * Champions singles and doubles; the control is the same board where the holder acts.
+ * A foe that hits through the holder's own Attack (Foul Play reads the target's stat, so the Dex entry names the holder as the stat's
+ * owner) hits an idle holder harder with a raised stage, and the coverage term must read that hit at the holder's raised stage
+ * (gen9ou-2658675932 turn 2: the bench Umbreon's Foul Play against a Great Tusk at +4 that the active Dragonite KOs first). A body
+ * that never acts is read on its drops as the defender too: the stage is moot to every pair term, whether it stands on the attacker
+ * or the defender side of the pair. Singles, Champions singles and doubles; the control is the same board where the holder acts.
  */
 describe('12a: the stage of an idle holder adds nothing to the hit of a foe that reads it (Foul Play)', () => {
   const FOUL = () => set('Umbreon', ['foulplay', 'splash']);
@@ -363,11 +358,10 @@ describe('12a: the stage of an idle holder adds nothing to the hit of a foe that
 });
 
 /**
- * Round 76 (T262): one evaluation asks whether a raised body acts once per foe in front, not once for the boosts term
- * and again for the pair terms (the profile of the VGC trees: the same pair read twice per leaf). The reading is the
- * simulator's ModifyBoost event of each attack of the pair (`pairStages`), so the events fired from inside
- * `holderActsInFront` are counted: an evaluation of a board with a raised holder fires as many as one `idleHolders`
- * pass, and the board without a raise none. The holder is idle (a faster foe KOs it) or acts (a harmless foe).
+ * One evaluation asks whether a raised body acts once per foe in front, not once for the boosts term and again for the pair terms (the
+ * same pair was read twice per leaf in the VGC trees). The reading is the simulator's ModifyBoost event of each attack of the pair
+ * (`pairStages`), so the events fired from inside `holderActsInFront` are counted: a board with a raised holder fires as many as one
+ * `idleHolders` pass, a board without a raise none.
  */
 describe('T262: the idle reading runs once per evaluation', () => {
   function modifyBoostEvents(battle: Battle, run: () => void): number {

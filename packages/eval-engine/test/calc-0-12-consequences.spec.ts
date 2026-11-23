@@ -7,9 +7,9 @@ import { positionBattle } from '../src/forward-model';
 import { checkedRolls, drawTurn, rollSet as set, rootOf } from './calc-roll-oracle';
 
 /**
- * Round 68 (T186, decision 6), the small consequences of the 0.12 diff: 0.12 drops the Gmax and Totem species from the
- * calculator's Gen 8 and Gen 9 (the form map must carry them), gives 110 Gen 9 species a gender (Rivalry reads it), and
- * lets Struggle take Normal items in Gens 2 to 4 (the simulator's Struggle has no type there).
+ * The small consequences of calculator 0.12: it drops the Gmax and Totem species from the calculator's Gen 8 and Gen 9 (the form map
+ * must carry them), gives 110 Gen 9 species a gender (Rivalry reads it), and lets Struggle take Normal items in Gens 2 to 4 (the
+ * simulator's Struggle has no type there).
  */
 const BASE: Omit<CalcBody, 'species'> = {
   level: 100, ability: '', item: '', nature: 'Hardy', evs: { hp: 4, atk: 252, spe: 252 }, ivs: {},

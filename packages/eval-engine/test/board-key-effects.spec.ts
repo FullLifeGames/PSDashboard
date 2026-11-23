@@ -10,30 +10,31 @@ import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, twoValues, verdictOf, type Verdict } from './board-key-support';
 
 /**
- * Round 89 (#149, step A8, the sweep of ruling 28): the state of every effect the Dex knows, in both orders against the play.
- * Every condition the simulator resolves (a volatile, a side, slot or field condition, a weather, a terrain, a status) is placed
- * where it acts, and so is the state of every ability and item. Each own field of the effect's state that holds a number, a
- * flag or a stat name is set to two values, and on the two boards the keys must differ wherever the play reads differently:
- *
- * - the hit of a move that costs its user HP, played without a memo, against the key of the hit memo;
- * - the end of the turn, played without a memo, against the key of the end-of-turn memo (and every event it fires is one the
- *   key reads: RESIDUAL_EVENTS).
- *
- * Doubles put the effect on the attacker's partner and the foe's partner too. The plain run plays the four rule sets that count
- * most; `DICE_SWEEPS=full` plays every rule set and every condition.
+ * The state of every effect the Dex knows (a volatile, a side, slot or field condition, a weather, a terrain, a status, an ability, an
+ * item), placed where it acts: each own field of its state that holds a number, a flag or a stat name is set to two values, and on the
+ * two boards the keys must differ wherever the play reads differently, for the hit of a move that costs its user HP (against the hit
+ * memo's key) and for the end of the turn (against the end-of-turn key; every event it fires is one the key reads: RESIDUAL_EVENTS).
+ * Doubles put the effect on the partners too. The plain run plays the four rule sets that count most; `DICE_SWEEPS=full` every rule set
+ * and condition.
  */
 
 await loadSimMods('gen9championscustomgame');
 
 const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'].includes(name));
 
-/** The conditions the plain run always plays, whatever the sample: a Substitute, a pending Future Sight, toxic, Leech Seed, sleep, confusion. */
+/**
+ * The conditions the plain run always plays, whatever the sample: a Substitute, a pending Future Sight, toxic, Leech Seed, sleep,
+ * confusion.
+ */
 const ALWAYS = ['substitute', 'futuremove', 'tox', 'leechseed', 'slp', 'confusion'];
 
 type Kind = 'volatile' | 'side' | 'slot' | 'field' | 'weather' | 'terrain' | 'status';
 type Dex = Battle['dex'];
 
-/** Which kind of effect each condition id is, by what the Dex's moves and conditions say (a move names the effect it puts on a body, a side, a slot or the field). */
+/**
+ * Which kind of effect each condition id is, by what the Dex's moves and conditions say (a move names the effect it puts on a body, a
+ * side, a slot or the field).
+ */
 function kindsOf(dex: Dex): Map<string, Kind> {
   const kinds = new Map<string, Kind>();
   for (const move of dex.moves.all()) {
@@ -53,7 +54,6 @@ const holderBody = (battle: Battle, holder: Holder): Pokemon | undefined => ({
   attacker: battle.sides[0].active[0], defender: battle.sides[1].active[0], partner: battle.sides[0].active[1], foePartner: battle.sides[1].active[1],
 })[holder] ?? undefined;
 
-/** Puts the effect on the board where it acts and returns its state, or null where the simulator refuses it. */
 function place(battle: Battle, kind: Kind, id: string, holder: Holder): Record<string, unknown> | null {
   const body = holderBody(battle, holder);
   if (!body) return null;
@@ -73,10 +73,8 @@ function place(battle: Battle, kind: Kind, id: string, holder: Holder): Record<s
   }
 }
 
-/** The fields of a state that hold a value with a known second value: the effect's own bookkeeping, not its references. */
 const fieldsOf = (state: Record<string, unknown>): string[] => Object.keys(state).filter(name => !['id', 'name', 'target', 'effectOrder', 'source', 'sourceSlot', 'sourceEffect'].includes(name) && twoValues(state[name]) !== undefined);
 
-/** The end of the turn of a board played without a memo, and the events it fired. */
 function freshResiduals(battle: Battle, fired: Set<string>): string {
   resetResidualMemo();
   const copy = copyOf(battle);
@@ -201,7 +199,6 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
       }
     }
     expect(wrong).toEqual([]);
-    // A generation without abilities and items has no rows.
     if (rules.generation >= 3) expect(rows).toBeGreaterThan(0);
   });
 });

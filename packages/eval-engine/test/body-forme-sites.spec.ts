@@ -11,13 +11,11 @@ import { toId } from '@fulllifegames/replay-core';
 import { RULESETS, become, forcedBoard, mon, type GameType, type Ruleset } from './forme-boards';
 
 /**
- * Round 88 (#103): the other sites that tell whether two names are one body in another forme. Each used to cut the suffix list ('tera',
- * 'stellar', 'terastal') off the ids it compared; each now asks the battle's Dex (`sameBodyForme`, `branch/body-forme.ts`). Held here the way
- * `switch-forme-sweep.spec.ts` holds the resolver: in every generation and mod the corpus plays, singles and doubles (the predicates read a
- * species and a name and do not depend on the game type, the boards are built for both anyway), for every species with a `battleOnly`
- * origin: the body on the bench holds the forme and the other side names the origin, the other way round, and the forme itself. The body's
- * name is a nickname and the other side's name another, so only the species can tie them. Negative rows: two bodies of one base that the
- * Dex keeps apart (Ogerpon-Teal-Tera and Ogerpon-Wellspring-Tera, Rotom-Wash and Rotom) never match.
+ * The sites that tell whether two names are one body in another forme ask the battle's Dex (`sameBodyForme`, `branch/body-forme.ts`),
+ * held the way `switch-forme-sweep.spec.ts` holds the resolver: every generation and mod the corpus plays, singles and doubles, every
+ * species with a `battleOnly` origin (the body on the bench holds the forme and the other side names the origin, the other way round, and
+ * the forme itself; both names are nicknames, so only the species ties them). Negative rows: two bodies of one base that the Dex keeps
+ * apart (Ogerpon-Teal-Tera and Ogerpon-Wellspring-Tera, Rotom-Wash and Rotom) never match.
  */
 
 const NICKNAME = 'Nick';
@@ -27,7 +25,6 @@ const OGERPON_APART: [string, string][] = [
 ];
 const NEGATIVES: [string, string][] = [...OGERPON_APART, ['Rotom-Wash', 'Rotom'], ['Rotom', 'Rotom-Wash']];
 
-/** The failures of `holds` over every forme of the Dex and every origin (as a list of readable rows), and over the negative rows. */
 function sweep(
   rules: Ruleset, type: GameType, holds: (body: Pokemon, species: string) => boolean, { decoyFirst = false, negatives = NEGATIVES } = {},
 ): { failures: string[]; formes: number } {
@@ -167,7 +164,6 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
 });
 
 describe('no site reads a species suffix list (#103)', () => {
-  // The suffix list of team-order.ts ('terastal', 'stellar', 'tera') is gone: the six sites ask `branch/body-forme.ts`, which reads the Dex.
   test('no source file of the packages or the app names the list, its helper or a Tera suffix test', () => {
     const roots = ['packages/eval-engine/src', 'packages/replay-core/src', 'src'];
     const files = roots.flatMap(root => readdirSync(root, { recursive: true, withFileTypes: true })

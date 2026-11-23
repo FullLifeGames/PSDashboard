@@ -18,23 +18,21 @@ import { calcMove } from '../src/calc/move';
 import { pairKoOdds } from '../src/pair/odds';
 import { killing, simDamages } from './sim-rolls';
 
-/** A set that can always Splash, so a turn has a move for the side that stays. */
 const mon = (species: string, moves: string[], extra: Parameters<typeof set>[2] = {}) => set(species, [...moves, 'splash'], extra);
 
 /**
- * Round 68 (T156): the ability the calc is given is the one the simulator lets act now. An ability the simulator
- * suppresses (Gastro Acid, an active Neutralizing Gas) goes to the calc as No Ability; a body still to come in gets the
- * entry stage of Intrepid Sword or Dauntless Shield only when the simulator would give it (its own handler, asked on a
- * stand-in with the holder's flags: Gen 9 gives it once per battle, Gen 8 every time, none under Neutralizing Gas).
- * The oracle is the simulator: the stage a body really holds after it switches in, and the kill table against the
- * logged damage at the drawn roll. Singles and doubles both (the doubles path shares bodyOf and the calc builder).
+ * The ability the calc is given is the one the simulator lets act now. An ability the simulator suppresses (Gastro Acid, an active
+ * Neutralizing Gas) goes to the calc as No Ability; a body still to come in gets the entry stage of Intrepid Sword or Dauntless Shield
+ * only when the simulator would give it (its own handler, asked on a stand-in with the holder's flags: Gen 9 gives it once per battle,
+ * Gen 8 every time, none under Neutralizing Gas). The oracle is the simulator: the stage a body really holds after it switches in,
+ * and the kill table against the logged damage at the drawn roll. Singles and doubles both (the doubles path shares bodyOf and the
+ * calc builder).
  */
 
 type Kind = 'singles' | 'doubles';
 const KINDS: Kind[] = ['singles', 'doubles'];
 const format = (gen: number, kind: Kind) => (kind === 'singles' ? `gen${gen}customgame` : `gen${gen}doublescustomgame`);
 
-/** The stage the calc holds for `mon` when it is priced as the attacker or defender of an Iron Head against `foe`. */
 function calcStages(battle: Battle, mon: Pokemon, foe: Pokemon) {
   const gen = calcGenerationFor(battle.gen, battle.dex.currentMod);
   const move = new CalcMove(gen, 'Iron Head');
@@ -52,7 +50,6 @@ function switchIn(battle: Battle, kind: Kind, incoming: Pokemon) {
   battle.makeChoices(side === 0 ? out : stay, side === 0 ? stay : out);
 }
 
-/** Zacian leaves for the first Pokémon behind it (the second team slot in singles, the third in doubles). */
 function switchOut(battle: Battle, kind: Kind, leaving: Pokemon) {
   switchIn(battle, kind, leaving.side.pokemon[kind === 'singles' ? 1 : 2]);
 }
@@ -195,8 +192,8 @@ describe('calc-champions-entry-stage', () => {
       });
     }
 
-    // The one routing-probe row that 0.12 moves in the fixtures (probe B): Meganium-Mega's Mega Sol makes Weather Ball a Fire move
-    // of double power, which the calculator's generation 0 knows and 0.11 did not. The simulator is the judge.
+    // Meganium-Mega's Mega Sol makes Weather Ball a Fire move of double power, which the calculator's generation 0 knows. The
+    // simulator is the judge.
     for (const game of ['singles', 'doubles'] as const) {
       test(`${game}: a Mega Sol Weather Ball lies on the kill table at the drawn roll`, () => {
         const doubles = game === 'doubles';
@@ -226,7 +223,6 @@ function neutral<T>(bodies: Pokemon[], ask: () => T): T {
   }
 }
 
-/** The defender's HP set between the calc's rolls with and without the doubled stage, so the kill share tells them apart. */
 function hpBetween(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string) {
   defender.sethp(defender.maxhp);
   const doubled = boundaryEvent(battle, attacker, defender, moveId);
@@ -239,7 +235,6 @@ function hpBetween(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId:
   throw new Error('no HP between the two readings');
 }
 
-/** Every hit of a drawn turn against its kill table (calc-roll-oracle.ts). */
 function check(drawn: ReturnType<typeof drawTurn>) {
   const rolls = checkedRolls(drawn);
   expect(rolls.every(({ table }) => table !== null)).toBe(true);
@@ -316,7 +311,7 @@ describe('the abilities the calc boosts by itself are read from the calc (T100)'
     expect(found(3)).toEqual([]);
     for (const gen of [4, 5, 6, 7]) expect(found(gen), `gen ${gen}`).toEqual(['Download']);
     expect(found(8)).toEqual(['Dauntless Shield', 'Download', 'Intrepid Sword']);
-    // Intrepid Sword and Dauntless Shield give their stage in Gen 9 only with abilityOn (calcOwnEntryStage, 0.12).
+    // Intrepid Sword and Dauntless Shield give their stage in Gen 9 only with abilityOn (calcOwnEntryStage).
     expect(found(9)).toEqual([
       'Download', 'Embody Aspect (Cornerstone)', 'Embody Aspect (Hearthflame)', 'Embody Aspect (Teal)', 'Embody Aspect (Wellspring)',
     ]);
@@ -497,7 +492,6 @@ describe('stellar-first-use', () => {
       expect(killing(first.normal, hpFirst)).toBeLessThan(16);
       expectRolls(rootOfTurn('Stellar', undefined, hpFirst), move, true, hpFirst, first);
 
-      // After the click turn the type is spent: the same move hits without the boost.
       const spent = afterClick(`move ${move} terastallize`, 'move splash');
       const second = simDamages(rootOfTurn('Stellar', spent), `move ${move}`, 'move splash', script);
       const hpSecond = [...second.normal].sort((a, b) => a - b)[8];
@@ -505,7 +499,6 @@ describe('stellar-first-use', () => {
       expect(killing(second.normal, hpSecond)).toBeGreaterThan(0);
       expect(killing(second.normal, hpSecond)).toBeLessThan(16);
       expectRolls(rootOfTurn('Stellar', spent, hpSecond), move, false, hpSecond, second);
-      // The body carries the type it spent.
       const after = positionBattle(rootOfTurn('Stellar', spent));
       expect(bodyOf(after, after.sides[0].active[0]).stellarBoostedTypes).toEqual([move === 'earthquake' ? 'Ground' : 'Fire']);
     });

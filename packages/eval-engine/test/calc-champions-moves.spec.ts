@@ -9,14 +9,11 @@ import type { CalcBody } from '../src/calc/body';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 68 (T186, decision 2): the Champions mod stays the truth for moves. Checker: every damaging move the mod
- * allows (isNonstandard null), read through the engine's calcMove for a body of the Champions mod, has the mod's base
- * power (a power callback excepted: the engine asks the callback), type, category, hit count and the contact, punch,
- * bite, sound and slicing flags. Negative priority is left out on purpose: the calculator reads priority only as
- * "greater than zero", so it has no damage effect. A move's data does not depend on the game type, so one run covers
- * singles and doubles (the roll oracle in pokemon-info.spec.ts prices a spread move in doubles).
- * The moves the engine's override layer touches in legal Champions play (the calculator's own data differs from the
- * mod, or has none) go to steps/champions-override-moves.json so the ledger can name them without a list in the test.
+ * The Champions mod stays the truth for moves: every damaging move the mod allows (isNonstandard null), read through the engine's
+ * calcMove for a body of the Champions mod, has the mod's base power (a power callback excepted), type, category, hit count and the
+ * contact, punch, bite, sound and slicing flags. Negative priority is left out: the calculator reads priority only as "greater than
+ * zero", so it has no damage effect. A move's data does not depend on the game type, so one run covers singles and doubles. The moves the
+ * engine's override layer touches in legal Champions play go to steps/champions-override-moves.json.
  */
 await loadSimMods('gen9championsou');
 
@@ -26,7 +23,6 @@ const gen = calcGenerationFor(9, 'champions');
 const legalDamaging = () => Dex.dexes.champions.moves.all()
   .filter(move => move.exists && !move.isNonstandard && move.category !== 'Status' && move.id !== 'struggle');
 
-/** The move as the calculator builds it from its own data alone, or null when it has none or refuses it. */
 function plain(name: string): Move | null {
   try {
     return gen.moves.get(toID(name) as never) ? new Move(gen, name) : null;

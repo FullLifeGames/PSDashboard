@@ -10,11 +10,10 @@ import { serializePreviewPosition } from '../src/branch-engine';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 89 (#124, stage 1): the worlds of every bring-limited game of `.fit-corpus` (Scarlet/Violet VGC, Champions VGC bo1 and
- * bo3, Battle Stadium Singles; skipped without the corpus). Each world, with equal weights, names only bodies of its side's team
- * preview, holds the bring count on both sides, puts the guesses last, and trims both sides to the count through the team-preview
- * position (`serializePreviewPosition`, the trim of the rebuild): no world pits a pinned four against an open six. The root spec
- * `bring-list-corpus.spec.ts` holds the lists of `replayBringOnly`; the engine's zone keeps this row in the package.
+ * The worlds of every bring-limited game of `.fit-corpus` (Scarlet/Violet VGC, Champions VGC bo1 and bo3, Battle Stadium Singles; skipped
+ * without the corpus). Each world, with equal weights, names only bodies of its side's team preview, holds the bring count on both sides,
+ * puts the guesses last, and trims both sides to the count through the team-preview position (`serializePreviewPosition`): no world pits
+ * a pinned four against an open six. The lists of `replayBringOnly` are held by `bring-list-corpus.spec.ts`.
  */
 const FIT = join(process.cwd(), '.fit-corpus');
 const HAVE_CORPUS = existsSync(FIT);
@@ -33,7 +32,6 @@ const blankTeam = (source: ReplayData, side: 'p1' | 'p2') => inferOpponentTeam(s
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50,
 }));
 
-/** The problems of one world: the list per side, its bodies against the preview, and the trimmed team-preview position. */
 function worldProblems(id: string, source: ReplayData, count: number, world: BringWorld, teams: { p1: PokemonSet[]; p2: PokemonSet[] }): string[] {
   const rules = replayRules(source);
   const problems: string[] = [];
@@ -82,12 +80,11 @@ describe.skipIf(!HAVE_CORPUS)('the worlds of the corpus (#124)', () => {
       const teams = { p1: blankTeam(source, 'p1'), p2: blankTeam(source, 'p2') };
       for (const world of worlds) wrong.push(...worldProblems(id, source, count, world, teams));
     }
-    // Round 89: 4,033 games (Champions VGC bo1 523, bo3 900, VGC SV 2,610), 3,190 pinned and 843 short (113, 219, 511), 128 of them with more than three worlds.
     const all = Object.values(counts);
     expect(all.length).toBeGreaterThanOrEqual(3);
-    // Round 89 (B5b): 550 short games once a body that entered and fainted within one turn counts as fielded (843 before).
+    // 550 short games once a body that entered and fainted within one turn counts as fielded.
     expect(all.reduce((sum, family) => sum + family.short, 0)).toBeGreaterThan(500);
-    // 80 games hold more than three worlds (128 before).
+    // 80 games hold more than three worlds.
     expect(all.reduce((sum, family) => sum + family.capped, 0)).toBeGreaterThan(50);
     expect(wrong, JSON.stringify(counts)).toEqual([]);
   }, 600_000);

@@ -4,10 +4,9 @@ import { createBranchStateFromBattle } from '../src/branch/state';
 import { FORMATS, moveCommand, setOf, sideId, startBattle } from './branch-rule-battles';
 
 /**
- * Round 77 (acceptance of the fix wave): on a recharge turn the simulator's request lists one entry, "Recharge", which
- * the Dex does not know, so since A-1 the picker showed every move disabled and no button at all; before A-1 the moves
- * were clickable and Execute failed. The turn could not be played by hand. Every Dex move that forces a recharge,
- * in singles and doubles, on either side: the next turn offers exactly one enabled button, and it executes.
+ * On a recharge turn the simulator's request lists one entry, "Recharge", which the Dex does not know: the picker must not show every
+ * move disabled with no button at all. Every Dex move that forces a recharge, in singles and doubles, on either side: the next turn
+ * offers exactly one enabled button, and it executes.
  */
 const RECHARGE_MOVES = (() => {
   const battle = startBattle('gen9customgame', [setOf('Snorlax', ['Splash'])], [setOf('Snorlax', ['Splash'])]);

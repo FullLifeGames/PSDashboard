@@ -9,13 +9,7 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { serializeLiveBattle } from '../src/serialize';
 
-/**
- * Round 38: the interactive branch may start from a SERIALIZED position
- * (reconstructed in a worker, or captured earlier) instead of a runtime
- * the main thread reconstructed itself. The adopted runtime must be the
- * same battle to everything above it: the pickers, the protocol log, the
- * choices it accepts and rejects, and the turns it plays.
- */
+/** A runtime adopted from a SERIALIZED position must be the same battle to everything above it: pickers, protocol log, accepted and rejected choices, turns played. */
 
 const TURN = 12;
 const noChoices = { p1Choices: [], p2Choices: [] };
@@ -24,7 +18,6 @@ function loadReplay(): ReplayData {
   return JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as ReplayData;
 }
 
-/** A live reconstruction to `targetTurn` with the app's healing, locks, and boundary capture. */
 async function liveRuntime(targetTurn: number) {
   const replay = loadReplay();
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
@@ -47,7 +40,6 @@ async function liveRuntime(targetTurn: number) {
   return { replay, runtime, captured, snapshotAt };
 }
 
-/** Protocol lines without the wall-clock `|t:|` stamps two concurrent runs may straddle. */
 const withoutTimestamps = (log: string[]) => log.filter(line => !line.startsWith('|t:|'));
 const pickers = (runtime: BranchRuntime) => {
   const state = createBranchState(runtime.battleStream, runtime.log, noChoices);
@@ -56,12 +48,9 @@ const pickers = (runtime: BranchRuntime) => {
 const serialized = (runtime: BranchRuntime) => serializeLiveBattle(runtime.battleStream.battle!);
 
 /**
- * The battle minus the sim's log bookkeeping, which legitimately differs
- * between a live battle and one adopted from the stable serialization:
- * that serialization drops the `|t:|` timestamp lines, so the adopted
- * battle's send cursor and last-move line index count fewer lines (every
- * engine fork lives with the same shift), and deserialization leaves the
- * redundant `formatid` as an own key in another position.
+ * The battle minus the sim's log bookkeeping that legitimately differs between a live battle and an adopted one: the stable
+ * serialization drops the `|t:|` lines, so the send cursor and last-move line index count fewer lines, and deserialization leaves
+ * `formatid` as an own key in another position.
  */
 function comparable(runtime: BranchRuntime): string {
   const state = JSON.parse(serialized(runtime)) as Record<string, unknown>;

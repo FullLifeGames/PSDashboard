@@ -5,12 +5,10 @@ import { bodyOf, calcPokemon } from '../src/calc/body';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 68 (T186, decision 3): a species the calculator does not know must not throw. Checker: every species the
- * Champions mod allows (isNonstandard null) builds through calcPokemon on a body read off the simulator (bodyOf) without a
- * throw, with the simulator's stats at 0 Stat Points on a neutral nature, the mod's types and the mod's weight. The
- * calculator's generation 0 lacks 35 of them (the base Aegislash, the Vivillon patterns, the Alcremie flavors, the
- * Ogerpon Tera forms, Terapagos-Terastal, ...); under 0.11 it lacks the Mega forms as well. The same builder serves
- * singles and doubles; the run covers the OU format and the VGC format, which load the same mod.
+ * A species the calculator does not know must not throw: every species the Champions mod allows (isNonstandard null) builds through
+ * calcPokemon on a body read off the simulator (bodyOf), with the simulator's stats at 0 Stat Points on a neutral nature, the mod's types
+ * and the mod's weight. The calculator's generation 0 lacks 35 of them (the base Aegislash, the Vivillon patterns, the Alcremie flavors,
+ * the Ogerpon Tera forms, Terapagos-Terastal, ...). The run covers the OU and the VGC format, which load the same mod.
  */
 await loadSimMods('gen9championsou');
 

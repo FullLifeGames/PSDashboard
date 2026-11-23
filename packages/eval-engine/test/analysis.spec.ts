@@ -5,15 +5,11 @@ import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 import type { TurnRolls } from '../src/dice-events';
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 2a, and T217): what makes a hindsight read's cell "a guess" (HINDSIGHT_MIN_VISITS visits,
- * not verified, T64), once the planner's answer rides on the cell (T178).
- *
- *  - A cell the planner calls plain ("none": no accuracy roll and no kill range in the pair) has one outcome, so the first
- *    draw that priced it is no guess however few visits the tree gave it. VGC 2630685175 turn 7: the best row (Wood Hammer into
- *    Calyrex-Shadow with Earth Power into Zamazenta) against the clicked Pollen Puff with Wide Guard is such a cell, with 4
- *    visits and a value of 1.00, and the card dropped the read for it.
- *  - The gain is the best row's cell minus the played row's cell, so the gate looks at both (T217, finding 5 of the round-69
- *    review): a played row priced by a one-visit rolled cell lets a guessed number through.
+ * What makes a hindsight read's cell "a guess" (HINDSIGHT_MIN_VISITS visits, not verified): a cell the planner calls plain (no
+ * accuracy roll and no kill range in the pair) has one outcome, so the first draw that priced it is no guess however few visits it
+ * has (VGC 2630685175 turn 7: Wood Hammer into Calyrex-Shadow with Earth Power into Zamazenta against Pollen Puff with Wide Guard,
+ * 4 visits, value 1.00). The gain is the best row's cell minus the played row's, so the gate looks at both: a played row priced by
+ * a one-visit rolled cell lets a guessed number through.
  */
 
 const rowOf = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev - 0.1, expected: ev, ev, punishedBy: 'Reply' });
@@ -80,7 +76,6 @@ function readOf(make: () => Shape, cells?: Cell[][]): NonNullable<SideAnalysis['
   return read;
 }
 
-/** The cells of the shape: [played row 0, best row 1] x [clicked column 0, other column 1]. */
 const cellsOf = (bestAgainstClick: Cell, playedAgainstClick: Cell = SEEN): Cell[][] => [[playedAgainstClick, SEEN], [bestAgainstClick, SEEN]];
 
 describe.each(SHAPES)('%s: a plain cell is no guess', (_name, make) => {
@@ -111,7 +106,6 @@ describe.each(SHAPES)('%s: the played row\'s cell gates the read too (T217)', (_
     const read = readOf(make, cellsOf(SEEN, GUESS));
     expect(read.thin).toBe(true);
     expect(read.shown).toBeUndefined();
-    // The read itself stays on the analysis (display only): the same pair of rows.
     expect(read.response).toBe(make().p1Labels[1]);
   });
 
@@ -142,7 +136,7 @@ const ranked = (choice: string, label: string, worstCase: number, expected: numb
 const quiet: TurnRolls = { favored: { p1: false, p2: false }, hits: [] };
 const rolled = (side: 'p1' | 'p2'): TurnRolls => ({ favored: { p1: side === 'p1', p2: side === 'p2' }, hits: [] });
 
-/** The lane D numbers of 653785 t19 (p1 view): best -0.1, played -0.1155 (regret 0.0155), safe floor -0.1307, window peak 0.2136. */
+/** The numbers of 653785 t19 (p1 view): best -0.1, played -0.1155 (regret 0.0155), safe floor -0.1307, window peak 0.2136. */
 function t19(side: 'p1' | 'p2', over: Partial<AnalyzeTurnParams> = {}, doubles = false) {
   const sign = side === 'p1' ? 1 : -1;
   const own = (value: number) => sign * value;
@@ -198,7 +192,6 @@ describe('the hazard sack reads the dice, not the gap between two searches (T287
 
   test('without the turn\'s rolls the score test stays: a later root 0.138 above the pair earns no stamp', () => {
     expect(t19('p1', { rolls: undefined }).p1.sacrifice).toBeUndefined();
-    // The pair's own value reached by the after score (own luck 0): the stamp stands.
     expect(t19('p1', { rolls: undefined, scoreAfter: -0.0927 }).p1.sacrifice).toMatchObject({ hazard: true, verified: true });
   });
 });

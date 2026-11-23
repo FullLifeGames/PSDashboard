@@ -21,18 +21,12 @@ import type { SimBattle } from '../src/branch/types';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 89 (M, fix 3 of #111): `queuePlace` and `actionPriority` read the action speed and the priority handlers of a body on the battle
- * they are given, and the rebuild gives them its LIVE battle, which it plays turn after turn. A value read in one turn must never answer a
- * later turn: Trick Room, Tailwind, paralysis, a stat stage, a body that comes back in after a switch, an item knocked off, an item or an
- * ability that gains a priority handler. The first version kept both reads per battle and body ("a position's reader battle is never
- * written"), which holds for the search's reader battles and not for the rebuild (2630685175 turn 5, Trick Room: Fake Out's user read
- * the speed of turn 4, 105 for 1703, and the cant stand-in of the flinching body got no move).
- *
- * Each row asks one body, changes the battle the way the simulator does it in play (an event, a switch, a knocked-off item), and asks the
- * same body again: the answer must equal the one a battle that was never asked gives (a copy of the live one is a new battle object, so it
- * holds no memo) and the body's own `getActionSpeed()`; the row also checks that the change moved the answer, so a row cannot pass by
- * changing nothing. The rows run in singles and doubles, with the development check off (the app and the bank) and on (`sim-ask.spec.ts`
- * and the sweeps): with it on, the memo of the first version threw `AskLeak` at the second question, and no spec asked twice.
+ * `queuePlace` and `actionPriority` read the live battle the rebuild plays turn after turn: a value read in one turn must never
+ * answer a later turn (Trick Room, Tailwind, paralysis, a stat stage, a switch, a knocked-off item, an item or ability that gains a
+ * priority handler). Scene: 2630685175 turn 5, Trick Room: Fake Out's user read the speed of turn 4 (105 for 1703) and the cant
+ * stand-in of the flinching body got no move. Each row asks one body, changes the battle the way the simulator does, asks again, and
+ * must equal a never-asked battle and `getActionSpeed()`; it also checks that the change moved the answer. Singles and doubles, with
+ * the development check off and on (on, a memo throws `AskLeak` at the second question).
  */
 
 const GEN9 = RULES.find(rules => rules.generation === 9 && rules.name === 'Gen 9')!;
@@ -41,14 +35,10 @@ const MODES: Mode[] = ['singles', 'doubles'];
 interface Change {
   name: string;
   move: string;
-  /** The body's item and ability. */
   item?: string;
   ability?: string;
-  /** Changes the live battle before the first question. */
   prepare?(battle: Battle, body: Pokemon): void;
-  /** Changes the live battle after the first question. */
   apply(battle: Battle, body: Pokemon, mode: Mode): void;
-  /** What the change moves: the speed or the priority of the body's action. */
   moves: 'speed' | 'priority';
   chance?: boolean;
 }
@@ -86,7 +76,6 @@ function sceneOf(rules: Rules, mode: Mode, change: Change): { battle: Battle; bo
   return { battle, body: battle.sides[0].active[0] as Pokemon };
 }
 
-/** A battle that was never asked: a copy is a new battle object, so no memo of the live one reaches it. */
 const unasked = (battle: Battle, body: Pokemon, move: string, chance: boolean) => {
   const copy = copyOf(battle);
   const same = copy.sides[0].pokemon[body.side.pokemon.indexOf(body)];
@@ -133,7 +122,10 @@ describe('stand-in-order', () => {
 
   interface Scene { battle: SimBattle; preUpkeep: string[]; logged: string[] }
 
-  /** The battle at the start of turn 7 as the app rebuilds it, with the teams the log gives; `dragonite` replaces the moves of the p1 Dragonite. */
+  /**
+   * The battle at the start of turn 7 as the app rebuilds it, with the teams the log gives; `dragonite` replaces the moves of the p1
+   * Dragonite.
+   */
   async function sceneOf(dragonite?: string[]): Promise<Scene> {
     await loadSimMods(getBranchSimulatorFormat(replay));
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);

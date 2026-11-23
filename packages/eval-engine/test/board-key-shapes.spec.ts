@@ -5,10 +5,9 @@ import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
 
 /**
- * Round 89 (#149, step A9): the key of a body or a board is made from the shape of its own fields (which fields it has, in
- * which order) and the read set of its composition. The class of a field and the decision what the key does with it belong to
- * the shape and the consumer, so they are made once per shape for the process, and a read set only picks the fields that a
- * handler on its board reads. Nothing is kept per body: a body that changes between two calls gives the key a fresh build gives.
+ * The key of a body or a board is made from the shape of its own fields and the read set of its composition: the class of a field and the
+ * key's decision about it are made once per shape for the process, and a read set only picks the fields that a handler on its board
+ * reads. Nothing is kept per body: a body that changes between two calls gives the key a fresh build gives.
  */
 
 await loadSimMods('gen9championscustomgame');

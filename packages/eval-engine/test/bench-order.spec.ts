@@ -10,14 +10,10 @@ import type { StaticRuleset } from '../src/eval-function';
 import type { EvalResult, EvalSettings } from '../src/types';
 
 /**
- * Round 67 (T129): a verdict must not depend on the order in which the
- * rebuild keeps the bench in the simulator's team list. 649664 t14 (round 64,
- * lane G): two boards with the same game state in two bench orders read the
- * switch to Ferrothorn as the best move and as a blunder. The static sums in
- * team order and a tie among replacement hints falls to the team order, so
- * the trees part at their first near tie. The search now runs every board
- * with its bench in one fixed order and names the choices back in the
- * board's own slots.
+ * A verdict must not depend on the order in which the rebuild keeps the bench in the simulator's team list. 649664 t14: two boards
+ * with the same game state in two bench orders read the switch to Ferrothorn as the best move and as a blunder. The static sums in
+ * team order and a tie among replacement hints falls to the team order, so the trees part at their first near tie: the search runs
+ * every board with its bench in one fixed order and names the choices back in the board's own slots.
  */
 
 interface Position {
@@ -36,7 +32,6 @@ const settingsOf = (position: Position, mode: 'mcts' | 'matrix'): EvalSettings =
   ruleset: position.ruleset, keepPlayed: position.keepPlayed ?? undefined,
 });
 
-/** The board with each side's bench (the bodies past the active slots) in reverse order. */
 function reverseBench(serialized: string): string {
   const battle = deserializeBattleExact(serialized);
   for (const side of battle.sides) {
@@ -48,10 +43,8 @@ function reverseBench(serialized: string): string {
 }
 
 /**
- * Each tree's result per board, kept for the whole file: the rows below ask for
- * the same boards (the singles g2 board, the VGC board with its bench reversed)
- * and the search is the cost. A row run alone computes what it needs and
- * caches it. The key holds the board and the settings it was asked with.
+ * Each tree's result per board, kept for the whole file: the search is the cost and the rows ask for the same boards. The key holds the
+ * board and the settings.
  */
 const treeResults = new Map<string, Promise<EvalResult>>();
 const tree = (serialized: string, position: Position): Promise<EvalResult> => {
@@ -75,7 +68,6 @@ const ranking = (result: EvalResult) => ({
   p2: result.perSide.p2.map(row => [row.label, row.ev, row.worstCase]),
 });
 
-/** Every switch a ranking names brings in, on the board it was asked about, the species its label names. */
 function expectSlotsNameTheirSpecies(result: EvalResult, serialized: string): void {
   const battle = deserializeBattleExact(serialized);
   (['p1', 'p2'] as const).forEach((side, sideIndex) => {
@@ -139,7 +131,7 @@ describe('one board in two bench orders (round 67, T129)', () => {
   test('2629703929 t6 (VGC tree): the board and its reversed bench read the same ranking', { timeout: 300_000 }, async () => {
     const position = fixture('gen9vgc2026regi-2629703929-t6');
     expect(ranking(await tree(reverseBench(position.serialized), position))).toEqual(ranking(await tree(position.serialized, position)));
-    // Two VGC trees took 122 to 144 s with the speed layer forced off on devbox, 70 s with it on (round 89, the merge's slow-mode timeouts).
+    // Two VGC trees take 122 to 144 s with the speed layer forced off on devbox, 70 s with it on.
   });
 
   test('every switch a ranking names brings in the species of its label on the board it was asked about', { timeout: 120_000 }, async () => {

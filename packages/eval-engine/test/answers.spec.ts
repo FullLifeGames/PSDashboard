@@ -40,12 +40,10 @@ import { analyzeTurn } from '../src/analysis';
 import type { PlayedTurn } from '../src/played';
 
 /**
- * Round 69 (T149): the answer round of round 67 (T128) read the top row of each side only, priced the added column by one
- * natural draw, and ran once. 2629703929 t4: six p1 rows lie within 0.012 of each other, so which row stands first (a
- * tree's noise) decided which answers the round found. 912045 t6: the switching row read 0.18 to 0.21 priced by one draw
- * and 0.03 to 0.07 one ply deeper. Now detection and the depth check read the rows within the prover's near tie of the
- * top, the rows that can still decide the ranking price the added answer one deepened ply, and a round that changes the
- * best row sends the new row's unverified cells through one more verify round.
+ * The answer round reads the rows within the prover's near tie of the top, not the top row alone, and prices an added answer by one
+ * deepened ply, not one natural draw. 2629703929 t4: six p1 rows lie within 0.012 of each other, so which row stands first (a tree's
+ * noise) must not decide which answers the round finds. 912045 t6: the switching row read 0.18 to 0.21 priced by one draw and 0.03 to
+ * 0.07 one ply deeper. A round that changes the best row sends the new row's unverified cells through one more verify round.
  */
 
 const NAMES = ['R0', 'R1', 'R2', 'R3'];
@@ -80,7 +78,6 @@ const NEAR_ORDERS = permutations([0, 1, 2]).map(order => [...order, 3]);
 
 const sorted = (jobs: EvalCellJob[]): string[] => jobs.map(job => `${job.i}:${job.j}`).sort();
 const detectedOf = (jobs: EvalCellJob[]): EvalCellValue[] => jobs.map(job => ({ i: job.i, j: job.j, value: priced(job.i, job.j), ended: false }));
-/** Both stages of detection, priced by `priced`: the best row against every answer, the other near rows against the probes. */
 const detect = (view: AnswerSide, result: EvalResult): EvalCellValue[] => {
   const first = detectedOf(detectionJobs(view, result));
   return [...first, ...detectedOf(siblingJobs(view, result, first))];
@@ -240,7 +237,6 @@ describe('the named scenes read the same answers in every order of their near ro
       const detected = [...first, ...await executor.evalCells(siblingJobs(view, merged, first))];
       const reference = { refuting: refutations(view, merged, detected), deep: deepRows(view, merged), jobs: sorted(detectionJobs(view, merged)) };
       expect(near.length).toBeGreaterThan(0);
-      // Every order of the near rows in the side's ranking (rows beyond the near tie stay behind them).
       const ranked = merged.perSide[view.side];
       const nearChoices = new Set(near.map(row => view.rows[row].choice));
       const head = ranked.filter(row => nearChoices.has(row.choice));
@@ -295,7 +291,6 @@ describe('a round that changes the best row sends the new row through one more v
     return { log, result, bestRow, listed2 };
   }
 
-  /** The calls of the round that are verify cells: the re-check (the extension's deepened cells are plain draws). */
   const rechecks = (log: Scripted) => log.calls.filter(jobs => jobs.some(job => job.deepen !== undefined && !job.plain));
 
   test('a changed best row triggers exactly one more cells round with the new row’s unverified cells, an unchanged one none', { timeout: 240_000 }, async () => {
@@ -330,7 +325,6 @@ describe('a round that changes the best row sends the new row through one more v
     expect(log[0].every(job => job.deepen !== undefined)).toBe(true);
     expect(rechecked!.perSide.p1[0].choice).toBe(choices[target]);
 
-    // The cells a verify round priced before are not asked again.
     const skip = log[0][0];
     const priced = { ...round, values: new Map([[cellKey(skip.i, skip.j), { i: skip.i, j: skip.j, value: 0.3, ended: false }]]) };
     const againLog: EvalCellJob[][] = [];
@@ -382,11 +376,9 @@ describe('doubles-answers', () => {
     test('2630685175 t7: p1’s best row meets a Protect answer, and p1 is graded against it (the tree lists it since round 70)', { timeout: 120_000 }, async () => {
       const position = fixture('gen9vgc2026regi-2630685175-t7-played');
       const result = await search(position);
-      // Round 69 (T148, T149): four rows lie within 0.003 of each other in value, so which of them comes first follows the
-      // verify price of a small outcome and the answers the near rows add; the pin reads the Earth Power row into
-      // Zamazenta-Crowned, which the trees rated best at 1.00.
-      // Round 70 (Protect tempo, batch gate): a Protect earns the damage it denies in the doubles hints, so p2's tree lists
-      // Protect + Protect itself; before, only the answer round added it.
+      // Four rows lie within 0.003 of each other in value, so which of them comes first follows the verify price of a small outcome
+      // and the answers the near rows add; the pin reads the Earth Power row into Zamazenta-Crowned, which the trees rated best at 1.00.
+      // A Protect earns the damage it denies in the doubles hints, so p2's tree lists Protect + Protect itself.
       const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned'))!;
       expect(best.worstCase).toBeLessThanOrEqual(0.8);
       expect(best.punishedBy).toMatch(/Protect/);
@@ -396,11 +388,9 @@ describe('doubles-answers', () => {
     });
 
     test('2630685175 t8: a double Protect that only stalls answers nothing, and the played Taunt stays the mistake (user truth pin)', { timeout: 180_000 }, async () => {
-      // At one ply p1’s Protect + Protect read -0.16 for p2, the board’s static after a stalled turn, where the trees
-      // read +0.84; one ply deeper it reads +0.87, like the listed answers (probe lanes/B/t128-pin). An answer counts
-      // only when it still refutes the best row one ply deeper.
-      // Round 70 (batch gate): the round-70 static and the Protect tempo read the best row at 0.7529 (above 0.8 before);
-      // the Taunt stays the mistake at regret 1.3531.
+      // At one ply p1's Protect + Protect read -0.16 for p2, the board's static after a stalled turn, where the trees read +0.84;
+      // one ply deeper it reads +0.87, like the listed answers. An answer counts only when it still refutes the best row one ply deeper.
+      // The best row reads 0.7529 and the Taunt stays the mistake at regret 1.3531.
       const position = fixture('gen9vgc2026regi-2630685175-t8');
       const result = await search(position);
       const best = result.perSide.p2[0];
@@ -430,7 +420,6 @@ describe('doubles-answers', () => {
     });
   });
 
-  /** A two-by-two doubles root with two more legal p2 answers the tree did not list. */
   function scene(): { tree: MctsTreeStats; result: EvalResult; view: AnswerSide } {
     const p1 = [{ choice: 'move a 1, move b 1', label: 'A + B' }, { choice: 'move c 1, move d 1', label: 'C + D' }];
     const p2 = [{ choice: 'move x 1, move y 1', label: 'X + Y' }, { choice: 'move x 2, move y 2', label: 'X2 + Y2' }];

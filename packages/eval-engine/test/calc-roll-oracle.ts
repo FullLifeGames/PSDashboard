@@ -7,12 +7,10 @@ import { hpAfterHit } from '../src/pair/log';
 import type { RollRecord } from '../src/pair/prng';
 
 /**
- * Round 67, lane A test helpers: the calc against the simulator at the drawn
- * roll. A turn is drawn under the recording dice (pair/draw.ts); every hit's
- * kill table, priced from the snapshot the dice took, must hold the damage
- * the log shows (at least the HP on a kill), as pair-kill-table.spec.ts
- * checks it. A singles hit runs through the same table: its doubles field
- * differs from the singles one only by screens, and these battles have none.
+ * Test helpers: the calc against the simulator at the drawn roll. A turn is drawn under the recording dice (pair/draw.ts); every
+ * hit's kill table, priced from the snapshot the dice took, must hold the damage the log shows (at least the HP on a kill), as
+ * pair-kill-table.spec.ts checks it. A singles hit runs through the same table: its doubles field differs from the singles one only
+ * by screens, and these battles have none.
  */
 
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -25,7 +23,6 @@ export function rollSet(species: string, moves: string[], extra: Partial<Pokemon
   };
 }
 
-/** A custom game past team preview (every set in team order); `setup` may change the battle before it is serialized. */
 export function rootOf(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen9championscustomgame' | 'gen9championsdoublescustomgame' | 'gen7customgame' | 'gen7doublescustomgame' | 'gen6customgame' | 'gen3customgame',
   p1: PokemonSet[], p2: PokemonSet[], setup?: (battle: Battle) => void): SimPosition {
   const battle = new Battle({ formatid: toID(format), seed: '1,2,3,4', p1: { name: 'Alpha', team: Teams.pack(p1) }, p2: { name: 'Beta', team: Teams.pack(p2) } });
@@ -45,7 +42,6 @@ export function drawTurn(root: SimPosition, p1: string, p2: string, seed = '1,2,
   return drawPair(root, p1, p2, seed as never, new Map(), createMatchupCache());
 }
 
-/** Every recorded hit of a drawn turn with its kill table and whether the table holds the logged damage. */
 export function checkedRolls(drawn: PairDraw): CheckedRoll[] {
   return drawn.records.filter((record): record is RollRecord => record.kind === 'roll').flatMap(roll => {
     const after = hpAfterHit(drawn.log, roll.logIndex, targetOf(roll.key), roll.snapshot.defender.maxhp);

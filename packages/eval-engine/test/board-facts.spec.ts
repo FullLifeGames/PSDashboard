@@ -10,25 +10,18 @@ import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#145, step A6-0): the board facts. Two draws of one cell are the same board when they differ only by what the dice of
- * the roll decide (the damage, the crit, the hit count) or by the turn's own bookkeeping. The prover (A6-2) reads this to tell which
- * chance dice of a cell moved the board and which only moved a number. The facts are the memo key's state (`endgame/key.ts`) without
- * the roll fields and the bookkeeping, and nothing reads them yet: this step holds the rule against the simulator.
- *
- * What the rows hold:
- *  1. The roll fields and the nominal aim of a move that takes no chosen target leave the facts alone; in doubles, in every rule set
- *     the corpus plays (Gens 3 to 9 and the Champions mod), and in singles for the roll fields.
- *  2. PP, a status counter, a volatile, a boost, the item, the ability, the field's duration, the weather and a body's HP outside the
- *     roll fields each move the facts. So does the aim of a move that takes a chosen target (a lock re-aims on it).
- *  3. A source scan of the installed @pkmn/sim and @pkmn/mods builds: every read of a dropped bookkeeping key is one of the reads
- *     pinned below, each inside the turn that wrote the key (the simulator resets the flags at the end of the turn).
+ * Two draws of one cell are the same board when they differ only by what the dice of the roll decide (damage, crit, hit count) or by the
+ * turn's own bookkeeping; the facts are the memo key's state (`endgame/key.ts`) without those fields. Rows: (1) the roll fields and the
+ * nominal aim of a move without a chosen target leave the facts alone (doubles in Gens 3 to 9 and the Champions mod, singles for the roll
+ * fields); (2) PP, status counter, volatile, boost, item, ability, field duration, weather, HP and the aim of a chosen-target move (a
+ * lock re-aims on it) each move them; (3) a source scan of @pkmn/sim and @pkmn/mods: every read of a dropped bookkeeping key is one of
+ * the reads pinned below, each inside the turn that wrote the key (the simulator resets the flags at the end of the turn).
  */
 await loadSimMods('gen9championsou');
 
 const DOUBLES = SWEEP_CASES.filter(entry => entry.mode === 'doubles');
 const bodiesOf = (battle: Battle): Pokemon[] => battle.sides.flatMap(side => side.pokemon);
 
-/** One turn of a sweep board: the attacker uses the move, everyone else splashes. */
 function turnOf(rules: (typeof RULES)[number], moveId: string, mode: Mode, seed: string): Battle {
   const board = sweepBoard(rules, moveId, mode, seed);
   const target = dexOfRules(rules).moves.get(moveId).target;
@@ -36,7 +29,6 @@ function turnOf(rules: (typeof RULES)[number], moveId: string, mode: Mode, seed:
   return board;
 }
 
-/** The target types a click does not choose (the simulator's own list: `battle.actions.targetTypeChoices`). */
 const unchosen = (battle: Battle, moveId: string): boolean => !battle.actions.targetTypeChoices(battle.dex.moves.get(moveId).target);
 
 describe('the facts leave the roll fields and a nominal aim alone', () => {
@@ -161,8 +153,8 @@ describe.each([RULES[8], CHAMPIONS])('what the facts keep, $name', rules => {
 });
 
 /**
- * Round 89 (A6-2): a finished battle has no later turn, so nothing reads what it holds beyond the winner. A game that ends in the middle of a
- * turn leaves the rest of the turn's actions in the queue (their nominal targets differ between draws), and the battle's last move is the
+ * A finished battle has no later turn, so nothing reads what it holds beyond the winner. A game that ends in the middle of a turn
+ * leaves the rest of the turn's actions in the queue (their nominal targets differ between draws), and the battle's last move is the
  * move of whichever action ran last; the prover returns at `battle.ended` before it reads either (`prove`).
  */
 describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
@@ -192,8 +184,7 @@ describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
  * every read pinned here sits in a handler that runs while the turn runs: Burning Jealousy and Alluring Voice (stages raised this
  * turn), Lash Out (lowered this turn), Fusion Flare and Fusion Bolt (the move before this one), the Gen 1 and Gen 2 "already moved"
  * test in the move runner. `lastMoveTargetLoc` is the one key with a read in a later turn (Instruct, a locked or charging body):
- * those moves take a chosen target, so the facts keep the aim for them (rows above). A new reader in an updated simulator fails the
- * pin below and has to be classified here before the facts may drop its key.
+ * those moves take a chosen target, so the facts keep the aim for them. A new reader in an updated simulator fails the pin below.
  */
 describe('the simulator reads a dropped key only where the facts keep it (source scan)', () => {
   const require = createRequire(import.meta.url);
@@ -206,7 +197,6 @@ describe('the simulator reads a dropped key only where the facts keep it (source
     item.isDirectory() ? files(`${dir}/${item.name}`) : item.name.endsWith('.js') ? [`${dir}/${item.name}`] : []);
   const sources = roots.flatMap(({ name, root }) => files(root.replace(/\/$/, '')).map(path => ({ file: `${name}:${path.slice(root.length)}`, lines: readFileSync(path, 'utf8').split('\n') })));
 
-  /** The lines that read the key: a mention that is no comment and no plain assignment of the key. */
   function readsOf(key: string): string[] {
     const mention = new RegExp(`\\b${key}\\b`);
     const assign = new RegExp(`\\.${key}\\s*=[^=]`);

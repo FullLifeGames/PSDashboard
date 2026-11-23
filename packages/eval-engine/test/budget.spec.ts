@@ -40,18 +40,16 @@ import { SEARCH_SEEDS } from './seed-streams';
 import { AUTO_MCTS_FAINTED_FRACTION } from '../src/types';
 
 /**
- * Round 89 (SB-4, issue #197): a forced replacement under the matrix is judged by the turn that follows it. The pivot request or
- * the knock-out is the root; its cells are the switch-ins (one column, "waiting", or the other side's own replacements), and each
- * cell's child is the board on arrival. The search used to price that board by the static alone, so two bodies that look alike on
- * arrival tied, and a body that loses its race the next turn could still lead (the user's game: Glimmora after U-turn). Now every
- * cell holds the engine's own search of its child, one turn, the root's draws: the replacement's value is the solved value of the
- * turn that follows.
+ * A forced replacement under the matrix is judged by the turn that follows it. The pivot request or the knock-out is the root; its cells
+ * are the switch-ins (one column, "waiting", or the other side's own replacements), and each cell's child is the board on arrival. Priced
+ * by the static alone, two bodies that look alike on arrival tie, and a body that loses its race the next turn could still lead (the
+ * user's game: Glimmora after U-turn); so every cell holds the engine's own search of its child, one turn, the root's draws.
  *
- * Rows: the user's game (Great Tusk), two corpus replacements the static read wrong (653785 turn 10: Lopunny-Mega where the player
- * sent Weavile; 655336 turn 5, p2: Clefable where the reference reads Lopunny), a doubles replacement under an explicit matrix
- * (VGC 2630685175 turn 2, one slot, and turn 4, two slots), and the guards: a root with no forced request is unchanged, the tree
- * keeps its own forced node, the sync and the orchestrated search agree, and a stop leaves the depth-1 result.
- * The reference of every row is computed here: each switch-in played on a copy, then the search of that board with the same settings.
+ * Rows: the user's game (Great Tusk), two corpus replacements the static read wrong (653785 turn 10: Lopunny-Mega where the player sent
+ * Weavile; 655336 turn 5, p2: Clefable where the reference reads Lopunny), a doubles replacement under an explicit matrix (VGC 2630685175
+ * turn 2, one slot, and turn 4, two slots), and the guards: a root with no forced request is unchanged, the tree keeps its own forced
+ * node, the sync and the orchestrated search agree, and a stop leaves the depth-1 result. The reference of every row is computed here:
+ * each switch-in played on a copy, then the search of that board with the same settings.
  */
 
 interface Fixture { settings: { tera: boolean; ruleset: StaticRuleset; sleepClause: boolean }; serialized: string }
@@ -65,7 +63,6 @@ const settingsOf = (scene: Fixture, samples: 1 | 3 | 5, depth: 1 | 2 | 3 = 1): E
 const search = (scene: Fixture, serialized: string, settings: EvalSettings): Promise<EvalResult> =>
   searchOrchestrated(createLocalExecutor(serialized, scene.settings.ruleset), settings);
 
-/** The side that chooses at the root: the one whose list is not the waiting sentinel. */
 const choosingSide = (result: EvalResult): 'p1' | 'p2' => (result.perSide.p1[0]?.choice === 'wait' ? 'p2' : 'p1');
 
 /** The reference: every row's choice played on a copy, then the search of the board it makes (the app's own turn search, depth 1). */
@@ -83,7 +80,6 @@ async function perBody(scene: Fixture, serialized: string, settings: EvalSetting
 
 const argmax = (values: Map<string, number>): string => [...values].sort((a, b) => b[1] - a[1])[0][0];
 
-/** What a row has to hold: the first row is the best body by the turn after it, and every row carries that turn's value. */
 async function expectTurnValues(scene: Fixture, serialized: string, settings: EvalSettings): Promise<{ result: EvalResult; side: 'p1' | 'p2'; reference: Map<string, number> }> {
   const result = await search(scene, serialized, settings);
   const side = choosingSide(result);
@@ -138,7 +134,6 @@ describe('doubles under an explicit matrix: the same rule on every assignment', 
   }, 600_000);
 });
 
-/** An executor that counts the sub-searches that ask for a whole turn, and runs `onTurn` when one starts. */
 function counting(base: SearchExecutor, onTurn?: () => void): { executor: SearchExecutor; turns: () => number } {
   let turns = 0;
   return {
@@ -372,7 +367,6 @@ function makeSixVsSix(): Battle {
 
 const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-/** Plays `turns` turns of each side's first legal choice: a position with history behind it. */
 function withHistory(root: SimPosition, turns: number): SimPosition {
   let position = root;
   for (let turn = 0; turn < turns; turn++) {
@@ -448,7 +442,7 @@ function capture(root: SimPosition): unknown {
 
 describe('fork and search identity', () => {
   test('children, the depth-1 matrix, and one MCTS tree match the recorded reference', { timeout: 120000 }, () => {
-    // The reference holds a tree of the search before round 61 (600 iterations): the identity under test is the
+    // The reference holds a tree of 600 iterations: the identity under test is the
     // speed layer's, not the budget's, so the tree runs with that budget.
     configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, iterations: 600 });
     onTestFinished(() => configureSearchBudget(null));
@@ -576,7 +570,7 @@ describe('search-budget', () => {
       const doublesOne = parseSearchBudget('doubles-tree-from=0.25')!;
       expect(doublesOne.doubles.treeFrom).toBe(0.25);
       expect(doublesOne.singles).toEqual(SEARCH_BUDGET_DEFAULT.singles);
-      // The unprefixed keys keep their round-61 meaning for turns: both game types, never the lead.
+      // The unprefixed keys mean turns: both game types, never the lead.
       const both = parseSearchBudget('tree-from=0.25,early-samples=3')!;
       expect(both.singles).toEqual({ earlyDepth: 1, earlySamples: 3, treeFrom: 0.25 });
       expect(both.doubles).toEqual({ earlyDepth: 1, earlySamples: 3, treeFrom: 0.25 });

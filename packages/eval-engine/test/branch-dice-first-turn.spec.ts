@@ -10,9 +10,9 @@ import { executeBranchChoices } from '../src/branch-engine';
 import { playTurn, reconstruct } from './arrival-turn';
 
 /**
- * Round 82 (forced dice), step A6, item 2 (gate answer 19a): on the first turn of a branch the dice the log shows for the actions
- * the user leaves as logged join the user's dice, once the user forces a die in that turn. The slots whose action the user
- * changed (another move, another aim, a switch) leave the join, as do the dice aimed at a body the user switched out.
+ * On the first turn of a branch the dice the log shows for the actions the user leaves as logged join the user's dice, once the user
+ * forces a die in that turn. The slots whose action the user changed (another move, another aim, a switch) leave the join, as do the
+ * dice aimed at a body the user switched out.
  */
 await loadSimMods('gen9championsou');
 
@@ -111,7 +111,6 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     expect(has(played.lines, '|-status|p2b: tea pot|brn')).toBe(false);
   });
 
-  // Round 82 (A7d, gate answer 2a): the first turn joins the log with or without a die of the user's.
   test('singles (t73): a first turn with no forced die shows the Fire Fang miss and lists no die', { timeout: 300000 }, async () => {
     const { replay, runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
     const played = await playTurn(runtime, replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });

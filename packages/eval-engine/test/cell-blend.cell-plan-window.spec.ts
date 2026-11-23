@@ -9,9 +9,9 @@ import { SEARCH_SEEDS } from './seed-streams';
 import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
 /**
- * Round 69 (T146 part c1): a cell's kill window ends with the move phase. A defender that survives the hit and
- * faints at the turn's residual (poison, Leech Seed, Future Sight) is `hit-nokill`: the kill fraction the plan prices
- * is the move's own. The logs are the simulator's, played in singles and in doubles.
+ * A cell's kill window ends with the move phase. A defender that survives the hit and faints at the turn's residual (poison, Leech
+ * Seed, Future Sight) is `hit-nokill`: the kill fraction the plan prices is the move's own. The logs are the simulator's, played in
+ * singles and in doubles.
  */
 
 const set = (species: string, moves: string[], item = '', level = 50): PokemonSet => ({
@@ -125,7 +125,6 @@ describe('cell-plan-immune', () => {
   const P1 = 'move thunderwave';
   const P2 = 'move recover';
 
-  /** Whether the simulator shows the attacker's miss line in any of 64 natural seeds. */
   function simulatorMisses(root: SimPosition, p1Choice: string): boolean {
     for (let k = 0; k < 64; k++) {
       const { log } = advancePositionWithLog(root, p1Choice, P2, `${1000 + k},${2000 + k},${3000 + k},${4000 + k}` as never);
@@ -152,8 +151,8 @@ describe('cell-plan-immune', () => {
         const plan = planCellEvents(positionBattle(root), p1, P2);
         expect(plan.kind).toBe(reachable ? 'events' : 'none');
         const sample = sampleCell(root, 0, p1, P2, 3, createMatchupCache(), true);
-        // r89 A5 gate: was `expect(sample.diagnostic).toBeUndefined()` on the fixed seeds. A cell's own seeds can all hit a 90 percent
-        // move (0.9^14 = 23 percent, the Water control reads 14 hits): the miss class is then unreached and booked as a diagnostic.
+        // A cell's own seeds can all hit a 90 percent move (0.9^14 = 23 percent, the Water control reads 14 hits): the miss class
+        // is then unreached and booked as a diagnostic.
         if (reachable) expect(sample.diagnostic?.missing ?? ['miss']).toEqual(['miss']);
         else expect(sample.diagnostic).toBeUndefined();
         expect(sample.blend !== undefined).toBe(reachable);

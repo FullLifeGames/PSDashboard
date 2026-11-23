@@ -9,18 +9,11 @@ import { setRaceCut } from '../src/score/boost-race';
 import { pairThreat, threatGetter } from '../src/score/threat';
 
 /**
- * Round 69 (T49, review of the merge): a stage below 0 bites too. A drop that
- * moves the 1v1 race against its holder counts negative in boostsBiting, as the
- * same stage counts in boosts; a drop that moves nothing counts 0. Every premise
- * is played in the simulator, in Scarlet and Violet and on the Champions mod,
- * singles and doubles.
- *
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): a drop is the
- * mirror of a boost. It is the foe's stage, so it bites only where the FOE wins
- * the race with it (a flip from my win to the foe's, or a win the drop made
- * faster) and gets to act in it; a drop in a race I still win costs nothing, and
- * a foe that never swings back never wins one. Scene (a) used to be a passive
- * Clefable that only waited for a 3HKO and is now a Jolteon that swings back.
+ * A stage below 0 bites too. A drop that moves the 1v1 race against its holder counts negative in boostsBiting, as the same stage
+ * counts in boosts; a drop that moves nothing counts 0. A drop is the mirror of a boost: it is the foe's stage, so it bites only where
+ * the FOE wins the race with it (a flip from my win to the foe's, or a win the drop made faster) and gets to act in it; a drop in a
+ * race I still win costs nothing, and a foe that never swings back never wins one. Every premise is played in the simulator, in
+ * Scarlet and Violet and on the Champions mod, singles and doubles.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -60,14 +53,12 @@ function board(mode: Mode, mine: [string, string[]], foe: [string, string[]], se
 
 const mons = (battle: Battle) => ({ mine: battle.sides[0].active[0]!, foe: battle.sides[1].active[0]! });
 
-/** One side's choice: the lead clicks its first move (at the foe's lead in doubles) or Splashes through the last move. */
 function click(mode: Mode, lead: Pokemon, attacks: boolean): string {
   const splash = lead.moveSlots.findIndex(slot => slot.id === 'splash') + 1;
   const move = attacks ? (mode.doubles ? 'move 1 1' : 'move 1') : `move ${splash}`;
   return mode.doubles ? `${move}, move 1` : move;
 }
 
-/** Turns until `victim` faints when `attacker` (0 or 1) clicks its first move every turn and the other side does not (8 if never). */
 function turnsToKo(battle: Battle, attacker: 0 | 1, victim: 'mine' | 'foe', mode: Mode): number {
   const target = mons(battle)[victim];
   for (let turn = 1; turn <= 8 && !battle.ended; turn++) {
@@ -79,9 +70,8 @@ function turnsToKo(battle: Battle, attacker: 0 | 1, victim: 'mine' | 'foe', mode
 }
 
 /**
- * `hits` times the median first hit of the attacker (side 0 or 1) on the other lead on no stages, over sixteen seeds
- * (a middle damage roll, no crit), in HP points: the HP a scene sets, so that the hit counts are the same on the
- * simulator's dice and in the static, which reads the top roll.
+ * `hits` times the median first hit of the attacker on the other lead on no stages, over sixteen seeds (a middle roll, no crit), in HP
+ * points: the simulator's dice and the static (top roll) then count the same hits.
  */
 function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, string[]], attacker: 0 | 1): number {
   const damage: number[] = [];
@@ -101,7 +91,6 @@ function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, 
   return Math.max(1, Math.floor(hits * damage[8]));
 }
 
-/** The foes of the first side count in the feature as living mons of the other side. */
 const foeCount = (battle: Battle) => battle.sides[1].pokemon.filter(mon => !mon.fainted).length;
 
 describe.each(MODES)('a stage drop in the race, $name', mode => {
@@ -119,7 +108,6 @@ describe.each(MODES)('a stage drop in the race, $name', mode => {
     return battle;
   }
 
-  /** Both leads attack every turn until one faints: who wins the race, and in how many turns. */
   function played(stage: number): { winner: 'mine' | 'foe'; turns: number } {
     const battle = raceScene(mode, stage);
     for (let turn = 1; turn <= 8; turn++) {
@@ -188,7 +176,6 @@ describe.each(MODES)('a stage drop in the race, $name', mode => {
     };
     expect(firstAt(0)).toBe(true);
     expect(firstAt(-1)).toBe(false);
-    // The sim's turn: the one that moves first KOs the other.
     const played = (stage: number) => {
       const battle = scene(stage);
       battle.choose('p1', click(mode, mons(battle).mine, true));
@@ -251,7 +238,7 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
     // The front Jolteon at full HP wins on the move order whatever the drop does; the bench Jolteon would be the flip.
     const battle = behind(JOLTEON);
     expect(evalFeatures(battle).boosts).toBeLessThan(0);
-    // T248 (round 73): the front Jolteon is bitten itself, as it wins and the drop makes the win safer in the fresh race (half the foes); the bench Jolteon behind it would add the other half.
+    // The front Jolteon is bitten itself, as it wins and the drop makes the win safer in the fresh race (half the foes); the bench Jolteon behind it would add the other half.
     expect(evalFeatures(battle).boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
   });
 
@@ -281,7 +268,7 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
     mine.boosts.spe = 2;
     expect(mine.getActionSpeed()).toBeLessThan(foe.getActionSpeed());
     const features = evalFeatures(battle);
-    // T249 (round 73): the slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too (before: it read the stage in full).
+    // The slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too.
     expect(features.boosts).toBe(0);
     expect(features.boostsBiting).toBe(0);
   });
@@ -376,7 +363,6 @@ describe('boost-bite-front', () => {
   const DOUBLES = 'gen9doublescustomgame';
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
-  /** The best damage fraction of the attacker's moves on no stages. */
   const hit = (battle: Battle, attacker: Pokemon, victim: Pokemon) => {
     const threat = pairThreat(attacker, victim, battle);
     return Math.max(threat.physical, threat.special);
@@ -384,7 +370,7 @@ describe('boost-bite-front', () => {
 
   /**
    * HP (points) at which `hits` hits of the attacker's best move on no stages take the victim: 1.4 is one boosted hit but not one plain
-   * one. A scene that asks for more hits than the victim's max HP holds is a mistake in the scene, not a board.
+   * one.
    */
   const hpAt = (battle: Battle, attacker: Pokemon, victim: Pokemon, hits: number) => {
     const share = hits * hit(battle, attacker, victim);
@@ -392,12 +378,10 @@ describe('boost-bite-front', () => {
     return Math.max(1, Math.floor(share * victim.maxhp));
   };
 
-  /** p1's boostsBiting contribution (side 0), alone: the foe's own stages do not enter. */
   function sideValue(battle: Battle): number {
     return boostBiteValue(battle.sides[0], 0, battle, threatGetter(battle, createMatchupCache('standard')));
   }
 
-  /** One turn of the simulator: both sides click their first move (the lead of a doubles side at the foe's first slot). */
   function turn(battle: Battle): void {
     const doubles = battle.gameType === 'doubles';
     battle.choose('p1', doubles ? 'move 1 1, move 1' : 'move 1');
@@ -443,7 +427,6 @@ describe('boost-bite-front', () => {
     });
   });
 
-  /** Garchomp +2 Attack in front of nothing but the foes given: the front foe first, the bench behind it. */
   function behind(front: PokemonSet, bench: PokemonSet, mine: Partial<PokemonSet> = {}): Battle {
     const battle = battleOf(SINGLES, [GARCHOMP(mine)], [front, bench]);
     battle.sides[0].active[0]!.boosts.atk = 2;
@@ -451,7 +434,6 @@ describe('boost-bite-front', () => {
   }
 
   describe('the foes in front gate the stage (T218)', () => {
-    /** The bench foe at the HP where only the boosted Crunch KOs it. */
     const benchBitten = (battle: Battle) => {
       const [mine, foe] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
       foe.sethp(hpAt(battle, mine, foe, 1.4));
@@ -462,7 +444,7 @@ describe('boost-bite-front', () => {
       const battle = behind(splash('Snorlax'), splash('Clefable'));
       battle.sides[1].active[0]!.sethp(1);
       benchBitten(battle);
-      // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+      // The stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
       expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
     });
 
@@ -502,7 +484,7 @@ describe('boost-bite-front', () => {
       const control = behind(set('Clefable', ['splash']), splash('Clefable'));
       control.sides[1].active[0]!.sethp(1);
       benchBitten(control);
-      // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+      // The stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
       expect(sideValue(control)).toBeCloseTo(stageValue(control.sides[0].active[0]!, 'atk', 2), 12);
     });
 
@@ -516,7 +498,10 @@ describe('boost-bite-front', () => {
   describe('the report on gen9draft-2058494320: a 5% Cobalion at +4 into a full-HP Shore Up Palossand', () => {
     const COBALION = () => set('Cobalion', ['smartstrike', 'splash']);
     const PALOSSAND = () => set('Palossand', ['shoreup', 'earthpower']);
-    /** Cobalion at 5% and +4 Attack (a hit three times as hard); the bench foe stands at 1.4 plain hits, so only the boosted Smart Strike KOs it. */
+    /**
+     * Cobalion at 5% and +4 Attack (a hit three times as hard); the bench foe stands at 1.4 plain hits, so only the boosted Smart Strike
+     * KOs it.
+     */
     function scene(front: PokemonSet): Battle {
       const battle = battleOf(SINGLES, [COBALION()], [front, splash('Clefable')]);
       const [mine, bench] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
@@ -624,7 +609,7 @@ describe('boost-bite-front', () => {
 
     test('the same board with a harmless first foe: the stage counts for the foe it bites', () => {
       const { battle, mine } = board(splash('Snorlax'));
-      // T248 (round 73): the stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
+      // The stage is judged on the fresh race, so the front foe at 1 HP is bitten as well as the bench foe.
       expect(sideValue(battle)).toBeCloseTo(stageValue(mine, 'atk', 2), 12);
     });
   });

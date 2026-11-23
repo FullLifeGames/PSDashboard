@@ -19,13 +19,12 @@ import { searchPosition } from '../src/search';
 import { serializeLiveBattle } from '../src/serialize';
 
 /**
- * Round 89 (#124, stage 1): the list of a bring-limited game with its unknown bodies, and the worlds the engine will play.
- * A world is one set of guesses for the bodies a side brought but never fielded. Units over the rules of the weights, the
- * pairs, the cap and the pinned game; the rebuilds of the scenes are in bring-limit.spec.ts. Singles and doubles both.
+ * The list of a bring-limited game with its unknown bodies, and the worlds the engine will play: a world is one set of guesses for the
+ * bodies a side brought but never fielded. Units over the weights, the pairs, the cap and the pinned game; the rebuilds of the scenes are
+ * in bring-limit.spec.ts. Singles and doubles both.
  */
 const PREVIEW = ['Garchomp', 'Gholdengo', 'Kingambit', 'Dragonite', 'Corviknight', 'Glimmora'];
 
-/** The leads enter before turn 1 (one in singles, two in doubles), then one body per side enters per turn. */
 function log(gametype: 'singles' | 'doubles', tier: string, preview: { p1: string[]; p2: string[] }, played: { p1: string[]; p2: string[] }, count?: number): string {
   const leads = gametype === 'singles' ? 1 : 2;
   const enter = (side: 'p1' | 'p2', index: number) => {
@@ -48,7 +47,6 @@ const BSS_ID = 'gen9battlestadiumsinglesregh';
 const VGC_TIER = '[Gen 9] VGC 2026 Regulation I';
 const VGC_ID = 'gen9vgc2026regi';
 
-/** Singles: P1 fielded two of three, P2 fielded three. */
 const bssLog = log('singles', BSS_TIER, { p1: PREVIEW, p2: PREVIEW }, { p1: ['Garchomp', 'Gholdengo'], p2: ['Kingambit', 'Dragonite', 'Corviknight'] }, 3);
 const listOf = (text: string, formatid: string, stats?: SmogonUsageStats | null) => replayBringList({ formatid, log: text }, parseReplayLog(text), stats);
 
@@ -71,7 +69,6 @@ describe('replayBringList: the weights of a short side (#124)', () => {
     expect(list.p1.open).toBe(1);
     expect(names(list.p1)).toEqual(['Kingambit', 'Dragonite', 'Corviknight', 'Glimmora']);
     expect(weights(list.p1).every(weight => Math.abs(weight - 0.25) < 1e-9)).toBe(true);
-    // P2 fielded its whole selection: nothing to guess.
     expect(list.p2.open).toBe(0);
     expect(list.p2.candidates).toEqual([]);
   });
@@ -280,7 +277,6 @@ describe('blendWorlds', () => {
     expect(seen.map(entry => [entry.side, entry.label, entry.for, entry.end])).toEqual([
       ['p1', 'A', ['played'], 0.01], ['p1', 'B', ['engine'], 0.61], ['p2', 'X', ['engine', 'played'], -0.2],
     ]);
-    // no world held a line: none appears
     expect(blendWorlds([result(), result()], [0.6, 0.4]).lines).toBeUndefined();
     // the worlds that hold a line but none of the blended best row's: the result has the played lines only, or none
     const onlyHeavy = blendWorlds([heavy, result({ perSide: light.perSide })], [0.6, 0.4]);
@@ -346,7 +342,6 @@ function mon(name: string, move: string): PokemonSet {
   };
 }
 
-/** One world's position at `turn` (the boundary before it), searched light. */
 async function evaluateWorld(replay: ReplayData, world: BringWorld, teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }, turn: number): Promise<EvalResult> {
   const format = getBranchSimulatorFormat(replay);
   await loadSimMods(format);
@@ -360,7 +355,6 @@ async function evaluateWorld(replay: ReplayData, world: BringWorld, teams: { p1T
   return searchPosition(serializeLiveBattle(battle), { depth: 1, samples: 1, tera: false });
 }
 
-/** The short side's rows that switch to the last party slot, the slot of the unknown body in every world. */
 const guessRows = (result: EvalResult, side: 'p1' | 'p2', slots: number) =>
   result.perSide[side].filter(row => new RegExp(`switch ${slots}\\b`).test(row.choice));
 const named = (label: string, species: string) => label.includes(`→ ${species.split('-')[0]}`);
@@ -401,14 +395,14 @@ const SCENES = [
     teamsFile: null,
   },
   {
-    // Round 89 (#124, B5b): 2630452654 fielded all four P2 bodies (Farigiraf came in and fainted within turn 2), so 2630181744
+    // 2630452654 fielded all four P2 bodies (Farigiraf came in and fainted within turn 2), so 2630181744
     // (P1 never fielded its fourth body) carries the VGC Scarlet/Violet scene; the counts are test data.
     label: 'VGC 2630181744 (doubles; P1 short)', file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
     stats: statsOf([['Incineroar', 400000], ['Amoonguss', 200000], ['Grimmsnarl', 50000]]),
     order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4],
-    // Round 89 (#143): the app's build of this game (usage stats and set assumptions, frozen). The naked build (no items, no spreads,
+    // The app's build of this game (usage stats and set assumptions, frozen). The naked build (no items, no spreads,
     // Tackle for every unlogged slot) drifts from the log in turn 1 (Ninetales faints to Bulldoze), so the logged clicks of turns 2 to 4
-    // meet other bodies, and since the stand-in for a refused move the rebuilt game plays to its end before turn 6.
+    // meet other bodies, and with the stand-in for a refused move the rebuilt game plays to its end before turn 6.
     // Turn 6 is not asserted: at the log's real position no world ranks a switch to the unknown body, so the row would check nothing.
     teamsFile: 'gen9vgc2026regi-2630181744-teams.json',
   },
@@ -436,7 +430,6 @@ describe('#124: the blend of the worlds of a short-side game', () => {
           for (const row of [...blended.perSide.p1, ...blended.perSide.p2]) expect(row.label).not.toContain(name);
         }
 
-        // The numbers are the weighted sums.
         const sum = (pick: (result: EvalResult) => number) => results.reduce((total, result, index) => total + pick(result) * weights[index], 0);
         expect(blended.score).toBeCloseTo(sum(result => result.score), 9);
         expect(blended.interval).toBeCloseTo(sum(result => result.interval), 9);
@@ -448,7 +441,6 @@ describe('#124: the blend of the worlds of a short-side game', () => {
         });
         expect(own.length).toBeGreaterThan(0);
         expect(top.ev).toBeCloseTo(own.reduce((total, row) => total + row.ev * row.weight, 0) / own.reduce((total, row) => total + row.weight, 0), 9);
-        // The ranking is the blended ev, descending.
         for (const side of ['p1', 'p2'] as const) {
           const evs = blended.perSide[side].map(row => row.ev);
           expect(evs).toEqual([...evs].sort((a, b) => b - a));
@@ -475,7 +467,6 @@ describe('#124: the blend of the worlds of a short-side game', () => {
     const stats = statsOf([['Kingambit', 500], ['Dragonite', 300], ['Corviknight', 150], ['Glimmora', 50]]);
     const worlds = bringWorlds(replayBringList(replay, parseReplayLog(log), stats), BRING_WORLD_CAP)!;
     expect(worlds).toHaveLength(3);
-    // Distinct sets per body, so the worlds read differently.
     const moves: Record<string, string> = { Garchomp: 'Earthquake', Gholdengo: 'Make It Rain', Kingambit: 'Iron Head', Dragonite: 'Extreme Speed', Corviknight: 'Brave Bird', Glimmora: 'Sludge Wave' };
     const teams = { p1Team: preview.map(name => mon(name, moves[name])), p2Team: preview.map(name => mon(name, moves[name])) };
     const results: EvalResult[] = [];

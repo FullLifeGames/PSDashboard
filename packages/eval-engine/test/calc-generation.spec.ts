@@ -4,10 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { calcGenerationFor, calcModOf, simGenNum } from '@fulllifegames/replay-core';
 
 /**
- * Round 68 (T186, decisions 1 and 6): one function decides the calculator's generation from the game generation and
- * the battle's mod (replay-core calc-gen.ts), and every caller takes it. The calculator's generation number is not the
- * simulator's: the Champions mod is the calculator's generation 0, which plays on Gen 9's rules, so a reader that wants
- * the simulator's generation asks simGenNum.
+ * One function decides the calculator's generation from the game generation and the battle's mod (replay-core calc-gen.ts), and
+ * every caller takes it. The calculator's generation number is not the simulator's: the Champions mod is the calculator's
+ * generation 0, which plays on Gen 9's rules, so a reader that wants the simulator's generation asks simGenNum.
  */
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 

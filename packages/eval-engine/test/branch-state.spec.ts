@@ -12,12 +12,9 @@ import { doubles, IDLE_ALONE, SCENES, SCREENS, wall, type Scene } from './forced
 import { simDamages } from './sim-rolls';
 
 /**
- * Round 69 (T182): a move button also carries the type the move lands with
- * after the Tera click (typeUnderTera), read from the simulator on a copy of
- * the battle where the simulator's own terastallize ran. The oracle here is
- * the real queue: the same position played through the click, then read with
- * the same reading as `type`. Singles and doubles share the code (VGC is a
- * doubles format).
+ * A move button also carries the type the move lands with after the Tera click (typeUnderTera), read from the simulator on a copy of
+ * the battle where the simulator's own terastallize ran. The oracle is the real queue: the same position played through the click,
+ * then read with the same reading as `type`. Singles and doubles share the code (VGC is a doubles format).
  */
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
@@ -28,12 +25,9 @@ const movesOf = (battle: Battle, side: 'p1' | 'p2' = 'p1', slot = 0): BranchMove
 
 const byName = (moves: BranchMoveOption[]) => Object.fromEntries(moves.map(move => [move.name, move]));
 
-/** What the button should show with the toggle pressed: the label the state computed before the click. */
 const underTera = (moves: BranchMoveOption[]) => Object.fromEntries(moves.map(move => [move.name, move.typeUnderTera ?? move.type]));
-/** What the simulator's queue gives after the click: the state's plain reading on the terastallized body. */
 const afterClick = (moves: BranchMoveOption[]) => Object.fromEntries(moves.map(move => [move.name, move.type]));
 
-/** Slot `slot` of p1 clicks Tera on its first move (a Splash); everyone else Splashes. */
 function clickTeraAt(battle: Battle, slot: number, doubles: boolean) {
   const own = doubles ? [0, 1].map(index => (index === slot ? 'move 1 terastallize' : 'move 1')).join(', ') : 'move 1 terastallize';
   battle.choose('p1', own);
@@ -138,7 +132,7 @@ describe('typeUnderTera labels a move with the type after the Tera click (T182)'
         expect(mon.terastallized).toBeFalsy();
         expect(mon.canTerastallize).toBeTruthy();
       }
-      // The same state with the label stripped is the state the T85 reading builds.
+      // The same state with the label stripped is the state the plain reading builds.
       const stripped = JSON.parse(JSON.stringify(state, (key, value) => (key === 'typeUnderTera' ? undefined : value)));
       expect(stripped.p1MovesBySlot.flat().map((move: BranchMoveOption) => move.type)).toEqual(
         state.p1MovesBySlot.flat().map(move => move.type));
@@ -316,7 +310,6 @@ describe('usage stats and doubles support', () => {
 const optionOf = (scene: Scene) => ({ name: scene.move, activeSlot: 0, slot: 1, pp: 8, maxpp: 8, disabled: false, type: 'Normal', targetType: 'normal', requiresTarget: true, targetOptions: [] });
 const pct = (damage: number, maxhp: number) => Math.round(damage / maxhp * 1000) / 10;
 
-/** The preview's result for the first attacker into the first foe, with the live battle of the position when `live`. */
 function previewOf(scene: Scene, root: SimPosition, screen: string, live: boolean, battle = positionBattle(root)) {
   const state = createBranchStateFromBattle(battle, [], {});
   const mon = scene.id === 'terastarstorm' ? { ...state.p1ActiveSlots[0]!, teraType: 'Stellar' } : state.p1ActiveSlots[0]!;

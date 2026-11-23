@@ -16,16 +16,16 @@ import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../s
 import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
- * The branch's first turn as the specs play it (round 70, arrival-dice.spec.ts; round 73, logged-rolls.spec.ts): the app's
- * reconstruction of a fixture up to a turn, and the logged turn played through the branch's own execution path.
+ * The branch's first turn as the specs play it: the app's reconstruction of a fixture up to a turn, and the logged turn played through
+ * the branch's own execution path.
  */
 
 export const loadReplay = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
 
 /**
- * The app's reconstruction: healed, locked, boundaries captured. Champions replays bring what the app brings. `source` is a
- * replay that does not live in this folder's fixtures (the feedback corpus); `fixture` still names its game type.
+ * The app's reconstruction: healed, locked, boundaries captured. `source` is a replay outside this folder's fixtures (the feedback
+ * corpus); `fixture` still names its game type.
  */
 export async function reconstruct(fixture: string, targetTurn: number, source?: ReplayData) {
   const replay = source ?? loadReplay(fixture);
@@ -53,10 +53,9 @@ export async function reconstruct(fixture: string, targetTurn: number, source?: 
 export const prngOf = (runtime: BranchRuntime) => runtime.battleStream.battle!.prng.getSeed();
 
 /**
- * The logged turn through the branch's own execution path: the commands the replay would send (or `p2` instead of the logged
- * click), written to the live battle, the forced replacements answered from the log as the replay answers them. Scored the
- * way the replay scores its own blocks: the discrete events (faints, misses, crits, secondaries, cants, move order).
- * `choices` replaces a side's logged click.
+ * The logged turn through the branch's own execution path: the commands the replay would send (`choices` replaces a side's logged
+ * click), the forced replacements answered from the log, scored the way the replay scores its blocks (faints, misses, crits,
+ * secondaries, cants, move order).
  */
 export async function playTurn(
   runtime: BranchRuntime, replayLog: string, turn: number, choices?: string | { p1?: string; p2?: string },
@@ -65,7 +64,7 @@ export async function playTurn(
   const replaced = typeof choices === 'string' ? { p2: choices } : choices ?? {};
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
   const battle = runtime.battleStream.battle!;
-  // round 82 (A6): with `dice` the turn plays through the dice module; the later calls (forced replacements) carry no choices, as the app's
+  // with `dice` the turn plays through the dice module; the later calls (forced replacements) carry no choices
   const send = (commands: { side: 'p1' | 'p2'; command: string }[], first = false) =>
     executeBranchChoices({
       streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors, commands,
@@ -112,7 +111,6 @@ export function observeDraws(battle: SimBattle): Draw[] {
   return draws;
 }
 
-/** The draws of each action, in order. */
 export function drawsByAction(draws: Draw[]): Map<string, Draw[]> {
   const byAction = new Map<string, Draw[]>();
   for (const draw of draws) {
@@ -123,9 +121,8 @@ export function drawsByAction(draws: Draw[]): Map<string, Draw[]> {
 }
 
 /**
- * Round 82 (forced dice), step A5: the `play` of the dice module for the logged turn. It writes the commands the replay would
- * send to the battle it gets (the live battle and its copy alike) and answers the forced replacements from the log, so the
- * module plays the turn twice the way `playTurn` plays it once.
+ * The `play` of the dice module for the logged turn: writes the commands the replay would send to the battle it gets (live battle and
+ * copy alike) and answers the forced replacements from the log.
  */
 export function loggedClicks(replayLog: string, turn: number, choices: { p1?: string; p2?: string } = {}): (battle: Battle) => void {
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;

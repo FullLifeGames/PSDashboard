@@ -9,11 +9,10 @@ import { battleOf } from './power-oracle';
 import { BITE_TURNS } from '../src/score/boost-race';
 
 /**
- * Round 79 (T288): a standing defensive stage that takes away the foe's win bites although the holder wins nothing
- * itself. Clefable behind +1 Defense and +1 Special Defense against a Rhydon whose Earthquake and Avalanche then never
- * KO it: the simulator is the judge of that (the Rhydon's hits and Clefable's Moonlight), the race reads it, and the
- * holder's own clock (fourteen turns against a resting Rhydon) no longer shuts the stage. The rule's table is in
- * boost-race.spec.ts; the guards (a foe that wipes stages, a foe that plays Unaware, no hit the stage reduces) stay.
+ * A standing defensive stage takes away the foe's win bites although the holder wins nothing itself. Clefable behind +1 Defense and
+ * +1 Special Defense against a Rhydon whose Earthquake and Avalanche then never KO it: the simulator is the judge of that (the
+ * Rhydon's hits and Clefable's Moonlight), the race reads it, and the holder's own clock (fourteen turns against a resting Rhydon)
+ * does not shut the stage. The rule's table is in boost-race.spec.ts.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -23,12 +22,10 @@ const WALL = () => set('Clefable', ['cosmicpower', 'moonlight', 'moonblast'], { 
 const BRUISER = (extra: Partial<PokemonSet> = {}) =>
   set('Rhydon', ['earthquake', 'rest', 'sleeptalk'], { evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 252, spe: 0 }, ...extra });
 
-/** p1's boostsBiting contribution (side 0), alone. */
 function sideValue(battle: Battle): number {
   return boostBiteValue(battle.sides[0], 0, battle, threatGetter(battle, createMatchupCache('standard')));
 }
 
-/** The holder with +1 Defense and +1 Special Defense, at the share of its HP given. */
 function shielded(foe: PokemonSet, hpShare = 0.7, boosts: Record<string, number> = { def: 1, spd: 1 }): Battle {
   const battle = battleOf(SINGLES, [WALL()], [foe, set('Landorus-Therian', ['earthquake', 'uturn'])]);
   const mine = battle.sides[0].active[0]!;
@@ -102,7 +99,6 @@ describe('doubles and the other families (T288)', () => {
   const SP = { hp: 32, atk: 8, def: 0, spa: 0, spd: 32, spe: 0 };
   const splash = (species: string) => set(species, ['splash']);
 
-  /** The shielded Clefable at 70% with a Splashing Snorlax beside it, against the Rhydon and a Splashing Snorlax beside it. */
   function doublesBoard(): Battle {
     const battle = battleOf(DOUBLES, [WALL(), splash('Snorlax')], [BRUISER(), splash('Snorlax')]);
     const mine = battle.sides[0].active[0]!;
@@ -126,7 +122,6 @@ describe('doubles and the other families (T288)', () => {
     expect(featureWeights(true, 'vgc').boostsBiting).toBe(16);
     const cache = createMatchupCache('vgc');
     expect(evalFeatures(battle, cache).boostsBiting).toBeGreaterThan(0);
-    // The same board without the stages reads 0.
     const plain = doublesBoard();
     plain.sides[0].active[0]!.boosts.def = 0;
     plain.sides[0].active[0]!.boosts.spd = 0;
@@ -167,7 +162,6 @@ const hpAt = (battle: Battle, attacker: Pokemon, victim: Pokemon, hits: number) 
 const wall = () => splash('Skarmory');
 const walled = (foe: Pokemon) => { foe.boosts.def = 6; };
 
-/** Turns the holder's Crunch needs to take the foe in the slot, both sides clicking their first move (the holder at the foe's first slot). */
 function turnsToKo(battle: Battle, foeSlot = 0): number {
   const doubles = battle.gameType === 'doubles';
   const foe = battle.sides[1].active[foeSlot]!;
@@ -180,7 +174,6 @@ function turnsToKo(battle: Battle, foeSlot = 0): number {
   return Infinity;
 }
 
-/** Garchomp +2 Attack against the front foe, a Clefable on the bench at the HP where only the boosted Crunch KOs it. */
 function singlesBoard(format: string, front: PokemonSet, edit: (foe: Pokemon) => void): Battle {
   const battle = battleOf(format, [GARCHOMP()], [front, splash('Clefable')]);
   const [mine, foe, bench] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle.sides[1].pokemon[1]];
@@ -207,13 +200,12 @@ describe.each([SINGLES, CHAMPIONS])('singles on %s: the bench credit needs the h
 
   test('the same board with a front foe the holder takes within three turns keeps the bench credit', () => {
     const battle = singlesBoard(format, splash('Snorlax'), foe => foe.sethp(1));
-    // T248 (round 73): the front foe at 1 HP is bitten as well as the bench foe (the stage is judged on the fresh race).
+    // The front foe at 1 HP is bitten as well as the bench foe (the stage is judged on the fresh race).
     expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 });
 
 describe('doubles: the holder has to get past every foe on the field', () => {
-  /** Garchomp +2 Attack with a Splashing partner against two front foes and a Clefable on the bench the stage bites. */
   function board(second: PokemonSet, edit: (foe: Pokemon) => void): Battle {
     const battle = battleOf(DOUBLES, [GARCHOMP(), splash('Snorlax')], [splash('Snorlax'), second, splash('Clefable')]);
     const [mine, first, other, bench] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle.sides[1].active[1]!, battle.sides[1].pokemon[2]];

@@ -9,13 +9,10 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * Round 69 (T49, decision 16): boostsBiting, the standing stages of `boosts`
- * damped by the share of living foes the stage bites, at weight 0 until a fit
- * prices it. A foe takes the bite away when it plays Unaware, can click a move
- * that takes the stages away (Haze, Clear Smog, a phazer), or when the stage
- * changes nothing in the race within a few turns (a wall that survives the
- * boosted hit, a boost no move of the mon reads). Every premise (the damage,
- * who moves first, what a move does to a stage) is played in the simulator.
+ * boostsBiting: the standing stages of `boosts` damped by the share of living foes the stage bites, at weight 0 until a fit prices
+ * it. A foe takes the bite away when it plays Unaware, can click a move that takes the stages away (Haze, Clear Smog, a phazer), or
+ * when the stage changes nothing in the race within a few turns (a wall that survives the boosted hit, a boost no move of the mon
+ * reads). Every premise (the damage, who moves first, what a move does to a stage) is played in the simulator.
  */
 
 await loadSimMods('gen9championscustomgame');
@@ -28,12 +25,14 @@ const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species
 const GARCHOMP = () => set('Garchomp', ['crunch', 'splash']);
 const clefable = (ability: string, moves = ['splash']) => set('Clefable', moves, { ability });
 
-/** Foe HP (in HP points) at `hits` hits of the attacker's best move on no stages: 1.4 means one boosted hit KOs and an unboosted one does not. */
+/**
+ * Foe HP (in HP points) at `hits` hits of the attacker's best move on no stages: 1.4 means one boosted hit KOs and an unboosted one does
+ * not.
+ */
 function biteHp(battle: Battle, attacker: Pokemon, foe: Pokemon, hits = 1.4): number {
   return Math.max(1, Math.floor(hits * pairThreat(attacker, foe, battle).physical * foe.maxhp));
 }
 
-/** HP the foe loses when slot 0 of p1 clicks its first move at +`stage` Attack, the others Splashing. */
 function hitAt(build: () => Battle, stage: number): number {
   const battle = build();
   const foe = battle.sides[1].active[0]!;
@@ -47,7 +46,6 @@ function hitAt(build: () => Battle, stage: number): number {
 const plainDuel = () => battleOf(SINGLES, [GARCHOMP()], [clefable('No Ability')]);
 const unawareDuel = () => battleOf(SINGLES, [GARCHOMP()], [clefable('Unaware')]);
 
-/** The singles scene: +2 Attack on the first side, the foe at the HP where only the boost KOs. */
 function duel(foe: PokemonSet, mine: PokemonSet[] = [GARCHOMP()], hits = 1.4): Battle {
   const battle = battleOf(SINGLES, mine, [foe]);
   const attacker = battle.sides[0].active[0]!;
@@ -128,8 +126,8 @@ describe('boostsBiting, singles', () => {
     expect(alone.boostsBiting).toBeCloseTo(alone.boosts, 12);
   });
 
-  // 13.10.2026: a speed stage bites where the move order decides a race somebody wins. The foe swings back with an Ice Beam
-  // (it KOs Garchomp in one hit, so the faster one wins); a foe that only Splashes lets the holder win either way.
+  // A speed stage bites where the move order decides a race somebody wins. The foe swings back with an Ice Beam (it KOs Garchomp
+  // in one hit, so the faster one wins); a foe that only Splashes lets the holder win either way.
   test('each stage on its own: against Unaware the Attack part is 0 and the Speed part stays where it moves first', () => {
     const battle = battleOf(SINGLES, [GARCHOMP()], [set('Jolteon', ['icebeam', 'splash'], { ability: 'Unaware' })]);
     const attacker = battle.sides[0].active[0]!;
@@ -182,9 +180,8 @@ describe('boostsBiting, doubles', () => {
 });
 
 /**
- * What the simulator does to a boosted mon (+2 Attack and Speed) when a foe
- * clicks the move at it, with a bench behind it or without: the positive
- * stages are gone (the mon is dragged out, or none is left on it).
+ * What the simulator does to a boosted mon (+2 Attack and Speed) when a foe clicks the move at it, with a bench behind it or without: the
+ * positive stages are gone (the mon is dragged out, or none is left on it).
  */
 function removedInSim(format: string, moveId: string, benched: boolean): boolean {
   const doubles = format === DOUBLES || format === CHAMPIONS_DOUBLES;
@@ -298,8 +295,8 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
     expect(control.boostsBiting).toBeCloseTo(control.boosts, 12);
   });
 
-  // 13.10.2026: a Haze on the field wipes the stage for every foe (the foes in front gate it, boost-bite.drops.spec.ts); a Haze on
-  // the bench only takes its own foe out of the share.
+  // A Haze on the field wipes the stage for every foe (the foes in front gate it, boost-bite.drops.spec.ts); a Haze on the bench
+  // only takes its own foe out of the share.
   test('a Champions doubles board: a foe with Haze on the bench, three without: the stage counts for the three quarters it bites', () => {
     const battle = battleOf(CHAMPIONS_DOUBLES, [champion('Garchomp', ['crunch', 'splash']), champion('Garchomp', ['crunch', 'splash'])],
       [champion('Clefable', ['splash']), champion('Clefable', ['splash']), champion('Clefable', ['haze', 'splash']), champion('Clefable', ['splash'])]);
@@ -346,10 +343,9 @@ describe('inert at weight 0', () => {
     expect({ ...skipped, boostsBiting: all.boostsBiting }).toEqual(all);
   });
 
-  // Round 69 (S8, T49; S17): REPLACEMENT in four families: the damped column takes the place of `boosts`, `boosts` goes to 0.
-  // Champions doubles read 61 since S17 (the Schluss-Fit on the drops-aware column, user answer 2a: a fit value outside the lane band
-  // [64, 120] applies), VGC doubles 16 (REPLACEMENT 20 of 20 seeds once the drops count). Standard doubles (REPLACEMENT 0 of 20,
-  // ADDITIVE flagged) keeps `boosts` and the key at 0.
+  // REPLACEMENT in four families: the damped column takes the place of `boosts`, `boosts` goes to 0. Champions doubles read 61 (a fit
+  // value outside the lane band [64, 120] applies), VGC doubles 16 (REPLACEMENT in 20 of 20 seeds once the drops count). Standard
+  // doubles (REPLACEMENT in 0 of 20, ADDITIVE flagged) keeps `boosts` and the key at 0.
   test.each([
     ['standard singles', false, 'standard' as const, 0, 95],
     ['champions singles', false, 'champions' as const, 0, 102],
@@ -392,7 +388,7 @@ describe('inert at weight 0', () => {
     const features = evalFeatures(battle, cache);
     expect(features.boosts).toBeGreaterThan(0);
     const weights = featureWeights(doubles, ruleset);
-    // The sum is the table's: the singles phase form (round 69, S9) is off here and pinned in phase-form.spec.ts.
+    // The sum is the table's: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     let diff = 0;
     for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {

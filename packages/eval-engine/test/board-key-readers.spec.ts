@@ -8,30 +8,19 @@ import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, twoValues, verdictOf, type Holder, type Lineup } from './board-key-support';
 
 /**
- * Round 89 (#149, step A8): the `read` fields of the board key held to the Dex and to the simulator's own move path. A field
- * of the table's `read` class enters the key only when a handler of an entry on the board names it (dex-facts/state-readers.ts),
- * so this sweep varies each such field on two boards and requires, wherever the hit played without a memo reads differently,
- * that the keys differ too (test/board-key-support.ts, `verdictOf`):
- *
- * - the entries the scan names as readers of the field, each placed where it acts (an ability or an item on the attacker, the
- *   defender and, in doubles, the partners), and a sample of entries it does not name: a field that matters to an entry the scan
- *   missed fails here, and then moves to the `key` class in the table;
- * - a bare board (no ability, no item) with every move that costs its user HP by itself: the move path's own reads
- *   (`moveSlots`, `lastMove`, `hurtThisTurn`, ... of BattleActions) do not reach a hit's cost, or the field moves to `key`.
- *
- * The plain run plays the cases of the four rule sets that count most (Scarlet/Violet and the Champions mod, singles and
- * doubles), the scan's readers up to a few per field and a fixed sample of the others; `DICE_SWEEPS=full` plays every case, every reader the scan
- * names and 8 of the other entries per field (the 120-entry sample of the first full run found no split and no wrong row on 88,616 rows in
- * two cases and cost an hour). The teeth (some entry splits, `activeTurns` is touched) are checked in the four cases of the plain run only:
- * the older Dexes have no entry that changes the cost of this hit through a `read` field (Stakeout, which does, comes in Gen 7), so the other
- * cases check the fault verdict (`wrong`) and count the splits.
+ * The `read` fields of the board key held to the Dex and to the simulator's own move path. A `read` field enters the key only when a
+ * handler of an entry on the board names it (dex-facts/state-readers.ts); this sweep varies each such field on two boards and requires,
+ * wherever the hit played without a memo reads differently, that the keys differ too (`verdictOf`): for the entries the scan names
+ * (placed on the attacker, the defender and, in doubles, the partners) and a sample it does not name (a miss moves the field to the `key`
+ * class), and for a bare board with every move that costs its user HP by itself. The plain run plays the four rule sets that count most;
+ * `DICE_SWEEPS=full` every case and reader and 8 other entries per field. The teeth are checked in the plain run only: older Dexes have
+ * no entry that changes the cost of this hit through a `read` field (Stakeout comes in Gen 7).
  */
 
 await loadSimMods('gen9championscustomgame');
 
 const PLAIN_CASES = ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'];
 const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => PLAIN_CASES.includes(name));
-/** Entries the scan names for a field: how many the plain run plays, and how many entries it does not name. */
 const NAMED_CAP = SWEEPS_FULL ? Infinity : 3;
 const SAMPLE = SWEEPS_FULL ? 8 : 4;
 /** The full run reads every named entry: Gen 9 doubles takes several minutes. */
@@ -40,7 +29,6 @@ const NAMED_TIMEOUT = SWEEPS_FULL ? 600_000 : 60_000;
 type Pair = [unknown, unknown];
 type Setter = (battle: Battle, value: unknown) => void;
 
-/** Values for the fields whose current value says no pair. */
 const NAMED: Record<string, (battle: Battle) => Pair> = {
   hurtThisTurn: () => [null, 10],
   lastItem: () => ['', 'sitrusberry'],
@@ -67,7 +55,6 @@ const NAMED: Record<string, (battle: Battle) => Pair> = {
 
 interface Target { owner: 'pokemon' | 'side' | 'battle'; name: string; who: string; set: Setter; pair: Pair }
 
-/** The `read` fields of the hit consumer with two values each, on the attacker, the defender and, for a side's own fields, both sides. */
 function targetsOf(battle: Battle): { targets: Target[]; skipped: string[] } {
   const targets: Target[] = [];
   const skipped: string[] = [];
@@ -139,7 +126,6 @@ describe.each(CASES)('the read fields of the key hold on $name', ({ rules, mode,
   });
 
   test('every ability and item the scan names as a reader, and a sample of the others, on every holder: no board is priced by another', { timeout: NAMED_TIMEOUT }, () => {
-    // Gen 1 has no abilities and no items: no entry to place
     if (entries.length === 0) return;
     const wrong: string[] = [];
     let split = 0;
