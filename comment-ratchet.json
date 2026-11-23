@@ -591,5 +591,18 @@
     "src/main.tsx": 5,
     "src/workers/eval-worker.ts": 9,
     "src/workers/teambuilder-table-worker.ts": 1
+  },
+  "lines": {
+    "source:eval-engine": 11692,
+    "source:replay-core": 3371,
+    "source:app": 5917,
+    "source:app-css": 184,
+    "test:app": 2506,
+    "test:replay-core": 1851,
+    "test:eval-engine": 7306,
+    "test:ui": 1905,
+    "test:e2e": 1129,
+    "test:e2e-feedback": 149,
+    "test:e2e-build": 36
   }
 }

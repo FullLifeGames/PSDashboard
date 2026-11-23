@@ -226,11 +226,11 @@ export function readCss(text) {
   return { comments, stripped: stripped.replace(/\s+/g, ' ').trim() };
 }
 
-/** The comments of a file as `{ text, line }`, whatever its language; a stylesheet has only block comments. */
+/** The comments of a file as `{ text, line, start }` (`start`: the offset in the text), whatever its language. */
 export function commentsOf(text, fileName) {
   if (isCss(fileName)) {
     const lineOf = offset => text.slice(0, offset).split('\n').length;
-    return readCss(text).comments.map(comment => ({ text: comment.text, line: lineOf(comment.start) }));
+    return readCss(text).comments.map(comment => ({ text: comment.text, line: lineOf(comment.start), start: comment.start }));
   }
   return readSource(text, fileName).items.filter(item => item.k === 'c');
 }
