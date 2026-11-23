@@ -35,9 +35,8 @@ interface SheetPokemon {
 }
 
 /**
- * One unpacked sheet entry in the shape the inference reads: the Tera type, level and gender default as the sheet
- * leaves them out. A species the sheet writes in the name field (the server's way) is left as written by the
- * unpacker, so it reads the Dex's name for it, and its own text when the Dex does not know it.
+ * One unpacked sheet entry as the inference reads it: Tera type, level and gender default as the sheet leaves them out. A species the
+ * sheet writes in the name field reads the Dex's name for it, else its own text.
  */
 function sheetEntry(dex: RulesDex, set: PokemonSet): SheetPokemon | null {
   const packed = set.species || set.name;
@@ -79,11 +78,8 @@ function writtenNames(dex: RulesDex, set: PokemonSet, entry: string): PokemonSet
 }
 
 /**
- * One entry of a sheet through the library's unpacker, handed the Dex tables (`Teams.import` of @pkmn/sim reads a
- * packed line with them), so a name reads as the Dex spells it: "WillOWisp" is "Will-O-Wisp", "XScissor" is
- * "X-Scissor", and a species in its own field keeps "Porygon2". The unpacker counts fields and runs a short entry into
- * the next one, so each entry goes in alone, padded to the full count: a hand-edited or cut-off entry reads with its
- * missing fields empty and does not swallow the entries after it.
+ * One entry through the library's unpacker (`Teams.import`), handed the Dex tables so a name reads as the Dex spells it ("WillOWisp" is
+ * "Will-O-Wisp"). The unpacker runs a short entry into the next one, so each entry goes in alone, padded to the full count.
  */
 function unpackEntry(dex: RulesDex, entry: string): PokemonSet | undefined {
   const pipes = entry.split('|').length - 1;
@@ -91,10 +87,7 @@ function unpackEntry(dex: RulesDex, entry: string): PokemonSet | undefined {
   return set && writtenNames(dex, set, entry);
 }
 
-/**
- * The sets of one packed sheet, the part of a `|showteam|` line after the side: the one reader of the parser below
- * and of the built sets (`extractTeamSheets`). Entries without a species are left out.
- */
+/** The sets of one packed sheet (the part of a `|showteam|` line after the side): the one reader of the parser and of `extractTeamSheets`. */
 export function unpackSheetSets(packed: string, dex: RulesDex): PokemonSet[] {
   const sets: PokemonSet[] = [];
   for (const entry of packed.split(']')) {
@@ -111,22 +104,14 @@ function sheetSetsOf(log: string, side: 'p1' | 'p2', dex: RulesDex): PokemonSet[
   return line ? unpackSheetSets(line.slice(prefix.length), dex) : null;
 }
 
-/**
- * Reads the `|showteam|` protocol line of a side (Open Team Sheets) through the library (`unpackSheetSets`). Round 72
- * (T241): the hand splitter of packed names is gone, and the names come from the Dex tables where the Dex knows them
- * (sheet-text.spec.ts holds the reading to the old one).
- */
+/** Reads the `|showteam|` line of a side (Open Team Sheets) through `unpackSheetSets`; null without one. */
 export function parseShowteamSheet(log: string, side: 'p1' | 'p2'): SheetPokemon[] | null {
   const dex = dexOf(logRules(log));
   const pokemon = (sheetSetsOf(log, side, dex) ?? []).map(set => sheetEntry(dex, set)).filter((mon): mon is SheetPokemon => mon !== null);
   return pokemon.length > 0 ? pokemon : null;
 }
 
-/**
- * Applies an Open Team Sheet (`|showteam|`) onto protocol-revealed data: team
- * sheets are public information, so moves/items/abilities from them count as
- * revealed instead of being replaced by Smogon guesses (B3).
- */
+/** Applies an Open Team Sheet onto the revealed data: a sheet is public, so its moves, items and abilities count as revealed, not as Smogon guesses. */
 function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: SheetPokemon[]) {
   const infoFor = sheetMatcher(pokemonMap);
 
@@ -146,8 +131,7 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
       continue;
     }
 
-    // The sheet names the forme a "-*" preview marker hid, and the battle
-    // may never show it (the mon stayed benched).
+    // The sheet names the forme a "-*" preview marker hid, and the battle may never show it (the mon stayed benched).
     if (info.species.endsWith('-*')) info.species = sheetMon.species;
     const knownMoveIds = new Set(info.moves.map(move => toId(move.name)));
     for (const move of sheetMon.moves) {
@@ -160,14 +144,7 @@ function applyTeamSheet(pokemonMap: Map<string, RevealedPokemonInfo>, sheet: She
   }
 }
 
-/**
- * Extracts revealed information about the opponent's team from the replay log.
- * Every line is read once through @pkmn/protocol (round 67, T108 step 1) and
- * runs through the handlers in this fixed order; unlike the protocol parser
- * several of them may fire for one line. The walk's own @pkmn/client battle
- * reads the line last, and its state gives abilities and items the handlers
- * leave to it (T108 step 2, inference/client-facts.ts).
- */
+/** The revealed team of the opponent: every line runs through the handlers in this fixed order, several may fire for one line, and the walk's @pkmn/client battle reads it last. */
 export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p2'): OpponentTeamInfo {
   const log = normalizeLineEndings(rawLog);
   const lines = log.split('\n').map(readLine);
@@ -207,11 +184,7 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
   return { pokemon: Array.from(state.pokemonMap.values()) };
 }
 
-/**
- * Switching into Stealth Rock without taking chip damage is a strong
- * Heavy-Duty Boots tell (N2). Only applies from gen 8 on (the item's debut)
- * and skips holders an ability they may have explains as well (T130).
- */
+/** Switching into Stealth Rock without chip damage is a Heavy-Duty Boots tell; gen 8 on (the item's debut), and not for a holder an ability it may have explains. */
 function inferBootsFromHazards(
   lines: readonly LogLine[],
   side: 'p1' | 'p2',
@@ -232,14 +205,12 @@ function inferBootsFromHazards(
   }
 }
 
-/** Stealth Rock on the side: set by its -sidestart, lifted by its -sideend; every other line leaves it. */
 function rocksAfter(line: LogLine, side: string, up: boolean): boolean {
   if (identOf(arg(line, 1))?.side !== side || !arg(line, 2).includes('Stealth Rock')) return up;
   if (line.cmd === '-sidestart') return true;
   return line.cmd === '-sideend' ? false : up;
 }
 
-/** The nickname of a Pokémon of the side entering a position ("|switch|p2a: Nick|..."), else null. */
 function entrantOf(line: LogLine, side: string): string | null {
   if (line.cmd !== 'switch' && line.cmd !== 'drag') return null;
   const ident = identOf(arg(line, 1));
@@ -247,10 +218,8 @@ function entrantOf(line: LogLine, side: string): string | null {
 }
 
 /**
- * Boots stay a guess only while nothing known about the holder rules them
- * out, and while no ability it may have keeps the rock damage off, asked of
- * the simulator as the build asks it (T130: a Magic Guard Clefable showed the
- * guess in the panel while the build refused it).
+ * Boots stay a guess only while nothing known about the holder rules them out and no ability it may have keeps the rock damage off, asked
+ * of the simulator as the build asks it (the panel never shows a guess the build refuses).
  */
 function canGuessBoots(pokemon: RevealedPokemonInfo, legality: LegalityContext): boolean {
   if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
@@ -259,7 +228,6 @@ function canGuessBoots(pokemon: RevealedPokemonInfo, legality: LegalityContext):
   return !rocksMayMiss(pokemon, dexOf(legality), legality.freeAbilities);
 }
 
-/** Entry-hazard damage resolves before the next action — scan until then. */
 function tookRockDamageOnEntry(lines: readonly LogLine[], index: number, nickname: string): boolean {
   for (let lookahead = index + 1; lookahead < lines.length; lookahead++) {
     const next = lines[lookahead];

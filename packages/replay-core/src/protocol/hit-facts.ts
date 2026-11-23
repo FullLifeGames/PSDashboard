@@ -21,7 +21,7 @@ export function noteAbilityEnd(state: ParserState, line: string) {
   if (mon) state.abilityEnded.add(mon);
 }
 
-/** A line that changes an ability's own state: the stat a Paradox ability picks (T167), or the ability a Gastro Acid ends. */
+/** A line that changes an ability's own state: the stat a Paradox ability picks, or the ability a Gastro Acid ends. */
 export function noteAbilityState(state: ParserState, line: string) {
   if (line.startsWith('|-endability|')) noteAbilityEnd(state, line);
   else if (line.startsWith('|-ability|')) noteSurvivalMarker(state, line);
@@ -61,7 +61,7 @@ function fieldFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon):
   return [...found].sort();
 }
 
-/** The living partner of `mon` as the solver reads it (T203); undefined in singles and when the partner has fainted. */
+/** The living partner of `mon` as the solver reads it; undefined in singles and when the partner has fainted. */
 function allyReading(mon: Pokemon): AllyReading | undefined {
   const ally = allyOf(mon);
   if (!ally) return undefined;
@@ -69,14 +69,13 @@ function allyReading(mon: Pokemon): AllyReading | undefined {
   return { species: ally.speciesForme, ...(ability ? { ability } : {}), ...(!(ally.ability || ally.baseAbility) ? { unrevealed: true } : {}) };
 }
 
-/** The living partners of the hit (T203). */
 function partnerFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const attackerAlly = allyReading(attacker);
   const defenderAlly = allyReading(defender);
   return { ...(attackerAlly ? { attackerAlly } : {}), ...(defenderAlly ? { defenderAlly } : {}) };
 }
 
-/** The history a move's power can read (T210): the fallen of the attacker's side and the hits it took (group 1), the defender's status (group 2). */
+/** The history a move's power can read: the attacker's fallen allies and hits taken, the defender's status. */
 function historyFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const attackerFainted = attacker.side.team.filter(mon => mon.fainted).length;
   return {
@@ -89,7 +88,7 @@ function historyFactsOf(attacker: Pokemon, defender: Pokemon): Partial<DamageObs
 /** The slot key of an active Pokémon in the idents the parser keeps ('p2a'). */
 const slotKeyOf = (mon: Pokemon) => `p${mon.side.n + 1}${String.fromCharCode(97 + mon.side.active.indexOf(mon))}`;
 
-/** The turn's order of events at the hit (T210 group 3): the defender came in this turn, and every other living active has moved or switched. */
+/** The turn's order of events at the hit: the defender came in this turn, and every other living active has moved or switched. */
 function turnFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const acted = new Set([...state.actedThisTurn].map(ident => ident.slice(0, 3)));
   const others = state.battle.getAllActive().filter(mon => mon !== attacker && !mon.fainted);
@@ -99,11 +98,7 @@ function turnFactsOf(state: ParserState, attacker: Pokemon, defender: Pokemon): 
   };
 }
 
-/**
- * What the client battle shows at the damage line besides the stages, the item and the weather (round 69, T86): the move's name,
- * the terrain, the Terastallized types, both HP fractions, the fallen of Supreme Overlord, the abilities and the field facts. The
- * client is read before the line applies, so the HP is the pre-hit HP. The solver hands them to the calculator.
- */
+/** What the client battle shows at the damage line besides stages, item and weather; read before the line applies, so the HP is the pre-hit HP. */
 export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Pokemon, defender: Pokemon): Partial<DamageObservation> {
   const fallen = Object.keys(attacker.volatiles).map(volatile => FALLEN.exec(volatile)?.[1]).find(count => count !== undefined);
   const facts = fieldFactsOf(state, attacker, defender);

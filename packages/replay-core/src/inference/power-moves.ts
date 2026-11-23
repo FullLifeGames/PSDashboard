@@ -7,13 +7,8 @@ import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { arg, identOf, kwText, type LogLine } from './log-line.ts';
 
 /**
- * What the move line of a Z-move or a Max move proves about the set (round 70, batch fix). The log shows the powered move and
- * never its base move. The Dex answers the rest:
- * - a Z-move (`isZ`) names its crystal; a species' own Z-move also names the base move (`zMoveFrom` of the crystal);
- * - a status Z-move prints "Z-" before its base move and names the base move again in `[anim]`;
- * - any other damaging Z-move keeps the type of its base move, and so does every damaging Max move (`isMax`; a G-Max move
- *   holds the species there), whose category is the base move's;
- * - Max Guard, the Max move of status category, stands for every status move.
+ * Reads a Z-move or Max move line: the log shows the powered move and never its base move, so the Dex gives the base move or its type.
+ * Max Guard, the Max move of status category, stands for every status move.
  */
 
 type PowerMove =

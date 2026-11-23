@@ -15,7 +15,7 @@ interface TurnMover {
   cleanSecond: boolean;
 }
 
-/** A Choice Scarf that came (`held`) or went at this turn (round 63). */
+/** A Choice Scarf that came (`held`) or went at this turn. */
 export interface ScarfChange {
   turn: number;
   held: boolean;
@@ -32,15 +32,15 @@ export interface PendingMove {
   attacker: string;
   target: string;
   moveId: string;
-  /** The move's name as the move line prints it (round 69, T86). */
+  /** The move's name as the move line prints it. */
   moveName: string;
-  /** The move line names `[spread]`: the simulator cut the damage (round 69, T31). */
+  /** The move line names `[spread]`: the simulator cut the damage. */
   spread: boolean;
   /** Targets a `|-crit|` line named: their damage is no reading. */
   crits: Set<string>;
   /** Per target ident, in the order the damage lines came (a spread move has up to three, Dragon Darts two). */
   hits: Map<string, TargetHit>;
-  /** The item of a Pokémon whose item ended inside this move before its damage line: it counted for the hit (round 69, T191). */
+  /** The item of a Pokémon whose item ended inside this move before its damage line: it counted for the hit. */
   itemsBefore: Map<string, ItemReading>;
   /** Targets with an item or ability line inside this move before their damage line: a Focus Sash, Sturdy or Endure may hold the hit back. */
   marked: Set<string>;
@@ -48,7 +48,7 @@ export interface PendingMove {
   speedClean: boolean;
   attackerSide: 'p1' | 'p2';
   attackerSpecies: string;
-  /** Effectiveness marker seen for this move (HP-type evidence, ⑤). */
+  /** Effectiveness marker seen for this move (HP-type evidence). */
   effectiveness?: 'super' | 'resisted';
 }
 
@@ -62,29 +62,26 @@ export interface ParserState {
   currentTurnLines: string[];
   singles: boolean;
   genNum: GenerationNum;
-  // Speed-order evidence: the |move| lines of a turn prove effective speed
-  // order between opposite sides — but only when nothing else could
+  // Speed-order evidence: the |move| lines of a turn prove effective speed order between opposite sides, but only when nothing else could
   // explain it.
   speedTurn: number;
   turnMovers: TurnMover[];
   switchedThisTurn: Set<string>;
   actedThisTurn: Set<string>;
-  /** Idents whose slot After You or Quash rearranged this turn (round 37). */
+  /** Idents whose slot After You or Quash rearranged this turn. */
   reordered: Set<string>;
-  /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn (round 37). */
+  /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn. */
   quickActed: Set<string>;
   /**
-   * Per `side:species`, the turns a Choice Scarf came or went (round 63):
-   * the races around them are read with the Scarf the mon held, the races
+   * Per `side:species`, the turns a Choice Scarf came or went: the races around them are read with the Scarf the mon held, the races
    * of a change turn are dropped.
    */
   scarfChanges: Map<string, ScarfChange[]>;
-  /** The stat stages each Pokémon had when its Protosynthesis or Quark Drive last activated (round 69, T167). */
+  /** The stat stages each Pokémon had when its Protosynthesis or Quark Drive last activated. */
   paradoxStages: Map<Pokemon, Record<string, number>>;
-  /** The Pokémon whose ability a `|-endability|` line took away (Gastro Acid): the client keeps no trace of it (round 69, T86). */
+  /** The Pokémon whose ability a `|-endability|` line took away (Gastro Acid): the client keeps no trace of it. */
   abilityEnded: Set<Pokemon>;
   lastMove: PendingMove | null;
-  // Take initial snapshot at turn 0 (before any turns)
   capturedInitial: boolean;
 }
 
@@ -114,11 +111,9 @@ export function createParserState(format = ''): ParserState {
 }
 
 /**
- * Round 89 (#106): @pkmn/client 0.7.4 never charges Pressure's extra PP point: `getPressurePP` compares `effectiveAbility()`, which
- * returns an ID (`pressure`), with the name `Pressure`. The simulator charges it (a Pressure holder as the target of a move costs two
- * PP per use), so the count the log shows would stay one short per use and a move at 0 PP would read 1 PP. This copy is the client's
- * method with the comparison made on IDs; the Pressure row of `low-pp-sweep.spec.ts` holds it to the simulator. Upstream list: the
- * comparison in `Pokemon#getPressurePP`.
+ * @pkmn/client 0.7.4 never charges Pressure's extra PP point: `getPressurePP` compares `effectiveAbility()`, which returns an ID
+ * (`pressure`), with the name `Pressure`. The simulator charges it (a Pressure holder as the target of a move costs two PP per use).
+ * This copy is the client's method with the comparison made on IDs; the Pressure row of `low-pp-sweep.spec.ts` holds it to the simulator.
  */
 // eslint-disable-next-line names/no-new-dex-name -- the client's own ability ID, held to the simulator by the Pressure rows of low-pp-sweep.spec.ts
 const PRESSURE = 'pressure';
@@ -140,10 +135,9 @@ type PressurePP = number | [number, number];
 };
 
 /**
- * Round 89 (#106): the PP the log shows spent per move of the body, as @pkmn/client counts it (`ppUsed` of its move slots, which
- * charges Pressure and takes a Leppa or Mystery Berry back off). The copies a Transform holds are the target's moves and stay out;
- * a pair is a range: the client's when the foe's Pressure is open, and a charge move's, whose second move line some generations
- * do not charge. Undefined when the body shows no move.
+ * The PP the log shows spent per move of the body, as @pkmn/client counts it (`ppUsed` of its move slots: it charges Pressure and takes
+ * a Leppa or Mystery Berry back off). The copies a Transform holds stay out. A pair is a range: the foe's Pressure is open, or a charge
+ * move whose second move line some generations do not charge. Undefined when the body shows no move.
  */
 export function ppUsedOf(mon: Pokemon): PokemonSnapshot['ppUsed'] {
   const own = mon.moveSlots.filter(slot => !slot.virtual);
@@ -160,16 +154,11 @@ export function ppUsedOf(mon: Pokemon): PokemonSnapshot['ppUsed'] {
 }
 
 /**
- * DIRECTIONAL contamination, read at decision time: an observation drops
- * only when the factor could EXPLAIN the observed order — a speed-RAISING
- * factor (Tailwind, +spe stages, paradox boosters) on the FIRST mover, or
- * a speed-LOWERING factor (paralysis, −spe stages) on the SECOND. The
- * kept directions are IMPLIED constraints: outrunning a Tailwind-doubled
- * opponent outruns its base speed a fortiori, and a paralyzed mon moving
- * first won the race at a quarter of its speed. Trick Room inverts order
- * outright and same-turn entries are unknowable at order time — both
- * stay bilateral. (Paradox boosters are VOLATILES, not stat stages; any
- * variant counts as a raiser and none as a lowerer.)
+ * Directional contamination, read at decision time: an observation drops only when the factor could explain the observed order, a
+ * speed-raising factor (Tailwind, +spe stages, paradox boosters) on the first mover or a speed-lowering one (paralysis, -spe stages) on
+ * the second. The kept directions are implied constraints: outrunning a Tailwind-doubled opponent outruns its base speed a fortiori, and
+ * a paralyzed mon moving first won the race at a quarter of its speed. Trick Room inverts order outright and same-turn entries are
+ * unknowable at order time: both stay bilateral. Paradox boosters are volatiles, not stat stages; any variant counts as a raiser.
  */
 export function speedContaminatedAt(state: ParserState, ident: string, role: 'first' | 'second'): boolean {
   const { battle } = state;
@@ -188,11 +177,8 @@ export function speedContaminatedAt(state: ParserState, ident: string, role: 'fi
 }
 
 /**
- * Every opposite-side pair of the turn's movers in action order is a
- * race the earlier one won (round 37: doubles turns carry up to four
- * movers; a singles turn still yields its one pair). A pair drops when
- * the earlier mover is not clean as a first mover, the later one not as
- * a second, or either slot was rearranged.
+ * Every opposite-side pair of the turn's movers in action order is a race the earlier one won (doubles turns carry up to four movers).
+ * A pair drops when the earlier mover is not clean as a first mover, the later one not as a second, or either slot was rearranged.
  */
 export function flushSpeedOrder(state: ParserState) {
   const movers = state.turnMovers;

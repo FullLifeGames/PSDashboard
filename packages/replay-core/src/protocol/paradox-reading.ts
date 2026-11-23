@@ -19,9 +19,8 @@ function statOf(mon: Pokemon): StatId | undefined {
 }
 
 /**
- * The activation line of Protosynthesis or Quark Drive. The simulator picks the stat to raise there (getBestStat on the
- * Pokémon's staged stats), so the client's stages before the line applies are the ones the choice was made at: an Intimidate
- * that came before counts, a Swords Dance that comes after does not (round 69, T167).
+ * The activation line of Protosynthesis or Quark Drive. The simulator picks the stat to raise there (getBestStat on the Pokémon's
+ * staged stats), so the client's stages before the line applies are the ones the choice was made at: a Swords Dance after it does not count.
  */
 export function noteParadoxStart(state: ParserState, line: string) {
   const mon = state.battle.getPokemon((line.split('|')[2] ?? '') as ClientIdent);

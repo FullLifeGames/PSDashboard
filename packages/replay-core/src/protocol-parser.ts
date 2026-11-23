@@ -10,6 +10,7 @@ import { noteSurvivalMarker } from './protocol/survival-marker.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
+/** The turn snapshots of a replay log. */
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
 }
@@ -42,11 +43,7 @@ function dispatch(state: ParserState, line: string) {
   }
 }
 
-/**
- * One pass over the protocol: the per-tag handlers read the client battle
- * BEFORE the line applies (status, boosts, HP at decision time), then the
- * line feeds the client and turn boundaries take their snapshot.
- */
+/** One pass over the log: the handlers read the client battle before each line applies (the state at decision time), then the line feeds the client. */
 export function parseReplayLogWithObservations(rawLog: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];

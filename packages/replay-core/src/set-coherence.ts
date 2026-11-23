@@ -1,4 +1,3 @@
-// Round 75 (T160): the Dex of the game comes in with the evidence and the context (a type-only import of the resolver's Dex).
 import type { RulesDex } from './rules-dex.ts';
 import type { PokemonSetAssumption } from './smogon/sets-lookup.ts';
 import { filledSlots, slotMoveKey, slotOrderedMoves } from './team/move-slots.ts';
@@ -6,12 +5,9 @@ import { fillsOpenMove } from './team/open-moves.ts';
 import type { OpenMove } from './types.ts';
 
 /**
- * Pairwise coherence vetoes for guessed set assembly. Marginal fills (top
- * usage moves + top usage item) are individually plausible but often jointly
- * incoherent — SD Cobalion carrying Body Press, Noivern with Air Slash AND
- * Hurricane, a Choice set stuffed with status (GPL findings). Each veto row
- * applies ONLY to guessed entries: revealed/manual knowledge is proof and is
- * never second-guessed, however incoherent it looks.
+ * Pairwise coherence vetoes for guessed set assembly: marginal fills (top usage moves, top usage item) are individually plausible but
+ * often jointly incoherent (SD Cobalion with Body Press, Noivern with Air Slash and Hurricane, a Choice set stuffed with status).
+ * Revealed and manual knowledge is proof and never second-guessed, however incoherent it looks.
  */
 
 export interface MoveCandidate {
@@ -19,30 +15,24 @@ export interface MoveCandidate {
   /** false = revealed/manual (immune to vetoes), true = usage/set fill. */
   guessed: boolean;
   /**
-   * A move of the chosen Smogon set: coherent by construction, so rows 1
-   * to 4 spare it (row 3 since the review of round 64: the set is read as
-   * published); the item rows spare it only when the item is the set's own
-   * (round 67, T131), because an item from elsewhere (an inferred Scarf)
-   * may contradict it. Round 63, T28.
+   * A move of the chosen Smogon set: coherent by construction, so rows 1 to 4 spare it (the set is read as published); the item rows
+   * spare it only when the item is the set's own, because an item from elsewhere (an inferred Scarf) may contradict it.
    */
   fromSet?: boolean;
   /**
-   * A usage move past the top ten: it may refill a slot, but its boost
-   * serves nothing in row 1 (round 63 review: a Dragon Dance at 0.2 %
-   * struck Kingdra's guessed special attacks).
+   * A usage move past the top ten: it may refill a slot, but its boost serves nothing in row 1 (a Dragon Dance at 0.2 % struck
+   * Kingdra's guessed special attacks).
    */
   tail?: boolean;
 }
 
 export interface CoherenceContext {
-  /** The Dex of the game the set is assembled for (its generation and mod). */
   dex: RulesDex;
   /** The set's item id ('' when unknown): a status fill contradicts a Choice/AV item whether it is proof or a guess. */
   itemId: string;
   /**
-   * The item is the chosen set's own published item (round 67, T131,
-   * decision 20): the set's moves came with it, so the item rows spare
-   * them, and only them. Absent or false: the item came from elsewhere.
+   * The item is the chosen set's own published item: the set's moves came with it, so the item rows spare them, and only them.
+   * Absent or false: the item came from elsewhere.
    */
   itemFromSet?: boolean;
 }
@@ -52,12 +42,7 @@ export type CuratedSetAssumption = PokemonSetAssumption & { itemReplaced?: true 
 
 type DexMove = ReturnType<RulesDex['moves']['get']>;
 
-/**
- * The offense stats a move raises for its user, from the Dex (round 64,
- * decision 17): a self-targeted status move's boosts, `self.boosts`,
- * `selfBoost`, and a sure secondary's self boosts (Torch Song). The
- * coherence axis of veto row 1.
- */
+/** The offense stats a move raises for its user, from the Dex: self boosts, and a sure secondary's self boosts (Torch Song). */
 function boostsServed(move: DexMove): ('atk' | 'spa')[] {
   const raised: Record<string, number | undefined> = {
     ...(move.category === 'Status' && move.target === 'self' ? move.boosts : undefined),
@@ -68,12 +53,9 @@ function boostsServed(move: DexMove): ('atk' | 'spa')[] {
 }
 
 /**
- * Defense-boost setup whose offensive payoff is a Defense-scaling attack
- * (Body Press). Usage ranks these high BECAUSE of the pairing — when the
- * payoff attack is vetoed or absent, the guessed enabler must fall with it
- * (GPL Cobalion: Body Press vetoed next to revealed Swords Dance, Iron
- * Defense stayed behind). From the Dex (round 64, decision 17): a
- * self-targeted status move that raises Defense and no offense stat.
+ * Defense-boost setup whose offensive payoff is a Defense-scaling attack (Body Press). Usage ranks these high because of the pairing:
+ * when the payoff attack is vetoed or absent, the guessed enabler must fall with it (Body Press vetoed next to a revealed Swords Dance
+ * left Iron Defense behind). From the Dex: a self-targeted status move that raises Defense and no offense stat.
  */
 function defenseBoost(move: DexMove): boolean {
   return move.category === 'Status' && move.target === 'self' && (move.boosts?.def ?? 0) > 0 && boostsServed(move).length === 0;
@@ -101,7 +83,6 @@ interface MoveFacts {
   lowersOwn: string[];
 }
 
-/** The user's stats a move lowers on itself, from the Dex (`self.boosts`, `selfBoost`). */
 function ownStatsLowered(move: DexMove): string[] {
   const boosts: Record<string, number | undefined> = { ...move.self?.boosts, ...move.selfBoost?.boosts };
   return Object.keys(boosts).filter(stat => (boosts[stat] ?? 0) < 0);
@@ -121,13 +102,12 @@ export function factsOf(dex: RulesDex, name: string): MoveFacts | null {
 }
 
 export interface CuratedEvidence {
-  /** The Dex of the game the set is chosen for (its generation and mod). */
   dex: RulesDex;
   /** Move ids seen in game or user-set — the anchors a set must cover. */
   revealedMoves: string[];
   /**
-   * The base moves of Z-moves and Max moves that no revealed move explains (round 70): each is worth a revealed move's two points
-   * to a set that lists a move to fill it. Absent: none.
+   * The base moves of Z-moves and Max moves that no revealed move explains: each is worth a revealed move's two points to a set that
+   * lists a move to fill it. Absent: none.
    */
   openMoves?: OpenMove[];
   /** Item/ability ids known from proof ('' when unknown). */
@@ -138,9 +118,8 @@ export interface CuratedEvidence {
   /** Usage marginal probability of a move id (tiebreak; 0..1). */
   usageProbability: (moveId: string) => number;
   /**
-   * An item the log already points to (the inference's Heavy-Duty Boots
-   * tell, or the panel's own guess): the first replacement when the log
-   * rules out the item of the set the evidence picks (round 64, decision 19).
+   * An item the log already points to (the inference's Heavy-Duty Boots tell, or the panel's own guess): the first replacement when the
+   * log rules out the item of the set the evidence picks.
    */
   guessedItem?: string;
   /** The most used item the log still allows: the replacement after that ('' without usage data). */
@@ -150,19 +129,9 @@ export interface CuratedEvidence {
 /** Marginal floor for moves the usage list does not know. */
 const UNSEEN_MOVE_PROBABILITY = 0.01;
 
-/**
- * Coherent-set selection: score each CURATED set against the revealed
- * evidence and build from the best match instead of assembling marginals.
- * fit = +2 per revealed move in the set, +2 item match, +2 ability match,
- * disqualified on rule-out violations (an item slot only when the log rules
- * out every item it lists); ties break toward the set whose moves
- * the usage marginals like best (Σ log p). A set below the floor —
- * fit < revealed-move count, i.e. it contradicts what we saw — yields null
- * and the caller falls back to marginal assembly plus the pairwise vetoes.
- */
 interface CandidateIds {
   moveIds: string[];
-  /** Every item the published slot lists, first listed first (round 64, R1). */
+  /** Every item the published slot lists, first listed first. */
   itemIds: string[];
   abilityId: string;
 }
@@ -175,10 +144,7 @@ function candidateIds(dex: RulesDex, candidate: PokemonSetAssumption): Candidate
   };
 }
 
-/**
- * Two points per move slot a revealed move fills (any option, one move per
- * slot: T89), per revealed item, and per revealed ability the candidate carries.
- */
+/** Two points per move slot a revealed move fills (one move per slot), per revealed item and per revealed ability the candidate carries. */
 function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: CuratedEvidence): number {
   let fit = 2 * filledSlots(evidence.dex, candidate.moves, evidence.revealedMoves.map(name => slotMoveKey(evidence.dex, name))).size;
   if (evidence.revealedItem && ids.itemIds.includes(evidence.revealedItem)) fit += 2;
@@ -187,8 +153,8 @@ function fitScore(candidate: PokemonSetAssumption, ids: CandidateIds, evidence: 
 }
 
 /**
- * Two points per open move (a Z-move's or Max move's hidden base move) some option of a move slot fills (round 70). They rank the sets
- * that clear the floor and never lift one over it: a set that misses the revealed moves stays out.
+ * Two points per open move (a Z-move's or Max move's hidden base move) some option of a move slot fills. They rank the sets that clear
+ * the floor and never lift one over it: a set that misses the revealed moves stays out.
  */
 function openFit(candidate: PokemonSetAssumption, evidence: CuratedEvidence): number {
   const fills = (open: OpenMove) => candidate.moves.some(slot => (slot.options ?? [slot.value]).some(option => fillsOpenMove(evidence.dex, open, option)));
@@ -222,6 +188,13 @@ function bestCandidate(
   return best;
 }
 
+/**
+ * Coherent-set selection: scores each curated set against the revealed evidence and builds from the best match instead of assembling
+ * marginals. fit = +2 per revealed move in the set, +2 item match, +2 ability match, disqualified on rule-out violations (an item slot
+ * only when the log rules out every item it lists); ties break toward the set whose moves the usage marginals like best (sum of log p).
+ * A set below the floor (fit < revealed-move count, it contradicts what we saw) yields null and the caller falls back to marginal
+ * assembly plus the pairwise vetoes.
+ */
 export function selectCuratedSet(
   candidates: PokemonSetAssumption[],
   evidence: CuratedEvidence,
@@ -229,8 +202,8 @@ export function selectCuratedSet(
   const best = bestCandidate(candidates, evidence, true);
   const unruled = bestCandidate(candidates, evidence, false);
   if (!best) {
-    // Every published set that fits the moves lists only items the log rules out (round 69, T166): the set that fits stays
-    // the pick and plays the replacement item of the rule below, or none of it when no replacement is allowed.
+    // Every published set that fits the moves lists only items the log rules out: the set that fits stays the pick and plays the
+    // replacement item of the rule below, or none of it when no replacement is allowed.
     const replaced = unruled ? withItemAfterRuleOut(withSlotsResolved(unruled, evidence), unruled, evidence) : null;
     return replaced?.itemReplaced ? replaced : null;
   }
@@ -239,11 +212,9 @@ export function selectCuratedSet(
 }
 
 /**
- * The log ruled out the item of the set the evidence picks (`unruled`), so
- * the next set won, and its item is no evidence (round 64, T120, decision
- * 19: 2663102863's Gholdengo lost Leftovers and drew the next set's Choice
- * Specs). It plays a guess the log supports, else the most used item the
- * log allows, marked as such; without either it keeps its own.
+ * The log ruled out the item of the set the evidence picks (`unruled`), so the next set won, and its item is no evidence (Gholdengo lost
+ * Leftovers and drew the next set's Choice Specs). It plays a guess the log supports, else the most used item the log allows, marked as
+ * such; without either it keeps its own.
  */
 function withItemAfterRuleOut(
   set: PokemonSetAssumption, unruled: PokemonSetAssumption, evidence: CuratedEvidence,
@@ -257,17 +228,14 @@ function withItemAfterRuleOut(
   return { ...set, item: { value: replacement, sourceDetail: `${listed} ruled out, ${why}` }, itemReplaced: true };
 }
 
-/** Whether `item` is the chosen set's own: an option of its published item slot that no rule-out replaced (T131). */
-/**
- * The IVs the build plays from the published sets (round 69, T136): the chosen set's, else the marginal set's when no
- * usage spread leads. The panel and the build read this one rule.
- */
+/** The IVs the build plays from the published sets: the chosen set's, else the marginal set's when no usage spread leads. The panel and the build read this one rule. */
 export function publishedIvs(
   curated: CuratedSetAssumption | null, usageHasSpread: boolean, smogonSet: PokemonSetAssumption | undefined,
 ): PokemonSetAssumption['ivs'] {
   return curated ? curated.ivs : !usageHasSpread ? smogonSet?.ivs : undefined;
 }
 
+/** Whether `item` is the chosen set's own: an option of its published item slot that no rule-out replaced. */
 export function itemFromChosenSet(dex: RulesDex, curated: CuratedSetAssumption | null, item: string): boolean {
   if (!curated?.item || curated.itemReplaced || !item) return false;
   const itemId = (name: string) => dex.items.get(name).id as string;
@@ -275,9 +243,8 @@ export function itemFromChosenSet(dex: RulesDex, curated: CuratedSetAssumption |
 }
 
 /**
- * The item a published item slot plays (round 64, T120, R1: the set as
- * published): the revealed one when the slot lists it, else the first the
- * log does not rule out. A slot whose first item stands keeps its object.
+ * The item a published item slot plays (the set as published): the revealed one when the slot lists it, else the first the log does
+ * not rule out. A slot whose first item stands keeps its object.
  */
 function withItemSlotResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
   const options = set.item?.options;
@@ -288,7 +255,6 @@ function withItemSlotResolved(set: PokemonSetAssumption, evidence: CuratedEviden
   return !played || played === set.item.value ? set : { ...set, item: { ...set.item, value: played } };
 }
 
-/** The winner's moves with its slots read against the evidence (T89, decision 11). */
 function withSlotsResolved(set: PokemonSetAssumption, evidence: CuratedEvidence): PokemonSetAssumption {
   const moves = slotOrderedMoves(evidence.dex, set.moves, new Set(evidence.revealedMoves.map(name => slotMoveKey(evidence.dex, name))));
   return moves === set.moves ? set : { ...set, moves };
@@ -312,9 +278,8 @@ function protectedDamaging(dex: RulesDex, candidates: MoveCandidate[]): MoveFact
 }
 
 /**
- * Pass 1 decides the DAMAGING keeps (rows 1 and 2), so a status rule can
- * ask what the kept attacks scale with — Iron Defense is only coherent
- * while a Defense-scaling attack survives.
+ * Pass 1 decides the damaging keeps (rows 1 and 2), so a status rule can ask what the kept attacks scale with: Iron Defense is only
+ * coherent while a Defense-scaling attack survives.
  */
 function keepDamagingMoves(dex: RulesDex, candidates: MoveCandidate[], served: Set<string>): DamagingKeeps {
   const keptDamageTypes = new Set<string>();
@@ -339,9 +304,8 @@ function keepDamagingMoves(dex: RulesDex, candidates: MoveCandidate[], served: S
       facts.basePower >= BOOST_VETO_MIN_BP && !facts.pivot) {
       continue;
     }
-    // Row 4: a move the Dex says contradicts a kept one (Body Press reads
-    // the Defense that Close Combat or Clanging Scales lowers): the guessed
-    // move falls, the first kept stays (round 64, T120, decision 15).
+    // Row 4: a move the Dex says contradicts a kept one (Body Press reads the Defense that Close Combat or Clanging Scales lowers):
+    // the guessed move falls, the first kept stays.
     if (keptFacts.some(kept => contradicts(facts, kept))) continue;
     // Row 2: redundant same-type damage from the same slot budget
     // (Air Slash + Hurricane) — first accepted (higher usage) wins. A
@@ -352,7 +316,6 @@ function keepDamagingMoves(dex: RulesDex, candidates: MoveCandidate[], served: S
   return { keptScalings, damagingKept };
 }
 
-/** Pass 2 assembles in pool order; status rows run against the kept attacks. */
 function assembleKeptMoves(
   dex: RulesDex, candidates: MoveCandidate[], restrictiveItem: 'choice' | 'av' | null, keeps: DamagingKeeps, itemFromSet: boolean,
 ): MoveCandidate[] {
@@ -364,7 +327,6 @@ function assembleKeptMoves(
       continue;
     }
     if (facts.category === 'Status') {
-      // The set's own item came with the set's moves (T131).
       const spared = !!candidate.fromSet && itemFromSet;
       if (restrictiveItem === 'av' && !spared) continue;
       if (restrictiveItem === 'choice' && !TRICK_FAMILY.has(facts.id) && !spared) continue;
@@ -383,14 +345,12 @@ export function applyCoherenceVetoes(
   candidates: MoveCandidate[],
   context: CoherenceContext,
 ): MoveCandidate[] {
-  // A Choice item from the Dex (`isChoice`, round 64 decision 17).
   const { dex } = context;
   const restrictiveItem = dex.items.get(context.itemId).isChoice ? 'choice'
     : context.itemId === 'assaultvest' ? 'av' : null;
   // Boost context comes from the WHOLE pool (usage order can list the attack
   // before the boost) — boost moves themselves are never vetoed by these rows.
-  // A guessed boost the item rows strike serves nothing (round 63, T28: a
-  // usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only),
+  // A guessed boost the item rows strike serves nothing (a usage Dragon Dance under Choice Specs left Kyurem with Icicle Spear only),
   // and neither does a boost from the usage tail.
   const served = new Set<string>();
   const itemFromSet = !!context.itemFromSet;

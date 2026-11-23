@@ -3,31 +3,11 @@ import { CHAMPIONS_MOD } from '../calc-gen.ts';
 import type { RulesDex } from '../rules-dex.ts';
 import { twinBattle } from './twin.ts';
 
-/**
- * Round 89 (#110): the simulator's own answer to "would this ability have refused the effect the log shows landing?". The
- * inference reads a landed flinch, stat drop, status, confusion or Taunt as proof that the body's ability was none of the
- * abilities that refuse it; which abilities refuse it is the Dex handlers' business (`onTryAddVolatile`, `onTryBoost`,
- * `onSetStatus`, `onImmunity`, `onModifySecondaries`, `onTryHit` and the `onAlly` twins of the first four), and no list of
- * names stands here. A scene is played on a fresh twin battle (sim-ask/twin.ts) of the replay's generation, mod and game
- * type: the source and the body that took the effect, the ally of the body in doubles, each with the ability the scene
- * names. The twin runs the same events the real move would: the move's own `ModifyMove` event (a Mold Breaker kin sets
- * `ignoreAbility` there, and the battle's own `suppressingAbility` then skips the breakable handlers), the secondary filter
- * for an effect a move's secondary adds, `TryHit` for a status move, then the add or boost call the move makes.
- * blocked-effects-sweep.spec.ts holds every verdict to a whole battle played through `choose` for every ability of every
- * generation and mod the corpus plays, singles and doubles.
- *
- * Round 89 (#150): a fourth kind of effect, the hit itself. The twin plays the move through the simulator's own turn (`choose` with the
- * dice forced lucky: `ModifyMove`, `ModifyType`, the redirect of a doubles ally, `TryHit`, the immunity checks, `onFoeTryMove`), under the
- * weather, terrain and field conditions the log shows and with the target's item, types and volatile conditions, and answers whether the
- * damage line of the hit (`|-damage|` without `[from]`) came out. landed-hit-sweep.spec.ts holds it to whole battles the same way. The target does not act in
- * that turn (the log shows the hit before the target's own action, and Protean or Libero would change its type with its first move), and a scene in which a
- * body transforms (Imposter copies the foe on entry) answers null. `mayRefuseHit` names the abilities that could refuse a hit at all, so the reader asks the
- * simulator about no others.
- */
+/** The simulator's own answer to "would this ability have refused the effect the log shows landing?", played as a scene on a twin battle (EVALUATION.md, "Rule-outs"). */
 
 /**
- * One body of a scene: the species and the ability the twin gives it ('' leaves it without one: inert). The target of a hit may carry
- * what the log shows of it (its item, its types now, the volatile conditions it stands under: Ingrain and Smack Down ground it).
+ * One body of a scene: the species and the ability the twin gives it ('' leaves it inert). The target of a hit may carry what the log
+ * shows of it (its item, its types now, its volatile conditions: Ingrain and Smack Down ground it).
  */
 export interface SceneBody { species: string; ability: string; item?: string; types?: string[]; volatiles?: string[] }
 
@@ -35,18 +15,15 @@ export interface SceneBody { species: string; ability: string; item?: string; ty
 export interface SceneEffect { kind: 'volatile' | 'status' | 'boost' | 'hit'; id: string; stat?: string }
 
 export interface EffectScene {
-  /** The body that took the effect. */
   target: SceneBody;
   /** The target's ally on the field in doubles, absent in singles. */
   partner?: SceneBody;
-  /** The body that dealt the effect (the move's user, the Intimidate holder). */
   source: SceneBody;
   effect: SceneEffect;
   /** How the effect reached the target: a status move's own field, a damaging move's secondary, or an ability's call. */
   route: 'primary' | 'secondary' | 'ability';
   /** The move that dealt it (primary and secondary routes), as the log names it. */
   move?: string;
-  /** The ability that dealt it (the ability route). */
   ability?: string;
   /** The weather standing at that moment (a Dex weather id), '' for none. */
   weather?: string;
@@ -66,7 +43,6 @@ const formatOf = (dex: RulesDex, doubles: boolean): string =>
 // eslint-disable-next-line names/no-new-dex-name -- the twin's warm-up move: any move that does nothing (blocked-effects-sweep.spec.ts plays the same scenes through whole battles)
 const NO_MOVE = 'splash';
 
-/** The twin of a scene: source and filler on one side, the target and its ally (or a filler) on the other, all on the field. */
 function twinOf(dex: RulesDex, scene: EffectScene): Battle {
   const doubles = !!scene.partner;
   const hit = scene.effect.kind === 'hit';
@@ -99,7 +75,6 @@ function reaches(battle: Battle, scene: EffectScene, move: ActiveMove | null): b
   return !(scene.route === 'primary' && move?.category === 'Status') || !!battle.runEvent('TryHit', target, source, move);
 }
 
-/** Plays the scene's events up to the effect's own call, and answers whether the call went through. */
 function play(dex: RulesDex, scene: EffectScene): boolean {
   if (scene.effect.kind === 'hit') return hitLands(dex, scene);
   const battle = twinOf(dex, scene);
@@ -109,6 +84,7 @@ function play(dex: RulesDex, scene: EffectScene): boolean {
   battle.activePokemon = source;
   battle.activeMove = move;
   if (scene.weather) battle.field.setWeather(scene.weather, source);
+  // ModifyMove first: a Mold Breaker kin sets `ignoreAbility` there, and the battle's own `suppressingAbility` then skips the breakable handlers.
   if (move) battle.runEvent('ModifyMove', source, target, move, move);
   if (!reaches(battle, scene, move)) return false;
   const { kind, id, stat } = scene.effect;
@@ -122,8 +98,8 @@ function play(dex: RulesDex, scene: EffectScene): boolean {
 }
 
 /**
- * The choice text of the move at the foe in front: the simulator asks for a target only for the moves that pick one (`targetTypeChoices` of the battle's
- * actions, so no list of target types stands here); a move that picks the ally or the user is no hit on a foe.
+ * The choice text of the move at the foe in front: the simulator asks for a target only for the moves that pick one (`targetTypeChoices`
+ * of the battle's actions, so no list of target types stands here); a move that picks the ally or the user is no hit on a foe.
  */
 function aimOf(battle: Battle, move: string, doubles: boolean): string {
   const target = battle.dex.moves.get(move).target;
@@ -131,9 +107,9 @@ function aimOf(battle: Battle, move: string, doubles: boolean): string {
 }
 
 /**
- * The field the log shows (weather, terrain, Gravity and the other pseudo-weathers) stands before the move. A field the twin cannot stand under (a
- * condition it refuses to start) is a scene it cannot play: the caller then rules nothing out. A field that already stands (an ability of the twin's own
- * bodies sets it on entry, as in the game) is the field of the scene.
+ * The field the log shows (weather, terrain, Gravity and the other pseudo-weathers) stands before the move. A field the twin cannot stand
+ * under (a condition it refuses to start) is a scene it cannot play: the caller then rules nothing out. A field that already stands (an
+ * ability of the twin's own bodies sets it on entry) is the field of the scene.
  */
 function standUnderField(battle: Battle, scene: EffectScene) {
   const source = battle.p1.active[0];
@@ -184,7 +160,6 @@ const memoByDex = new WeakMap<RulesDex, Map<string, boolean | null>>();
 let plays = 0;
 export const twinPlays = (): number => plays;
 
-/** Asked once per Dex and scene. */
 function remembered(dex: RulesDex, key: string, ask: () => boolean | null): boolean | null {
   const memo = memoByDex.get(dex) ?? new Map<string, boolean | null>();
   memoByDex.set(dex, memo);

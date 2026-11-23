@@ -4,9 +4,9 @@ import type { ParserState, PendingMove } from './parser-state.ts';
 const ONE_PERCENT = 0.01;
 
 /**
- * An item or ability line of a Pokémon inside the pending move, before its own damage line (round 69): Focus Sash prints
- * `-enditem`, Focus Band and Endure `-activate`, Sturdy `-ability`. The line names no item; any of them in front of a damage line
- * that leaves the Pokémon at 1 percent says the hit was held back, so the damage is a lower bound (`survivedAtOne`).
+ * An item or ability line of a Pokémon inside the pending move, before its own damage line: Focus Sash prints `-enditem`, Focus Band and
+ * Endure `-activate`, Sturdy `-ability`. The line names no item; one in front of a damage line that leaves the Pokémon at 1 percent says
+ * the hit was held back, so the damage is a lower bound (`survivedAtOne`).
  */
 export function noteSurvivalMarker(state: ParserState, line: string) {
   const { lastMove } = state;

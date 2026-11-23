@@ -7,23 +7,9 @@ import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { arg, hasKw, identOf, keyOf, type LogLine } from './log-line.ts';
 import { illusionPossible, possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 
-/**
- * Round 86 (T310): the item that held a screen, from the screen's turns in the log. Reflect, Light Screen and Aurora Veil last
- * five turns, eight with Light Clay (`conditionTurns` reads both numbers from the Dex's condition). The log shows a screen's
- * start in the action phase of the turn its setter used the move and its end in the residual phase of a later turn, so the
- * lifetime counts the turns: the plain five rule out the items that would have extended it, the turns of one item prove it.
- *
- * A verdict needs an observed end in the residual phase on the side that holds the interval. Nothing is read when the turns
- * prove nothing: a removal ends a screen in the action phase (found by the phase, never by a move's name); a screen that moves
- * without a line (Court Change) shows an end on a side with no interval and voids the open ones; a screen still standing at the
- * log's end could have been taken by such a mover; a start whose move line carries `[from]` (Snatch, Copycat, Metronome) or
- * `[silent]` belongs to no setter the reader can name. The rule-out alone doubts an item that counted for nothing (Klutz,
- * Embargo, Magic Room: `ITEM_BLOCKERS`); both verdicts doubt an item the log showed or changed, and an Illusion team. The
- * sweeps `screen-turns-sweep.spec.ts` and `screen-evidence.spec.ts` hold the table, the blockers, the removers and the movers
- * to the simulator in every rule set and both game types.
- */
+/** The item that held a screen (Reflect, Light Screen, Aurora Veil: five turns, eight with Light Clay), read from its lifetime in the log (ARCHITECTURE.md, "Rule-outs"). */
 
-/** A screen standing on one side, opened at its setter's move (round 88, T329: a weather or a terrain, opened at its setter's move or ability, shares the interval and the verdict). */
+/** A screen standing on one side, opened at its setter's move; a weather or a terrain shares the interval and the verdict. */
 export interface Interval {
   /** The `|turn|` the setter used the move on. */
   turn: number;
@@ -69,7 +55,10 @@ function tableOf(state: InferrerState, condition: string): ConditionTurns | null
   return table && table.byItem.size > 0 ? table : null;
 }
 
-/** A start in the action phase, set by the move line before it. */
+/**
+ * A start in the action phase, set by the move line before it. A start whose move line carries `[from]` (Snatch, Copycat, Metronome)
+ * or `[silent]` belongs to no setter the reader can name.
+ */
 function onStart(state: InferrerState, watch: ScreenWatch, line: LogLine) {
   const side = identOf(arg(line, 1))?.side;
   const condition = conditionOf(line);
@@ -109,7 +98,10 @@ export function judge(state: InferrerState, interval: Interval, lifetime: number
   }
 }
 
-/** An end: in the residual phase it closes the screen with a verdict, in the action phase it is a removal, with no interval it is a mover. */
+/**
+ * An end: in the residual phase it closes the screen with a verdict, in the action phase it is a removal (found by the phase, never by a
+ * move's name). With no interval it is a mover (Court Change moves a screen without a line) and voids the open intervals of the condition.
+ */
 function onEnd(state: InferrerState, watch: ScreenWatch, line: LogLine) {
   const side = identOf(arg(line, 1))?.side;
   const condition = conditionOf(line);
@@ -123,10 +115,7 @@ function onEnd(state: InferrerState, watch: ScreenWatch, line: LogLine) {
   if (watch.residual) judge(state, interval, watch.turn - interval.turn + 1);
 }
 
-/**
- * The line handler, called after `watchItemEvidence` (it has updated the item watch this line reads): the turn and the phase,
- * the setter's move, the start and the end of a screen.
- */
+/** The line handler, called after `watchItemEvidence` (it has updated the item watch this line reads). */
 export function watchScreenEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.screenWatch ??= newWatch());
   if (line.cmd === 'turn') watch.turn = Number(arg(line, 1)) || 0;

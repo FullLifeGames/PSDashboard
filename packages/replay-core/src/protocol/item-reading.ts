@@ -6,7 +6,7 @@ import type { ClientIdent, ParserState, PendingMove } from './parser-state.ts';
 /** The client's marks for an item a Pokémon took from another one (the idiom of inference/hits.ts). */
 const ACQUIRED = new Set(['tricked', 'stolen', 'bestowed', 'harvested']);
 
-/** What the client battle holds of a Pokémon's item at one moment (round 69, T191). */
+/** What the client battle holds of a Pokémon's item at one moment. */
 export interface ItemReading {
   /** The item id the log has shown it holding now; '' when it holds none or the log never showed it. */
   item: string;
@@ -19,10 +19,9 @@ export function readItem(mon: Pokemon): ItemReading {
 }
 
 /**
- * The first `-enditem` of a Pokémon inside the pending move, before its own damage line: the item ended while the damage was
- * resolved (a weakening berry, a gem), so the hit counted it. The reading is the client's before the line applies, with the item
- * the line names when the log had not shown it. An item that
- * ends after its holder's damage line (Knock Off, a popped Air Balloon, a Sitrus Berry) is gone only for the next hit.
+ * The first `-enditem` of a Pokémon inside the pending move, before its own damage line: the item ended while the damage resolved, so the
+ * hit counted it (a weakening berry, a gem). An item that ends after the damage line (Knock Off, a popped Air Balloon, Sitrus Berry) is
+ * gone only for the next hit. The reading is the client's before the line applies, with the item the line names when the log had not shown it.
  */
 export function noteItemEnd(state: ParserState, line: string) {
   const { lastMove, battle } = state;

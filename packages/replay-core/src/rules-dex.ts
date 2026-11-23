@@ -4,11 +4,8 @@ import { CHAMPIONS_MOD, calcModOf, type CalcGeneration } from './calc-gen.ts';
 import { genNumOf, toId } from './ids.ts';
 
 /**
- * Round 75 (T160, decision D1): the one place that reads the simulator's global Dex. The global Dex is Generation 9 on
- * Scarlet/Violet: it knows neither the type chart of Gen 1 to 5, a species' older base stats and abilities (Clefable's Special
- * Attack is 95 from Gen 7 and 85 before), a move's older power, nor the Pokémon Champions mod (159 moves, 7 abilities, White Herb
- * and three conditions differ). Every read of a rule asks `rulesDex(gen, mod)`, or a battle's own `battle.dex`; the lint rule
- * dex/no-global-dex-read (eslint.dex.mjs) fails any other read of the global Dex in this package's src.
+ * The one place that reads the simulator's global Dex (Generation 9 Scarlet/Violet: no older type chart, base stats or powers, no Champions
+ * mod); every other read asks `rulesDex(gen, mod)` or a battle's own `battle.dex`, which the lint rule dex/no-global-dex-read holds.
  */
 
 /** The Dex of one generation or mod: the type of `Dex.forGen(gen)`, which the registered Champions Dex shares. */
@@ -22,16 +19,13 @@ export interface GameRules { gen: number; mod: RulesMod }
 
 const NEWEST_GEN = 9;
 
-/**
- * The Dex a game plays by: the registered Champions Dex for the Champions mod (and the calculator's generation 0), else the
- * Dex of generation `gen` (clamped to 1..9, the generations the simulator knows). The Champions mod loads on demand
- * (eval-engine's loadSimMods, the hosts await it before they read a Champions game): a Champions game without it throws,
- * because Scarlet/Violet would answer silently and wrongly.
- */
+/** The Dex a game plays by: the Champions Dex for the Champions mod (and the calculator's generation 0), else generation `gen` clamped to 1..9. */
 export function rulesDex(gen: number, mod?: string): RulesDex {
   if (mod === CHAMPIONS_MOD || gen === 0) {
     const champions = Dex.dexes[CHAMPIONS_MOD] as RulesDex | undefined;
     if (!champions) {
+      // The mod loads on demand (eval-engine's loadSimMods, which the hosts await before they read a Champions game). Throwing beats an
+      // answer from Scarlet/Violet, silently wrong.
       throw new Error('The Pokémon Champions mod is not registered on the simulator: await loadSimMods(format) (eval-engine) or register @pkmn/mods/champions before a Champions game is read');
     }
     return champions;
@@ -50,7 +44,7 @@ export function formatRules(format: string): GameRules {
   return { gen: genNumOf(toId(format)), mod: calcModOf(format) };
 }
 
-/** The Dex of the first format of the list that names one ('' reads as Generation 9, the format-less default): the sources a set was published or a usage count was made for. */
+/** The Dex of the first format of the list that names one ('' reads as Generation 9): the sources a set was published or a usage count was made for. */
 export const dexOfSources = (...formats: (string | undefined)[]): RulesDex => dexOf(formatRules(formats.find(format => !!format) ?? ''));
 
 /** The Dex of the game these rules name: `rulesDex(rules.gen, rules.mod)`. */
@@ -60,10 +54,9 @@ export const dexOf = (rules: GameRules): RulesDex => rulesDex(rules.gen, rules.m
 export const dexOfCalc = (calc: CalcGeneration): RulesDex => rulesDex(calc.num as number);
 
 /**
- * The data-only Dex that @pkmn/data's Generations, and so @pkmn/client's Battle, is built on. The client reads an item or an
- * ability by the shape of the data package (the simulator's Dex adds the handlers, and the client then misses an item's own
- * effect: Toxic Orb's holder stayed unknown), so the client's Generations take this one. It holds the base data of every
- * generation; the Champions mod enters `generationsFor` as its own Dex ('legal' scope), never through here.
+ * The data-only Dex that @pkmn/data's Generations, and so @pkmn/client's Battle, is built on: the client reads an item or an ability by the
+ * data package's shape, and the simulator's handlers make it miss an item's own effect (Toxic Orb's holder stayed unknown). The Champions
+ * mod enters `generationsFor` as its own Dex, never through here.
  */
 export function dataDex(): typeof DataDex {
   return DataDex;
@@ -79,15 +72,13 @@ export function dexOfFormat(format: Parameters<typeof Dex.forFormat>[0]): RulesD
   return Dex.forFormat(format);
 }
 
-/** Types of what registering a mod takes: the mod's data and its format list. */
+/** The data a mod registers (`Dex.mod`'s second argument). */
 export type RulesModData = NonNullable<Parameters<typeof Dex.mod>[1]>;
+/** The format list a mod registers (`Dex.formats.extend`'s argument). */
 export type RulesModFormats = Parameters<typeof Dex.formats.extend>[0];
 
-/**
- * Registers the Champions mod with the simulator: its Dex (`Dex.mod`) and its formats on the base Dex. The one place that writes
- * the global Dex; eval-engine's registerChampionsMod (forward/sim-mods.ts) calls it once per process (a second format registration
- * throws "duplicate ID").
- */
+// The one place that writes the global Dex; call it once per process (a second format registration throws "duplicate ID").
+/** Registers the Champions mod (its Dex and its formats) on the simulator. */
 export function registerChampionsDex(data: RulesModData, formats: RulesModFormats): void {
   Dex.mod(CHAMPIONS_MOD, data);
   Dex.formats.extend(formats);

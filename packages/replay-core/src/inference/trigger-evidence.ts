@@ -8,28 +8,11 @@ import { toId } from '../ids.ts';
 import { terrainConditions } from '../dex-facts/index.ts';
 import { newFieldItemWatch, watchFieldItems, type FieldItemWatch } from './field-item-triggers.ts';
 
-/**
- * Items the protocol rules out by a trigger it shows without the item's line
- * (round 67, T130, decision 18). The round-64 census counted the guesses the
- * simulator consumed where the game showed nothing: Air Balloon 207, Booster
- * Energy 183 and Eject Pack 164 of 562 singles rows. Each fact runs through
- * @pkmn/sim in trigger-evidence.spec.ts:
- *  - Air Balloon announces itself as its holder enters (onStart), unless
- *    Gravity is up or the item is ignored (Magic Room, a possible Klutz);
- *  - Booster Energy is spent at entry by an ability its own handler names,
- *    outside the weather or terrain that ability reads (gen 9);
- *  - Eject Pack switches its holder out after any drop but Parting Shot's, at
- *    the latest in the residual phase after the next move, while a teammate
- *    can come in (gens 8 and 9);
- *  - the terrain seeds and Room Service are used when the field changes
- *    (field-item-triggers.ts, round 88, T349).
- * Only items still unknown and never swapped are ruled out, and a team that
- * may hold an Illusion user is not judged (ruleOutUnknown, item-evidence.ts).
- */
+/** Rules out Air Balloon, Booster Energy and Eject Pack by the trigger the protocol shows without the item's line. */
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 
-/** An entry waiting for its Air Balloon announcement or its Booster Energy line. */
+/** An entry waiting for its Air Balloon announcement (it shows as its holder enters, unless Gravity is up or the item is ignored) or its Booster Energy line. */
 interface EntryCheck {
   ident: string;
   balloon: boolean;
@@ -56,7 +39,7 @@ export interface TriggerWatch {
   drops: Map<string, { moved: boolean }>;
   /** The Lum Berry, Sitrus Berry, Eject Button and Red Card windows (item-triggers.ts). */
   items: ItemTriggerWatch;
-  /** The terrain seeds and Room Service (field-item-triggers.ts, round 88, T349). */
+  /** The terrain seeds and Room Service (field-item-triggers.ts). */
   field: FieldItemWatch;
 }
 
@@ -94,7 +77,7 @@ function spendsWith(onUpdate: ItemHandler, ability: string, watch: TriggerWatch)
   return used;
 }
 
-/** Every ability the Pokémon may have makes Booster Energy spend itself at entry, so a holder shows the line. */
+/** Every ability the Pokémon may have makes Booster Energy spend itself at entry (gen 9), outside the weather or terrain it reads, so a holder shows the line. */
 function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch): boolean {
   if (watch.neutralized || watch.magicRoom || !inGen(state, 'boosterenergy')) return false;
   const { onUpdate } = dexOf(state).items.get('boosterenergy') as { onUpdate?: ItemHandler };
@@ -127,7 +110,7 @@ function closeEntries(state: InferrerState, watch: TriggerWatch) {
   watch.entries.clear();
 }
 
-/** A drop on an opponent Pokémon that an Eject Pack would answer. */
+/** A drop on an opponent Pokémon that an Eject Pack would answer (gens 8 and 9: after any drop but Parting Shot's). */
 function onDrop(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
   if (!(Number(arg(line, 3)) > 0) || !inGen(state, 'ejectpack') || watch.drops.has(key)) return;
   if (toId(state.pendingMove?.moveName ?? '') === 'partingshot') return;
@@ -158,8 +141,7 @@ function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
   else if (terrainConditions(dexOf(state)).has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
-  // A field change inside an entry's window: the Booster Energy reading is no longer clean.
-  // A lasting weather's upkeep line changes nothing (752839 t13).
+  // A field change inside an entry's window: the Booster Energy reading is no longer clean. A lasting weather's upkeep line changes nothing.
   if (fieldOf(watch) !== before) for (const entry of watch.entries.values()) entry.booster = false;
 }
 
@@ -219,10 +201,7 @@ function noteCommander(watch: TriggerWatch, line: LogLine) {
   for (const ident of [arg(line, 1), ofIdent(line)]) if (ident) watch.commanding.add(keyOf(ident));
 }
 
-/**
- * The line handler: the field the triggers read, the windows they open, and
- * at their close the items whose line never came.
- */
+/** The line handler: the field the triggers read, the windows they open, and at their close the items whose line never came. */
 export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.triggerWatch ??= newWatch(state));
   const tag = line.cmd;
