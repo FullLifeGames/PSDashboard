@@ -5,12 +5,9 @@ import { playedFromLines } from '../../src/hooks/usePositionPicker';
 import { dockReplays, fixtureReplay } from '../e2e/helpers';
 import { loggedTurn } from '../e2e/dock-helpers';
 
-/**
- * Round 84 (turn dock), step A6c: the task e2e compares the dock with the log through `loggedTurn`, which reads the lines apart
- * from the app. Here that reader is held against the app's played record on every turn of the e2e fixtures, so a wrong
- * expectation shows as a unit failure and not as a red e2e run: the same slots acted, with the same move or body, the same
- * gimmick, and a target label where the seed carries a target.
- */
+// The e2e compares the dock with the log through `loggedTurn`, which reads the lines apart from the app. Here that reader is held
+// against the app's played record on every turn of the e2e fixtures: the same slots acted, with the same move or body, the same
+// gimmick, and a target label where the seed carries a target.
 const replays = [fixtureReplay, ...dockReplays];
 
 describe.each(replays.map(replay => [replay.id, replay] as const))('%s', (_id, replay) => {

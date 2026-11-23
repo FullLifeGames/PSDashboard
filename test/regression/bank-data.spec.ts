@@ -8,12 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { hashDirectory } from '../../scripts/calibration-fingerprint.mjs';
 import { downloadWithRetry, packData, tarEntry, tarEnd, unpackData } from '../../scripts/bank-data.mjs';
 
-/**
- * Round 71 (bank in GitHub Actions): the bank's data (.fit-corpus and .smogon-cache) travels to CI as one gzipped
- * tar. Packing the same folders twice gives the same bytes; the CI job checks the file's sha256, unpacks only
- * regular files under the two folders and checks that the folders hash as the fingerprint read them here, so a CI
- * run's fingerprint names the same data as a local run's.
- */
 
 const made: string[] = [];
 afterAll(() => {
@@ -120,7 +114,7 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
   /** The holdout sets of the temp checkout: the tarball takes these replays of .fit-corpus. */
   const holdout = (root: string, ids: string[]) =>
     put(root, 'test/regression/fixtures/fit-holdout-manifest.json', JSON.stringify({ sets: [{ key: 'doublesou|a|b', family: 'doublesou', ids }] }));
-  /** The fit corpus manifest of the temp checkout (test/regression/fixtures/fit-corpus-manifest.json, read by test/regression/bank-universe.ts). */
+  /** The fit corpus manifest of the temp checkout (read by bank-universe.ts). */
   const fitManifest = (root: string, ids: string[]) =>
     put(root, 'test/regression/fixtures/fit-corpus-manifest.json', JSON.stringify({ replays: ids.map(id => ({ id, format: id.split('-')[0], source: 'tournament' })) }));
   const run = (root: string, ...args: string[]) =>
@@ -206,7 +200,7 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
 });
 
 describe('the download of the data release', () => {
-  // Round 72: a CI job met HTTP 504 on the release asset and failed, so the run's merge lost its slices.
+  // A CI job that meets HTTP 504 on the release asset must try again, or the run's merge loses its slices.
   type Step = Error | number;
   const scripted = (steps: Step[]) => {
     let calls = 0;

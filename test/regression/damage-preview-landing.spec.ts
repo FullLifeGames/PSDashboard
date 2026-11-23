@@ -6,13 +6,9 @@ import {
 } from '@fulllifegames/eval-engine';
 import { computePreviewDamage } from '../../src/lib/branch-damage';
 
-/**
- * The picker's damage preview against the simulator: a battle is built, the
- * preview is read the way BranchPanel reads it (createBranchStateFromBattle,
- * computePreviewDamage), then the simulator plays the move and the HP it
- * took must lie inside the previewed range. Damage does not depend on the
- * defender's current HP, so the range stays valid across the hit.
- */
+// The picker's damage preview against the simulator: the preview is read the way BranchPanel reads it (createBranchStateFromBattle,
+// computePreviewDamage), then the simulator plays the move and the HP it took must lie inside the previewed range. Damage does not
+// depend on the defender's current HP, so the range stays valid across the hit.
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
 function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet {
@@ -221,7 +217,7 @@ describe('the Tera toggle in the preview equals the calc after the click (T20, d
       [wall('Snorlax'), wall('Blissey')]);
     const off = preview(current).p1;
     const on = preview(current, { p1: ['Ground', null], p2: [null, null] }).p1;
-    // round 83: Earthquake lists its partner's row too; Corviknight takes nothing from a Ground move, with or without the toggle
+    // Earthquake lists its partner's row too; Corviknight takes nothing from a Ground move, with or without the toggle
     expect(on.spread[0][1].find(row => row.label === 'P1B')?.result.maxPercent).toBe(0);
     const rows = (side: typeof on) => [
       ...side.spread[0][1].filter(row => row.label !== 'P1B').map(row => span(row.result)),

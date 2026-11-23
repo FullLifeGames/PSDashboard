@@ -23,66 +23,31 @@ import { holdoutSets } from './bank-universe';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 
 /**
- * Weight-fitting harness (WP 7): fits the static eval's linear feature
- * weights by logistic regression on the manifest-pinned corpus (positions →
- * game outcomes), clustered by game. REPORTS ONLY — adopting a fitted weight
- * means editing EVAL_WEIGHTS by hand and passing the calibration gate.
+ * Weight-fitting harness: fits the static eval's linear feature weights by logistic regression on the manifest-pinned corpus
+ * (positions to game outcomes), clustered by game. REPORTS ONLY: adopting a fitted weight means editing EVAL_WEIGHTS by hand and
+ * passing the calibration gate.
  *
- * Corpus: node scripts/build-fit-corpus.mjs (manifest committed, logs cached
- * in .fit-corpus/). Run: EVAL_FIT=1 npx vitest run --project app
- * test/regression/eval-fit.spec.ts
+ * Corpus: node scripts/build-fit-corpus.mjs (manifest committed, logs cached in .fit-corpus/). Run:
+ * EVAL_FIT=1 npx vitest run --project app test/regression/eval-fit.spec.ts
  *
- * Effective sample size is the number of GAMES (positions share their game's
- * outcome label) — hence the cluster bootstrap for standard errors and the
- * tournament-vs-ladder comparison (tournament outcomes carry cleaner labels).
- *
- * Instrumented run 2026-08-09 (schema 2: faintedFraction + genClass;
- * 5,985 positions / 1,100 games):
- * - K(phase) fit, P = sigmoid((k0 + k1·ff)·score):
- *     singles constant K=2.61 · phase k0=2.28 k1=1.49
- *       early brier 0.2470→0.2451 · mid 0.1802→0.1799 · late 0.1661→0.1634
- *     doubles constant K=3.15 · phase k0=2.98 k1=0.88
- *       early brier 0.2264→0.2259 · mid 0.1764→0.1764 · late 0.1655→0.1644
- *   Phase-K beats constant-K on the early bucket in BOTH gametypes and
- *   regresses nowhere → ADOPTED (winprob.ts, cache v11). The k1 direction
- *   (confidence grows as bodies drop) is exactly the measured early
- *   overconfidence the round targets.
- * - Gen-class tranches (is the singles weakness a corpus artifact?):
- *     matchup implied GEN9-ONLY 145.6±68.0 vs OLDGEN-ONLY 37.3 (pooled
- *     88.8±48.3, hand 120): matchup carries far more outcome signal in gen9;
- *     the oldgen-heavy singles tranche drags the pooled fit down. Within
- *     ~1.5 SE of pooled → no weight change; RECORDED as the follow-up
- *     trigger for a gen9-singles corpus expansion (out of scope this round).
- * - Tranche sanity: tailwind never occurs in the singles corpus (0.0±0.0);
- *   oldgen trick room is noise (−345±242). The per-gametype weight split
- *   (2026-08-08) stays justified; no doubles-weight update from this run
- *   (doubles implied values match the adopted 27/68/87 within noise).
- *
- * Corpus expanded 2026-08-09 to 2,127 replays (gen9-singles follow-up:
- * SV OU archive + UWC threads + gen9ru cap raise; gen9 singles ~840
- * games). Findings and the fifth boost rejection are recorded in the
- * eval-calibration header — that run supersedes the tranche notes above
- * where they conflict (the gen9-vs-oldgen matchup gap was tranche noise).
+ * The effective sample size is the number of GAMES (positions share their game's outcome label), hence the cluster bootstrap for
+ * standard errors and the tournament-vs-ladder comparison (tournament outcomes carry cleaner labels).
  */
 
 const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
 /**
- * Captured samples are cached so fit-side iterations skip the hour-long
- * reconstruction pass. The stamp covers the feature keys, every weight
- * value, and the manifest's replay list — a change to any of them
- * invalidates automatically. Feature DEFINITION changes (same keys, same
- * weights) still require deleting the file by hand.
+ * Captured samples are cached so fit-side iterations skip the hour-long reconstruction pass. The stamp covers the feature keys, every
+ * weight value and the manifest's replay list; a change to any of them invalidates it. A changed feature DEFINITION (same keys, same
+ * weights) still needs the file deleted by hand.
  */
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 
 /**
- * Round 64 (T127): a capture into its own folder, never into the shared
- * cache above (`EVAL_FIT_SAMPLES=<dir>`), sliced over the manifest so
- * parallel processes split it (`EVAL_FIT_SLICE=k/n` captures every n-th
- * replay from the k-th and stops; without it the fit reads every
- * `samples-<k>of<n>.json` of the folder and writes `EVAL_FIT_OUT`, default
- * `<dir>/fit-report.json`). `EVAL_FIT_LEGACY=0` skips the older reports.
+ * A capture into its own folder, never into the shared cache above (`EVAL_FIT_SAMPLES=<dir>`), sliced over the manifest so parallel
+ * processes split it (`EVAL_FIT_SLICE=k/n` captures every n-th replay from the k-th and stops; without it the fit reads every
+ * `samples-<k>of<n>.json` of the folder and writes `EVAL_FIT_OUT`, default `<dir>/fit-report.json`). `EVAL_FIT_LEGACY=0` skips the
+ * older reports.
  */
 const SAMPLES_DIR = process.env.EVAL_FIT_SAMPLES;
 const SLICE = (process.env.EVAL_FIT_SLICE ?? '').match(/^(\d+)\/(\d+)$/);
@@ -138,10 +103,7 @@ function writeSamples(manifest: Manifest, samples: FitSample[]): string {
 const tables = (singles: Record<keyof EvalFeatures, number>, doubles: Record<keyof EvalFeatures, number>) =>
   ({ singles: FEATURE_KEYS.map(key => singles[key]), doubles: FEATURE_KEYS.map(key => doubles[key]) });
 
-/**
- * Round 65: the families the static weighs apart (rule set × game type,
- * score/weights.ts), each refit on its own games.
- */
+/** The families the static weighs apart (rule set × game type, score/weights.ts), each refit on its own games. */
 const FAMILIES = [
   { name: 'standard-singles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
   { name: 'standard-doubles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
@@ -150,43 +112,28 @@ const FAMILIES = [
   { name: 'champions-doubles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
 ];
 
-/**
- * Round 67: `EVAL_FIT_FAMILIES=<name>,<name>` refits only these families
- * (the Champions refit after T145 and T143); without it every family.
- */
+/** `EVAL_FIT_FAMILIES=<name>,<name>` refits only these families; without it every family. */
 const familiesToFit = () => {
   const names = (process.env.EVAL_FIT_FAMILIES ?? '').split(',').map(name => name.trim()).filter(Boolean);
   return names.length === 0 ? FAMILIES : FAMILIES.filter(family => names.includes(family.name));
 };
 
-/**
- * The pre-registered holds of round 64's variant E: the two weights whose
- * free fit flips its sign inside a band over nought (shared Trick Room,
- * choice mismatch) and both boost weights (T49).
- */
+/** The pre-registered holds: the weights whose free fit flips its sign inside a band over nought (shared Trick Room, choice mismatch) and both boost weights. */
 const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boosts'] };
 
 /**
- * Round 69 (T42, T49, T102): the new columns fit one at a time on one shared
- * capture, the rest of the table at hand. EVAL_FIT_ONLY=<names> moves only
- * these columns (a column at 0 in both tables is free then; `*@phase` names
- * every phase column), EVAL_FIT_LIFT=<names> takes names off HOLD (the boost
- * weight is free for the T49 and T102 fits only), EVAL_FIT_SET=<name=weight,...>
- * starts columns elsewhere (a REPLACEMENT: boosts=0,boostsBiting=<its weight>),
- * EVAL_FIT_FORMS=<phase:bodies,root:matchup> adds model-form columns
- * (fit-families.ts withModelForms), EVAL_FIT_CAPTURED=<name=weight,...> names the
- * weights a capture was made under where a table has moved since (the identity
- * check starts from them; the fit stays at today's tables).
+ * New columns fit one at a time on one shared capture, the rest of the table at hand. EVAL_FIT_ONLY=<names> moves only these columns
+ * (a column at 0 in both tables is free then; `*@phase` names every phase column), EVAL_FIT_LIFT=<names> takes names off HOLD,
+ * EVAL_FIT_SET=<name=weight,...> starts columns elsewhere (a REPLACEMENT: boosts=0,boostsBiting=<its weight>),
+ * EVAL_FIT_FORMS=<phase:bodies,root:matchup> adds model-form columns (fit-families.ts withModelForms), EVAL_FIT_CAPTURED=<name=weight,...>
+ * names the weights a capture was made under where a table has moved since (the identity check starts from them; the fit stays at the
+ * current tables).
  */
 const listOf = (name: string) => (process.env[name] ?? '').split(',').map(part => part.trim()).filter(Boolean);
 
-/**
- * The T127 refit (round 64; per family since round 65): the static's weights
- * at the fixed K of winprob.ts, every family on its own games, clustered by
- * set. First the identity: the start tables must give back every captured
- * score, or the fit refuses.
- */
-/** The leaf's phase K of a family's rule set (round 67, T138: Pokémon Champions prices its own scale; round 74, T163: VGC too, one table per rule set). */
+// The refit: the static's weights at the fixed K of winprob.ts, every family on its own games, clustered by set. First the identity:
+// the start tables must give back every captured score, or the fit refuses.
+/** The leaf's phase K of a family's rule set (Pokémon Champions and VGC price their own scale: one table per rule set). */
 const kOf = (ruleset: Ruleset) => WINPROB_K_OF[ruleset];
 
 const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
@@ -195,11 +142,7 @@ const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sa
   search: sample.search,
 }));
 
-/**
- * Round 67 (T138): `EVAL_FIT_PHASE_K=1` writes the phase K of every family
- * to fit on its own games (fit-families.ts phaseKReports) to
- * `EVAL_FIT_K_OUT`, default `<dir>/phase-k-report.json`.
- */
+/** `EVAL_FIT_PHASE_K=1` writes the phase K of every family (fit-families.ts phaseKReports) to `EVAL_FIT_K_OUT`, default `<dir>/phase-k-report.json`. */
 function writePhaseKReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
   const report = phaseKReports(familySamplesOf(samples), familiesToFit(), kOf, draws);
@@ -212,12 +155,10 @@ function writePhaseKReport(samples: FitSample[]) {
 }
 
 /**
- * Round 69 (T163): `EVAL_FIT_ROOT_SCALE=1` writes the scale of the search's logit per family
- * (fit-families.ts rootScaleReports) from captures WITH search (EVAL_CALIBRATION_FAMILY and
- * EVAL_CALIBRATION_TURNS=thirds, EVAL_CALIBRATION_FEATURES=1 for the feature vector the loader
- * wants), to `EVAL_FIT_K_OUT`, default `<dir>/root-scale-report.json`. `EVAL_FIT_ROOT_K=<stamp
- * file>` names the K table the capture ran under; without it the capture is taken to have run
- * under today's table (fit at the capture's commit).
+ * `EVAL_FIT_ROOT_SCALE=1` writes the scale of the search's logit per family (fit-families.ts rootScaleReports) from captures WITH
+ * search (EVAL_CALIBRATION_FAMILY and EVAL_CALIBRATION_TURNS=thirds, EVAL_CALIBRATION_FEATURES=1 for the feature vector the loader
+ * wants), to `EVAL_FIT_K_OUT`, default `<dir>/root-scale-report.json`. `EVAL_FIT_ROOT_K=<stamp file>` names the K table the capture
+ * ran under; without it the capture is taken to have run under the current table (fit at the capture's commit).
  */
 function writeRootScaleReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
@@ -264,15 +205,11 @@ function writeRefitReport(samples: FitSample[]) {
 }
 
 /**
- * Round 65: the corpus measured like the app (EVAL_FIT_DUMP=<bank dumps>,
- * from EVAL_CALIBRATION_SOURCE=fit with EVAL_CALIBRATION_STATIC=1 and
- * EVAL_CALIBRATION_FEATURES=1: the app's team build and the bank's
- * reconstruction) instead of this spec's own capture, whose naked teams
- * leave a Doubles OU mon 1.9 moves. Sets are keyed by the corpus cache's
- * players.
- * Round 74 (T163, T263): a dump from a capture with search (no EVAL_CALIBRATION_STATIC) feeds the same fit; its score
- * is the search's root value, so the identity check leaves its samples out (fit-families.ts dumpSamples reads the root
- * fields of a search) and the fit runs on the features, the outcome and the start tables.
+ * The corpus measured like the app (EVAL_FIT_DUMP=<bank dumps>, from EVAL_CALIBRATION_SOURCE=fit with EVAL_CALIBRATION_STATIC=1 and
+ * EVAL_CALIBRATION_FEATURES=1: the app's team build and the bank's reconstruction) instead of this spec's own capture, whose naked
+ * teams leave a Doubles OU mon 1.9 moves. Sets are keyed by the corpus cache's players. A dump from a capture with search (no
+ * EVAL_CALIBRATION_STATIC) feeds the same fit; its score is the search's root value, so the identity check leaves its samples out
+ * (fit-families.ts dumpSamples reads the root fields of a search) and the fit runs on the features, the outcome and the start tables.
  */
 function samplesOf(manifest: Manifest): FitSample[] {
   if (!process.env.EVAL_FIT_DUMP) return cachedSamples(manifest);
@@ -282,11 +219,7 @@ function samplesOf(manifest: Manifest): FitSample[] {
   return fromDumps;
 }
 
-/**
- * Round 66: dump samples leave out ladder games without a rating (played after
- * their format left the ladder; fit-families.ts), unless EVAL_FIT_UNRATED=1
- * keeps them for a diagnosis.
- */
+/** Dump samples leave out ladder games without a rating (played after their format left the ladder; fit-families.ts), unless EVAL_FIT_UNRATED=1 keeps them. */
 function dumpSamplesOf(paths: string): FitSample[] {
   const playersOf = (id: string) => (JSON.parse(readFileSync(join(CACHE_DIR, `${id}.json`), 'utf-8')) as { players?: string[] }).players ?? [];
   const genClass = (id: string): FitSample['genClass'] => (/^(smogtours-)?gen9/.test(id) ? 'gen9' : 'old');
@@ -296,7 +229,7 @@ function dumpSamplesOf(paths: string): FitSample[] {
   return kept.map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
 }
 
-/** Round 65: no fit ever trains on the holdout (scripts/build-fit-holdout.mjs). */
+/** No fit ever trains on the holdout (scripts/build-fit-holdout.mjs). */
 function fitSamples(samples: FitSample[]): FitSample[] {
   const holdout = new Set(holdoutSets().flatMap(set => set.ids));
   const { kept, dropped } = withoutHoldout(samples, holdout);
@@ -315,12 +248,12 @@ interface FitSample {
   /** Fainted bodies / total bodies at capture time — the phase covariate. */
   faintedFraction: number;
   p1Won: boolean;
-  /** Round 65 (bank dumps): the cluster key, the rule set, a score in wp-units, the last pair (no identity check). */
+  /** From bank dumps: the cluster key, the rule set, a score in wp-units, the last pair (no identity check). */
   set?: string;
   ruleset?: Ruleset;
   wp?: boolean;
   lastPair?: boolean;
-  /** Round 74: the dump came from a search; the score is its root value (no identity check, fit-families.ts). */
+  /** The dump came from a search; the score is its root value (no identity check, fit-families.ts). */
   search?: boolean;
 }
 
@@ -352,10 +285,8 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
     const wanted = new Set<number>();
     for (let turn = 2; turn < maxTurn; turn += step) wanted.add(turn);
 
-    // Bring-limited replays (VGC: four of six) reconstruct with the
-    // brought species only, the trim the app and the bank apply; without
-    // it every sample carried two bodies per side that never played
-    // (round 46). Per-side fail-open, null for bring-all formats.
+    // Bring-limited replays (VGC: four of six) reconstruct with the brought species only, the trim the app and the bank apply.
+    // Per-side fail-open, null for bring-all formats.
     const replayMeta = { id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log };
     const bringOnly = bringOnlyFor(replayMeta as Parameters<typeof replayBringOnly>[0], snapshots);
 
@@ -371,7 +302,7 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
         snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
         onPosition: (turn, battle) => {
           if (!wanted.has(turn) || battle.ended) return;
-          // Round 65: the score under the replay's rule set, as the families check it.
+          // The score under the replay's rule set, as the families check it.
           const cache = createMatchupCache(ruleset);
           const features = evalFeatures(battle, cache);
           const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
@@ -474,9 +405,8 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     report('ALL', samples);
     report('TOURNAMENT-ONLY', samples.filter(sample => sample.source === 'tournament'));
     report('LADDER-ONLY', samples.filter(sample => sample.source === 'ladder'));
-    // Per-gametype fits: the pooled fit is singles-dominated, so a weight it
-    // favors can hurt doubles (seen in the 2026-08-08 adoption gate). These
-    // ask whether the doubles data itself supports different weights.
+    // Per-gametype fits: the pooled fit is singles-dominated, so a weight it favors can hurt doubles; these ask whether the doubles
+    // data itself supports different weights.
     report('SINGLES-ONLY', singles);
     report('DOUBLES-ONLY', doubles);
 
@@ -484,9 +414,7 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     report('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
     report('OLDGEN-ONLY', samples.filter(s => s.genClass === 'old'));
 
-    // Sweep-vs-boosts variant: with the flat boosts column zeroed, does the
-    // sweep feature absorb the boost signal on its own? (The adoption matrix
-    // compares both variants — see the calibration header.)
+    // Sweep-vs-boosts variant: with the flat boosts column zeroed, does the sweep feature absorb the boost signal on its own?
     const boostsIndex = FEATURE_KEYS.indexOf('boosts' as keyof EvalFeatures);
     const noBoosts = samples.map(s => ({ ...s, g: s.g.map((value, j) => (j === boostsIndex ? 0 : value)) }));
     report('ALL-NO-BOOSTS', noBoosts);
@@ -497,12 +425,9 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     bootstrap('DOUBLES-ONLY', doubles);
     bootstrap('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
 
-    // Sweep v2 cells (round 9, design doc 2026-08-17): the round-8 CV showed
-    // v1 carries nothing beyond flat boosts. v2 splits each flipped pair into
-    // 2×2 cells (acts-first × in-KO-range); each training fold prices the
-    // cells itself — no guessed factors. PRE-REGISTERED hierarchy, decision
-    // tranche SINGLES-ONLY, criterion per branch: mean OOF logloss Δ < 0 AND
-    // wins ≥ 16/20 seeds AND mean OOF brier ≤ base.
+    // Sweep cells: each flipped pair splits into 2×2 cells (acts-first × in-KO-range); each training fold prices the cells itself,
+    // with no guessed factors. PRE-REGISTERED hierarchy, decision tranche SINGLES-ONLY, criterion per branch: mean OOF logloss Δ < 0
+    // AND wins ≥ 16/20 seeds AND mean OOF brier ≤ base.
     //   1. REPLACEMENT: M1 (cells, no boosts) beats M0 (boosts, no cells).
     //   2. ADDITIVE: else M2 (both) beats M0.
     //   3. Otherwise STATUS QUO — cells stay weight 0.
@@ -566,7 +491,7 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       const phase = fitPhaseK(subset);
       console.log(`\nwinprob ${gameType}: constant K=${constant.toFixed(2)} ` +
         `phase k0=${phase.k0.toFixed(2)} k1=${phase.k1.toFixed(2)} (n=${subset.length})`);
-      // Round 48: the phase fit is the maximum now; its spread over games says how far a pin may sit from it.
+      // The phase fit is the maximum; its spread over games says how far a pin may sit from it.
       const spread = bootstrapPhaseK(subset, 200, 48);
       console.log(`  bootstrap over games: k0 ±${spread.k0.se.toFixed(2)} [${spread.k0.lo.toFixed(2)}, ${spread.k0.hi.toFixed(2)}] ` +
         `k1 ±${spread.k1.se.toFixed(2)} [${spread.k1.lo.toFixed(2)}, ${spread.k1.hi.toFixed(2)}] · K at fainted ` +

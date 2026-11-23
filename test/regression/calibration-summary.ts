@@ -1,12 +1,6 @@
 import { brierScore, fitConstantK, type OutcomeSample } from './fit-helpers';
 
-/**
- * The calibration harness's printed aggregate, line for line the same as
- * scripts/calibration-lib.mjs summarize(): sign accuracy and mean |score|
- * per phase, sign accuracy per gametype, the fitted K per pool, Brier per
- * phase under the pooled K, then (round 34) the hq tranche and the
- * luck-adjusted view, and the confidence buckets last.
- */
+// The calibration harness's printed aggregate, line for line the same as scripts/calibration-lib.mjs summarize().
 export interface SummarySample {
   id: string;
   turn: number;
@@ -17,7 +11,7 @@ export interface SummarySample {
   p1Won: boolean;
   quality: 'hq' | 'std';
   luckAgainstFavored: boolean;
-  /** The root's decided-sweep side (round 32), and the side the bar holds it for (round 50, heldDecided). */
+  /** The root's decided-sweep side, and the side the bar holds it for (heldDecided). */
   decided?: 'p1' | 'p2' | null;
   decidedHeld?: 'p1' | 'p2' | null;
 }
@@ -51,11 +45,7 @@ function phaseLines(samples: SummarySample[]): string[] {
   return lines;
 }
 
-/**
- * Round 50: how often the side the decided sweep names wins, over every
- * sweep and over the sweeps the bar holds. A dump from before round 50
- * carries no held field and prints the first half only.
- */
+/** How often the side the decided sweep names wins, over every sweep and over the sweeps the bar holds (a dump without the held field: first half only). */
 function decidedLines(samples: SummarySample[]): string[] {
   const share = (key: 'decided' | 'decidedHeld'): string => {
     const named = samples.filter(sample => sample[key]);
@@ -92,8 +82,7 @@ export function summaryLines(samples: SummarySample[]): string[] {
     if (subset.length === 0) continue;
     lines.push(`${phase} brier=${brierScore(subset, pooledK).toFixed(4)}`);
   }
-  // Round 34: the hq tranche (smogtours or rating >= 1700) and the view
-  // without luck against the favored side, both under the pooled K so the
+  // The hq tranche (smogtours or rating >= 1700) and the view without luck against the favored side, both under the pooled K so the
   // lines stay comparable with the full bank.
   const hq = samples.filter(sample => sample.quality === 'hq');
   if (hq.length > 0) lines.push(`hq: n=${hq.length} sign-accuracy=${pct(hq)}% brier early/mid/late=${phaseBriers(hq, pooledK)}`);

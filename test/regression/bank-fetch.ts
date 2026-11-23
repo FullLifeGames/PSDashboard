@@ -1,12 +1,5 @@
-/**
- * Round 71: the bank's replay fetch. The bank (test/regression/eval-calibration.spec.ts) loads its replays from
- * replay.pokemonshowdown.com on every run, here as in CI. A network error used to throw out of the slice (CI run
- * 39210778828: `read ECONNRESET` cost slice 1 its 14 rows); a server error or a rate limit failed the replay at once.
- * Both get further attempts with pauses now; a client error such as a 404 does not heal and returns at once. A replay
- * that never arrives comes back as its status (0 for a network error), and the harness logs it as
- * `skipping <id>: HTTP <status>`, which scripts/run-calibration.mjs counts, so the run stays incomplete and serves as
- * no base.
- */
+// The bank's replay fetch: retries a network error, a server error or a rate limit; a client error returns at once. A replay that never
+// arrives comes back as its status (0 for a network error); the harness logs it as `skipping <id>: HTTP <status>`, which run-calibration.mjs counts.
 
 export type FetchOutcome<T> = { replay: T } | { status: number };
 

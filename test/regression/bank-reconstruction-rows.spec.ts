@@ -6,17 +6,11 @@ import { deserializeBattleExact } from '../../packages/eval-engine/src/forward-m
 import { isPerfectAlignment } from '../../packages/eval-engine/src/hax-alignment';
 import { rebuild, type Rebuilt } from './forced-reconstruction-support';
 
-/**
- * Round 86 (the engine reads the dice), lane B, step B9 (T306, the causes C1 to C3 of the B7 diagnosis): scenes of the VGC holdout where the
- * rebuild with the log's dice read worse than the sixteen-seed search of the base. The replays are bank replays of the local fit corpus
- * (`.fit-corpus`), so the rows skip where the corpus is absent (a clone, CI without the bank data).
- *
- * - C1, 2243810213 (Regulation H) turn 6: the log has Jet Punch knock out Annihilape. The turn has a soft mismatch no die mends, so the faint
- *   step used to throw its step set away and Annihilape stood at 14 of 186.
- * - C3, 2243810213 turn 7 and 2159578969 turn 5: a body the log faints and the turn leaves standing. The correction at the turn's boundary
- *   used to write `fainted` and hp 0 and nothing else: the unshown bench of p2 (Typhlosion and Farigiraf never came out) stayed alive, so p2
- *   stood at three living bodies against the log's one; Weezing's Neutralizing Gas never ended, so Slow Start never started on Regigigas.
- */
+// Scenes of the VGC holdout where the rebuild with the log's dice read worse than the sixteen-seed search. The replays are bank replays of
+// the local fit corpus (`.fit-corpus`), so the rows skip where the corpus is absent (a clone, CI without the bank data).
+// 2243810213 (Regulation H) turn 6: the log has Jet Punch knock out Annihilape; the turn has a soft mismatch no die mends.
+// 2243810213 turn 7 and 2159578969 turn 5: a body the log faints and the turn leaves standing; the correction must retire the unshown bench
+// of p2 (Typhlosion and Farigiraf never came out) and end Weezing's Neutralizing Gas so Slow Start starts on Regigigas.
 
 /** The position the bank scores: the boundary position of the rebuild with the snapshot's corrections (`applyTargetCorrections`). */
 const bankPosition = (rebuilt: Rebuilt, turn: number): SimBattle => {
@@ -75,9 +69,7 @@ describe.skipIf(!present(SCENE_C3B))('C3: the end of Neutralizing Gas starts wha
   beforeAll(async () => { rebuilt = await rebuild(SCENE_C3B, { corpus: true, through: 5 }); }, 300_000);
 
   // The log's turn 2: Earth Power knocks out Weezing, `-end Neutralizing Gas`, `-start Slow Start` on Regigigas. The position at turn 2 has Weezing
-  // alive (gas on, Slow Start held back); the correction to the log's turn 3 takes Weezing out through its End event. The rebuild itself meets the same
-  // faint one step earlier, in `faintThePredecessor` (branch/entry-effects.ts, the switch-in of Grafaiai in its slot). Since B10 that path takes
-  // Weezing out through `takeBodyOut` too, and the row of the whole rebuild (the position at turn 5) holds it.
+  // alive (gas on, Slow Start held back); the correction to the log's turn 3 takes Weezing out through its End event.
   test('turn 2 with the snapshot of turn 3: Weezing stands at 0 and Slow Start runs on Regigigas', () => {
     const battle = correctedWith(rebuilt, 2, 3);
     const bodies = battle.sides.flatMap(side => side.pokemon);
@@ -87,8 +79,8 @@ describe.skipIf(!present(SCENE_C3B))('C3: the end of Neutralizing Gas starts wha
     expect({ slowStart: (regigigas.abilityState as { counter?: number }).counter, weezing: weezing.hp }).toEqual({ slowStart: 5, weezing: 0 });
   });
 
-  // Round 86 (B10): the whole rebuild meets that faint in `faintThePredecessor` (branch/entry-effects.ts: Grafaiai takes Weezing's slot while the
-  // simulator's Weezing still stands). The predecessor leaves through `takeBodyOut` on the field, so the gas ends and Slow Start starts.
+  // The whole rebuild meets that faint in `faintThePredecessor` (branch/entry-effects.ts: Grafaiai takes Weezing's slot while the
+  // simulator's Weezing still stands); the predecessor leaves through `takeBodyOut` on the field, so the gas ends and Slow Start starts.
   test('the whole rebuild: the position at turn 5 has Slow Start running on Regigigas', () => {
     const battle = bankPosition(rebuilt, 5);
     const regigigas = battle.sides.flatMap(side => side.pokemon).find(body => body.species.id === 'regigigas')!;

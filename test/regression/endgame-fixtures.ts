@@ -2,12 +2,9 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 
 /**
- * Synthetic endgames for the round-34 truth bench: small positions (at
- * most three living bodies) whose exact value the solver can reach and
- * whose shape names one estimator weakness each (fixed-damage races,
- * accuracy kills, walls against breakers, stall, PP locks, priority,
- * level gaps, two against one, and the doubles counterparts). Singles
- * run on gen9customgame, doubles on gen9doublescustomgame.
+ * Synthetic endgames for the truth bench: small positions (at most three living bodies) whose exact value the solver can reach and
+ * whose shape names one estimator weakness each (fixed-damage races, accuracy kills, walls against breakers, stall, PP locks,
+ * priority, level gaps, two against one, and the doubles counterparts). Singles run on gen9customgame, doubles on gen9doublescustomgame.
  */
 export interface EndgameFixture {
   name: string;

@@ -5,7 +5,6 @@ import {
 } from './bank-universe';
 import { FAMILY_NAMES, familyOf, familyOfFormat, rulesetOfId } from './fit-families';
 
-/** Round 65: the universe of a bank run (bank, fit corpus, holdout) and its sampled turns. */
 
 const bank = { ids: ['a', 'b'], trancheOf: new Map([['a', 'x'], ['b', 'y']]) };
 const saved = {
@@ -36,7 +35,7 @@ describe('bank universe', () => {
   });
 
   test('round 66: each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
-    // Round 65's rule clamped the early point to turn 2, which a game of five or six snapshots reads as mid.
+    // The reference rule clamps the early point to turn 2, which a game of five or six snapshots reads as mid.
     const round65 = (maxTurn: number) => [...new Set([1 / 6, 1 / 2, 5 / 6]
       .map(at => Math.min(maxTurn - 1, Math.max(2, Math.round(at * maxTurn)))))].filter(turn => turn < maxTurn);
     for (let maxTurn = 3; maxTurn <= 400; maxTurn++) {
@@ -66,19 +65,19 @@ describe('bank universe', () => {
     expect(universe.sampleTurns(30)).toEqual([5, 15, 25]);
   });
 
-  // Round 66 review: scripts/expand-fit-corpus.mjs keeps bank and feedback replays out, scripts/build-fit-corpus.mjs does not.
+  // scripts/expand-fit-corpus.mjs keeps bank and feedback replays out of the corpus; scripts/build-fit-corpus.mjs does not.
   test('the fit corpus and its holdout share no replay with the bank or the feedback corpus', () => {
     const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
     const barred = new Set([...quoted('test/regression/eval-calibration.spec.ts'), ...quoted('test/e2e-feedback/corpus.ts')]);
     const corpus = new Set((JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string }[] }).replays.map(entry => entry.id));
     expect(barred.size).toBeGreaterThanOrEqual(134);
     expect([...corpus].filter(id => barred.has(id))).toEqual([]);
-    // Round 86: the sets of the four families come from the corpus; a family that scripts/fresh-holdout.mjs drew does not.
+    // The sets of the four families come from the corpus; a family that scripts/fresh-holdout.mjs drew does not.
     const own = new Set(['championsou', 'championsvgc', 'doublesou', 'vgc']);
     expect(holdoutSets().filter(set => own.has(set.family)).flatMap(set => set.ids).filter(id => !corpus.has(id))).toEqual([]);
   });
 
-  // Round 86 (the fresh VGC holdout): a drawn family holds replays that no fit, bank or feedback run has read.
+  // A drawn family holds replays that no fit, bank or feedback run has read.
   test('a drawn holdout family shares no replay with the fit corpus, the bank or the feedback corpus', () => {
     const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
     const barred = new Set([...quoted('test/regression/eval-calibration.spec.ts'), ...quoted('test/e2e-feedback/corpus.ts')]);
@@ -98,10 +97,6 @@ describe('bank universe', () => {
   });
 });
 
-/**
- * Round 69 (T163): a search capture of one family at up to three positions per game, so a night holds
- * the four families the leaf K is fitted on. The default paths do not move.
- */
 describe('fit universe of one family', () => {
   type Entry = { id: string; format: string; source: 'tournament' | 'ladder' };
   const corpus = () => (JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: Entry[] }).replays;
@@ -116,8 +111,7 @@ describe('fit universe of one family', () => {
   /** What a fit does not read: the holdout and the ladder games without a rating (withoutHoldout, withoutUnratedLadder). */
   const leavesTheFit = (entry: Entry, holdout: ReadonlySet<string>) =>
     holdout.has(entry.id) || (entry.source === 'ladder' && (cachedRating(entry.id) ?? 0) <= 0 && cachedRating(entry.id) !== undefined);
-  // Release 1.0.0: the Tests workflow on master runs without the bank's data (.fit-corpus reaches only the bank jobs),
-  // so the tests that read the corpus's replay files skip there, like every spec of local data.
+  // The Tests workflow runs without the bank's data (.fit-corpus reaches only the bank jobs): the rows that read replay files skip there.
   const corpusHere = existsSync('.fit-corpus');
 
   test('without a family or a turn rule the fit universe is the whole corpus at the bank turns', () => {
@@ -188,11 +182,6 @@ describe('fit universe of one family', () => {
   });
 });
 
-/**
- * Round 70 (bank tooling): EVAL_CALIBRATION_FRACTION keeps a deterministic, stratified share of the
- * universe, so a quick run screens a change in a fraction of the machine time and pairs against a
- * full base on the rows both hold. Unset, empty and 1 leave the universe whole.
- */
 describe('quick tier', () => {
   type Entry = readonly [id: string, tranche: string];
   type Universe = { ids: string[]; trancheOf: Map<string, string> };
@@ -315,7 +304,7 @@ describe('quick tier', () => {
     const whole = bankUniverse(bank);
     expect(new Set(whole.ids).size).toBe(whole.ids.length);
     const wholeCounts = counted(whole, (_id, tranche) => tranche);
-    // Round 86: the four families of the fit corpus plus vgc2, the fresh VGC holdout drawn on 06.11.2026.
+    // The four families of the fit corpus plus vgc2, the fresh VGC holdout.
     expect(wholeCounts.size).toBe(5);
     for (const fraction of [0.1, 0.25, 0.5]) {
       process.env.EVAL_CALIBRATION_FRACTION = String(fraction);

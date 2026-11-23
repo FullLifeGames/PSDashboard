@@ -8,19 +8,14 @@ import { loadReplayMods } from '../../src/lib/replay-mods';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../../src/lib/smogon-stats';
 
-/**
- * The calibration bank's team build, in one place: without the Smogon
- * fills the naked build of the standing records, with them the app's chain
- * (round 52) or, behind EVAL_CALIBRATION_RAWBUILD=1, the two naked builds
- * every number before that round stands on.
- */
+// The calibration bank's team build: naked without Smogon fills, the app's chain with them, the old raw build behind EVAL_CALIBRATION_RAWBUILD=1.
 
 type Parsed = Pick<ReturnType<typeof parseReplayLogWithObservations>, 'observations' | 'speedOrders' | 'hpEvidence'>;
 type Teams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 
 export interface BankBuildArgs {
   log: string;
-  /** `replay.formatid ?? id`, the key the bank's Smogon calls have always used. */
+  /** `replay.formatid ?? id`, the key of the bank's Smogon calls. */
   formatId: string;
   parsed: Parsed;
   fetcher: typeof fetch | undefined;
@@ -29,7 +24,7 @@ export interface BankBuildArgs {
 /** The teams, or the reason the loop logs and skips the replay for. */
 export interface BankBuild {
   teams: Teams | null;
-  /** Round 89 (#124): the usage stats the build fetched, which weigh the worlds of a short-side game; null on the naked build. */
+  /** The usage stats the build fetched, which weigh the worlds of a short-side game; null on the naked build. */
   usageStats: SmogonUsageStats | null;
   reason: 'could not build teams' | 'could not build teams with fills' | null;
 }
@@ -38,7 +33,7 @@ const empty = (teams: Teams) => teams.p1Team.length === 0 || teams.p2Team.length
 
 export async function bankTeamsFor(args: BankBuildArgs): Promise<BankBuild> {
   const { log, parsed, fetcher } = args;
-  // A Champions game reads the Champions Dex: the mod registers first, as the app's replay load does (round 75, T160).
+  // A Champions game reads the Champions Dex: the mod registers first, as the app's replay load does.
   await loadReplayMods({ log, formatid: args.formatId });
   if (!fetcher) {
     const teams = buildTeamsFromReplay(log, { observations: parsed.observations, speedOrders: parsed.speedOrders });
@@ -47,14 +42,13 @@ export async function bankTeamsFor(args: BankBuildArgs): Promise<BankBuild> {
   return process.env.EVAL_CALIBRATION_RAWBUILD === '1' ? rawBuild(args, fetcher) : appBuild(args, fetcher);
 }
 
-/** The build every record before round 52 stands on: raw infos, one solve, a rebuild with the fills. */
+/** The raw build: raw infos, one solve, a rebuild with the fills. */
 async function rawBuild(args: BankBuildArgs, fetcher: typeof fetch): Promise<BankBuild> {
   const { log, formatId, parsed } = args;
   const { observations, speedOrders } = parsed;
   const naked = buildTeamsFromReplay(log, { observations, speedOrders });
   if (empty(naked)) return { teams: null, usageStats: null, reason: 'could not build teams' };
-  // Mirroring the app hooks: usage stats by the replay's format id, set
-  // assumptions for the known species.
+  // Usage stats by the replay's format id, set assumptions for the known species, as the app hooks do.
   const species = [...new Set([...naked.p1Team, ...naked.p2Team].map(set => set.species))];
   const { usageStats, setAssumptions } = await smogonFor(formatId, species, fetcher);
   const teams = buildTeamsFromReplay(log, { observations, speedOrders, usageStats, setAssumptions });
@@ -65,8 +59,7 @@ async function rawBuild(args: BankBuildArgs, fetcher: typeof fetch): Promise<Ban
 async function appBuild(args: BankBuildArgs, fetcher: typeof fetch): Promise<BankBuild> {
   const { log, formatId, parsed } = args;
   const seed = appTeamSeed(log, parsed);
-  // The builds map 1:1 over the infos, so an empty side here is exactly the
-  // empty team the naked build used to skip on.
+  // The builds map 1:1 over the infos, so an empty side here is exactly an empty team.
   if (seed.rawInfos.p1.pokemon.length === 0 || seed.rawInfos.p2.pokemon.length === 0) {
     return { teams: null, usageStats: null, reason: 'could not build teams' };
   }
@@ -90,10 +83,9 @@ export interface BankWorld {
 }
 
 /**
- * Round 89 (#124): the worlds the bank searches for one replay, the heaviest first. A bring-all game and a game that pins both
- * sides give one world of weight 1 with the list `replayBringOnly` always gave (digit-identical rows); a game with a short side
- * gives its worlds (the three heaviest by usage weight, renormalized), the bank builds like the app, so the weights come from the
- * stats the build fetched (equal weights on the naked build).
+ * The worlds the bank searches for one replay, the heaviest first. A bring-all game and a game that pins both sides give one world
+ * of weight 1 with the list `replayBringOnly` gives; a game with a short side gives its worlds (the three heaviest by usage weight,
+ * renormalized; equal weights on the naked build).
  */
 export function bankWorldsFor(
   source: Parameters<typeof replayBringOnly>[0], snapshots: Parameters<typeof replayBringOnly>[1], usageStats: SmogonUsageStats | null,
@@ -117,7 +109,7 @@ export interface WorldReading {
  * One sample's numbers from the worlds that read at a turn: the weighted mean of the score, the game value (only when every world
  * has one) and each feature, through the same `blendValues` the engine's `blendWorlds` uses for the score. A world that ended
  * early or missed its boundary at the turn is not in `readings`, so the weights renormalize over the rest. One reading comes back
- * as it is: the rows of a pinned or bring-all game stay digit-identical.
+ * as it is.
  */
 export function blendReadings(readings: WorldReading[]): Omit<WorldReading, 'weight'> {
   const weights = readings.map(reading => reading.weight);

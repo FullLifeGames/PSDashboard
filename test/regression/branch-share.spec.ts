@@ -56,7 +56,7 @@ describe('branch save/share payloads', () => {
     expect(decoded.finalLog).toContain('|move|p1a: Test|Tackle|p2a: Test');
   });
 
-  // Round 77 (D6): the shared view reads move and Pokemon names, not the simulator commands.
+  // The shared view reads move and Pokemon names, not the simulator commands.
   test.each([
     ['singles', [{ kind: 'move' as const, moveId: 'earthquake', moveName: 'Earthquake' }], [{ kind: 'switch' as const, speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }], 'Earthquake', '→ Rotom-Wash'],
     ['doubles', [{ kind: 'move' as const, moveId: 'closecombat', moveName: 'Close Combat', targetLoc: 1 }, { kind: 'move' as const, moveId: 'protect', moveName: 'Protect' }], [{ kind: 'switch' as const, speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }, null], 'Close Combat +1 + Protect', '→ Rotom-Wash'],
@@ -71,8 +71,8 @@ describe('branch save/share payloads', () => {
     expect(decoded.version).toBe(1);
   });
 
-  // Round 82 (forced dice), step A7c: each turn of a link names its forced dice, the turn's row reads the joined report of a
-  // turn that paused for a switch, and a turn without a forced die writes no key (an old reader meets today's shape).
+  // Each turn of a link names its forced dice, the turn's row reads the joined report of a turn that paused for a switch, and a turn
+  // without a forced die writes no key (an old reader meets the old shape).
   describe('forced dice in a link', () => {
     const turn: BranchHistoryEntry = { ...history[0], p1Choice: 'move 1', p2Choice: 'move 1', diceMarks: { p1: [{ label: 'Air Slash: Flinch', noEffect: 'Air Slash did not run' }], p2: [{ label: 'Scald: Burn' }] } };
     const make = (entries: BranchHistoryEntry[]) => makeBranchSharePayload({ replay, branchTurn: 3, history: entries, finalLog: '|turn|3' });
@@ -108,7 +108,7 @@ describe('branch save/share payloads', () => {
     expect(payload.choices[0].p2Label).toBe('switch 2');
   });
 
-  // Round 77 (D7): two saves of one branch are two rows, and a delete removes one of them.
+  // Two saves of one branch are two rows, and a delete removes one of them.
   describe('saving the same branch twice', () => {
     const withStore = (run: () => void) => {
       const store = new Map<string, string>();

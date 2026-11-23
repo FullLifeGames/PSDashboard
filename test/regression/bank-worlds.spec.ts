@@ -7,11 +7,7 @@ import { loadSimMods, reconstructBranchRuntime, serializeLiveBattle } from '@ful
 import { bankSearch } from './bank-search';
 import { bankWorldsFor, blendReadings, type WorldReading } from './bank-build';
 
-/**
- * Round 89 (#124, stage 2): the bank reads a short-side game in every world and blends the readings, so one sample per sampled
- * turn carries the weighted score. A bring-all game and a game that pins both sides keep their one world and their rows
- * digit-identical. Doubles (Champions VGC 2625939941, Doubles OU style pinned VGC) and singles (the draft fixture, bring-all).
- */
+// Doubles (Champions VGC 2625939941, Doubles OU style pinned VGC) and singles (the draft fixture, bring-all).
 const fixture = (path: string) => JSON.parse(readFileSync(path, 'utf-8')) as ReplayData;
 const SHORT = 'packages/eval-engine/test/fixtures/gen9championsvgc2026regma-2625939941.json';
 

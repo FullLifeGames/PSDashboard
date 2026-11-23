@@ -7,13 +7,10 @@ import { EMPTY_SIDE_DAMAGE } from '../../src/lib/branch-damage';
 import { buildDockModel } from '../../src/components/dock/dock-model';
 import type { Gimmick } from '../../src/hooks/useSideControlsState';
 
-/**
- * Round 85 (T320): the dock at a position where a Tatsugiri commands its Dondozo. The scene: Scarlet/Violet VGC 2556366252 turn 3,
- * Tatsugiri-Curly inside the opposing Dondozo; the dock filled P1, left both P2 chips at "choose", and Execute waited for a pick
- * in the commanding slot. Played here on the real simulator and the real search: the engine's best line fills the Dondozo's
- * chip, the Tatsugiri's chip takes no input and says why, and Execute is ready with the Dondozo's pick alone. The rule itself is
- * swept against the simulator in `packages/eval-engine/test/commander-slots.spec.ts`.
- */
+// The dock at a position where a Tatsugiri commands its Dondozo: Scarlet/Violet VGC 2556366252 turn 3, Tatsugiri-Curly inside the
+// opposing Dondozo. Played on the real simulator and the real search: the engine's best line fills the Dondozo's chip, the Tatsugiri's
+// chip takes no input and says why, and Execute is ready with the Dondozo's pick alone. The rule itself is swept against the
+// simulator in `packages/eval-engine/test/commander-slots.spec.ts`.
 const EVS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const IVS = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const mon = (species: string, ability: string, moves: string[]): PokemonSet => ({

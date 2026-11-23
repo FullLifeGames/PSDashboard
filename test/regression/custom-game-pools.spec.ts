@@ -5,18 +5,14 @@ import { toId, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllife
 import { getEveryAbilityPool, getEveryMovePool, getItemPool, type PoolUse } from '../../src/lib/pokemon-options';
 import { loadImportPools, parseSetsImport, validateSetsImport } from '../../src/lib/sets-io';
 
-/**
- * Round 88 (#102): the pools of the editor and the sets import follow what the format's simulator lets exist. A Custom
- * Game has no `-Nonexistent` rule, so it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; a standard format
- * (`gen9ou`) refuses them; National Dex lifts the rule for what its own rule table names. An id the simulator does not list (a
- * draft league's, and every Scarlet/Violet VGC regulation but 2024 Reg G and 2025 Reg I in @pkmn/sim 0.10.15) keeps the standard
- * pools in the editor's lists, and the import accepts what the Custom Game of its generation plays (round 88, gate of 08.11.2026:
- * the editor of a VGC 2026 game offered about 620 Past, CAP and placeholder entries). The user report: P2 Landorus-Therian "Flying Gem", P2 Banette "Spectral Thief" and P2
- * Infernape "Fire Mane" were refused by the import, and the simulator plays all three in `gen9customgame`.
- *
- * The sweep compares the existence verdict of the simulator's own TeamValidator with the pools, per kind. Its other refusals
- * ("can't learn", "can't have") are no part of it: the app accepts those since round 83 (T308).
- */
+// The pools of the editor and the sets import follow what the format's simulator lets exist. A Custom Game has no `-Nonexistent`
+// rule, so it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; a standard format (`gen9ou`) refuses them; National
+// Dex lifts the rule for what its own rule table names. An id the simulator does not list (a draft league's, and every Scarlet/Violet
+// VGC regulation but 2024 Reg G and 2025 Reg I in @pkmn/sim 0.10.15) keeps the standard pools in the editor's lists, and the import
+// accepts what the Custom Game of its generation plays. Scene: P2 Landorus-Therian "Flying Gem", P2 Banette "Spectral Thief" and P2
+// Infernape "Fire Mane" were refused by the import, and the simulator plays all three in `gen9customgame`.
+// The sweep compares the existence verdict of the simulator's own TeamValidator with the pools, per kind. Its other refusals
+// ("can't learn", "can't have") are no part of it: the app accepts those.
 
 const unknown = { value: '', source: 'unknown' as const };
 const entry = (species: string): RevealedPokemonInfo => ({

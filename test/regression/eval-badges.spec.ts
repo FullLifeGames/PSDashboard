@@ -2,9 +2,7 @@ import { test, expect, describe } from 'vitest';
 import type { TurnAnalysis } from '@fulllifegames/eval-engine';
 import { attributionBadge } from '../../src/components/eval-badges';
 
-// The attribution badge is the one label the turn card and the game report
-// share for "who moved the needle": only the attribution and the two
-// sides' verdict flags decide it.
+// The attribution badge ("who moved the needle") is decided by the attribution and the two sides' verdict flags alone.
 const side = (extra: Partial<TurnAnalysis['p1']> = {}) => ({ tier: 'inaccuracy', riskUnpunished: false, riskPaidOff: false, ...extra }) as TurnAnalysis['p1'];
 const analysis = (attribution: TurnAnalysis['attribution'], p1: Partial<TurnAnalysis['p1']> = {}, p2: Partial<TurnAnalysis['p2']> = {}, extra: Partial<TurnAnalysis> = {}) =>
   ({ turn: 3, attribution, p1: side(p1), p2: side(p2), ...extra }) as unknown as TurnAnalysis;

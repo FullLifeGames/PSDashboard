@@ -3,14 +3,9 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { calcSingleDamageRange, createBranchStateFromBattle, type DamageResult } from '@fulllifegames/eval-engine';
 import { computePreviewDamage } from '../../src/lib/branch-damage';
 
-/**
- * Round 67, lane A: the picker's damage preview reads the body the simulator
- * holds (one builder sim to calc, T100). A battle is built, the preview read
- * the way BranchPanel reads it (createBranchStateFromBattle,
- * computePreviewDamage), then the simulator plays the move and the HP it
- * took must lie inside the previewed range (the harness of
- * damage-preview-landing.spec.ts).
- */
+// The picker's damage preview reads the body the simulator holds. The preview is read the way BranchPanel reads it
+// (createBranchStateFromBattle, computePreviewDamage), then the simulator plays the move and the HP it took must lie inside the
+// previewed range (the harness of damage-preview-landing.spec.ts).
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -59,10 +54,8 @@ function play(current: Battle, p1: string, p2: string) {
 
 const percentOf = (lost: number, maxhp: number) => Math.round(lost / maxhp * 1000) / 10;
 
-/**
- * Reads the preview row, plays the turn, and checks the damage lies in the row; a seed whose hit crits or misses
- * is skipped (the range covers the roll only). At least one seed must count.
- */
+// Plays the turn and checks the damage lies in the preview row; a seed whose hit crits or misses is skipped (the range covers the roll
+// only). At least one seed must count.
 function expectRowsHold(scene: (seed: number) => { current: Battle; rows: { row: DamageResult | undefined; side: 0 | 1; slot: number }[]; p1: string; p2: string }) {
   let counted = 0;
   for (const seed of SEEDS) {

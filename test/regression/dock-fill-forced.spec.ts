@@ -5,12 +5,9 @@ import {
 } from '@fulllifegames/eval-engine';
 import { pickFill, slotChoicesOf } from '../../src/lib/dock-fill';
 
-/**
- * Round 84 (turn dock), step A7a, ruling 2a: the engine fills a forced replacement like any slot. The premise, proved on the real
- * simulator and the real search: the evaluation ranks the replacement at a forced position (the dock serializes the live battle
- * at its open request, as the sweep does for a knockout), and `pickFill` maps the best line onto the forced slot, in singles and in
- * doubles, with one side or both replacing. Memento faints its user at once, so the turn ends in the open request.
- */
+// The engine fills a forced replacement like any slot: the evaluation ranks the replacement at a forced position (the dock serializes
+// the live battle at its open request, as the sweep does for a knockout), and `pickFill` maps the best line onto the forced slot, in
+// singles and in doubles, with one side or both replacing. Memento faints its user at once, so the turn ends in the open request.
 const EVS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const IVS = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const mon = (species: string, moves: string[]): PokemonSet => ({

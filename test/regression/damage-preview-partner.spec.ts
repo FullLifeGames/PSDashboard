@@ -3,12 +3,9 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { calcSingleDamageRange, createBranchStateFromBattle, loadSimMods, type DamageResult } from '@fulllifegames/eval-engine';
 import { computePreviewDamage, hitsPartner } from '../../src/lib/branch-damage';
 
-/**
- * Round 83 (the user, 01.11.2026: "Multihits like Earthquake are also weird, the damage on P1B is missing"): a move that hits
- * every body next to its user hits the user's partner too, and the move tile listed only the foes. The preview now adds the
- * partner's row, priced behind the partner's own side's screens. The scenes hold the row to the HP the simulator takes; the
- * sweep holds the reading to the simulator's targets for every damaging move of the Dex.
- */
+// A move that hits every body next to its user hits the user's partner too: the preview adds the partner's row, priced behind the
+// partner's own side's screens. The scenes hold the row to the HP the simulator takes; the sweep holds the reading to the
+// simulator's targets for every damaging move of the Dex.
 
 await loadSimMods('gen9championsou');
 

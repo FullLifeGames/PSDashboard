@@ -11,15 +11,12 @@ import { replayBuildOptions, replaySolveOptions } from '../../src/lib/team-build
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../../src/lib/smogon-stats';
 
-/**
- * Issue 150, claim 1 (round 89): what the panel shows is what the battle plays, on the edit path too. Every body of the
- * harness games gets its EVs set by hand at the values the panel showed (the user's edit of one number marks the field
- * manual); the app then solves again and builds. The built nature and EVs must equal the nature and EVs of the panel
- * (`applyInferredSpreads` over the edited info). Before the fix the solver's nature, fitted to the solver's own EVs,
- * replaced the shown one. The games are the feedback harness's tracked fixtures with their pinned Smogon answers, so the
- * sweep runs in a clone; it needs no local data. Game types are counted apart: singles (Gen 6, Gen 8, Champions OU),
- * doubles (Doubles OU) and VGC (Scarlet/Violet Regulation I, Champions Regulation M-C).
- */
+// What the panel shows is what the battle plays, on the edit path too. Every body of the harness games gets its EVs set by hand at
+// the values the panel showed (the edit of one number marks the field manual); the app then solves again and builds. The built nature
+// and EVs must equal those of the panel (`applyInferredSpreads` over the edited info), not the solver's nature fitted to its own EVs.
+// The games are the feedback harness's tracked fixtures with their pinned Smogon answers, so the sweep runs in a clone. Game types
+// are counted apart: singles (Gen 6, Gen 8, Champions OU), doubles (Doubles OU) and VGC (Scarlet/Violet Regulation I, Champions
+// Regulation M-C).
 const FIXTURES = join('test', 'e2e-feedback', 'fixtures');
 const GAMES: { kind: 'singles' | 'doubles' | 'vgc'; id: string }[] = [
   { kind: 'singles', id: 'smogtours-gen6ou-648453' },

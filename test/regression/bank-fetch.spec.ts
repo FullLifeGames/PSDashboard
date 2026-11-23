@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { fetchBankReplay } from './bank-fetch';
 
-/**
- * Round 71: the bank's replay fetch tries again after a network error, a server error or a rate limit, and returns at
- * once on a client error; a replay that never arrives comes back as its status, which the harness logs as a skip.
- */
 
 type Step = Error | { status: number; body?: unknown; brokenBody?: boolean };
 

@@ -5,11 +5,6 @@ import {
   BANK_TRANCHES, FIT_TRANCHES, holdoutTranches, jobArgs, mergeArgs, validateRunConfig,
 } from '../../scripts/bank-run-config.mjs';
 
-/**
- * Round 71 (bank in GitHub Actions): .bank-run.json is untrusted input to the bank workflow. scripts/bank-run-config.mjs
- * validates it against an allowlist and builds the runner's argument vector itself, so no value of the file reaches a
- * shell line; these specs pin the allowlist and the job split.
- */
 
 const TRANCHES = [...BANK_TRANCHES, ...holdoutTranches(), ...FIT_TRANCHES];
 const valid = (raw: unknown) => validateRunConfig(raw, TRANCHES);
@@ -63,13 +58,12 @@ describe('the allowlist of .bank-run.json', () => {
     const harness = readFileSync(fileURLToPath(new URL('./eval-calibration.spec.ts', import.meta.url)), 'utf8');
     const declared = [...harness.matchAll(/^\s+tranche: '([^']+)',$/gm)].map(match => match[1]).sort();
     expect([...BANK_TRANCHES].sort()).toEqual(declared);
-    // Round 86 (the fresh VGC holdout): the manifest also carries the family scripts/fresh-holdout.mjs drew (vgc2), so the
-    // tranches are the four of the fit corpus plus one per drawn family, whatever the manifest holds.
+    // The manifest also carries the family scripts/fresh-holdout.mjs drew (vgc2): the tranches are the four of the fit corpus plus one
+    // per drawn family, whatever the manifest holds.
     const manifest = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/fit-holdout-manifest.json', import.meta.url)), 'utf8')) as { sets: { family: string }[] };
     const families = new Set(manifest.sets.map(set => set.family));
     for (const family of ['championsou', 'championsvgc', 'doublesou', 'vgc']) families.add(family);
     expect(holdoutTranches()).toEqual([...families].map(family => `holdout-${family}`).sort());
-    // The draw of 06.11.2026 (user gate "1c 2a 3a 4a 5a"): the fresh VGC holdout is in the manifest.
     expect(holdoutTranches()).toContain('holdout-vgc2');
   });
 });

@@ -2,13 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { contrastRatio, TYPE_BG, typeTileVars } from '../../src/lib/type-colors';
 
-/**
- * Round 87 (release 1.1.0), T313: the app's own buttons. White bold text read 2.5 : 1 on the .ps-btn gradient (3.9 : 1 on
- * .ps-btn-red and on Execute, which paints the same red) and fell further under the hover brightness. Every gradient stop of
- * .ps-btn, .ps-btn-red, the dock's Execute and Start (the class ps-execute-btn-ready) and the numbered circles of the loader's
- * guide now hold white to 4.5 : 1 (WCAG AA for small text), at rest and at the hover brightness of the button's own rule.
- * Round 84's move-tile-contrast.spec.ts holds the dock's selection blue; this spec holds the buttons it left out.
- */
+// Every gradient stop of .ps-btn, .ps-btn-red, the dock's Execute and Start (the class ps-execute-btn-ready) and the numbered
+// circles of the loader's guide holds white to 4.5 : 1 (WCAG AA for small text), at rest and at the hover brightness of the
+// button's own rule.
 const read = (file: string): string => readFileSync(new URL(`../../src/styles/${file}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const formsCss = read('forms.css');
 const dockCss = read('dock.css');

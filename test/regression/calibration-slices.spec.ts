@@ -8,13 +8,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FINGERPRINT_PATHS } from '../../scripts/calibration-fingerprint.mjs';
 
-/**
- * Round 71 (bank in GitHub Actions): a CI job runs a range of the slices (--slice-range a..b of --slices N) and
- * leaves its dumps with a job.json; --merge joins the jobs of one run into a run folder that reads like a local run
- * (merged.jsonl, summary.txt, run.json with the fingerprint). Slices are independent, so the merged rows equal a run
- * of all slices in one process. The specs run the runner in small git repositories against a stand-in for the
- * slices; no bank runs.
- */
+// Slices are independent, so the merged rows of the CI jobs (--slice-range a..b of --slices N, joined by --merge) equal a run of all
+// slices in one process. The specs run the runner in small git repositories against a stand-in for the slices; no bank runs.
 
 const SCRIPTS = fileURLToPath(new URL('../../scripts/', import.meta.url));
 const RUNNER = ['run-calibration.mjs', 'calibration-lib.mjs', 'calibration-fingerprint.mjs', 'calibration-jobs.mjs'];

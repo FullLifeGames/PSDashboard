@@ -13,14 +13,7 @@ import {
   quickTierLines, runFraction,
 } from '../../scripts/calibration-fingerprint.mjs';
 
-/**
- * Round 70 (bank tooling): the fingerprint of a bank run and the reuse of a finished base. A fingerprint
- * names everything that decides the rows (the git tree ids of the tracked inputs at HEAD, the content of
- * the two caches, the lever env, the Node version). Every run writes it into run.json; with a clean tree
- * `run-calibration.mjs --reuse` prints the folder of a finished run that carries the same one instead of
- * running again. The specs build small git repositories in temporary folders and run the runner against a
- * stand-in for the slices; no bank runs.
- */
+// The specs build small git repositories in temporary folders and run the runner against a stand-in for the slices; no bank runs.
 
 const SCRIPTS = fileURLToPath(new URL('../../scripts/', import.meta.url));
 const made: string[] = [];

@@ -13,20 +13,12 @@ import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../../src/li
 import { limitBench, replayBench, type Bench } from '../../src/lib/bench';
 import { dockReplays } from '../e2e/helpers';
 
-/**
- * Round 88 (T314, #55), step C4: a bench offers only bodies the side could have brought. In a bring-limited game (VGC brings four of
- * six, Battle Stadium Singles three) the log fields every brought body of a side that played its whole selection, and the app's
- * reconstruction of such a game builds the full team of six when the OTHER side stayed short (`replayBringOnly` pins both sides or
- * neither: a pinned four against an open six flipped game 2630452654 in the A.3c gate). Option (a) of the mid-wave gate leaves that
- * rebuild alone and filters what the user sees: the snapshot pickers, the stored positions and the live What-if, per side.
- *
- * Round 89 (#124) moves the short side: the app rebuilds the heaviest world of its unknown bodies (the fielded bodies plus one guess
- * per missing body from the side's team preview, trimmed to the count) and the bench lists those bodies, so no side stays whole.
- *
- * The oracle is the log: a side whose fielded count equals the bring count has exactly those bodies; a short side has its fielded
- * bodies plus the heaviest world's guess (a body of its team preview the log never fielded). The sweep reads every bring-limited game of `.fit-corpus` and `.calibration/replays` (skipped without them), Champions VGC and
- * Scarlet/Violet VGC in their own rows, and a synthetic Battle Stadium Singles log.
- */
+// A bench offers only bodies the side could have brought. In a bring-limited game (VGC brings four of six, Battle Stadium Singles
+// three) the log fields every brought body of a side that played its whole selection; a short side is rebuilt as the heaviest world
+// of its unknown bodies (the fielded bodies plus one guess per missing body from the side's team preview, trimmed to the count).
+// The oracle is the log: a full side has exactly its fielded bodies, a short side those plus the heaviest world's guess. The sweep
+// reads every bring-limited game of `.fit-corpus` and `.calibration/replays` (skipped without them), Champions VGC and
+// Scarlet/Violet VGC in their own rows, and a synthetic Battle Stadium Singles log.
 
 const ROOT = process.cwd();
 const FIT = join(ROOT, '.fit-corpus');
@@ -102,7 +94,7 @@ function benchProblems(game: Game, label: string, shown: BranchSimState, world: 
   const rules = replayRules(game.source);
   for (const side of ['p1', 'p2'] as const) {
     const allowed = baseIds(world ? world[side] : game.fielded[side], rules);
-    // A short side without a world (its preview cannot name the missing bodies) keeps its whole team, as before round 89.
+    // A short side without a world (its preview cannot name the missing bodies) keeps its whole team.
     if (game.fielded[side].length !== game.count && !world) continue;
     const stray = switchSpecies(shown, side).filter(species => !allowed.has(speciesBaseId(species, rules)));
     if (stray.length > 0) problems.push(`${game.id} ${label} ${side}: bench offers ${[...new Set(stray)].join(', ')}`);

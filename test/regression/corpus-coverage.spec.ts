@@ -7,12 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { Dex } from '@pkmn/dex';
 import { bankIds, bankLogs, coverageOf, fixtureLogs } from '../../scripts/corpus-coverage.mjs';
 
-/**
- * Round 72 (T237): scripts/corpus-coverage.mjs counts the replays that carry each rule-bearing population (generation, game type,
- * protocol features, move classes read from the Dex by property) for the bank, the fit corpus and the fixtures. A population with
- * no replays is one where a rule error is invisible to every measurement. The cases run the counter on small written logs (one
- * singles, one doubles, one VGC, one Z-move, one CRLF) and on a real fixture, and the CLI once on the fixtures column.
- */
+// The cases run the counter on small written logs (one singles, one doubles, one VGC, one Z-move, one CRLF) and on a real fixture,
+// and the CLI once on the fixtures column.
 
 const SCRIPT = fileURLToPath(new URL('../../scripts/corpus-coverage.mjs', import.meta.url));
 const REPO = fileURLToPath(new URL('../..', import.meta.url));

@@ -26,12 +26,7 @@ import type { SolveSpreadsJob } from '../../src/lib/replay-jobs/types';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { bankTeamsFor } from './bank-build';
 
-/**
- * Round 88 (F, #101): a game without team preview shows only the bodies that entered; `|teamsize|` says how many the side has. A side
- * short of its team size gets stand-ins chosen by the format's teammate statistics, in every build path (the app's panel and live
- * build, `buildAppTeams` of the bank, the builder itself). Scene: smogtours-gen4ou-544639, where P1 shows 3 of 6 in twelve turns and the
- * engine read a 3 against 6 game as a loss at turn 1 (-0.750).
- */
+// Scene: smogtours-gen4ou-544639, where P1 shows 3 of 6 bodies in twelve turns; without stand-ins the engine read it as a loss at turn 1.
 const fixture = (name: string) => JSON.parse(readFileSync(`test/regression/fixtures/${name}.json`, 'utf-8')) as { log: string };
 const SCENE = fixture('smogtours-gen4ou-544639').log;
 const GEN4 = parseSmogonChaosStats(fixture('stats-gen4ou-trimmed'), { format: 'gen4ou', month: 'latest' }) as SmogonUsageStats;
@@ -228,7 +223,6 @@ describe('app-build-parity', () => {
   const fixture = (id: string) =>
     JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
 
-  /** The seed and the Smogon answers the app waits for before it evaluates. */
   async function knowledgeFor(replay: Fixture) {
     const parsed = parseReplayLogWithObservations(replay.log);
     const seed = appTeamSeed(replay.log, parsed);
@@ -247,21 +241,18 @@ describe('app-build-parity', () => {
   ];
   const nameOf = (row: string) => row.split('|')[0];
 
-  /** The `side:species` rows on which two builds disagree. */
   function moved(left: string[], right: string[]): string[] {
     const a = new Map(left.map(row => [nameOf(row), row]));
     const b = new Map(right.map(row => [nameOf(row), row]));
     return [...new Set([...a.keys(), ...b.keys()])].filter(name => a.get(name) !== b.get(name)).sort();
   }
 
-  /** Solved spreads as comparable rows, in key order. */
   const serialized = (spreads: Map<string, SpreadCandidate>) =>
     [...spreads.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, candidate]) => `${key} ${JSON.stringify(candidate)}`);
 
   const itemOf = (teams: Teams, side: 'p1' | 'p2', species: string) =>
     (side === 'p1' ? teams.p1Team : teams.p2Team).find(set => set.species === species)?.item;
 
-  /** The bank's helper under the retired build, with the switch restored. */
   async function withRawBuild<T>(run: () => Promise<T>): Promise<T> {
     const before = process.env.EVAL_CALIBRATION_RAWBUILD;
     process.env.EVAL_CALIBRATION_RAWBUILD = '1';
@@ -293,17 +284,12 @@ describe('app-build-parity', () => {
       const { parsed, seed, usageStats, setAssumptions } = await knowledgeFor(replay);
       const app = buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
       const old = await withRawBuild(() => bankTeams(replay, parsed));
-      // Round 63: both builds read the published move slots (T89), so the old
-      // build picks Volcanion's Leftovers set too; and the settled move orders
-      // (T117) keep p1 Tornadus-Therian's Speed (Timid 252 Spe, not Hardy
-      // 252 Atk), so p2 Ferrothorn solves to the old build's Relaxed
-      // 88 Def / 168 SpD again. Round 64 (T122): the solve refills open EV
-      // budgets toward the prior, so p2 Keldeo's spread now differs between
-      // the builds and p2 Tornadus-Therian's no longer does.
+      // Both builds read the published move slots, so the old build picks Volcanion's Leftovers set too; the move orders keep
+      // p1 Tornadus-Therian's Speed (Timid 252 Spe), so p2 Ferrothorn solves to the old build's Relaxed 88 Def / 168 SpD. The solve
+      // refills open EV budgets toward the prior, so p2 Keldeo's spread differs between the builds.
       expect(moved(rows(old), rows(app)))
         .toEqual(['p1:Tornadus-Therian', 'p2:Keldeo', 'p2:Landorus-Therian']);
-      // The scene the round is named after: the old build explains the move
-      // order with speed EVs.
+      // The old build explains the move order with speed EVs.
       expect(itemOf(old, 'p2', 'Landorus-Therian')).toBe('Rocky Helmet');
       expect(itemOf(app, 'p2', 'Landorus-Therian')).toBe('Choice Scarf');
       expect(itemOf(app, 'p1', 'Volcanion')).not.toBe('Choice Scarf');
@@ -313,9 +299,7 @@ describe('app-build-parity', () => {
     test.each([SINGLES, DOUBLES])('buildAppTeams matches the app entry points on %s', async id => {
       const replay = fixture(id);
       const { seed, usageStats, setAssumptions } = await knowledgeFor(replay);
-      // The enrich memo of useTeamKnowledge, settled: the lazy hidden-power
-      // resolver has landed, the Smogon data is in, and the damage judge came
-      // with the inference (round 67, T130).
+      // The enrich memo of useTeamKnowledge, settled: the lazy hidden-power resolver has landed and the Smogon data is in.
       const hp = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
         seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(replay.log));
       const { p1: effectiveP1Info, p2: effectiveP2Info } = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions,

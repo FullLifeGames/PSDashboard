@@ -1,14 +1,14 @@
 import type { Battle as SimBattle, Pokemon as SimPokemon } from '@pkmn/sim';
 
 /**
- * Round 89 (#138, lane M): the observer of the protocol correction. `observed` wraps `correctActivesFromProtocol` (a spec mocks the
- * module and puts the wrapper in its place), and for every block whose slots the simulator already holds as the log's last entrants it
- * prints the board before and after the correction. The correction may add (a start the board lacked, T212) and must change nothing
- * else: a lost volatile, a reset move or a moved body is a difference. The held item is not read: `applyProtocolHeldItems` is its own
- * correction (T133) and the protocol-proven lock stamp (spec 1b) move it or the move flags on any block, and a block that enters each slot once is outside what
- * the pass-through of a slot changes (`passing`: a slot with two entry lines). A body that is off the field after the correction (the one the block shows fainted on
- * arrival) is read for its volatiles and boosts only: its entry rewrites the move flags, the active flag and the place on the bench, which
- * the simulator's own switch-in rewrites again, and no turn reads them before then.
+ * The observer of the protocol correction. `observed` wraps `correctActivesFromProtocol` (a spec mocks the module and puts the wrapper
+ * in its place), and for every block whose slots the simulator already holds as the log's last entrants it prints the board before and
+ * after the correction. The correction may add (a start the board lacked) and must change nothing else: a lost volatile, a reset move
+ * or a moved body is a difference. The held item is not read: `applyProtocolHeldItems` is its own correction, and the protocol-proven
+ * lock stamp moves it or the move flags on any block. A block that enters each slot once is outside what the pass-through of a slot
+ * changes (`passing`: a slot with two entry lines). A body that is off the field after the correction (fainted on arrival) is read for
+ * its volatiles and boosts only: its entry rewrites the move flags, the active flag and the place on the bench, which the simulator's
+ * own switch-in rewrites again, and no turn reads them before then.
  */
 
 export interface Observation {

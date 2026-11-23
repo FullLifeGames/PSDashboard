@@ -116,8 +116,7 @@ describe('eval-gap visibility helpers', () => {
 
 describe('graph merge monotonicity', () => {
   test('a shallower pass never overwrites deeper stored data', () => {
-    // The re-analyze fast pass (d1s1) used to clobber a deepened turn's
-    // graph entry until the key-turn pass restored some of them.
+    // The re-analyze fast pass (d1s1) must not clobber a deepened turn's graph entry.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
     expect(supersedesStored(null, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
@@ -138,16 +137,14 @@ describe('graph merge monotonicity', () => {
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
   test('a matrix result of depth ≥ 2 is replaced by an MCTS-target sweep', () => {
-    // Round 69 (T184): the configured engine decides. The deep matrix result no
-    // longer outranks the tree, whether MCTS is the target via explicit prefs or
-    // the auto routing (the full table: prefs.spec.ts).
+    // The configured engine decides: the deep matrix result does not outrank the tree, whether MCTS is the target via explicit prefs
+    // or the auto routing (the full table: prefs.spec.ts).
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(true);
   });
   test('a matrix result of depth ≥ 2 does not land on an MCTS-target turn', () => {
-    // The other direction of the removed rule: where the tree is the turn's
-    // target, only a tree pass replaces a stored tree result.
+    // Where the tree is the turn's target, only a tree pass replaces a stored tree result.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(false);
@@ -157,7 +154,7 @@ describe('graph merge monotonicity', () => {
 });
 
 describe('auto mode resolution', () => {
-  // The search before round 61 for both game types (round 63: auto splits per game type).
+  // A search budget that starts both game types on the matrix and switches to the tree at the fainted-fraction threshold.
   const before61 = { earlyDepth: 1, earlySamples: 1, treeFrom: AUTO_MCTS_FAINTED_FRACTION } as const;
   const budgetBefore61 = { ...SEARCH_BUDGET_DEFAULT, singles: before61, doubles: before61 };
 
@@ -192,7 +189,7 @@ describe('auto mode resolution', () => {
     const fastIncoming = { depth: 1, samples: 1, mode: 'matrix' } as const;
     // Doubles default (tree from the first turn): an early turn's target is MCTS too.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1, true)).toBe(false);
-    // The resolution logic below, under the threshold before round 61.
+    // The resolution logic below runs under that threshold.
     configureSearchBudget(budgetBefore61);
     onTestFinished(() => configureSearchBudget(null));
     // Late turn (fraction at/above the threshold): auto's target is MCTS — keep it.
@@ -231,10 +228,8 @@ describe('verification deep tier', () => {
 
 describe('key-turn coverage matches the report', () => {
   test('every report-worthy swing gets the deepening pass', () => {
-    // GPL finding: the report named T14/T36 (+15% ≈ 0.29–0.34 swings) while
-    // selectKeyTurns still used the 0.4 blunder threshold — the whole
-    // deepening pass skipped the replay and the chips carried d1 badges
-    // under MCTS prefs. One constant now feeds both.
+    // One constant feeds the report and selectKeyTurns: a swing of 0.29 to 0.34 that the report names must get the deepening pass,
+    // or its chips keep d1 badges under MCTS prefs.
     expect(KEY_MOMENT_SWING).toBe(KEY_TURN_SWING);
     expect(selectKeyTurns([-0.16, -0.25, 0.1])).toEqual([2, 3]);
     // Below the report threshold stays on the fast scan.

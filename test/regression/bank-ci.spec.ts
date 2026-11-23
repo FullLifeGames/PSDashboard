@@ -10,13 +10,6 @@ import {
 } from '../../scripts/bank-ci.mjs';
 import { BANK_TRANCHES, validateRunConfig } from '../../scripts/bank-run-config.mjs';
 
-/**
- * Round 71 (bank in GitHub Actions): scripts/bank-ci.mjs pushes one bank/<name> branch per run (the user's standing
- * okay of 13.10. covers these and nothing else). The specs pin what it pushes and deletes, that the run commit adds
- * exactly .bank-run.json without touching the repository's index, working tree or branches, the secret check before
- * a push, and the reuse of a downloaded run.
- */
-
 const made: string[] = [];
 afterAll(() => {
   for (const dir of made) rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
@@ -79,8 +72,7 @@ describe('finding the run of a pushed commit', () => {
 });
 
 describe('the secret check before a push', () => {
-  // Round 77: the diff of the round against v1 grew past 1 MB, Node's default output limit of execFileSync, and the
-  // check died with "spawnSync git ENOBUFS" before any push.
+  // A diff past 1 MB exceeds Node's default output limit of execFileSync ("spawnSync git ENOBUFS").
   test('reads a git output larger than 1 MB', () => {
     const root = fileURLToPath(new URL('../..', import.meta.url));
     const text = gitText(root, ['show', 'HEAD:test/e2e-feedback/fixtures/smogon/_stats_gen9ou.json.json']);
@@ -126,8 +118,7 @@ describe('the reuse of a downloaded CI run', () => {
   });
 });
 describe('waiting for the CI run', () => {
-  // Round 72: gh run watch also ends on an API error (HTTP 504 on run 39262005491), and the script read the run as over
-  // while it ran; the run's own status decides now.
+  // `gh run watch` also ends on an API error (HTTP 504), which must not read as a finished run: the run's own status decides.
   const scripted = (watches: (Error | null)[], views: (Error | { status: string; conclusion?: string })[]) => {
     const calls = { watch: 0, view: 0 };
     const watch = () => {
@@ -161,8 +152,8 @@ describe('waiting for the CI run', () => {
 });
 
 describe('a finished run that GitHub holds open', () => {
-  // Round 76 (T266): on 22.10.2026 the Champions OU holdout run of r74-k finished its 16 jobs and its merge, and GitHub kept the
-  // run "in_progress" for about an hour. The run's jobs and its merged artifact decide, after a grace period.
+  // GitHub can keep a run "in_progress" for about an hour after its 16 jobs and its merge finished: the run's jobs and its merged
+  // artifact decide, after a grace period.
   const JOBS = 4;
   const MERGE = 'Merge the jobs';
   type Job = { name: string; status: string; conclusion?: string };

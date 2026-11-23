@@ -12,19 +12,11 @@ import {
 import { branchFrameLog } from '../../src/lib/branch-log';
 import { decodeBranchShare, encodeBranchShare, makeBranchSharePayload } from '../../src/lib/branch-share';
 
-/**
- * The replay iframe's sidebar icons in a branch. The embed keeps one roster
- * entry per Pokémon and finds it again by ident (`p1: <name>`) plus details
- * (`Landorus-Therian, M, shiny`). The replay spells both its own way (the
- * player's nickname, the game's level, gender and shiny flags), and since
- * round 72 (T238) the built sets carry them, so the simulator writes the
- * replay's own switch lines and the frame needs no translation. Before, a
- * simulator switch-in met no roster entry: the body became a second entry,
- * the second entry fainted, and the sidebar (one icon per species, the first
- * entry wins) kept showing the first one alive.
- * The scene of the report is smogtours-gen7ou-450650: branch at turn 17 with
- * Stone Edge for Landorus-Therian, played to the end.
- */
+// The replay iframe's sidebar icons in a branch. The embed keeps one roster entry per Pokémon and finds it again by ident
+// (`p1: <name>`) plus details (`Landorus-Therian, M, shiny`). The built sets carry the replay's nickname, level, gender and shiny
+// flags, so the simulator writes the replay's own switch lines; a switch-in that met no roster entry became a second entry, and the
+// sidebar (one icon per species, the first entry wins) kept showing the first one alive.
+// Scene: smogtours-gen7ou-450650, branch at turn 17 with Stone Edge for Landorus-Therian, played to the end.
 
 const fixture = (path: string) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf-8')) as ReplayData;
 
@@ -73,7 +65,7 @@ async function playBranch(
   replay: ReplayData, branchTurn: number,
   options: { edit?: (p1Team: ReturnType<typeof buildTeamsFromReplay>['p1Team']) => void; opening?: BranchSlotChoice } = {},
 ): Promise<PlayedBranch> {
-  // Round 75 (T160): the Champions mod registers before the inference reads the Champions Dex, as the app's replay load does.
+  // The Champions mod registers before the inference reads the Champions Dex, as the app's replay load does.
   await loadSimMods(getBranchSimulatorFormat(replay));
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });

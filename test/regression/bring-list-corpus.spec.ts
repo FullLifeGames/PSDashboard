@@ -7,16 +7,11 @@ import {
 } from '@fulllifegames/replay-core';
 import { loadSimMods, serializePreviewPosition } from '@fulllifegames/eval-engine';
 
-/**
- * Round 89 (#116): a Ditto that copied a foe stood in the snapshot as the foe's species, and the bring list named the copy.
- * Two rows over every bring-limited game of `.fit-corpus` (Scarlet/Violet VGC, Champions VGC, Battle Stadium Singles; skipped
- * without the corpus):
- *  - no side's list holds a base species outside the side's own `|poke|` preview (a copy that the side did not preview was a
- *    stranger on the list);
- *  - every game that pins (both sides fielded their whole selection) trims both sides to the bring count with the team the
- *    log alone gives (the team-preview position the lead picker builds, which trims by the list): the list names a body for each
- *    set, so the rebuild plays four against four (three against three), never four against six.
- */
+// Two rows over every bring-limited game of `.fit-corpus` (Scarlet/Violet VGC, Champions VGC, Battle Stadium Singles; skipped without
+// the corpus). A Ditto that copied a foe stands in the snapshot as the foe's species, so the list must not name the copy:
+//  - no side's list holds a base species outside the side's own `|poke|` preview;
+//  - every game that pins (both sides fielded their whole selection) trims both sides to the bring count with the team the log alone
+//    gives (the team-preview position the lead picker builds, which trims by the list): four against four (three against three).
 const FIT = join(process.cwd(), '.fit-corpus');
 const HAVE_CORPUS = existsSync(FIT);
 
@@ -56,7 +51,7 @@ describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus (#116)', () => {
     expect(strangers).toEqual([]);
   }, 1_200_000);
 
-  // Round 89: this test read 237.9 s on 20.11.2026 and timed out at 240 s on the slower devbox; the limit guards against a hang, not a slow machine.
+  // The long timeout guards against a hang, not a slow machine: the row needs about 240 s on devbox.
   test('every game that pins trims both sides to the bring count', async () => {
     await loadSimMods('gen9championsvgc2026regmbbo3');
     const games = bringLimitedGames();
@@ -79,7 +74,7 @@ describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus (#116)', () => {
         if (side.pokemon.length !== count) wrong.push(`p${index + 1} of ${id}: ${side.pokemon.length} of ${count} (team of ${(index === 0 ? p1Team : p2Team).length})`);
       });
     }
-    // Round 89: 3,190 of the corpus' 4,033 bring-limited games pin once the copy no longer takes the Ditto's place.
+    // 3,190 of the corpus' 4,033 bring-limited games pin.
     expect(pinned).toBeGreaterThan(3000);
     expect(wrong).toEqual([]);
   }, 1_200_000);

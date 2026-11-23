@@ -5,14 +5,8 @@ import {
 } from '@fulllifegames/eval-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId, replayRuleset, type GameRules } from '@fulllifegames/replay-core';
 
-/**
- * Round 61: the bank's search, the app's dispatch. Below the auto threshold
- * the sync matrix search (parity with the app's orchestrated matrix is
- * pinned by eval-orchestrator.spec.ts); at or above it the app's tree
- * search (searchTreesOrchestrated: four trees, verify, prover) over an
- * in-process executor. Before round 61 the bank ran one tree without
- * verify (mctsSearch).
- */
+// The bank's search, the app's dispatch: below the auto threshold the sync matrix search (parity with the app's orchestrated matrix is
+// pinned by eval-orchestrator.spec.ts); at or above it the app's tree search (searchTreesOrchestrated) over an in-process executor.
 export interface BankSearchInput {
   serialized: string;
   faintedFraction: number;
@@ -28,8 +22,7 @@ const isDoubles = (serialized: string) => (JSON.parse(serialized) as { gameType?
 
 export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   const { serialized, faintedFraction, mode, settings } = input;
-  // Round 61: auto reads the search budget (early depth and draws, tree threshold); the depth and draw levers apply outside auto.
-  // Round 63 (T110): per game type.
+  // Auto reads the search budget per game type (early depth and draws, tree threshold); the depth and draw levers apply outside auto.
   const resolved = mode === 'auto'
     ? autoTurnSettings(faintedFraction, isDoubles(serialized))
     : { depth: input.depth, samples: input.samples, mode: mode === 'mcts' ? 'mcts' as const : 'matrix' as const };
@@ -39,17 +32,12 @@ export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   return Promise.resolve(searchPosition(serialized, { ...settings, depth: resolved.depth, samples: resolved.samples }));
 }
 
-/**
- * The app's format switches for one replay (useEvalView useEvalFormat): Tera
- * with the default preference 'auto' (none without a click, everyone on the
- * ladder, only the species that clicked in draft and custom formats), Sleep
- * Clause from the branch format.
- */
+/** The app's format switches for one replay (useEvalFormat): Tera by the 'auto' preference, Sleep Clause from the branch format. */
 export function bankSettings(replay: { id?: string; formatid?: string; log: string }): { tera: TeraAllowance; sleepClause: boolean; ruleset: StaticRuleset } {
   return {
     tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
     sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
-    // Round 65: the rule set from the replay's own format, as the app resolves it (useEvalView).
+    // The rule set comes from the replay's own format, as the app resolves it.
     ruleset: replayRuleset(replay),
   };
 }
