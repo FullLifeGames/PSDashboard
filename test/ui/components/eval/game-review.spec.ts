@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest';
-import { buildGameReport, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewDiffers, reviewMarks } from '../../../../src/components/eval/game-review';
+import {
+  buildGameReport,
+  winDeltaText,
+  winPctText,
+  type EvalLine,
+  type EvalResult,
+  type SideAnalysis,
+  type TurnAnalysis,
+  lostGround,
+} from '@fulllifegames/eval-engine';
+import { gameReview, gradedTier, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
@@ -343,5 +352,28 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
     expect(lines[0].block.worstNote).toBe('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.');
+  });
+});
+
+const best = rankedChoice('move 1', 'Hydro Pump', 0.1);
+const played = rankedChoice('move 2', 'Hyper Voice', -0.05);
+const risk = (tier: 'inaccuracy' | 'mistake', overrides: Partial<SideAnalysis> = {}): SideAnalysis => ({
+  ...sideAnalysis(), played, best, safe: best, regret: 0.15, tier,
+  safeAgainstClick: { against: 'Protect', playedValue: 0.325, safeValue: 0.454 }, ...overrides,
+});
+
+describe('a risk that the safe line matched against the click is graded', () => {
+  test.each(['inaccuracy', 'mistake'] as const)('%s: graded without the read credit', tier => {
+    expect(gradedTier(risk(tier))).toBe(tier);
+  });
+
+  test.each(['inaccuracy', 'mistake'] as const)('%s: with the credit it is no grade', tier => {
+    expect(gradedTier(risk(tier, { riskPaidOff: true }))).toBeNull();
+  });
+
+  test('the review lists the graded side of a turn', () => {
+    const analysis = turnAnalysis(8, { p1: risk('inaccuracy'), p2: sideAnalysis() });
+    expect(gradedSides([analysis]).map(entry => [entry.side, entry.grade])).toEqual([['p1', 'inaccuracy']]);
+    expect(lostGround(analysis, 'p1')).toBe(false);
   });
 });
