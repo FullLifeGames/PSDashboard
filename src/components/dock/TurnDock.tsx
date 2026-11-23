@@ -20,9 +20,8 @@ type LiveBattle = LiveHit['battle'];
 
 export interface TurnDockProps {
   simState: BranchSimState | null;
-  /** Round 89 (#105): the position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of offering a turn. */
+  /** The position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of offering a turn. */
   endOfGame?: MainLineEnd;
-  /** Round 89 (#105): a new game is open: the strip names the game where it would name the replay. */
   isGame?: boolean;
   /** The state shown is the last resolved position's while the viewed one resolves: the dock keeps its height and takes no input. */
   stale?: boolean;
@@ -38,13 +37,10 @@ export interface TurnDockProps {
   /** The game's format id ('' when unknown): the tray's What if list reads its move pool by it. */
   format?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
-  /** Round 84 (A7c, ruling 16a): stores a pick without sending anything (the live tip only). Without it every pick goes through `onSetChoice`. */
+  /** Stores a pick without sending anything (the live tip only). Without it every pick goes through `onSetChoice`. */
   onRecordChoice?: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
-  /** "What if it had …": loads a legal move into the active set and rebuilds the branch. */
   onHypotheticalMove: (side: Side, activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
-  /** Execute sends the effective choices: the played seed under the user's picks. */
   onExecuteTurn: (choices: SideChoices) => void;
-  /** The action each side actually took at this position on the viewed line. */
   played?: PlayedAtPosition | null;
   /** Names the viewed position: the open tray and the armed gimmick toggles belong to it. */
   positionKey?: string;
@@ -52,20 +48,17 @@ export interface TurnDockProps {
   getBattle?: () => LiveBattle | null;
   /** The replay's log with the battle of a stored position on the main line: the chips read the log's dice from its lines. */
   replayLog?: string;
-  /** The played choice of each slot, validated against the picker; an untouched slot shows it. */
   seed?: SeedChoices | null;
   /** The engine's fill at the live tip: a pending run holds the empty chips and queues an Execute; null off the tip. */
   fill?: DockFillView | null;
-  /** Round 88 (T316): the side the replay frame shows near; its chips come first. Default P1. */
   nearSide?: Side;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the status strip says so and offers "Turn off". */
   opponentReads?: boolean;
   onOpponentReadsChange?: (value: boolean) => void;
 }
 
 /**
  * A pick of the user takes the slot from the engine's fill first, then the choice is stored. A forced replacement normally goes out
- * at once; while another forced slot of the turn holds only the engine's pick (ruling 16a) the pick is recorded and Execute sends it.
+ * at once; while another forced slot of the turn holds only the engine's pick the pick is recorded and Execute sends it.
  * `writeChoice` stores a choice without that first step: "Back to the engine's pick" gives the slot back to the fill and writes its choice.
  */
 function useUserChoice(
@@ -85,7 +78,7 @@ function useUserChoice(
   return { setChoice, writeChoice };
 }
 
-/** Round 84: tells the fill which slot's tray is open, so a result that lands later never writes it. The effect only writes a ref. */
+/** Tells the fill which slot's tray is open, so a result that lands later never writes it. The effect only writes a ref. */
 function useHeldTray(fill: DockFillView | null | undefined, open: TrayOpen | null) {
   const holdTray = fill?.holdTray;
   const side = open?.side;
@@ -96,7 +89,6 @@ function useHeldTray(fill: DockFillView | null | undefined, open: TrayOpen | nul
   }, [holdTray, side, slot]);
 }
 
-/** One callback ref for the dock's element: the tray state finds its chips through it, and the page learns the dock's height (narrow windows). */
 function useDockElement(attachRoot: (element: HTMLElement | null) => void) {
   const reportHeight = useDockHeight();
   return useCallback((element: HTMLDivElement | null) => {
@@ -114,8 +106,7 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
   onClose: () => void;
 }) {
   const waitsForFill = !!fill?.pending && !model.flags.bothChosen;
-  // Round 84 (A7a): a forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench
-  // click sends the body in at once, as before.
+  // A forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench click sends the body in at once.
   if (model.flags.isForceSwitch && !model.flags.bothChosen && !waitsForFill) return null;
   return (
     <ExecuteButton
@@ -133,8 +124,8 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
 }
 
 /**
- * Round 89 (#153, HM3b): the tray offers "Back to the engine's pick" where the slot holds a pick of the user's (the engine's mark is
- * gone) that differs from what the fill chose for it. A forced replacement goes out at once, so its tray has none.
+ * The tray offers "Back to the engine's pick" where the slot holds a pick of the user's (the engine's mark is gone) that differs from what
+ * the fill chose for it. A forced replacement goes out at once, so its tray has none.
  */
 function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel | undefined, write: (side: Side, choice: BranchSlotChoice, slot: number) => void): (() => void) | undefined {
   if (!fill || !slot) return undefined;
@@ -146,10 +137,6 @@ function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel 
   };
 }
 
-/**
- * Round 84 (turn dock): the dock at the foot of the replay column. One chip per active slot with its choice, a tray above it for
- * the open slot, and Execute at the right. The picker state it reads already holds the seed under the user's picks.
- */
 export function TurnDock(props: TurnDockProps) {
   const {
     simState, stale, source, acquiringExact, executeError, executing, gen, format = '', onSetChoice, onRecordChoice, onHypotheticalMove, onExecuteTurn,
@@ -186,7 +173,6 @@ export function TurnDock(props: TurnDockProps) {
             diceViews={diceViews}
             onChoice={choice => setChoice(open.side, choice, open.slot)}
             onHypotheticalMove={params => {
-              // The loaded move becomes the slot's choice: the engine's held-back pick is no longer wanted.
               fill?.onUserChoice(open.side, open.slot);
               onHypotheticalMove(open.side, open.slot, params);
               close();

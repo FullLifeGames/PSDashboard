@@ -39,7 +39,6 @@ function StepView({ view, turn, host, clicked, onClick }: { view: WinStepView; t
 
 const STEP_COUNT = 3;
 
-/** What the panel says while the job runs or after it broke. */
 function statusLine(status: 'positioning' | 'searching' | 'done' | 'failed', turn: number, arrived: number): string | null {
   if (status === 'positioning') return `Rebuilding turn ${turn}…`;
   if (status === 'searching') return `Searching step ${Math.min(arrived + 1, STEP_COUNT)} of ${STEP_COUNT}…`;
@@ -48,10 +47,9 @@ function statusLine(status: 'positioning' | 'searching' | 'done' | 'failed', tur
 }
 
 /**
- * Round 89 (#130), step G8b: "How could <player> have won?". Under the Endgame row of the Game review and under the turn card of an
- * endgame turn. A picker names every turn of the endgame; the turn picked is searched when picked. The steps appear one by one in
- * the order the user ruled (a stronger play, luck, a mistake by the opponent); a step without a find says so in one sentence.
- * ▶ Play opens the line as a variation, with the dice it forces (the replace question stands under the step that was clicked).
+ * "How could <player> have won?", under the Endgame row of the Game review and under the turn card of an endgame turn. The steps appear
+ * one by one (a stronger play, luck, a mistake by the opponent); a step without a find says so in one sentence. ▶ Play opens the line as
+ * a variation, with the dice it forces (the replace question stands under the step that was clicked).
  */
 export function WinPathsPanel({ host, playerNames, doubles, picker = true, from = 'review' }: WinPathsPanelProps) {
   const { winPaths } = host;

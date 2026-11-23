@@ -1,4 +1,3 @@
-/** The red inline alert used by the loader and the sets dialog. */
 export function AlertBox({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div

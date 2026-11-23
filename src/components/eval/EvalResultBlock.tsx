@@ -36,9 +36,7 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   );
 }
 
-/** The equilibrium value in the eval bar's own language: the win odds
- *  this choice is worth against balanced play. The guaranteed floor
- *  and the punishing reply live in the tooltip. */
+/** The equilibrium value in the eval bar's own language: the win odds this choice is worth against balanced play. The guaranteed floor and the punishing reply live in the tooltip. */
 function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null, opponentReads = false): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
@@ -52,14 +50,12 @@ function ChoiceList({
 }: {
   side: 'p1' | 'p2';
   choices: RankedChoice[];
-  /** The other side's engine answer, committed alongside a clicked line. */
   reply: RankedChoice | null;
   /** The result these rows are from: a click hands it on, so Hard mode can read the reply that hurts the clicked move most. */
   result: EvalResult;
   onPickChoice?: PickChoice;
   doubles?: boolean;
   faintedFraction?: number | null;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the click sentence of the title says so. */
   opponentReads?: boolean;
 }) {
   const best = choices[0];
@@ -110,7 +106,6 @@ function SettingsLine({ result, resultSettings }: {
   );
 }
 
-/** The single-position result: the advantage bar, its provenance, the ranked lines, and the matrix. */
 export function EvalResultBlock({ result, status, playerNames, positionLabel, resultSettings, onPickChoice, onPickPair, doubles, faintedFraction, opponentReads }: {
   result: EvalResult;
   status: EvalStatus;
@@ -120,9 +115,8 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
   onPickChoice?: PickChoice;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   doubles?: boolean;
-  /** Round 69 (T51): the fainted share of the shown turn; the percents print at it, as the graph does. Absent: the opening map. */
+  /** The fainted share of the shown turn; the percents print at it, as the graph does. Absent: the opening map. */
   faintedFraction?: number | null;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the ranked rows' titles say so. */
   opponentReads?: boolean;
 }) {
   const p1Pct = winPercent(result.score, faintedFraction);

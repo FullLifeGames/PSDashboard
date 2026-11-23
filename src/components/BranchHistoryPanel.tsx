@@ -8,8 +8,8 @@ import { markText, turnDiceMarks, type DiceMarks } from '../lib/branch-dice-mark
 import { turnEntryCount } from '../lib/variation-turns';
 
 /**
- * Round 84 (A7i, ruling 20a): what the caller hands the panel. `actions` stand at the right end of the toggle line, `status` under
- * the line (it learns whether the body is open), `saved` in the body under the moves; `onOpenChange` hears each toggle.
+ * What the caller hands the panel: `actions` at the right end of the toggle line, `status` under the line (it learns whether the body
+ * is open), `saved` in the body under the moves; `onOpenChange` hears each toggle.
  */
 export interface BranchHistorySlots {
   actions: ReactNode;
@@ -22,11 +22,9 @@ interface Props {
   branchStartTurn: number;
   history: BranchHistoryEntry[];
   snapshots: TurnSnapshot[];
-  /** The timeline pointer — the matching cell renders highlighted. */
   currentPosition?: TimelinePosition;
-  /** Clicking a cell navigates there, naming its line explicitly. */
   onNavigate?: (position: TimelinePosition) => void;
-  /** The live sim has a winner: the tip is an end, not a place to play on (round 77, C7). */
+  /** The live sim has a winner: the tip is an end, not a place to play on. */
   ended?: boolean;
   slots?: BranchHistorySlots;
 }
@@ -39,7 +37,7 @@ const cellReset = {
   boxSizing: 'border-box' as const,
 };
 
-/** One interlude: a replacement on one side, or (round 88, T348) on both sides, an entry of kind turn that no side marks. */
+/** One interlude: a replacement on one side or on both, an entry of kind turn that no side marks. */
 function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   const p1 = notationSideLabel(entry.p1SlotChoices, entry.p1Choice);
   const p2 = notationSideLabel(entry.p2SlotChoices, entry.p2Choice);
@@ -61,10 +59,7 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   );
 }
 
-/**
- * Round 82 (forced dice), step A7c, decision 6a: the dice the user forced in the row's turn, each with its side, and "(no effect)"
- * on a die the simulator did not use (the reason sits in the title).
- */
+/** The dice the user forced in the row's turn, each with its side, and "(no effect)" on a die the simulator did not use (the reason sits in the title). */
 function DiceMarksLine({ marks }: { marks: DiceMarks }) {
   const sides = (['p1', 'p2'] as const).flatMap(side => marks[side].map((mark, index) => ({ side, mark, key: `${side}-${index}` })));
   return (
@@ -79,7 +74,6 @@ function DiceMarksLine({ marks }: { marks: DiceMarks }) {
   );
 }
 
-/** One line's cell of a history row: the heading and both sides' actives; clickable when navigation exists. */
 function LineCell({ heading, summary, highlighted, color, onClick }: {
   heading: string;
   summary: SideSummary;
@@ -111,7 +105,6 @@ function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapsh
   entry: BranchHistoryEntry;
   /** The dice of the whole turn: a turn that paused for a switch reads the joined report of its last forced entry. */
   marks: DiceMarks | undefined;
-  /** Holds the board after the turn's forced replacements (A-5). */
   settled: BranchHistoryEntry;
   originalTurn: number;
   variationTurn: number;
@@ -160,7 +153,6 @@ function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapsh
   );
 }
 
-/** The open panel's list: one row per executed turn (a replacement on one side or both is its own row) and the tip button. */
 function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onNavigate, ended }: Props & { ended: boolean }) {
   const rows = alignHistoryRows(history, branchStartTurn);
   const turnEntries = turnEntryCount(history);
@@ -206,9 +198,8 @@ function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onN
 }
 
 /**
- * Round 84 (A7f, ruling 18a): the panel sits closed under a one-line toggle, like the turn's explanation, so a variation's history no
- * longer pushes the left column under the sticky dock. The caller keys it by the variation's start turn: it starts closed in every
- * variation, keeps the user's setting while that variation lives, and the app stores nothing.
+ * The panel sits closed under a one-line toggle. The caller keys it by the variation's start turn: it starts closed in every
+ * variation and keeps the user's setting while that variation lives; the app stores nothing.
  */
 export function BranchHistoryPanel({ ended = false, slots, ...props }: Props) {
   const [open, setOpen] = useState(false);

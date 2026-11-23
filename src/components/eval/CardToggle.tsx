@@ -1,7 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 
 interface CardToggleProps {
-  /** The words on the toggle line (the glyph in front is the toggle's own). */
   label: ReactNode;
   children: ReactNode;
   /**
@@ -14,14 +13,12 @@ interface CardToggleProps {
   onToggle?: (next: boolean) => void;
   disabled?: boolean;
   title?: string;
-  /** The class of the body: the Explanation's text carries its own look. */
   bodyClassName?: string;
 }
 
 /**
- * Round 89 (the user's note on X1): the one fold of the turn card. The Explanation (round 80, T294), the Lines section and the
- * win-path question sit under a toggle line that starts closed; the card keys each by its turn, so every turn starts closed and
- * the app remembers nothing. A `button.ps-eval-analysis-toggle` with `aria-expanded` and `aria-controls`, a body with `hidden`.
+ * The one fold of the turn card: the Explanation, the Lines section and the win-path question sit under a toggle line that starts
+ * closed; the card keys each by its turn, so every turn starts closed and the app remembers nothing.
  */
 export function CardToggle({ label, children, lazy = false, open: controlled, onToggle, disabled, title, bodyClassName }: CardToggleProps) {
   const [kept, setKept] = useState(false);

@@ -12,17 +12,13 @@ const FORCED_TITLE = 'This move carries forced dice. Open "Dice · What if" to s
 
 export interface MoveTileProps {
   move: BranchMoveOption;
-  /** The type the tile shows (the Tera type under a pressed Tera toggle). */
   type: string;
   bars: TileBar[];
   selected: boolean;
-  /** This is the move the viewed line played at this position. */
   wasPlayed: boolean;
-  /** Round 84 (A7a): the engine's choice for the open slot, held back until the tray closes. */
+  /** The engine's choice for the open slot, held back until the tray closes. */
   engine?: boolean;
-  /** The move is the slot's pick and carries forced dice (round 82). */
   forced: boolean;
-  /** The Z-Move the pressed Z toggle turns this move into. */
   zMoveName?: string | null;
   title?: string;
   onPick: () => void;
@@ -38,7 +34,6 @@ function BarRow({ bar }: { bar: TileBar }) {
   );
 }
 
-/** Round 84 (turn dock), style 5: name, type tag and PP, then one hit bar per body the move reaches. A click picks the move on its preselected target. */
 export function MoveTile({ move, type, bars, selected, wasPlayed, engine = false, forced, zMoveName, title, onPick }: MoveTileProps) {
   return (
     <button

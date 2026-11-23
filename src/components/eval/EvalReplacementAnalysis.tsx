@@ -4,14 +4,12 @@ import {
 import { evTitle } from './turn-copy';
 
 /**
- * Round 79 (T290): the replacement after a knockout, as a note on the card of the turn that follows it. One sentence per
- * replacing side: what the player sent in with its win chance, then the engine's pick, "matches the engine", or "only X was
- * left". Doubles name every replaced slot. Nothing is graded: no tier, no mark, no input to the report.
+ * The replacement after a knockout, as a note on the card of the turn that follows it: what the player sent in with its win chance,
+ * then the engine's pick. Nothing is graded: no tier, no mark, no input to the report.
  */
 
 const joined = (species: string[]) => species.join(' and ');
 
-/** The sentence of one side: the played pick against the engine's list. */
 function sentenceOf(name: string, played: string[], side: ReplacementSideAnalysis, faintedFraction: number | null | undefined): string {
   const sent = joined(played);
   if (side.onlyChoice) return `${name} had only ${sent} left.`;
@@ -22,7 +20,6 @@ function sentenceOf(name: string, played: string[], side: ReplacementSideAnalysi
 }
 
 export function EvalReplacementAnalysis({ turn, records, playerNames, faintedFraction }: {
-  /** The turn whose card carries the note: the first turn after the knockout. */
   turn: number;
   records: ReplacementEvalData[];
   playerNames: [string, string];

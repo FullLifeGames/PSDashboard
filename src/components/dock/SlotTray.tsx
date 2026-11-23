@@ -6,10 +6,7 @@ import { SwitchRow } from './SwitchRow';
 import { TrayHeader } from './TrayHeader';
 import { TrayMore } from './TrayMore';
 
-/**
- * Round 84 (turn dock): the tray of one slot, above the dock: header, move tiles with their targets, the bench, and behind
- * "Dice · What if" the dice, the What-if loader and all choices. A slot that must replace a body shows only the bench.
- */
+/** The tray of one slot, above the dock; a slot that must replace a body shows only the bench. */
 export function SlotTray({ slot, hpByLabel, gen, format, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   hpByLabel: Record<string, number>;
@@ -20,7 +17,6 @@ export function SlotTray({ slot, hpByLabel, gen, format, moreOpen, diceViews, on
   onChoice: (choice: BranchSlotChoice) => void;
   onHypotheticalMove: (params: { species: string; move: string; replace: string | null }) => void;
   onMore: () => void;
-  /** Round 89 (#153, HM3b): set where the slot holds a pick that differs from the engine's. */
   onBackToEngine?: () => void;
   onDone: () => void;
 }) {

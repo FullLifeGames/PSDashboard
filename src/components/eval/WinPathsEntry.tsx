@@ -10,10 +10,8 @@ interface WinPathsEntryProps {
 }
 
 /**
- * Round 89 (#130), step G8b (ruling W2b): the turn card of an endgame turn asks "How could <the player who lost> have won from
- * here?". The question is a toggle that starts closed on every turn, like the Explanation (the user's note on X1): opening it
- * searches this turn and shows the panel under it, closing it stops the search. The toggle is open only while the open search is the
- * card's own, for this turn (a search the Game review opened shows in the review).
+ * The turn card of an endgame turn asks "How could <the player who lost> have won from here?": a toggle that starts closed on every turn.
+ * It is open only while the open search is the card's own, for this turn (a search the Game review opened shows in the review).
  */
 export function WinPathsEntry({ turn, host, playerNames, doubles }: WinPathsEntryProps) {
   const { winPaths } = host;

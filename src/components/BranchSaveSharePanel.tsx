@@ -1,6 +1,6 @@
 import { savedBranchChoices, type SavedBranch } from '../lib/branch-share';
 
-/** Round 84 (A7i): the parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
+/** The parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
 
 export function ShareLinkField({ link, label = 'Branch share link' }: { link: string; label?: string }) {
   return (
@@ -68,7 +68,6 @@ function SavedBranchRow({ entry, onOpen, onRemove }: {
   );
 }
 
-/** The saved branches of this replay, one row each, for the body of the history panel. */
 export function SavedList({ saved, onOpen, onRemove }: {
   saved: SavedBranch[];
   onOpen: (entry: SavedBranch) => void;
@@ -79,7 +78,7 @@ export function SavedList({ saved, onOpen, onRemove }: {
     <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
       <div style={{ fontSize: 10, color: '#8899aa' }}>Saved branches</div>
       {saved.map((entry, index) => (
-        // The index joins the key: rows saved before the stamps were unique may share createdAt and branchTurn.
+        // The index joins the key: saved rows may share createdAt and branchTurn.
         <SavedBranchRow key={`${entry.createdAt}-${entry.branchTurn}-${index}`} entry={entry} onOpen={onOpen} onRemove={onRemove} />
       ))}
     </div>

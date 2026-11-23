@@ -12,11 +12,9 @@ interface RowProps {
   name: string;
   side: SideAnalysis;
   onExplore?: (choice: RankedChoice) => void;
-  /** Round 67 (T59): the side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
+  /** The side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
   lostGround?: boolean;
-  /** Round 89 (#153, HM-2): the Setup setting is on: the engine-move buttons say the opponent reads the move. */
   opponentReads?: boolean;
-  /** Round 89 (LN-4): the turn's result and this row's side: the better line's "then ..." reads the line the Lines section shows. */
   rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
 }
 
@@ -46,13 +44,12 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
   );
 }
 
-/** The engine's line next to the played one: agreement, a better line, or the line when nothing was played. */
 function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProps & { regretful: boolean }) {
   const engine = engineChoice(side);
   if (!side.best || !engine) return null;
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
-  // a stand-in for a choice the log does not show earns no tick (X1a): the engine's move stands as it does for a side that played nothing
+  // a stand-in for a choice the log does not show earns no tick: the engine's move stands as it does for a side that played nothing
   if (!side.played || side.neverActed) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
@@ -76,7 +73,7 @@ function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProp
   );
 }
 
-/** The chip title of an unpunished risk; round 89 (B6a): where the matrix shows the safe line did as well against the reply that came, it says so. */
+/** The chip title of an unpunished risk; where the matrix shows the safe line did as well against the reply that came, it says so. */
 function unpunishedTitle(side: SideAnalysis): string {
   const punisher = side.played?.punishedBy ?? 'the punishing reply';
   const held = side.safeAgainstClick;
@@ -85,7 +82,6 @@ function unpunishedTitle(side: SideAnalysis): string {
     : `The floor assumes ${punisher}; the opponent chose differently, so the read came true.`;
 }
 
-/** The graded regret chip: setup caveat, unpunished risk, blunder, or mistake. */
 function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> & { setupMove: string | null }) {
   if (side.regret === null) return null;
   const view = regretView(name, side, side.regret);
@@ -113,13 +109,12 @@ function RegretCell({ name, side, setupMove }: Pick<RowProps, 'name' | 'side'> &
   return <span style={{ color: blunder ? '#ff7a7a' : '#f3a6a6' }} title={view.title}>{blunder ? 'blunder' : 'mistake'} · {view.text}</span>;
 }
 
-/** What kind of sack the note marks (round 63 adds the hazard and stayed shapes). */
 function sackTitle(sacrifice: NonNullable<SideAnalysis['sacrifice']>): string {
   if (sacrifice.hazard) {
     return 'Switched into the entry hazards and fell before acting, so the next Pokémon came in on a free switch: a sacrifice, not graded as a misplay.';
   }
   if (sacrifice.stayed) {
-    // Round 64 (T123): only a verified feed was paid back; a demoted one lands within the window (as sackClause says).
+    // only a verified feed was paid back; a demoted one lands within the window (as sackClause says).
     return sacrifice.verified
       ? 'The body was left in to take the hit the line priced in, and the next turns paid it back: a sacrifice, not graded as a misplay.'
       : "The body was left in to take the hit the line priced in, and the line's payoff lands within the payoff window: a sacrifice, not graded as a misplay.";
@@ -129,7 +124,6 @@ function sackTitle(sacrifice: NonNullable<SideAnalysis['sacrifice']>): string {
     : 'A nearly-dead Pokémon was fed on purpose: a low-cost sack, not graded as a misplay.';
 }
 
-/** The read that beat the safe line's guarantee. */
 function ReadPaidOffCell({ side }: Pick<RowProps, 'side'>) {
   return (
     <span
@@ -185,7 +179,6 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
   );
 }
 
-/** The played line against its reference (safe line or ev-best) with the difference, for regretful rows. */
 function ComparisonRows({ name, side, played, best, difference, onExplore, opponentReads, rowLines }: Pick<RowProps, 'name' | 'side' | 'opponentReads' | 'rowLines'> & {
   played: RankedChoice;
   best: RankedChoice;
@@ -232,7 +225,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore, oppon
   );
 }
 
-/** Round 69 (T64): the number against the reply the opponent really clicked, once the engine's gate let it through. */
+/** The number against the reply the opponent really clicked, once the engine's gate let it through. */
 function HindsightRow({ line }: { line: string }) {
   return (
     <div className="ps-eval-analysis-row">
@@ -246,7 +239,6 @@ function HindsightRow({ line }: { line: string }) {
   );
 }
 
-/** One tracked side of an analyzed turn: what it played, the engine's line, the verdict, and the comparison. */
 export function SideRow({ name, side, onExplore, lostGround, opponentReads, rowLines }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);

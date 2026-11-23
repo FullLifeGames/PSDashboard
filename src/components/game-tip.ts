@@ -8,9 +8,8 @@ import { turnEntryCount } from '../lib/variation-turns';
 import { shareUrl } from './useBranchSaveShare';
 
 /**
- * Round 89 (#105): a new game's live tip is the main line's next turn, no variation (`idleGameTip`): while no turn was played from
- * it, or its first turn waits for a replacement, the timeline, the side panels, the graph and the share link show none of a
- * variation's chrome. One reading for every reader of it.
+ * A new game's live tip is the main line's next turn, no variation (`idleGameTip`): while no turn was played from it, or its first turn
+ * waits for a replacement, the timeline, the side panels, the graph and the share link show none of a variation's chrome.
  */
 export function idleTip(app: AppController): boolean {
   const record = app.ctx.newGame.record;
@@ -27,8 +26,8 @@ export function variationOpen(app: AppController): boolean {
 }
 
 /**
- * H16a: an open variation that no saved branch holds (Save Branch writes the row the comparison reads). It asks before Start, a load
- * or an open of a saved game closes it. A replay's branch and a game's variation read the same way.
+ * An open variation that no saved branch holds (Save Branch writes the row the comparison reads); it asks before Start, a load or an
+ * open of a saved game closes it. A replay's branch and a game's variation read the same way.
  */
 export function unsavedVariation(app: AppController): boolean {
   if (!variationOpen(app)) return false;
@@ -42,7 +41,6 @@ export function unsavedVariation(app: AppController): boolean {
     : makeBranchSharePayload({ replay, branchTurn: startTurn, history, finalLog: app.analysis.simLog }));
 }
 
-/** Where the sharer stands: on the main line's tip while the tip turn is idle, else where the pointer is. */
 function gameView(app: AppController, idle: boolean): NonNullable<GameSharePayload['view']> {
   const record = app.ctx.newGame.record!;
   const { viewTurn, viewT0, viewingVariation } = app.board.timeline;
@@ -54,9 +52,9 @@ function gameView(app: AppController, idle: boolean): NonNullable<GameSharePaylo
 }
 
 /**
- * The share link of the open game: its main line, the open variation when there is one, and the turn the pointer stands on
- * (version 2, ruling 31 H6a). It exists for a game at Team Preview, on the main line, at the tip and at the end, with or without a
- * variation; a tip turn that waits for its replacement is no variation. Null while no game is open.
+ * The share link of the open game: its main line, the open variation when there is one, and the turn the pointer stands on (version 2).
+ * It exists for a game at Team Preview, on the main line, at the tip and at the end, with or without a variation; a tip turn that waits
+ * for its replacement is no variation. Null while no game is open.
  */
 export function gameShareLink(app: AppController): string | null {
   const record = app.ctx.newGame.record;

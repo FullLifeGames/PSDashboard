@@ -15,7 +15,6 @@ interface EngineControlsProps {
   onRemove: (id: string) => void;
 }
 
-/** The engines this browser added, each removable, and the form that adds one by address. */
 function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineControlsProps, 'engines' | 'onAdd' | 'onRemove'> & { onClose: () => void }) {
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
@@ -60,10 +59,7 @@ function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineContr
   );
 }
 
-/**
- * Round 77 (user gate 28.10.2026, 4a and 5a): the engine choice of the Evaluation panel. The dropdown
- * shows once another engine is integrated; "+ engine" adds one by address in this browser.
- */
+/** The engine choice of the Evaluation panel: the dropdown shows once another engine is integrated; "+ engine" adds one by address in this browser. */
 export function EngineControls({ engines, selected, running, note, onSelect, onAdd, onRemove }: EngineControlsProps) {
   const [adding, setAdding] = useState(false);
   return (

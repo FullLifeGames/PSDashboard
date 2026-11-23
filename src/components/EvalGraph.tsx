@@ -12,41 +12,33 @@ interface EvalGraphProps {
   scores: (number | null)[];
   playerNames: [string, string];
   currentTurn: number;
-  /** Which line the pointer sits on — the ring marker follows it. */
   currentLine?: 'main' | 'variation';
   onSelectTurn?: (turn: number, line?: 'main' | 'variation') => void;
   /**
-   * Variation overlay (unified timeline): gold curve anchored at the branch
-   * point's main value; scores indexed like the main array (scores[t-1]),
-   * filled only for played variation positions. Gaps stay gaps — no
-   * invented values. Its points print at `shares`, the fainted share of the
-   * variation's own board (round 70, T216), never at the main line's share.
+   * Variation overlay (unified timeline): gold curve anchored at the branch point's main value; scores indexed like the main array
+   * (scores[t-1]), filled only for played variation positions. Gaps stay gaps, no invented values. Its points print at `shares`, the
+   * fainted share of the variation's own board, never at the main line's share.
    */
   variation?: VariationSeries | null;
-  /** Turn 0 (team preview) game value — adds a leads point before turn 1. */
   leadScore?: number | null;
-  /** Best and played lead per side — the T0 diamond's tooltip names them. */
   leadDetail?: LeadAnalysis | null;
   /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
   /** faintedFractions[t-1] = the main line turn's fainted share (graph.faintedFractions): a main-line tooltip prints at it, like the bar. */
   faintedFractions?: (number | null)[];
   /**
-   * decided[t-1] = the turn's decided-sweep state (round 15): the board is
-   * practically over for `side`. Rendered as a thin strip on that side's
-   * edge (top = p1, bottom = p2) plus a node-label note — the calibrated
-   * line itself stays honest.
+   * decided[t-1] = the turn's decided-sweep state: the board is practically over for `side`. Rendered as a thin strip on that side's
+   * edge (top = p1, bottom = p2) plus a node-label note; the calibrated line itself stays honest.
    */
   decided?: DecidedSignal[];
   /**
-   * Full main-line length. Keeps the x-domain honest when nothing has been
-   * analyzed yet — without it a lone variation collapsed the axis to its own
-   * few turns and rendered at the far right of an empty box.
+   * Full main-line length. Keeps the x-domain honest when nothing has been analyzed yet: without it a lone variation collapses the axis
+   * to its own few turns and renders at the far right of an empty box.
    */
   maxTurn?: number;
   /**
-   * Round 89 (#104): the turns the Game review lists. A circle marks a graded turn of player 1 and a square one of player 2,
-   * in the player's colour, around the turn's point; a turn graded on both sides carries both.
+   * The turns the Game review lists. A circle marks a graded turn of player 1 and a square one of player 2, in the player's colour,
+   * around the turn's point; a turn graded on both sides carries both.
    */
   reviewMarks?: ReviewMark[];
 }
@@ -57,10 +49,8 @@ const VARIATION_COLOR = '#f0c76b';
 type SelectTurn = EvalGraphProps['onSelectTurn'];
 
 /**
- * The viewBox tracks the rendered width 1:1 (ResizeObserver) — a fixed
- * viewBox stretched with preserveAspectRatio="none" turned every circle
- * into a viewport-dependent ellipse (fills scale even where strokes are
- * protected), so markers looked different on desktop and mobile.
+ * The viewBox tracks the rendered width 1:1 (ResizeObserver): a fixed viewBox stretched with preserveAspectRatio="none" turned every
+ * circle into a viewport-dependent ellipse, so markers looked different on desktop and mobile.
  */
 function useMeasuredWidth() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -78,7 +68,6 @@ function useMeasuredWidth() {
   return { svgRef, width };
 }
 
-/* Mockup look: inset dark panel, emphasized zero line, faint ±0.5 grid. */
 function GraphFrame({ width, y }: { width: number; y: GraphScales['y'] }) {
   return (
     <>
@@ -213,7 +202,6 @@ function MainPoints({ scores, blunders, scales: { x, y } }: { scores: (number | 
 const REVIEW_CIRCLE_R = 5.6;
 const REVIEW_SQUARE = 11.2;
 
-/** The Game review's marks (round 89): a circle for player 1, a square for player 2, centred on the turn's point. */
 function ReviewMarks({ marks, scores, scales: { x, y } }: { marks: ReviewMark[]; scores: (number | null)[]; scales: GraphScales }) {
   return (
     <>
@@ -292,9 +280,8 @@ function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
 }
 
 /**
- * Chess-style evaluation line over the whole game. Single series (no legend
- * needed); point color carries the polarity via the app's player colors;
- * blunder markers add a shape ring plus tooltip text, never color alone.
+ * Chess-style evaluation line over the whole game: one series, point color carries the polarity via the app's player colors; blunder
+ * markers add a shape ring plus tooltip text, never color alone.
  */
 export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn, reviewMarks }: EvalGraphProps) {
   const { svgRef, width } = useMeasuredWidth();
@@ -303,7 +290,6 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   const lastTurn = Math.max(turns, lastVariationTurnOf(variation), maxTurn ?? 0);
   if (lastTurn === 0) return null;
 
-  // With a lead evaluation the x-domain starts at turn 0 (team preview).
   const hasLead = leadScore !== null && leadScore !== undefined;
   const first = hasLead ? 0 : 1;
   const scales = graphScales(width, first, lastTurn);
@@ -313,7 +299,6 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
   const hitWidth = (width - 2 * PAD_X) / Math.max(lastTurn - first, 1);
   const overlay = variationOverlay(variation, scores, scales);
   const spans = decidedSpans(decided, scores, x);
-  // Where both lines have a point on a turn, the column splits between them (round 77, C8).
   const bands = sharedHitBands(overlay.points, scores, y);
   const highlight = highlightEdge({ currentTurn, scores, hasLead, leadScore, first, scales });
   const ring = ringScore({ currentLine, variation, scores, currentTurn, hasLead, leadScore, first });
@@ -348,7 +333,6 @@ export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSel
       {reviewMarks && reviewMarks.length > 0 && <ReviewMarks marks={reviewMarks} scores={scores} scales={scales} />}
       <MainHits scores={scores} hitWidth={hitWidth} x={x} bands={bands.main} onSelectTurn={onSelectTurn} titleArgs={titleArgs} />
       <VariationHits points={overlay.points} hitWidth={hitWidth} playerNames={playerNames} bands={bands.gold} onSelectTurn={onSelectTurn} />
-      {/* Ring marker: the pointer's position on ITS line. */}
       {ring !== null && (
         <circle
           cx={x(currentTurn)} cy={y(ring)} r={4.5}

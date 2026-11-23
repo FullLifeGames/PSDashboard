@@ -15,7 +15,6 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
   const { branchPreparing, handleSetChoice, handleExecuteDraft } = app.board.deviation;
   const { positionPicker, dockSimState, pickerSeed, pickerStale, playedAtView, getPickerBattle, pickerReplayLog } = app.engine;
   return {
-    // A replay turn shows the picker's state with the engine's fill laid over its empty slots (Q19 b).
     simState: liveTip ? simState : dockSimState,
     isGame: isGame(app),
     endOfGame: gameEnd({
@@ -30,7 +29,7 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     gen: app.ctx.meta.replayGen,
     format: replayFormatId(app.ctx.replay.replayData),
     onSetChoice: handleSetChoice,
-    // The live tip can hold a forced replacement back for Execute (ruling 16a); a replay turn has none.
+    // The live tip can hold a forced replacement back for Execute; a replay turn has none.
     onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,
     onHypotheticalMove: app.handleHypotheticalMove,
     // The tip executes its own pending choices; off the tip the effective choices (the played seed under the picks) go along.
@@ -43,13 +42,13 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     seed: liveTip ? null : pickerSeed,
     // The first chip click at a replay turn starts the fill for its empty slots; the tip fills at once.
     fill: app.engine.dockFill,
-    // Round 89 (#153, HM-2): the stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
+    // The stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
     opponentReads: !!app.ctx.evaluation.prefs.hardMode,
     onOpponentReadsChange: value => app.ctx.evaluation.setPrefs({ ...app.ctx.evaluation.prefs, hardMode: value }),
   };
 }
 
-/** A steady stand-in while the engine plays: the per-turn picker churn was the "everything keeps switching" complaint, and a click mid-run would corrupt the loop. */
+/** A steady stand-in while the engine plays: the per-turn picker would keep switching, and a click mid-run would corrupt the loop. */
 function PlayOutStandIn() {
   return (
     <div className="ps-panel" role="status" style={{ fontSize: 11, color: '#aabbcc' }}>
@@ -60,9 +59,8 @@ function PlayOutStandIn() {
 }
 
 /**
- * Round 84 (turn dock): the last child of the replay column: the confirm banner, the Raw Protocol Log toggle directly above the
- * dock, and the dock. While the engine plays out, the stand-in takes the dock's place. At turn 0 the lead picker takes it, so the
- * region renders nothing. Round 88 (T316): `nearSide` is the side the replay frame shows near; the dock puts its chips first.
+ * The last child of the replay column: the confirm banner, the Raw Protocol Log toggle and the dock. `nearSide` is the side the replay frame
+ * shows near; the dock puts its chips first.
  */
 export function DockRegion({ app, replayId, nearSide }: { app: AppController; replayId: string; nearSide?: Side }) {
   const { playOut, pendingConfirm, setPendingConfirm } = app.transients;

@@ -4,11 +4,8 @@ import { toId } from '@fulllifegames/replay-core';
 interface Props {
   options: string[];
   value: string;
-  /** Fires on every keystroke with the raw text. */
   onChange: (text: string) => void;
-  /** Fires when an option is committed — by click or by Enter. */
   onSelect: (option: string) => void;
-  /** Enter pressed while the text matches no option (free-text fallback). */
   onEnterFreeText?: (text: string) => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -21,7 +18,6 @@ interface Props {
 
 const MAX_VISIBLE_OPTIONS = 100;
 
-/** Prefix matches first, then substring matches; the raw list for an empty query. */
 function filterOptions(options: string[], value: string): string[] {
   const query = value.trim().toLowerCase();
   if (!query) return options;
@@ -43,7 +39,6 @@ interface KeyContext {
   onEnterFreeText?: (text: string) => void;
 }
 
-/** Arrow keys move the highlight, Escape closes, Enter commits the highlighted or exact option (else free text). */
 function comboKeyHandler(ctx: KeyContext) {
   return (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
@@ -122,7 +117,6 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, optionNote, onCommi
   ) : null;
 }
 
-/** Keeps the highlighted option of an open popup in view. */
 function useScrollToHighlight(open: boolean, idBase: string, highlight: number) {
   useEffect(() => {
     if (!open) return;
@@ -130,11 +124,7 @@ function useScrollToHighlight(open: boolean, idBase: string, highlight: number) 
   }, [highlight, open, idBase]);
 }
 
-/**
- * Filterable single-select dropdown with proper commit semantics — clicking
- * an option selects it immediately, arrows + Enter work, no hidden
- * "press Enter to confirm" step. Replaces the browser-dependent <datalist>.
- */
+/** A filterable single-select dropdown that commits on a click or on arrows plus Enter; it has no <datalist>, whose behavior differs by browser. */
 export function ComboBox({
   options,
   value,

@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { onGameEvicted, type SavedGameRow } from '../lib/new-game/store';
 
 /**
- * Round 89 (lane H, #105), H15a (user ruling 13.11.2026): the store keeps 20 games; a save over the limit pushes one out (first a game
- * without a played turn, then the oldest) and this line names it, in the words of the saved list's row, until the user dismisses it.
+ * The store keeps 20 games; a save over the limit pushes one out (first a game without a played turn, then the oldest) and this line
+ * names it, in the words of the saved list's row, until the user dismisses it.
  */
 const describeRow = (row: SavedGameRow): string => {
   const played = row.turns === 0 ? 'no turn played' : `${row.turns} ${row.turns === 1 ? 'turn' : 'turns'} played`;

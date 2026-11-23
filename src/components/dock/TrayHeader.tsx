@@ -1,10 +1,7 @@
 import { ModifierRow } from './GimmickRow';
 import type { DockSlotModel } from './dock-model';
 
-/**
- * Round 84 (turn dock): the head of an open tray: the slot, its body and HP, the gimmick toggles (they edit the slot's pending
- * move), "Back to the engine's pick" where the slot holds another pick than the fill's (round 89), the "Dice · What if" toggle and Done. A slot that must replace a body has neither gimmicks nor "Dice · What if".
- */
+/** The head of an open tray; a slot that must replace a body has neither gimmick toggles nor "Dice · What if". */
 export function TrayHeader({ slot, moreOpen, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   moreOpen: boolean;

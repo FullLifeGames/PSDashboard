@@ -4,21 +4,18 @@ import type { MatrixMarks } from '../../lib/matrix-marks';
 export interface MatrixTableProps {
   matrix: EvalMatrix;
   playerNames: [string, string];
-  /** Click a cell: play EXACTLY this pair out in a branch. */
   onPickPair?: (
     p1: { choice: string; label: string },
     p2: { choice: string; label: string },
   ) => void;
-  /** Round 69 (T51): the fainted share of the shown turn, for the cells' percents. */
   faintedFraction?: number | null;
   /** Cells play their pair out (a handler, and choice ids on both axes: results cached before the ids existed stay read-only). */
   clickable: boolean;
-  /** Round 89 (B7a): the dialog's view: bigger text, labels that wrap, sticky headers, every weight, and these marks. The overview passes neither. */
+  /** The dialog's view: bigger text, labels that wrap, sticky headers, every weight, and these marks. The overview passes neither. */
   dialog?: boolean;
   marks?: MatrixMarks;
 }
 
-/** Cell tint leans toward whoever the cell favors, stronger when decisive. */
 const cellTint = (value: number) => {
   const strength = Math.min(1, Math.abs(value)) * 0.45;
   return value >= 0
@@ -50,7 +47,6 @@ const DANGER = 'var(--ps-danger)';
 /** The tag colour of "worst": the app's light red (misplay and error text), readable on the dialog's blue where --ps-danger is not. */
 const DANGER_TEXT = '#f3a6a6';
 
-/** The outline of the played row and column: a solid line on the row's top and bottom, on the column's left and right. */
 function playedOutline(row: boolean, column: boolean): string | undefined {
   const lines = [
     ...(row ? [`inset 0 2px 0 ${ACCENT}`, `inset 0 -2px 0 ${ACCENT}`] : []),
@@ -63,7 +59,6 @@ const tagStyle = (color: string): React.CSSProperties => ({
   display: 'inline-block', border: `1px solid ${color}`, color, borderRadius: 3, padding: '0 3px', fontSize: 9, lineHeight: '13px',
 });
 
-/** The words under a header: its weight, then "played" and "engine" where the row or column is one. */
 function HeaderTags({ mix, played, best }: { mix: number | undefined; played: boolean; best: boolean }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2, alignItems: 'center' }}>
@@ -74,7 +69,6 @@ function HeaderTags({ mix, played, best }: { mix: number | undefined; played: bo
   );
 }
 
-/** A cell's tooltip: the pair and both chances, the worst-reply sentence where the cell is one, the click hint where it plays. */
 function cellTitle(props: MatrixTableProps & { i: number; j: number; pct: number }, worst: { p1: boolean; p2: boolean }): string {
   const { matrix, playerNames, clickable, i, j, pct } = props;
   const worstP1 = worst.p1 ? `The worst reply to ${playerNames[0]}'s ${matrix.p1Labels[i]}` : '';
@@ -123,7 +117,6 @@ function MatrixCell(props: MatrixTableProps & { i: number; j: number; value: num
   );
 }
 
-/** The column headers: the overview's cut labels with a badge above half a percent, or the dialog's whole labels with every weight and mark. */
 function ColumnHeader({ matrix, playerNames, j, marks, dialog }: Pick<MatrixTableProps, 'matrix' | 'playerNames' | 'marks' | 'dialog'> & { j: number }) {
   const label = matrix.p2Labels[j];
   const title = `${playerNames[1]}: ${label} · equilibrium weight ${Math.round((matrix.mixes.p2[j] ?? 0) * 100)}%`;
@@ -168,10 +161,7 @@ function RowHeader({ matrix, playerNames, i, marks, dialog }: Pick<MatrixTablePr
   );
 }
 
-/**
- * The payoff table: every (own choice × opposing reply) pair at its win probability for the first player, equilibrium weights on the
- * headers. The overview's 10 px table and the dialog's table are this one component (round 89, B7a).
- */
+/** The payoff table of the overview (10 px) and of the dialog: every (own choice × opposing reply) pair at its win probability for the first player, equilibrium weights on the headers. */
 export function MatrixTable(props: MatrixTableProps) {
   const { matrix, playerNames, marks, dialog } = props;
   return (

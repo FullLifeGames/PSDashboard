@@ -19,19 +19,15 @@ export { MiniBar } from './eval/analysis-bits';
 interface EvalTurnAnalysisProps {
   analysis: TurnAnalysis;
   playerNames: [string, string];
-  /** Exploitative Read recommendations (advisory — never part of the grade). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
-  /** Click on an engine line: play it out in a branch at this turn, the other side answering with `reply`. */
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
-  /** Round 89 (#104): the turn's own result (its `lines`) and what the Lines section needs of the host; without them the section is absent. */
+  /** The turn's own result (its `lines`) and what the Lines section needs of the host; without them the section is absent. */
   result?: EvalResult | null;
   linesHost?: LinesHost;
   doubles?: boolean;
-  /** Round 89 (#105): the turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
+  /** The turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
   open?: boolean;
-  /** Round 89 (B7a): the panel's handler of a matrix cell, which the card's matrix dialog calls (absent: the dialog reads only). */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the engine-move buttons say so in their titles. */
   opponentReads?: boolean;
 }
 
@@ -59,8 +55,8 @@ function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysis
 }
 
 /**
- * The estimate change split in two: what the chosen pair was expected to move and the rest. Round 67 (T22):
- * the rest is "how it rolled" only with a roll in its direction, else the part no roll explains (Round 79, T286).
+ * The estimate change split in two: what the chosen pair was expected to move and the rest. The rest is "how it rolled" only with a roll
+ * in its direction, else the part no roll explains.
  */
 function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) {
   const unrolled = chanceRolled(analysis) === false;
@@ -78,15 +74,13 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
 }
 
 /**
- * Round 80 (T294): the turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both
- * sides. Every turn starts closed (the card keys it by turn), and the app remembers nothing. Round 89 (the user's note on X1): the Lines
- * section and the win-path question fold the same way (`CardToggle`).
+ * The turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both sides. Every turn starts closed
+ * (the card keys it by turn), and the app remembers nothing; the Lines section and the win-path question fold the same way (`CardToggle`).
  */
 function TurnSummary({ text }: { text: string }) {
   return <CardToggle label="Explanation" bodyClassName="ps-eval-analysis-summary">{text}</CardToggle>;
 }
 
-/** A game's tip: the position is open, so the card names it as such and shows each side's engine line (round 89, H4h). */
 function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onPickPair, opponentReads }: Omit<EvalTurnAnalysisProps, 'open'>) {
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) => onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
@@ -104,7 +98,6 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onP
   );
 }
 
-/** Chess-style explanation of one analyzed turn: played vs best, and why the score moved. */
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair, opponentReads }: EvalTurnAnalysisProps) {
   // The turn whose Lines section is open. It follows the turn prop (every turn starts closed) and survives a result that goes away
   // and comes back under the card; reconciled during render, never in an effect.
@@ -153,7 +146,6 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
 
 const stripLead = (label: string) => label.replace(/^Lead /, '');
 
-/** The graded lead miss or inaccuracy (singles; a doubles lead carries no verdict, leadTier). */
 function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   const tier = leadTier(side);
   const bad = tier === 'mistake' || tier === 'blunder';
@@ -173,10 +165,7 @@ function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   );
 }
 
-/**
- * The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick.
- * Round 64 (T123): a doubles pair gets no tick either, only the engine's pick as a neutral line (T116).
- */
+/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. A doubles pair gets no tick either, only the engine's pick as a neutral line. */
 function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
   const agrees = !!side.played && !!side.best && side.played.choice === side.best.choice;
   const pair = isPairLead(side);
@@ -211,7 +200,6 @@ function LeadRow({ name, side }: { name: string; side: LeadSideAnalysis }) {
   );
 }
 
-/** Turn 0: the team-preview lead decision, graded like any other turn. */
 export function EvalLeadAnalysis({ leads, playerNames }: { leads: LeadAnalysis; playerNames: [string, string] }) {
   return (
     <div className="ps-eval-analysis">

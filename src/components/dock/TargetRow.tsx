@@ -3,10 +3,6 @@ import type { DamageResult } from '@fulllifegames/eval-engine';
 import { koVerdict, shortRange } from '../../lib/move-damage-text';
 import { HitBar } from './HitBar';
 
-/**
- * Round 84 (turn dock): the targets of the slot's pending move, each with the target's HP bar under one hit. A press moves the
- * pick onto that target; the pressed one is the pick's own.
- */
 export function TargetRow({ move, selectedLoc, targets, onPick }: {
   move: BranchMoveOption;
   selectedLoc: number | undefined;

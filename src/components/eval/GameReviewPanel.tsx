@@ -15,7 +15,6 @@ interface GameReviewPanelProps {
   onSelectTurn?: (turn: number) => void;
 }
 
-/** The grades' colours of the turn card (SideRow). */
 const GRADE_COLORS: Record<ReviewGrade, string> = { inaccuracy: '#b6a46a', mistake: '#f3a6a6', blunder: '#ff7a7a' };
 
 function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; turn: number; onPlay: LinesHost['onPlay']; confirm?: LinesHost['confirm'] }) {
@@ -67,7 +66,6 @@ function ReviewSide({ view, onPlay, confirm, onSelectTurn }: { view: ReviewSideV
   );
 }
 
-/** The Endgame row of the player who lost (round 89, #130): one click searches the endgame's first turn; the panel opens under it. */
 function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView; host: LinesHost; playerNames: [string, string]; doubles: boolean }) {
   const { winPaths } = host;
   if (!winPaths) return null;
@@ -90,7 +88,6 @@ function EndgameEntry({ row, host, playerNames, doubles }: { row: EndgameRowView
   );
 }
 
-/** Round 89 (G13): the stage that gives the graded early singles turns their lines is searching; it can be stopped. */
 function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['earlyLines']> }) {
   return (
     <span className="ps-eval-line" role="status" style={{ marginTop: 0 }}>
@@ -101,11 +98,6 @@ function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['ear
   );
 }
 
-/**
- * Round 89 (#104), step G4 (ruling 33, 4a): the Game review under the game report. One list per player of the turns the cards
- * grade, with the played and the engine's value, the loss, the engine's line and the played line, each with ▶ Play, and a
- * button that opens the turn. The graph marks the same turns.
- */
 export function GameReviewPanel({ analyses, results, playerNames, doubles, host, onSelectTurn }: GameReviewPanelProps) {
   const sides = useMemo(
     () => gameReview({ analyses, results, playerNames, doubles, host }),

@@ -79,11 +79,6 @@ function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<Lines
   return 'No line on this turn: the search kept none for these choices.';
 }
 
-/**
- * Round 89 (#104), step G3: the Lines section under a turn's rows (the card puts it under its closed `Lines` toggle). Per player the engine's line and the played line (one line for a
- * player who played the engine's move), each with ▶ Play, the end value and the dice that could have gone the other way. A turn
- * that holds no line says why in one muted sentence; a turn without a result shows nothing.
- */
 export function LinesSection({ turn, result, playerNames, doubles, host, analysis }: LinesSectionProps) {
   if (!result) return null;
   const lines = linesForMode(cardLines(result.lines ?? [], analysis), !!host.hardMode);

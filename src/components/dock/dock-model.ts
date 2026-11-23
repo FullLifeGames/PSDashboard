@@ -12,10 +12,7 @@ import {
   EMPTY_MODIFIERS, EMPTY_MOVES, EMPTY_SWITCHES, blockedSwitchKeys, panelFlags, playedOfSlot, slotIdentity,
 } from '../../lib/dock-panel';
 
-/**
- * Round 84 (turn dock): everything the chip and the tray of one slot read, built once per render from the picker state, the
- * damage preview, the gimmick toggles, the played record and the seed.
- */
+/** Everything the chip and the tray of one slot read, built once per render. */
 
 export type Side = 'p1' | 'p2';
 
@@ -33,7 +30,7 @@ export interface DockSlotModel {
   forceSwitch: boolean;
   /** The slot has no choice to make: a fainted body nobody replaces. */
   nobodyLeft: boolean;
-  /** The other side replaces a body and this side has nothing to choose until it has (round 77, B5). */
+  /** The other side replaces a body and this side has nothing to choose until it has. */
   waits: boolean;
   pending: BranchSlotChoice | null;
   blockedSwitchKeys: Set<string>;
@@ -44,14 +41,12 @@ export interface DockSlotModel {
   targets: Record<string, DamageResult | undefined>;
   /** What the viewed line played here; null when it did not act or no line is read. */
   played: PlayedPick | null;
-  /** The chip's pick line, empty for an empty slot. */
   pickText: string;
-  /** The text of an empty chip. */
   placeholder: string;
   /** What the engine does about this empty chip: the placeholder's style reads it (a shimmer while the run is pending). */
   wait: EngineWait | null;
   origin: ChipOrigin | null;
-  /** Round 84 (A7a): the engine's pick for this slot while its tray is open; the chip and the tile name it, the slot takes it on close. */
+  /** The engine's pick for this slot while its tray is open; the chip and the tile name it, the slot takes it on close. */
   deferred: BranchSlotChoice | null;
   /** The HP of the one living foe, for a move that names no target. */
   foeHp: number | undefined;
@@ -60,7 +55,6 @@ export interface DockSlotModel {
 export interface DockModel {
   p1: DockSlotModel[];
   p2: DockSlotModel[];
-  /** The HP of every body on the field by slot label. */
   hpByLabel: Record<string, number>;
   flags: ReturnType<typeof panelFlags>;
   /** What Execute sends: the effective choices, the engine's deferred picks counted in. */
@@ -80,11 +74,9 @@ export interface DockModelArgs {
   gimmickFor: (side: Side, slot: number) => Gimmick;
   played?: PlayedAtPosition | null;
   seed?: SeedChoices | null;
-  /** The engine's fill at the live tip: which chips it wrote, and whether it is under way. */
   fill?: DockFillView | null;
 }
 
-/** What the engine does about an empty chip right now. */
 function engineWait(fill: DockFillView | null | undefined): EngineWait | null {
   if (fill?.pending) return 'pending';
   return fill?.busy ? 'busy' : null;
@@ -96,17 +88,16 @@ function slotEngine(fill: DockFillView | null | undefined, view: Pick<SideView, 
 }
 
 /**
- * Round 84 (A7f): a slot that takes no input. The side that waits for the other's replacement, and the partner of a forced
- * replacement on the replacing side (it is asked nothing); a slot the user must fill, forced or not, stays live.
+ * A slot that takes no input: the side that waits for the other's replacement, and the partner of a forced replacement on the
+ * replacing side; a slot the user must fill, forced or not, stays live.
  */
 function slotWaits(view: Pick<SideView, 'waits' | 'required' | 'forceSwitches'>, slot: number): boolean {
   return view.waits || (view.forceSwitches.some(Boolean) && !view.required[slot]);
 }
 
 /**
- * What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has
- * one). A forced replacement shimmers while the run is pending like any slot; when the game analysis blocks the engine it keeps
- * its own text, since the user has to choose.
+ * What an empty chip says, and the engine's state as the placeholder's style shows it (only a chip that waits for the engine has one).
+ * A forced replacement shimmers while the run is pending like any slot; when the game analysis blocks the engine it keeps its own text.
  */
 function emptyChip(
   pending: BranchSlotChoice | null, facts: Omit<Parameters<typeof chipPlaceholder>[0], 'deferred'>, deferred: BranchSlotChoice | null,
@@ -118,7 +109,6 @@ function emptyChip(
 
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo => !!info && !info.fainted && info.hp > 0;
 
-/** What one side of the position holds, by slot. */
 interface SideView {
   actives: (SimPokemonInfo | null)[];
   movesBySlot: BranchMoveOption[][];
@@ -150,18 +140,15 @@ function sideView(side: Side, args: DockModelArgs, flags: DockModel['flags']): S
   };
 }
 
-/** What the viewed line played in one slot. */
 function playedIn(side: Side, played: PlayedAtPosition | null | undefined, slot: number): PlayedPick | null {
   if (!played) return null;
   return side === 'p1' ? playedOfSlot(played.p1Slots, played.p1, slot) : playedOfSlot(played.p2Slots, played.p2, slot);
 }
 
-/** The damage preview of one slot's moves. */
 function damageOf(damage: SideDamage, slot: number) {
   return { dmg: damage.default[slot] ?? [], spread: damage.spread[slot] ?? {}, targets: damage.targets[slot] ?? {} };
 }
 
-/** The chip of one slot: the pick line or the placeholder, the origin, and the engine's deferred pick. */
 function chipOf(
   side: Side, slot: number, view: SideView, args: DockModelArgs,
   facts: { forceSwitch: boolean; nobodyLeft: boolean; partnerSwitching: boolean; commanding: boolean; played: PlayedPick | null },
@@ -186,7 +173,7 @@ function slotModel(side: Side, slot: number, view: SideView, args: DockModelArgs
   const forceSwitch = view.forceSwitches[slot] ?? false;
   const pending = view.choices[slot] ?? null;
   const nobodyLeft = identity.activeFainted && !forceSwitch && switches.length === 0;
-  // Round 85 (T320): a Tatsugiri inside its Dondozo takes no input; the position asks its slot nothing.
+  // A Tatsugiri inside its Dondozo takes no input; the position asks its slot nothing.
   const commanding = !!active?.commanding && !identity.activeFainted && !view.required[slot];
   const pick = playedIn(side, played, slot);
   return {

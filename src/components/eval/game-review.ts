@@ -4,9 +4,8 @@ import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockVie
 import { cardLines, engineChoice, neverActedOf, neverActedText, regretView, rowValueTexts } from './turn-copy';
 
 /**
- * Round 89 (#104), step G4: what the Game review lists, as plain data. Ruling 33 (4a): only the turns the cards grade (inaccuracy,
- * mistake, blunder); the graph marks the same turns (`reviewMarks`). Each row carries the side's engine line and played line the
- * Lines section shows (`lineBlocks`, one rule in one module), with the text of one line and the block's own play tooltip.
+ * What the Game review lists, as plain data: only the turns the cards grade (inaccuracy, mistake, blunder), the same turns the graph marks
+ * (`reviewMarks`). Each row carries the side's engine line and played line the Lines section shows (`lineBlocks`, one rule in one module).
  */
 
 type Side = 'p1' | 'p2';
@@ -16,9 +15,8 @@ export interface ReviewMark { turn: number; side: Side }
 export interface ReviewLineView {
   key: string;
   role: 'engine' | 'played';
-  /** The whole line on one row: "<own choice> vs <the answer>, then …". */
   text: string;
-  /** "ends at 19%": the line's own number; the head of the row prints the row's (round 89, G10). */
+  /** "ends at 19%": the line's own number; the head of the row prints the row's. */
   end: string;
   block: LineBlockView;
 }
@@ -27,13 +25,10 @@ export interface ReviewRowView {
   turn: number;
   side: Side;
   grade: ReviewGrade;
-  /** "Hyper Voice 42%". */
   played: string;
-  /** The row's head as the card words it: "played Hyper Voice 42%", or that the body was knocked out before it moved (X1a). */
+  /** The row's head as the card words it: "played Hyper Voice 42%", or that the body was knocked out before it moved. */
   playedText: string;
-  /** "Surf 51%": the engine's choice as the turn card names it (`engineChoice`). */
   engine: string;
-  /** "engine", or "safe" where the card's reference is the safe line. */
   engineWord: 'engine' | 'safe';
   loss: string;
   lossTitle: string;
@@ -45,11 +40,10 @@ const SIDES: readonly Side[] = ['p1', 'p2'];
 const SIDE_INDEX: Record<Side, 0 | 1> = { p1: 0, p2: 1 };
 
 /**
- * The grade the turn card prints for a side, or null (the turn card, the review and the graph marks read it). A mistake or blunder
- * that the card replaces by a sack or a read that paid off is not graded. A read that paid off speaks for an inaccuracy too, as it
- * does in the report, whose list of reads takes it unless the side lost ground on the turn (`lostGround`, round 89 G4d: the report
- * page said "read paid off +9%" and "inaccuracy -9%" for one click); an inaccuracy keeps its chip beside a sack. A side without its
- * played or its engine row has nothing to compare.
+ * The grade the turn card prints for a side, or null (the turn card, the review and the graph marks read it). A mistake or blunder that the
+ * card replaces by a sack or a read that paid off is not graded. A read that paid off speaks for an inaccuracy too, as it does in the report,
+ * whose list of reads takes it unless the side lost ground on the turn (`lostGround`): otherwise the report page says "read paid off +9%" and
+ * "inaccuracy -9%" for one click. An inaccuracy keeps its chip beside a sack. A side without its played or its engine row has nothing to compare.
  */
 export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): ReviewGrade | null {
   const tier = side.tier;
@@ -60,7 +54,7 @@ export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): Review
   return tier;
 }
 
-/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2 (round 89, G13: the early-lines stage reads the same rule). */
+/** Turns the cards grade in the order the review lists them: turn by turn, player 1 before player 2; the early-lines stage reads the same rule. */
 export function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | undefined): { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] {
   const found: { analysis: TurnAnalysis; side: Side; grade: ReviewGrade }[] = [];
   for (const analysis of analyses ?? []) {
@@ -74,19 +68,17 @@ export function gradedSides(analyses: readonly (TurnAnalysis | null)[] | null | 
   return found;
 }
 
-/** The marks of the graph: one per graded side and turn. */
 export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | undefined): ReviewMark[] {
   return gradedSides(analyses).map(({ analysis, side }) => ({ turn: analysis.turn, side }));
 }
 
 /**
- * One line on one row: the listed player's choice against the answer, a replacement by the player who replaces. A doubles step
- * holds two moves for each player, so each pair stands behind its player's name (round 89, G4d: "A + B vs C + D" read as one
- * run-on list of four moves).
+ * One line on one row: the listed player's choice against the answer, a replacement by the player who replaces. A doubles step holds two
+ * moves for each player, so each pair stands behind its player's name ("A + B vs C + D" would read as one run-on list of four moves).
  */
 function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
-  // the first answer carries its rank in the search's ranking (round 89, G11); a replacement-first line has none
+  // the first answer carries its rank in the search's ranking; a replacement-first line has none
   const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);
   return line.steps.map((step, index) => {
     if (step.replacement) {
@@ -147,11 +139,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
 
 export interface EndgameRowView { side: Side; player: string; /** The first turn of the endgame: the row's click searches it. */ turn: number; text: string }
 
-/**
- * Round 89 (#130), step G8b: the Endgame row, for the player who lost a game that reached its endgame (the host's `endgame`: three
- * bodies or fewer standing at the turn's start, the loser, every such turn). The click searches from the endgame's first turn; the
- * panel's picker holds the later ones (ruling W2b).
- */
+/** The Endgame row, for the player who lost a game that reached its endgame (the host's `endgame`: three bodies or fewer standing at the turn's start). The click searches from the endgame's first turn; the panel's picker holds the later ones. */
 export function endgameRow(endgame: { loser: Side; turns: readonly number[] } | null | undefined, playerNames: [string, string]): EndgameRowView | null {
   if (!endgame || endgame.turns.length === 0) return null;
   const player = playerNames[SIDE_INDEX[endgame.loser]];
@@ -159,7 +147,6 @@ export function endgameRow(endgame: { loser: Side; turns: readonly number[] } | 
   return { side: endgame.loser, player, turn, text: `Endgame · T${turn} · How could ${player} have won?` };
 }
 
-/** The lists of the Game review: one per player, player 1 first, the graded turns in turn order. */
 export function gameReview(args: ReviewArgs): ReviewSideView[] {
   const graded = gradedSides(args.analyses);
   return SIDES.map(side => ({
@@ -168,10 +155,8 @@ export function gameReview(args: ReviewArgs): ReviewSideView[] {
   }));
 }
 
-/** The line blocks of the whole review, for the sentences under it. */
 export const reviewBlocks = (view: readonly ReviewSideView[]): LineBlockView[] => view.flatMap(side => side.rows.flatMap(row => row.lines.map(line => line.block)));
 
-/** Whether any line of the review ends at another number than its row shows: the one sentence under the review then says why (G10). */
 export function reviewDiffers(view: readonly ReviewSideView[]): boolean {
   return view.some(side => side.rows.some(row => row.lines.some(line => line.block.differs)));
 }

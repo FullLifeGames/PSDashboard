@@ -12,8 +12,8 @@ const PLAYED_TITLE = 'The action played at this position on the line you are vie
 const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when you close the tray, unless you pick something else.";
 
 /**
- * Round 84 (A7b): the played and engine badges stand in the tile's flag row on its top edge (the move tile's place, `.ps-tile-flags`),
- * out of the tile's flow, so a badge that appears under an open tray never widens the tile or reflows the bench.
+ * The played and engine badges stand in the tile's flag row on its top edge (`.ps-tile-flags`), out of the tile's flow, so a badge
+ * that appears under an open tray never widens the tile or reflows the bench.
  */
 function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine, guessed, onPick }: {
   sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason: string; wasPlayed: boolean; engine: boolean; guessed: StandInMark | null; onPick: () => void;
@@ -49,16 +49,14 @@ function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine,
   );
 }
 
-/** Round 84 (turn dock): the bench as switch tiles. A trapped body and a body the partner already takes stay disabled with their reason. */
 export function SwitchRow({ side, activeName, switches, pending, blockedSwitchKeys, played, deferred = null, onPick }: {
-  /** The side the bench belongs to: a stand-in (a body the log never showed) wears the stats panel's marker (round 88, #101). */
+  /** The side the bench belongs to: a stand-in (a body the log never showed) wears the stats panel's marker. */
   side: GuessedSide;
   activeName: string;
   switches: BranchSwitchOption[];
   pending: BranchSlotChoice | null;
   blockedSwitchKeys: Set<string>;
   played: PlayedPick | null;
-  /** Round 84 (A7a): the engine's pick for the open slot, held back until the tray closes. */
   deferred?: BranchSlotChoice | null;
   onPick: (choice: BranchSlotChoice) => void;
 }) {
