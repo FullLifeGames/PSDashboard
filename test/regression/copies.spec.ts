@@ -1,17 +1,23 @@
-import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { expect, test, describe } from 'vitest';
+import { NEVER_ACTED_WORDS as ROW_WORDS, neverActedText } from '../../src/components/eval/turn-copy';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 /**
- * Round 72 (T236): packages/eval-engine/src/line-endings.ts is a deliberate copy of packages/replay-core/src/line-endings.ts.
- * replay-core's helper is no part of its barrel (the package API is pinned by test/regression/fixtures/api/) and the engine reaches
- * replay-core by its barrel only, so the engine keeps its own text. AGENTS.md asks a deliberate copy for a spec that compares the
- * two: this one holds the function bodies equal and runs both over a table of logs. normalizeLines belongs to the engine alone
- * (the readers that take a turn's lines are engine functions); the test below says so.
- *
- * The function does not depend on the game type; the table runs a singles and a doubles log all the same.
+ * Round 89 (FT-1): the card's row and the engine's sentences ("..., but Beta was knocked out before it moved, so the log shows no
+ * choice") say the same words for a body that fell before it moved. The engine package reaches the app only through its barrel, and
+ * root specs import it by name, so the app keeps a copy and this spec reads the engine's constant from its source and holds the two equal.
  */
+const phrases = readFileSync(new URL('../../packages/eval-engine/src/prose/phrases.ts', import.meta.url), 'utf-8');
+const engineWords = /export const NEVER_ACTED_WORDS =\s*'([^']+)'/.exec(phrases)?.[1];
+
+test('the app row and the engine sentences use one wording for a side knocked out before it moved', () => {
+  expect(engineWords).toBeDefined();
+  expect(ROW_WORDS).toBe(engineWords);
+  expect(neverActedText({ played: null })).toBe(engineWords);
+  expect(neverActedText({ played: { ev: 0 } })).toMatch(new RegExp(`^${engineWords} · staying in \\d+%$`));
+});
 
 const read = (relative: string) => readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8');
 const ENGINE = 'packages/eval-engine/src/line-endings.ts';
@@ -106,5 +112,35 @@ describe('the two line-endings.ts copies (T236)', () => {
   test('normalizeLines stays in the engine; replay-core has no copy of it', () => {
     expect(read(ENGINE)).toContain('export function normalizeLines(');
     expect(read(CORE)).not.toContain('normalizeLines');
+  });
+});
+
+const source = (path: string): string => readFileSync(new URL(`../../packages/${path}`, import.meta.url), 'utf-8');
+
+const SHARED = 'replay-core/src/team/item-damage-shared.ts';
+const FIT = 'replay-core/src/spreads/fit.ts';
+const CHOICE_LOCK = 'eval-engine/src/choice-lock.ts';
+
+const DEFINITION = /^(?:export )?const OBSERVATION_SLACK = ([0-9.]+);$/m;
+
+describe('OBSERVATION_SLACK (#133)', () => {
+  test('replay-core defines it once, in item-damage-shared.ts, and exports it', () => {
+    const text = source(SHARED);
+    expect(text).toMatch(/^export const OBSERVATION_SLACK = [0-9.]+;$/m);
+    expect(text.match(/OBSERVATION_SLACK = /g)).toHaveLength(1);
+  });
+
+  test('the spread fit holds no definition of its own and imports the shared one', () => {
+    const text = source(FIT);
+    expect(text).not.toMatch(/\bconst OBSERVATION_SLACK\b/);
+    expect(text).toMatch(/^import \{[^}]*\bOBSERVATION_SLACK\b[^}]*\} from '\.\.\/team\/item-damage-shared\.ts';$/m);
+  });
+
+  test('the Choice-lock check keeps a copy of the same value', () => {
+    const shared = DEFINITION.exec(source(SHARED));
+    const copy = DEFINITION.exec(source(CHOICE_LOCK));
+    expect(shared).not.toBeNull();
+    expect(copy).not.toBeNull();
+    expect(Number(copy![1])).toBe(Number(shared![1]));
   });
 });
