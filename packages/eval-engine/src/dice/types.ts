@@ -16,7 +16,7 @@ export interface DieName { slot: string; moveId: string; targetSlot?: string; ki
 
 /** The answer to a die; the shape depends on the kind. */
 export type DieResult =
-  | { happens: boolean }        // a chance: accuracy, crit, secondary, procs, stalling, end of turn; a status check: the body goes on; a first mover: it acts first
+  | { happens: boolean }        // a chance: accuracy, crit, secondary, procs, stalling, end of turn; status check: the body goes on; first mover: it acts first
   | { step: number }            // the damage roll, 0 is the lowest damage
   | { hits: number }            // the hit count
   | { option: string }          // a die with several results (Effect Spore's status), by its protocol word
@@ -25,7 +25,8 @@ export type DieResult =
 /** A die with the result the user forces. */
 export interface ForcedDie { name: DieName; result: DieResult }
 
-// `applied`: the draw ran and took the answer. `no-draw`: the simulator never drew it. `no-chance`: the draw cannot give the answer. `blocked`: forced, the effect did not land.
+// `applied`: the draw ran and took the answer. `no-draw`: the simulator never drew it. `no-chance`: the draw cannot give the answer.
+// `blocked`: forced, the effect did not land.
 /** What became of a forced die. */
 export type DieTook = 'applied' | 'no-draw' | 'no-chance' | 'blocked';
 

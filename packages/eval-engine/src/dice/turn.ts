@@ -12,7 +12,10 @@ import { secondaryEffectId } from './recognize.ts';
 import { secondariesIn } from './secondaries.ts';
 import { dieKey, plainKey, type DiceReport, type DieReport, type DieTook, type ForcedDie } from './types.ts';
 
-/** The branch's turn through the dice module; `executeBranchChoices` loads this file by dynamic import only when the slot choices carry a forced die (ADR 0001). */
+/**
+ * The branch's turn through the dice module; `executeBranchChoices` loads this file by dynamic import only when the slot choices carry a
+ * forced die (ADR 0001).
+ */
 
 /**
  * What a turn that paused for a switch (U-turn, Volt Switch, Flip Turn, Parting Shot, Eject Button, Eject Pack, Emergency Exit, Wimp Out) hands to

@@ -3,16 +3,14 @@ import { hurtsItsUser } from './contact-play.ts';
 
 /** Whether anything in a pair could cost the attacker when it uses a move: the filter in front of the played hit of score/contact.ts. */
 
-/**
- * The rule is over the Dex, never a name:
- * - the foe's item or ability has a handler for a hit it takes (`onDamagingHit`: Rocky Helmet, Rough Skin, Iron Barbs, Flame Body,
- *   Static, Poison Point, Effect Spore, and the like; `onHit`: the Sticky Barb that moves to the attacker);
- * - the attacker's own item or ability has a handler for the move it just used (`onAfterMoveSecondarySelf`: Life Orb);
- * - the move costs its user by itself (recoil, a crash, a self-destruct): the Dex's recoil fields say it, and a move the simulator
- *   treats in code and not in data (Chloroblast) is found by playing it once on a bare pair.
- * test/contact-prefilter.spec.ts holds the rule to the simulator over the whole Dex of generation 9: wherever the played hit costs
- * the attacker HP or a status, the rule said so.
- */
+// The rule is over the Dex, never a name:
+// - the foe's item or ability has a handler for a hit it takes (`onDamagingHit`: Rocky Helmet, Rough Skin, Iron Barbs, Flame Body,
+//   Static, Poison Point, Effect Spore, and the like; `onHit`: the Sticky Barb that moves to the attacker);
+// - the attacker's own item or ability has a handler for the move it just used (`onAfterMoveSecondarySelf`: Life Orb);
+// - the move costs its user by itself (recoil, a crash, a self-destruct): the Dex's recoil fields say it, and a move the simulator
+//   treats in code and not in data (Chloroblast) is found by playing it once on a bare pair.
+// test/contact-prefilter.spec.ts holds the rule to the simulator over the whole Dex of generation 9: wherever the played hit costs
+// the attacker HP or a status, the rule said so.
 
 /** The events of the foe's item or ability that a hit on the foe can set off, and of the attacker's own when its move is done. */
 const FOE_EVENTS = ['onDamagingHit', 'onHit'] as const;

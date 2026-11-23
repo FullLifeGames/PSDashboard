@@ -6,18 +6,16 @@ import { MAX_PRICED_HITS, NO_COST, type HitCost, type StatusCost } from './conta
 
 /** Plays one hit of a move on copies of the board and reads what it costs the attacker; the simulator's own move use runs, so nothing here knows a name. */
 
-/**
- * The dice are quantiles: every draw of one played hit answers the same quantile u of its range (random(n) is floor(u * n), a
- * chance of n in d fires when u < n / d), and the hit is played on the grid u = (k + 1/2) / 20. A chance event then fires in
- * exactly the share of the grid below its chance (Flame Body's 30% reads as 30%), and damage rolls and hit counts average over
- * their range. Two probes (u = 0.075 and 0.925) come first: when the hit leaves the same status (or none) in both and the move
- * does not roll its hit count, the hit is deterministic and the mean of the probes is its cost; otherwise the other 18 points are
- * played too.
- * Each hit is played at full HP on both sides and with the other bodies on the field at full HP too: the chip is the amount of
- * the effect, not what a body at low HP has left, and a recoil is read on a hit that does not run into the foe's last HP (the
- * race counts the hit that finishes it as free, score/contact-price.ts). A benched body is put on the field of the copy for the
- * hit, as the static asks the simulator about benched bodies everywhere else.
- */
+// The dice are quantiles: every draw of one played hit answers the same quantile u of its range (random(n) is floor(u * n), a
+// chance of n in d fires when u < n / d), and the hit is played on the grid u = (k + 1/2) / 20. A chance event then fires in
+// exactly the share of the grid below its chance (Flame Body's 30% reads as 30%), and damage rolls and hit counts average over
+// their range. Two probes (u = 0.075 and 0.925) come first: when the hit leaves the same status (or none) in both and the move
+// does not roll its hit count, the hit is deterministic and the mean of the probes is its cost; otherwise the other 18 points are
+// played too.
+// Each hit is played at full HP on both sides and with the other bodies on the field at full HP too: the chip is the amount of
+// the effect, not what a body at low HP has left, and a recoil is read on a hit that does not run into the foe's last HP (the
+// race counts the hit that finishes it as free, score/contact-price.ts). A benched body is put on the field of the copy for the
+// hit, as the static asks the simulator about benched bodies everywhere else.
 
 /** The points of the grid, the two probes at its ends that decide whether the hit rolls anything, and the middle one. */
 const GRID = 20;
@@ -181,7 +179,10 @@ function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: 
   return { chip: endOfTurn(run.setup) - baseline(), output, ...(acts ? { acts } : {}) };
 }
 
-/** Whether the move costs its user HP by itself, played once on a pair stripped of items, abilities and typing (finds Chloroblast, which the Dex does not list); not memoized. */
+/**
+ * Whether the move costs its user HP by itself, played once on a pair stripped of items, abilities and typing (finds Chloroblast, which the
+ * Dex does not list); not memoized.
+ */
 export function hurtsItsUser(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string): boolean {
   try {
     return playRun(battle, attacker, defender, moveId, quantileOf(MIDDLE), true).lost > 0;

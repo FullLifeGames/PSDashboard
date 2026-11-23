@@ -158,7 +158,10 @@ const inputToCanonical = (order: BenchOrder, input: ForcedWinInput): ForcedWinIn
   },
 });
 
-/** An executor over the canonical board that speaks the given board's slots: its option lists and diagnostics leave in them, jobs and the prover's root order arrive in them. */
+/**
+ * An executor over the canonical board that speaks the given board's slots: its option lists and diagnostics leave in them, jobs and the
+ * prover's root order arrive in them.
+ */
 export function executorToGiven(order: BenchOrder, executor: SearchExecutor): SearchExecutor {
   return {
     choices: async (tera, keepPlayed, sleepClause) => {

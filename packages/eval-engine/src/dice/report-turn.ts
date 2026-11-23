@@ -4,7 +4,10 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport, ForcedDie } from './types.ts';
 
-/** The witnesses of the dice that belong to the body's turn and not to its move (the status checks, the order of the turn); each reads the protocol after the draw. */
+/**
+ * The witnesses of the dice that belong to the body's turn and not to its move (the status checks, the order of the turn); each reads the
+ * protocol after the draw.
+ */
 
 /** The line names the condition in one of its arguments after the body (`|cant|p1a: X|par`, `|-activate|p1a: X|move: Attract`). */
 function mentions(line: string, id: string): boolean {

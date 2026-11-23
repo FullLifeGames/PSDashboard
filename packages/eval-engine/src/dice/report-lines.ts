@@ -1,7 +1,10 @@
 import type { DieReport, ForcedDie } from './types.ts';
 import type { DieNote } from './prng.ts';
 
-/** The small readers of the protocol's lines every report witness shares: the fields of a line, the body a line is about, and the witness a draw hands to its report. */
+/**
+ * The small readers of the protocol's lines every report witness shares: the fields of a line, the body a line is about, and the witness a
+ * draw hands to its report.
+ */
 
 export const parts = (line: string): string[] => line.split('|');
 export const slotOfIdent = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();

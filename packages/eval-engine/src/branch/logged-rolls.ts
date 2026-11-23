@@ -9,11 +9,13 @@ import { buildForcedSwitchChoice, hasForceSwitch } from './corrections.ts';
 import type { ProtocolBench } from './team-order.ts';
 
 /**
- * The logged dice of every action in a branch's first turn. The actions draw from ONE stream in order, so when the user changes the faster action's move the number of draws before
- * the slower action changes and it rolls other numbers than the log has. A recorder plays the logged choices once on a copy and writes down, per action (side, slot, move in flight), the numbers
- * the sim drew; the branch's PRNG answers an action still in the log with those. Every draw is a call of PRNG#random (randomChance, sample, shuffle, the damage roll), so one mechanism covers all of them.
- * A changed action has no record and draws from the seed; draws outside any action (speed ties, residual rolls) are never replaced. The underlying stream advances on every call, answered or not,
- * so a turn whose actions all stay as logged draws exactly the plain seed's numbers, and a replaced answer moves no later draw.
+ * The logged dice of every action in a branch's first turn. The actions draw from ONE stream in order, so when the user changes the faster
+ * action's move the number of draws before the slower action changes and it rolls other numbers than the log has. A recorder plays the
+ * logged choices once on a copy and writes down, per action (side, slot, move in flight), the numbers the sim drew; the branch's PRNG
+ * answers an action still in the log with those. Every draw is a call of PRNG#random (randomChance, sample, shuffle, the damage roll), so
+ * one mechanism covers all of them. A changed action has no record and draws from the seed; draws outside any action (speed ties, residual
+ * rolls) are never replaced. The underlying stream advances on every call, answered or not, so a turn whose actions all stay as logged
+ * draws exactly the plain seed's numbers, and a replaced answer moves no later draw.
  */
 
 interface Draw { from: number | undefined; to: number | undefined; value: number }
@@ -54,14 +56,20 @@ class RollRecorder extends PRNG {
   }
 }
 
-/** The logged turn a branch opens on: the block's lines (the log's own results) and the commands the log's players sent; the dice module joins the results to the user's forced dice and finds the changed actions by comparing the commands. */
+/**
+ * The logged turn a branch opens on: the block's lines (the log's own results) and the commands the log's players sent; the dice module
+ * joins the results to the user's forced dice and finds the changed actions by comparing the commands.
+ */
 export interface LoggedTurn {
   turn: number;
   lines: readonly string[];
   choices: { p1: string; p2: string };
 }
 
-/** The branch's dice for its first turn: the plain seed stream, except that an action the log has plays its logged draws. `turn` is the turn the position stands at; from the next turn on this is the plain PRNG. */
+/**
+ * The branch's dice for its first turn: the plain seed stream, except that an action the log has plays its logged draws. `turn` is the turn
+ * the position stands at; from the next turn on this is the plain PRNG.
+ */
 export class LoggedRollPRNG extends PRNG {
   private battle: Battle | null = null;
   private readonly logged: LoggedRolls;
@@ -82,7 +90,10 @@ export class LoggedRollPRNG extends PRNG {
     this.battle = battle;
   }
 
-  /** A second stream at this one's place, with the same logged dice and the cursors where they stand, for a copy that plays the natural turn. It is not attached: the caller attaches it to the battle it plays on. */
+  /**
+   * A second stream at this one's place, with the same logged dice and the cursors where they stand, for a copy that plays the natural
+   * turn. It is not attached: the caller attaches it to the battle it plays on.
+   */
   fork(): LoggedRollPRNG {
     const copy = new LoggedRollPRNG(this.getSeed(), this.logged, this.turn, this.loggedTurn ?? undefined);
     for (const [key, cursor] of this.cursors) copy.cursors.set(key, cursor);
@@ -106,7 +117,10 @@ export class LoggedRollPRNG extends PRNG {
   }
 }
 
-/** The draws of the logged turn: the block's choices (and its forced replacements, answered from the log) played under the aligned seed on a copy of the position; null when the copy cannot play them (the caller keeps the plain seed). */
+/**
+ * The draws of the logged turn: the block's choices (and its forced replacements, answered from the log) played under the aligned seed on a
+ * copy of the position; null when the copy cannot play them (the caller keeps the plain seed).
+ */
 export function recordLoggedRolls(
   battle: Battle, seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },
 ): LoggedRolls | null {
@@ -132,9 +146,10 @@ export function recordLoggedRolls(
 }
 
 /**
- * The draws of the logged turn as the reconstruction plays it: the block's choices under the hidden dice of `seed` with the log's dice forced (`dice`), part by part (the choices, then every forced
- * replacement the log answers), so an action the user leaves as logged rolls what the rebuilt position rolled, damage roll included. The forced parts' draws are the answers the dice module gave,
- * not the stream's values: the same die forced again reads the same. Null when the copy cannot play the turn (the caller falls back to the seed search).
+ * The draws of the logged turn as the reconstruction plays it: the block's choices under the hidden dice of `seed` with the log's dice
+ * forced (`dice`), part by part (the choices, then every forced replacement the log answers), so an action the user leaves as logged rolls
+ * what the rebuilt position rolled, damage roll included. The forced parts' draws are the answers the dice module gave, not the stream's
+ * values: the same die forced again reads the same. Null when the copy cannot play the turn (the caller falls back to the seed search).
  */
 export function recordForcedRolls(
   battle: Battle, dice: readonly ForcedDie[], seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },

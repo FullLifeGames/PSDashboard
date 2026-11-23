@@ -10,7 +10,8 @@ import { rulesOfActives } from './rules.ts';
 import { turnRolledFor } from './luck.ts';
 import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
 
-// The grading half of one side's turn: played match, verified regret, verdict band with its leniencies. Pure; the narrative signals (signals.ts) never touch it.
+// The grading half of one side's turn: played match, verified regret, verdict band with its leniencies. Pure; the narrative signals
+// (signals.ts) never touch it.
 
 /** The played action matched into the ranked list, with the doubles and phantom flags. */
 interface PlayedMatch {
@@ -174,7 +175,10 @@ export interface SideGrading {
   sensitivity: SideAnalysis['sensitivity'];
 }
 
-/** The turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to the one rule that builds `rolledFor` (luck.ts). Only a side with a sack asks. */
+/**
+ * The turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to the one rule that builds
+ * `rolledFor` (luck.ts). Only a side with a sack asks.
+ */
 function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoice | null): { p1: boolean; p2: boolean } | undefined {
   if (!params.sacks?.[key]) return undefined;
   const foe: Side = key === 'p1' ? 'p2' : 'p1';

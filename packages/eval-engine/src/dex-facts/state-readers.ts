@@ -1,7 +1,10 @@
 import type { Battle } from '@pkmn/sim';
 import { idsOfStrings, lex, readsOfCode } from './handler-source.ts';
 
-/** Which fields of the board a Dex entry reads when its handlers run, scanned from the handler sources at run time (the memo keys of score/contact.ts, score/residuals.ts). */
+/**
+ * Which fields of the board a Dex entry reads when its handlers run, scanned from the handler sources at run time (the memo keys of
+ * score/contact.ts, score/residuals.ts).
+ */
 
 export type Consumer = 'hit' | 'residual';
 
@@ -41,7 +44,10 @@ export type Methods = ReadonlyMap<string, ReadSet>;
 
 export const tokensOf = (source: string): Set<string> => readsOfCode(lex(source).code);
 
-/** Whether the consumer fires the event of this handler key (a key that is no handler is a callback the move path calls: the hit reads it, the end of the turn does not). */
+/**
+ * Whether the consumer fires the event of this handler key (a key that is no handler is a callback the move path calls: the hit reads it,
+ * the end of the turn does not).
+ */
 function fires(key: string, consumer: Consumer): boolean {
   const match = HANDLER.exec(key);
   if (!match) return consumer === 'hit';
@@ -111,7 +117,10 @@ function closeOver(direct: ReadonlyMap<string, ReadonlySet<string>>): { reads: M
   return { reads, reach };
 }
 
-/** The method of the battle that finds the handlers of an event in the Dex entries on the board: what reaches it runs those handlers, which the scan reads on their own. */
+/**
+ * The method of the battle that finds the handlers of an event in the Dex entries on the board: what reaches it runs those handlers, which
+ * the scan reads on their own.
+ */
 const DISPATCH = 'getCallback';
 
 /**

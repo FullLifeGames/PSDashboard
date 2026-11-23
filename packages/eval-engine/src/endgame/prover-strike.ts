@@ -77,7 +77,10 @@ function boardOf(position: SimPosition, side: Side, tera: TeraAllowance | undefi
   };
 }
 
-/** Whether a part is a strike: a damaging move at the foe's body that kills in every roll (also under the foe's Tera click) and moves before every damaging foe move. */
+/**
+ * Whether a part is a strike: a damaging move at the foe's body that kills in every roll (also under the foe's Tera click) and moves before
+ * every damaging foe move.
+ */
 function isStrike(board: Board, slot: number, part: Part): boolean {
   const { battle, foeBody } = board;
   const attacker = board.bodies[slot];
@@ -151,7 +154,10 @@ export function strikeNames(position: SimPosition, side: Side, choice: string, t
   return { first: nameOf(parts[first]), ...(partner ? { partner: nameOf(partner) } : {}) };
 }
 
-/** The strike of a position, read once per position object (the cache is the prover's own); the pool is the legal combinations in doubles and the search's list in singles. */
+/**
+ * The strike of a position, read once per position object (the cache is the prover's own); the pool is the legal combinations in doubles
+ * and the search's list in singles.
+ */
 export function cachedStrike(cache: WeakMap<SimPosition, ChoiceOption | null>, position: SimPosition, side: Side, own: ChoiceOption[], tera: TeraAllowance | undefined): ChoiceOption | null {
   const known = cache.get(position);
   if (known !== undefined) return known;

@@ -17,18 +17,19 @@ export type { ReconstructParams, ReplacementPoint } from './branch/runtime.ts';
 export { adoptSerializedRuntime } from './branch/adopt.ts';
 export type { AdoptParams } from './branch/adopt.ts';
 
-// @pkmn/sim's random-format rulesets read Node's `global` (`global.Config?.potd`), which browsers lack: without it every Random Battle branch dies with a ReferenceError.
+// @pkmn/sim's random-format rulesets read Node's `global` (`global.Config?.potd`), which browsers lack: without it every Random Battle
+// branch dies with a ReferenceError.
 if (typeof (globalThis as Record<string, unknown>).global === 'undefined') {
   (globalThis as Record<string, unknown>).global = globalThis;
 }
 
-/** The end-of-reconstruction correction chain for a caller-owned battle; it mirrors the tail of `reconstructBranchRuntime` in its order (snapshot correction, then request refresh). */
+/** The end-of-reconstruction correction chain for a caller-owned battle, in the order of the tail of `reconstructBranchRuntime` (snapshot correction, then request refresh). */
 export function applyTargetCorrections(battle: SimBattle, snapshot: TurnSnapshot | null | undefined): void {
   if (snapshot) correctBattleFromSnapshot(battle, snapshot);
   refreshRequestsFromLiveState(battle);
 }
 
-/** Whether the reconstruction arrived at `turn` as a live position; an ended battle fails, since a sampled turn lies before the real game's end and an ended arrival means the replayed choices killed a side the real game kept. */
+/** Whether the reconstruction reached `turn` as a live position; an ended battle fails, since a sampled turn lies before the real game's end. */
 export function reconstructionReached(runtime: BranchRuntime, turn: number): boolean {
   if (runtime.timedOut) return false;
   const battle = runtime.battleStream.battle;

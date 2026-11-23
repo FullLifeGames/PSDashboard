@@ -6,7 +6,10 @@ import { leafValue } from './leaf.ts';
 import { optionHints } from './hints.ts';
 import { searchOptions } from './options.ts';
 
-/** The MCTS node machinery: node creation, the decoupled UCB pick under progressive widening, the principal variation and lines, the tree-informed root matrix. */
+/**
+ * The MCTS node machinery: node creation, the decoupled UCB pick under progressive widening, the principal variation and lines, the
+ * tree-informed root matrix.
+ */
 
 const EXPLORATION = 0.8;
 /** The visits a cell needs for the principal variation (the summary's ", then ..." prose reads it, and the corpus pins that prose). */

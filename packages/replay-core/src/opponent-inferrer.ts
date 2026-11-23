@@ -184,7 +184,10 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
   return { pokemon: Array.from(state.pokemonMap.values()) };
 }
 
-/** Switching into Stealth Rock without chip damage is a Heavy-Duty Boots tell; gen 8 on (the item's debut), and not for a holder an ability it may have explains. */
+/**
+ * Switching into Stealth Rock without chip damage is a Heavy-Duty Boots tell; gen 8 on (the item's debut), and not for a holder an ability
+ * it may have explains.
+ */
 function inferBootsFromHazards(
   lines: readonly LogLine[],
   side: 'p1' | 'p2',

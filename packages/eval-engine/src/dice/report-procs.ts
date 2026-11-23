@@ -3,7 +3,10 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/** The witnesses of the dice an ability or an item draws (the procs of a hit, the end of the turn); each reads the lines between the die's draw and the next draw of any die. */
+/**
+ * The witnesses of the dice an ability or an item draws (the procs of a hit, the end of the turn); each reads the lines between the die's
+ * draw and the next draw of any die.
+ */
 
 /** The kinds whose lines end at the next draw, not at the next action. */
 export const SPAN_KINDS: ReadonlySet<string> = new Set(['ability-proc', 'item-proc', 'end-of-turn']);

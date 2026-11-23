@@ -8,17 +8,15 @@ import { priceHit, type HitPrice } from './contact-price.ts';
 
 /** The 1v1 race behind boostsBiting (score/boost-bite.ts): both KO clocks and move order of one pair, and whether a stage moves it for its holder. */
 
-/**
- * A stage counts against a foe only when the side it helps wins the race with it, gets to act in it, and the stage made the
- * difference: it turned a lost race into a won one, or the win into a faster one. A shorter clock in a race the holder loses
- * anyway is no bite (a Scarf Mienshao that moves first and KOs the holder in one hit stops +4 Attack from biting it). A drop is
- * the mirror: the foe must win the race with it, get to act, and win by it; a drop in a race the holder still wins costs nothing.
- * Both sides pay for their hits (Cobalion's contact moves into Talonflame meet Flame Body): the HP a hit takes from its attacker
- * (Rocky Helmet, Rough Skin, Iron Barbs, recoil, Life Orb) joins the attacker's residual, and the status it can leave joins as
- * expected end-of-turn damage and expected lost damage. The simulator reads the hit (score/contact.ts) and score/contact-price.ts
- * prices it into the race: a chip is paid after every hit, so the side that moves second is a chip better off than a plain
- * residual says, and a status compounds over the hits the clocks of the race without it give the side (`pricedClocks`).
- */
+// A stage counts against a foe only when the side it helps wins the race with it, gets to act in it, and the stage made the
+// difference: it turned a lost race into a won one, or the win into a faster one. A shorter clock in a race the holder loses
+// anyway is no bite (a Scarf Mienshao that moves first and KOs the holder in one hit stops +4 Attack from biting it). A drop is
+// the mirror: the foe must win the race with it, get to act, and win by it; a drop in a race the holder still wins costs nothing.
+// Both sides pay for their hits (Cobalion's contact moves into Talonflame meet Flame Body): the HP a hit takes from its attacker
+// (Rocky Helmet, Rough Skin, Iron Barbs, recoil, Life Orb) joins the attacker's residual, and the status it can leave joins as
+// expected end-of-turn damage and expected lost damage. The simulator reads the hit (score/contact.ts) and score/contact-price.ts
+// prices it into the race: a chip is paid after every hit, so the side that moves second is a chip better off than a plain
+// residual says, and a status compounds over the hits the clocks of the race without it give the side (`pricedClocks`).
 
 /** The race horizon, in turns: beyond three hits to a KO the pair is a stall war, not a sweep. */
 export const BITE_TURNS = 3;
@@ -133,7 +131,10 @@ const isFree = (cost: HitCost): boolean => cost.chip === 0 && cost.statuses.leng
  */
 const PRICING_PASSES = 2;
 
-/** One side of the race as it pays for its hits (score/contact-price.ts): the chip and the expected status in its residual, the burn in its damage, the buffer in its HP. */
+/**
+ * One side of the race as it pays for its hits (score/contact-price.ts): the chip and the expected status in its residual, the burn in its
+ * damage, the buffer in its HP.
+ */
 const paying = (body: Body, frac: number, price: HitPrice): RaceSide =>
   ({ ...body, frac: frac * price.output, residual: body.residual + price.residual, hp: body.hp + price.buffer });
 

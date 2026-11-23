@@ -40,7 +40,7 @@ export function forcedWinInput(result: EvalResult, settings: EvalSettings): Forc
 
 interface SerializedBodies { ended?: boolean; sides?: { pokemon?: { fainted?: boolean }[] }[] }
 
-/** Sim-free mirror of the prover's trigger for the main thread: true wherever the sim-side check could fire, false only where a worker round trip would certainly return nothing. */
+/** Sim-free mirror of the prover's trigger for the main thread: true wherever the sim-side check could fire, false only where a worker round trip would return nothing. */
 export function forcedWinPossible(serializedBattle: string, input: ForcedWinInput): boolean {
   const named = Boolean(input.unanswered?.decided || input.unanswered?.nearDecided);
   if (named && Math.abs(input.score) >= PROVER_SCORE_FLOOR) return true;

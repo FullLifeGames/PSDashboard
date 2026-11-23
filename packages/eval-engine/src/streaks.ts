@@ -46,7 +46,10 @@ function sameMoveRun(entries: (StreakHistoryEntry | null)[], last: StreakHistory
   return run;
 }
 
-/** The odds when the streak fishes for a narratable, unsuppressed secondary; null when nothing comes of it (a flinch chain that lost the speed race); undefined with no such story. */
+/**
+ * The odds when the streak fishes for a narratable, unsuppressed secondary; null when nothing comes of it (a flinch chain that lost the
+ * speed race); undefined with no such story.
+ */
 function secondaryStreak(
   move: DexMove,
   last: StreakHistoryEntry,
@@ -95,7 +98,10 @@ function boostedAttackRun(dex: GenDex, last: StreakHistoryEntry, entries: (Strea
   return attackRun;
 }
 
-/** A narratable streak in a side's played-move history (oldest first, the current turn last; null entries break streaks), or null below gen 3 and off milestones. */
+/**
+ * A narratable streak in a side's played-move history (oldest first, the current turn last; null entries break streaks), or null below gen
+ * 3 and off milestones.
+ */
 export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | null)[], mod?: RulesMod): StreakOdds | null {
   if (gen <= 2) return null;
   const last = entries[entries.length - 1];

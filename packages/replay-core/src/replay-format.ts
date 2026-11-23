@@ -309,7 +309,10 @@ export function replayBringOnly(
 /** One side of a bring list. */
 export interface BringSide {
   fielded: string[];
-  /** The preview bodies the side never fielded, in preview order, each with its share of the side's open choice (the shares sum to 1; empty when `open` is 0). */
+  /**
+   * The preview bodies the side never fielded, in preview order, each with its share of the side's open choice (the shares sum to 1; empty
+   * when `open` is 0).
+   */
   candidates: { species: string; weight: number }[];
   /** How many of the side's brought bodies never entered (the count minus `fielded`). */
   open: number;

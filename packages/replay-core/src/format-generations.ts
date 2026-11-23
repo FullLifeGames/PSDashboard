@@ -2,12 +2,12 @@ import { Generations } from '@pkmn/data';
 import { calcModOf } from './calc-gen.ts';
 import { dataDex } from './rules-dex.ts';
 
-/** The one place that knows which Generations a format's client battle is built on: the default hides what the Dex marks non-standard, and a Champions log names such species (Absol-Mega-Z is `Past` in the mod and `Future` in the base Dex), so the client would throw on their lines. */
+/** The one place that knows which Generations a format's client battle runs on; the default hides non-standard Dex entries that a Champions log names (Absol-Mega-Z). */
 
 /** The Dex a Generations is built on (the simulator's modded Dex counts). */
 export type LegalDex = ConstructorParameters<typeof Generations>[0];
 
-/** 'logged': every species, item, move and ability the Dex knows, whatever its legality (what the log shows); 'legal': exactly what a registered Champions mod allows (the team editor's pools). */
+/** 'logged': every species, item, move and ability the Dex knows (what the log shows); 'legal': what a registered Champions mod allows (the team editor's pools). */
 export type GenerationsScope = 'logged' | 'legal';
 
 /** The standard Generations: what the Dex lists as played in a generation. */
@@ -21,7 +21,10 @@ const known = (row: Known): boolean => !!row.exists && !(row.kind === 'Ability' 
 /** The simulator's modded Dex answers `forGen` with the plain Dex of that generation; the pools need the mod itself. */
 const pinnedTo = (mod: LegalDex): LegalDex => Object.assign(Object.create(mod as object) as LegalDex, { forGen: () => mod });
 
-/** A row the mod allows: the mod's own legality, without the default's tier filter (the mod's Meloetta-Pirouette is Illegal in the tier list and legal in the format). */
+/**
+ * A row the mod allows: the mod's own legality, without the default's tier filter (the mod's Meloetta-Pirouette is Illegal in the tier list
+ * and legal in the format).
+ */
 const legalRow = (row: Known): boolean => known(row) && !('isNonstandard' in row && row.isNonstandard);
 
 let loggedChampions: Generations | undefined;

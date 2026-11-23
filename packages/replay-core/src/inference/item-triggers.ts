@@ -8,7 +8,10 @@ import { toId } from '../ids.ts';
 import { teamSizes } from '../replay-format.ts';
 import { spentToMax } from './pp-trigger.ts';
 
-/** Items the protocol rules out by a trigger it shows without their line (Lum Berry, Sitrus Berry, Eject Button, Red Card, and the PP rule of pp-trigger.ts), each read by running the item's own handler on a stand-in holder; the rules are in EVALUATION.md, "Rule-outs". */
+/**
+ * Items the protocol rules out by a trigger it shows without their line (Lum Berry, Sitrus Berry, Eject Button, Red Card, and the PP rule
+ * of pp-trigger.ts), each read by running the item's own handler on a stand-in holder; the rules are in EVALUATION.md, "Rule-outs".
+ */
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard' | 'pp';
@@ -103,7 +106,10 @@ function eats(handler: ItemHandler | undefined, holder: object): boolean {
   return ate;
 }
 
-/** A stand-in holder with HP and one slot at this PP: what an item's `onUpdate` reads of a Pokémon (Leppa Berry: any slot at 0 PP; Mystery Berry: the last move's slot). */
+/**
+ * A stand-in holder with HP and one slot at this PP: what an item's `onUpdate` reads of a Pokémon (Leppa Berry: any slot at 0 PP; Mystery
+ * Berry: the last move's slot).
+ */
 function holderWithSlot(pp: number) {
   const slot = { id: 'standin', move: 'Stand-in', pp, maxpp: 10 };
   const volatiles: Record<string, object> = {};
@@ -115,7 +121,10 @@ function holderWithSlot(pp: number) {
 
 const eatersByDex = new WeakMap<RulesDex, ReadonlySet<string>>();
 
-/** The items of the Dex's generation that eat when a slot of the holder is at 0 PP (Leppa Berry; Mystery Berry in Generation 2): an item's `onUpdate` eats on the stand-in with its slot at 0 PP and not with it full, so Sitrus Berry at the stand-in's full HP does not count. */
+/**
+ * The items of the Dex's generation that eat when a slot of the holder is at 0 PP (Leppa Berry; Mystery Berry in Generation 2): an item's
+ * `onUpdate` eats on the stand-in with its slot at 0 PP and not with it full, so Sitrus Berry at the stand-in's full HP does not count.
+ */
 export function ppEaters(dex: RulesDex): ReadonlySet<string> {
   let found = eatersByDex.get(dex);
   if (!found) {
@@ -131,7 +140,10 @@ export function ppEaters(dex: RulesDex): ReadonlySet<string> {
 /** Whether the item id is the Sitrus Berry, the berry `sitrusEatsAt` judges. */
 export const isSitrusBerry = (itemId: string): boolean => itemId === ('sitrusberry' satisfies Rule);
 
-/** Whether Sitrus Berry would have been eaten at the HP the log shows: every display form puts the real ratio below one display unit above what it shows, so the berry is judged at that bound (a shown 49/100 eats, 50/100 does not). */
+/**
+ * Whether Sitrus Berry would have been eaten at the HP the log shows: every display form puts the real ratio below one display unit above
+ * what it shows, so the berry is judged at that bound (a shown 49/100 eats, 50/100 does not).
+ */
 export function sitrusEatsAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
@@ -139,12 +151,13 @@ export function sitrusEatsAt(dex: RulesDex, shown: string): boolean {
   return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: health.hp + 1, maxhp: health.maxhp });
 }
 
-/** Whether the Sitrus Berry certainly stays uneaten at the HP the log shows: the display hides up to one unit, so it is judged at the lowest ratio the text allows (a shown 51/100 is above half, 50/100 may be exactly half); an exact text is read as it stands. */
+/** Whether the Sitrus Berry certainly stays uneaten at the HP the log shows: the display hides up to one unit, so it is judged at the lowest ratio the text allows. */
 export function sitrusKeptAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
   const item = dex.items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
-  // The display forms are hp-display.ts's (a percentage or the pixel bar hides up to one unit); this reader judges at one unit below in every mode, the Champions floor included.
+  // The display forms are hp-display.ts's (a percentage or the pixel bar hides up to one unit); this reader judges at one unit below in
+  // every mode, the Champions floor included.
   const lowest = formOf(health.maxhp, false) === 'exact' ? health.hp : health.hp - 1 + 1e-6;
   // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about the threshold.
   return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
@@ -319,7 +332,10 @@ function onFaint(watch: ItemTriggerWatch, key: string) {
   for (const [position, ident] of watch.slots) if (keyOf(ident) === key) watch.slots.delete(position);
 }
 
-/** The line handler: closes the window at each action boundary and judges its triggers, then reads the line into the next window; the residual phase's `upkeep` is no boundary, because the simulator's last update, and so a berry's line, comes after it. */
+/**
+ * The line handler: closes the window at each action boundary and judges its triggers, then reads the line into the next window; the
+ * residual phase's `upkeep` is no boundary, because the simulator's last update, and so a berry's line, comes after it.
+ */
 export function watchItemTriggers(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates, line: LogLine) {
   const tag = line.cmd;
   const key = keyOf(arg(line, 1));

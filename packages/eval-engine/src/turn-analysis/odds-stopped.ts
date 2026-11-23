@@ -49,7 +49,10 @@ function shownRecommendation(
     : { line: best, odds: best?.koOdds };
 }
 
-/** The claims of one side's clause the actual click stops (the played line's KO odds and the shown recommendation's); undefined when none or without cell facts. */
+/**
+ * The claims of one side's clause the actual click stops (the played line's KO odds and the shown recommendation's); undefined when none or
+ * without cell facts.
+ */
 export function hitStoppedFor(
   params: AnalyzeTurnParams,
   key: Side,

@@ -10,7 +10,8 @@ import { rideAlongOf } from './prose/ride-along.ts';
 import { QUIET_TURN, hintShown, quietSentences, quietVoiceOf, type QuietVoice } from './prose/quiet.ts';
 import type { NamedJudgement } from './prose/ride-along.ts';
 
-// Natural-language rendering of a turn analysis: pure template composition, deterministic, sim-free, main-bundle safe. Values render as win probabilities for the named player.
+// Natural-language rendering of a turn analysis: pure template composition, deterministic, sim-free, main-bundle safe. Values render as win
+// probabilities for the named player.
 
 export { formatRead } from './prose/phrases.ts';
 

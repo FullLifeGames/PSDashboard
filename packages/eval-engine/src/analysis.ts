@@ -5,7 +5,10 @@ import { attributionFor, markRisk } from './turn-analysis/risk.ts';
 import { turnRolledFor } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
-/** Turns a turn's cached sweep data into a TurnAnalysis (regret per side, swing split into decision and chance). Pure: no @pkmn/sim imports, main-bundle safe. */
+/**
+ * Turns a turn's cached sweep data into a TurnAnalysis (regret per side, swing split into decision and chance). Pure: no @pkmn/sim imports,
+ * main-bundle safe.
+ */
 
 export {
   BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD,

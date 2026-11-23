@@ -3,7 +3,10 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/** The witnesses of the dice of a move that are not accuracy, crit or roll, and the reasons a secondary was never drawn; each reads the protocol after the draw. */
+/**
+ * The witnesses of the dice of a move that are not accuracy, crit or roll, and the reasons a secondary was never drawn; each reads the
+ * protocol after the draw.
+ */
 
 /** Names the ability or the item in a body's Dex entry that carries the handler `handler`, or null. */
 function holderOf(battle: Battle, slot: string | undefined, handler: string): string | null {

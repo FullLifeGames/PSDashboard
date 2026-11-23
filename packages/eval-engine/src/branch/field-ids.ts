@@ -7,7 +7,8 @@ export function terrainIdFromSnapshot(terrain: string, dex: RulesDex): string {
   return terrainCondition.exists ? terrainCondition.id : toId(terrain);
 }
 
-// @pkmn/client snapshots name weather by display name (its WEATHERS map: "Sand", "Sun"), the sim only knows condition ids: an untranslated name silently disables every weather residual.
+// @pkmn/client snapshots name weather by display name (its WEATHERS map: "Sand", "Sun"), the sim only knows condition ids: an untranslated
+// name silently disables every weather residual.
 const CLIENT_WEATHER_IDS: Record<string, string> = {
   sand: 'sandstorm',
   sun: 'sunnyday',

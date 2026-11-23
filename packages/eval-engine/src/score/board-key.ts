@@ -7,18 +7,16 @@ export type { Consumer, ReadSet };
 
 /** The key of a board for the memos that play it (the hit cost of score/contact.ts, the end of the turn of score/residuals.ts), both game types. */
 
-/**
- * A memo may answer for a board only when the board's own play would give the answer: the key carries everything the play reads
- * and leaves out only what the consumer sets before it plays or never reads.
- * - Every own field of `Pokemon`, `Side`, `Field` and `Battle` has a class per consumer (score/board-key-table.ts); a field the
- *   table does not name is keyed.
- * - The turn-varying fields (`activeTurns`, `lastMove`, the clocks of an effect, a Substitute's HP, the toxic stage) are `read`
- *   fields: they enter the key only when a handler of an entry on the board reads them in an event the consumer fires
- *   (dex-facts/state-readers.ts). On a board without Stakeout the turns a foe has stood are no part of the key.
- * - `hp` is set by the consumer's copy before it plays (score/contact-play.ts, score/residuals.ts), so it is not keyed.
- * - `effectOrder` is dropped: the simulator compares it only between handlers of the SwitchIn and RedirectTarget events, which
- *   a played hit and a played end of the turn do not fire (held by the event census).
- */
+// A memo may answer for a board only when the board's own play would give the answer: the key carries everything the play reads
+// and leaves out only what the consumer sets before it plays or never reads.
+// - Every own field of `Pokemon`, `Side`, `Field` and `Battle` has a class per consumer (score/board-key-table.ts); a field the
+//   table does not name is keyed.
+// - The turn-varying fields (`activeTurns`, `lastMove`, the clocks of an effect, a Substitute's HP, the toxic stage) are `read`
+//   fields: they enter the key only when a handler of an entry on the board reads them in an event the consumer fires
+//   (dex-facts/state-readers.ts). On a board without Stakeout the turns a foe has stood are no part of the key.
+// - `hp` is set by the consumer's copy before it plays (score/contact-play.ts, score/residuals.ts), so it is not keyed.
+// - `effectOrder` is dropped: the simulator compares it only between handlers of the SwitchIn and RedirectTarget events, which
+//   a played hit and a played end of the turn do not fire (held by the event census).
 
 type EffectState = Record<string, unknown>;
 
@@ -31,7 +29,8 @@ function valueKey(value: unknown, depth = 0): string {
   if (object.pokemon !== undefined && object.sideConditions !== undefined) return `side:${String(object.id)}`;
   if (object.side !== undefined && object.species !== undefined) return `@${(object.side as { id: string }).id}${String(object.position)}:${(object.species as { id: string }).id}`;
   if (typeof object.effectType === 'string' && typeof object.id === 'string') return `#${object.id}`;
-  // A back-reference to the battle (a battle queue holds one) is the whole battle again: its log, its PRNG, its rule table. No rule reads those through a field.
+  // A back-reference to the battle (a battle queue holds one) is the whole battle again: its log, its PRNG, its rule table. No rule reads
+  // those through a field.
   return `{${Object.keys(object).filter(name => name !== 'battle').sort().map(name => `${name}=${valueKey(object[name], depth + 1)}`).join(';')}}`;
 }
 
@@ -214,7 +213,8 @@ function partsText(object: unknown, owner: Owner, reads: ReadSet, consumer: Cons
 
 /** The key of one body: its own fields by class, and the state of its effects; `withHp` keys the HP too (a benched body, which no copy sets). */
 export function bodyStateKey(pokemon: Pokemon, reads: ReadSet, consumer: Consumer, withHp = false): string {
-  // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator creates some on an event) keeps its key.
+  // A field that the key leaves out adds nothing, not even a separator: a body that has grown an own field no rule reads (the simulator
+  // creates some on an event) keeps its key.
   return partsText(pokemon, 'pokemon', reads, consumer, 'after', withHp);
 }
 

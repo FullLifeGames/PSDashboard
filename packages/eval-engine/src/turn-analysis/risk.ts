@@ -138,7 +138,10 @@ export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysi
 
 const badTier = (side: SideAnalysis): boolean => side.tier === 'mistake' || side.tier === 'blunder';
 
-/** Who owns the swing when a verdict or a paid-off read stands (an inaccuracy, a softened verdict and a paid-off read are no decision problem); null when nothing crossed a blame threshold. */
+/**
+ * Who owns the swing when a verdict or a paid-off read stands (an inaccuracy, a softened verdict and a paid-off read are no decision
+ * problem); null when nothing crossed a blame threshold.
+ */
 function culpritAttribution(p1: SideAnalysis, p2: SideAnalysis): TurnAttribution | null {
   const p1Bad = badTier(p1) && !p1.riskPaidOff;
   const p2Bad = badTier(p2) && !p2.riskPaidOff;

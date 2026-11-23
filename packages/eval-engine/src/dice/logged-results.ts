@@ -11,7 +11,10 @@ export interface LoggedOptions {
   clicked?: ReadonlyMap<string, string>;
   /** The status-check conditions each body stood under at the start of the turn, by slot (`par`, `confusion`, `attract`, `frz`). */
   checks?: ReadonlyMap<string, readonly string[]>;
-  /** The effect ids (`brn`, `flinch`, `boosts:spd`, `self:atk+def`) of a move's secondaries that carry a chance; a secondary the log shows nothing of is then a logged no. */
+  /**
+   * The effect ids (`brn`, `flinch`, `boosts:spd`, `self:atk+def`) of a move's secondaries that carry a chance; a secondary the log shows
+   * nothing of is then a logged no.
+   */
   secondariesOf?: (moveId: string) => readonly string[];
   /**
    * The condition each body stands under that makes its clicked move draw the chance to succeed again (a stalling move used twice in a row),
@@ -127,7 +130,10 @@ function readMiss(action: LoggedAction, parts: string[]): void {
   if (!action.targets.includes(target)) action.targets.push(target);
 }
 
-/** A `|-anim|` line of the move names the target of a later hit (the second dart of Dragon Darts goes to the other foe in doubles; the `|move|` line names the first one only). */
+/**
+ * A `|-anim|` line of the move names the target of a later hit (the second dart of Dragon Darts goes to the other foe in doubles; the
+ * `|move|` line names the first one only).
+ */
 function readAnim(action: LoggedAction, parts: string[]): void {
   const target = slotOf(field(parts, 4));
   if (!target || toId(field(parts, 3)) !== action.moveId || action.targets.includes(target)) return;

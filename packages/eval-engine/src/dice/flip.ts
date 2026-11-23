@@ -43,13 +43,19 @@ class HeldRecordingPRNG extends ForcedDicePRNG {
   }
 }
 
-/** The dice the module does not turn: the roll facts (damage roll, crit, hit count: sampled and disclosed as such, ADR 0020) and the speed tie (the endgame children price it). */
+/**
+ * The dice the module does not turn: the roll facts (damage roll, crit, hit count: sampled and disclosed as such, ADR 0020) and the speed
+ * tie (the endgame children price it).
+ */
 export const ROLL_FACT_KINDS: ReadonlySet<DieKind> = new Set<DieKind>(['damage-roll', 'crit', 'hit-count', 'speed-tie']);
 
 export interface FlipDie {
   key: string;
   name: DieName;
-  /** The chance the draw comes true: the numerator over the denominator of `randomChance`, or the entry's chance of a `random(100)` the script compares; strictly between 0 and 1. */
+  /**
+   * The chance the draw comes true: the numerator over the denominator of `randomChance`, or the entry's chance of a `random(100)` the
+   * script compares; strictly between 0 and 1.
+   */
   chance: number;
   drew: boolean;
   /** The chance of the answer the recording drew. */
@@ -81,7 +87,10 @@ export interface FlippedTurn {
   logStart: number;
   /** The turn drew the die and answered it the other way. False when the simulator never drew it on this branch, or the draw has no way to give the answer. */
   took: boolean;
-  /** The other dice this branch drew (the keys of `FlipDie`). A die the branch never reached (a paralysis that a knock-out ends the turn before) is no part of its chance. */
+  /**
+   * The other dice this branch drew (the keys of `FlipDie`). A die the branch never reached (a paralysis that a knock-out ends the turn
+   * before) is no part of its chance.
+   */
   drawn: ReadonlySet<string>;
 }
 

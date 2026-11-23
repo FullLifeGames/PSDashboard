@@ -59,7 +59,10 @@ function slotMatches(choicePart: string, labelPart: string, action: PlayedAction
   return true;
 }
 
-/** The combined (doubles) option matching the side's per-slot actions; generic over anything with choice and label, so the search restriction can use it on raw options. */
+/**
+ * The combined (doubles) option matching the side's per-slot actions; generic over anything with choice and label, so the search
+ * restriction can use it on raw options.
+ */
 export function findPlayedOption<T extends { choice: string; label: string }>(
   options: T[],
   slots: (PlayedAction | null)[] | undefined,

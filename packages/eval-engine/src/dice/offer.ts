@@ -156,7 +156,10 @@ function secondaryOffers(copy: Battle, user: Pokemon, move: ActiveMove, base: Ba
   })));
 }
 
-/** The secondary dice a move of `userSlot` draws against `targetSlot`, with their chances in the draw's order, read on a copy; `dice/secondaries.ts` caches it. */
+/**
+ * The secondary dice a move of `userSlot` draws against `targetSlot`, with their chances in the draw's order, read on a copy;
+ * `dice/secondaries.ts` caches it.
+ */
 export function secondaryDiceOf(battle: Battle, userSlot: string, moveId: string, targetSlot: string): { effectId: string; chance: number }[] {
   const copy = copyOf(battle);
   copy.prng ??= battle.prng.clone();
@@ -237,7 +240,10 @@ function procOffers(battle: Battle, user: Pokemon, move: ActiveMove, targets: Po
   return offers;
 }
 
-/** The status checks the body carries: a condition whose own `BeforeMove` handler draws a chance for this move; the chance offered is that of "the body goes on". */
+/**
+ * The status checks the body carries: a condition whose own `BeforeMove` handler draws a chance for this move; the chance offered is that
+ * of "the body goes on".
+ */
 function checkOffers(battle: Battle, slot: string, moveId: string): DieOffer[] {
   const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
   if (!body || body.fainted) return [];

@@ -19,7 +19,10 @@ export { evBudget, legalizeEvs } from './spreads/ev-budget.ts';
 export type { SpreadCandidate } from './spreads/ladder.ts';
 export type { SpeedKnowledge, SpeedKnowledgeMap } from './spreads/scarf.ts';
 
-/** Damage-consistent spread inference: a ladder of standard spreads is scored with @smogon/calc against each Pokémon's observations; the best fit replaces guessed EVs only. */
+/**
+ * Damage-consistent spread inference: a ladder of standard spreads is scored with @smogon/calc against each Pokémon's observations; the
+ * best fit replaces guessed EVs only.
+ */
 // With sparse observations "the defender is bulkier" and "the attacker is weaker" fit the same damage line, so per-mon spreads are not
 // ground truth; the result guarantees pair consistency: forked battles reproduce the damage the replay showed.
 

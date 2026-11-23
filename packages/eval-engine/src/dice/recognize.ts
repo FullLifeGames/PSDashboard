@@ -77,7 +77,10 @@ function isCritDraw(draw: Draw, shape: GenShape, watch: BattleWatch): boolean {
   return draw.call === 'chance' || (draw.from === 256 && draw.to === undefined);
 }
 
-/** The name of the die this draw is, read at the moment of the draw from the watch and the battle's state; `gen` is the battle's generation (Champions plays as Gen 9). */
+/**
+ * The name of the die this draw is, read at the moment of the draw from the watch and the battle's state; `gen` is the battle's generation
+ * (Champions plays as Gen 9).
+ */
 export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName | null {
   const { battle, armed } = watch;
   const first = pickedDie(draw, watch) ?? firstMoverDie(draw, battle) ?? endOfTurnDie(draw, watch);

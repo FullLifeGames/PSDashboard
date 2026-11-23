@@ -168,7 +168,10 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult, 
     .map(([key]) => cellJob(trees[0], key));
 }
 
-/** Doubles: the support and played cells the visit stats leave ineligible, for the pair plan to check (a doubles tree ships no boundary list); empty for singles. */
+/**
+ * Doubles: the support and played cells the visit stats leave ineligible, for the pair plan to check (a doubles tree ships no boundary
+ * list); empty for singles.
+ */
 export function boundaryCheckCells(trees: MctsTreeStats[], merged: EvalResult, focus?: VerifyFocus): EvalCellJob[] {
   const mixes = merged.matrix?.mixes;
   if (!mixes || trees[0].boundaryCells !== undefined) return [];

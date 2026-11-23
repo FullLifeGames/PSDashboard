@@ -1,2 +1,2 @@
-/** The dice seed every reconstruction and new game starts on unless the caller names another. It lives alone because the app's start page reads it: a module that imports the battle runtime would pull that runtime into the start load. */
+/** The dice seed every reconstruction and new game starts on unless the caller names another; it lives alone so the app's start page need not load the battle runtime. */
 export const DEFAULT_GAME_SEED = '1,2,3,4';

@@ -26,7 +26,10 @@ export interface EndgameChild {
   ended: boolean;
   /** Group key `${order}:${classKey}` on the class path; absent on the plain path. */
   key?: string;
-  /** The plain path's child of a chance die turned the other way for its price (`pricedGroup`); the prover's lazy pass leaves it aside; absent on the class path. */
+  /**
+   * The plain path's child of a chance die turned the other way for its price (`pricedGroup`); the prover's lazy pass leaves it aside;
+   * absent on the class path.
+   */
   turned?: true;
 }
 export interface EndgameChildren {
@@ -199,7 +202,10 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
   return { children: weighed(priced.children), unpriced: priced.unpriced, plain: true, spread: priced.spread, missing: [], events: [] };
 }
 
-/** The children of one matrix cell; `drawBudget` caps the forced draws for classes the base seeds never showed (the prover passes less and leaves rare classes open). */
+/**
+ * The children of one matrix cell; `drawBudget` caps the forced draws for classes the base seeds never showed (the prover passes less and
+ * leaves rare classes open).
+ */
 export function endgameChildren(root: SimPosition, p1Choice: string, p2Choice: string, drawBudget = BOUNDARY_DRAW_BUDGET): EndgameChildren {
   const battle = positionBattle(root);
   const classes = classChildren(root, p1Choice, p2Choice, { baseSeeds: cellSeeds(root, p1Choice, p2Choice).slice(0, BASE_DRAWS), forcedCap: drawBudget });

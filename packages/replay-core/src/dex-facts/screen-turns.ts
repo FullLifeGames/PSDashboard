@@ -1,7 +1,11 @@
 import { toId } from '../ids.ts';
 import type { RulesDex } from '../rules-dex.ts';
 
-/** The turns a condition lasts, read from the Dex's `durationCallback` on a stand-in source: Light Clay makes Reflect, Light Screen and Aurora Veil last eight turns instead of five and the log never shows the item (Generations 1 and 2 give no table, Generation 3 a plain five). */
+/**
+ * The turns a condition lasts, read from the Dex's `durationCallback` on a stand-in source: Light Clay makes Reflect, Light Screen and
+ * Aurora Veil last eight turns instead of five and the log never shows the item (Generations 1 and 2 give no table, Generation 3 a plain
+ * five).
+ */
 export interface ConditionTurns {
   /** The turns the condition lasts for a source whose item does not matter. */
   readonly plain: number;
@@ -33,7 +37,10 @@ const sourceHolding = (held: string) => ({
   hasAbility: () => false,
 });
 
-/** The turns of a condition for a source with no item, and the items that change them; null when no move sets it, it has no `durationCallback`, or the callback needs more than an item (unknown, never guessed). */
+/**
+ * The turns of a condition for a source with no item, and the items that change them; null when no move sets it, it has no
+ * `durationCallback`, or the callback needs more than an item (unknown, never guessed).
+ */
 export function conditionTurns(dex: RulesDex, conditionId: string): ConditionTurns | null {
   let table = memo.get(dex);
   if (!table) memo.set(dex, table = new Map());
@@ -42,7 +49,10 @@ export function conditionTurns(dex: RulesDex, conditionId: string): ConditionTur
   return table.get(id)!;
 }
 
-/** Whether an ability's start leaves a weather or terrain standing for good (before Generation 6 `onFieldStart` sets the duration to 0); true when the handler needs more than a stand-in (unknown, never guessed). */
+/**
+ * Whether an ability's start leaves a weather or terrain standing for good (before Generation 6 `onFieldStart` sets the duration to 0);
+ * true when the handler needs more than a stand-in (unknown, never guessed).
+ */
 export function startsForGood(dex: RulesDex, conditionId: string, abilityId: string): boolean {
   const handler = (dex.conditions.get(conditionId) as unknown as { onFieldStart?: (this: unknown, ...args: unknown[]) => unknown }).onFieldStart;
   if (typeof handler !== 'function') return false;
@@ -83,7 +93,10 @@ function read(dex: RulesDex, id: string): ConditionTurns | null {
   }
 }
 
-/** What makes a holder's item count for nothing (`Pokemon.ignoringItem`), so a screen lasts its plain turns whatever the item is: an ability, a volatile and a field condition. */
+/**
+ * What makes a holder's item count for nothing (`Pokemon.ignoringItem`), so a screen lasts its plain turns whatever the item is: an
+ * ability, a volatile and a field condition.
+ */
 // oracle: packages/replay-core/test/screen-turns-sweep.spec.ts
 // eslint-disable-next-line names/no-new-dex-name -- reviewed: the three causes of Pokemon.ignoringItem, held to the simulator by the sweep named above
 export const ITEM_BLOCKERS = { ability: ['klutz'], volatile: ['embargo'], field: ['magicroom'] } as const;

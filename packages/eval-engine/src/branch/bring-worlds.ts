@@ -1,7 +1,7 @@
 import type { BringList, BringSide } from '@fulllifegames/replay-core';
 import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../types.ts';
 
-/** One world of a bring-limited game: one set of guesses for the unknown bodies of both sides; the lists are the fielded bodies plus the guesses (last), `weight` the world's renormalized share. */
+/** One world of a bring-limited game: one set of guesses for both sides' unknown bodies; the lists are the fielded bodies plus the guesses (last), `weight` its share. */
 export interface BringWorld {
   p1: string[];
   p2: string[];
@@ -36,7 +36,7 @@ function sideWorlds(side: BringSide): SideWorld[] {
   return worlds.map(world => ({ guess: world.guess, weight: total > 0 ? world.weight / total : 1 / worlds.length }));
 }
 
-/** The worlds of a game, the heaviest first (ties by preview order), at most `cap` with weights renormalized to sum 1; null for a bring-all game. A game that pins both sides gives one world of weight 1. */
+/** The worlds of a game, heaviest first (ties by preview order), at most `cap`, weights summing to 1; null for a bring-all game; a game that pins both sides gives one world. */
 export function bringWorlds(list: BringList | null | undefined, cap: number): BringWorld[] | null {
   if (!list) return null;
   const p1Worlds = sideWorlds(list.p1);
@@ -143,8 +143,9 @@ function blendMatrix(frame: EvalMatrix, others: { matrix: EvalMatrix | undefined
 }
 
 /**
- * The lines of a blended result. Each world kept the line of its own best row and of the played row, but the blend ranks the rows again: a line stays when its row is the blend's
- * best row of its side (whichever world holds it, the heaviest first) or the played row. Nothing reads `lines` to score or rank.
+ * The lines of a blended result. Each world kept the line of its own best row and of the played row, but the blend ranks the rows again: a
+ * line stays when its row is the blend's best row of its side (whichever world holds it, the heaviest first) or the played row. Nothing
+ * reads `lines` to score or rank.
  */
 function blendLines(entries: { entry: EvalResult }[], perSide: EvalResult['perSide']): EvalLine[] | undefined {
   const merged = new Map<string, EvalLine>();
@@ -161,7 +162,7 @@ function blendLines(entries: { entry: EvalResult }[], perSide: EvalResult['perSi
   return merged.size === 0 ? undefined : [...merged.values()];
 }
 
-/** One result for a game with several worlds, each solved under perfect information (ADR 0013): the heaviest world's result is the frame, the numbers are weighted means; `results` and `weights` are index-aligned. */
+/** One result for a game with several worlds (ADR 0013): the heaviest world's result is the frame, the numbers are weighted means; `results` and `weights` are index-aligned. */
 export function blendWorlds(results: EvalResult[], weights: number[]): EvalResult {
   if (results.length === 1) return results[0];
   // Rows and matrix cells blend by choice id; a forced win stays only when every world proves one for the same side.

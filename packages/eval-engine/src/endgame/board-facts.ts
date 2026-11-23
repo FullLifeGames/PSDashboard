@@ -48,7 +48,10 @@ function state(battle: Battle): Json & { sides: Bodies[] } {
 
 export interface StageReading { rest: string; boosts: Record<string, number>[][] }
 
-/** The position with the roll fields and the stat stages taken out: the rest as one string, the stages by side and body; the turn's bookkeeping stays in `rest`. */
+/**
+ * The position with the roll fields and the stat stages taken out: the rest as one string, the stages by side and body; the turn's
+ * bookkeeping stays in `rest`.
+ */
 export function stageReading(battle: Battle): StageReading {
   const serialized = state(battle);
   const boosts = serialized.sides.map(side => side.pokemon.map(body => {

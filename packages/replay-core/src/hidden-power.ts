@@ -5,7 +5,7 @@ import type { HiddenPowerEvidence } from './types.ts';
 import { toId } from './ids.ts';
 import { rulesDex, type GameRules, type RulesDex } from './rules-dex.ts';
 
-/** Resolves a typeless Hidden Power (the replay shows only the generic name and the simulator then runs the IV-default type): effectiveness markers filter the candidate types and usage ranks the survivors. */
+/** Resolves a typeless Hidden Power (the replay shows only the generic name): effectiveness markers filter the candidate types and usage ranks the survivors. */
 
 /** The sixteen types a Hidden Power can have. */
 export const HP_TYPES = [

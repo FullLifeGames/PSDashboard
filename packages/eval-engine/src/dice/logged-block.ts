@@ -22,7 +22,10 @@ import { dieKey, type DiceReport, type DieName, type DieReport, type ForcedDie }
 /** The choices of both sides, as the stream writes them (`>p1 move 1`). */
 export interface BlockCommands { p1: string; p2: string }
 
-/** The dice the log shows for a block, read against the battle at that turn's move request (it names the clicked moves, checks and stalling conditions the log cannot). */
+/**
+ * The dice the log shows for a block, read against the battle at that turn's move request (it names the clicked moves, checks and stalling
+ * conditions the log cannot).
+ */
 export function forcedTurnDice(battle: Battle, lines: readonly string[], choices: BlockCommands): ForcedDie[] {
   return loggedDice(lines, loggedOptions(battle, choices));
 }

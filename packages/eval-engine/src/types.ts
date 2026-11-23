@@ -354,7 +354,10 @@ export interface ForcedWin {
 export const ENDGAME_MAX_BODIES = 3;
 /** Proofs below this mass change nothing; a proof at exactly this mass (a coin flip) stays on the result without a bar. */
 export const MIN_FORCED_MASS = 0.5;
-/** Outside the small endgame the prover runs only when the search already reads the board at this score or beyond; below it proofs are rare and the probe is wasted. */
+/**
+ * Outside the small endgame the prover runs only when the search already reads the board at this score or beyond; below it proofs are rare
+ * and the probe is wasted.
+ */
 export const PROVER_SCORE_FLOOR = 0.6;
 /** Proofs at or above this mass are spoken. */
 export const SPOKEN_MASS = 0.9;

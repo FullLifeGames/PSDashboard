@@ -4,7 +4,10 @@ import type { StaticRuleset } from './score/weights.ts';
 /** The leaf's K at a fainted share f: k0 + k1·f (fainted over total bodies of both sides; the early game earns less confidence per point than the endgame). */
 export interface PhaseK { readonly k0: number; readonly k1: number }
 
-/** Standard leaf K per game type (fits: test/regression/eval-fit.spec.ts); the verdict tiers and the sack and prover floors are in wp-units, so a new K moves them. */
+/**
+ * Standard leaf K per game type (fits: test/regression/eval-fit.spec.ts); the verdict tiers and the sack and prover floors are in wp-units,
+ * so a new K moves them.
+ */
 export const WINPROB_K = {
   singles: { k0: 2.28, k1: 1.49 },
   doubles: { k0: 2.98, k1: 0.88 },

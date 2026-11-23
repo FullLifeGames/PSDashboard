@@ -11,7 +11,10 @@ export function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** Guarded stream write: a sim crash inside write() (old-gen mods throw on odd states) surfaces via `record`, as a throw or a rejection (write() returns void on the buffered path, a promise otherwise). */
+/**
+ * Guarded stream write: a sim crash inside write() (old-gen mods throw on odd states) surfaces via `record`, as a throw or a rejection
+ * (write() returns void on the buffered path, a promise otherwise).
+ */
 export function safeStreamWrite(
   stream: { write(data: string): void | Promise<void> },
   payload: string,
@@ -59,7 +62,10 @@ function resolveMoveSlotChoice(
   return { ok: true, command: `move ${requestIndex + 1}${suffix}${modifier}` };
 }
 
-/** The slot's body when the simulator holds it: a held body cannot switch out in a move request (side.js chooseSwitch); a forced replacement is no switch out. */
+/**
+ * The slot's body when the simulator holds it: a held body cannot switch out in a move request (side.js chooseSwitch); a forced replacement
+ * is no switch out.
+ */
 function heldBody(battle: SimBattle, sideIdx: number, activeSlot: number): SimPokemon | null {
   const side = battle.sides[sideIdx];
   const body = side.active[activeSlot];
@@ -67,8 +73,9 @@ function heldBody(battle: SimBattle, sideIdx: number, activeSlot: number): SimPo
 }
 
 /**
- * How well a bench body fits the clicked species, 0 best, -1 not at all. A body is kin when the Dex ties the two (Ogerpon-Teal-Tera for Ogerpon, a Mega for its base) or its name is the species' id.
- * The order: kin with the exact name, kin with the same name by id, any kin, then a body by its name alone (Shaymin-Sky frozen back to Shaymin keeps its name and no Dex tie).
+ * How well a bench body fits the clicked species, 0 best, -1 not at all. A body is kin when the Dex ties the two (Ogerpon-Teal-Tera for
+ * Ogerpon, a Mega for its base) or its name is the species' id. The order: kin with the exact name, kin with the same name by id, any kin,
+ * then a body by its name alone (Shaymin-Sky frozen back to Shaymin keeps its name and no Dex tie).
  */
 function switchRank(battle: SimBattle, pokemon: SimPokemon, choice: Extract<BranchSlotChoice, { kind: 'switch' }>): number {
   const kin = sameBodyForme(battle.dex, pokemon.species?.name, choice.speciesId) || toId(pokemon.name || '') === choice.speciesId;
@@ -122,7 +129,7 @@ export function annotateNicknames(message: string, battle: SimBattle | null | un
   return annotated;
 }
 
-/** Resolves identity-based slot choices (move ids, switch species) into the position-index commands the sim expects, always against the live request, so a stored index never points at the wrong move. */
+/** Resolves slot choices by identity (move ids, switch species) into the sim's position-index commands against the live request, so no stored index points at the wrong move. */
 export function resolveSideChoices(
   battle: SimBattle,
   side: 'p1' | 'p2',
@@ -150,7 +157,10 @@ export function resolveSideChoices(
   return { ok: true, command: fragments.join(', ') };
 }
 
-/** The commands on a copy of the battle, as the stream writes them to the live one; a refused choice throws. A deliberate copy of `chooseOnCopy` in `dice/logged-block.ts` (this module loads the dice layer lazily); `test/execute.spec.ts` holds the two together. */
+/**
+ * The commands on a copy of the battle, as the stream writes them to the live one; a refused choice throws. A deliberate copy of
+ * `chooseOnCopy` in `dice/logged-block.ts` (this module loads the dice layer lazily); `test/execute.spec.ts` holds the two together.
+ */
 export function chooseOnCopy(battle: SimBattle, commands: { side: 'p1' | 'p2'; command: string }[]): void {
   for (const { side, command } of commands) {
     if (battle.choose(side, command)) continue;
@@ -171,7 +181,10 @@ async function playWithDice(
   }
 }
 
-/** The turns that paused for a switch in the middle, by battle: the forced dice of the turn wait here for the call that plays the rest (the forced replacement). */
+/**
+ * The turns that paused for a switch in the middle, by battle: the forced dice of the turn wait here for the call that plays the rest (the
+ * forced replacement).
+ */
 const pendingTurns = new WeakMap<object, PendingTurn>();
 
 /** What a call needs to play a turn with forced dice: the live battle and the slot choices the dice ride on. */
@@ -183,13 +196,19 @@ export interface BranchDiceTurn {
 
 const carriesDice = (turn: BranchDiceTurn): boolean => [...turn.p1Choices, ...turn.p2Choices].some(choice => (choice?.dice?.length ?? 0) > 0);
 
-/** Whether this is the branch's first turn, which always joins the log's visible results: the move request of the turn the live PRNG (a `LoggedRollPRNG`) knows the logged lines of. Read by shape: this file keeps type-only imports of the dice module and the PRNG classes. */
+/**
+ * Whether this is the branch's first turn, which always joins the log's visible results: the move request of the turn the live PRNG (a
+ * `LoggedRollPRNG`) knows the logged lines of. Read by shape: this file keeps type-only imports of the dice module and the PRNG classes.
+ */
 function joinsLog(battle: SimBattle): boolean {
   const logged = (battle.prng as { loggedTurn?: { turn: number } | null }).loggedTurn;
   return battle.requestState === 'move' && !!logged && logged.turn === battle.turn;
 }
 
-/** Writes the turn's commands to the sim through the stream, or, for a turn with forced dice (the choices carry one, dice are pending after a pause for a switch, or it joins the log), through the dice module, which plays the turn on a copy first and then on the live battle. */
+/**
+ * Writes the turn's commands to the sim through the stream, or, for a turn with forced dice (the choices carry one, dice are pending after
+ * a pause for a switch, or it joins the log), through the dice module, which plays the turn on a copy first and then on the live battle.
+ */
 async function dispatchTurn(
   params: Parameters<typeof executeBranchChoices>[0], record: (error: unknown) => void,
 ): Promise<{ ok: true; report?: DiceReport } | { ok: false; error: string }> {
@@ -211,7 +230,7 @@ async function dispatchTurn(
   return { ok: true, report: outcome.report };
 }
 
-/** Writes side commands to the sim and waits for the outcome: succeeds when the omniscient log grows, fails when the sim rejects a choice or never answers within the timeout; `dice` routes a forced-dice turn through the dice module (see `dispatchTurn`). */
+/** Writes side commands to the sim and waits: succeeds when the omniscient log grows, fails on a rejected choice or timeout; `dice` routes a forced-dice turn. */
 export async function executeBranchChoices(params: {
   streams: BranchRuntime['streams'];
   log: string[];

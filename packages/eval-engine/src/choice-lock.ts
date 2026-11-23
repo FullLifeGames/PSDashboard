@@ -212,7 +212,10 @@ export function buildProtocolHeldItems(replayLog: string): Map<number, ProtocolH
 
 export type ItemCorroboration = 'corroborated' | 'contradicted' | 'ambiguous';
 
-/** HP-bar reading slack: a deliberate copy of replay-core's `OBSERVATION_SLACK` (`team/item-damage-shared.ts`), held equal by `test/regression/observation-slack.spec.ts`. */
+/**
+ * HP-bar reading slack: a deliberate copy of replay-core's `OBSERVATION_SLACK` (`team/item-damage-shared.ts`), held equal by
+ * `test/regression/copies.spec.ts`.
+ */
 const OBSERVATION_SLACK = 0.02;
 
 /** The ×1.2 bluff items a big hit could hide behind (Mystic Water for a Water move). */
@@ -263,7 +266,10 @@ function calcDefender(gen: CalcGen, defenderSet: PokemonSet | undefined, obs: Da
 const itemsAtHit = (gen: CalcGen, items: string[], obs: DamageObservation): string[] =>
   (obs.defenderItem || obs.defenderItemChanged ? [obs.defenderItem ? dexOfCalc(gen).items.get(obs.defenderItem).name : ''] : items);
 
-/** Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability and item the defender may have; null when the calc cannot judge any. */
+/**
+ * Whether the roll range (± slack) under `withItem` contains the observed fraction for some ability and item the defender may have; null
+ * when the calc cannot judge any.
+ */
 function explainsObservation(
   gen: CalcGen, attackerSet: PokemonSet, defender: DefenderRead, obs: DamageObservation,
   calcMoveId: string, withItem: string, mod?: string,

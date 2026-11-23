@@ -2,7 +2,10 @@ import { type TurnSnapshot, toId } from '@fulllifegames/replay-core';
 import type { SimBattle } from './types.ts';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
 
-/** Field and side conditions from the turn snapshot: @pkmn/client gives side conditions a `level` (a repeated setter) and the remaining minimum and maximum turns, weather and terrain theirs in weatherState and terrainState. */
+/**
+ * Field and side conditions from the turn snapshot: @pkmn/client gives side conditions a `level` (a repeated setter) and the remaining
+ * minimum and maximum turns, weather and terrain theirs in weatherState and terrainState.
+ */
 
 type EffectEntry = { id?: string; duration?: number; effectOrder?: number; layers?: number };
 
@@ -32,14 +35,20 @@ function snapshotConditionRange(value: unknown): { min: number; max: number } | 
   return { min, max: max || min };
 }
 
-/** The remaining turns a synced condition keeps: the simulator's own count where the snapshot allows it (it knows the setter's item; the client never sees it and counts a Light Clay screen from five turns, not eight), else the snapshot's. */
+/**
+ * The remaining turns a synced condition keeps: the simulator's own count where the snapshot allows it (it knows the setter's item; the
+ * client never sees it and counts a Light Clay screen from five turns, not eight), else the snapshot's.
+ */
 function syncedDuration(held: number | undefined, value: unknown): number | undefined {
   const range = snapshotConditionRange(value);
   if (held !== undefined && range && held >= range.min && held <= range.max) return held;
   return snapshotConditionDuration(value);
 }
 
-/** Whether the sim stacks this condition: its dex condition has `onSideRestart` (exactly Spikes and Toxic Spikes in 0.10.11, which count layers); the client counts the same setter as `level`. */
+/**
+ * Whether the sim stacks this condition: its dex condition has `onSideRestart` (exactly Spikes and Toxic Spikes in 0.10.11, which count
+ * layers); the client counts the same setter as `level`.
+ */
 function stacks(battle: SimBattle, id: string): boolean {
   // Side handlers are not on the dex's Condition type; the data object carries them.
   const condition = battle.dex.conditions.get(id);

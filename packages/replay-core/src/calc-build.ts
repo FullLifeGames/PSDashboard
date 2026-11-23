@@ -48,7 +48,8 @@ export function calcSpecies(gen: number, name: string, dex?: SpeciesDex): string
   return known;
 }
 
-// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, the Vivillon patterns, the Alcremie flavors, Minior-Meteor, the Ogerpon Tera formes) and refuses a name it does not list.
+// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, the Vivillon patterns, the Alcremie flavors,
+// Minior-Meteor, the Ogerpon Tera formes) and refuses a name it does not list.
 function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string {
   if (calc.species.get(toId(name) as never)) return name;
   const species = dex.species.get(name);

@@ -4,7 +4,10 @@
  * scan must find the same reads in both; test/state-readers-built.spec.ts builds the Dex with the app's own Vite settings and compares.
  */
 
-/** The code of a source (comments dropped, strings and regular expressions written as `""`, `x['key']` as `x.key`, quoted object keys bare) and the texts of its strings. */
+/**
+ * The code of a source (comments dropped, strings and regular expressions written as `""`, `x['key']` as `x.key`, quoted object keys bare)
+ * and the texts of its strings.
+ */
 export interface Lexed { code: string; strings: string[] }
 
 const IDENT = /^[A-Za-z_$][\w$]*$/;

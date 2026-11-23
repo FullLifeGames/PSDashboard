@@ -9,7 +9,10 @@ import {
   type AbilityVariant, type CalcOptions, type GenDex, type Spread,
 } from './item-damage-shared.ts';
 
-/** The damage judge, attacker direction: an item falls when no allowed spread and ability of the holder lets the calculator reach the logged hit, or stay under it. */
+/**
+ * The damage judge, attacker direction: an item falls when no allowed spread and ability of the holder lets the calculator reach the logged
+ * hit, or stay under it.
+ */
 
 // Allowed means legal: the stat the move reads from no EVs, IV 0 and a lowering nature up to the format's cap, IV 31 and a raising nature.
 // The defender's item and ability count as built only where the log showed them; a guessed one is ranged with no item and with the

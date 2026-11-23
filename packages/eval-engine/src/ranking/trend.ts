@@ -112,7 +112,10 @@ export function applyTrendExtrapolation(
   return applied;
 }
 
-/** Trends in the group's own perspective (a p2 row reads the p1-perspective trend negated); null when any row is unpriced, since a partial comparison is the asymmetry to avoid. */
+/**
+ * Trends in the group's own perspective (a p2 row reads the p1-perspective trend negated); null when any row is unpriced, since a partial
+ * comparison is the asymmetry to avoid.
+ */
 function groupRowTrends(
   group: TieRow[],
   matrix: ValueMatrix,

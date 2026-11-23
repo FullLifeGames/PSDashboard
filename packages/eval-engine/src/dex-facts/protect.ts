@@ -4,7 +4,10 @@ import { protectKind } from '@fulllifegames/replay-core';
 type BattleDex = Battle['dex'];
 type DexMove = ReturnType<BattleDex['moves']['get']>;
 
-/** The Protect family as the engine's readers ask it, all on `protectKind` of replay-core; test/dex-facts-protect.spec.ts sweeps every move of Gens 1 to 9 and Champions. */
+/**
+ * The Protect family as the engine's readers ask it, all on `protectKind` of replay-core; test/dex-facts-protect.spec.ts sweeps every move
+ * of Gens 1 to 9 and Champions.
+ */
 
 /** A move that stops the hits on its user (Protect, Detect and their kin, Max Guard; Endure holds the user up and stops nothing). */
 export const shieldsFromHits = (dex: BattleDex, move: DexMove): boolean => protectKind(dex, move) === 'shield';

@@ -20,8 +20,9 @@ export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
 };
 
 /**
- * Calculator flags by the Dex id of the ability or condition that sets them: a Ruin or Aura ability on any active Pokémon and a field condition set a field flag;
- * the attacker's volatiles and its ally's abilities set an attacker-side flag; the defender's ally's abilities a defender-side flag. The calculator's own check leaves out the holder itself.
+ * Calculator flags by the Dex id of the ability or condition that sets them: a Ruin or Aura ability on any active Pokémon and a field
+ * condition set a field flag; the attacker's volatiles and its ally's abilities set an attacker-side flag; the defender's ally's abilities
+ * a defender-side flag. The calculator's own check leaves out the holder itself.
  */
 export const FIELD_FLAG_BY_ID: Record<string, string> = {
   beadsofruin: 'isBeadsOfRuin', swordofruin: 'isSwordOfRuin', tabletsofruin: 'isTabletsOfRuin', vesselofruin: 'isVesselOfRuin',
@@ -34,7 +35,10 @@ export const ATTACKER_SIDE_FLAG_BY_ID: Record<string, string> = {
 };
 export const DEFENDER_SIDE_FLAG_BY_ID: Record<string, string> = { friendguard: 'isFriendGuard', defenderflowergift: 'isFlowerGift' };
 
-/** The fact an ally's ability books for one side of a hit, or null when the calculator reads nothing of it; Flower Gift weighs on both sides, so the defender side books it as `defenderflowergift`. */
+/**
+ * The fact an ally's ability books for one side of a hit, or null when the calculator reads nothing of it; Flower Gift weighs on both
+ * sides, so the defender side books it as `defenderflowergift`.
+ */
 export function allyFactOf(role: 'attacker' | 'defender', ability: string): string | null {
   if (role === 'attacker') return ability in ATTACKER_SIDE_FLAG_BY_ID ? ability : null;
   // eslint-disable-next-line names/no-new-dex-name -- the one ability both sides read; field-ability-census.spec.ts holds it to the Dex

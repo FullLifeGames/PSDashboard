@@ -32,7 +32,10 @@ export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12 
 /** Forced draws per class cell, retries included; a class beyond the cap stays open and its share leaves the mass. */
 const PROVER_DRAW_BUDGET = 6;
 const PROVER_INNER_DRAW_BUDGET = 3;
-/** Own candidates tried at the root (ranking order) and at inner nodes (odds order); a sure strike (`prover-strike.ts`) goes before them, one more at the root. */
+/**
+ * Own candidates tried at the root (ranking order) and at inner nodes (odds order); a sure strike (`prover-strike.ts`) goes before them,
+ * one more at the root.
+ */
 const ROOT_CANDIDATES = 3;
 const INNER_CANDIDATES = 2;
 
@@ -204,7 +207,10 @@ export class ForcedWinProver {
     return isCombined(legal) ? legal : searchOptions(position, other(this.side), this.opts);
   }
 
-  /** Lazy pass first, full proof only for a candidate that clears MIN_FORCED_MASS; if none clears it, the full proof runs over all with what is left (ADR 0020). */
+  /**
+   * Lazy pass first, full proof only for a candidate that clears MIN_FORCED_MASS; if none clears it, the full proof runs over all with what
+   * is left (ADR 0020).
+   */
   private rootLoop(position: SimPosition, ply: number, candidates: ChoiceOption[], replies: ChoiceOption[]): ReplyProof {
     let best: ReplyProof = { proven: NONE, cells: [] };
     let passed = false;

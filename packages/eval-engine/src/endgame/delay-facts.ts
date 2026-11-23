@@ -105,7 +105,10 @@ function bodyEntries(body: Pokemon): [EntryKind, string][] {
   ];
 }
 
-/** Whether a body on the board could bring a fainted one back: a move of the Dex that sets a slot condition (the simulator revives through the queue action it raises). */
+/**
+ * Whether a body on the board could bring a fainted one back: a move of the Dex that sets a slot condition (the simulator revives through
+ * the queue action it raises).
+ */
 const mayRevive = (battle: Battle): boolean => battle.sides.some(side => side.pokemon.some(body => !body.fainted
   && [...body.moveSlots, ...body.baseMoveSlots].some(slot => !!(battle.dex.moves.get(slot.id) as { slotCondition?: string }).slotCondition)));
 
@@ -187,7 +190,8 @@ const sameBody = (a: Pokemon, b: Pokemon): boolean => a.set.name === b.set.name 
 
 /**
  * Whether a repeated stall held in the turn from `parent` to `child`: a foe body that carries the stall volatile in the parent still
- * carries it in the child. The volatile lasts two turns, so only a stalling move that held (`onRestart`) keeps it; the counter cannot tell (Gens 3 and 4 stop it at 8).
+ * carries it in the child. The volatile lasts two turns, so only a stalling move that held (`onRestart`) keeps it; the counter cannot tell
+ * (Gens 3 and 4 stop it at 8).
  */
 export function heldStall(parent: Battle, child: Battle, foe: SideId): boolean {
   const before = parent.sides[sideIndex(foe)].pokemon;

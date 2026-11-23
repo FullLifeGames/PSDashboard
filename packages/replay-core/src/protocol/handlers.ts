@@ -352,7 +352,10 @@ export function feedLine(state: ParserState, line: string) {
   }
 }
 
-/** The post-game end entry, stamped lastTurn + 1: consumers that count turns from the snapshot list must not read it as a turn (replay-turns.finalPlayedTurn). */
+/**
+ * The post-game end entry, stamped lastTurn + 1: consumers that count turns from the snapshot list must not read it as a turn
+ * (replay-turns.finalPlayedTurn).
+ */
 export function appendFinalSnapshot(state: ParserState) {
   const { battle, snapshots, currentTurnLines } = state;
   if (currentTurnLines.length > 0) {

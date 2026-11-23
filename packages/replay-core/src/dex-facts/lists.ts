@@ -32,5 +32,5 @@ export const terrainConditions = (dex: FactsDex): ReadonlySet<string> => idsOf(d
 /** The weathers the Utility Umbrella takes away: the weather conditions that change the damage of a type. */
 export const umbrellaWeathers = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'umbrellaWeathers', scanUmbrella);
 
-/** The moves that call another move (`callsMove`: Metronome, Sleep Talk, Assist, Copycat, Mirror Move, Me First, Nature Power), which a one-turn model cannot price; read over a Dex that carries the Past moves (Generation 9 marks Assist, Mirror Move, Me First and Nature Power Past). */
+/** The moves that call another move (`callsMove`: Metronome, Sleep Talk, Assist, Copycat, Mirror Move, Me First, Nature Power), read over a Dex that carries the Past moves. */
 export const callingMoves = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'callingMoves', scanCalling);

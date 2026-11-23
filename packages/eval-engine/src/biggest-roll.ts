@@ -78,7 +78,10 @@ export function rollToCopy(known: TurnAnalysis[], winner: Side | null, diceTurns
   return candidateRoll(known, winner, deniedEndFor(known, diceTurns)?.turn);
 }
 
-/** The roll the sentence speaks. A doubles click waits for the copy: its odds label may belong to the partner slot, and only the copy finds the die in the log. */
+/**
+ * The roll the sentence speaks. A doubles click waits for the copy: its odds label may belong to the partner slot, and only the copy finds
+ * the die in the log.
+ */
 export function biggestRollFor(known: TurnAnalysis[], winner: Side | null, hit: RollFlip | null = null, deniedTurn?: number): BiggestRoll | null {
   const roll = candidateRoll(known, winner, deniedTurn);
   if (!roll) return null;

@@ -80,7 +80,10 @@ export function bodyAsClicked(battle: Battle, mon: Pokemon, clicks: boolean): Si
     : body;
 }
 
-/** The body after the Tera click on its `tera` type, as the simulator makes it when the forme changes, else the same body; a click that clears `field` marks it abilityOn. */
+/**
+ * The body after the Tera click on its `tera` type, as the simulator makes it when the forme changes, else the same body; a click that
+ * clears `field` marks it abilityOn.
+ */
 export function teraClicked<T extends SimBody>(gen: number, body: T, field: ClickField = {}): T {
   if (!body.tera || gen < 9) return body;
   const formeKey = `${gen}|${body.species}|${body.tera}`;

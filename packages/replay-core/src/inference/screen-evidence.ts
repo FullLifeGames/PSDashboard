@@ -7,7 +7,10 @@ import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { arg, hasKw, identOf, keyOf, type LogLine } from './log-line.ts';
 import { illusionPossible, possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 
-/** The item that held a screen (Reflect, Light Screen, Aurora Veil: five turns, eight with Light Clay), read from its lifetime in the log (ARCHITECTURE.md, "Rule-outs"). */
+/**
+ * The item that held a screen (Reflect, Light Screen, Aurora Veil: five turns, eight with Light Clay), read from its lifetime in the log
+ * (ARCHITECTURE.md, "Rule-outs").
+ */
 
 /** A screen standing on one side, opened at its setter's move; a weather or a terrain shares the interval and the verdict. */
 export interface Interval {

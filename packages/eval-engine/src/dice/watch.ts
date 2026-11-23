@@ -37,7 +37,10 @@ export interface MoveSight {
   removedFor: string[];
 }
 
-/** The allies a handler asked for with `adjacentAllies()` (Healer draws once per ally with a status); the first draw names the first such ally, the next draw the next. */
+/**
+ * The allies a handler asked for with `adjacentAllies()` (Healer draws once per ally with a status); the first draw names the first such
+ * ally, the next draw the next.
+ */
 export interface AllyList {
   holder: unknown;
   effectId: string | undefined;

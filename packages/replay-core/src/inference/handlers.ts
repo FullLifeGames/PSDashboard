@@ -18,7 +18,10 @@ export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   // eslint-disable-next-line names/no-new-dex-name -- held by swap-item-sources-oracle.spec.ts (Pickup, round 72 W9b)
   ability: new Set(['Magician', 'Pickpocket', 'Pickup']),
 };
-/** `|-activate|` effects that hand an item from the first Pokémon of the line to the `[of]` Pokémon: Symbiosis writes no `|-item|` line (`|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>`). */
+/**
+ * `|-activate|` effects that hand an item from the first Pokémon of the line to the `[of]` Pokémon: Symbiosis writes no `|-item|` line
+ * (`|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>`).
+ */
 // oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
 export const ITEM_HANDOVER_ACTIVATIONS: Record<string, Set<string>> = { ability: new Set(['Symbiosis']) };
 /** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
@@ -37,7 +40,10 @@ function sideSubject(line: LogLine, side: string): string | null {
   return ident?.side === side ? ident.name : null;
 }
 
-/** Two plain moves disprove a Choice lock, a plain Status move Assault Vest; a Z-move or Max move is no plain move (a Dynamaxed body picks any Max move whatever it holds, and Max Guard still disproves Assault Vest). */
+/**
+ * Two plain moves disprove a Choice lock, a plain Status move Assault Vest; a Z-move or Max move is no plain move (a Dynamaxed body picks
+ * any Max move whatever it holds, and Max Guard still disproves Assault Vest).
+ */
 function recordPlainMove(state: InferrerState, ident: string, moveName: string, powered: boolean) {
   const nickname = identOf(ident)?.name.trim();
   if (!nickname) return;
@@ -87,7 +93,10 @@ export function noteEntry(state: InferrerState, line: LogLine) {
   state.plainMovesSince.delete(ident);
 }
 
-/** Disproving evidence: a Pokémon that takes hazard, status, weather or recoil damage cannot be Magic Guard; rocks chip rules out Heavy-Duty Boots (a Clefable simmed with Magic Guard visibly took Stealth Rock damage). */
+/**
+ * Disproving evidence: a Pokémon that takes hazard, status, weather or recoil damage cannot be Magic Guard; rocks chip rules out Heavy-Duty
+ * Boots (a Clefable simmed with Magic Guard visibly took Stealth Rock damage).
+ */
 const HAZARDS = new Set(['Stealth Rock', 'Spikes']);
 const INDIRECT = new Set(['psn', 'tox', 'brn', 'Sandstorm', 'Hail']);
 
@@ -127,7 +136,10 @@ export function addFromPreview(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Switch: |switch|p2a: Nickname|Species, L50, M|100/100. A forme the team preview hid behind "-*" (Urshifu-*, Zamazenta-*) is revealed here: the marker entry becomes that forme instead of a seventh body. */
+/**
+ * Switch: |switch|p2a: Nickname|Species, L50, M|100/100. A forme the team preview hid behind "-*" (Urshifu-*, Zamazenta-*) is revealed
+ * here: the marker entry becomes that forme instead of a seventh body.
+ */
 export function addFromSwitch(state: InferrerState, line: LogLine) {
   if ((line.cmd !== 'switch' && line.cmd !== 'drag') || sideSubject(line, state.opponentSide) === null) return;
   const details = detailsOf(arg(line, 2));
@@ -140,8 +152,9 @@ export function addFromSwitch(state: InferrerState, line: LogLine) {
 }
 
 /**
- * The move line a `|cant|` line stands for, or null when it names no move (sleep, paralysis, flinch, recharge, Truant): the blocked move never ran, so the log shows it only here (Taunt, Imprison, Disable, Heal Block).
- * A blocker's `[of]` line (Dazzling, Queenly Majesty, Armor Tail, Damp) reaches the inference as `-block` after the attacker's own `|move|` line, so it is no `cant` here.
+ * The move line a `|cant|` line stands for, or null when it names no move (sleep, paralysis, flinch, recharge, Truant): the blocked move
+ * never ran, so the log shows it only here (Taunt, Imprison, Disable, Heal Block). A blocker's `[of]` line (Dazzling, Queenly Majesty,
+ * Armor Tail, Damp) reaches the inference as `-block` after the attacker's own `|move|` line, so it is no `cant` here.
  */
 function blockedMoveLine(line: LogLine): LogLine | null {
   const moveName = arg(line, 3);
@@ -197,7 +210,10 @@ function creditSwapGiver(state: InferrerState, line: LogLine, ident: string, ite
   }
 }
 
-/** An item handed over by an ability's `|-activate|` line: the receiver holds an item that is not its set item, and the giver's set item is the one the line names. */
+/**
+ * An item handed over by an ability's `|-activate|` line: the receiver holds an item that is not its set item, and the giver's set item is
+ * the one the line names.
+ */
 function recordHandover(state: InferrerState, line: LogLine) {
   const [type, name] = arg(line, 2).split(': ');
   if (!ITEM_HANDOVER_ACTIVATIONS[type]?.has(name)) return;
@@ -210,7 +226,11 @@ function recordHandover(state: InferrerState, line: LogLine) {
   if (pokemon && itemOpen(pokemon)) pokemon.item = revealedField(itemName);
 }
 
-/** Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-acquired item (Trick, Switcheroo, Thief, Covet, Bestow, Magician, Pickpocket, Pickup; Symbiosis hands its item over through an |-activate| line) is not the holder's set item: crediting Vileplume with the scarf a Trick planted on it manufactured a choice lock that hid its real moves. */
+/**
+ * Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-acquired item (Trick, Switcheroo, Thief, Covet, Bestow, Magician, Pickpocket, Pickup;
+ * Symbiosis hands its item over through an |-activate| line) is not the holder's set item: crediting Vileplume with the scarf a Trick
+ * planted on it manufactured a choice lock that hid its real moves.
+ */
 export function recordItem(state: InferrerState, line: LogLine) {
   if (line.cmd === '-activate') return recordHandover(state, line);
   if (line.cmd !== '-item') return;
@@ -234,7 +254,11 @@ export function recordItem(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Item damage that hurts the attacker reveals its holder (Rocky Helmet, Jaboca and Rowap Berry): the [of] Pokémon, or in video-reconstructed logs that drop [of] the target of the damaged Pokémon's own move; the holder's own recoil items (Life Orb, Black Sludge) come from client-facts.ts. */
+/**
+ * Item damage that hurts the attacker reveals its holder (Rocky Helmet, Jaboca and Rowap Berry): the [of] Pokémon, or in
+ * video-reconstructed logs that drop [of] the target of the damaged Pokémon's own move; the holder's own recoil items (Life Orb, Black
+ * Sludge) come from client-facts.ts.
+ */
 export function recordItemDamage(state: InferrerState, line: LogLine) {
   const from = fromEffect(line);
   if (line.cmd !== '-damage' || from.type !== 'item' || !ATTACKER_PUNISH_ITEMS.has(toId(from.name))) return;
@@ -259,7 +283,10 @@ export function recordTera(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Effect attributions reveal abilities (`[from] ability: Poison Heal` on heal, damage and status lines); the holder is the line's [of] or its subject as the Dex allows (ability-holder.ts). */
+/**
+ * Effect attributions reveal abilities (`[from] ability: Poison Heal` on heal, damage and status lines); the holder is the line's [of] or
+ * its subject as the Dex allows (ability-holder.ts).
+ */
 export function recordAbilityAttribution(state: InferrerState, line: LogLine) {
   const from = fromEffect(line);
   if (from.type !== 'ability' || !from.name) return;

@@ -42,7 +42,10 @@ function slotZeroAbility(dex: GenDex, species: string): string | undefined {
   return slots[0] || slots[1] || slots.H || undefined;
 }
 
-/** Whether the format lets any species hold any ability, by the sim's rule table (Balanced and Pure Hackmons and Hackmons Cup carry no 'obtainableabilities'). */
+/**
+ * Whether the format lets any species hold any ability, by the sim's rule table (Balanced and Pure Hackmons and Hackmons Cup carry no
+ * 'obtainableabilities').
+ */
 export function abilitiesAreFree(log: string): boolean {
   const tier = log.match(/^\|tier\|(.*)$/m)?.[1] ?? '';
   const format = simFormats().get(tier);

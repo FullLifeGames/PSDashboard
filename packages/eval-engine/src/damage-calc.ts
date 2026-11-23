@@ -56,7 +56,10 @@ export interface DamageCalcContext {
   defenderPartner?: SimPokemonInfo | null;
   attackerPartnerAlive?: boolean;
   defenderPartnerMove?: string;
-  /** The live battle of the branch with the two bodies of the hit: the hits the calc cannot price are played on a copy of it. Left out where the position has none. */
+  /**
+   * The live battle of the branch with the two bodies of the hit: the hits the calc cannot price are played on a copy of it. Left out where
+   * the position has none.
+   */
   liveHit?: LiveHit;
   /** The hit is a crit (the user forced one); the calculator prices it as a crit. */
   isCrit?: boolean;
@@ -200,7 +203,7 @@ function askModifyMove(dex: RulesDex, attacker: GearHolder, moveName: string) {
 
 /**
  * The hit counts the simulator's hit loop draws for one use of the move (calc/hit-draws.ts, held against the simulator's own draws by
- * test/damage-calc-hit-counts.spec.ts), or null when the Dex fixes one count and the calc's own reading stands.
+ * test/damage-calc.spec.ts), or null when the Dex fixes one count and the calc's own reading stands.
  */
 export function hitCounts(dex: RulesDex, attacker: GearHolder, moveName: string): HitCount[] | null {
   const multihit = multihitAtUse(dex, attacker, moveName);
@@ -250,7 +253,10 @@ function strengthPriced(priceAt: (hits?: number, firstUse?: boolean, power?: { b
   return [{ chance: 1 - mix.chance, result: weak }, { chance: mix.chance, result: priceAt(undefined, firstUse, strongerPower(weak.move.bp, mix.factor)) }];
 }
 
-/** A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose Dex target spreads). */
+/**
+ * A Doubles hit on a foe that stands alone, with the foes-only spread target left on the move (moveLanding sets one foe for the moves whose
+ * Dex target spreads).
+ */
 function aloneSpread(context: DamageCalcContext, result: CalcResult): boolean {
   return context.gameType === 'Doubles' && context.defenderPartner === null && result.move.target === 'allAdjacentFoes';
 }

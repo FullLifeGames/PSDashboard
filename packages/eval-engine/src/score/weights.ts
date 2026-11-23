@@ -150,7 +150,10 @@ export const FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   statusFix: EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp,
 };
 
-/** Doubles OU and every doubles format outside VGC and Champions, fitted on the Scarlet/Violet doubles corpus; the boost weights, tailwind and choice mismatch are held. */
+/**
+ * Doubles OU and every doubles format outside VGC and Champions, fitted on the Scarlet/Violet doubles corpus; the boost weights, tailwind
+ * and choice mismatch are held.
+ */
 export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 180,
   boosts: 27,

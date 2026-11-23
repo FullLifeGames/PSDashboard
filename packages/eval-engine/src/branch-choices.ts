@@ -20,7 +20,7 @@ export function branchChoiceActive(pokemon: { fainted: boolean; volatiles: Recor
 /** The Tera, Mega, Z-Move and Ultra Burst intents of a move choice. */
 export type BranchMoveModifier = 'terastallize' | 'mega' | 'zmove' | 'ultra';
 
-/** One slot's choice by identity (a move by id, a switch by species and nickname), never by position; `dice` are the dice forced in this choice's turn, each named by its body (`name.slot`), optional and JSON-clean. */
+/** One slot's choice by identity (a move id, a switch by species and nickname), never by position; `dice` are the JSON-clean forced dice of its turn, keyed `name.slot`. */
 export type BranchSlotChoice =
   | { kind: 'move'; moveId: string; moveName: string; targetLoc?: number; modifier?: BranchMoveModifier; dice?: ForcedDie[] }
   | { kind: 'switch'; speciesId: string; pokemonName: string; dice?: ForcedDie[] };
@@ -84,8 +84,9 @@ export function switchOptionKey(option: Pick<BranchSwitchOption, 'species' | 'na
 }
 
 /**
- * The forced slots a bench can fill: the simulator asks every flagged slot even when fewer Pokémon wait in the back, then takes one switch per Pokémon and a pass for the rest,
- * the first slots first (side.js `forcedPasses = canSwitchOut - min(canSwitchOut, canSwitchIn)`). `switchIns` undefined or zero leaves the request as it is.
+ * The forced slots a bench can fill: the simulator asks every flagged slot even when fewer Pokémon wait in the back, then takes one switch
+ * per Pokémon and a pass for the rest, the first slots first (side.js `forcedPasses = canSwitchOut - min(canSwitchOut, canSwitchIn)`).
+ * `switchIns` undefined or zero leaves the request as it is.
  */
 export function fillableForcedSlots(forced: boolean[], switchIns?: number): boolean[] {
   if (switchIns === undefined || switchIns <= 0) return forced;
@@ -244,7 +245,7 @@ function resolvePartChoice(
   return { ok: true, choice: modifier ? { ...resolved.choice, modifier } : resolved.choice };
 }
 
-/** Maps an engine choice string (a doubles pair like "move bugbite 1 mega, switch 3") onto per-slot choices checked against each slot's live options; null when any part fails, a null entry is a pass slot. */
+/** Maps an engine choice string (a doubles pair like "move bugbite 1 mega, switch 3") to slot choices checked against live options; null if a part fails, a null entry passes. */
 export function evalChoiceToSlotChoices(
   evalChoice: string,
   movesBySlot: BranchMoveOption[][],

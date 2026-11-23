@@ -5,8 +5,9 @@ import type { SimBattle } from './types.ts';
 type FormeDex = SimBattle['dex'];
 
 /**
- * A species' family: its own id and the ids of its origins, followed up the chain. A forme that exists only in battle (Ogerpon-Teal-Tera, Terapagos-Stellar,
- * a Mega, a Primal, Zygarde-Complete, Castform-Sunny) carries its origin as the Dex's `battleOnly` (a name or a list); two species are one body when their families meet.
+ * A species' family: its own id and the ids of its origins, followed up the chain. A forme that exists only in battle (Ogerpon-Teal-Tera,
+ * Terapagos-Stellar, a Mega, a Primal, Zygarde-Complete, Castform-Sunny) carries its origin as the Dex's `battleOnly` (a name or a list);
+ * two species are one body when their families meet.
  */
 export function formeFamily(dex: FormeDex, species: string | undefined): ReadonlySet<string> {
   const family = new Set<string>();
@@ -31,10 +32,11 @@ export function formeFamily(dex: FormeDex, species: string | undefined): Readonl
 }
 
 /**
- * The base species that stands for an origin of a forme an ability makes (Greninja-Ash by Battle Bond), when the origin differs from its base species in nothing
- * but the ability list (Greninja-Bond). The simulator shows such an origin to the log by its base species, so the bench holds "Greninja" while the log asks for the forme.
- * A forme that needs an item or a move, or an origin with other stats or types (Darmanitan-Galar-Zen, Ogerpon-Wellspring-Tera, Urshifu-Rapid-Strike-Gmax, Necrozma-Ultra)
- * or with the base species' abilities (Mimikyu-Totem), is another body and does not tie.
+ * The base species that stands for an origin of a forme an ability makes (Greninja-Ash by Battle Bond), when the origin differs from its
+ * base species in nothing but the ability list (Greninja-Bond). The simulator shows such an origin to the log by its base species, so the
+ * bench holds "Greninja" while the log asks for the forme. A forme that needs an item or a move, or an origin with other stats or types
+ * (Darmanitan-Galar-Zen, Ogerpon-Wellspring-Tera, Urshifu-Rapid-Strike-Gmax, Necrozma-Ultra) or with the base species' abilities
+ * (Mimikyu-Totem), is another body and does not tie.
  */
 function originShownAsBase(dex: FormeDex, forme: ReturnType<FormeDex['species']['get']>, origin: ReturnType<FormeDex['species']['get']>): string | undefined {
   if (!origin.exists || origin.baseSpecies === origin.name || !forme.requiredAbility) return undefined;

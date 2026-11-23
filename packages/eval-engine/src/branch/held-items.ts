@@ -4,11 +4,13 @@ import type { SimBattle, SimPokemon } from './types.ts';
 import { findPokemonOnSide } from './protocol-choices.ts';
 
 /**
- * The board holds the items the protocol shows. The sim plays every block with the build's guesses, so its items drift (its Trick swaps two guesses, its Knock Off lands on another body,
- * it pops a balloon the game never popped, it misses a Pickpocket the game had). At each boundary a body the protocol shows an item line for takes that item; a body without one gets its build item
- * back when the sim's own move or ability took it. A guess the sim's own trigger consumed stays consumed (the game often rules it out: a balloon no hit popped), except on a body the sim switched in
- * and the game never did: no trigger of the game's can have touched it (an Iron Valiant that ate its Booster Energy at an entry the game never had).
- * A Sitrus Berry the sim ate comes back when the HP the block shows, with no item line in the protocol, is one where the Dex's threshold certainly does not eat; at or under it the game refutes the berry.
+ * The board holds the items the protocol shows. The sim plays every block with the build's guesses, so its items drift (its Trick swaps two
+ * guesses, its Knock Off lands on another body, it pops a balloon the game never popped, it misses a Pickpocket the game had). At each
+ * boundary a body the protocol shows an item line for takes that item; a body without one gets its build item back when the sim's own move
+ * or ability took it. A guess the sim's own trigger consumed stays consumed (the game often rules it out: a balloon no hit popped), except
+ * on a body the sim switched in and the game never did: no trigger of the game's can have touched it (an Iron Valiant that ate its Booster
+ * Energy at an entry the game never had). A Sitrus Berry the sim ate comes back when the HP the block shows, with no item line in the
+ * protocol, is one where the Dex's threshold certainly does not eat; at or under it the game refutes the berry.
  */
 export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockContext, turn: number, events: readonly string[] = []): boolean {
   const held = context.heldItems.get(turn) ?? [];
@@ -32,7 +34,10 @@ export function applyProtocolHeldItems(battle: SimBattle, context: ChoiceLockCon
   return changed;
 }
 
-/** One body: the protocol's item, else the build's when the sim's move took it; then, on an active body whose item changed or the block touched, the choice lock (a guessed Choice item only when its damage record allows one). True when the board changed. */
+/**
+ * One body: the protocol's item, else the build's when the sim's move took it; then, on an active body whose item changed or the block
+ * touched, the choice lock (a guessed Choice item only when its damage record allows one). True when the board changed.
+ */
 function correctHeldBody(
   battle: SimBattle, body: SimPokemon, entry: ProtocolHeldItem | undefined, eligible: boolean, gameLess: boolean, health?: string,
 ): boolean {
@@ -93,7 +98,10 @@ function simBroughtIn(battle: SimBattle, body: SimPokemon): boolean {
   });
 }
 
-/** Whether the sim's own last item line on the body came from a move or an ability (Knock Off, Trick, Thief, Pickpocket; Bug Bite and Pluck write `[from] stealeat`) rather than from the item's own trigger. */
+/**
+ * Whether the sim's own last item line on the body came from a move or an ability (Knock Off, Trick, Thief, Pickpocket; Bug Bite and Pluck
+ * write `[from] stealeat`) rather than from the item's own trigger.
+ */
 function simTookItem(battle: SimBattle, body: SimPokemon): boolean {
   const ident = `${body.side.id}: ${body.name}`;
   for (let index = battle.log.length - 1; index >= 0; index--) {
@@ -122,7 +130,10 @@ function setHeldItem(battle: SimBattle, body: SimPokemon, itemId: string): boole
   return true;
 }
 
-/** The protocol's lock: a held Choice item and the first move since it arrived or the body entered, else none (the sim's Choice item drops its old lock on arrival); a direct stamp, as `restampProtocolLocks`. */
+/**
+ * The protocol's lock: a held Choice item and the first move since it arrived or the body entered, else none (the sim's Choice item drops
+ * its old lock on arrival); a direct stamp, as `restampProtocolLocks`.
+ */
 function setHeldItemLock(body: SimPokemon, lock: string | null): boolean {
   const want = lock && body.getItem().isChoice && body.moveSlots.some(slot => slot.id === lock) ? lock : null;
   const current = (body.volatiles['choicelock'] as { move?: string } | undefined)?.move ?? null;

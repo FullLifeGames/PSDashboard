@@ -3,7 +3,10 @@ import type { ClientIdent, ParserState } from './parser-state.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
-/** Cleanliness of speed evidence: everything that explains a move order without Speed (foreign actions, rearranged slots, early and late movers, Scarf changes). */
+/**
+ * Cleanliness of speed evidence: everything that explains a move order without Speed (foreign actions, rearranged slots, early and late
+ * movers, Scarf changes).
+ */
 
 const NOT_A_RACE = /\[from\]\s?(?:ability: |move: )?(?:Dancer|Instruct|Magic Bounce|Magic Coat|Snatch)/;
 const AT_THE_SWITCH = /\[from\]\s?Pursuit/;

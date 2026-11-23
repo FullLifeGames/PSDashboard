@@ -42,7 +42,10 @@ function setterOf(state: InferrerState, id: string, line: LogLine): string | nul
   return hasKw(line, 'from') || !move || move.from || !setsField(state, move.name, id) ? null : move.ident;
 }
 
-/** The interval of a start the reader can judge; a start before the first turn (a lead's ability) or after the turn's `|upkeep` (a replacement's ability) counts from the next turn. */
+/**
+ * The interval of a start the reader can judge; a start before the first turn (a lead's ability) or after the turn's `|upkeep` (a
+ * replacement's ability) counts from the next turn.
+ */
 function intervalOf(state: InferrerState, watch: FieldWatch, id: string, line: LogLine): Interval | null {
   const table = conditionTurns(dexOf(state), id);
   if (!table || table.byItem.size === 0 || inResidual(watch) || hasKw(line, 'silent')) return null;
@@ -57,7 +60,10 @@ function intervalOf(state: InferrerState, watch: FieldWatch, id: string, line: L
   };
 }
 
-/** A start replaces the field of its kind (a replaced terrain prints only the new start, never an end); the same one again (an ability that fails on its own weather) keeps the count. */
+/**
+ * A start replaces the field of its kind (a replaced terrain prints only the new start, never an end); the same one again (an ability that
+ * fails on its own weather) keeps the count.
+ */
 function onStart(state: InferrerState, watch: FieldWatch, kind: Kind, id: string, line: LogLine) {
   if (watch.open.get(kind)?.id === id) return;
   watch.open.delete(kind);

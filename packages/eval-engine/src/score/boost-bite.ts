@@ -12,17 +12,15 @@ import { stageStands } from './switch-out.ts';
 
 /** `boostsBiting`: `boosts` with every standing stage damped by the share of living foes it bites. */
 
-/**
- * A stage bites a foe when the foe leaves it alone and the stage moves the 1v1 race of the pair within BITE_TURNS in favour of the
- * side it helps (score/boost-race.ts). It does not bite a foe that plays Unaware (the simulator's own ModifyBoost answers), that can
- * click a move that takes the stages away (`removesStages`), or that a wall holds anyway.
- * The foes in front of the holder gate the whole stage: while a foe on the field can take the stages away or KOs the holder before it
- * acts, no foe counts for a boost; while a foe on the field wins the race within the horizon, or the holder does not win it against
- * one (a wall it needs six turns for), no foe off the field counts for any stage.
- * A drop counts only while its holder cannot switch out (score/switch-out.ts): the simulator clears every stage of a body that
- * leaves, so a holder that can leave carries its drop for a turn (the engine had read a -1 Special Attack as lasting and expected
- * the holder to flee). A trapped holder, or one with no living bench, keeps the value; the drop still weakens its hits this turn.
- */
+// A stage bites a foe when the foe leaves it alone and the stage moves the 1v1 race of the pair within BITE_TURNS in favour of the
+// side it helps (score/boost-race.ts). It does not bite a foe that plays Unaware (the simulator's own ModifyBoost answers), that can
+// click a move that takes the stages away (`removesStages`), or that a wall holds anyway.
+// The foes in front of the holder gate the whole stage: while a foe on the field can take the stages away or KOs the holder before it
+// acts, no foe counts for a boost; while a foe on the field wins the race within the horizon, or the holder does not win it against
+// one (a wall it needs six turns for), no foe off the field counts for any stage.
+// A drop counts only while its holder cannot switch out (score/switch-out.ts): the simulator clears every stage of a body that
+// leaves, so a holder that can leave carries its drop for a turn (the engine had read a -1 Special Attack as lasting and expected
+// the holder to flee). A trapped holder, or one with no living bench, keeps the value; the drop still weakens its hits this turn.
 
 /** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
 export function stageValue(active: Pokemon, stat: string, stage: number): number {

@@ -9,7 +9,11 @@ import { arg, hasKw, identOf, keyOf, namesEffect, ofIdent, type LogLine } from '
 import { toId } from '../ids.ts';
 import { standingScreens } from '../dex-facts/index.ts';
 
-/** The clean hits each opponent Pokémon dealt, read from the inference's own @pkmn/client walk just before each damage line, for the item judge (team/item-damage.ts): a hit counts once per target (a second damage line of the move, a crit and every [from]-attributed line drop it); singles and doubles alike, unlike the parser's damage observations (singles only). */
+/**
+ * The clean hits each opponent Pokémon dealt, read from the inference's own @pkmn/client walk just before each damage line, for the item
+ * judge (team/item-damage.ts): a hit counts once per target (a second damage line of the move, a crit and every [from]-attributed line drop
+ * it); singles and doubles alike, unlike the parser's damage observations (singles only).
+ */
 
 type ClientPokemon = NonNullable<ReturnType<Battle['getPokemon']>>;
 
@@ -144,7 +148,11 @@ function closeMove(walk: HitWalk) {
   }
 }
 
-/** The first `-enditem` of a Pokémon inside the resolving move, before its own damage line: the item ended while the damage was resolved (a weakening berry, a gem), so the hit counted it; one that ends after its holder's damage line is gone only for the next hit. The client is read before the line applies, with the item the line names when the log had not shown it. */
+/**
+ * The first `-enditem` of a Pokémon inside the resolving move, before its own damage line: the item ended while the damage was resolved (a
+ * weakening berry, a gem), so the hit counted it; one that ends after its holder's damage line is gone only for the next hit. The client is
+ * read before the line applies, with the item the line names when the log had not shown it.
+ */
 function noteItemEnd(walk: HitWalk, line: LogLine) {
   const pending = walk.pending;
   const ident = arg(line, 1);
@@ -176,7 +184,10 @@ function noteMoveLine(walk: HitWalk, state: InferrerState, line: LogLine) {
   }
 }
 
-/** The line handler: closes the resolving move at each action boundary, opens a move of the opponent side, records the hits of its damage lines and feeds the line to the client. */
+/**
+ * The line handler: closes the resolving move at each action boundary, opens a move of the opponent side, records the hits of its damage
+ * lines and feeds the line to the client.
+ */
 export function collectHits(state: InferrerState, line: LogLine) {
   const walk = (state.hitWalk ??= newWalk(state));
   if (ACTION_ENDS.has(line.cmd)) closeMove(walk);
@@ -193,7 +204,10 @@ export function collectHits(state: InferrerState, line: LogLine) {
   if (line.cmd === '-damage' && !hasKw(line, 'from')) settleDamage(walk, line);
 }
 
-/** At the end of the walk the hits go onto their attackers' infos; a team that may hold an Illusion user gets none, because any attacker could be the disguise. */
+/**
+ * At the end of the walk the hits go onto their attackers' infos; a team that may hold an Illusion user gets none, because any attacker
+ * could be the disguise.
+ */
 export function attachHits(state: InferrerState) {
   const walk = state.hitWalk;
   if (!walk) return;

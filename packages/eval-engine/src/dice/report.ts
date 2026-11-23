@@ -124,7 +124,10 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
-/** A target that fainted in the chain gets the `|-hitcount|` line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads as the target too. */
+/**
+ * A target that fainted in the chain gets the `|-hitcount|` line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads
+ * as the target too.
+ */
 function hitCountIn(action: readonly string[], targetSlot: string | undefined): number | undefined {
   const line = action.find(entry => parts(entry)[1] === '-hitcount' && (about(entry, targetSlot) || slotOfIdent(parts(entry)[2]) === targetSlot?.slice(0, 2)));
   return line === undefined ? undefined : Number(parts(line)[3]);

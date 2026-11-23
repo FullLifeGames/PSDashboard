@@ -271,7 +271,10 @@ export class ForcedDicePRNG extends WatchedPRNG {
     return answer.value;
   }
 
-  /** The answer to a forced die's draw: the learned script, or the answer of the die's kind (a status check's turned round when its draw's true stops the body). */
+  /**
+   * The answer to a forced die's draw: the learned script, or the answer of the die's kind (a status check's turned round when its draw's
+   * true stops the body).
+   */
   private answerFor(key: string, die: ForcedDie, draw: Draw, natural: number, drawn: number): Answered | null {
     const script = this.scripts.get(key);
     if (script !== undefined) return this.scripted(script, drawn, natural);

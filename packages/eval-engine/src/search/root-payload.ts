@@ -1,7 +1,10 @@
 import type { PlayedBounds } from '../played.ts';
 import type { EvalChoiceOption, EvalResult, KoOddsInfo, KoOddsMismatch, UnansweredProfile } from '../types.ts';
 
-/** The root's narrative payload shared by every search path: kill odds per option, mismatch diagnostics, the unanswered-mon profile. Pure, no sim imports (main-thread safe). */
+/**
+ * The root's narrative payload shared by every search path: kill odds per option, mismatch diagnostics, the unanswered-mon profile. Pure,
+ * no sim imports (main-thread safe).
+ */
 
 /** Per-option kill odds keyed by choice string, one map per side. */
 export type KoOddsMaps = { p1: Map<string, KoOddsInfo | null>; p2: Map<string, KoOddsInfo | null> };

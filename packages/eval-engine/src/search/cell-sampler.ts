@@ -17,7 +17,10 @@ import {
 
 /** One matrix cell's value from seeded sims: the plain seed average, or the analytic class blend on root boundary cells. */
 
-/** One sampled root cell: its value, whether it ended, the first-seed child and the blend when one applied; class children and outcome groups serve the verify step. */
+/**
+ * One sampled root cell: its value, whether it ended, the first-seed child and the blend when one applied; class children and outcome
+ * groups serve the verify step.
+ */
 export interface CellSample extends VerifyDraws {
   value: number;
   ended: boolean;

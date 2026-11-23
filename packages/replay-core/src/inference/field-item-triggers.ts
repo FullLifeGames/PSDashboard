@@ -8,7 +8,10 @@ import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, keyOf, type LogLine } from './log-line.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
 
-/** The items that fire when the field changes (terrain seeds, Room Service), ruled out by a trigger the log shows without their line; the rules are in EVALUATION.md, "Rule-outs". */
+/**
+ * The items that fire when the field changes (terrain seeds, Room Service), ruled out by a trigger the log shows without their line; the
+ * rules are in EVALUATION.md, "Rule-outs".
+ */
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 type Trigger = 'start' | 'terrain' | 'pseudo';

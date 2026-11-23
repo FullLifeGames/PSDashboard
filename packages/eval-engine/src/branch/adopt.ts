@@ -31,7 +31,8 @@ export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
   // The arrival corrections are identities on an already corrected position.
   if (params.snapshot) correctBattleFromSnapshot(battle, params.snapshot);
   refreshRequestsFromLiveState(battle);
-  // A position with a snapshot is put on the seed its turn plays under in the log, whatever dice it carried (a sweep boundary keeps the previous block's state).
+  // A position with a snapshot is put on the seed its turn plays under in the log, whatever dice it carried (a sweep boundary keeps the
+  // previous block's state).
   if (params.snapshot) alignArrivalDice(battle, replayLog, params.targetTurn);
   // The stable serialization drops the sim's `|t:|` lines, so the sent-log cursor is realigned.
   battle.sentLogPos = battle.log.length;

@@ -12,7 +12,10 @@ import { newFieldItemWatch, watchFieldItems, type FieldItemWatch } from './field
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 
-/** An entry waiting for its Air Balloon announcement (it shows as its holder enters, unless Gravity is up or the item is ignored) or its Booster Energy line. */
+/**
+ * An entry waiting for its Air Balloon announcement (it shows as its holder enters, unless Gravity is up or the item is ignored) or its
+ * Booster Energy line.
+ */
 interface EntryCheck {
   ident: string;
   balloon: boolean;
@@ -77,7 +80,10 @@ function spendsWith(onUpdate: ItemHandler, ability: string, watch: TriggerWatch)
   return used;
 }
 
-/** Every ability the Pokémon may have makes Booster Energy spend itself at entry (gen 9), outside the weather or terrain it reads, so a holder shows the line. */
+/**
+ * Every ability the Pokémon may have makes Booster Energy spend itself at entry (gen 9), outside the weather or terrain it reads, so a
+ * holder shows the line.
+ */
 function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch): boolean {
   if (watch.neutralized || watch.magicRoom || !inGen(state, 'boosterenergy')) return false;
   const { onUpdate } = dexOf(state).items.get('boosterenergy') as { onUpdate?: ItemHandler };

@@ -94,7 +94,10 @@ function bookDrawnClass(
   if (weight !== null) book.weights.set(key, order ? weight / 2 : weight);
 }
 
-/** The sink of a singles root draw: the quantiles when the tree spreads its dice (a doubles cell the pair plan never reads keeps the stream), else the secondary-dice recorder. */
+/**
+ * The sink of a singles root draw: the quantiles when the tree spreads its dice (a doubles cell the pair plan never reads keeps the
+ * stream), else the secondary-dice recorder.
+ */
 function drawSink(quantiles: DieQuantiles | undefined, book: RootClassBook | undefined, recording: boolean): DiceSink | null {
   if (quantiles && book?.battle.gameType !== 'doubles') return new QuantileSink(quantiles);
   return recording ? new DiceSink() : null;

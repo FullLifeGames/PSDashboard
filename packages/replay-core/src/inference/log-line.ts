@@ -1,6 +1,9 @@
 import { Protocol } from '@pkmn/protocol';
 
-/** One log line as @pkmn/protocol reads it: the inference parses every line once, with the protocol's split into arguments and keyword arguments ([from], [of], [spread], ...) and its upgrade of older line forms. */
+/**
+ * One log line as @pkmn/protocol reads it: the inference parses every line once, with the protocol's split into arguments and keyword
+ * arguments ([from], [of], [spread], ...) and its upgrade of older line forms.
+ */
 export interface LogLine {
   /** The line as the log has it. */
   raw: string;

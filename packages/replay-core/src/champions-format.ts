@@ -5,7 +5,7 @@ const CHAMPIONS_FORMAT = /champions/;
 const MEMO_LIMIT = 512;
 const memo = new Map<string, boolean>();
 
-/** Whether `format` (a Dex id, a replay id, a branch format with custom rules or a tier name as a log prints it) names a Pokémon Champions format; memoized because a search asks per node. */
+/** Whether `format` (a Dex id, replay id, branch format with custom rules or a logged tier name) names a Pokémon Champions format; memoized because a search asks per node. */
 export function isChampionsFormat(format: string): boolean {
   let champions = memo.get(format);
   if (champions === undefined) {

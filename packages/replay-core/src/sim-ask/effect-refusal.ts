@@ -3,7 +3,10 @@ import { CHAMPIONS_MOD } from '../calc-gen.ts';
 import type { RulesDex } from '../rules-dex.ts';
 import { twinBattle } from './twin.ts';
 
-/** The simulator's own answer to "would this ability have refused the effect the log shows landing?", played as a scene on a twin battle (EVALUATION.md, "Rule-outs"). */
+/**
+ * The simulator's own answer to "would this ability have refused the effect the log shows landing?", played as a scene on a twin battle
+ * (EVALUATION.md, "Rule-outs").
+ */
 
 /**
  * One body of a scene: the species and the ability the twin gives it ('' leaves it inert). The target of a hit may carry what the log

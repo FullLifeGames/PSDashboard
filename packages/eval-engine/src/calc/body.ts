@@ -222,7 +222,10 @@ export function calcAddsStages(gen: number, ability: string): boolean {
   return probeStages(gen, ability, false);
 }
 
-/** The calc adds a stage to the holder only when its `abilityOn` is set (Intrepid Sword and Dauntless Shield in Gen 9): a stage with abilityOn and none without. */
+/**
+ * The calc adds a stage to the holder only when its `abilityOn` is set (Intrepid Sword and Dauntless Shield in Gen 9): a stage with
+ * abilityOn and none without.
+ */
 export function calcOwnEntryStage(gen: number, ability: string): boolean {
   return probeStages(gen, ability, true) && !probeStages(gen, ability, false);
 }

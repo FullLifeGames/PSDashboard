@@ -228,7 +228,10 @@ function withItemAfterRuleOut(
   return { ...set, item: { value: replacement, sourceDetail: `${listed} ruled out, ${why}` }, itemReplaced: true };
 }
 
-/** The IVs the build plays from the published sets: the chosen set's, else the marginal set's when no usage spread leads. The panel and the build read this one rule. */
+/**
+ * The IVs the build plays from the published sets: the chosen set's, else the marginal set's when no usage spread leads. The panel and the
+ * build read this one rule.
+ */
 export function publishedIvs(
   curated: CuratedSetAssumption | null, usageHasSpread: boolean, smogonSet: PokemonSetAssumption | undefined,
 ): PokemonSetAssumption['ivs'] {
