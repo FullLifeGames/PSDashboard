@@ -3,11 +3,8 @@ import { Dex } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { abilityStateAtHit, abilityStateIds, allyStateIds } from '../src/spreads/ability-state';
 
-/**
- * Round 73 (T210, group 3): the table of abilities whose damage reads the turn's order (`spreads/ability-state.ts`) against the Dex.
- * Every ability whose damage handler reads how long the target has been out (`activeTurns`) or whether a Pokémon still has to move
- * (`willMove`) is in the table, and every table id is such an ability. A new Dex ability of that kind fails here.
- */
+// Every ability whose damage handler reads how long the target has been out (activeTurns) or whether a Pokémon still has to move (willMove)
+// is in the table of spreads/ability-state.ts, and every table id is such an ability; a new Dex ability of that kind fails here.
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
@@ -16,7 +13,6 @@ const dexes = [5, 6, 7, 8, 9].map(gen => [`gen ${gen}`, Dex.forGen(gen)] as cons
 const DAMAGE_HANDLER = /^on(Ally|Any|Foe|Source)?(Modify(Atk|SpA|Def|SpD|Damage)|BasePower)$/;
 const READS_THE_TURN = /activeTurns|willMove/;
 
-/** The abilities with a damage handler that reads the turn, with the handlers that do. */
 function readers(dex: ReturnType<typeof Dex.forGen>): Map<string, string[]> {
   const found = new Map<string, string[]>();
   for (const ability of dex.abilities.all()) {
@@ -42,7 +38,6 @@ describe('the ability-state table is the Dex\'s abilities that read the turn', (
   });
 });
 
-/** The abilities with a damage handler that asks the user's allies about their abilities, with the abilities the handler names. */
 function allyReaders(dex: ReturnType<typeof Dex.forGen>): Map<string, string[]> {
   const found = new Map<string, string[]>();
   for (const ability of dex.abilities.all()) {

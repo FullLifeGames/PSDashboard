@@ -4,22 +4,14 @@ import * as championsMod from '@pkmn/mods/champions';
 import { belongsToOthers, boostItemIds, changesSpeed } from '../src/spreads/boost-items';
 import { registerChampionsDex, rulesDex } from '../src/rules-dex';
 
-/**
- * Round 89 (#75 step 2, ruling 27): the item rung swaps in only items the Dex says boost damage, so the list it reads must be the simulator's own.
- * `boostItemIds` derives it from the damage hooks of the Dex (`onModifyAtk`, `onModifySpA`, `onBasePower`, `onModifyDamage`), with no name in code.
- * This sweep holds that derivation to the simulator in every generation the corpus plays (2 to 9) and the Champions mod: every item of the generation
- * is put in the hand of an attacker on a twin battle, and the simulator's own `getDamage` answers, with and without the item, for one move of every
- * type and category, for the moves that carry each flag, against a neutral body and one the move is super effective on (Expert Belt). An item that
- * raises the damage of any of them is a damage-boost item.
- *  - Every such item is in `boostItemIds`, but the Generation 2 pair below.
- *  - Every item `boostItemIds` lists and the generation holds raised the damage of some move: the list holds no item that does nothing.
- * The Generation 2 pair: the Light Ball and the Thick Club raise their holder's stat in that generation's own stat calculation (`gen2/scripts`, "in
- * Generation 2 this happens in stat calculation directly"), so the Dex gives the items no damage hook and the rung never offers them there. Two
- * items of one species pair in one old generation; the rung is conservative there, which is the safe side.
- * A hit with the holder's own species items (Light Ball, Soul Dew, the Plates, the masks) is played by the species the Dex names in `itemUser`.
- * The rung also asks two more questions of the Dex, held here: which items change Speed (`changesSpeed`: the Scarf's, the Iron Ball's hook) and
- * which belong to other species (`belongsToOthers`: the `itemUser` list).
- */
+// `boostItemIds` derives the damage-boost items from the Dex's damage hooks (onModifyAtk, onModifySpA, onBasePower, onModifyDamage), with no name in
+// code. Every item of every generation the corpus plays (2 to 9) and the Champions mod is put in the hand of an attacker on a twin battle, and the
+// simulator's getDamage answers with and without it for one move of every type and category, for the moves that carry each flag, against a neutral
+// body and one the move is super effective on (Expert Belt). Every item that raises any of them is in boostItemIds (but the Generation 2 pair), and
+// the list holds no item that does nothing. The Generation 2 pair: the Light Ball and the Thick Club raise their holder's stat in that generation's
+// own stat calculation (gen2/scripts), so the Dex gives them no damage hook and the rung never offers them there (the safe side). A hit with an item
+// of one species (Light Ball, Soul Dew, the Plates, the masks) is played by the species the Dex names in itemUser. The rung also asks the Dex which
+// items change Speed (changesSpeed) and which belong to other species (belongsToOthers); both are held here.
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
 interface World { name: string; format: string; dex: ReturnType<typeof Dex.forGen>; rules: ReturnType<typeof rulesDex> }
@@ -30,7 +22,6 @@ WORLDS.push({ name: 'Champions mod', format: 'gen9championscustomgame', dex: Dex
 const NO_HOOK: Record<string, string[]> = { 'Generation 2': ['lightball', 'thickclub'] };
 
 const DEFENDERS = ['Mew', 'Slowbro', 'Charizard', 'Blastoise', 'Venusaur', 'Pikachu', 'Onix', 'Gyarados', 'Machamp', 'Gengar', 'Snorlax', 'Scizor', 'Weavile', 'Clefable', 'Dragonite', 'Alakazam', 'Steelix', 'Tyranitar', 'Skarmory'];
-/** Flags that say nothing about damage. */
 const PLAIN_FLAGS = new Set(['protect', 'mirror', 'metronome', 'contact', 'distance', 'defrost', 'bypasssub', 'cantusetwice', 'failcopycat', 'failinstruct', 'failmimic', 'noassist', 'nosleeptalk', 'noparentalbond', 'allyanim', 'nonsky', 'failencore', 'futuremove']);
 
 const set = (species: string): PokemonSet => ({
@@ -38,7 +29,6 @@ const set = (species: string): PokemonSet => ({
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, nature: 'Hardy', gender: '',
 }) as PokemonSet;
 
-/** One move of every type and category, and the first damaging move of every flag the Dex knows, as ids. */
 function sampleMoves(dex: World['dex']): string[] {
   const picked = new Map<string, string>();
   for (const move of dex.moves.all()) {
@@ -51,7 +41,6 @@ function sampleMoves(dex: World['dex']): string[] {
   return [...new Set(picked.values())];
 }
 
-/** The items of the generation that raise the damage of some sampled hit, played on the simulator. */
 function raisers(world: World): { raising: Set<string>; held: Set<string> } {
   const { dex } = world;
   const moves = sampleMoves(dex);

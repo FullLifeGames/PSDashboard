@@ -5,18 +5,14 @@ import { ATTACKER_SIDE_FLAG_BY_ID, DEFENDER_SIDE_FLAG_BY_ID, FIELD_FLAG_BY_ID, a
 import { partnerAbility } from '../src/spreads/partner-ability';
 import { FIELD_DAMAGE_HOOK } from '../src/team/item-damage-shared';
 
-/**
- * Round 73 (T203): the abilities that change another Pokémon's damage, read from the Dex, against what the calculator tables of
- * `calc-field.ts` hold. A new ability with such a handler in a later Dex fails here until the tables name it or this file says why
- * the calculator lacks it. The partner path (`partnerAbility`) is held to the Dex species the same way: a species with one ability
- * has it, any other species has the ability of its set.
- */
+// The abilities that change another Pokémon's damage, read from the Dex, against the calculator tables of calc-field.ts: a new ability with such a
+// handler fails here until the tables name it or this file says why the calculator lacks it. The partner path (partnerAbility) is held to the Dex
+// species the same way: a species with one ability has it, any other species has the ability of its set.
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
 const dexes = [5, 6, 7, 8, 9].map(gen => [`gen ${gen}`, Dex.forGen(gen)] as const).concat([['champions', Dex.mod('champions')] as never]);
 
-/** The abilities with a damage hook on another Pokémon, by their handlers. */
 const hooked = (dex: ReturnType<typeof Dex.forGen>) => dex.abilities.all()
   .map(ability => ({ id: ability.id, hooks: Object.keys(ability).filter(key => FIELD_DAMAGE_HOOK.test(key)) }))
   .filter(entry => entry.hooks.length > 0);
@@ -32,7 +28,6 @@ function tableOf(hooks: string[]): 'field' | 'attacker' | 'defender' | 'both' | 
   return hooks.some(hook => hook.startsWith('onAny')) ? 'field' : 'unknown';
 }
 
-/** What the calculator lacks, with the reason. Empty while the tables hold every hooked ability. */
 const CALCULATOR_LACKS: Record<string, string> = {};
 
 describe('the calculator tables hold every ability with a damage hook on another Pokémon', () => {
@@ -81,7 +76,7 @@ describe('the partner path follows the Dex species (singles has no partner)', ()
     expect(singles + several).toBeGreaterThan(0);
   });
 
-  // Round 78 (@pkmn 0.10.12): Regulation M-C brings Perrserker, whose Steely Spirit lifts its partner's Steel moves.
+  // Perrserker (Regulation M-C): its Steely Spirit lifts its partner's Steel moves.
   test('the Champions roster holds three families of these species: Vivillon (the Champions scene plays it) and Maushold with Friend Guard, Perrserker with Steely Spirit', () => {
     const dex = Dex.mod('champions');
     const partnerOf = (species: { abilities: Record<string, string> }) =>

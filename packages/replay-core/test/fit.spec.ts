@@ -21,20 +21,17 @@ import {
   type Scene,
 } from './fit-field-scenes';
 
-/**
- * Round 69 (T31, spec decision 6): the spread solver prices the doubles hits the parser now records. The oracle is the simulator:
- * real doubles battles on the doubles format, a VGC format and the Champions doubles format, each scene one turn (Reflect two) with
- * the damage the simulator took off every target. The calculator's rolls under the played spreads must contain it, so the Field
- * must say Doubles, cut a spread hit and leave a lone target alone, and a hit on the attacker's partner must reach the partner's set.
- *   A  Rock Slide on two foes                       the 0.75 cut
- *   B  Rock Slide while one foe protects            the simulator keeps spreadHit (two targets at the start): the cut stays
- *   C  Earthquake on a foe and the partner          the other foe is immune (Flying); the partner is a defender of its own side
- *   D  Stomping Tantrum through Reflect             the screen is x2732/4096 in doubles, x0.5 in singles
- *   E  Rock Slide with one foe left on the field    no spreadHit: no cut, whatever the move's target says (the other foe set off
- *                                                   Explosion the turn before and has no replacement; VGC picks four, so its bench would come in: not run there)
- * Singles has no spread targets and no partner: the Field of a singles hit is the one of before (last test), and the singles solver
- * scenes are team-info.boots-guess.spec.ts and the rest of the suite.
- */
+// The spread solver prices the doubles hits the parser records. The oracle is the simulator: real battles on the doubles format, a VGC format and the
+// Champions doubles format, each scene one turn (Reflect two) with the damage taken off every target. The calculator's rolls under the played spreads
+// must contain it, so the Field must say Doubles, cut a spread hit and leave a lone target alone, and a hit on the attacker's partner must reach the
+// partner's set.
+//   A  Rock Slide on two foes                       the 0.75 cut
+//   B  Rock Slide while one foe protects            the simulator keeps spreadHit (two targets at the start): the cut stays
+//   C  Earthquake on a foe and the partner          the other foe is immune (Flying); the partner is a defender of its own side
+//   D  Stomping Tantrum through Reflect             the screen is x2732/4096 in doubles, x0.5 in singles
+//   E  Rock Slide with one foe left on the field    no spreadHit: no cut, whatever the move's target says (the other foe set off
+//                                                   Explosion the turn before and has no replacement; VGC picks four, so its bench would come in: not run there)
+// Singles has no spread targets and no partner: the Field of a singles hit is the one of before (last test).
 describe('doubles-damage-fit', () => {
   interface Cfg { name: string; id: string; level: number; points: boolean }
   const CFGS: Cfg[] = [
@@ -63,9 +60,7 @@ describe('doubles-damage-fit', () => {
     move: string;
     p1: (cfg: Cfg) => PokemonSet[];
     p2: (cfg: Cfg) => PokemonSet[];
-    /** [p1 choice, p2 choice] per turn; the last turn is the hit. */
     turns: [string, string][];
-    /** The mons of the opposing/own side that take damage in the last turn, as `side:Species`. */
     hit: string[];
     spread: boolean;
   }
@@ -101,9 +96,7 @@ describe('doubles-damage-fit', () => {
 
   interface Played {
     log: string;
-    /** The simulator's damage per target, `side:Species`. */
     damage: Map<string, { damage: number; maxHp: number }>;
-    /** `move.spreadHit` of the simulator at the end of the scene's move. */
     spreadHit: boolean;
     sets: { p1: PokemonSet[]; p2: PokemonSet[] };
   }
@@ -143,7 +136,6 @@ describe('doubles-damage-fit', () => {
         if (before.get(key) !== mon.hp) damage.set(key, { damage: before.get(key)! - mon.hp, maxHp: mon.maxhp });
       }
     }
-    // A clean scene: exactly the expected targets lost HP, nobody fainted.
     const clean = [...damage.keys()].sort().join() === [...scene.hit].sort().join() && [...damage.values()].every(entry => entry.damage > 0);
     return clean ? { log, damage, spreadHit, sets } : null;
   }
@@ -319,7 +311,7 @@ const GRASSY_HIT: FieldScene = {
   hitLine: true,
 };
 
-/** What T86 added to DamageObservation: stripped, an observation reads as it did in round 68. */
+/** The observation without the fields the field-fact rows added. */
 const T86_FIELDS = [
   'moveName', 'terrain', 'attackerTera', 'defenderTera', 'attackerHp', 'defenderHp', 'attackerFallen', 'attackerAbility', 'defenderAbility',
   'attackerAbilityOn', 'attackerSuppressed', 'defenderSuppressed', 'fieldFacts',
@@ -370,7 +362,7 @@ describe('the Ruin abilities and the Grassy Terrain are in the rolls of a hit (T
             expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1}`).toBe(true);
             expect(observationError(ctx, obs, keyOf('p2', scene.defender), spreadFor(ctx, 'p2', scene.defender)), `error of hit ${index + 1}`).toBe(0);
           });
-          // The reading of round 68 misses the hit, except where the calculator reads the Ruin off the two bodies: the defender's own
+          // Without the field fact the reading misses the hit, except where the calculator reads the Ruin off the two bodies: the defender's own
           // Sword of Ruin lowers nothing, and the attacker's comes with the ability of its set.
           if (scene !== RUIN_ON_THE_DEFENDER && scene !== RUIN_ON_THE_ATTACKER) {
             expect(reads.some((obs, index) => !containsDamage(ctx, scene, stale(obs), damages[index], played.maxHp)), 'a hit the stale reading misses').toBe(true);
@@ -440,7 +432,6 @@ describe('spread-item-at-hit', () => {
   });
   const partner = () => set('Blissey', '', 'Natural Cure', 'Calm', { hp: 252 });
 
-  /** The set on the format's scale: level 50 and Stat Points (32 for a full 252) in Champions. */
   function scaled(body: PokemonSet, kind: Kind): PokemonSet {
     if (!kind.startsWith('champions')) return body;
     return { ...body, level: 50, evs: Object.fromEntries(Object.entries(body.evs).map(([stat, value]) => [stat, value > 0 ? 32 : 0])) as unknown as PokemonEvs };
@@ -462,21 +453,18 @@ describe('spread-item-at-hit', () => {
     defender: set('Aegislash', 'Air Balloon', 'Stance Change', 'Impish', { hp: 252, def: 252 }),
     moves: { singles: ['Dragon Claw', 'Earthquake'], doubles: ['Dragon Claw', 'Stomping Tantrum'] },
   };
-  /** Gengar knocks the Eviolite off Dusclops, which the log has never shown, then a special hit lands. */
   const KNOCK_OFF: Setup = {
     title: 'a Knock Off',
     attacker: set('Gengar', '', 'Cursed Body', 'Timid', { spa: 252, spe: 252 }),
     defender: set('Dusclops', 'Eviolite', 'Pressure', 'Calm', { hp: 252, spd: 252 }),
     moves: { singles: ['Knock Off', 'Shadow Ball'], doubles: ['Knock Off', 'Shadow Ball'] },
   };
-  /** A Chilan Berry halves the first Tackle and is gone for the second: the line that eats it comes before the damage line. */
   const BERRY: Setup = {
     title: 'a consumed Chilan Berry',
     attacker: set('Garchomp', '', 'Rough Skin', 'Jolly', { atk: 252, spe: 252 }),
     defender: set('Blissey', 'Chilan Berry', 'Natural Cure', 'Calm', { hp: 252, spd: 252 }),
     moves: { singles: ['Tackle', 'Tackle'], doubles: ['Tackle', 'Tackle'] },
   };
-  /** Gengar's Trick hands it Garchomp's Wise Glasses for its Choice Specs; the log shows both items. */
   const TRICK: Setup = {
     title: 'a Trick',
     attacker: set('Gengar', 'Choice Specs', 'Cursed Body', 'Timid', { spa: 252, spe: 252 }),
@@ -486,12 +474,10 @@ describe('spread-item-at-hit', () => {
 
   interface Scene {
     log: string;
-    /** The defender's HP lost to each turn's hit, in the simulator's own numbers. */
     damage: number[];
     maxHp: number;
   }
 
-  /** A battle of the setup's turns; null when a hit crit (the parser records no crit), missed or a damaging turn dealt nothing. */
   function sceneOf(kind: Kind, setup: Setup, seed: number): Scene | null {
     const doubles = isDoubles(kind);
     const attacker = { ...scaled(setup.attacker, kind), moves: movesOf(setup, kind) };
@@ -520,7 +506,6 @@ describe('spread-item-at-hit', () => {
     return { log, damage, maxHp };
   }
 
-  /** Up to `count` clean scenes whose last hit differs. */
   function scenesOf(kind: Kind, setup: Setup, count: number): Scene[] {
     const scenes: Scene[] = [];
     for (let seed = 1; scenes.length < count && seed <= 200; seed++) {
@@ -530,7 +515,6 @@ describe('spread-item-at-hit', () => {
     return scenes;
   }
 
-  /** The observations of the hits into the defender, in turn order (a turn without damage, a Trick, has none). */
   function hitsOf(scene: Scene, setup: Setup): DamageObservation[] {
     const found = parseReplayLogWithObservations(scene.log).observations.filter(obs => obs.defenderSpecies === setup.defender.species);
     expect(found).toHaveLength(scene.damage.filter(lost => lost > 0).length);
@@ -540,18 +524,16 @@ describe('spread-item-at-hit', () => {
   const contextOf = (kind: Kind, setup: Setup, observations: DamageObservation[]): SolveContext =>
     buildSolveContext(observations, { p1: [scaled(setup.attacker, kind)], p2: [scaled(setup.defender, kind)] }, FORMAT[kind], []);
 
-  /** The solver's read of an observation (the forme and side it resolves to). */
   const readOf = (ctx: SolveContext, setup: Setup, index: number): ReadObservation =>
     ctx.byMon.get(keyOf('p2', setup.defender.species))![index];
 
-  /** Whether the calculator's rolls of the hit, under the sets' own spreads, contain the simulator's exact damage. */
   function containsDamage(ctx: SolveContext, setup: Setup, obs: ReadObservation, damage: number, maxHp: number): boolean {
     const range = rollRange(ctx, obs, spreadFor(ctx, 'p1', setup.attacker.species), spreadFor(ctx, 'p2', setup.defender.species));
     expect(range).not.toBeNull();
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation as the solver read it before round 69, T191: no item at the hit, the set's item. */
+  /** The observation without the item fields: no item at the hit, the set's item. */
   const stale = (obs: ReadObservation): ReadObservation => ({
     ...obs, attackerItem: undefined, defenderItem: undefined, attackerItemChanged: undefined, defenderItemChanged: undefined,
   });

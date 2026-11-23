@@ -4,12 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import type { DamageObservation } from '../src/types';
 
-/**
- * Round 69 (T31, spec decision 6): the parser records the damage observations of doubles too, one per target of the move.
- * An observation says which game type it came from, whether the move line named `[spread]` (the simulator's 0.75 cut) and the side
- * of its defender (a spread move hits the attacker's partner as well). Singles logs keep their observations; the two stored
- * singles logs were parsed by the unchanged parser of 006b33c and their observations are compared field for field.
- */
+// An observation says which game type it came from, whether the move line named `[spread]` (the simulator's 0.75 cut) and the side of its defender
+// (a spread move hits the attacker's partner as well). The two stored singles logs are compared field for field against the parser of 006b33c.
 
 const header = (gametype: string, tier: string) => [
   '|player|p1|Alice|', '|player|p2|Bob|', `|gametype|${gametype}`, '|gen|9', `|tier|${tier}`, '|start',
@@ -123,9 +119,7 @@ describe('doubles damage observations (T31)', () => {
 
 describe('singles logs give the observations they gave before (T31)', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
-  // T31 added the first three fields, T191 the four item fields, T167 the two paradox readings (the logs hold a Protosynthesis
-  // mon), T86 the move name, terrain, HP, Tera, ability and field-fact fields, round 73 (T203, T210) the partner readings and the
-  // history facts, round 89 (#75) the HP texts of a knockout; all are stripped before the comparison with 006b33c.
+  // The fields added since 006b33c are stripped before the comparison.
   const NEW_FIELDS = [
     'doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged',
     'attackerParadox', 'defenderParadox', 'moveName', 'terrain', 'attackerHp', 'defenderHp', 'attackerAbility', 'defenderAbility',

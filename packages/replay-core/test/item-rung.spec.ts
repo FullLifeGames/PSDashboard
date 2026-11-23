@@ -11,15 +11,10 @@ import { buildSolveContext, observationError } from '../src/spreads/fit';
 import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
 
-/**
- * Round 89 (#75 step 2, ruling 27): a knockout that stays refuted under every spread of the set is the log's word that the guessed item is wrong. The
- * solver then tries the usage-listed damage-boost items of the attacker in usage order, and the first that makes every knockout reach (with a lower
- * total error than the best spread alone) is the item; the candidate carries it with `itemReason: 'boost'`.
- *
- * The scene is written forward with the calculator: a Timid Gengar with 252 Special Attack hits an uninvested Alakazam from a shown 100/100 (the
- * defender stood at full HP) twice, and the hit took everything. The best item-less rung (Modest, 252 Special Attack) reaches only about 0.8 of
- * the Alakazam in Scarlet/Violet and Champions alike, while the boost item the attacker really held reaches it.
- */
+// A knockout that stays refuted under every spread of the set is the log's word that the guessed item is wrong: the solver then tries the
+// usage-listed damage-boost items in usage order and the first that makes every knockout reach (with a lower total error than the best spread
+// alone) is the item (`itemReason: 'boost'`). The scene: a Timid 252 SpA Gengar hits an uninvested Alakazam from a shown 100/100 twice and the
+// hit took everything; the best item-less rung (Modest, 252 SpA) reaches only about 0.8 of it, in Scarlet/Violet and Champions alike.
 const WORLDS = [
   { name: 'Scarlet/Violet singles', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: false, item: 'Choice Specs', other: 'Life Orb' },
   { name: 'Scarlet/Violet doubles', formatid: 'gen9doublesou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: true, item: 'Choice Specs', other: 'Life Orb' },
@@ -37,13 +32,11 @@ const asSet = (species: string, nature: string, spread: PokemonEvs, level: numbe
 });
 const body = (world: World, species: string, nature: string, spread: PokemonEvs, item?: string) =>
   buildCalcPokemon(world.gen, species, { level: world.level, nature, evs: spread, item });
-/** The best roll of the move as a fraction of the defender's HP. */
 function bestRoll(world: World, attacker: ReturnType<typeof body>, defender: ReturnType<typeof body>, move: string): number {
   const result = calculate(world.gen, attacker, defender, new Move(world.gen, move));
   return Math.max(...(Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number)) / defender.maxHP();
 }
 
-/** A knockout from a shown full-HP text: the defender stood at 100 percent and the hit took it all. */
 const knockout = (world: World, attacker: string, defender: string, move: string): DamageObservation => ({
   attackerSpecies: attacker, defenderSpecies: defender, attackerSide: 'p2', moveId: toId(move), observedFraction: 1, lethal: true,
   attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '', ...(world.doubles ? { doubles: true } : {}),
@@ -55,11 +48,7 @@ const DEFENDERS = ['Alakazam', 'Gardevoir', 'Clefable', 'Dragonite', 'Garchomp',
 interface Attacker { species: string; guessed: string; plus: string; moves: string[] }
 const GENGAR: Attacker = { species: 'Gengar', guessed: 'Timid', plus: 'Modest', moves: ['Shadow Ball', 'Sludge Bomb'] };
 
-/**
- * The first defender and move for which the attacker's best item-less roll (the offense nature, full investment) stays below the full HP the text
- * shows and the boost item's roll at the guessed spread reaches it, on the defender with no investment at all: no rung of the ladder reaches
- * without the item.
- */
+/** The first defender and move for which no rung of the item-less ladder reaches the full HP the text shows, and the boost item at the guessed spread does. */
 function scene(world: Pick<World, 'gen' | 'level' | 'max'>, item: string, attacker: Attacker = GENGAR) {
   const stat = attacker.moves[0] === 'Flare Blitz' || attacker.moves[0] === 'Dragon Claw' ? 'atk' : 'spa';
   for (const defender of DEFENDERS) {

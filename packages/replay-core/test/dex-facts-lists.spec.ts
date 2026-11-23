@@ -3,12 +3,8 @@ import { Dex } from '@pkmn/sim';
 import * as champions from '@pkmn/mods/champions';
 import { callingMoves, choiceItems, hazardConditions, terrainConditions, umbrellaWeathers, SCREENS, screenFlags, isScreen } from '../src/dex-facts/index';
 
-/**
- * Round 72 (T235): four hand lists of name literals now come from the Dex through the facts table. The lists below are the old
- * ones, copied from the code before the change; the sweep derives each from every view the corpus plays (Generations 1 to 9
- * and the Champions mod) and requires the hand list, so a Dex that grows a fifth terrain or a second Choice item fails here
- * with its id.
- */
+// The sweep derives each hand list from every view the corpus plays (Generations 1 to 9 and the Champions mod), so a Dex that grows a fifth
+// terrain or a second Choice item fails here with its id.
 
 Dex.mod('champions', champions as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 

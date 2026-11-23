@@ -39,15 +39,12 @@ import {
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import type { ReadObservation } from '../src/spreads/observation-read';
 
-/**
- * Round 89 (#75 step 1, ruling 27.4): a knockout reads the shown HP by the game's own display. The log prints the defender's HP before the hit as
- * a text (`75/100`); the real HP behind it lies in the range the rounding of the battle's mode allows (Scarlet/Violet rounds the percentage up,
- * the Champions mod down, the pixel bar down, an exact text is exact: `hp-display.ts`, held to the simulator by `hp-display-sweep.spec.ts`).
- * A rung whose best roll stays below the lowest HP the text allows is refuted, with no slack: the game itself refutes it. The slack of two
- * percent stays for the readings that are not knockouts. The rows build every observation from the maximum roll of the built attacker, so the
- * edge sits at one HP point: the text one step above is refuted, the text of that very HP is not. The display rules are written out in the rows
- * (ceil, floor, 48ths) and never taken from `hp-display.ts`.
- */
+// A knockout reads the shown HP by the game's own display. The log prints the defender's HP before the hit as a text (`75/100`); the real HP behind
+// it lies in the range the rounding of the battle's mode allows (Scarlet/Violet rounds the percentage up, the Champions mod down, the pixel bar down,
+// an exact text is exact; hp-display.ts, held to the simulator by hp-display-sweep.spec.ts). A rung whose best roll stays below the lowest HP the text
+// allows is refuted with no slack; the slack of two percent stays for readings that are not knockouts. The rows build every observation from the
+// maximum roll of the built attacker, so the edge sits at one HP point: the text one step above is refuted, the text of that very HP is not. The display
+// rules are written out in the rows (ceil, floor, 48ths) and never taken from hp-display.ts.
 const WORLDS = [
   { name: 'Scarlet/Violet singles', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: false, round: 'up' },
   { name: 'Scarlet/Violet doubles', formatid: 'gen9vgc2025regi', gen: calcGenerationFor(9), level: 50, max: 252, doubles: true, round: 'up' },
@@ -62,7 +59,10 @@ const asSet = (species: string, nature: string, spread: PokemonEvs, level: numbe
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
 });
 
-/** The prior attacker (a bulky-offense guess) and the defender of every row: Garchomp's Stone Edge (one target in doubles too) hits a Clefable that holds no investment and no Defense nature (no defender rung is weaker, so the defender cannot absorb the refutation). */
+/**
+ * The prior attacker (a bulky-offense guess) and the defender of every row: Garchomp's Stone Edge (one target in doubles too) hits a Clefable that holds no
+ * investment and no Defense nature (no defender rung is weaker, so the defender cannot absorb the refutation).
+ */
 function scene(world: World, attackerAtk: number, defender = 'Clefable', move = 'Stone Edge') {
   const sets = {
     p1: [asSet(defender, 'Hardy', evs({}), world.level, ['Moonblast'])],
@@ -80,7 +80,6 @@ function scene(world: World, attackerAtk: number, defender = 'Clefable', move = 
   return { sets, base, ctx, prior, maxHp, best };
 }
 
-/** A lethal hit on the defender shown at `hp` of `maxhp` before it, as the protocol records it. */
 const lethalAt = (base: DamageObservation, hp: number, maxhp: number, after?: { hp: number; maxhp: number }): DamageObservation => ({
   ...base, lethal: true, observedFraction: hp / maxhp - (after ? after.hp / after.maxhp : 0), defenderShown: { before: { hp, maxhp }, ...(after ? { after } : {}) },
 });
@@ -198,17 +197,14 @@ describe('an attacker seen only in knockouts opens its offense when the game ref
   }
 });
 
-/**
- * Round 89 (D9, gen9ou-2658671254, Iron Valiant): the top-up spends the offense stat while the mon's lines "fit as well as at the winning rung". When the winning
- * rung is a coarse one (Special Attack 0) that a knockout refutes, its own error is the knockout's shortfall, and the tolerance it gives lets a clean line on
- * the same mon overshoot by as much: the stat ran to 180 where the lines fit best between 32 and 56 (a hit on Moltres that shows 74 beside a knockout that needs
- * 301 HP). The rule: the top-up measures from the cheapest spread that reaches every knockout of the mon, so it never ends on a spread the lines fit worse than that one.
- */
+// The top-up spends the offense stat while the mon's lines "fit as well as at the winning rung". When the winning rung is a coarse one (Special Attack 0)
+// that a knockout refutes, its own error is the knockout's shortfall and the tolerance lets a clean line on the same mon overshoot by as much (gen9ou-2658671254,
+// Iron Valiant: the stat ran to 180 where the lines fit best between 32 and 56). The top-up measures from the cheapest spread that reaches every knockout.
 describe('the top-up never ends on an offense the lines fit worse than the cheapest spread that reaches every knockout', () => {
   for (const world of WORLDS) {
     describe(world.name, () => {
       const step = world.max === 252 ? 4 : 1;
-      // The prior carries Speed only and a neutral nature (a guess without a boost, the rest of the budget open), so the defender has nothing to absorb and the scene stays on the attacker.
+      // The prior carries Speed only and a neutral nature (a guess without a boost), so the defender has nothing to absorb and the scene stays on the attacker.
       const start = scene(world, 0);
       const sets = { p1: start.sets.p1, p2: start.sets.p2.map(set => ({ ...set, nature: 'Hardy', evs: evs({ spe: world.max }) })) };
       const { base, maxHp } = start;
@@ -259,13 +255,11 @@ const GARDEVOIR = () => set('Gardevoir', '', 'Trace', ['Psychic Terrain', 'Splas
 const TERAPAGOS = () => set('Terapagos', '', 'Tera Shift', ['Tera Starstorm', 'Splash'], 'Modest', { hp: 252, spa: 252 }, 'Stellar');
 const WALL = () => set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252, spd: 252 });
 const PARTNER = () => set('Chansey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 });
-/** The second foe of a lone-foe scene: it explodes on the first turn and the first foe stands alone. */
 const BOMB = () => set('Magikarp', '', 'Swift Swim', ['Explosion', 'Splash'], 'Hardy', {});
 const AWAY = 'move splash, pass';
 const FIRST = (lone: boolean) => (lone ? 'move splash, move explosion' : 'move splash, move splash');
 const THEN = (lone: boolean) => (lone ? AWAY : 'move splash, move splash');
 
-/** Hatterene in Psychic Terrain into a lone Blissey (`lone`), or into two foes. */
 const expandingForce = (lone: boolean): FieldScene => ({
   title: `Expanding Force in Psychic Terrain into ${lone ? 'a lone foe' : 'two foes'}`,
   p1: () => [HATTERENE(), GARDEVOIR()],
@@ -278,7 +272,6 @@ const expandingForce = (lone: boolean): FieldScene => ({
   kinds: ['doubles', 'champions doubles'],
 });
 
-/** Terapagos after the Tera click into a lone Blissey, or into two foes. */
 const teraStarstorm = (lone: boolean): FieldScene => ({
   title: `Tera Starstorm after the click into ${lone ? 'a lone foe' : 'two foes'}`,
   p1: team(TERAPAGOS()),
@@ -375,11 +368,8 @@ describe('partner-ability-hits', () => {
   const splashing = (species: string, ability: string, extra: string[] = []) => set(species, '', ability, ['Splash', ...extra], 'Hardy', { hp: 252 });
 
   interface PartnerScene extends FieldScene {
-    /** The sets the solver gets: the attacker, the defender and the partner whose ability is a guess, by side. */
     solverSets: () => { p1: PokemonSet[]; p2: PokemonSet[] };
-    /** The fact the partner books, by its id. */
     fact: string;
-    /** The side the partner stands on. */
     partnerSide: 'attacker' | 'defender';
   }
 
@@ -444,7 +434,7 @@ describe('partner-ability-hits', () => {
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation as the solver read it before T203: no partner reading, no partner fact. */
+  /** The observation without the partner reading and the partner fact. */
   const stale = (obs: ReadObservation, fact: string): ReadObservation => {
     const rest: Record<string, unknown> = { ...obs };
     for (const field of ['attackerAlly', 'defenderAlly', 'attackerAllyAbility', 'defenderAllyAbility']) delete rest[field];
@@ -519,17 +509,14 @@ describe('spread-fit-field', () => {
     );
   }
 
-  /** The observations of the hits into the defender, in step order, as the parser reads the scene's public log. */
   function hitsOf(scene: FieldScene, played: Scene): DamageObservation[] {
     const found = parseReplayLogWithObservations(played.log).observations.filter(obs => obs.defenderSpecies === scene.defender);
     expect(found).toHaveLength(damagingTurns(played).length);
     return found;
   }
 
-  /** The solver's read of the observations of the hits (the forme and side they resolve to). */
   const readsOf = (ctx: SolveContext, scene: FieldScene): ReadObservation[] => ctx.byMon.get(keyOf('p2', scene.defender)) ?? [];
 
-  /** Whether the calculator's rolls of the hit, under the sets' own spreads, contain the simulator's exact damage. */
   function containsDamage(ctx: SolveContext, scene: FieldScene, obs: ReadObservation, damage: number, maxHp: number): boolean {
     const range = rollRange(ctx, obs, spreadFor(ctx, 'p1', scene.attacker), spreadFor(ctx, 'p2', scene.defender));
     expect(range).not.toBeNull();
@@ -537,7 +524,7 @@ describe('spread-fit-field', () => {
     return Math.round(range!.min * maxHp * (1 - slack)) <= damage && damage <= Math.round(range!.max * maxHp * (1 + slack));
   }
 
-  /** Scenes that read wrong before T86: every hit is in the rolls after, and at least one is not in the rolls of the stale reading. */
+  /** Scenes the stale reading (without the field facts) gets wrong: every hit is in the rolls with them, and at least one is not in the rolls without. */
   const FIELD_SCENES: FieldScene[] = [
     WEATHER_BALL, TERRAIN_PULSE, MULTISCALE, SUPREME_OVERLORD, TERA_ATTACKER, TERA_DEFENDER, ERUPTION, GASTRO_ACID, GAS_ON_THE_PARTNER, GRAVITY,
     FLASH_FIRE, HELPING_HAND, BEADS_OF_RUIN,
@@ -560,7 +547,7 @@ describe('spread-fit-field', () => {
               expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1} of ${damages.length}`).toBe(true);
               expect(observationError(ctx, obs, keyOf('p2', scene.defender), spread), `error of hit ${index + 1}`).toBe(0);
             });
-            // The reading of round 68 gets at least one hit wrong, or the scene shows nothing.
+            // The reading before the Champions fix gets at least one hit wrong, or the scene shows nothing.
             expect(reads.some((obs, index) => !containsDamage(ctx, scene, stale(obs), damages[index], played.maxHp)), 'a hit the stale reading misses').toBe(true);
           }
         });
@@ -587,7 +574,6 @@ describe('spread-fit-field', () => {
   });
 
   describe('the observation names the field at the hit (T86)', () => {
-    /** The observations of a scene's first clean battle on the kind. */
     const observationsOf = (scene: FieldScene, kind: Kind) => {
       const [played] = scenesOf(kind, scene, 1);
       return hitsOf(scene, played);

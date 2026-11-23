@@ -15,13 +15,8 @@ import type { PokemonSetAssumption, SetAssumption, SmogonSetAssumptions } from '
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
 
-/**
- * The damage judge (round 67, T130, decision 18): an item candidate falls
- * when no legal spread of its holder lets the calculator explain a hit the
- * log shows, against the defender as the panel builds it (ruling R1). Logs
- * come from @pkmn/sim, so each hit really happened with the item the game
- * gave its holder; the judge sees only the log.
- */
+// An item candidate falls when no legal spread of its holder lets the calculator explain a hit the log shows, against the defender as the panel
+// builds it. Logs come from @pkmn/sim, so each hit really happened with the item the game gave its holder; the judge sees only the log.
 
 function set(species: string, item: string, ability: string, moves: string[], spread: { nature: string; evs: Partial<PokemonEvs> }, teraType?: string): PokemonSet {
   return {
@@ -31,7 +26,6 @@ function set(species: string, item: string, ability: string, moves: string[], sp
   } as PokemonSet;
 }
 
-/** The spectators' log of a game; an empty choice skips a side. */
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, format = 'ou'): string {
   const battle = new Battle({
     formatid: toID(doubles ? `gen9doubles${format}` : `gen9${format}`), seed: '1,2,3,4',
@@ -55,7 +49,6 @@ const gholdengo = (item: string, spread = SPECS_SPREAD) =>
   set('Gholdengo', item, 'Good as Gold', ['Dazzling Gleam', 'Shadow Ball'], spread, 'Fairy');
 const moltres = (item = 'Leftovers') => set('Moltres-Galar', item, 'Berserk', ['Protect', 'Nasty Plot'], BULKY);
 
-/** The defender as the panel builds it: here the spread the game really gave it. */
 function builtAs(species: string, item: string, ability: string, spread: { nature: string; evs: Partial<PokemonEvs> }): RevealedPokemonInfo {
   return {
     species, moves: [], ability: revealedField(ability), item: revealedField(item), teraType: unknownField(),
@@ -176,7 +169,6 @@ describe('the calculator sees the states the log shows (T130)', () => {
   test('a miss within the smallest item factor (x1.1) decides nothing; a wider one does (ruling R12)', () => {
     const attacker = attackerIn(play([moltres()], [gholdengo('Choice Specs')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]), 'Gholdengo');
     const hit = (attacker.hits ?? [])[0];
-    // The no-item maximum the judge reads: the holder at Modest 252 SpA against the Moltres-Galar as built.
     const gen = Generations.get(9);
     const target = new Pokemon(gen, 'Moltres-Galar', { item: 'Leftovers', ability: 'Berserk', nature: 'Calm', evs: { hp: 252, spd: 252 } });
     const bare = calculate(gen, new Pokemon(gen, 'Gholdengo', { ability: 'Good as Gold', nature: 'Modest', evs: { spa: 252 }, teraType: 'Fairy' }),
@@ -234,14 +226,9 @@ describe('any doubt drops the hit (T130, ruling R3)', () => {
   });
 });
 
-/**
- * The defender's item and ability count as the panel builds them only where
- * the log has shown them (round 67, ruling R18): a guessed Assault Vest or a
- * guessed Multiscale cuts the damage the calculator expects, so a hit the
- * game dealt without them would refute every item without a boost. 649664
- * t23: one Hydro Pump into a Tornadus-Therian whose Assault Vest was a guess
- * ruled Keldeo's Choice Scarf out.
- */
+// The defender's item and ability count as the panel builds them only where the log has shown them: a guessed Assault Vest or Multiscale cuts the
+// damage the calculator expects, so a hit dealt without them would refute every item without a boost (649664 t23: a Hydro Pump into a
+// Tornadus-Therian whose Assault Vest was a guess ruled Keldeo's Choice Scarf out).
 describe('the defender\'s unproven item and ability widen the hull (T130, ruling R18)', () => {
   const plainLog = () => play([moltres()], [gholdengo('Metal Coat')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
   const guessedVest = () => ({ ...builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY), item: guessedField('Assault Vest') });

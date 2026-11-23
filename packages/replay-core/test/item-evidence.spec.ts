@@ -4,12 +4,7 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { contactLands } from '../src/inference/item-evidence';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Items the protocol rules out by a line it does NOT show (round 63, T80).
- * Every log here comes from @pkmn/sim, so the simulator, not a hand-kept
- * list, says what a holder shows: each case first checks the sim fact, then
- * what the inference reads from the same log for the side p2.
- */
+// Items the protocol rules out by a line it does not show. Every log comes from @pkmn/sim: each case first checks the sim fact, then what the inference reads for p2.
 
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
@@ -20,10 +15,8 @@ function set(species: string, item: string, ability: string, moves: string[], le
 }
 
 /**
- * The spectators' log: each `|split|` keeps its public line, as a replay does.
- * `format` defaults to OU, whose rules fix each species' abilities; Balanced
- * Hackmons lets any species hold any ability, and the inference then judges
- * nothing that hangs on an ability (round 64, T125).
+ * The spectators' log: each `|split|` keeps its public line. `format` defaults to OU, whose rules fix each species' abilities; Balanced Hackmons lets any
+ * species hold any ability, and the inference then judges nothing that hangs on an ability.
  */
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'ou'): string {
   const battle = new Battle({
@@ -180,7 +173,6 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
 
   test('a punch from a Punching Glove holder makes no contact: nothing is ruled out', () => {
     const glove = set('Hitmonchan', 'Punching Glove', 'Iron Fist', ['Mach Punch', 'Tackle']);
-    // Frisk on the holder's side shows the attacker's Punching Glove.
     const frisker = holder('Shed Shell', 'Frisk');
     const punch = ou([glove], [frisker], [['move machpunch', 'move roost']]);
     expect(punch).toMatch(/\|-item\|p1a: Hitmonchan\|Punching Glove\|\[from\] ability: Frisk/);
@@ -207,7 +199,6 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
 });
 
 describe('Shell Bell heals its holder after a hit below full HP (round 64, T120, decision 19)', () => {
-  // Mew moves first and chips the slow attacker, whose hit then shows the heal (or not).
   const chip = () => set('Mew', '', 'Synchronize', ['Tackle', 'Recover', 'Psychic Noise']);
   const slow = (item: string, ability = 'Thick Fat', moves = ['Body Slam']) => set('Snorlax', item, ability, moves);
   const ou = (p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false) => play(p1, p2, turns, doubles, 9, 'ou');
@@ -282,8 +273,7 @@ describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 6
     const p1 = [wall(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
     const doubles = play(p1, [guarded, set('Talonflame', '', 'Gale Wings', ['Roost'])],
       [['move recover, move softboiled', 'move tackle 1, move roost']], true, 9, 'customgame')
-      // The sim knows no doubles format with free abilities; the log names Balanced Hackmons (round 67 gate: a custom
-      // game keeps each species to its own abilities).
+      // The sim knows no doubles format with free abilities; the log names Balanced Hackmons.
       .replace(/\|tier\|[^\n]*/, '|tier|[Gen 9] Balanced Hackmons');
     expect(ruledOut(doubles, 'Rattata')).not.toContain('lifeorb');
   });

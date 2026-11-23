@@ -3,13 +3,9 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { judgeable } from '../src/team/item-damage-shared';
 
-/**
- * Round 73 (T210, group 5): the item judge's hit walk (inference/hits.ts) read a Pokémon's item at the damage line. A weakening
- * berry or a gem ends inside the move, before the damage line, so the client showed no item and a used-up mark and the judge
- * skipped the hit, although the hit counted the item. The walk now reads the item before the first `-enditem` of the move (the
- * idiom of protocol/item-reading.ts), so the hit records the item it counted. An item taken before the move (Knock Off) is still a
- * changed item, and the hit stays skipped. Real simulator battles, singles and doubles.
- */
+// A weakening berry or a gem ends inside the move, before the damage line, so the client showed no item; the hit walk (inference/hits.ts) reads
+// the item before the first `-enditem` of the move and the hit records the item it counted. An item taken before the move (Knock Off) is
+// still a changed item and the hit stays skipped. Real simulator battles, singles and doubles.
 
 type Format = 'singles' | 'doubles';
 

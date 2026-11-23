@@ -14,19 +14,10 @@ import { unknownEvs, unknownField } from '../src/team-info';
 import type { RevealedPokemonInfo } from '../src/types';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
-/**
- * Round 75 (T160, decision D1), the sweep of replay-core's half: the Dex a reader gets from its state is the Dex of the game,
- * entry by entry. Two halves, one for the mod and one for the older generations.
- *
- * The mod: every move, ability, item and condition the Champions mod changes (found by comparing the raw mod data with
- * Scarlet/Violet, not by our code) reads the mod's value through the Dex an inferrer state hands out for a Champions tier line,
- * in singles and in doubles, and the Scarlet/Violet value through the state of a Scarlet/Violet tier line. The readers that take
- * a move's fields (the veto facts, the open-move fit, the contact check) then run on every changed move.
- *
- * The generations: the readers of a species' base stats and abilities (the default spread, the default ability) and of the type
- * chart (the Hidden Power resolver) run over every species and type of every generation 1 to 9 and are compared with the
- * generation's own data; the sweep checks that older generations really differ from Generation 9 on what the readers read.
- */
+// The Dex a reader gets from its state is the Dex of the game, entry by entry. The mod: every move, ability, item and condition the Champions mod
+// changes (found by comparing the raw mod data with Scarlet/Violet, not by our code) reads the mod's value, in singles and doubles, and the
+// Scarlet/Violet value through a Scarlet/Violet tier line. The generations: the readers of base stats, abilities and the type chart run over every
+// species and type of Generations 1 to 9 against the generation's own data; older generations must really differ from Generation 9 on what they read.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const mod = Dex.dexes.champions;
 const standard = Dex.forGen(9);
@@ -47,7 +38,6 @@ type Kind = 'moves' | 'abilities' | 'items' | 'conditions';
 /** The fields that carry text or listing data, not rules (and the ones the Dex derives from the mod's own data set). */
 const PROSE = new Set(['desc', 'shortDesc', 'rating', 'isNonstandard', 'tier', 'doublesTier', 'natDexTier', 'gen', 'num', 'fullname', 'effectType', 'sourceEffect', 'toString']);
 
-/** Per field, the entries of one kind whose value the mod changes. */
 function changed(kind: Kind, fields: string[]): Record<string, Row[]> {
   const out: Record<string, Row[]> = {};
   const read = (dex: RulesDex, id: string) => (kind === 'conditions' ? dex.conditions.get(id) : dex[kind].get(id)) as unknown as Record<string, unknown>;
@@ -71,9 +61,6 @@ const conditions = changed('conditions', []);
 describe('the sweep sees what the mod changes', () => {
   test('the changed entries are the ones the round-67 diff and the fact check counted', () => {
     // By id, not by row: the mod's 16 typed Hidden Power rows share one id (the fact check's 18 types and 23 flags count rows).
-    // Round 78 (@pkmn 0.10.12, Regulation M-C): two more powers and two more PP counts, Double Shock's punch flag, Curse's
-    // own target rule, Emergency Exit, Run Away and Wimp Out changed and Disguise back to the game's, Eject Button for
-    // White Herb.
     expect(moves.type?.map(row => row.id).sort()).toEqual(['growth', 'snaptrap']);
     expect(moves.basePower?.length).toBe(25);
     expect(moves.accuracy?.length).toBe(5);

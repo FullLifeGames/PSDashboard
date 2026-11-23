@@ -5,19 +5,11 @@ import { registerChampionsDex, type RulesDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { fieldItemIds } from '../src/inference/field-item-triggers';
 
-/**
- * Round 88 (T349, GitHub issue #5): the sweep of the five items that fire when the field changes. The four terrain seeds
- * (`onTerrainChange`, Generation 7 on) and Room Service (`onAnyPseudoWeatherChange`, Generation 8 on, Past in the Champions mod)
- * are used the moment their holder stands in their terrain (or under Trick Room) and the field changes or the holder enters;
- * a log that shows the trigger without the item's line rules the item out. Each scene plays twice on @pkmn/sim: once with the
- * item (does the simulator use it, and does the inference then leave it alone) and once with an inert item and the same
- * choices (does the inference rule the item out exactly when the simulator used it). The scenes cover every trigger (the lead
- * with the terrain coming up, the holder's entry, a terrain or a pseudo-weather start by a move, a drag), every gate (Klutz,
- * Embargo, Magic Room, the wrong terrain, a block that ends later, a Trick Room that ends the first one) and the cases that
- * stay open (+6, Contrary, Commander), for singles and doubles in Generations 6 to 9 and the Champions mod. A scene the rule
- * leaves unjudged on purpose (a possible Klutz under Neutralizing Gas, an item the generation does not hold) is listed with
- * its reason and must never rule the item out.
- */
+// The five items that fire when the field changes: the four terrain seeds (onTerrainChange, Generation 7 on) and Room Service
+// (onAnyPseudoWeatherChange, Generation 8 on, Past in the Champions mod). A log that shows the trigger without the item's line rules the item out.
+// Each scene plays twice on @pkmn/sim: with the item (does the simulator use it, and does the inference leave it alone) and with an inert item and
+// the same choices (does the inference rule the item out exactly when the simulator used it). A scene the rule leaves unjudged on purpose (a
+// possible Klutz under Neutralizing Gas, an item the generation does not hold) is listed with its reason and must never rule the item out.
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -40,7 +32,6 @@ interface Scene {
   p1: PokemonSet[];
   p2: (item: string) => PokemonSet[];
   turns: [string, string][];
-  /** The simulator uses the item and the rule leaves it unjudged on purpose: it must not rule the item out. */
   conservative?: string;
 }
 
@@ -81,7 +72,6 @@ function scenesFor(doubles: boolean, rules: RuleSet, item: string, dex: RulesDex
     const others = TERRAINS.filter(entry => entry !== terrain);
     const setter = (extraMoves: string[] = []) => mk('Pikachu', { moves: ['splash', ...extraMoves, terrain.move] });
     const setters = () => [A(), B(), X()];
-    // The terrain starts by a move with the holder on the field.
     {
       const foe = setter();
       add('terrain by a foe\'s move', [foe, ...setters()], lead(holder()), [[pick(mv(foe, terrain.move)), idle]]);
@@ -143,7 +133,6 @@ function scenesFor(doubles: boolean, rules: RuleSet, item: string, dex: RulesDex
     return scenes;
   }
 
-  // Room Service
   const trick = () => mk('Pikachu', { moves: ['splash', 'trickroom'] });
   {
     const foe = trick();
@@ -249,7 +238,7 @@ describe('a terrain seed or Room Service that never fired is ruled out (T349)', 
   }
 });
 
-/** The head of gen9championsvgc2026regmc-2710507840 (the issue's replay): Indeedee-F's Psychic Surge at the lead, a Trick Room at turn 1. */
+/** The head of gen9championsvgc2026regmc-2710507840: Indeedee-F's Psychic Surge at the lead, a Trick Room at turn 1. */
 const ISSUE_LOG = (tier: string) => [
   '|gametype|doubles', '|player|p1|Alpha|1|1000', '|player|p2|Beta|1|1008', '|gen|9', `|tier|${tier}`,
   '|poke|p1|Glimmora, L50, M, shiny|', '|poke|p1|Volcarona, L50, F|', '|poke|p1|Rillaboom, L50, F|', '|poke|p1|Kingambit, L50, F, shiny|',

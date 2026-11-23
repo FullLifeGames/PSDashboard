@@ -40,23 +40,17 @@ import type { SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import { toId } from '../src/ids';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Round 73 (T210, group 1): Last Respects and Rage Fist take their power from the battle's history, the fallen of the attacker's
- * side and the hits the attacker took. The Dex gives the calculator the plain 50, so the solver priced a hit of 150 power at 50.
- * The observation carries the two counts the client battle holds at the damage line, and the solver asks the Dex move's own
- * `basePowerCallback` for the power (spreads/hit-power.ts); no move name decides it. The oracle is the simulator's damage:
- * singles and doubles (the Champions roster holds neither move's users, the census spec states it).
- */
+// Last Respects and Rage Fist take their power from the battle's history (the fallen of the attacker's side, the hits the attacker took); the
+// Dex gives the calculator the plain 50. The observation carries the two counts and the solver asks the Dex move's own basePowerCallback
+// (spreads/hit-power.ts). The oracle is the simulator's damage: singles and doubles (the Champions roster holds neither move's users).
 
 const GARCHOMP = () => set('Garchomp', '', 'Rough Skin', ['Crunch', 'Dragon Claw', 'Splash'], 'Hardy', { hp: 252, def: 252, spd: 4 });
 const DRAGONITE = () => set('Dragonite', '', 'Inner Focus', ['Crunch', 'Dragon Claw', 'Splash'], 'Hardy', { hp: 252 });
-/** One HP, and a Dark move is super effective on it: every Crunch knocks it out. */
 const FODDER = (nickname: string) => ({ ...set('Shedinja', '', 'Wonder Guard', ['Splash'], 'Hardy', {}), name: nickname });
 const BASCULEGION = () => set('Basculegion', '', 'Swift Swim', ['Last Respects', 'Splash'], 'Adamant', { hp: 252, atk: 252 });
 const ANNIHILAPE = () => set('Annihilape', '', 'Defiant', ['Rage Fist', 'Splash'], 'Adamant', { hp: 252, atk: 252 });
 const BLISSEY = () => set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252, spd: 252 });
 
-/** Two teammates of Basculegion fall to the foes' Crunch before it uses Last Respects. */
 const LAST_RESPECTS: FieldScene = {
   title: 'Last Respects after two fallen',
   p1: doubles => (doubles ? [FODDER('Shed1'), FODDER('Shed2'), BASCULEGION(), BLISSEY()] : [FODDER('Shed1'), FODDER('Shed2'), BASCULEGION()]),
@@ -78,7 +72,6 @@ const LAST_RESPECTS: FieldScene = {
   kinds: ['singles', 'doubles'],
 };
 
-/** Annihilape takes two hits of Dragon Claw before its Rage Fist. */
 const RAGE_FIST: FieldScene = {
   title: 'Rage Fist after two hits taken',
   p1: doubles => (doubles ? [ANNIHILAPE(), BLISSEY()] : [ANNIHILAPE()]),
@@ -107,7 +100,6 @@ function contextOf(scene: FieldScene, kind: Kind, observations: DamageObservatio
   return buildSolveContext(observations, { p1: [bodyOf(scene, kind, 'p1', scene.attacker)], p2: [bodyOf(scene, kind, 'p2', scene.defender)] }, FORMAT[kind], []);
 }
 
-/** The hits of the scene's attacker into the defender. */
 function hitsOf(scene: FieldScene, played: Scene): DamageObservation[] {
   const found = parseReplayLogWithObservations(played.log).observations.filter(obs => obs.defenderSpecies === scene.defender && obs.attackerSpecies === scene.attacker);
   expect(found.length).toBeGreaterThan(0);
@@ -120,7 +112,7 @@ function containsDamage(ctx: SolveContext, scene: FieldScene, obs: ReadObservati
   return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
 }
 
-/** The observation as the solver read it before T210 group 1: no history count. */
+/** The observation without the history counts. */
 const stale = (obs: ReadObservation): ReadObservation => {
   const rest: Record<string, unknown> = { ...obs };
   delete rest.attackerFainted;
@@ -139,7 +131,6 @@ describe('a history power reaches the calculator through the Dex callback (T210 
           const ctx = contextOf(scene, kind, observations);
           const reads = ctx.byMon.get(keyOf('p2', scene.defender)) ?? [];
           expect(reads).toHaveLength(observations.length);
-          // The last damage of the scene is the history hit.
           const damage = damagingTurns(played).at(-1)!;
           const obs = reads.at(-1)!;
           expect(containsDamage(ctx, scene, obs, damage, played.maxHp), `the history hit sim ${damage}`).toBe(true);
@@ -287,9 +278,7 @@ describe('hit-history-ally', () => {
   const partner = (species: string, ability: string) => set(species, '', ability, ['Splash'], 'Hardy', { hp: 252 });
 
   interface AllyScene extends FieldScene {
-    /** The sets the solver gets: the attacker, the defender and the partner whose ability is a guess. */
     solverSets: () => { p1: PokemonSet[]; p2: PokemonSet[] };
-    /** Whether the user's ability is on: an ally has Plus or Minus. */
     boosted: boolean;
   }
 
@@ -330,7 +319,6 @@ describe('hit-history-ally', () => {
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation without the partner: the reading of a solver that never looked at the ally. */
   const withoutAlly = (obs: ReadObservation): ReadObservation => {
     const rest: Record<string, unknown> = { ...obs };
     delete rest.attackerAlly;
@@ -480,7 +468,6 @@ describe('survival-marker-observation', () => {
   const BLISSEY = () => set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 });
   const CHANSEY = () => set('Chansey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 });
 
-  /** Garchomp's Drill Run into one defender, which answers with its own choice (Endure goes first). */
   function drillRun(title: string, defender: ReturnType<typeof set>, answer = 'move splash'): FieldScene {
     return {
       title,
@@ -495,9 +482,7 @@ describe('survival-marker-observation', () => {
   const SASH = drillRun('a Focus Sash holder at full HP', set('Gengar', 'Focus Sash', 'Cursed Body', ['Splash'], 'Timid', {}));
   const STURDY = drillRun('Sturdy at full HP', set('Magnezone', '', 'Sturdy', ['Splash'], 'Timid', {}));
   const ENDURE = drillRun('Endure', set('Gengar', '', 'Cursed Body', ['Endure'], 'Timid', {}), 'move endure');
-  /** The control: the same hit is a knock-out for a holder without a marker. */
   const NO_MARKER = drillRun('the same hit without a marker', set('Gengar', '', 'Cursed Body', ['Splash'], 'Timid', {}));
-  /** The control: a Shuca Berry ends inside the move, before the damage line, and the holder keeps most of its HP. */
   const BERRY = drillRun('a berry that weakens the hit', set('Gengar', 'Shuca Berry', 'Cursed Body', ['Splash'], 'Timid', {}));
 
   /** The observation of the Drill Run on the first clean seed of the scene (a crit is no reading and the scene skips it). */

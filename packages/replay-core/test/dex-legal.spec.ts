@@ -3,13 +3,8 @@ import { toID } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/team-builder';
 import { abilitiesAreFree, legalAbility } from '../src/team/dex-legal';
 
-/**
- * Round 60 (T93): the log names an ability by its display name. "As One" is
- * no ability id of the gen 9 dex ("As One (Glastrier)", "As One (Spectrier)"),
- * and the sim plays an unknown id as no ability at all (no Unnerve, no boost
- * after a KO). Ogerpon and Terapagos carried the ability of a battle-only
- * forme (Embody Aspect, Teraform Zero) on their base forme.
- */
+// The log names an ability by its display name. "As One" is no ability id of the gen 9 dex ("As One (Glastrier)", "As One (Spectrier)"), and the sim
+// plays an unknown id as no ability at all. Ogerpon and Terapagos must not carry the ability of a battle-only forme (Embody Aspect, Teraform Zero) on their base forme.
 
 const vgcLog = (tier: string) => [
   '|gametype|doubles', '|gen|9', `|tier|${tier}`,
@@ -46,7 +41,7 @@ describe('dex-legal abilities (round 60, T93)', () => {
     }).toEqual({ calyrexIce: 'asoneglastrier', calyrexShadow: 'asonespectrier', terapagos: 'terashift', ogerpon: 'waterabsorb' });
   });
 
-  // Since round 67 (T108 step 2) the inference also reads an ability a line names as its effect, as the client does:
+  // The inference reads an ability a line names as its effect, as the client does:
   // Terapagos shows Tera Shift on entry (`|-activate|p1b: Terapagos|ability: Tera Shift`) before its Stellar forme shows
   // Teraform Zero, so the set keeps the ability it entered with; Ogerpon's Embody Aspect still shows only on its Tera.
   test('a format with free abilities keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
@@ -56,7 +51,7 @@ describe('dex-legal abilities (round 60, T93)', () => {
     expect(abilityOf(p1Team, 'Terapagos')).toBe('terashift');
   });
 
-  // Round 67 gate (11.10.): draft leagues play as custom games under the usual abilities.
+  // Draft leagues play as custom games under the usual abilities.
   test('a custom game reads abilities like a standard format', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
     expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('waterabsorb');

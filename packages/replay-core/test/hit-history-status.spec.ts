@@ -6,13 +6,9 @@ import type { ReadObservation } from '../src/spreads/observation-read';
 import type { DamageObservation } from '../src/types';
 import { FORMAT, KINDS, alone, damagingTurns, hit, isDoubles, scaled, scenesOf, set, splash, team, type FieldScene, type Kind, type Scene } from './fit-field-scenes';
 
-/**
- * Round 73 (T210, group 2): Hex and Infernal Parade double their power against any status, Venoshock and Barb Barrage against
- * poison, and Marvel Scale lifts the defender's Defense under one. The calculator reads them off the defender's status, and the
- * solver never gave the defender one. The observation carries the defender's status as the client battle holds it before the hit
- * (`defenderStatus`), and the calculator body takes it. The oracle is the simulator's damage; every move that reads the target's
- * status in its Dex handler is swept below, so a new one is named here.
- */
+// Hex and Infernal Parade double their power against any status, Venoshock and Barb Barrage against poison, and Marvel Scale lifts the
+// defender's Defense under one. The observation carries the defender's status as the client battle holds it before the hit (`defenderStatus`).
+// The oracle is the simulator's damage; every move that reads the target's status in its Dex handler is swept below.
 
 const DRAGONITE = () => set('Dragonite', '', 'Inner Focus', ['Splash'], 'Hardy', { hp: 252, def: 252 });
 const GENGAR = (moves: string[]) => set('Gengar', '', 'Cursed Body', [...moves, 'Splash'], 'Modest', { hp: 252, spa: 252 });
@@ -52,7 +48,6 @@ function containsDamage(ctx: SolveContext, scene: FieldScene, obs: ReadObservati
   return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
 }
 
-/** The observation as the solver read it before group 2: the defender has no status. */
 const stale = (obs: ReadObservation): ReadObservation => {
   const rest: Record<string, unknown> = { ...obs };
   delete rest.defenderStatus;

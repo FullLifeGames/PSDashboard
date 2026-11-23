@@ -4,15 +4,10 @@ import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-/**
- * Round 89 (#132): a Pokémon that spends a move's last PP and shows no item line held no Leppa Berry. The simulator's Leppa
- * Berry eats in `onUpdate` the moment any slot sits at 0 PP and its holder has HP, so a log that shows the 0-PP use without
- * the berry's line rules the berry out. Every log comes from @pkmn/sim: each scene plays once with a neutral item (what the
- * inference reads) and once with a Leppa Berry (what a real holder shows), and the two must agree. A guard is a scene where
- * the real holder shows nothing although the move ran out, or where the log cannot tell: the inference rules nothing out.
- * The sweep that holds the rule to every Dex item and the PP read to the simulator is `pp-trigger-sweep.spec.ts`; the corpus
- * rows (Champions OU 2692599072 and the games of the issue) are `test/regression/leppa-refuted-corpus.spec.ts`.
- */
+// The simulator's Leppa Berry eats in onUpdate the moment any slot sits at 0 PP and its holder has HP, so a log that shows the 0-PP use without the
+// berry's line rules the berry out. Each scene plays once with a neutral item (what the inference reads) and once with a Leppa Berry (what a real
+// holder shows), and the two must agree. A guard is a scene where the real holder shows nothing although the move ran out, or where the log cannot
+// tell. The sweep over every Dex item is pp-trigger-sweep.spec.ts; the corpus rows are test/regression/leppa-refuted-corpus.spec.ts.
 
 if (!Dex.formats.get('gen9championsou').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -32,18 +27,14 @@ const set = (species: string, item: string, ability: string, moves: string[]): P
   evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
 });
 
-/** An item that shows nothing in a log, so the holder stays unknown. */
 const NEUTRAL = 'Mystic Water';
 const LEPPA = 'Leppa Berry';
 
 interface Scene {
-  /** What the holder does each turn (a move id; the foe's target is chosen by the harness). */
   turns: string[];
   holder: (item: string) => PokemonSet;
   foe?: PokemonSet;
-  /** The p1 move of the turn, by index (default Splash). */
   foeTurns?: string[];
-  /** Whether a real Leppa Berry holder eats. */
   shown: boolean;
   /** A line spliced into the neutral log after the holder's last move line (a faint, a transform). */
   splice?: (log: string) => string;
@@ -95,7 +86,6 @@ function read(format: Format, scene: Scene, species = 'Pawmot') {
 const revival = (extra: Partial<Scene> = {}): Scene => ({
   turns: ['revivalblessing'], holder: item => set('Pawmot', item, 'Natural Cure', ['Revival Blessing', 'Splash']), shown: true, ...extra,
 });
-/** After the holder's move line: the line a scene needs between its action and the next boundary. */
 const afterHolderMove = (line: string) => (log: string) => log.replace(/(\|move\|p2a: Pawmot\|Revival Blessing[^\n]*\n)/, `$1${line}\n`);
 
 describe('a move that ran out of PP with no Leppa Berry line rules the berry out (#132)', () => {

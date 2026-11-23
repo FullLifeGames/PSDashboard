@@ -4,22 +4,16 @@ import { toId } from '../src/ids';
 import { arg, fromEffect, readLine } from '../src/inference/log-line';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
-/**
- * Round 72 (T235), plan row 16: `ATTACKER_PUNISH_ITEMS` in inference/client-facts.ts names the items whose `[from] item:` damage
- * lands on the attacker (the inference reads their holder itself, the client gives them to the damaged Pokémon when a
- * reconstructed log drops `[of]`). The Dex marks nine items with an `onDamagingHit` handler (Absorbent Bulb, Air Balloon, Cell
- * Battery, Jaboca Berry, Luminous Moss, Rocky Helmet, Rowap Berry, Snowball, Weakness Policy), and the handler does not say whom
- * it hurts, so this spec plays each of them in every view the corpus plays: a holder is hit by a physical contact move (Tackle)
- * and by a special move without contact (Swift), alone and with a partner in doubles, and the log's `|-damage|` lines against
- * the attacker with `[from] item:` name the items that punish. They are the list, view by view (Rocky Helmet from Generation 5,
- * the two berries from Generation 4, so Generations 1 to 3 have no candidate).
- */
+// The Dex marks nine items with an onDamagingHit handler (Absorbent Bulb, Air Balloon, Cell Battery, Jaboca Berry, Luminous Moss, Rocky
+// Helmet, Rowap Berry, Snowball, Weakness Policy) and the handler does not say whom it hurts. Each is played in every view the corpus
+// plays (a contact move and a special move without contact, alone and with a partner in doubles); the `|-damage|` lines against the
+// attacker with `[from] item:` name the items that punish, which is the list of ATTACKER_PUNISH_ITEMS (Rocky Helmet from Generation 5,
+// the two berries from Generation 4, so Generations 1 to 3 have none).
 
 const SPEC = 'packages/replay-core/test/attacker-punish-items-oracle.spec.ts';
 
 const realItems = (view: SimView) => view.dex.items.all().filter(item => item.exists && item.isNonstandard !== 'Future');
 
-/** The items among `candidates` whose `[from] item:` damage reaches the attacker (p1) in one of the two hits. */
 function punishing(view: SimView, candidates: string[]): string[] {
   const found = new Set<string>();
   for (const id of candidates) {
@@ -47,7 +41,6 @@ describe('ATTACKER_PUNISH_ITEMS is held to the simulator (round 72)', () => {
 
   describe.each(ALL_VIEWS)('$name', view => {
     test('the items that hurt the attacker are the listed ones', () => {
-      // An item with an onDamagingHit handler is a candidate; nothing else answers a hit.
       const candidates = realItems(view)
         .filter(item => (item as unknown as { onDamagingHit?: unknown }).onDamagingHit)
         .map(item => item.id);

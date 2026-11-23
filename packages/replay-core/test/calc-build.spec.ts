@@ -14,11 +14,8 @@ import { rulesDex } from '../src/rules-dex';
 import { boostItemIds } from '../src/spreads/boost-items';
 import { toId } from '../src/ids';
 
-/**
- * Round 89 (#75 step 2): the build hands the solver what the log lets it offer. The usage list of the species, in usage order, less the items the
- * log refutes (a Choice lock two different moves break), and the format's Item Clause read from the log's own `|rule|` line (else the simulator's
- * rule table of the `|tier|`; a Custom Game has none). The solved item rides out on the candidate, into the built set and the panel.
- */
+// The build hands the solver the usage list of the species less the items the log refutes, and the format's Item Clause read from the log's
+// `|rule|` line (else the simulator's rule table of the `|tier|`; a Custom Game has none).
 const evs = (spread: Partial<PokemonEvs>): PokemonEvs => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...spread });
 const usage = (species: string, items: string[], nature: string, spread: PokemonEvs): SmogonUsageStats['pokemon'][string] => ({
   species, rawCount: 100, abilities: [], moves: [],
@@ -48,7 +45,6 @@ const HEAD = [
 const START = ['|start', '|switch|p1a: Alakazam|Alakazam, M|100/100', '|switch|p2a: Gengar|Gengar, M|100/100', '|switch|p2b: Garchomp|Garchomp, M|100/100', '|turn|1'];
 const logOf = (rules: string[] = [], events: string[] = []) => [...HEAD, ...rules, ...START, ...events].join('\n');
 const RULE = ['|rule|Item Clause: Limit 1 of each item'];
-/** Gengar used two different moves in a row: a Choice lock would have held it to the first. */
 const lockedLog = () => [...HEAD, ...START.slice(0, 4), '|turn|1', '|move|p2a: Gengar|Shadow Ball|p1a: Alakazam', '|turn|2',
   '|move|p2a: Gengar|Sludge Bomb|p1a: Alakazam', '|turn|3'].join('\n');
 

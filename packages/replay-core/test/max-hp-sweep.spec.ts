@@ -5,19 +5,13 @@ import * as championsMod from '@pkmn/mods/champions';
 import { hpEvsForMaxHp } from '../src/spreads/max-hp.ts';
 import { calcEvs, evBudget, evStep, ZERO_EVS, type EvBudget } from '../src/spreads/ev-budget.ts';
 
-/**
- * Round 72, T241 step 1c: `hpEvsForMaxHp` computes a maximum HP with the library (`gen.stats.calc` of @pkmn/data)
- * and not with its own copy of the formula. Two holds:
- *  - the simulator is the oracle: for every species of generations 3 to 9 (and every Champions species on the Stat Point
- *    scale), at the levels a replay plays and at 1 and 5, a Pokémon built with chosen HP EVs reports its `maxhp`, and the
- *    inverse, asked for that maxhp with the chosen EVs as its prior, answers the chosen EVs (the prior is nearest to
- *    itself, so a level that leaves several candidates still has one answer). Shedinja, whose HP is 1 whatever the
- *    spread, measures nothing: `undefined`.
- *  - the hand formula the function used until round 72 (`legacyHpEvsForMaxHp`) and the library agree on every base HP
- *    1 to 255, at the levels below, with IVs 31, 30 and 0, from either end of the prior, on both budgets, for every HP the
- *    formula can print and for the ones next to them.
- * Singles and doubles do not part here (the formula reads no game type); the Champions budget is the second table.
- */
+// `hpEvsForMaxHp` computes a maximum HP with the library (gen.stats.calc of @pkmn/data), not with its own copy of the formula. Held in two ways. The
+// simulator is the oracle for every species of generations 3 to 9 (and every Champions species on the Stat Point scale), at the levels a replay plays
+// and at 1 and 5: a Pokémon built with chosen HP EVs reports its maxhp, and the inverse, asked for that maxhp with the chosen EVs as its prior, answers the
+// chosen EVs (the prior is nearest to itself, so a level that leaves several candidates still has one answer). Shedinja, whose HP is 1 whatever the spread,
+// measures nothing: `undefined`. The hand formula (`legacyHpEvsForMaxHp`) and the library agree on every base HP 1 to 255, at the levels below, with IVs 31,
+// 30 and 0, from either end of the prior, on both budgets, for every HP the formula can print and for the ones next to them. The formula reads no game
+// type; the Champions budget is the second table.
 
 function legacyHpEvsForMaxHp(
   baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31, budget: EvBudget = evBudget(''),

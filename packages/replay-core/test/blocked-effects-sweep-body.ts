@@ -5,28 +5,18 @@ import { toId } from '../src/ids';
 import type { RulesDex } from '../src/rules-dex';
 import { play, type PlayBody } from './blocked-effects-play';
 
-/**
- * Round 89 (#110): the sweep that holds the reader of blocked-effects.ts to the simulator. For every ability of every generation and
- * mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and in doubles, a species that can
- * hold the ability takes one of 17 effects (a flinch, Intimidate, a primary and a secondary drop, each kind of status by a status
- * move and by a secondary, confusion, Taunt, Encore, Torment, a status under sun, which Leaf Guard needs). The scene is played on @pkmn/sim through
- * `choose` once with no ability on the target (the log the inference reads) and once with each ability of the species. The expected
- * set is every ability of the species under which the effect did NOT land in the played battle; the inference reads the first
- * log and must rule out exactly that set. The two failures a sweep exists for:
- *  - a false rule-out (the inference rules out an ability under which the simulator let the effect land): never allowed;
- *  - a miss (the simulator refused the effect, the inference did not rule the ability out): allowed only for the scenes in `UNREAD`,
- *    each pinned with the reason (the effect never reached the body at all, or the ability is not a guard of this effect).
- * Doubles run the same scenes with an ally on the field, and a second sweep gives the ally the ability (the `onAlly` guards: Flower
- * Veil, Sweet Veil, Pastel Veil, Aroma Veil and any the Dex adds): the ally's candidates are ruled out by what lands on the body next
- * to it. A third sweep plays every species as the source of the flinch against a body that holds Inner Focus or nothing: the species'
- * abilities decide whether the attacker may ignore the target's ability (Mold Breaker, Teravolt, Turboblaze), and the inference must
- * rule Inner Focus out exactly when no ability of the attacker's species ignores it. The default run plays the abilities that have a
- * guard handler (`onTryAddVolatile`, `onTryBoost`, `onTryHit`, `onSetStatus`, `onImmunity`, `onModifySecondaries`, `onAllyTry*`, `onAllySetStatus`; every third of them) and every 24th of the rest; with
- * `DICE_SWEEPS=full` (its own CI job) it plays every ability; doubles play in Generations 5 and 9, the full run in all realms.
- *
- * D9b (#125): the sweep runs in two specs by realm (`blocked-effects-sweep.spec.ts` and `blocked-effects-sweep-2.spec.ts`), each calling
- * `registerBlockedEffectsSweep` with its realms, so the full run's 3,000 seconds in one file become two files of about 1,500 each. Every row keeps its full name.
- */
+// For every ability of every generation and mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and doubles, a
+// species that can hold the ability takes one of 17 effects (a flinch, Intimidate, a primary and a secondary drop, each kind of status by a status move
+// and by a secondary, confusion, Taunt, Encore, Torment, a status under sun, which Leaf Guard needs). The scene is played on @pkmn/sim once with no
+// ability on the target (the log the inference reads) and once with each ability of the species. The expected set is every ability under which the effect
+// did NOT land; the inference reads the first log and must rule out exactly that set. A false rule-out is never allowed; a miss is allowed only for the
+// scenes in `UNREAD`, each pinned with the reason. Doubles run the same scenes with an ally on the field, and a second sweep gives the ally the ability
+// (the `onAlly` guards: Flower Veil, Sweet Veil, Pastel Veil, Aroma Veil): the ally's candidates are ruled out by what lands on the body next to it.
+// A third sweep plays every species as the source of the flinch against a body that holds Inner Focus or nothing: the inference must rule Inner Focus
+// out exactly when no ability of the attacker's species ignores it (Mold Breaker, Teravolt, Turboblaze). The default run plays the abilities that have a
+// guard handler (`onTryAddVolatile`, `onTryBoost`, `onTryHit`, `onSetStatus`, `onImmunity`, `onModifySecondaries`, `onAllyTry*`, `onAllySetStatus`; every third
+// of them) and every 24th of the rest; with `DICE_SWEEPS=full` it plays every ability; doubles play in Generations 5 and 9, the full run in all realms.
+// The sweep runs in two specs by realm, each calling `registerBlockedEffectsSweep` with its realms.
 
 const FULL = process.env.DICE_SWEEPS === 'full';
 
@@ -41,11 +31,8 @@ const formatOf = (realm: Realm, doubles: boolean) => `gen${realm.gen}${realm.cha
 interface Scene {
   id: string;
   minGen: number;
-  /** The source's moves, one used per turn. */
   moves: string[];
-  /** The source's ability ('' for none). */
   sourceAbility?: string;
-  /** The line that shows the effect on the target `Target`. */
   landed: RegExp;
   /** A move that picks one foe: the ally sweep plays only these. */
   single: boolean;
@@ -75,10 +62,9 @@ const SCENES: Scene[] = [
 
 const SEEDS = Array.from({ length: 60 }, (_, index) => `${index + 1},2,3,4`);
 /**
- * The source of every scene: a species that learns every move the scenes use, holding an ability its species has. A source with no ability is
- * a body the game never plays, and Trace copies it as nothing (the first full run read "Ralts confusion: trace" as a false rule-out: the
- * only ability Smeargle has in Generation 3 is Own Tempo, which Trace copies, and which refuses confusion). The second ability is the
- * one that touches no scene (Technician); the first stands where a generation has one.
+ * The source of every scene: a species that learns every move the scenes use, holding an ability its species has. A source with no ability is a body the
+ * game never plays, and Trace copies it as nothing (Smeargle's only Generation 3 ability is Own Tempo, which Trace copies and which refuses confusion). The
+ * second ability is the one that touches no scene (Technician); the first stands where a generation has one.
  */
 const sourceOf = (realm: Realm): PlayBody => {
   const abilities = dexOf(realm).species.get('Smeargle').abilities as Record<string, string>;
@@ -88,7 +74,6 @@ const FILLER: PlayBody = { species: 'Chansey', ability: 'Natural Cure' };
 
 const aimOf = (dex: RulesDex, move: string, doubles: boolean) => (doubles && ['normal', 'any', 'adjacentFoe'].includes(dex.moves.get(move).target) ? ' 1' : '');
 
-/** One battle: the source (and a filler) against the target (and the ally, else a filler). */
 function battleOf(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = sourceOf(realm)): string {
   const dex = dexOf(realm);
   const source = { ...user, ability: scene.sourceAbility ?? user.ability, moves: scene.moves, name: 'Source' };
@@ -101,7 +86,6 @@ function battleOf(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody
   });
 }
 
-/** The log of the scene with the first seed that shows the effect on a target with no ability, null when none does. */
 function baseline(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, user: PlayBody = sourceOf(realm)): { log: string; seed: string } | null {
   for (const seed of SEEDS) {
     const log = battleOf(realm, doubles, scene, target, ally, seed, user);
@@ -123,7 +107,6 @@ function landsWith(realm: Realm, doubles: boolean, scene: Scene, target: PlayBod
 }
 
 const inferred = new Map<string, string[]>();
-/** The abilities the inference rules out for the target species (or the ally) of a log, memoized by the log. */
 function ruledOutOf(log: string, species: string): string[] {
   const key = `${species}|${log}`;
   if (!inferred.has(key)) inferred.set(key, inferOpponentTeam(log, 'p2').pokemon.find(mon => toId(mon.species) === toId(species))?.ruledOut?.abilities ?? []);
@@ -132,15 +115,12 @@ function ruledOutOf(log: string, species: string): string[] {
 
 const GUARD = /^on(Try(AddVolatile|Boost|Hit)|SetStatus|Immunity|ModifySecondaries|Ally(Try|SetStatus))/;
 /**
- * The abilities every run plays, one for each kind of row the full run's first reading found red (D6b; the sampled default run played
- * none of them): an ability that copies the foe's (a source ability decides it), a weather guard (the ally's twin under sun), a redirect
- * the move never gets past (the effect never reaches the target), a field the ability sets on entry (the move itself is stopped).
+ * The abilities every run plays, one for each kind of row the sampled run misses: an ability that copies the foe's, a weather guard, a redirect the move
+ * never gets past, a field the ability sets on entry.
  */
 const ALWAYS = ['trace', 'leafguard', 'lightningrod', 'psychicsurge'];
-/** Doubles take far longer than singles: the default run plays two generations of them (the oldest ally rules and the newest; the Champions mod in singles only). */
 const DOUBLES_DEFAULT = ['Generation 5', 'Generation 9'];
 
-/** The species the sweep plays for each ability of the realm: the first that can hold it, preferring one with another ability to compare. */
 function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilities: string[]; guard: boolean }> {
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
   const species = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
@@ -157,10 +137,9 @@ function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilit
 }
 
 /**
- * Refusals the reader leaves unread, by scene: the guard refuses the move itself and never the effect, so the log's effect proves the guard away only
- * through the move's own refusal. Round 89 (#150): the landed hit reads those: the Fake Out that lands rules out the priority guards (Armor Tail,
- * Dazzling, Queenly Majesty) and the terrain setter that stops it (Psychic Surge), the Mud-Slap that lands rules out Earth Eater (landed-hit-sweep.spec.ts
- * holds those verdicts). Only the Neutralizing Gas row of the Intimidate scene stays unread; a pin the reader reads turns the row red.
+ * Refusals the reader leaves unread, by scene: the guard refuses the move itself and never the effect, so the log's effect proves the guard away only through
+ * the move's own refusal (the landed hit reads those: landed-hit-sweep.spec.ts holds the verdicts). Only the Neutralizing Gas row of the Intimidate scene
+ * stays unread; a pin the reader reads turns the row red.
  */
 const UNREAD: Record<string, string[]> = {
   // The gas stops the activation of the source's Intimidate on the field; the log of a holder shows the gas itself, so the log without it is the absence read.
@@ -179,7 +158,6 @@ const UNREAD_ALLY: Record<string, string[]> = {
 
 interface Verdict { missed: string[]; falseRuleOuts: string[]; stalePins: string[]; played: number; skipped: number }
 
-/** The sweep of one realm and game type over the target's own abilities. */
 function sweepTargets(realm: Realm, doubles: boolean): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0 };
@@ -199,7 +177,6 @@ function sweepTargets(realm: Realm, doubles: boolean): Verdict {
   return verdict;
 }
 
-/** The ally sweep: the ability sits on the ally of the body that takes the effect (a Grass body, then a body of another type). */
 function sweepAllies(realm: Realm): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0 };
@@ -260,10 +237,6 @@ function sweepSources(realm: Realm): { wrong: string[]; played: number; ignoring
   return { wrong, played, ignoring };
 }
 
-/**
- * Registers the rows of the realms a part plays (`names`: realm names), under the titles of the former single file. A describe with no row for
- * the part's realms (the default run plays doubles in two realms only) is left out.
- */
 export function registerBlockedEffectsSweep(names: string[]): void {
   const realms = REALMS.filter(realm => names.includes(realm.name));
   if (realms.length !== names.length) throw new Error(`unknown realm among ${names.join(', ')}`);

@@ -6,14 +6,10 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { isSitrusBerry, sitrusEatsAt, sitrusKeptAt } from '../src/inference/item-triggers';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Round 69, T168 (decision 34): four items whose trigger the protocol shows without the item's line are ruled out, as
- * R5 does for Air Balloon, Booster Energy and Eject Pack (trigger-evidence.spec.ts). A Lum Berry holder eats on a status or
- * a confusion, a Sitrus Berry holder at half HP, an Eject Button holder survives a damaging hit from another Pokémon and
- * leaves, a Red Card holder sends the attacker away. Every log comes from @pkmn/sim: each case first checks what a real
- * holder shows (so a wrong trigger fails here, not in a game), then what the inference reads for the side p2 from the
- * same battle with a neutral item. A guard is a case where the real holder shows nothing and the inference rules nothing out.
- */
+// Four items whose trigger the protocol shows without the item's line are ruled out (Air Balloon, Booster Energy and Eject Pack: trigger-evidence.spec.ts): a
+// Lum Berry holder eats on a status or a confusion, a Sitrus Berry holder at half HP, an Eject Button holder survives a damaging hit from another
+// Pokémon and leaves, a Red Card holder sends the attacker away. Every log comes from @pkmn/sim: each case first checks what a real holder shows, then
+// what the inference reads for p2 from the same battle with a neutral item. A guard is a case where the real holder shows nothing and nothing is ruled out.
 
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
@@ -28,16 +24,13 @@ const FORMATS: Format[] = ['singles', 'doubles'];
 
 interface Scene {
   attacker?: Partial<PokemonSet> & { moves?: string[] };
-  /** The second attacker of the doubles side (default: a Ground-immune Skarmory that splashes). */
   partner?: PokemonSet;
   holder?: Partial<PokemonSet>;
   mate?: PokemonSet;
-  /** Pokémon on each side beyond the leads. */
   p1Bench?: number;
   p2Bench?: number;
   /** The turns as the p1 move ids with targets: 'earthquake' (the holder is target 1 in doubles), 'splash'. */
   turns: string[][];
-  /** The holder's move per turn (default: Splash). */
   p2Turns?: string[];
   gen?: number;
 }
@@ -58,7 +51,6 @@ function side2(scene: Scene, format: Format, item: string): PokemonSet[] {
   return format === 'doubles' ? [holder, mate, ...bench] : [holder, ...bench];
 }
 
-/** The battle's log as a viewer reads it (the split lines keep their public form). */
 function playTeams(p1: PokemonSet[], p2: PokemonSet[], options: { doubles: boolean; gen?: number }, turns: [string, string][]): string {
   const { doubles, gen = 9 } = options;
   const battle = new Battle({
@@ -94,16 +86,13 @@ function play(scene: Scene, format: Format, item: string): string {
 }
 
 const mv = (id: string, target?: number) => `move ${id}${target ? ` ${target}` : ''}`;
-/** One turn of p1: the lead uses `id` on the holder (target 1 where the move picks a target), the partner splashes in doubles. */
 const hit = (id: string): string[] => [mv(id, ['normal', 'any', 'adjacentFoe'].includes(Dex.moves.get(id).target) ? 1 : undefined), mv('splash')];
 const quiet: string[] = [mv('splash'), mv('splash')];
-/** An item that shows nothing in a log, so the holder stays unknown. */
 const NEUTRAL = 'Mystic Water';
 
 const ruledOut = (log: string, species: string) =>
   inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === species)?.ruledOut?.items ?? [];
 
-/** What the real holder shows, and what the inference rules out when the holder's item is a neutral one. */
 function read(scene: Scene, format: Format, item: string, species = 'Blissey') {
   const withItem = play(scene, format, item);
   const shown = new RegExp(`\\|-enditem\\|p2a: ${species}\\|${item}`).test(withItem);
@@ -168,7 +157,8 @@ describe('Sitrus Berry is eaten at half HP (T168)', () => {
     expect(ruledOut(mixed, 'Chansey')).not.toContain('sitrusberry');
   });
 
-  // Leech Seed's drain is the residual phase: the simulator eats the berry in its last update, after the upkeep line (level 90 holds above half after the Earthquake and below it after the drain).
+  // Leech Seed's drain is the residual phase: the simulator eats the berry in its last update, after the upkeep line (level 90 holds above half after the
+  // Earthquake and below it after the drain).
   test.each(FORMATS)('%s: a berry eaten after the upkeep line is no miss, and a drain below half without it rules the item out', format => {
     const scene: Scene = { holder: { level: 90 }, turns: [hit('earthquake'), hit('leechseed')] };
     const real = play(scene, format, 'Sitrus Berry');

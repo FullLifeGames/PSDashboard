@@ -4,16 +4,10 @@ import * as championsMod from '@pkmn/mods/champions';
 import { historyPower, historyPowerMove } from '../src/spreads/hit-power';
 import { FORMAT, KINDS, isDoubles, scaled, set, type Kind } from './fit-field-scenes';
 
-/**
- * Round 73 (step 4, the census of the simulator's callers): `spreads/hit-power.ts` runs a Dex `basePowerCallback` on a recording
- * stand-in, with no battle behind it, so the callback has nothing to write to. Two specs hold it to the simulator:
- *  - `hit-power-census.spec.ts` sorts every move with a `basePowerCallback` in every generation (1 to 9) and in the Champions mod
- *    by what the callback reads, and holds the history class to exactly Last Respects and Rage Fist;
- *  - this spec plays real battles (Gen 9 singles and doubles, Champions singles and doubles), and at every use of a history move
- *    compares the base power the simulator's own damage step took (its `BasePower` event, first in line, before any modifier) with
- *    `historyPower` at the counts the battle held at that moment. A move of the class that this spec does not play fails the
- *    sweep test at the bottom, so a new history move needs its scene.
- */
+// spreads/hit-power.ts runs a Dex basePowerCallback on a recording stand-in with no battle behind it; hit-power-census.spec.ts holds the history
+// class to exactly Last Respects and Rage Fist. This spec plays real battles (Gen 9 and Champions, singles and doubles) and at every use of a
+// history move compares the base power of the simulator's own damage step (its BasePower event, before any modifier) with historyPower at the
+// counts the battle held then. A move of the class this spec does not play fails the sweep test at the bottom.
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
@@ -25,7 +19,6 @@ const BASCULEGION = () => set('Basculegion', '', 'Swift Swim', ['Last Respects',
 
 interface Use { move: string; basePower: number; fainted: number; timesAttacked: number }
 
-/** Plays the scene to its end; every use of Last Respects or Rage Fist is read at the simulator's BasePower event. */
 function play(kind: Kind): Use[] {
   const doubles = isDoubles(kind);
   const battle = new Battle({

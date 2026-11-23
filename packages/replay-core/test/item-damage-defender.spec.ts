@@ -8,14 +8,9 @@ import { judgeItemsByDamage } from '../src/team/item-damage';
 import { guessedEvs, guessedField, revealedField, unknownField } from '../src/team-info';
 import type { PokemonEvs, PokemonFieldInfo, RevealedPokemonInfo } from '../src/types';
 
-/**
- * Round 69 (T169, spec decision 35): the damage judge reads a Pokemon as the defender of the hits it took. An Assault Vest
- * (special hits) or an Eviolite (both Defenses, only on a species that can still evolve) falls when a logged hit is too strong
- * for the bulkiest-not-enough holder: no EVs, IV 0 and a lowering nature at its softest, the item on. The attacker is as built
- * with its unproven item ranged (the mirror of R18): a guessed Choice Specs may be no item, a guessed Leftovers may be Specs, so
- * a hit that the attacker's item cancels against the Vest refutes nothing. Every hit is a real battle of @pkmn/sim in singles
- * and doubles; the judge sees only the log.
- */
+// An Assault Vest (special hits) or an Eviolite (both Defenses, only on a species that can still evolve) falls when a logged hit is too strong for
+// the bulkiest-not-enough holder: no EVs, IV 0 and a lowering nature at its softest, the item on. The attacker is as built with its unproven item
+// ranged, so a hit that the attacker's item cancels against the Vest refutes nothing. Every hit is a real @pkmn/sim battle; the judge sees only the log.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -45,7 +40,6 @@ const chansey = () => set({ species: 'Chansey', item: 'Leftovers', ability: 'Nat
 interface Scene { p1: PokemonSet; p2: PokemonSet; p1Choice: string; p2Choice: string; partner: [PokemonSet, PokemonSet] }
 const FORMAT: Record<Kind, string> = { singles: 'gen9ou', doubles: 'gen9doublesou' };
 
-/** One turn of a real battle for a seed; null when the roll crit (a crit is no clean hit). */
 function turnLog(kind: Kind, scene: Scene, seed: number): string | null {
   const doubles = kind === 'doubles';
   const battle = new Battle({
@@ -64,7 +58,6 @@ function turnLog(kind: Kind, scene: Scene, seed: number): string | null {
   return /\|-crit\|/.test(log) ? null : log;
 }
 
-/** The first clean log in which the attacker's hit reaches the defender, and the attacker as the inference reads it. */
 function sceneOf(kind: Kind, scene: Scene): { log: string; attacker: RevealedPokemonInfo } {
   for (let seed = 1; seed <= 80; seed++) {
     const log = turnLog(kind, scene, seed);
@@ -75,12 +68,10 @@ function sceneOf(kind: Kind, scene: Scene): { log: string; attacker: RevealedPok
   throw new Error('no clean hit in 80 seeds');
 }
 
-/** The attacker as the build plays it: a spread, a nature, an ability and an item that may be a guess. */
 const builtAttacker = (raw: RevealedPokemonInfo, build: Build, item: PokemonFieldInfo): RevealedPokemonInfo => ({
   ...raw, ability: revealedField(build.ability), item, evs: guessedEvs(sp(build.evs ?? {})), nature: guessedField(build.nature), level: 100, gender: '',
 });
 
-/** The defender with the item the build guessed; the judge ranges its bulk, so spread and nature are placeholders. */
 const holderInfo = (species: string, item: PokemonFieldInfo): RevealedPokemonInfo => ({
   species, moves: [], ability: unknownField(), item, teraType: unknownField(),
   evs: guessedEvs(sp({})), nature: guessedField('Hardy'), level: 100, gender: '',
@@ -98,7 +89,6 @@ const judge = (kind: Kind, holder: RevealedPokemonInfo, attacker: RevealedPokemo
 
 const GHOLDENGO_BUILD: Build = { species: 'Gholdengo', item: '', ability: 'Good as Gold', moves: [], nature: 'Modest', evs: { spa: 252, spe: 252, hp: 4 } };
 const GARCHOMP_BUILD: Build = { species: 'Garchomp', item: '', ability: 'Rough Skin', moves: [], nature: 'Adamant', evs: { atk: 252, spe: 252, hp: 4 } };
-/** Dazzling Gleam hits every foe (a spread move in doubles); every other move of the scenes names its target. */
 const choiceOf = (kind: Kind, move: string) => (kind === 'doubles' && move !== 'dazzlinggleam' ? `move ${move} 1` : `move ${move}`);
 const specialScene = (kind: Kind, defender: PokemonSet, attackerItem: string, move = 'dazzlinggleam'): Scene =>
   ({ p1: defender, p2: gholdengo(attackerItem, ['Dazzling Gleam', 'Shadow Ball']), p1Choice: choiceOf(kind, 'ironhead'), p2Choice: choiceOf(kind, move), partner: [blissey(), chansey()] });
@@ -107,7 +97,6 @@ const physicalScene = (kind: Kind, defender: PokemonSet, attackerItem: string): 
 
 describe('an Assault Vest the hits taken rule out (T169, decision 35)', () => {
   for (const kind of ['singles', 'doubles'] as const) {
-    // Dazzling Gleam is a spread move in doubles: the log's [spread] factor goes into every roll.
     test(`${kind}: a Specs Gleam is too strong for a Vest on a Corviknight that holds none, so the Vest falls and Eviolite is no candidate`, () => {
       const { log, attacker } = sceneOf(kind, specialScene(kind, corviknight('Leftovers', {}), 'Choice Specs'));
       if (kind === 'doubles') expect(log).toMatch(/Dazzling Gleam\|[^\n]*\[spread\]/);
@@ -179,7 +168,7 @@ describe('the attacker\'s unproven item gets a span before a hit refutes a defen
 describe("the attacker's built spread is a guess too (T169, the Dragonite of 752624)", () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a physical spread built for an attacker that really hit with its Special Attack refutes no Vest`, () => {
-      // Primarina of 752624 took a 63% Thunderbolt from a Dragonite the build gave a physical spread: the Vest it may hold
+      // Primarina took a 63% Thunderbolt from a Dragonite the build gave a physical spread: the Vest it may hold
       // must not fall to a Special Attack the build never gave. Here the Gholdengo really has 252 Special Attack and the
       // build a physical spread; the Vest holder is at its softest, where the hit would refute it against the built spread.
       const { attacker } = sceneOf(kind, specialScene(kind, corviknight('Assault Vest', {}), 'Choice Specs', 'shadowball'));

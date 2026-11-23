@@ -1,13 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-/**
- * Round 60 (T104): the sim writes [of] differently per line. An ability heal
- * names the holder and [of] the attacker (battle.js:2103); Pickpocket's
- * -enditem names only the attacker (abilities.js:3390); Rough Skin's -damage
- * names the victim and [of] the holder. The dex decides: a Pokémon whose
- * species cannot have the ability never gets it.
- */
+// The sim writes [of] differently per line: a heal names the holder (battle.js:2103), Pickpocket's -enditem only the attacker
+// (abilities.js:3390), Rough Skin's -damage the victim and [of] the holder. The dex decides: a species never gets an ability it cannot have.
 
 const head = (tier: string) => ['|gametype|singles', '|gen|9', `|tier|${tier}`, '|start'];
 const abilityOf = (log: string[], side: 'p1' | 'p2', species: string) =>
@@ -61,8 +56,7 @@ describe('ability holders from [from] ability lines (round 60, T104)', () => {
     expect(abilityOf(log, 'p2', 'Landorus-Therian')).toBe('');
   });
 
-  // Round 67 (T108 step 1): @pkmn/protocol reads an absorbing heal (Dry Skin, Earth Eater, Volt Absorb, Water
-  // Absorb) without the attacker's [of], so the healed Pokémon holds the ability even where the dex decides nothing.
+  // @pkmn/protocol reads an absorbing heal (Dry Skin, Earth Eater, Volt Absorb, Water Absorb) without the attacker's [of].
   test('a format with free abilities: an absorbing heal goes to the healed Pokémon, as the protocol reads the line', () => {
     const log = [...head('[Gen 9] Balanced Hackmons'),
       '|switch|p1a: Alomomola|Alomomola, F|100/100', '|switch|p2a: Toad|Seismitoad, M|80/100', '|turn|1',

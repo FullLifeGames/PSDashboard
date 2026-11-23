@@ -7,25 +7,16 @@ import { effectLands, mayRefuseHit } from '../src/sim-ask/effect-refusal';
 import type { SceneBody } from '../src/sim-ask/effect-refusal';
 import { play, type PlayBody } from './blocked-effects-play';
 
-/**
- * Round 89 (#150, claim 2): the sweep that holds the landed-hit rule to the simulator, the sibling of `blocked-effects-sweep.spec.ts`. For
- * every ability of every generation and mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and in
- * doubles, a species that can hold the ability takes a damaging move of each type, and one of each kind the Dex flags (sound, ball and
- * bomb, wind, priority). The scene is played on @pkmn/sim through `choose` once with no ability on the target (the log the inference
- * reads) and once with each ability of the species. The target never acts in these battles (`idle`: its moves abort before they start), as on the twin: the
- * log shows the hit before the target's own action of the turn, and an ability that acts with the target's first move (Protean, Libero) would change the scene. The expected set is every ability of the species under which the hit did NOT land
- * (no plain `|-damage|` on the target); the inference reads the first log and must rule out exactly that set:
- *  - a false rule-out (the inference rules out an ability under which the simulator let the hit land): never allowed;
- *  - a miss (the simulator refused the hit and the inference did not rule the ability out): allowed only for the scenes in `UNREAD`, each
- *    pinned with its reason.
- * A second sweep gives the ability to the ally of the target (a redirect: Lightning Rod, Storm Drain; the guards of the `onAlly` kind), with the
- * single-target moves only (a spread move hits the ally too, and the ally is then asked as a target):
- * the hit aims at the target, and the ally's candidates are ruled out by what landed on the body next to it. A third pass holds the twin's
- * own reading to the whole battle: for every scene, `effectLands` on the twin answers what the played battle answered (the twin is
- * the oracle of the reader; the battle is the oracle of the twin). The default run plays the abilities with a hit guard handler (every
- * third) and every 24th of the rest; with `DICE_SWEEPS=full` (its own CI job) it plays every ability. Doubles play Generations 5 and 9
- * in the default run, all realms in the full run.
- */
+// For every ability of every generation and mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and doubles, a species
+// that can hold the ability takes a damaging move of each type and one of each kind the Dex flags (sound, ball and bomb, wind, priority). The scene is played on
+// @pkmn/sim through `choose` once with no ability on the target (the log the inference reads) and once with each ability of the species. The target never acts
+// (`idle`: its moves abort before they start), as on the twin: the log shows the hit before the target's own action, and an ability that acts with the target's
+// first move (Protean, Libero) would change the scene. The expected set is every ability under which the hit did NOT land (no plain `|-damage|` on the target);
+// the inference must rule out exactly that set. A false rule-out is never allowed; a miss only for the scenes in `UNREAD`, each pinned with its reason.
+// A second sweep gives the ability to the ally of the target (a redirect: Lightning Rod, Storm Drain; the `onAlly` guards) with single-target moves only (a
+// spread move hits the ally too). A third pass holds the twin to the played battle: for every scene `effectLands` on the twin answers what the battle answered.
+// The default run plays the abilities with a hit guard handler (every third) and every 24th of the rest; with `DICE_SWEEPS=full` it plays every ability.
+// Doubles play Generations 5 and 9 in the default run, all realms in the full run.
 
 const FULL = process.env.DICE_SWEEPS === 'full';
 
@@ -39,16 +30,13 @@ const dexOf = (realm: Realm): RulesDex => (realm.champions ? Dex.dexes.champions
 const formatOf = (realm: Realm, doubles: boolean) => `gen${realm.gen}${realm.champions ? 'champions' : ''}${doubles ? 'doubles' : ''}customgame`;
 const SEEDS = Array.from({ length: 12 }, (_, index) => `${index + 1},2,3,4`);
 
-/** A move of the sweep: the Dex move, and why it stands (a type, a flag). */
 interface HitScene { label: string; move: string; /** Hits every foe: the ally is a target too (the ally sweep leaves these out). */ spread: boolean }
 
-/** The reference body: no type immunity of its own except by the move, and no ability. */
 const REFERENCE = 'Magikarp';
 const FILLER: PlayBody = { species: 'Chansey', ability: 'Natural Cure' };
 
 const aimOf = (dex: RulesDex, move: string, doubles: boolean) => (doubles && ['normal', 'any', 'adjacentFoe'].includes(dex.moves.get(move).target) ? ' 1' : '');
 
-/** One battle: the source (and a filler) against the target (and the ally, else a filler), the source using the move on turn 1. */
 function battleOf(realm: Realm, doubles: boolean, move: string, target: PlayBody, ally: PlayBody | null, seed: string, source: PlayBody): string {
   const dex = dexOf(realm);
   return play({
@@ -61,11 +49,10 @@ function battleOf(realm: Realm, doubles: boolean, move: string, target: PlayBody
 
 /**
  * What the reader looks at: the damage line of the hit on the target, without a `[from]`. The log names the body in front, which is the disguise when the
- * target holds Illusion (it shows the name of the last party member, here the filler: round 89, N4c), so the name is not read.
+ * target holds Illusion (it shows the name of the last party member, here the filler), so the name is not read.
  */
 const LANDED = /\|-damage\|p2a: [^|\n]*\|[^|\n]*(\n|$)/;
 const landed = (log: string): boolean => LANDED.test(log);
-/** A log with the hit and no other effect on the target (a secondary of the move would be read by #110's rules, which the sweep of blocked-effects holds). */
 const clean = (log: string): boolean => landed(log) && !/\|(-status|-unboost|-boost|-start|cant)\|p2a: /.test(log);
 
 /** The abilities of the sweep's source: Smeargle holds an ability that touches no move of the sweep (the first of the generation's). */
@@ -111,7 +98,6 @@ const scenesOf = (realm: Realm): HitScene[] => {
   return scenesMemo.get(realm.name)!;
 };
 
-/** Whether the hit lands with the ability: on any of a few seeds (an ability that changes the dice, No Guard, needs more than one). */
 function landsWith(realm: Realm, doubles: boolean, move: string, target: PlayBody, ally: PlayBody | null, source: PlayBody): boolean {
   return SEEDS.some(seed => {
     const log = battleOf(realm, doubles, move, target, ally, seed, source);
@@ -120,7 +106,6 @@ function landsWith(realm: Realm, doubles: boolean, move: string, target: PlayBod
 }
 
 const inferred = new Map<string, string[]>();
-/** The abilities the inference rules out for the species of a log, memoized by the log. */
 function ruledOutOf(log: string, species: string): string[] {
   const key = `${species}|${log}`;
   if (!inferred.has(key)) inferred.set(key, inferOpponentTeam(log, 'p2').pokemon.find(mon => toId(mon.species) === toId(species))?.ruledOut?.abilities ?? []);
@@ -134,7 +119,6 @@ const GUARD = /^on(TryHit|Immunity|FoeTryMove|AnyRedirectTarget|AllyTryHitSide|T
  */
 const ALWAYS = ['levitate', 'wonderguard', 'disguise', 'iceface', 'sturdy', 'lightningrod', 'stormdrain', 'dazzling', 'telepathy'];
 
-/** The species the sweep plays for each ability of the realm: the first that can hold it, preferring one with another ability to compare. */
 function speciesPerAbility(dex: RulesDex, wanted: (ability: ReturnType<RulesDex['abilities']['all']>[number], index: number) => boolean): Map<string, { species: string; abilities: string[] }> {
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
   const species = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
@@ -154,15 +138,11 @@ const sampled = (guards: { n: number }) => (ability: { id: string }, index: numb
   return guard ? guards.n++ % 3 === 0 : index % 24 === 0;
 };
 
-/**
- * Refusals the reader leaves unread, by scene: none is known before the first full run. A pin names the move kind and the ability and the reason;
- * a pin the reader reads turns the row red (stale).
- */
+/** Refusals the reader leaves unread, by scene: a pin names the move kind, the ability and the reason; a pin the reader reads turns the row red (stale). */
 const UNREAD: Record<string, string[]> = {};
 
 interface Verdict { missed: string[]; falseRuleOuts: string[]; stalePins: string[]; played: number; skipped: number; refused: number }
 
-/** The sweep of one realm and game type over the target's own abilities. */
 function sweepTargets(realm: Realm, doubles: boolean): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0, refused: 0 };
@@ -185,7 +165,6 @@ function sweepTargets(realm: Realm, doubles: boolean): Verdict {
   return verdict;
 }
 
-/** The ally sweep: the ability sits on the ally of the body that takes the hit (a redirect, a guard of the `onAlly` kind). */
 function sweepAllies(realm: Realm): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0, refused: 0 };
@@ -260,14 +239,10 @@ function sweepSources(realm: Realm): { wrong: string[]; played: number; ignoring
 
 /**
  * The prefilter of the reader (`mayRefuseHit`): the abilities it leaves out are never asked, so none of them may be one the twin refuses a hit with. For every
- * ability of the realm (the sample, or all of them in the full run) and every scene of the sweep: when the twin lets the hit land with no ability and refuses it
- * with the ability, on the body that takes the hit or on its ally, the prefilter must keep the ability. The test also counts the abilities it leaves out: a
- * prefilter that keeps everything would pass.
+ * ability of the realm and every scene: when the twin lets the hit land with no ability and refuses it with the ability, on the body that takes the hit or on its
+ * ally, the prefilter must keep the ability. The test also counts the abilities it leaves out: a prefilter that keeps everything would pass.
  */
-/**
- * Registers the rows of the realms a part plays (`names`: realm names), under the titles of the former single file. `shared` adds the one row
- * that reads no realm (the powder check). A describe with no row for the part's realms (the default run plays doubles in two realms only) is left out.
- */
+/** Registers the rows of the realms a part plays (`names`: realm names); `shared` adds the one row that reads no realm (the powder check). */
 export function registerLandedHitSweep(names: string[], shared = false): void {
   const realms = REALMS.filter(realm => names.includes(realm.name));
   if (realms.length !== names.length) throw new Error(`unknown realm among ${names.join(', ')}`);

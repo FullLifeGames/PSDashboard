@@ -2,7 +2,7 @@ import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex } from '../src/rules-dex';
 
-/** Round 89 (#110): plays whole battles on @pkmn/sim for blocked-effects.spec.ts and blocked-effects-sweep.spec.ts. */
+/** Plays whole battles on @pkmn/sim for the blocked-effects specs. */
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -15,13 +15,11 @@ export const setOf = (body: PlayBody): PokemonSet => ({
 
 export interface PlayOptions {
   format: string;
-  /** Each side's bodies in team order; in doubles the first two lead. */
   p1: PlayBody[];
   p2: PlayBody[];
-  /** One entry per turn: the raw `choose` text of each side. */
   turns: { p1: string; p2: string }[];
   seed?: string;
-  /** Side p2 never acts: its moves abort before they start (the landed-hit sweep plays the hit before the target's own action, as the twin does). */
+  /** Side p2 never acts: its moves abort before they start. */
   idle?: boolean;
 }
 

@@ -2,18 +2,9 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-/**
- * T108 step 2 (round 67, spec decision 19): the inference takes from its own
- * @pkmn/client walk the facts its handlers missed, class by class as the
- * census of client against inference found them (544 deviations in 133
- * bank and feedback games): an ability the line names as its effect
- * (`|-activate|p2a: X|ability: Quark Drive`, a Queenly Majesty block), an item
- * a line names from the holder's own side (`[from] item: Toxic Orb` on a
- * status line, Poltergeist), and the client's rule for a move that is no
- * choice of the user's own (a Magic Bounce reflection, a move while
- * transformed, Struggle). Every log comes from @pkmn/sim; each case checks
- * the simulator's line first, then what the inference reads for p2.
- */
+// The inference takes from @pkmn/client the facts its handlers missed: an ability a line names as its effect (`|-activate|p2a: X|ability: Quark Drive`,
+// a Queenly Majesty block), an item a line names from the holder's own side (`[from] item: Toxic Orb`, Poltergeist), and the client's rule for a move
+// that is no choice of the user's (a Magic Bounce reflection, a move while transformed, Struggle). Every log comes from @pkmn/sim.
 
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {

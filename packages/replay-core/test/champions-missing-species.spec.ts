@@ -8,14 +8,9 @@ import { inferSpreads } from '../src/spread-inference';
 import { buildSolveContext, hpBasisOf, observationError, speedStat } from '../src/spreads/fit';
 import type { DamageObservation } from '../src/types';
 
-/**
- * Round 68 (T186, decision 3 with D8): the spread solver builds every species the Champions mod allows. The calculator's
- * Champions generation 0 lacks 35 of them (Aegislash, the Vivillon patterns, the Alcremie flavors, Minior-Meteor, the Ogerpon
- * Tera formes, ...); each used to throw inside the solver (an observation that never judged, a Speed of 0, no max-HP pin).
- * The solver builds through the shared builder now. It also holds the other half of decision 7: Pound, the one damaging
- * move generation 0 lacks, builds as a 0-damage Status move in the calculator and must read as unreadable, never as a miss.
- * The species come from the mod, the numbers from the simulator's Dex: stat = base + SP + 20, HP = base + SP + 75 at level 50.
- */
+// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, the Vivillon patterns, the Alcremie flavors, Minior-Meteor,
+// the Ogerpon Tera formes, ...); the solver builds them through the shared builder. Pound, the one damaging move generation 0 lacks, builds
+// as a 0-damage Status move in the calculator and must read as unreadable, never as a miss. Stat = base + SP + 20, HP = base + SP + 75 at level 50.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const dex = Dex.dexes.champions;
 const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;

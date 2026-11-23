@@ -3,14 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { play, type PlayBody } from './blocked-effects-play';
 
-/**
- * Round 89 (#110): a landed effect rules out the abilities that would have refused it. Rows on written and played logs: the scene
- * of the issue (Doubles OU 2663093831: Intimidate and a Rock Slide flinch land on Dragonite, so it holds no Inner Focus), the
- * same effects in singles, in doubles and under the Champions mod, the ally's guard (Flower Veil, Sweet Veil), and every case where
- * the log proves nothing: an attacker that may ignore the target's ability, Neutralizing Gas, an Illusion user on the team, an
- * effect the body dealt itself, a reflected drop, a swapped ability, the last ability the species has. Every log except the
- * fixture's comes from @pkmn/sim. The sweep over every ability of every generation and mod is `blocked-effects-sweep.spec.ts`.
- */
+// Every log except the fixture's comes from @pkmn/sim; the sweep over every ability of every generation and mod is blocked-effects-sweep.spec.ts.
 
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
@@ -22,9 +15,7 @@ const ruledOut = (log: string, side: 'p1' | 'p2', species: string): string[] =>
 const mon = (species: string, ability: string, moves: string[] = ['Splash']): PlayBody => ({ species, ability, moves });
 const FILLER = mon('Chansey', 'Natural Cure');
 
-/** A singles scene: p1 uses its first move into p2's lead on turn 1, p2 splashes. */
 const singles = (source: PlayBody, target: PlayBody) => play({ format: SINGLES, p1: [source, FILLER], p2: [target, FILLER], turns: [{ p1: 'move 1', p2: 'move 1' }] });
-/** A doubles scene: p1's first body uses its first move at p2's first body (a spread move needs no aim), the rest splash. */
 const doubles = (source: PlayBody, target: PlayBody, partner: PlayBody = FILLER, aim = ' 1', format = DOUBLES) =>
   play({ format, p1: [source, FILLER, FILLER, FILLER], p2: [target, partner, FILLER, FILLER], turns: [{ p1: `move 1${aim}, move 1`, p2: 'move 1, move 1' }] });
 

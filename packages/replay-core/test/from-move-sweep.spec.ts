@@ -4,24 +4,16 @@ import * as championsMod from '@pkmn/mods/champions';
 import { CHAMPIONS_MOD, dexOf, inferOpponentTeam } from '../src/index';
 import type { GameRules } from '../src/index';
 
-/**
- * Round 89 (#140): which move a `|move|` line books on its user. A move line names its source in `[from]`, and the simulator prints
- * `[from] <effect.fullname>`: a move effect prints `move: X`, a condition its bare name. Three cases hold every `[from]` the corpus has:
- *
- *  - A caller (Metronome, Copycat, Nature Power and the rest of the Dex's `callsMove` set): the line shows the CALLED move, which the
- *    user does not know; the caller is the user's own move.
- *  - A pull (a Pledge combination, Round): the line shows the user's OWN move, and the effect names the PARTNER's move that pulled it
- *    forward (`|move|p1a: Primarina|Water Pledge|...|[from] move: Grass Pledge`). The partner's move is no move of the user.
- *  - A condition (Magic Coat, Snatch, Pursuit's switch hit, a locked move): the type is missing; the line shows a move the user does
- *    not know when the condition reflected or stole it, and the user's own move for Pursuit and the locked move.
- *
- * The oracle is the simulator's own body: the moves it was built with (`baseMoveSlots`). The inference must book no move the body does
- * not know, and every move line without `[from]` must be booked. The sweep plays every Dex move that calls, pulls or reflects another
- * move (found by reading the Dex: `callsMove`, and the handlers that call `useMove`, `runMove` or `queue.prioritizeAction`), in every
- * generation the corpus plays (1 to 9) and the Champions mod, singles and, from Generation 3, doubles; its alone pass plays every
- * other move of the generation in doubles to see that no further move writes a `[from] move:` line. No species or move name stands in
- * the code that is under test.
- */
+// A move line names its source in `[from]`, and the simulator prints `[from] <effect.fullname>`: a move effect prints `move: X`, a condition its bare name.
+// Three cases hold every `[from]` the corpus has: a caller (Metronome, Copycat, Nature Power and the rest of the Dex's callsMove set) shows the CALLED
+// move, which the user does not know, and the caller is the user's own move; a pull (a Pledge combination, Round) shows the user's OWN move, and the effect
+// names the PARTNER's move that pulled it forward (`|move|p1a: Primarina|Water Pledge|...|[from] move: Grass Pledge`), which is no move of the user; a
+// condition (Magic Coat, Snatch, Pursuit's switch hit, a locked move) has no type, and the line shows a move the user does not know when the condition
+// reflected or stole it, and the user's own move for Pursuit and the locked move. The oracle is the simulator's own body (`baseMoveSlots`): the inference
+// must book no move the body does not know, and every move line without `[from]` must be booked. The sweep plays every Dex move that calls, pulls or
+// reflects another move (found by reading the Dex: callsMove, and the handlers that call useMove, runMove or queue.prioritizeAction) in every generation the
+// corpus plays (1 to 9) and the Champions mod, singles and, from Generation 3, doubles; its alone pass plays every other move of the generation in doubles to
+// see that no further move writes a `[from] move:` line.
 Dex.mod(CHAMPIONS_MOD, championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -51,7 +43,6 @@ function movesOf(dex: Dexish, scene: Scene): MoveData[] {
   return dex.moves.all().filter(move => move.exists && move.gen <= scene.gen && move.isNonstandard !== 'Future' && !move.isZ && !move.isMax);
 }
 
-/** The text of a move's handlers (the move and its condition), read from the Dex's functions. */
 function handlerText(move: MoveData): string {
   const seen = new Set<unknown>();
   const texts: string[] = [];
@@ -65,7 +56,6 @@ function handlerText(move: MoveData): string {
   read({ ...move });
   return texts.join('\n');
 }
-/** Whether a move's handlers call another move or pull an action of the queue forward. */
 const movesAMove = (move: MoveData): boolean => /useMove|runMove|prioritizeAction/.test(handlerText(move));
 /** Whether a move's handlers pull an action of the queue forward (a Pledge, Round, After You, Instruct, Shell Trap). */
 const pullsAnAction = (move: MoveData): boolean => /prioritizeAction/.test(handlerText(move));
@@ -78,9 +68,7 @@ function fillersOf(dex: Dexish, scene: Scene, count: number): string[] {
 }
 
 interface Plan {
-  /** What p1's two slots use in turn 2 (singles reads slot 1). */
   own: string[];
-  /** What p2's two slots use in turn 2. */
   foe: string[];
   /** What p2's two slots use in turn 1: the first puts p1's second slot to sleep when it is Spore, and the foe's last move is the one a copier reads. */
   opening: string[];
@@ -134,7 +122,6 @@ function play(scene: Scene, kind: Kind, plan: Plan): Played {
 
 interface Gap { side: string; species: string; booked: string; why: string }
 
-/** The inference against the simulator's bodies: no booked move the body does not know, and every plain move line booked. */
 function gapsOf(played: Played): Gap[] {
   const gaps: Gap[] = [];
   for (const side of ['p1', 'p2'] as const) {
@@ -156,7 +143,6 @@ function gapsOf(played: Played): Gap[] {
   return gaps;
 }
 
-/** The effects the log's move lines name after `[from]`, typed or not. */
 const fromEffects = (log: string) => log.split('\n').filter(text => text.startsWith('|move|'))
   .flatMap(text => text.split('|').filter(part => part.startsWith('[from]')).map(part => part.replace(/^\[from\] ?/, '')));
 
@@ -186,7 +172,7 @@ describe('the scenes of the issue', () => {
     const played = play(SCENES[8], 'singles', { own: ['naturepower'], foe: ['splash'], opening: ['tackle'] });
     expect(fromEffects(played.log)).toEqual(['move: Nature Power']);
     expect(movesOfSide(played.log, 'p1', 'Bulbasaur')).toEqual(['Nature Power', 'Splash']);
-    // The older servers wrote `[from]Nature Power` (smogtours-gen7ou-546696): the same set.
+    // The older servers wrote `[from]Nature Power`: the same set.
     const older = oldForm(played.log, new Set(['naturepower']));
     expect(fromEffects(older)).toEqual(['Nature Power']);
     expect(movesOfSide(older, 'p1', 'Bulbasaur')).toEqual(['Nature Power', 'Splash']);
@@ -200,7 +186,6 @@ describe('the scenes of the issue', () => {
   });
 });
 
-/** The moves each side's bodies are booked with, as one string per side. */
 const bookedOf = (log: string) => (['p1', 'p2'] as const).map(side => inferOpponentTeam(log, side).pokemon
   .map(entry => `${entry.species}: ${entry.moves.map(move => toID(move.name)).sort().join(',')}`).join(' | '));
 

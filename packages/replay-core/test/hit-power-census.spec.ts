@@ -3,13 +3,9 @@ import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { historyPower, historyPowerMove } from '../src/spreads/hit-power';
 
-/**
- * Round 73 (T210, group 1): the sweep over every move of the Dex with a `basePowerCallback`, in every generation and mod the
- * corpus plays (generations 1 to 9, the Champions mod), sorted by what the callback reads on a recording stand-in. The history
- * class (the fallen of the user's side, the hits the user took) is what the solver prices; its members are held against the simulator's own callback on a real battle at
- * sampled counts. A new Dex move that reads only the history joins the class and fails the list below until it is named. The other
- * classes are the findings: moves whose power reads state the observation does not carry (listed in the ledger as new TODO proposals).
- */
+// Every move of the Dex with a basePowerCallback, in every generation and mod the corpus plays, sorted by what the callback reads on a recording
+// stand-in. The history class (the fallen of the user's side, the hits the user took) is what the solver prices; its members are held against
+// the simulator's own callback on a real battle at sampled counts. A new move that reads only the history joins the class and fails the list below.
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
