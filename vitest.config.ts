@@ -34,6 +34,15 @@ export default defineConfig({
     // raise their own timeout in the test options.
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    // `npm run test:coverage` only; a plain run collects none.
+    coverage: {
+      provider: 'v8',
+      include: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
+      exclude: ['**/*.d.ts'],
+      reporter: ['json', 'json-summary', 'text-summary'],
+      reportsDirectory: '.calibration/coverage',
+      reportOnFailure: true,
+    },
     projects: [
       project('app', 'test/regression/**/*.spec.ts'),
       project('replay-core', 'packages/replay-core/test/**/*.spec.ts'),
