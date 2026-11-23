@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyTable } from '../../scripts/rows-compare.mjs';
-import { countPerProject, rowsOfList } from '../../scripts/rows-collect.mjs';
+import { countPerProject, listArgs, rowsOfList } from '../../scripts/rows-collect.mjs';
 
 /**
  * The tools that prove a test cut (`npm run test:coverage`, scripts/cov-compare.mjs, rows-collect.mjs, rows-compare.mjs):
@@ -148,6 +148,18 @@ describe('rows-collect', () => {
     expect(result.out).toContain('3 rows in 2 files');
     expect(run('rows-compare.mjs', out, out).code).toBe(0);
   });
+
+  test('a file that registers its rows through a helper is listed by running it, not by reading its text', () => {
+    expect(listArgs(['--project', 'app'])).toEqual(['vitest', 'list', '--json', '--staticParse=false', '--project', 'app']);
+    expect(listArgs(['--staticParse'])).toEqual(['vitest', 'list', '--json', '--staticParse']);
+    const out = join(dir, 'helper-registered.json');
+    const result = run('rows-collect.mjs', out, '--project', 'replay-core', 'packages/replay-core/test/landed-hit-sweep-3.spec.ts');
+    expect(result.out).toContain('replay-core');
+    expect(result.code).toBe(0);
+    const rows = JSON.parse(readFileSync(out, 'utf8')) as { name: string; projectName: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every(row => row.projectName === 'replay-core')).toBe(true);
+  }, 120_000);
 });
 
 describe('the coverage provider', () => {
