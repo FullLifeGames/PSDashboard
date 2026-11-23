@@ -3,7 +3,7 @@ import { loggedDice } from '../src/dice/logged-results';
 import { tieName } from '../src/dice/types';
 
 /**
- * Round 86 (the log's dice, T306), found by `cant-choice.spec.ts` (smogtours-gen9ou-752301, turn 1): two Landorus tie in speed, the foe
+ * Round 86 (the log's dice, T306), found by `choice-lock.spec.ts` (smogtours-gen9ou-752301, turn 1): two Landorus tie in speed, the foe
  * Taunts first and the other body is stopped by the Taunt it just got (`|cant|`). The log shows who acted first only through that `|cant|`
  * line, so the order die has to read a stopped body as an action of the queue too.
  */
