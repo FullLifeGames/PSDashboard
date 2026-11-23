@@ -12,19 +12,14 @@ import { bankTeamsFor } from './bank-build.ts';
 
 /**
  * The boards of the verify-scenes rows (`packages/eval-engine/test/tree-orchestrator.verify-scenes.spec.ts`), built the way the app builds
- * a turn (round 89, user ruling 16.11.2026, B5a).
+ * a turn: `bankTeamsFor` (the bank's door to `buildAppTeams`) over the saved replay and the saved Smogon files of the feedback harness
+ * (`test/e2e-feedback/fixtures/`), the replay rebuilt to the turn with the choice locks and the target corrections, the settings and the
+ * played turn read as the sweep reads them (`bankSettings`, `bankKeepPlayed`), the sacks from the turn's own protocol (`detectSacks`).
+ * It is the board the feedback dump of that turn read.
  *
- * The three rows of round 63 (648453 t13, 573756 t73, 912045 t8) graded boards that were exported once, with the sets
- * of that day, while the app builds its sets again on every analysis. The board here is the app's: `bankTeamsFor`
- * (the bank's door to `buildAppTeams`) over the saved replay and the saved Smogon files of the feedback harness
- * (`test/e2e-feedback/fixtures/`), the replay rebuilt to the turn with the choice locks and the target corrections,
- * the settings and the played turn read as the sweep reads them (`bankSettings`, `bankKeepPlayed`), the sacks from
- * the turn's own protocol (`detectSacks`). It is the board the feedback dump of that turn read.
- *
- * `verify-scenes-boards.spec.ts` rebuilds the three and fails when a fixture differs; `UPDATE_VERIFY_SCENES=1` writes
- * them again (then run `tree-orchestrator.verify-scenes.spec.ts` and recompute the Monte-Carlo references of its rows).
- * The fixtures live in `verify-scenes/`, beside `positions/` and not in it: the speed-layer sweeps read every file of
- * `positions/`.
+ * `verify-scenes-boards.spec.ts` rebuilds the three and fails when a fixture differs; `UPDATE_VERIFY_SCENES=1` writes them again (then run
+ * `tree-orchestrator.verify-scenes.spec.ts` and recompute the Monte-Carlo references of its rows). The fixtures live in `verify-scenes/`,
+ * beside `positions/` and not in it: the speed-layer sweeps read every file of `positions/`.
  */
 
 const REPO = new URL('../../', import.meta.url);
@@ -32,7 +27,6 @@ const FEEDBACK = new URL('test/e2e-feedback/fixtures/', REPO);
 export const BOARD_DIR = new URL('packages/eval-engine/test/fixtures/verify-scenes/', REPO);
 
 export interface SceneBoard {
-  /** The replay's file stem under `test/e2e-feedback/fixtures/`. */
   id: string;
   turn: number;
 }

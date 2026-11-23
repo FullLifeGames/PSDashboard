@@ -4,12 +4,11 @@ import { describe, expect, test, vi } from 'vitest';
 import { FIXTURES, rebuild } from './forced-reconstruction-support';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B12 (T306): the rebuild answers a forced replacement and waits for the simulator's
- * next move. When the simulator asks for another replacement at once (the replacement faints on entry to hazards; a Volt Switch chain;
- * a double faint in doubles), the old wait held for none of its conditions and ran to its 1.5 s timeout. The wait now also ends when
- * either side holds a new request object. Round 86's B11 found five such timeouts in the twelve fixtures (653785 turn 22, 573756
- * turn 40, 912045 turn 5, 2663093831 turn 1, 2630685175 turn 2). The rows rebuild through the log's last turn, the way the timing
- * probe does (the drift line's 356 turns stop before the last block).
+ * The rebuild answers a forced replacement and waits for the simulator's next move. When the simulator asks for another replacement at once
+ * (the replacement faints on entry to hazards; a Volt Switch chain; a double faint in doubles), the wait must end when either side holds
+ * a new request object and not run to its 1.5 s timeout (seen in 653785 turn 22, 573756 turn 40, 912045 turn 5, 2663093831 turn 1,
+ * 2630685175 turn 2). The rows rebuild through the log's last turn, the way the timing probe does (the drift line's 356 turns stop
+ * before the last block).
  */
 
 const waits = vi.hoisted(() => ({ calls: 0, timeouts: 0 }));

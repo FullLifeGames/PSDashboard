@@ -145,10 +145,9 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
-  // Round 77 (branching swarm, 28.10.2026): every load of a VGC 2026 replay logged twelve 404s for
-  // sets/gen9vgc2026.json, one per species of both teams. @pkmn/smogon keeps a sets file only once its response
-  // arrived, and the species ask at the same time. The species of one request now share one fetch per file, the
-  // Doubles Ubers fallback of Doubles OU included.
+  // Every load of a VGC 2026 replay logged twelve 404s for sets/gen9vgc2026.json, one per species of both teams. @pkmn/smogon keeps a
+  // sets file only once its response arrived, and the species ask at the same time, so the species of one request share one fetch
+  // per file, the Doubles Ubers fallback of Doubles OU included.
   test('round 77: the species of one request share one fetch per sets file', async () => {
     const asked: string[] = [];
     const counting = (files: Record<string, unknown>) => {
@@ -169,9 +168,9 @@ describe('Smogon set assumptions', () => {
     expect(doubles?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
-  // Round 66 review: WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message
-  // the error filter does not know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026)
-  // threw "Smogon sets unavailable" in Safari. A 404 sets file now reads as an empty file before json() runs.
+  // WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message the error filter does not
+  // know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026) threw "Smogon sets unavailable" in
+  // Safari. A 404 sets file reads as an empty file before json() runs.
   test('round 66: a 404 sets file reads as no sets in every browser', async () => {
     const webkit404 = async () => ({
       ok: false, status: 404, json: async () => { throw new SyntaxError('The string did not match the expected pattern.'); },
@@ -179,7 +178,7 @@ describe('Smogon set assumptions', () => {
     await expect(fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: ['Kyurem', 'Toxapex'], fetcher: webkit404 as never })).resolves.toBeNull();
   });
 
-  // Round 66 (T142): on 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
+  // On 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
   // and 82 % of the moves, the Doubles OU sets 48 % and 73 %; a year without a VGC set file guesses better from its
   // usage file alone than from the Doubles OU sets (2026 Reg I items 77 % against 68 %, Champions VGC 56 % against 51 %).
   test('round 66 (T142): a VGC format reads the VGC set file of its year and never the Doubles OU analyses', async () => {
@@ -200,9 +199,9 @@ describe('Smogon set assumptions', () => {
     expect(champions?.pokemon.toxapex).toBeUndefined();
   });
 
-  // Round 67 (T143): Champions OU asked for sets/gen9championsou.json, a file that does not exist (@pkmn/smogon names
-  // Champions files without the generation), and fell back to the Scarlet/Violet Ubers analyses: Corviknight (39 %
-  // usage) got Impish 252/160/96 with Tera instead of its Champions set with 32/32/2 Stat Points.
+  // Champions OU must not ask for sets/gen9championsou.json (a file that does not exist: @pkmn/smogon names Champions files without
+  // the generation) and fall back to the Scarlet/Violet Ubers analyses: Corviknight (39 % usage) would get Impish 252/160/96 with
+  // Tera instead of its Champions set with 32/32/2 Stat Points.
   test('round 67 (T143): Champions OU reads the Champions OU set file and no Scarlet/Violet file', async () => {
     const corviknightChampions = { Corviknight: { 'Iron Press': { nature: 'Impish', evs: { hp: 32, def: 32, spd: 2 }, moves: ['Iron Defense', 'Body Press', 'Roost', 'Brave Bird'] } } };
     const corviknightUbers = { Corviknight: { Defog: { nature: 'Impish', evs: { hp: 252, def: 160, spd: 96 }, moves: ['Defog', 'Brave Bird', 'Roost', 'U-turn'] } } };

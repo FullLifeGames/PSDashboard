@@ -5,10 +5,10 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Round 84 (turn dock), step A6b: the dock in narrow windows. At 1050 px (where the layout stacks) the dock is fixed at the
- * viewport's lower edge across the full width, the page keeps a bottom padding of the dock's height (`--ps-dock-h`, written by
- * `useDockHeight`), the tray opens from below as a sheet of up to 70 % of the viewport, and Execute takes its own row under the
- * chips. At 640 px the chips take one row each (A7c, ruling 11a) at the dock's 46 px, with the app's 640 px sizes (40 px minimum for chips and Execute).
+ * The dock in narrow windows. At 1050 px (where the layout stacks) the dock is fixed at the viewport's lower edge across the full width,
+ * the page keeps a bottom padding of the dock's height (`--ps-dock-h`, written by `useDockHeight`), the tray opens from below as a sheet
+ * of up to 70 % of the viewport, and Execute takes its own row under the chips. At 640 px the chips take one row each at the dock's
+ * 46 px, with the app's 640 px sizes (40 px minimum for chips and Execute).
  */
 const css = readFileSync(new URL('../../src/styles/dock.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
@@ -55,7 +55,7 @@ describe('the dock at 1050 px and below', () => {
     expect(tray, 'a .ps-tray rule').not.toBeNull();
     expect(tray).toMatch(/position:\s*fixed/);
     expect(tray).toMatch(/bottom:\s*var\(--ps-dock-h/);
-    // Round 84 (A7d): the vh units divide by the root's scale (`--ps-vh`).
+    // The vh units divide by the root's scale (`--ps-vh`).
     expect(tray).toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
     expect(rule(block ?? '', '.ps-tray.ps-tray-roomy') ?? '').toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
   });
@@ -78,12 +78,12 @@ describe('the dock at 640 px and below', () => {
   });
 
   test('the chips take one row each at 46 px, and the tray spans the width', () => {
-    // Round 84 (A7c, ruling 11a): two chips a row cut the choice after about twelve letters at 390 px; one a row (doubles four rows,
-    // singles two) leaves the whole choice and A7b's tag or sprite.
+    // Two chips a row cut the choice after about twelve letters at 390 px; one a row (doubles four rows,
+    // singles two) leaves the whole choice and the tag or sprite.
     const row = rule(block ?? '', '.ps-dock-row') ?? '';
     expect(row).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/);
     expect(row).toMatch(/grid-auto-rows:\s*46px/);
-    // The rows' own track no longer fixes the height of a row that holds two chips.
+    // The rows' own track does not fix the height of a row that holds two chips.
     expect(rule(block ?? '', '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*auto/);
     expect(rule(block ?? '', '.ps-tray') ?? '').toMatch(/width:\s*100%/);
   });
@@ -93,7 +93,7 @@ describe('the tray\'s tiles at 640 px and below', () => {
   const block = media(640);
 
   test('the move tiles stand two per row, so a name like "Rock Slide" is not cut at 390 px', () => {
-    // Round 84 (turn dock, A6c): at 390 px a row of four tiles left about 80 px a tile; two per row leave about 170.
+    // At 390 px a row of four tiles leaves about 80 px a tile; two per row leave about 170.
     const grid = rule(block ?? '', '.ps-tile-grid');
     expect(grid, 'a .ps-tile-grid rule in the 640 px block').not.toBeNull();
     expect(grid).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
@@ -105,9 +105,9 @@ describe('the tray\'s tiles at 640 px and below', () => {
 });
 
 describe('the dock above 1050 px: the label of Execute never moves a chip', () => {
-  // Round 84 (turn dock, A6d): the Execute column was `auto`, so the label ("Select all active choices", "Waits for engine…",
-  // "Execute Turn") sized it and the chip columns beside it changed width by a few pixels (P1A: 4.3 px in the Q19 b scene).
-  // The column is a fixed width that fits every label; the button fills it and wraps a long label.
+  // The Execute column is a fixed width that fits every label ("Select all active choices", "Waits for engine…", "Execute Turn"); with
+  // `auto` the label sized it and the chip columns beside it changed width by a few pixels (P1A: 4.3 px). The button fills it and wraps
+  // a long label.
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
 
   test('the chips share the bar with a column of fixed width', () => {
@@ -132,8 +132,8 @@ describe('the dock above 1050 px: the label of Execute never moves a chip', () =
 });
 
 describe('the HP bar of a bench tile', () => {
-  // Round 84 (turn dock, A7a): the fill is a span; without `display: block` it stays inline and its width does nothing, so every bench
-  // tile showed the bare grey track, at 15 % as at 100 %. The only users of `.ps-hpbar-fill` are the dock's bench tiles.
+  // The fill is a span; without `display: block` it stays inline and its width does nothing, so every bench tile shows the bare grey
+  // track, at 15 % as at 100 %. The only users of `.ps-hpbar-fill` are the dock's bench tiles.
   const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
   test('the fill is a block, so its inline width sets the bar', () => {
@@ -149,7 +149,7 @@ describe('the HP bar of a bench tile', () => {
 });
 
 describe('the engine badge of a tile', () => {
-  // Round 84 (A7a): the engine's held-back pick wears the played badge's face (same tokens, so the contrast spec covers it), shares the
+  // The engine's held-back pick wears the played badge's face (same tokens, so the contrast spec covers it), shares the
   // badge box rules, and sits in the tile's flag row beside the played and forced badges.
   const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
@@ -162,7 +162,7 @@ describe('the engine badge of a tile', () => {
     expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge,\n\.ps-tile-flags \.ps-guess-badge\s*\{[^}]*margin:\s*0/);
   });
 
-  // Round 88 (F, #101): a stand-in's tile wears the forced badge's face (same tokens, so the contrast spec covers it) in the same box and
+  // A stand-in's tile wears the forced badge's face (same tokens, so the contrast spec covers it) in the same box and
   // the same flag row.
   test('the stand-in badge takes the forced badge\'s colors', () => {
     expect(pickers).toMatch(/\n\.ps-guess-badge \{ background: var\(--ps-badge-forced-bg\); color: var\(--ps-badge-forced-fg\); \}/);
@@ -170,9 +170,9 @@ describe('the engine badge of a tile', () => {
 });
 
 describe("the dock follows the column's content (ruling 4a)", () => {
-  // Round 84 (A7a): `.ps-dock-log { margin-top: auto }` pushed the toggle and the dock to the foot of a tall column, and a gap of about
-  // 400 px opened under the timeline at 2560 x 1440. The dock now stands directly under the last panel; it stays sticky at the column's
-  // foot when the content is longer than the window, and the tray stays absolute above the bar, so a tray moves no chip.
+  // `.ps-dock-log { margin-top: auto }` would push the toggle and the dock to the foot of a tall column and open a gap of about 400 px
+  // under the timeline at 2560 x 1440. The dock stands directly under the last panel; it stays sticky at the column's foot when the
+  // content is longer than the window, and the tray stays absolute above the bar, so a tray moves no chip.
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
   const narrow = media(1050) ?? '';
 
@@ -311,7 +311,7 @@ describe('layout-css', () => {
     });
 
     test('the left column has no padding below the dock, so the shared row ends on the foot of the dock', () => {
-      // Round 84 (A7c, item 0a): a padding-bottom of 12px made the row 12px longer than the dock, and the right column reached past it.
+      // A padding-bottom of 12px makes the row 12px longer than the dock, and the right column reaches past it.
       expect(rule(base, '.ps-main-left')).not.toMatch(/padding-bottom:\s*[1-9]/);
     });
 
@@ -364,7 +364,7 @@ describe('layout-css', () => {
   });
 
   describe('the top bar above 640 px stays on one line with a long format name', () => {
-    // Round 84 (A7f, ruling 19a): the match had `flex: 1 1 auto`, so its basis was its whole text and the support links wrapped before
+    // The match must not have `flex: 1 1 auto`: its basis would be its whole text and the support links would wrap before
     // anything shrank. The match takes a zero basis and a floor; inside it the format tag shortens first (a shrink weight far above the
     // names'), the names next; the bar wraps only where even that floor does not fit.
     test('the match has no content basis and a floor that wins over the stacked layout min-width: 0', () => {
@@ -388,7 +388,7 @@ describe('layout-css', () => {
   });
 
   describe('the top bar at 640 px and below', () => {
-    // Round 84 (A7c, ruling 11a): the bar took three lines (74 px at 390 px); two at most: the match, then the menus with the support links.
+    // The bar takes two lines at most (three would be 74 px at 390 px): the match, then the menus with the support links.
     const phone = media(layout, 640);
 
     test('the match takes the first line, the menus and the support links share the second', () => {
@@ -410,7 +410,7 @@ describe('layout-css', () => {
   });
 
   describe('the replay frame at 640 px and below', () => {
-    // Round 84 (A7c, ruling 10a): the document shrinks its scene to the frame's width; the frame keeps no 640 px minimum and no sideways scroll.
+    // The document shrinks its scene to the frame's width; the frame keeps no 640 px minimum and no sideways scroll.
     test('the frame has no minimum width and its wrapper no horizontal scroll', () => {
       expect(media(layout, 640)).not.toMatch(/min-width:\s*640px/);
       expect(media(layout, 640)).not.toMatch(/\.ps-iframe-wrap\s*\{[^}]*overflow-x:\s*auto/);
@@ -647,7 +647,6 @@ describe('dock-status-background', () => {
 describe('dock-chip-placeholder', () => {
   const css = readFileSync(new URL('../../src/styles/dock.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
-  /** The declarations of the rule that opens a line with `selector`, or null. */
   const rule = (selector: string): string | null => {
     const start = css.indexOf(`\n${selector} {`);
     if (start < 0) return null;

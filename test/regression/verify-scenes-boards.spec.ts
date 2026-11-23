@@ -4,18 +4,16 @@ import { describe, expect, test } from 'vitest';
 import { BOARD_DIR, SCENE_BOARDS, boardFile, buildBoard, writeBoard } from './verify-scenes-boards.ts';
 
 /**
- * Round 89 (B5a): the fixtures of the verify-scenes rows are the boards the app builds today, and this spec keeps them so.
- * Round 63 exported the three boards once and left them; the app builds its sets again on every analysis, so the rows
- * graded boards nobody saw (912045 t8's Ursaluna held a Life Orb that the log rules out). Each row rebuilds its board
- * through the app's path (`bankTeamsFor`, the saved replay and Smogon files of the feedback harness) and compares it
- * with the committed fixture. A change to the set build, the inference, the reconstruction or the simulator that moves
+ * The fixtures of the verify-scenes rows are the boards the app builds, and this spec keeps them so: the app builds its sets again on
+ * every analysis, so a fixture exported once would grade a board nobody sees (912045 t8's Ursaluna held a Life Orb that the log rules
+ * out). Each row rebuilds its board through the app's path (`bankTeamsFor`, the saved replay and Smogon files of the feedback harness)
+ * and compares it with the committed fixture. A change to the set build, the inference, the reconstruction or the simulator that moves
  * a board fails here first.
  *
  *   UPDATE_VERIFY_SCENES=1 npx vitest run --project app test/regression/verify-scenes-boards.spec.ts
  *
  * writes the fixtures again. Then run `tree-orchestrator.verify-scenes.spec.ts`, recompute the Monte-Carlo references of its rows (the
  * recipe is in EVALUATION.md, "Scene pins") and move the pins at the gate, as the rows' comments say.
- * Cost: three team builds and replay reconstructions, about 3 to 8 seconds each on devbox.
  */
 
 const UPDATE = process.env.UPDATE_VERIFY_SCENES === '1';

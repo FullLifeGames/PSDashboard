@@ -9,11 +9,8 @@ import {
 } from '../../scripts/tier-census.mjs';
 
 /**
- * scripts/tier-census.mjs is the instrument of standing rule D21: it counts
- * the verdict tiers of feedback dump folders and names the turns behind a
- * changed count. The script is unlinted and untyped, so this spec is its only
- * gate. The dumps here are hand-built: the builder below IS the list of dump
- * fields the tool reads.
+ * scripts/tier-census.mjs counts the verdict tiers of feedback dump folders and names the turns behind a changed count; it is unlinted
+ * and untyped, so this spec is its only gate. The dumps are hand-built: the builder below IS the list of dump fields the tool reads.
  */
 
 interface SideInit {

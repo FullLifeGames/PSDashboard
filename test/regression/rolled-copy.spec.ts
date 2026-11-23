@@ -6,14 +6,14 @@ import { ALIGNMENT_SEEDS, extractProtocolEvents, isPerfectAlignment, scoreAlignm
 import { rebuild, type FixtureId, type GameType, type Rebuilt } from './forced-reconstruction-support';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B5 (T304): the copy of a turn with one die turned over. The report names the game's
- * biggest roll and asks what the other side of the die would have left; the copy plays the turn again from its start position with every
- * other die of the log as logged (the faint step and the phantom-proc rule of T306 included) and hands back the position of the next root.
+ * The copy of a turn with one die turned over. The report names the game's biggest roll and asks what the other side of the die would
+ * have left; the copy plays the turn again from its start position with every other die of the log as logged (the faint step and the
+ * phantom-proc rule included) and hands back the position of the next root.
  *
  * One row per game type, on the simulator: the turned die takes (a hit lands where the log has a miss, a miss where the log has a hit),
  * and the body that the log's turn did not knock out faints, or the one it did stays. Each scene also plays the control: the copy with no
  * die turned is the log's own turn (a perfect alignment), so the turned die alone makes the difference. The static score of the next
- * root stands in for the engine's evaluation here; `lanes/B/flip-cost.vt.ts` prices the real one.
+ * root stands in for the engine's evaluation here.
  */
 
 interface Scene {
@@ -70,7 +70,6 @@ beforeAll(async () => {
   for (const scene of SCENES) if (!rebuilt.has(scene.id)) rebuilt.set(scene.id, await rebuild(scene.id));
 }, 300_000);
 
-/** The copy of the scene's turn: with its die turned over, or the control with none. */
 const copyOf = (scene: Scene, turned = true): RolledCopy | null => {
   const built = rebuilt.get(scene.id)!;
   return rolledCopy({ position: built.positions.get(scene.turn)!, replayLog: built.replay.log, turn: scene.turn, ...(turned ? { flip: scene.flip } : {}) });
@@ -94,7 +93,6 @@ describe.each(SCENES)('the copy of $id turn $turn with $flip turned over ($type)
     const targetName = (line: string) => line.split('|')[2];
     const missed = (lines: string[]) => lines.some(line => line.startsWith('|-miss|') && line.split('|')[3]?.startsWith(`${scene.line.target}:`));
     const damaged = (lines: string[]) => lines.some(line => /^\|-damage\|/.test(line) && targetName(line).startsWith(`${scene.line.target}:`));
-    // the log shows the other side of the die
     expect(missed(logged)).toBe(scene.lands);
     expect(damaged(logged)).toBe(!scene.lands);
     expect(missed(shown)).toBe(!scene.lands);
@@ -140,7 +138,7 @@ describe('573756 turn 73: a hit leaves LordEnz ahead', () => {
 });
 
 /**
- * Round 86 (B6): the report hands the copy the roll it named (the side that rolled, the move, the doubles click's target body and
+ * The report hands the copy the roll it named (the side that rolled, the move, the doubles click's target body and
  * attacker slot) and the copy finds the die in the log: the winner's accuracy die that came out as a miss, on that move and that body.
  */
 describe('the roll the report names finds its die in the log', () => {

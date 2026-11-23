@@ -7,14 +7,7 @@ import * as replayCore from '@fulllifegames/replay-core';
 import * as evalEngine from '@fulllifegames/eval-engine';
 import { PKMN_EXACT } from '../../scripts/upgrade-pkmn.mjs';
 
-/**
- * The public surface of each workspace package, pinned twice: the names the
- * compiler sees on the barrel (values and types) against a committed
- * snapshot, and the names Node sees at runtime against the snapshot's value
- * lines. Widening or narrowing a barrel is a deliberate act: edit
- * `packages/<name>/src/index.ts`, rerun with `UPDATE_API_SNAPSHOT=1`, and
- * review the fixture diff.
- */
+/** The public surface of each workspace package: the barrel's names the compiler sees against a committed snapshot, and the names Node sees at runtime against its value lines. */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PACKAGES = [
   { name: 'replay-core', runtime: replayCore },
@@ -23,7 +16,6 @@ const PACKAGES = [
 
 const fixturePath = (name: string) => resolve(repoRoot, 'test/regression/fixtures/api', `${name}.txt`);
 
-/** `value name` / `type name` lines, sorted, for everything the barrel exports. */
 function compilerSurface(name: string): string[] {
   const dir = resolve(repoRoot, 'packages', name);
   const config = ts.readConfigFile(resolve(dir, 'tsconfig.json'), ts.sys.readFile);
@@ -69,7 +61,7 @@ describe('Package hygiene', () => {
     test(`${name}: the manifest is ready to publish`, () => {
       const manifest = readJson<Manifest>(resolve(dir, 'package.json'));
       expect(manifest.name).toBe(`@fulllifegames/${name}`);
-      // Release 1.0.1 (user 29.10.2026): the manifest names the version the release publishes, the root's.
+      // The manifest names the version the release publishes, the root's.
       expect(manifest.version, 'move all three: npm version <bump> --workspaces --include-workspace-root --no-git-tag-version')
         .toBe(rootVersion);
       expect(manifest.license).toBe('MIT');
@@ -78,11 +70,11 @@ describe('Package hygiene', () => {
       expect(manifest.publishConfig?.access).toBe('public');
       // The types condition has to come first: consumers resolve conditions in order.
       expect(Object.keys(manifest.exports['.'])).toEqual(['types', 'default']);
-      // Round 77 (user gate 28.10.2026, 6a): the engine package ships the check-engine command and its sample positions.
+      // The engine package ships the check-engine command and its sample positions.
       if (name === 'eval-engine') {
         expect(manifest.files).toEqual(['dist', 'bin', 'samples', 'README.md']);
-        // Round 78: the path as npm writes it (npm 12 dropped the leading ./ at the 1.0.0 publish and warned
-        // '"bin[eval-engine]" script name bin/eval-engine.mjs was invalid and removed', though it kept the entry).
+        // The path as npm writes it (npm 12 drops the leading ./ and warns
+        // '"bin[eval-engine]" script name bin/eval-engine.mjs was invalid and removed', though it keeps the entry).
         expect((manifest as Manifest & { bin?: Record<string, string> }).bin).toEqual({ 'eval-engine': 'bin/eval-engine.mjs' });
       } else {
         expect(manifest.files).toEqual(['dist', 'README.md']);
@@ -92,7 +84,7 @@ describe('Package hygiene', () => {
         expect(dep.startsWith('@fulllifegames/'), `${dep} is not a workspace package`).toBe(true);
         expect(range).toBe('*');
       }
-      // Peers float on a caret, except the simulator the speed layer copies (round 70, T43; test/regression/pkmn-pins.spec.ts).
+      // Peers float on a caret, except the simulator the speed layer copies (test/regression/pkmn-pins.spec.ts).
       for (const [dep, range] of Object.entries(manifest.peerDependencies ?? {})) {
         expect(range, dep).toMatch(PKMN_EXACT.includes(dep) ? /^\d+\.\d+\.\d+$/ : /^\^\d/);
       }

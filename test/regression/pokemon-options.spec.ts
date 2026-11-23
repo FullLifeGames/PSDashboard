@@ -32,8 +32,7 @@ describe('legal option pools', () => {
     expect(getAbilityPool('Machoke', 2)).toEqual([]);
   });
 
-  // Round 83 (T308, GitHub issue #2): the editor takes a move or an ability the species cannot have, so it needs the
-  // generation's whole list next to the species' own pool.
+  // The editor takes a move or an ability the species cannot have, so it needs the generation's whole list next to the species' own pool.
   test('the whole move list of a generation holds what the species cannot learn and nothing the Dex does not know', () => {
     const gen9 = getEveryMovePool(9);
     expect(gen9).toEqual(expect.arrayContaining(['Spore', 'Power Whip', 'Earthquake']));

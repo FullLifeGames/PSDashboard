@@ -4,12 +4,11 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Round 89 (lane H, #105): the start load holds no simulator code (`test/e2e-build/build-smoke.spec.ts` reads the built
- * chunks). This is its source-level twin, which fails in seconds and names the file: a module of the app's start load (the static
- * imports from src/main.tsx, no dynamic `import()`) that takes a value from a workspace package's barrel must take it from a
- * module that does not import the simulator's battle classes. A module the New game dialog shares with the start page lands in a
- * chunk of the start load together with every export the lazy chunk uses of it: `DEFAULT_GAME_SEED` re-exported from
- * `branch/new-game.ts` put the whole battle runtime there (CI run 43380926565).
+ * The start load holds no simulator code (`test/e2e-build/build-smoke.spec.ts` reads the built chunks). This is its source-level twin,
+ * which fails in seconds and names the file: a module of the app's start load (the static imports from src/main.tsx, no dynamic
+ * `import()`) that takes a value from a workspace package's barrel must take it from a module that does not import the simulator's
+ * battle classes. A module the New game dialog shares with the start page lands in a chunk of the start load together with every
+ * export the lazy chunk uses of it: `DEFAULT_GAME_SEED` re-exported from `branch/new-game.ts` would put the whole battle runtime there.
  *
  * The rule reads imports, not formats: singles and doubles reach it the same way.
  */
@@ -56,7 +55,6 @@ function staticImports(source: string): Import[] {
   return found;
 }
 
-/** The module of a barrel that defines each exported name (`export { a, b } from './x.ts'`). */
 function originsOfBarrel(barrel: string): Map<string, string> {
   const origins = new Map<string, string>();
   for (const { names, spec } of staticImports(read(barrel))) {

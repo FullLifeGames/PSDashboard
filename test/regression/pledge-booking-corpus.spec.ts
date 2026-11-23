@@ -6,7 +6,7 @@ import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
- * Round 89 (#140): a Pledge combination or Round writes `|move|p1a: Primarina|Water Pledge|p2a: Torkoal|[from] move: Grass Pledge`.
+ * A Pledge combination or Round writes `|move|p1a: Primarina|Water Pledge|p2a: Torkoal|[from] move: Grass Pledge`.
  * Primarina used its own Water Pledge; the partner's Grass Pledge pulled it forward. The inference booked Grass Pledge on Primarina,
  * the build left Water Pledge out, and the simulator refused the rebuilt `move waterpledge`. Each row reads a corpus game (local: the
  * rows skip without `.fit-corpus`): the built Pokémon holds the move its line shows and not the move that pulled it forward, and the
@@ -28,7 +28,6 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-/** The built set of the side's body of that species, through the bank's and the app's build with the disk-cached Smogon data. */
 async function builtMoves(id: string, side: 'p1' | 'p2', body: string): Promise<string[]> {
   const replay = JSON.parse(readFileSync(CORPUS(id), 'utf-8')) as Replay;
   const parsed = parseReplayLogWithObservations(replay.log);
@@ -47,7 +46,6 @@ describe('a Pledge combination and Round book the move the line shows (#140)', (
       // Round pulls Round: the shown move and the pulling move are one slot. A Pledge pulled by another Pledge leaves the partner's.
       if (row.pulled !== row.shown) expect(moves, `${row.body} lacks ${row.pulled}`).not.toContain(toId(row.pulled));
       expect(moves.filter(move => move === toId(row.shown)), `one slot for ${row.shown}`).toHaveLength(1);
-      // The simulator accepts the rebuilt choice: the turn adds no refusal.
       expect(await refusalsOfTurn(row.id, row.turn, (await rebuildThrough(row.id, row.turn)).refusals), 'refusals of the turn').toBe(0);
     }, 300_000);
   }

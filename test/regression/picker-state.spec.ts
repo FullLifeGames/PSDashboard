@@ -90,13 +90,11 @@ test('pickerStateFromSnapshot offers team moves and the living bench', () => {
   expect(state.p1SwitchesBySlot[0].map(option => option.species)).not.toContain('Weavile');
   expect(state.p2Active?.species).toBe('Zapdos');
   expect(state.field.p1SideConditions).toContain('stealthrock');
-  // PP is unknown at snapshot level — 0/0 marks the approximation honestly.
+  // PP is unknown at snapshot level: 0/0 marks the approximation.
   expect(state.p1MovesBySlot[0][0].maxpp).toBe(0);
-  // A never-revealed bench mon (percent-scale zeros) is a healthy option.
   expect(state.p2SwitchesBySlot[0].map(option => option.species)).toContain('Latios');
   expect(state.p2SwitchesBySlot[0].find(option => option.species === 'Latios')?.hpPercent).toBe(100);
-  // HP is rebuilt on the ABSOLUTE scale (snapshots carry percent bars):
-  // feeding maxhp 100 into the damage calc inflated shown percentages.
+  // HP is rebuilt on the ABSOLUTE scale (snapshots carry percent bars): maxhp 100 in the damage calc inflated shown percentages.
   expect(state.p1Active!.maxhp).toBeGreaterThan(200);
   expect(state.p1Active!.hp).toBe(state.p1Active!.maxhp);
 });
@@ -106,8 +104,7 @@ test('pickerStateFromSnapshot fills move and species types from the dex', () => 
   const p2Team = [set('Zapdos', ['Volt Switch', 'Heat Wave', 'Roost', 'Defog']), set('Ferrothorn', ['Leech Seed'])];
   const state = pickerStateFromSnapshot(makeSnapshot(), p1Team, p2Team);
 
-  // The snapshot only knows move NAMES — the type comes from the dex so the
-  // buttons color and label exactly like the live sim's.
+  // The snapshot only knows move NAMES: the type comes from the dex so the buttons color and label like the live sim's.
   expect(state.p1MovesBySlot[0].map(move => move.type))
     .toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
   expect(state.p2MovesBySlot[0].map(move => move.type))
@@ -116,26 +113,23 @@ test('pickerStateFromSnapshot fills move and species types from the dex', () => 
   expect(state.p1Active?.moves.map(move => move.type)).toEqual(['Fire', 'Ground', 'Dark', 'Rock']);
 });
 
-/** A snapshot whose p1 active is `species` (the rest of makeSnapshot stays). */
 function withActive(species: string, extra: Partial<TurnSnapshot['p1']['pokemon'][number]> = {}): TurnSnapshot {
   const snapshot = makeSnapshot();
   snapshot.p1.pokemon[0] = snapshotMon({ name: species, speciesForme: species, isActive: true, ...extra });
   return snapshot;
 }
 
-// Round 67 (T85): the snapshot path labels a move by its type at use: moveAtUse on the facts the snapshot
-// knows (the species, the revealed ability or every ability the species may have, a revealed item, the
-// Tera click), the catalog type where those facts leave it undecided. Round 70 (T215): the simulator reads the
-// body on a twin first (snapshotMoveTypes, with the field and the guessed set's ability); these cases hold the
-// labels on the snapshot facts, and test/ui/lib/picker-state-type-at-use.spec.ts holds them against live battles.
+// The snapshot path labels a move by its type at use: moveAtUse on the facts the snapshot knows (the species, the revealed ability or
+// every ability the species may have, a revealed item, the Tera click), the catalog type where those facts leave it undecided. The
+// simulator reads the body on a twin first (snapshotMoveTypes); these cases hold the labels on the snapshot facts, and
+// test/ui/lib/picker-state-type-at-use.spec.ts holds them against live battles.
 test('pickerStateFromSnapshot labels a move by its type at use', () => {
   const typesFor = (snapshot: TurnSnapshot, team: PokemonSet) =>
     pickerStateFromSnapshot(snapshot, [team], [set('Zapdos', ['Roost'])]).p1MovesBySlot[0].map(move => move.type);
   expect(typesFor(withActive('Ogerpon-Wellspring'), set('Ogerpon-Wellspring', ['Ivy Cudgel', 'Horn Leech']))).toEqual(['Water', 'Grass']);
   expect(typesFor(withActive('Sylveon', { ability: 'Pixilate' }), set('Sylveon', ['Hyper Voice', 'Shadow Ball']))).toEqual(['Fairy', 'Ghost']);
-  // Round 70 (T215): unrevealed, the guessed set's ability stands for the body the engine plays, so Pixilate retypes
-  // Hyper Voice (T85 kept the catalog type whatever ability the set named). A set that names none leaves Sylveon's
-  // possible abilities, Cute Charm and Pixilate, to disagree, and the button keeps the catalog type.
+  // Unrevealed, the guessed set's ability stands for the body the engine plays, so Pixilate retypes Hyper Voice. A set that names none
+  // leaves Sylveon's possible abilities, Cute Charm and Pixilate, to disagree, and the button keeps the catalog type.
   expect(typesFor(withActive('Sylveon'), { ...set('Sylveon', ['Hyper Voice']), ability: 'Pixilate' })).toEqual(['Fairy']);
   expect(typesFor(withActive('Sylveon'), set('Sylveon', ['Hyper Voice']))).toEqual(['Normal']);
   expect(typesFor(withActive('Garchomp', { terastallized: 'Fairy' }), set('Garchomp', ['Tera Blast', 'Earthquake']))).toEqual(['Fairy', 'Ground']);
@@ -153,9 +147,9 @@ test('pickerStateFromSnapshot labels both doubles slots at use', () => {
   expect(state.p1MovesBySlot.map(moves => moves.map(move => move.type))).toEqual([['Fire'], ['Water', 'Fairy']]);
 });
 
-// Round 67 (T136 point 2): the fast picker offers the Tera toggle the exact position will, the simulator's
-// canTerastallize on the snapshot's facts: gen 9, a side that has not terastallized, no Z crystal or usable Mega
-// Stone, no Terastal Clause in the branch format; the Tera type of the guessed set, else the species' first type.
+// The fast picker offers the Tera toggle the exact position will, the simulator's canTerastallize on the snapshot's facts: gen 9, a side
+// that has not terastallized, no Z crystal or usable Mega Stone, no Terastal Clause in the branch format; the Tera type of the guessed
+// set, else the species' first type.
 test('pickerStateFromSnapshot offers the Tera type the battle will have', () => {
   const teraOf = (snapshot: TurnSnapshot, team: PokemonSet, gen = 9, format?: string) =>
     pickerStateFromSnapshot(snapshot, [team], [set('Zapdos', ['Roost'])], gen, null, { format }).p1ModifiersBySlot.map(slot => slot.teraType);
@@ -245,10 +239,8 @@ test('the snapshot picker offers the Tera types of the stored picker', async () 
   }
 }, 120_000);
 
-// Round 54: the snapshot preview dropped the Tera type, so the branch
-// panel's damage numbers on the fallback path read Body Press into a
-// Ceruledge that had terastallized to Fighting as 0 % (the live and stored
-// paths carry it through branch/pokemon-info.ts).
+// The snapshot preview carries the Tera type: without it the branch panel's damage numbers on the fallback path read Body Press into a
+// Ceruledge that had terastallized to Fighting as 0 % (the live and stored paths carry it through branch/pokemon-info.ts).
 test('pickerStateFromSnapshot carries the Tera type of a terastallized body', () => {
   const snapshot = makeSnapshot();
   snapshot.p1.pokemon[0] = { ...snapshot.p1.pokemon[0], terastallized: 'Grass' };

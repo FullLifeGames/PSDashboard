@@ -8,10 +8,7 @@ import { bankTeamsFor } from './bank-build';
 import { emittedBlock } from './forced-reconstruction-support';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * Round 89 (#131, #144, #135): the corpus rows of lane C rebuild a game through one turn, like the bank does, and compare the turn's
- * emitted block with the log's block. `refusalsOfTurn` counts the refusals the turn itself adds.
- */
+/** Rebuilds a game through one turn, like the bank does, and compares the turn's emitted block with the log's block; `refusalsOfTurn` counts the refusals the turn itself adds. */
 
 type Fixture = ReplayData & { formatid: string };
 
@@ -49,7 +46,6 @@ export async function rebuildThrough(id: string, through: number) {
     emitted: publicLines(emittedBlock(runtime.battleStream.battle!.log, through)),
     refusals: runtime.choiceErrors.count,
     lastError: runtime.choiceErrors.last,
-    /** The rebuilt battle at the start of turn `through + 1`. */
     battle: runtime.battleStream.battle!,
   };
 }

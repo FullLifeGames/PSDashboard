@@ -2,11 +2,9 @@ import { describe, expect, test } from 'vitest';
 import { playedOutcomeSettings } from '../../src/lib/eval/worker-client';
 
 /**
- * Round 67 (T140): the played pair is re-searched with the sweep's own rules.
- * The sub-search's option filter falls back to the rule table that survived
- * serialization, and serialization strips the custom rules of draft leagues
- * and custom games ("@@@Sleep Clause Mod"): without the flag, the re-search
- * lets a second Pokémon fall asleep where the sweep around it does not.
+ * The played pair is re-searched with the sweep's own rules: the sub-search's option filter falls back to the rule table that survived
+ * serialization, which strips the custom rules of draft leagues and custom games ("@@@Sleep Clause Mod"); without the flag the
+ * re-search lets a second Pokémon fall asleep where the sweep around it does not.
  */
 describe('played-pair sub-search settings', () => {
   test("the played pair's sub-search keeps the Sleep Clause of the sweep", () => {

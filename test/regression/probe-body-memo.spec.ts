@@ -16,13 +16,11 @@ vi.mock('@pkmn/sim', async importOriginal => {
 const { loadSimMods, sightedHpAt, snapshotMoveTypes } = await import('@fulllifegames/eval-engine');
 
 /**
- * Round 70 (T215): the quick picker reads the HP a percent stands for off a probe body (sightedHpAt), a one-Pokémon
- * battle of the format. The Champions mod loads on demand; before it registers, the format id is unknown to the
- * simulator and a battle of it comes up on the base rules, without an error. The probe used to take that body for the
- * Champions one and keep it, so a picker built before the mod showed the base rules' HP (the base rounds the percent
- * up, the mod down) for the rest of the session. Now a missing mod answers null without building a battle, and the
- * next build asks again; a body that was built is kept, and so is a generation that has no body. The picker's move
- * types (snapshotMoveTypes) read the same kind of twin and follow the same rule.
+ * The quick picker reads the HP a percent stands for off a probe body (sightedHpAt), a one-Pokémon battle of the format. The Champions mod
+ * loads on demand; before it registers, the format id is unknown to the simulator and a battle of it comes up on the base rules, without
+ * an error (the base rounds the percent up, the mod down). So a missing mod answers null without building a battle and the next build asks
+ * again; a body that was built is kept, and so is a generation that has no body. The picker's move types (snapshotMoveTypes) read the
+ * same kind of twin and follow the same rule.
  */
 const SIGHTING = { hp: 50, maxhp: 100 };
 const FLAMETHROWER = {

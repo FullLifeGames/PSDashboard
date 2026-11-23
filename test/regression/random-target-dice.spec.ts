@@ -3,11 +3,10 @@ import { describe, expect, test } from 'vitest';
 import { CORPUS, rebuildThrough } from './rebuild-through';
 
 /**
- * Round 89 (#137): the simulator draws the foe a move is aimed at when the click names none (a move an Encore bent, a move that picks
- * its foe) and the body a drag brings in. The log shows both, and the rebuild used to draw its own: Sableye's Encore bent Gallade's click
- * to Taunt and the log shows Corviknight as the target, the rebuild taunted Sableye; Incineroar's Roar dragged Sableye in and the
- * rebuild dragged another body. Each row rebuilds a corpus game through the turn, like the bank does, and reads the lines that name the
- * draw in the rebuild's block against the log's.
+ * The simulator draws the foe a move is aimed at when the click names none (a move an Encore bent, a move that picks its foe) and the
+ * body a drag brings in. The log shows both, and the rebuild must read them: Sableye's Encore bent Gallade's click to Taunt and the log
+ * shows Corviknight as the target; Incineroar's Roar dragged Sableye in. Each row rebuilds a corpus game through the turn, like the bank
+ * does, and reads the lines that name the draw in the rebuild's block against the log's.
  * The reader's unit rows are in `packages/eval-engine/test/dice-logged-results.spec.ts`, the sweeps over every Dex move and item in
  * `dice-random-target-sweep.spec.ts` and `dice-drag-sweep.spec.ts`.
  */
@@ -15,7 +14,6 @@ interface Row {
   id: string;
   turn: number;
   type: string;
-  /** The lines of the log's block that name the draw: the rebuild's block must hold each of them. */
   lines: string[];
   /** The volatile a body carries (or lacks) at the next boundary: `[side index, body name, volatile, has]`. */
   volatiles?: [number, string, string, boolean][];

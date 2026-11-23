@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { nearPairs, newTwins, placesOf, twinsOf } from '../../scripts/twin-lists.mjs';
 
 /**
- * Round 72 (T236): the twin detector. AGENTS.md says one rule lives in one module and a deliberate copy gets a spec that compares
- * the two. scripts/twin-lists.mjs finds a list of 3 or more string literals that stands in two or more files with the same
+ * The twin detector. AGENTS.md says one rule lives in one module and a deliberate copy gets a spec that compares the two.
+ * scripts/twin-lists.mjs finds a list of 3 or more string literals that stands in two or more files with the same
  * names (the stat names in four files, Reflect / Light Screen / Aurora Veil in five), and `npm run lint` fails on a pair
  * (list, file) that scripts/twin-baseline.json lacks. The baseline only shrinks.
  *
@@ -154,7 +154,7 @@ describe('the command', () => {
     expect(result.status).toBe(0);
     const found = JSON.parse(result.stdout) as { groups: Record<string, string[]> };
     expect(Object.keys(found.groups).sort()).toEqual(Object.keys(baseline.groups).sort());
-    // The baseline only shrinks (10 groups at round 71, 7 after wave 4), so a floor on the twins would fail the day a lane
+    // The baseline only shrinks, so a floor on the twins would fail the day a lane
     // removes one; the floor stays on the lists the detector reads, which keeps a blind detector red.
     expect(placesOf(REPO).size).toBeGreaterThan(30);
   });

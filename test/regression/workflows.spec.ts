@@ -15,13 +15,12 @@ import {
 import { dirname, join, resolve, relative } from 'node:path';
 
 /**
- * Round 71 (bank in GitHub Actions, user 13.10.: "let's be secure here though"): the security properties of
- * .github/workflows/bank.yml, read from the file's text. Only a push to bank/** starts it, the token is read-only and
- * no job widens it or reads a secret, every action is GitHub's own and pinned to a commit, no checkout keeps
- * credentials, and no shell line holds an expression (the job index reaches the shell through env).
+ * The security properties of .github/workflows/bank.yml, read from the file's text: only a push to bank/** starts it, the token is
+ * read-only and no job widens it or reads a secret, every action is GitHub's own and pinned to a commit, no checkout keeps credentials,
+ * and no shell line holds an expression (the job index reaches the shell through env).
  */
 
-// A Windows checkout under core.autocrlf holds the YAML with CRLF: the specs read it with LF (round 72 merge).
+// A Windows checkout under core.autocrlf holds the YAML with CRLF: the specs read it with LF.
 const workflow = readFileSync(fileURLToPath(new URL('../../.github/workflows/bank.yml', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const lines = workflow.split(/\r?\n/).filter(line => !line.trimStart().startsWith('#'));
 const body = lines.join('\n');
@@ -50,8 +49,8 @@ describe('the bank workflow', () => {
   });
 
   test('every job sets up one exact Node version, so the jobs of a run share a fingerprint', () => {
-    // Round 72: with `node-version: 24`, runners of two images resolved v24.21.0 and v24.22.0 in one run, and the merge
-    // refused the jobs (they differ in fingerprint). The bases of round 72 ran on v24.21.0.
+    // With `node-version: 24`, runners of two images resolved v24.21.0 and v24.22.0 in one run, and the merge
+    // refused the jobs (they differ in fingerprint).
     const versions = [...workflow.matchAll(/^\s+node-version: (.+)$/gm)].map(match => match[1].trim());
     expect(versions.length).toBe(3);
     for (const version of versions) expect(version).toMatch(/^\d+\.\d+\.\d+$/);
@@ -77,7 +76,7 @@ describe('the bank workflow', () => {
 
   test('the site build skips a data release of the bank, whose tag may not deploy to github-pages', () => {
     const pages = readFileSync(fileURLToPath(new URL('../../.github/workflows/pages.yml', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
-    // Since 07.11.2026 the condition also waits for the Tests run of a push (release-workflow.spec.ts); the bank's clause leads it.
+    // The condition also waits for the Tests run of a push (release-workflow.spec.ts); the bank's clause leads it.
     expect(pages).toMatch(/ {2}build:\n(?: {4}.*\n)*? {4}if: \$\{\{ \(github\.event_name != 'release' \|\| !startsWith\(github\.event\.release\.tag_name, 'bank-data-'\)\) && .* \}\}\n/);
   });
 
@@ -258,7 +257,6 @@ describe('feedback-workflow', () => {
 const read = (name: string) => readFileSync(fileURLToPath(new URL(`../../.github/workflows/${name}`, import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
 const release = read('release.yml');
 const pages = read('pages.yml');
-/** The lines of one job: its key at two spaces, then every deeper or blank line up to the next key. */
 const jobOf = (workflow: string, name: string) => new RegExp(`^ {2}${name}:\\n((?:(?: {4}.*)?\\n)+)`, 'm').exec(workflow)?.[1] ?? '';
 
 describe('the release starts the Pages build of its frozen copy', () => {
@@ -280,9 +278,9 @@ describe('the release starts the Pages build of its frozen copy', () => {
 });
 
 /**
- * User gate 07.11.2026 ("1a 2a 3a"): after the release of 1.1.0 the work lands on master, and the root of GitHub Pages is the
- * nightly of master. A push that breaks the app must not reach the nightly while its tests still run: Pages builds a push of
- * master only after the Tests workflow passed on that very commit. A release and a dispatch keep their own triggers.
+ * The work lands on master, and the root of GitHub Pages is the nightly of master. A push that breaks the app must not reach the nightly
+ * while its tests still run: Pages builds a push of master only after the Tests workflow passed on that very commit. A release and a
+ * dispatch keep their own triggers.
  */
 describe('the nightly deploys a push of master only after its tests passed', () => {
   const on = /^on:\n((?:(?: {2}.*)?\n)+)/m.exec(pages)?.[1] ?? '';
@@ -332,10 +330,9 @@ describe('the runner of every workflow job', () => {
 });
 
 /**
- * Round 90 (F8, user 23.11.2026): each Vitest project runs once among the required jobs of test.yml. "Node suites" runs app, ui and
- * replay-core; the engine project runs in its two jobs, speed layer forced off and forced on, and nowhere else (the default speed mode
- * reads the same levers as forced on and only falls back quietly where forced on throws, so a third run read nothing new). The jobs'
- * commands carry no game type.
+ * Each Vitest project runs once among the required jobs of test.yml. "Node suites" runs app, ui and replay-core; the engine project runs
+ * in its two jobs, speed layer forced off and forced on, and nowhere else (the default speed mode reads the same levers as forced on and
+ * only falls back quietly where forced on throws, so a third run reads nothing new). The jobs' commands carry no game type.
  */
 describe('the Vitest projects of test.yml', () => {
   const text = readFileSync(`${DIR}test.yml`, 'utf8');
@@ -371,7 +368,6 @@ const DEFINITION = 'packages/eval-engine/test/dice-fixtures.ts';
 
 const withoutComments = (source: string): string => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 
-/** The lines of one job of test.yml: from its key at two spaces of indent to the next key at the same indent. */
 function jobLines(key: string): string[] {
   const start = WORKFLOW.findIndex(line => line === `  ${key}:`);
   if (start < 0) return [];
@@ -404,7 +400,6 @@ function switchExports(file: string): Set<string> {
 
 const supportExports = new Map(files.filter(file => !isSpec(file) && file !== DEFINITION && reads(file)).map(file => [file, switchExports(file)]));
 
-/** The named imports of a spec from a relative module, as repository paths. */
 function namedImports(file: string): { from: string; names: string[] }[] {
   return [...(source.get(file) ?? '').matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+'(\.[^']*)'/g)].map(match => ({
     from: resolve(dirname(join(ROOT, file)), `${match[2]}.ts`).slice(ROOT.length),
@@ -455,11 +450,11 @@ describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
     // Guards the scan itself: if it stops finding these, an empty list would pass the rows above.
     expect(readers).toContain('packages/eval-engine/test/board-key-readers.spec.ts');
     expect(readers).toContain('packages/eval-engine/test/dice-logged-sweep.spec.ts');
-    // the five parts of the logged sweep (D9b): the support module they share is read through its exports
+    // the five parts of the logged sweep: the support module they share is read through its exports
     for (const part of ['sweep', 'crit-doubles-a', 'crit-doubles-b', 'crit-singles', 'secondary']) {
       expect(readers).toContain(part === 'sweep' ? 'packages/eval-engine/test/dice-logged-sweep.spec.ts' : `packages/eval-engine/test/dice-logged-${part}.spec.ts`);
     }
-    // the sweeps D9b split by realm: every part reads the switch through its body module
+    // the sweeps split by realm: every part reads the switch through its body module
     for (const part of ['landed-hit-sweep', 'landed-hit-sweep-2', 'landed-hit-sweep-3', 'blocked-effects-sweep', 'blocked-effects-sweep-2']) {
       expect(readers).toContain(`packages/replay-core/test/${part}.spec.ts`);
     }
@@ -473,8 +468,8 @@ describe('the job names that branch protection reads', () => {
   const sweepParts = 'Full sweeps, the other specs, part ${{ matrix.part }} of 3';
   const engineJobs = 'Engine suite, speed layer ${{ matrix.speed-layer }}';
 
-  // GitHub matches a check by its whole name, so a matrix job gives one context per entry. Round 90 (F8): the three full-sweep parts are
-  // required (user 23.11.2026), the engine job's two entries and the aggregate "Browser flows" stay; the browser parts are no required checks
+  // GitHub matches a check by its whole name, so a matrix job gives one context per entry. The three full-sweep parts are
+  // required, the engine job's two entries and the aggregate "Browser flows" stay; the browser parts are no required checks
   // (browser-flows-parts.spec.ts holds the aggregate).
   test('the jobs in parts and the required checks keep their names', () => {
     expect(names.filter(name => name === 'Browser flows, part ${{ matrix.part }} of 3')).toHaveLength(1);
@@ -513,7 +508,6 @@ describe('browser-flows-parts', () => {
   const WORKFLOW = readFileSync(join(ROOT, '.github/workflows/test.yml'), 'utf8').split(/\r?\n/);
   const E2E = join(ROOT, 'test/e2e');
 
-  /** The lines of one job of test.yml: from its key at two spaces of indent to the next key at the same indent. */
   function jobLines(key: string): string[] {
     const start = WORKFLOW.findIndex(line => line === `  ${key}:`);
     if (start < 0) return [];

@@ -26,7 +26,7 @@ test('sliderMax extends past the replay when the variation is longer', () => {
 });
 
 test('sliderMax stays at the replay end when a short play-out ends inside it', () => {
-  // Round 89 (P6a): a play-out from turn 1 of four real turns (turn 5 is its tip) inside a replay of eight, and a hand-played
+  // A play-out from turn 1 of four real turns (turn 5 is its tip) inside a replay of eight, and a hand-played
   // variation from turn 6 of two turns (tip 8) in the same replay.
   expect(sliderMax(8, { startTurn: 1, length: 4 })).toBe(8);
   expect(sliderMax(8, { startTurn: 6, length: 2 })).toBe(8);
@@ -56,7 +56,7 @@ test('classifyDeviation implements the chess rules', () => {
 });
 
 test('a variation-line position the variation does not cover is the main line: a move there replaces (round 77)', () => {
-  // User report 28.10.2026: a one-turn variation at turn 5, then ▶ to turn 28. The line stayed 'variation' (the intent is
+  // A one-turn variation at turn 5, then ▶ to turn 28. The line stayed 'variation' (the intent is
   // sticky across uncovered turns), the screen showed the main line, and the move there extended the variation instead: its
   // Brave Bird ran at the variation's tip against Kyurem ("PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird."). Before the
   // start the same slip played the move at the variation's start turn.
@@ -75,7 +75,7 @@ test('keptEntries counts the entries that survive a truncating deviation', () =>
   expect(keptEntries(span, { turn: 18, line: 'variation' })).toBe(3); // extend keeps all
 });
 
-// Round 88 (T347, #83): where the pointer stands for a turn the branch frame shows. The rule reads turns only, so one
+// Where the pointer stands for a turn the branch frame shows. The rule reads turns only, so one
 // span shape holds for singles, doubles and VGC.
 test('pointerAtFrame names the variation position the frame shows, clamped to the covered turns', () => {
   expect(pointerAtFrame(null, span, false)).toBeNull();

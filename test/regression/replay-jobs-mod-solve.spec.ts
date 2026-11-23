@@ -6,9 +6,9 @@ import { handleReplayJob } from '../../src/lib/replay-jobs/handlers';
 import type { ReplayJobResponse } from '../../src/lib/replay-jobs/types';
 
 /**
- * Round 75 (T160, step 3): the spread solve of the replay worker builds the teams from the log's tier line, which a Champions game
- * reads on the registered Champions Dex. A fresh worker has none; the job registers the mod itself. Own spec file, because this
- * realm registers the mod once (the reconstruction job's spec is replay-jobs-mod.spec.ts).
+ * The spread solve of the replay worker builds the teams from the log's tier line, which a Champions game reads on the registered
+ * Champions Dex. A fresh worker has none; the job registers the mod itself. Own spec file, because this realm registers the mod once
+ * (the reconstruction job's spec is replay-jobs-mod.spec.ts).
  */
 const DOUBLES = JSON.parse(readFileSync('packages/eval-engine/test/fixtures/champions/gen9championsvgc2026regmbbo3-2679053861.json', 'utf8')) as ReplayData;
 

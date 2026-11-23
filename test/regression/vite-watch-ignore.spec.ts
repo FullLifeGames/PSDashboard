@@ -4,10 +4,9 @@ import { fileURLToPath } from 'node:url';
 import config from '../../vite.config';
 
 /**
- * Round 90 (#222, step E1): the dev server watches the repository root, and on devbox the local folders (`docs/`
- * with 33,000 files, `.calibration/` with 23,000) used up the inotify budget: 37,260 `ENOSPC` lines in one e2e run.
- * The folders below hold no module the app imports; the watch skips them. Tracked root files (README.md, index.html,
- * the configs) stay watched, so an edit there still reloads the page.
+ * The dev server watches the repository root, and on devbox the local folders (`docs/` with 33,000 files, `.calibration/` with 23,000)
+ * used up the inotify budget (37,260 `ENOSPC` lines in one e2e run). The folders below hold no module the app imports; the watch skips
+ * them. Tracked root files (README.md, index.html, the configs) stay watched, so an edit there still reloads the page.
  */
 const ROOT = fileURLToPath(new URL('../../', import.meta.url)).replace(/\/$/, '');
 const UNWATCHED = ['.calibration', '.claude', '.fit-corpus', '.playwright-mcp', '.smogon-cache', 'docs'];

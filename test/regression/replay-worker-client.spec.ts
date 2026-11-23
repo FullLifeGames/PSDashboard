@@ -6,7 +6,6 @@ import type {
 } from '../../src/lib/replay-jobs/types';
 import { readSimFastLevers } from '../../src/lib/eval/sim-fast-setting';
 
-/** A worker stand-in: records what the client posts, lets the test answer. */
 class FakeWorker implements WorkerLike {
   posted: ReplayJobRequest[] = [];
   terminated = false;

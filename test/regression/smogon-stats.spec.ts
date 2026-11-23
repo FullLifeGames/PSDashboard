@@ -281,10 +281,8 @@ describe('Smogon usage stat enrichment', () => {
 });
 
 /**
- * The displayed set guesses must be assembled by the SAME machinery the
- * simulator's team builder uses (curated selection + coherence vetoes) — the
- * GPL finding was Cobalion showing Body Press next to revealed Swords Dance
- * while the built team had already vetoed it.
+ * The displayed set guesses are assembled by the same machinery the simulator's team builder uses (curated selection + coherence
+ * vetoes): Cobalion must not show Body Press next to a revealed Swords Dance when the built team has vetoed it.
  */
 describe('coherent move enrichment', () => {
   const detail = 'Smogon gen9ou 2026-03';
@@ -327,9 +325,8 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats).pokemon[0];
 
-    // Body Press scales with Defense — Swords Dance does not serve it; Iron
-    // Head duplicates the revealed Heavy Slam's Steel damage. Both drop and
-    // the usage tail refills the display, exactly like the built team.
+    // Body Press scales with Defense and Swords Dance does not serve it; Iron Head duplicates the revealed Heavy Slam's Steel damage.
+    // Both drop and the usage tail refills the display, like the built team.
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Swords Dance', 'Heavy Slam', 'Stone Edge', 'Close Combat',
     ]);
@@ -352,9 +349,8 @@ describe('coherent move enrichment', () => {
   });
 
   test('revealed moves are immune however incoherent the pairing looks', () => {
-    // Revealed Body Press survives a pool whose boost serves Attack — proof
-    // is never second-guessed. (Stone Edge, not Close Combat: a Fighting
-    // fill would be same-type-redundant next to the revealed Body Press.)
+    // Revealed Body Press survives a pool whose boost serves Attack: proof is never second-guessed. (Stone Edge, not Close Combat:
+    // a Fighting fill would be same-type-redundant next to the revealed Body Press.)
     const info = monInfo('Cobalion', [{ name: 'Body Press', source: 'revealed' }]);
     const stats = statsFor('Cobalion', {
       moves: [['Swords Dance', 0.9], ['Stone Edge', 0.8]],
@@ -401,8 +397,7 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats, sets).pokemon[0];
 
-    // The alternative covers the revealed Super Fang — its moves AND its item
-    // fill the display (the first set contradicts what we saw).
+    // The alternative covers the revealed Super Fang: its moves and its item fill the display (the first set contradicts what we saw).
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Super Fang', 'Air Slash', 'U-turn', 'Roost',
     ]);
@@ -496,7 +491,6 @@ const ok = (species: string) => new Response(statsBody(species), { status: 200, 
 const status = (code: number) => new Response('', { status: code });
 const abortError = () => new DOMException('signal is aborted without reason', 'AbortError');
 
-/** A fetcher that answers with `answer(url, ask)`, counting the asks per stats file. */
 function fetcher(answer: (path: string, ask: number, init?: RequestInit) => Promise<Response> | Response) {
   const asks = new Map<string, number>();
   const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {

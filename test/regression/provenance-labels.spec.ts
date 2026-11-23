@@ -17,11 +17,7 @@ import { sourceLabel } from '../../src/lib/provenance-labels';
 import { buildSensitivityTargets } from '../../src/lib/team-knowledge';
 import { spriteUrl } from '../../src/lib/sprite-url';
 
-/**
- * Round 37: the Choice Scarf the solver infers from a move order (or drops
- * from a guessed set) reaches the built set AND the stats panel overlay
- * with the same value, so the sim and the panel never disagree on an item.
- */
+/** The Choice Scarf the solver infers from a move order (or drops from a guessed set) reaches the built set and the stats panel overlay with the same value. */
 describe('Choice Scarf inference reaches the build and the panel', () => {
   const log = (extra: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|8', '|tier|[Gen 8] OU',
@@ -160,7 +156,7 @@ describe('provenance labels', () => {
     expect(sourceLabel('guessed')).toBe('guessed');
     expect(sourceLabel('revealed', undefined, INFERRED_SPREAD_DETAIL)).toBe('revealed');
   });
-  // Round 69 (T69): the label names who checked the spread; fitted stays for damage lines only.
+  // The label names who checked the spread; fitted stays for damage lines only.
   test('a spread the move order or the HP of the log checked says so, and fitted stays with damage', () => {
     expect(sourceLabel('guessed', undefined, ORDER_SPREAD_DETAIL)).toBe('from move order');
     expect(sourceLabel('guessed', undefined, MEASURED_HP_SPREAD_DETAIL)).toBe('HP from log');

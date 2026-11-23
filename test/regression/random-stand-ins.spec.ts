@@ -12,10 +12,10 @@ import { fetchRandomSets } from '../../src/lib/random-sets';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 
 /**
- * Round 89 (lane B, #117): the app side of the Random Battle fill. The data arrives through the set fetch (the published file, one
- * request per format, cached with the other set data), `buildAppTeams` (the bank's chain) hands it to `withStandIns`, and the build
- * plays six against six. Rows: Gen 3 singles, Gen 9 Random Doubles and both Champions formats, logs the simulator played
- * (packages/replay-core/test/fixtures/random-*.json, with the file entries they read).
+ * The app side of the Random Battle fill. The data arrives through the set fetch (the published file, one request per format, cached with
+ * the other set data), `buildAppTeams` (the bank's chain) hands it to `withStandIns`, and the build plays six against six. Rows: Gen 3
+ * singles, Gen 9 Random Doubles and both Champions formats, logs the simulator played (packages/replay-core/test/fixtures/random-*.json,
+ * with the file entries they read).
  */
 interface RandomFixture {
   id: string; formatid: string; log: string;
@@ -30,10 +30,9 @@ const ROWS = [
   { label: 'Champions Random Doubles Battle', id: 'gen9championsrandomdoublesbattle-18', missing: 2 },
 ] as const;
 
-// The Champions formats read the Champions Dex: the mod registers before any log is read, as the app's replay load does (round 75, T160).
+// The Champions formats read the Champions Dex: the mod registers before any log is read, as the app's replay load does.
 await Promise.all(ROWS.map(row => { const game = fixture(row.id); return loadReplayMods({ log: game.log, formatid: game.formatid }); }));
 
-/** A fetcher that serves the fixture's file for the format's random-set address and a 404 for every other file. */
 function fakeFetch(game: RandomFixture, seen: string[] = []) {
   return async (url: string): Promise<Response> => {
     seen.push(url);

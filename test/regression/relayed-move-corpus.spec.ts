@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
 
 /**
- * Round 89 (#135): a move line that another effect wrote for a body is not the body's click. Magic Bounce and Dancer write
+ * A move line that another effect wrote for a body is not the body's click. Magic Bounce and Dancer write
  * `|move|<body>|<move>|<target>|[from] ability: ...` before the body's own line; the rebuild read the first move line of a slot as the
  * click, sent a move the body lacks (`move taunt`), and the simulator refused the choice: the side played `default`, and the switch of the
  * other body never happened (Champions VGC 2685328963 turn 6: Sableye's switch for Vivillon). Each row rebuilds a corpus game through the
@@ -29,11 +29,9 @@ const ROWS: Row[] = [
   { id: 'smogtours-gen5ubers-899931', turn: 25, type: 'Gen 5 Ubers', body: 'p1a: Giratina', what: 'Magic Coat sends Leech Seed back (singles)', clean: true },
 ];
 
-/** The move lines a body wrote, as `body|move`: the lines that another effect wrote for it carry a `[from]`. */
 const movesOf = (lines: string[], body: string, own: boolean): string[] =>
   lines.filter(line => line.startsWith(`|move|${body}|`) && (!own || !line.includes('[from]'))).map(line => line.split('|').slice(2, 4).join('|'));
 
-/** The entrances of a side's block: `slot|name` of every switch line of the holder's side. */
 const entrancesOf = (lines: string[], side: string): string[] =>
   lines.filter(line => line.startsWith(`|switch|${side}`)).map(line => line.split('|').slice(2, 4).join('|'));
 

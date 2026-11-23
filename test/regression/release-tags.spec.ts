@@ -2,9 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { missingReleaseTags, remoteTagNames } from '../../scripts/release-tags.mjs';
 
 /**
- * Round 77 (release gate 29.10.2026, "6a"): without the tags fetched, scripts/publish-packages.mjs compared against an
- * older release tag (v0.7.1 was missing locally on 28.10.) and would have published a package that had not moved. The
- * plan now stops when the remote holds a release tag below the version that the local tags lack.
+ * Without the tags fetched, scripts/publish-packages.mjs compared against an older release tag and would have published a package that
+ * had not moved: the plan stops when the remote holds a release tag below the version that the local tags lack.
  */
 describe('the release tags a plan needs', () => {
   const lsRemote = [

@@ -4,12 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { compareCounts, countSpecs, currentBaseline, SPEC_PROJECTS } from '../../scripts/spec-counts.mjs';
 
-/**
- * The spec-count ratchet (round 90, rule "What earns a test" in AGENTS.md): the number of spec files per test project only
- * falls, or grows with a named new module. `spec-count-ratchet.json` holds the counts; `npm run lint` runs the check;
- * `node scripts/update-lint-ratchet.mjs` lowers the baseline after a cut, and `--allow-raise` raises it for a new module.
- * Game types do not enter: a count is a count of files.
- */
+/** The spec-count ratchet: spec files per test project only fall, or grow with a named new module (`--allow-raise` of scripts/update-lint-ratchet.mjs); game types do not enter. */
 describe('compareCounts', () => {
   test('a project above its baseline is listed, a project at or below it is not', () => {
     expect(compareCounts({ app: 10, ui: 5 }, { app: 11, ui: 5 })).toEqual([{ project: 'app', baseline: 10, count: 11 }]);

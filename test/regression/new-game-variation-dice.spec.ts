@@ -8,16 +8,12 @@ import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { FAMILIES, playRecord } from './new-game-play';
 
 /**
- * Round 89 (lane H, #105), step H7 (wave-tester, second pass, finding 3): "The same seed, teams and choices roll the same dice."
- * A variation of a game at a past turn starts from the game's own PRNG state at that turn, so the choices the user leaves as they
- * were roll the game's rolls: the turn it plays is the game's log for that turn, line for line. The branch's position is the stored
- * position of the record's rebuild (exact, with the PRNG the game had), adopted the way `usePositionSource` adopts it for a game
- * (`gameAdoptSnapshot`): no re-seed to the log's dice, because the game's true dice are known. The cause before the fix: the adopt
- * put the position on seed index 0 with only the dice a log line names (crit, miss, secondary) forced, so every damage roll and
- * every roll the log does not show came from another stream (the tester: Earthquake 62.5 % in the variation, 59.6 % in the game).
+ * A variation of a game at a past turn starts from the stored position of the record's rebuild (the PRNG the game had, adopted as
+ * `usePositionSource` adopts it, `gameAdoptSnapshot`), so the choices the user leaves as they were roll the game's rolls: the turn it plays
+ * is the game's log for that turn, line for line. Re-seeding to the log's dice would put every roll the log does not show (damage rolls)
+ * on another stream.
  */
 
-/** The lines of battle turn `turn` in a protocol log, from `|turn|<turn>` up to the next `|turn|` line, clock lines out. */
 function turnLines(log: readonly string[], turn: number): string[] {
   const from = log.findIndex(line => line === `|turn|${turn}`);
   if (from < 0) return [];
@@ -56,9 +52,8 @@ describe('a variation of a game at a past turn that repeats the game\'s choices 
 });
 
 /**
- * H21a (user ruling 13.11.2026): "the game's dice up to the change, after it what the seed gives". The first half is the spec above. The
- * second half: a variation that changes a choice at turn N rolls the dice the seed's stream gives from that point, which a rebuild of
- * the game from its seed reaches too (the entries before turn N played again, then the changed turn): the two turns are the same lines.
+ * A variation that changes a choice at turn N rolls the dice the seed's stream gives from that point, which a rebuild of the game from
+ * its seed reaches too (the entries before turn N played again, then the changed turn): the two turns are the same lines.
  * The stored position carries the game's PRNG, so the variation and the reference cannot drift apart.
  */
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -94,13 +89,11 @@ describe('a variation that changes a choice rolls what the seed gives after the 
       const wanted = turnLines(reference!.runtime.log, turn);
       expect(wanted.length).toBeGreaterThan(1);
       expect(turnLines(variation.log, turn)).toEqual(wanted);
-      // the change is real: the game's own turn 2 read differently
       expect(turnLines(variation.log, turn)).not.toEqual(turnLines(restoredLog(record), turn));
     }, 240_000);
   }
 });
 
-/** The game's full log as its record's rebuild writes it. */
 function restoredLog(record: Parameters<typeof gameReplayData>[0]): string[] {
   return gameReplayData(record).log.split('\n');
 }

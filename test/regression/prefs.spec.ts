@@ -8,12 +8,7 @@ import {
   serializedAutoRouting,
 } from '../../src/hooks/evaluation/prefs';
 
-/**
- * Round 69 (T184): after a matrix result of depth 2 or more, a sweep whose
- * configured engine is the tree replaces it. The round-67 gate removed the
- * two cross-engine exceptions (a deep matrix result lands on a tree turn and
- * survives the next tree sweep); the configured engine decides, nothing else.
- */
+/** After a matrix result of depth 2 or more, a sweep whose configured engine is the tree replaces it: the configured engine decides, no cross-engine exception. */
 afterEach(() => configureSearchBudget(null));
 
 const DEEP_MATRIX = { depth: 2, samples: 3, mode: 'matrix' } as const;
@@ -40,7 +35,6 @@ describe('auto routing per game type', () => {
 
   test('the team-preview lead stays d1s1 in both game types, whatever the early splits', () => {
     expect(resolveAutoLeadSettings()).toEqual(SKETCH);
-    // Before round 63 the lead read the early matrix, so this form moved it to three draws.
     configureSearchBudget(parseSearchBudget('tree-from=0.25,early-samples=3'));
     expect(resolveAutoLeadSettings()).toEqual(SKETCH);
     configureSearchBudget(parseSearchBudget('singles-early-samples=5,doubles-early-depth=2'));
@@ -95,7 +89,7 @@ describe('after depth 2 the configured engine decides', () => {
   });
 
   test('a matrix pass does not land on a stored tree result of a tree turn', () => {
-    // The removed exception: a deep matrix pass used to outrank the tree on its own turn.
+    // A deep matrix pass does not outrank the tree on its own turn.
     expect(supersedesStored(TREE, DEEP_MATRIX, 'mcts')).toBe(false);
     expect(supersedesStored(TREE, DEEP_MATRIX, 'auto', 0.5, false)).toBe(false);
     expect(supersedesStored(TREE, DEEP_MATRIX, 'auto', 0.1, true)).toBe(false);

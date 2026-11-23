@@ -93,7 +93,7 @@ describe('sets import/export', () => {
     const parsed = parseSetsImport(text);
     expect(parsed.p1[0].item).toBe('Heavy-Duty Boots');
   });
-  // Round 69 (T136): the export carries the IVs the build plays (2663093831 Sinistcha: published IV 0 in Attack and Speed).
+  // The export carries the IVs the build plays (2663093831 Sinistcha: published IV 0 in Attack and Speed).
   for (const format of ['gen9ou', 'gen9doublesou']) {
     test(`exports the IVs of a published Trick Room set and round-trips them (${format})`, () => {
       const assumptions: SmogonSetAssumptions = {
@@ -117,7 +117,7 @@ describe('sets import/export', () => {
     });
   }
 
-  // Round 76 (T234): the library's import gives a set with a typed Hidden Power the type's own IVs (Ice: 30 Atk, 30 Def) unless the
+  // The library's import gives a set with a typed Hidden Power the type's own IVs (Ice: 30 Atk, 30 Def) unless the
   // text lists IVs, while the build plays a listed Hidden Power at the IVs it has. An export of IVs that are all 31 stays explicit.
   test.each([
     ['singles', 'Tornadus-Therian', ['U-turn', 'Hidden Power Ice', 'Hurricane', 'Knock Off']],
@@ -181,7 +181,7 @@ describe.each([
     expect(errors.every(message => message.startsWith('P1 Corviknight'))).toBe(true);
   });
 
-  // Round 83 (T308, GitHub issue #2): a move or an ability the species cannot have imports, the Dex decides what exists.
+  // A move or an ability the species cannot have imports: the Dex decides what exists.
   test('a move and an ability the species cannot have import; the editor marks them with a note', async () => {
     const text = textOf('Corviknight @ Leftovers\nAbility: Intimidate\n- Power Whip\n- Spore\n- Roost');
     expect(await check(format, 9, team(entry('Corviknight')), team(), text)).toEqual([]);
@@ -219,9 +219,9 @@ describe.each([
   });
 
   test('a value the panel shows from its solved sets passes, though the knowledge does not hold it', async () => {
-    // Round 77 (the suite of the acceptance): the export reads the stats view (the solved sets, round 70 T205), the check
-    // read the knowledge. Champions VGC 2695803506: Basculegion's guessed Head Smash stands in the export, not in the
-    // knowledge, and the editor's pool lacks it, so the panel's own export imported nothing. Moon Landing stands in here.
+    // The export reads the stats view (the solved sets), not the knowledge. Champions VGC 2695803506: Basculegion's guessed Head Smash
+    // stands in the export, not in the knowledge, and the editor's pool lacks it, so the panel's own export imported nothing. Moon
+    // Landing stands in here.
     const shown = entry('Corviknight', { moves: [{ name: 'Moon Landing', source: 'guessed' }], ability: { value: 'Mummy', source: 'guessed' } });
     const text = textOf('Corviknight\nAbility: Mummy\n- Moon Landing\n- Roost');
     const pools = await loadImportPools(['Corviknight'], 9, format);

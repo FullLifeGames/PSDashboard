@@ -6,15 +6,12 @@ import { getAbilityPool, getEveryMovePool, getMovePool } from '../../src/lib/pok
 import { canonicalMove } from '../../src/lib/team-editor';
 
 /**
- * Round 89 (#150, claim 3; user ruling 37, N1b). A species the generation marks Past (or CAP, Future, LGPE, Custom) is no entry of
- * the generation's standard Dex, and replay-core's Generations hide it: the editor's pool for Dracovish was every standard move
- * without Fishious Rend and its ability list was empty. The battle's own rules decide: a species the format's simulator lets
- * exist gets the simulator's own pool (`species.getMovePool(id, natDex)`) and the Dex entry's abilities. An id the simulator does
- * not list (a draft league's) plays as the Custom Game of its generation, as the rebuild does. The editor's standard lists stay;
- * typed names accept every move the battle plays.
- *
- * The sweep compares, for every non-standard species of every generation (and the Champions mod), the reader with the simulator.
- * Whether a species exists is the simulator's TeamValidator's verdict (the same existence reading as custom-game-pools.spec.ts).
+ * A species the generation marks Past (or CAP, Future, LGPE, Custom) is no entry of the generation's standard Dex, and replay-core's
+ * Generations hide it: the editor's pool for Dracovish was every standard move without Fishious Rend and its ability list was empty.
+ * The battle's own rules decide: a species the format's simulator lets exist gets the simulator's pool (`species.getMovePool(id, natDex)`)
+ * and the Dex entry's abilities; an id the simulator does not list (a draft league's) plays as the Custom Game of its generation.
+ * The sweep compares, for every non-standard species of every generation (and the Champions mod), the reader with the simulator;
+ * existence is the TeamValidator's verdict (as in custom-game-pools.spec.ts).
  */
 
 // A tier ban ("is tagged ND Uber, which is banned") answers after existence passed: it is no refusal of existence.
@@ -23,7 +20,7 @@ const EXISTENCE_REFUSAL = /does not exist|not obtainable|Smogon CAP|Let's Go|pla
 const names = (dex: { moves: { get(id: string): { name: string } } }, ids: Iterable<string>) => [...ids].map(id => dex.moves.get(id).name);
 const ids = (list: string[]) => list.map(toId).sort();
 
-/** The simulator's pool of a species the battle plays; a species whose pool is empty offers the moves the battle plays (the editor never blocks). */
+/** The simulator's pool of a species the battle plays; an empty pool offers the moves the battle plays (the editor never blocks). */
 const simulatorPool = (
   dex: { moves: { get(id: string): { name: string } }; species: { getMovePool(id: string, natDex: boolean): Set<string> } },
   species: { id: string }, natDex: boolean, everything: string[],
@@ -43,7 +40,6 @@ const existsIn = (validator: TeamValidator, dex: { species: { get(name: string):
   return !problem || !EXISTENCE_REFUSAL.test(problem);
 };
 
-/** Whether the format plays Past species at all (National Dex rules for the simulator's pool). */
 const playsPast = (validator: TeamValidator, dex: { species: { all(): readonly { exists: boolean; isNonstandard?: string | null; name: string }[]; get(name: string): never } }): boolean =>
   dex.species.all().some(species => species.exists && species.isNonstandard === 'Past' && existsIn(validator, dex, species) === true);
 
@@ -101,20 +97,16 @@ describe('the reported rows (#150): Dracovish and Zygarde under National Dex rul
     const played = getEveryMovePool(9, format, 'import');
     const dracovish = await getMovePool('Dracovish', 9, format);
     const garchomp = await getMovePool('Garchomp', 9, format);
-    // The species' own pool takes the name first.
     expect(canonicalMove(dracovish, 'fishious rend', editorList, played)).toEqual({ canonical: 'Fishious Rend', outside: false });
     // A species without it takes the battle's move as not learnable.
     expect(canonicalMove(garchomp, 'fishious rend', editorList, played)).toEqual({ canonical: 'Fishious Rend', outside: true });
     expect(canonicalMove(dracovish, 'Moon Landing', editorList, played)).toEqual({ unknown: true });
-    // Without the played list (the import's call) the answer is as before.
     expect(canonicalMove(garchomp, 'fishious rend', editorList)).toEqual({ unknown: true });
-    // A standard format: the played list is the standard one.
     const ou = getEveryMovePool(9, 'gen9ou');
     expect(canonicalMove(garchomp, 'fishious rend', ou, getEveryMovePool(9, 'gen9ou', 'import'))).toEqual({ unknown: true });
   });
 });
 
-// The sweep.
 const RULE_FORMATS = (gen: number): [string, string][] => [
   ...['customgame', 'doublescustomgame', 'ou', 'doublesou', 'nationaldex', 'ubers']
     .filter(kind => Dex.formats.get(`gen${gen}${kind}`).exists)
@@ -173,7 +165,6 @@ describe('the Champions mod reads its own species through the mod\'s pool', () =
     ['gen9championsdoublescustomgame', 'gen9championsdoublescustomgame'],
     ['gen9championsou', 'gen9championsou'],
     ['gen9championsvgc2026regmcbo3', 'gen9championsvgc2026regmcbo3'],
-    // An unlisted Champions id plays as the Champions Custom Game.
     ['gen9championsdraftleague', 'gen9championscustomgame'],
   ];
 

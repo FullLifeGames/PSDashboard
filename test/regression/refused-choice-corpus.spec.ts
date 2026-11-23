@@ -4,18 +4,16 @@ import { toId } from '@fulllifegames/replay-core';
 import { CORPUS, rebuildThrough } from './rebuild-through';
 
 /**
- * Round 89 (#143): a move the simulator refuses turned the whole side to `default`. Each row rebuilds a corpus game through the turn,
- * like the bank does: the turn adds no refusal, and the side keeps the actions the log shows (the switch of a partner, the move lines of
- * both bodies, the Tera or Mega click). The unit and sweep rows are in `packages/eval-engine/test/refused-choice-stand-in.spec.ts`.
+ * A move the simulator refuses turned the whole side to `default`. Each row rebuilds a corpus game through the turn, like the bank does:
+ * the turn adds no refusal, and the side keeps the actions the log shows (the switch of a partner, the move lines of both bodies, the
+ * Tera or Mega click). The unit and sweep rows are in `packages/eval-engine/test/refused-choice-stand-in.spec.ts`.
  *
- * Round 89 (lane M): a row that passes without a refusal due tests nothing, so every row that is not a guard also asserts that the click
- * the log shows is unplayable on the board at the start of the turn (the request lacks the move, or lists it disabled): without the
- * stand-in the simulator would refuse it. A row whose scene drifts away turns red there. A guard row asserts only what the turn adds.
+ * A row that passes without a refusal due tests nothing, so every row that is not a guard also asserts that the click the log shows is
+ * unplayable on the board at the start of the turn (the request lacks the move, or lists it disabled): without the stand-in the simulator
+ * would refuse it. A row whose scene drifts away turns red there. A guard row asserts only what the turn adds.
  *
- * Round 89 (#139): the rows 902024 turn 24 and 2694097898 turn 6 showed a Ditto that copied a Darkrai or a Dragonite and played a move of
- * the copied body. The inference now books such a move to its target, so the built copy holds it and the click is playable at the start
- * of the turn: the two scenes moved to `transform-booking-corpus.spec.ts`. The singles and Doubles OU rows now read a reflected and a
- * danced move (a click that names a move the body never knew), which the stand-in still replaces.
+ * A Ditto that copied a Darkrai or a Dragonite and played a move of the copied body is in `transform-booking-corpus.spec.ts`. The singles
+ * and Doubles OU rows read a reflected and a danced move (a click that names a move the body never knew), which the stand-in replaces.
  */
 
 /**
@@ -34,7 +32,6 @@ const ROWS: Row[] = [
   { id: 'gen9championsvgc2026regmb-2674079451', turn: 5, type: 'Champions VGC', what: 'Encore then Disable on Toxapex', click: { slot: 'p2b', move: 'Infestation' } },
 ];
 
-/** The actions of a block the choice decides: the move and switch lines, with the actor and the move or body. */
 const actionsOf = (lines: string[]): string[] =>
   lines.filter(line => /^\|(?:move|switch|-terastallize|-mega)\|/.test(line) && !line.includes('[from]')).map(line => line.split('|').slice(1, 4).join('|'));
 

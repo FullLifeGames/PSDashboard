@@ -19,9 +19,8 @@ describe('Replay iframe HTML', () => {
   test('seeks like the native player: rest state before the seek, never pause() after', () => {
     const html = generateReplayHtml({ log, seekTurn: 2 });
 
-    // scene.pause() bumps interruptionCount, which cancels the async seek
-    // chain battle.js schedules past 300ms of fast-forwarding — the old
-    // post-seek pause() was one half of the "seeking..." hang.
+    // scene.pause() bumps interruptionCount, which cancels the async seek chain battle.js schedules past 300ms of fast-forwarding: a
+    // pause() after the seek hangs the frame on "seeking...".
     expect(html).toContain('if (!seek.autoPlay && !battle.paused) battle.pause();');
     expect(html).toContain('battle.seekTurn(seek.turn)');
     expect(html).not.toContain('Replays.battle.pause()');
@@ -30,9 +29,8 @@ describe('Replay iframe HTML', () => {
   test('the turn tracker stays silent while a seek is scrubbing', () => {
     const html = generateReplayHtml({ log, reportTurn: true });
 
-    // Mid-seek turns echoed to the parent come back as stale seeks
-    // (turn <= current resets the scrub) — the self-sustaining reset loop
-    // that froze long jumps on "seeking..." forever.
+    // Mid-seek turns echoed to the parent come back as stale seeks (turn <= current resets the scrub): a self-sustaining reset loop
+    // that freezes long jumps on "seeking...".
     expect(html).toContain('if (Replays.battle.seeking !== null) return;');
   });
 
@@ -43,8 +41,8 @@ describe('Replay iframe HTML', () => {
     expect(html).toContain('battle.play()');
   });
 
-  // Round 88 (T347, #83): the bridge's guard against its own retries dropped Watch from turn N while the frame already
-  // played at or past N. A play seek with an id (the app's request, sent with retries) runs once per id instead.
+  // The bridge's guard against its own retries must not drop Watch from turn N while the frame already plays at or past N. A play seek
+  // with an id (the app's request, sent with retries) runs once per id.
   describe('play seeks with an id', () => {
     const bridge = () => {
       const html = generateReplayHtml({ log });
@@ -125,7 +123,7 @@ describe('Replay iframe HTML', () => {
   });
 
   test('relative effect sprites resolve against Showdown\'s fx folder (round 77)', () => {
-    // User report 28.10.2026: the Stealth Rock around both Pokémon of 562428 turn 12 showed as empty boxes.
+    // The Stealth Rock around both Pokémon of 562428 turn 12 showed as empty boxes.
     // graphics.js prefixes BattleEffects with Dex.fxPrefix only when Dex already exists; the embed loads
     // its scripts in any order, and when graphics.js runs first the sprites stay "rock1.png". A blob
     // document has no base to resolve that against, so the base names the folder the prefix would have.
@@ -140,7 +138,7 @@ describe('Replay iframe HTML', () => {
   });
 
   test('the embed\'s scripts run in the order the embed appends them (round 77)', () => {
-    // Branching swarm 28.10.2026: a cold first load left the frame empty with "$ is not defined". replay-embed.js
+    // A cold first load left the frame empty with "$ is not defined". replay-embed.js
     // appends its dependencies as dynamic scripts, those run in the order they arrive, and graphics.js stops halfway
     // when jQuery comes after it. test/e2e/replay-sprites.spec.ts plays that order in a browser.
     const html = generateReplayHtml({ log });
@@ -161,7 +159,7 @@ describe('Replay iframe HTML', () => {
   });
 
   test('the battle starts at the frame\'s top edge, and no title shows under the controls (round 77)', () => {
-    // User request 28.10.2026: a band of 21 px stood above the battle (the body's 12 px plus the 9 px the embed
+    // A band of 21 px stood above the battle (the body's 12 px plus the 9 px the embed
     // puts above it), and the title under the controls ("Branch Simulation", or the players) pushed the page past
     // the frame's 480 px, so it scrolled for nothing.
     const html = generateReplayHtml({ log, title: 'Branch Simulation', format: 'gen9ou', p1: 'Alice', p2: 'Bob' });
@@ -213,11 +211,9 @@ describe('Replay iframe HTML', () => {
   test('replaces the embed FontAwesome face with the given woff2 behind the loader', () => {
     const html = generateReplayHtml({ log, fontAwesomeWoff2Url: 'https://host.test/fonts/fa.woff2' });
 
-    // Same family/weight/style as font-awesome.css: for duplicate @font-face
-    // descriptors the later rule wins, and the embed appends its stylesheets
-    // to <head> — a rule in the body always cascades after them. The upstream
-    // woff2 (stale glyph bboxes, one Firefox sanitizer warning per glyph) is
-    // then never fetched.
+    // Same family/weight/style as font-awesome.css: for duplicate @font-face descriptors the later rule wins, and the embed appends its
+    // stylesheets to <head>, so a rule in the body always cascades after them. The upstream woff2 (stale glyph bboxes, one Firefox
+    // sanitizer warning per glyph) is then never fetched.
     expect(html).toContain("font-family: 'FontAwesome'");
     expect(html).toContain("src: url('https://host.test/fonts/fa.woff2') format('woff2')");
     expect(html).toContain('font-weight: normal');
@@ -235,10 +231,8 @@ describe('Replay iframe HTML', () => {
       .filter(body => !body.includes('replay-embed.js'));
     expect(html.indexOf('mozInputSource')).toBeLessThan(html.indexOf('replay-embed.js'));
 
-    // A Gecko-like prototype: reading the native accessor is what Firefox
-    // logs its deprecation for — the shim must replace it, keeping the
-    // touch semantics battle-tooltips.ts relies on (=== 5 suppresses the
-    // tooltip a stray tap would open).
+    // A Gecko-like prototype: reading the native accessor is what Firefox logs its deprecation for, so the shim must replace it, keeping
+    // the touch semantics battle-tooltips.ts relies on (=== 5 suppresses the tooltip a stray tap would open).
     const proto: Record<string, unknown> = {};
     Object.defineProperty(proto, 'mozInputSource', {
       configurable: true,

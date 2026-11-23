@@ -6,17 +6,17 @@ import { CORPUS, rebuildThrough } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
- * Round 89 (#139): a body under Transform uses the moves of its target, so a move line of the copy shows that the target knows the
- * move (`|move|p1a: Ditto|Protect|p1a: Ditto`, the copy of the foe's Dragonite). The inference dropped such a line: the built target
- * lacked the move, the rebuilt copy could not play it, and the simulator refused the click. Each row reads a corpus game (local: the
+ * A body under Transform uses the moves of its target, so a move line of the copy shows that the target knows the move
+ * (`|move|p1a: Ditto|Protect|p1a: Ditto`, the copy of the foe's Dragonite). The inference must book it on the target: otherwise the built
+ * target lacks the move, the rebuilt copy cannot play it, and the simulator refuses the click. Each row reads a corpus game (local: the
  * rows skip without `.fit-corpus`): the built target holds the move, the copy's request at the start of the turn offers it (the copy
  * plays its logged move, the click needs no stand-in), and the turn adds no refusal. The unit rows are in
  * `packages/replay-core/test/opponent-inferrer.spec.ts`, the sweep over every Dex entry that transforms a body in
  * `packages/replay-core/test/transform-booking-sweep.spec.ts`.
  *
  * Singles, Doubles OU, VGC SV and Champions each have a row (the log scan of 7,032 games: 357 move lines of copies in singles, 22 in
- * Doubles OU, 103 in VGC SV, 57 in Champions OU, 11 in Champions VGC). The first two rows were the scenes of two rows of
- * `refused-choice-corpus.spec.ts` (902024 turn 24, 2694097898 turn 6): their refusal is gone, because the copy now holds the move.
+ * Doubles OU, 103 in VGC SV, 57 in Champions OU, 11 in Champions VGC). The first two rows are the scenes 902024 turn 24 and 2694097898
+ * turn 6.
  */
 
 /** `copy`: the slot of the transformed body and the move its line shows; `target`: the side and the nickname of the body it copied. */
@@ -32,7 +32,6 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-/** The built set of the target through the bank's and the app's build with the disk-cached Smogon data. */
 async function builtMoves(row: Row): Promise<string[]> {
   const replay = JSON.parse(readFileSync(CORPUS(row.id), 'utf-8')) as Replay;
   const built = await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? row.id, parsed: parseReplayLogWithObservations(replay.log), fetcher: diskCachedSmogonFetcher() });

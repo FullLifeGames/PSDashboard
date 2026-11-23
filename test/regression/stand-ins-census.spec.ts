@@ -8,16 +8,15 @@ import { parseSmogonChaosStats } from '../../src/lib/smogon-stats';
 import * as championsMod from '@pkmn/mods/champions';
 
 /**
- * Round 88 (F, #101), sweeps S2 and S3 of the plan.
- * S3: no measured row moves. The step returns the infos unchanged for every log of the bank's replays, the fit corpus (the holdouts'
- *     games among them) and the feedback fixtures, because none has a short side; a tracked row keeps the guard in CI (the feedback
- *     fixtures), the local rows read the data that only the main checkout holds.
- * S2: a stand-in is a body of the game's own Dex that the format's rule table lets in, and never repeats a base species of its side:
- *     for the 34 short sides of the fit corpus and a simulator-made log of every no-preview format with a stats file, the whole team
- *     (shown bodies plus stand-ins) validates in the format, ignoring the problems of sets (moves, abilities, items, spreads: the
- *     stand-ins carry none) and holds six distinct base species.
+ * The stand-in step returns the infos unchanged for every log of the bank's replays, the fit corpus (the holdouts' games among them) and
+ * the feedback fixtures, because none has a short side; a tracked row keeps the guard in CI (the feedback fixtures), the local rows read
+ * the data that only the main checkout holds.
+ * A stand-in is a body of the game's own Dex that the format's rule table lets in, and never repeats a base species of its side: for the
+ * 34 short sides of the fit corpus and a simulator-made log of every no-preview format with a stats file, the whole team (shown bodies
+ * plus stand-ins) validates in the format, ignoring the problems of sets (moves, abilities, items, spreads: the stand-ins carry none)
+ * and holds six distinct base species.
  */
-// The feedback fixtures include Champions games: the mod registers before a log is read, as every host does (round 75).
+// The feedback fixtures include Champions games: the mod registers before a log is read, as every host does.
 registerChampionsDex(championsMod as unknown as Parameters<typeof registerChampionsDex>[0], championsMod.Formats as unknown as Parameters<typeof registerChampionsDex>[1]);
 const FEEDBACK = 'test/e2e-feedback/fixtures';
 const readLog = (path: string): string | null => {
