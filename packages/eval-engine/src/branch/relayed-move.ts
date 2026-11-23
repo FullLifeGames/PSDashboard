@@ -1,15 +1,8 @@
 import { toId, type RulesDex } from '@fulllifegames/replay-core';
 
-/**
- * Round 89 (#135): a `|move|` line that another effect wrote for a body is not the body's click. The simulator writes a move line with
- * `|[from] <effect>` when the move runs with a source effect (`@pkmn/sim` battle-actions.js, `useMove`/`runMove`): Magic Bounce and Dancer
- * (an Ability, `ability: <name>`), and the volatile of a move that relays another body's move (Magic Coat, Snatch: a Condition, whose
- * `fullname` is its bare name). A lock continuation (`lockedmove`) and a move that runs early under its own click (Pursuit) write a `[from]`
- * too, and those lines are the body's own action. The rule reads the Dex, never a name: older logs write the Ability or the Condition
- * without its prefix (`[from]ability: Magic Bounce` without the space, `[from] Magic Bounce`, `[from] Magic Coat`).
- */
+/** A `|move|` line that another effect wrote for a body (Magic Bounce, Dancer, Magic Coat, Snatch) is not the body's click. */
 
-/** The effect a move line names after `[from]` (with or without the space), as written; undefined when the line has none. */
+/** The effect a move line names after `[from]` (with or without the space), as written; undefined without one. */
 export function moveLineSource(line: string): string | undefined {
   const field = line.split('|').slice(5).find(part => part.startsWith('[from]'));
   return field?.slice('[from]'.length).trim() || undefined;
@@ -17,7 +10,7 @@ export function moveLineSource(line: string): string | undefined {
 
 const volatilesByDex = new WeakMap<RulesDex, ReadonlySet<string>>();
 
-/** The ids of every volatile a Dex move sets on a body, as the Dex lists them: the states that can relay a move (Magic Coat, Snatch) or lock one. */
+/** The ids of every volatile a Dex move sets on a body: the states that can relay a move (Magic Coat, Snatch) or lock one. */
 function moveVolatiles(dex: RulesDex): ReadonlySet<string> {
   let ids = volatilesByDex.get(dex);
   if (!ids) {
@@ -31,10 +24,11 @@ function moveVolatiles(dex: RulesDex): ReadonlySet<string> {
 }
 
 /**
- * Does another effect own this move line, so that the body's click is a later line of its slot? True for an Ability (prefixed, or the
- * bare form of older logs) and for a Condition that is the volatile of a Dex move and carries no lock handler (`onLockMove`, which
- * `lockedmove` carries: its continuation is the body's own action). False for a `move:` or `item:` source, a bare move name
- * (`[from]Sleep Talk`), and a Condition that is no body's volatile (Pursuit, the Pledges' side conditions).
+ * Does another effect own this move line, so that the body's click is a later line of its slot? The simulator writes `|[from] <effect>`
+ * when a move runs with a source effect (`@pkmn/sim` battle-actions.js, `useMove`/`runMove`); older logs drop the prefix or the space
+ * (`[from]ability: Magic Bounce`, `[from] Magic Coat`). True for an Ability and for a Condition that is the volatile of a Dex move
+ * without a lock handler (`onLockMove`: `lockedmove` continues the body's own action). False for a `move:` or `item:` source, a bare
+ * move name (`[from]Sleep Talk`) and a Condition that is no body's volatile (Pursuit, the Pledges' side conditions).
  */
 export function isRelayedMoveLine(line: string, dex: RulesDex): boolean {
   const source = moveLineSource(line);

@@ -6,13 +6,9 @@ import { normalizeLineEndings } from '../line-endings.ts';
 import type { PokemonIdent, SimBattle, SimPokemon } from './types.ts';
 
 /**
- * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6). Resolution
- * is per NAME: the exact species/nickname id first, then a UNIQUE
- * base-species match — the protocol reveals ACTIVE formes
- * (Zamazenta-Crowned) while built sets may carry the base name, and
- * 7-8-set teams holding both forme siblings must keep the exact one only.
- * Any unresolved or ambiguous name fails the side open (team stays whole).
- * Filtering preserves team order, so leads stay in front.
+ * Fields only the brought species (VGC's 4 of 6, BSS's 3 of 6), resolved per NAME: the exact species or nickname id first, then a
+ * UNIQUE base-species match (the protocol reveals ACTIVE formes such as Zamazenta-Crowned while built sets may carry the base name, and
+ * a team holding both forme siblings keeps the exact one only). An unresolved or ambiguous name fails the side open (team stays whole).
  */
 export function trimTeamToBring(team: PokemonSet[], keep: string[] | undefined, rules: GameRules): PokemonSet[] {
   const claimed = claimBring(team, keep, rules);
@@ -45,7 +41,7 @@ function claimBring(team: PokemonSet[], keep: string[] | undefined, rules: GameR
   return claimed;
 }
 
-/** Round 89 (#124): a bring list of both sides, with how many trailing names of each list are guesses (absent: none). */
+/** A bring list of both sides, with how many trailing names of each list are guesses (absent: none). */
 export interface BringLists {
   p1: string[];
   p2: string[];
@@ -53,11 +49,10 @@ export interface BringLists {
 }
 
 /**
- * Round 89 (#124): both teams trim to their bring lists, or neither does. A pinned four against an open six overrates the open
- * side (the A.3c gate flipped game 452654 on that asymmetry, ADR 0010), so one side whose list is empty, unresolved or ambiguous
- * leaves both teams whole. After the trim each side's guessed sets (the trailing names of its list) move behind the known bodies, in list
- * order; every other set keeps team order, leads first. A guess therefore takes the last party slots, and every world of a game
- * puts each known body at the same party index, so one choice string names one body in all worlds.
+ * Both teams trim to their bring lists, or neither does: a pinned four against an open six overrates the open side (ADR 0010), so one
+ * side whose list is empty, unresolved or ambiguous leaves both teams whole. After the trim each side's guessed sets (the trailing
+ * names of its list) move behind the known bodies, so a guess takes the last party slots and every world of a game puts each known body
+ * at the same party index: one choice string names one body in all worlds. Other sets keep team order, leads first.
  */
 export function trimTeamsToBring(
   p1Team: PokemonSet[], p2Team: PokemonSet[], list: BringLists | null | undefined, rules: GameRules,
@@ -89,7 +84,6 @@ export function sameBodyName(a: string | undefined, b: string | undefined): bool
   return id !== '' && id === toId(b);
 }
 
-/** The first item named `name` exactly, else the first with the same name by `sameBodyName`. */
 export function findByName<T>(items: readonly T[], nameOf: (item: T) => string | undefined, name: string | undefined): T | undefined {
   if (!name) return undefined;
   return items.find(item => nameOf(item) === name) ?? items.find(item => sameBodyName(nameOf(item), name));
@@ -128,12 +122,11 @@ export function reorderForLeads(team: PokemonSet[], leads: PokemonIdent[]): Poke
 }
 
 /**
- * Round 73 (T250): what the protocol says about a side's bench. `shown`: the ids (name and base species) of every body its
- * switch, drag, replace and detailschange lines name; a body outside the set never stood on the field. `fainted`: the slots
- * the block's own lines faint. The game left a slot empty only where its body fainted, so a slot the simulator wants filled
- * without a faint line in the block is the simulator's divergence, not the bring list. `goesOn`: the log plays on past the block.
- * At the log's last block (a forfeit, a win or a tie follows) an empty slot proves nothing about the bench: a player who forfeits
- * with bodies left leaves the same slot empty.
+ * What the protocol says about a side's bench. `shown`: the ids (name and base species) of every body its switch, drag, replace and
+ * detailschange lines name; a body outside the set never stood on the field. `fainted`: the slots the block's own lines faint; the game
+ * left a slot empty only where its body fainted, so a slot the simulator wants filled without a faint line is the simulator's
+ * divergence, not the bring list. `goesOn`: the log plays on past the block; at the last block an empty slot proves nothing (a player
+ * who forfeits with bodies left leaves the same slot empty).
  */
 export interface ProtocolBench {
   shown: ReadonlySet<string>;
@@ -141,7 +134,6 @@ export interface ProtocolBench {
   goesOn: boolean;
 }
 
-/** Whether the log has a turn line after the given turn: the game played on with the slot empty. */
 export function logGoesOn(replayLog: string, turn: number): boolean {
   return normalizeLineEndings(replayLog).split('\n').some(line => {
     const match = line.match(/^\|turn\|(\d+)/);
@@ -160,7 +152,6 @@ export function shownBodyIds(replayLog: string, sideId: 'p1' | 'p2'): Set<string
   return shown;
 }
 
-/** The slots of a side that a block's lines faint. */
 export function faintedSlots(blockLines: readonly string[], sideId: 'p1' | 'p2'): Set<number> {
   const slots = new Set<number>();
   for (const line of blockLines) {
@@ -178,8 +169,7 @@ export const wasShownBody = (body: SimPokemon, shown: ReadonlySet<string>) => {
   return [body.name, body.species.name, body.baseSpecies.name].some(name => shown.has(toId(name)) || shown.has(speciesBaseId(name, rules)));
 };
 
-
-/** Round 86 (B9): the shown ids of a snapshot's seen bodies, in the form `shownBodyIds` gives for a log (a body's name, its forme and their base species). */
+/** The shown ids of a snapshot's seen bodies, in the form `shownBodyIds` gives for a log (a body's name, its forme and their base species). */
 export function shownIdsOfSnapshot(battle: SimBattle, seen: readonly { name: string; speciesForme: string }[]): Set<string> {
   const rules = rulesOf(battle);
   const shown = new Set<string>();
@@ -193,11 +183,11 @@ export const mayDisguise = (body: SimPokemon) =>
     typeof (body.battle.dex.abilities.get(name) as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function');
 
 /**
- * Round 86 (B9, ruling C3): the one way a body leaves the game outside the simulator's own turn, in the order of `Battle#resolveFaints`: the
- * fallen count, then the End events of the body's ability and item, then the flags. A body on the field runs the End events (Neutralizing Gas
- * ends and starts what it held back, Desolate Land clears its weather); a bench body that the log never shows was never in the game and runs
- * none. `fallen`: the body fainted in the game and counts as a fallen ally (the side's `totalFainted`, which Last Respects and Supreme Overlord
- * read). `test/body-out-sweep.spec.ts` holds the function to the simulator over every Dex ability with an End handler.
+ * The one way a body leaves the game outside the simulator's own turn, in the order of `Battle#resolveFaints`: the fallen count, then
+ * the End events of the body's ability and item, then the flags. A body on the field runs the End events (Neutralizing Gas ends and
+ * starts what it held back, Desolate Land clears its weather); a bench body the log never shows was never in the game and runs none.
+ * `fallen`: the body counts as a fallen ally (`totalFainted`, read by Last Respects and Supreme Overlord).
+ * `test/body-out-sweep.spec.ts` holds the function to the simulator over every Dex ability with an End handler.
  */
 export function takeBodyOut(body: SimPokemon, { fallen }: { fallen: boolean }): void {
   const { side, battle } = body;
@@ -214,11 +204,11 @@ export function takeBodyOut(body: SimPokemon, { fallen }: { fallen: boolean }): 
 }
 
 /**
- * The game left a forced slot empty (every forced slot is one the block faints, and no switch followed for at least one): the living bench bodies the protocol never shows were not brought (a player with a
- * body to send sends it), so they leave the game as the simulator takes a fainted body out (no faint line, no fallen-ally
- * count) and the slot takes `pass`, which the simulator accepts once no living body waits. Nothing happens, and the old
- * answer stands, when the bench holds a shown body the log's answers leave over (the simulator diverged, not the bring
- * list) or a body that may disguise itself as another. True when bodies left.
+ * The game left a forced slot empty (every forced slot is one the block faints, and no switch followed for at least one): the living
+ * bench bodies the protocol never shows were not brought (a player with a body to send sends it), so they leave the game as the
+ * simulator takes a fainted body out (no faint line, no fallen-ally count) and the slot takes `pass`. Nothing happens when the bench
+ * holds a shown body the log's answers leave over (the simulator diverged, not the bring list) or a body that may disguise itself.
+ * True when bodies left.
  */
 export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: ProtocolBench, answers: number, forcedSlots: number[]): boolean {
   const { shown, fainted, goesOn } = bench;
@@ -235,11 +225,10 @@ export function retireUnshownBench(battle: SimBattle, sideIdx: number, bench: Pr
 }
 
 /**
- * Round 86 (B9, ruling C3): a body the correction took out leaves a slot empty when the snapshot has nobody to stand in it. The game left that
- * slot empty because its side had no body to send, so the bench bodies the log never shows were not brought: they leave the game, as they do
- * when the rebuild's own replacement round meets the empty slot (`buildForcedSwitchChoice`). The same rule (`retireUnshownBench`) with the
- * snapshot's shown bodies (the ones the log saw: a team preview entry nobody saw has no hit points), and only while the side has a shown
- * body alive, so the retire never ends a game the log goes on with.
+ * A body the correction took out leaves a slot empty when the snapshot has nobody to stand in it: the game's side had no body to send,
+ * so the bench bodies the log never shows were not brought and leave the game (`retireUnshownBench`, as in `buildForcedSwitchChoice`).
+ * The shown bodies are the snapshot's (a team preview entry nobody saw has no hit points), and only while the side has a shown body
+ * alive, so the retire never ends a game the log goes on with.
  */
 export function retireBenchAfterFaints(battle: SimBattle, snapshot: TurnSnapshot, tookOut: ReadonlySet<SimPokemon>) {
   if (tookOut.size === 0) return;
@@ -255,8 +244,8 @@ export function retireBenchAfterFaints(battle: SimBattle, snapshot: TurnSnapshot
 }
 
 /**
- * The faint state of one body against its snapshot entry. Round 86 (ruling C3): the log's faint of a body the simulator's turn left standing
- * takes it out the way the simulator does (`takeBodyOut`); a faint written or taken back otherwise moves the side's fainted count.
+ * Sets the faint state of one body from its snapshot entry: the log's faint of a body the sim left standing takes it out
+ * (`takeBodyOut`); other changes move the side's fainted count.
  */
 export function settleFaintFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: TurnSnapshot['p1']['pokemon'][number]) {
   if (snapshotPokemon.fainted && !battlePokemon.fainted) {

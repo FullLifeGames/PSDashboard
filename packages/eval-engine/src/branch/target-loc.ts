@@ -3,10 +3,7 @@ import type { SimBattle, SimPokemon } from './types.ts';
 import { formatTargetLoc, slotLetter } from './team-order.ts';
 import { aimThatFailsAsLogged, hidesItsTarget } from '../sim-ask/index.ts';
 
-/**
- * The aim of a click: the loc the log's target maps to, the suffix a doubles click carries, and (round 89, #136) the aim of a move line
- * whose target the protocol hides. Split out of `protocol-choices.ts`, which re-exports the two names its callers import.
- */
+/** The aim of a click: the loc the log's target maps to, the suffix a doubles click carries, and the aim of a move line whose target the protocol hides. */
 
 export function protocolTargetLoc(
   battle: SimBattle,
@@ -46,10 +43,8 @@ function shouldAppendTargetLoc(
 }
 
 /**
- * A locked request (recharge, the release turn of Fly or Dig, a continued
- * rampage) carries one entry WITHOUT a `target`, and the sim rejects any loc
- * on it together with the whole side choice. The Dex fallback in
- * `targetTypeForMove` would still name a target type there.
+ * A locked request (recharge, the release turn of Fly or Dig, a continued rampage) carries one entry WITHOUT a `target`, and the sim
+ * rejects any loc on it together with the whole side choice, while the Dex fallback in `targetTypeForMove` would still name a target type.
  */
 function requestEntryHasNoTarget(active: SimPokemon | null | undefined, moveName: string): boolean {
   if (!active) return false;
@@ -94,8 +89,8 @@ export function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targe
 }
 
 /**
- * Round 89 (#136): the aims of the turn's choices. `resolved` holds the aim a slot's hidden target was answered with (key side and
- * slot: `p2b`); `ask` is false while a question to the simulator builds the turn's choices for one aim.
+ * The aims of the turn's choices. `resolved` holds the aim a slot's hidden target was answered with (key side and slot: `p2b`);
+ * `ask` is false while a question to the simulator builds the choices for one aim.
  */
 export interface Aiming { ask: boolean; resolved: Map<string, number> }
 
@@ -103,11 +98,10 @@ export interface Aiming { ask: boolean; resolved: Map<string, number> }
 export type SlotChoice = (owner: 'p1' | 'p2', slot: number, aiming: Aiming) => string;
 
 /**
- * Round 89 (#136): the aim of a move line that hides its target (`|move|p2b: Sableye|Disable||[still]`: the game stopped the move before it
- * animated). The default aim falls on the foe in slot a, and a Disable or Encore that failed on a fresh switch-in in slot b landed there. The
- * question goes to the simulator (`aimThatFailsAsLogged`): the turn's choices with each legal aim, played on a copy; the first aim that fails
- * as the log shows wins, else the default stays (0). Doubles only: with one foe the move has one aim. The other bodies' hidden aims stay at
- * their default while a slot is asked; the slots of the side are answered in order, so a later slot reads the earlier answers.
+ * The aim of a move line that hides its target (`|move|p2b: Sableye|Disable||[still]`: the game stopped the move before it animated).
+ * The default aim falls on the foe in slot a, while a Disable or Encore that failed on a fresh switch-in in slot b landed there. The
+ * simulator is asked (`aimThatFailsAsLogged`): the turn's choices with each legal aim, played on a copy; the first aim that fails as the
+ * log shows wins, else 0. Doubles only. Other hidden aims stay at their default while a slot is asked; a later slot reads the earlier answers.
  */
 export function hiddenTargetLoc(
   line: string, side: 'p1' | 'p2', activeSlot: number, battle: SimBattle, moveName: string, aiming: Aiming, choiceOf: SlotChoice,

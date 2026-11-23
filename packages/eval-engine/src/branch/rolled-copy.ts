@@ -10,22 +10,13 @@ import { hasForceSwitch } from './corrections.ts';
 import { getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import type { SimBattle } from './types.ts';
 
-/**
- * Round 86 (the engine reads the dice, T304): the copy of a logged turn with one die turned over. The report names the game's biggest roll
- * (`biggest-roll.ts`) and asks what the other side of the die would have left: a Fire Fang that missed hits, a Gunk Shot that hit misses.
- * The copy starts from the position at the turn's start, plays the turn the way the reconstruction plays it (the choices the log shows,
- * seed index 0, every die the log shows forced, the faint step and the phantom-proc rule of T306 included, `faintStep`) and turns the one
- * die over before the play. The faint step searches the damage rolls that make the log's faints, so it runs on the log's turn; the turned
- * die then plays on top of its result and the faints may differ from the log's. Only the dice the log names are turned: a die the log does
- * not show gives no copy, and the sentence speaks only where the log names the event (gate 30.10.2026, 2a).
- * The report names its roll in its own words (the side that rolled, the move, the doubles click's target body and attacker slot) and the
- * copy finds the die in the log: the accuracy die of that side and move that came out as a miss.
- *
- * The copy stops where the turn opens a request for a replacement (ruling Q7, the path of the sweep's replacement round, T290): the next
- * root is then the open request, which the engine prices like any forced replacement and which ranks the replacing side's options. The
- * hit's own damage roll, crit and secondary are no die of the log (the log shows a miss), so they fall to the hidden dice of the seed.
- * No snapshot corrects the copy's position (the log shows the other side of the die), so it carries what the simulator gives.
- */
+/** The copy of a logged turn with one die turned over (a Fire Fang that missed hits, a Gunk Shot that hit misses), for the report's biggest roll. */
+
+// The copy plays the turn as the reconstruction does (the log's choices, seed index 0, every die the log shows forced, `faintStep`), turns
+// the one die over before the play, and stops where the turn opens a replacement request, the next root. The faint step searches the
+// damage rolls that make the log's faints, so it runs on the log's turn; the turned die plays on top of its result and the faints may
+// differ. A die the log does not show gives no copy. The hit's own damage roll, crit and secondary are no die of the log (it shows a
+// miss), so they fall to the hidden dice of the seed. No snapshot corrects the copy's position.
 
 /** The roll the report names: the winner's click whose accuracy die came out as a miss. */
 export interface RollSelector {
@@ -37,6 +28,7 @@ export interface RollSelector {
   slot?: number;
 }
 
+/** The input of `rolledCopy`: the turn's start position, the log, and the die to turn over by key or by the report's roll. */
 export interface RolledCopyInput {
   /** The serialized position at the start of `turn` (the sweep's boundary position). */
   position: string;
@@ -48,6 +40,7 @@ export interface RolledCopyInput {
   roll?: RollSelector;
 }
 
+/** The position after the copy's turn with the die turned over, and how the turn ended. */
 export interface RolledCopy {
   /** The position of the next root. */
   serialized: string;
@@ -109,6 +102,7 @@ function standingOf(copy: SimBattle, written: string[]): Omit<RolledCopy, 'flip'
   };
 }
 
+/** Plays the logged turn with one die turned over; null where the log has no such die, the turn cannot be played, or the position is no turn start. */
 export function rolledCopy({ position, replayLog, turn, flip: key, roll }: RolledCopyInput): RolledCopy | null {
   try {
     const seed = ALIGNMENT_SEEDS[0];
@@ -130,7 +124,7 @@ export function rolledCopy({ position, replayLog, turn, flip: key, roll }: Rolle
     if (flip === null) return null;
     const played = flip === undefined ? dice : turnedOver(dice, flip);
     if (!played) return null;
-    // Round 86 (ruling C2): the copy plays under the seed the rebuild found for the dice no `DieKind` names
+    // The copy plays under the seed the rebuild found for the dice no `DieKind` names
     const copy = forkBattle({ serialized: position }, playSeed);
     const start = copy.log.length;
     playBlockOnCopy({ copy, dice: played, choices, forced: aligned.alignForced, bench, stopAtRequest: true });

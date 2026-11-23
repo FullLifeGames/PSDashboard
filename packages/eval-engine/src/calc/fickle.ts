@@ -1,14 +1,10 @@
 import type { Dex } from '@pkmn/sim';
 
 /**
- * Round 69 (T154): a move that doubles its strength on a chance (Fickle Beam:
- * the Dex's onBasePower asks `this.randomChance(3, 10)` and chains a factor of
- * 2) is priced as the mix of its two strengths. The calc knows nothing of the
- * draw, so the chance and the factor are read from the handler itself: it runs
- * on a stand-in battle whose randomChance records its arguments and answers
- * yes and whose chainModify returns the factor. A handler that never asks for
- * a chance (Venoshock's) or needs the battle itself (Expanding Force's field)
- * is no mix. Last Respects (T76) reads a fixed strength instead.
+ * A move that doubles its strength on a chance (Fickle Beam: onBasePower asks `this.randomChance(3, 10)` and chains a factor of 2) is
+ * priced as the mix of its two strengths. The calc knows nothing of the draw, so the chance and the factor are read from the Dex handler
+ * on a stand-in battle whose randomChance records its arguments and answers yes and whose chainModify returns the factor. A handler that
+ * never asks for a chance (Venoshock's) or needs the battle itself (Expanding Force's field) is no mix.
  */
 
 export interface StrengthMix {

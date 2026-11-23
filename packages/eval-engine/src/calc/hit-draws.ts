@@ -1,16 +1,9 @@
 /**
- * The hit counts the simulator's hit loop draws for one use of a multi-hit
- * move (battle-actions hitStepMoveHitLoop), as the array it samples from.
- * Its rules live inline there, with no handler to ask, so they are mirrored
- * here once (round 67, T100): the static prices their mean
- * (score/move-facts.ts), the preview each count with its share
- * (damage-calc.ts). test/multi-hit.spec.ts and
- * test/damage-calc-hit-counts.spec.ts hold them against the simulator's own
- * draws: 2 to 5 hits sample 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5 from
- * gen 5 on and 2/2/2/3/3/3/4/5 before; from gen 5 on Loaded Dice turns a
- * count under 4 into 4 or 5, and it turns ten hits into 4 to 10; any other
- * range draws each count alike. `multihit` is the count after the user's
- * ability reshaped it (Skill Link takes the top).
+ * The hit counts the simulator's hit loop draws for one use of a multi-hit move (battle-actions hitStepMoveHitLoop), as the array it
+ * samples from. The rules live inline there with no handler to ask, so they are mirrored here: 2 to 5 hits sample
+ * 2/2/2/2/2/2/2/3/3/3/3/3/3/3/4/4/4/5/5/5 from gen 5 on and 2/2/2/3/3/3/4/5 before; from gen 5 on Loaded Dice turns a count under 4
+ * into 4 or 5 and ten hits into 4 to 10; any other range draws each count alike. `multihit` is the count after the user's ability
+ * reshaped it (Skill Link takes the top). `test/damage-calc.spec.ts` holds the counts against the simulator's draws.
  */
 export function hitDraws(gen: number, multihit: number | number[], holdsLoadedDice: boolean): number[] {
   if (typeof multihit === 'number') return multihit === 10 && holdsLoadedDice ? range(4, 10) : [multihit];

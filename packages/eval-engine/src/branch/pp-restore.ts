@@ -4,16 +4,10 @@ import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 type BodyOf = (side: SimSide, snapshotPokemon: TurnSnapshot['p1']['pokemon'][number]) => SimPokemon | undefined;
 
 /**
- * Round 89 (#106): the PP a move has left is the log's count of its uses, not the rebuilt battle's. The rebuild spends PP by the
- * moves it plays, and it drifts from the game in two ways: a Leppa Berry the log rules out (the set guessed it, the game never
- * showed it) restores the move, and a turn the rebuild played differently (a faint before the body acted) never spends it. A
- * move at 0 PP in the game then ranks first in the rebuilt one (Revival Blessing, 1 PP, used and offered again).
- *
- * The snapshot carries the PP the log shows spent per move (`ppUsed`, read by @pkmn/client: Pressure charges its extra point, a
- * Leppa or Mystery Berry in the log takes its points back). Each own move slot of a body takes the simulator's own maximum minus
- * that count; a range (Pressure left open) clamps the slot into it. A move the log never shows used reads 0 spent, as the
- * simulator's slot of a move nobody used does. A snapshot without the field (written before round 89) changes nothing.
- * Returns whether a slot moved: the request was built from the old PP and needs a refresh.
+ * Sets each move's PP from the log's count of its uses (`ppUsed` of the snapshot, read by @pkmn/client) and returns whether a slot moved
+ * (the request was built from the old PP). The rebuild drifts from the game: a Leppa Berry the set guessed restores the move, and a turn
+ * played differently never spends it, so a move at 0 PP in the game (Revival Blessing, 1 PP) would rank first again. A range of spent
+ * PP (Pressure left open) clamps the slot into it.
  */
 export function restorePpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot, bodyOf: BodyOf): boolean {
   let changed = false;

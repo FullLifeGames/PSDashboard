@@ -5,13 +5,8 @@ import { typeAtUse, typesUnderTera } from './state.ts';
 import type { PokemonStatTable, SimBattle, SimPokemon } from './types.ts';
 
 /**
- * The quick picker's move types, from the simulator (round 70, T215). The picker builds its buttons from a replay
- * snapshot and the guessed teams, with no battle at hand, so it used to keep the catalog type for every move whose
- * type the simulator changes at use: Weather Ball and Terrain Pulse need the field, the -ate family, Liquid Voice and
- * Normalize need the ability. The snapshot holds the field and the guessed set names the ability, so the picker now
- * asks the simulator the way the live picker does (branch/state.ts typeAtUse, and typesUnderTera for the Tera click):
- * a throwaway battle of the body, the field set as the snapshot shows it, the move's own rule and then everyone's run
- * by the simulator. No move or ability name is read here.
+ * The quick picker's move types from a throwaway battle of the snapshot body (no battle at hand), asked as the live picker asks
+ * (`typeAtUse`, `typesUnderTera`): Weather Ball and Terrain Pulse need the field, the -ate family, Liquid Voice and Normalize the ability.
  */
 
 /** What the type a move lands with depends on, for a body read off a snapshot. */
@@ -27,6 +22,7 @@ export interface SnapshotTypeBody {
   teraType?: string;
 }
 
+/** The question to the twin battle: the body, its candidate abilities, the field and the moves to type. */
 export interface SnapshotTypeQuery {
   gen: number;
   /** A Pokémon Champions game: the mod's battle, which exists once the mod is loaded. */
@@ -139,13 +135,9 @@ function readOne(query: SnapshotTypeQuery, ability: string): ReadonlyMap<string,
 const same = (a: SnapshotMoveType | undefined, b: SnapshotMoveType | undefined): boolean =>
   !!a && !!b && a.type === b.type && a.typeUnderTera === b.typeUnderTera;
 
-/**
- * The type each listed move lands with for the snapshot body, as the simulator reads it (null where no twin can be
- * built: the Champions mod is not loaded, the generation lacks the species). Every candidate ability gets its own
- * twin; a move whose candidates disagree is left out, and so is a move the Dex does not know, so the caller keeps its
- * catalog type there. The Tera label is set only where the click changes the type.
- */
+/** The type each listed move lands with for the snapshot body, as the simulator reads it; null where no twin can be built. */
 export function snapshotMoveTypes(query: SnapshotTypeQuery): ReadonlyMap<string, SnapshotMoveType> | null {
+  // Every candidate ability gets its own twin; a move whose candidates disagree or that the Dex does not know is left out (the caller keeps its catalog type).
   const reads = (query.abilities.length > 0 ? query.abilities : ['']).map(ability => readOne(query, ability));
   if (reads.some(read => read === null)) return null;
   const [first, ...others] = reads as ReadonlyMap<string, SnapshotMoveType>[];

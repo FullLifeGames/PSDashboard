@@ -8,10 +8,8 @@ type SleepRules = { lo: number; hi: number; rest: number | null };
 const sleepRulesOf = new WeakMap<object, SleepRules | null>();
 
 /**
- * Round 69, T187: the sleep counter's rules, asked of the simulator instead of
- * typed. The sleep condition's onStart runs on a stand-in that records the one
- * random call (start time in [lo, hi), Gen 9: 2 to 4, so 1 to 3 cants), and
- * Rest's onHit on a stand-in that records the count it sets (`rest`).
+ * The sleep counter's rules, asked of the simulator: the sleep condition's onStart runs on a stand-in that records the one random call
+ * (start time in [lo, hi); Gen 9: 2 to 4, so 1 to 3 cants), and Rest's onHit on a stand-in that records the count it sets (`rest`).
  */
 function sleepRules(dex: SimBattle['dex']): SleepRules | null {
   if (sleepRulesOf.has(dex)) return sleepRulesOf.get(dex)!;
@@ -52,11 +50,9 @@ function sleepStep(body: SimPokemon): number {
 }
 
 /**
- * Gives a body asleep in the game a remaining count the game's cant lines
- * allow (`turns` of them so far): the simulator's own count stays when it is
- * allowed, else a start time is drawn from the rest of the range. After Rest
- * (the block shows it) the count is exact. An old snapshot (no count) and a
- * generation without rules leave the counter alone.
+ * Gives a body asleep in the game a remaining count the game's cant lines allow (`turns` of them so far): the simulator's own count
+ * stays when it is allowed, else a start time is drawn from the rest of the range. After Rest the count is exact. A snapshot without
+ * a count and a generation without rules leave the counter alone.
  */
 export function settleSleepCounter(body: SimPokemon, turns: number, rested: boolean, redraw: boolean) {
   const rules = sleepRules(body.battle.dex);
@@ -76,11 +72,9 @@ export function settleSleepCounter(body: SimPokemon, turns: number, rested: bool
 }
 
 /**
- * Round 69, T187: a lock with a random length (Outrage and its kin) that the
- * game ended (its fatigue confusion is in the block) while the simulator's
- * draw goes on: the lock ends as the simulator ends one, and the confusion
- * the fatigue starts comes with it. The lock's volatile is the one the last
- * move line of that body names in the Dex (`self.volatileStatus`).
+ * Ends a lock with a random length (Outrage and its kin) that the game ended (its fatigue confusion is in the block) while the
+ * simulator's draw goes on, and starts the fatigue confusion. The lock's volatile is the one the body's last move line names in the Dex
+ * (`self.volatileStatus`).
  */
 export function endLocksTheGameEnded(battle: SimBattle, snapshot: TurnSnapshot, bodyOf: BodyOf) {
   const lastMove = new Map<string, string>();
