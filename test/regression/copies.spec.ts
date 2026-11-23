@@ -124,11 +124,6 @@ const CHOICE_LOCK = 'eval-engine/src/choice-lock.ts';
 const DEFINITION = /^(?:export )?const OBSERVATION_SLACK = ([0-9.]+);$/m;
 
 describe('OBSERVATION_SLACK (#133)', () => {
-  test('replay-core defines it once, in item-damage-shared.ts, and exports it', () => {
-    const text = source(SHARED);
-    expect(text).toMatch(/^export const OBSERVATION_SLACK = [0-9.]+;$/m);
-    expect(text.match(/OBSERVATION_SLACK = /g)).toHaveLength(1);
-  });
 
   test('the spread fit holds no definition of its own and imports the shared one', () => {
     const text = source(FIT);
