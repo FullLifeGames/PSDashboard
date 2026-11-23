@@ -2,11 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { dockChip, dockTray, expectReplaySettled, waitForExactPickers, type DockSlotKey } from './helpers';
 
-/**
- * Round 84 (turn dock), step A6c: what the dock's task specs share. A click counter (the spec holds each task to the clicks the
- * spec names), the layout rules that hold throughout, the chip boxes, the engine gate that holds the evaluation workers' messages
- * until the spec lets them go, and the reader of a logged turn that the seeded Execute is compared with.
- */
+/** What the dock's task specs share: the click counter, the layout rules, the chip boxes, the engine gate and the reader of a logged turn. */
 
 /** Counts the clicks of a task. Loading the fixture, waiting for the exact pickers and reading do not count; typing into a field does not either. */
 export class Clicks {
@@ -18,7 +14,7 @@ export class Clicks {
   }
 }
 
-/** The viewport the tasks are counted at (the spec's success criteria: 1366 x 768). */
+/** The viewport the tasks are counted at (1366 x 768). */
 export const TASK_VIEWPORT = { width: 1366, height: 768 };
 
 /** Loads a dock fixture by its id and waits for the exact pickers at `turn`. */
@@ -202,8 +198,8 @@ export async function branchFrameEntries(page: Page): Promise<() => Promise<stri
 export const variationPanel = (page: Page): Locator => page.locator('.ps-panel', { hasText: 'Variation moves' });
 
 /**
- * Round 84 (A7f, ruling 18a): the history panel stands closed under its toggle in every variation. A spec that reads or clicks the
- * history cells (the cells, the tip button, the hint) opens it first; the text of a closed panel stays in the DOM, so `toContainText` needs no opening.
+ * The history panel stands closed under its toggle in every variation. A spec that reads or clicks the history cells (the cells, the tip
+ * button, the hint) opens it first; the text of a closed panel stays in the DOM, so `toContainText` needs no opening.
  */
 export async function openVariationHistory(page: Page): Promise<void> {
   const toggle = variationPanel(page).getByRole('button', { name: /Variation moves/ });
@@ -214,7 +210,7 @@ export async function openVariationHistory(page: Page): Promise<void> {
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Criterion 5: after Execute without a change, the history row names what the log shows (moves, bodies switched to, "(Tera)" and
+ * After Execute without a change, the history row names what the log shows (moves, bodies switched to, "(Tera)" and
  * "(Mega)"), and the branch frame played the moves: each move shows at least as often as the log shows it up to the end of the
  * turn (the frame's log starts with the same turns).
  */
@@ -245,9 +241,8 @@ export async function expectExecutedLoggedTurn(page: Page, replay: ReplayData, t
 const resizeLoops = new WeakMap<Page, string[]>();
 
 /**
- * Round 84 (A7d): a spec that calls this fails when its page raises "ResizeObserver loop completed with undelivered notifications".
- * The A7c run raised it 15 times in 19 tests and nothing failed, because the browser reports it as an uncaught error that no
- * assertion read. Call it once at the top of the spec file, with the file's `test`.
+ * A spec that calls this fails when its page raises "ResizeObserver loop completed with undelivered notifications": the browser reports
+ * it as an uncaught error that no assertion reads, so it would pass silently. Call it once at the top of the spec file, with the file's `test`.
  */
 export function failOnResizeLoops(spec: typeof import('@playwright/test').test): void {
   spec.beforeEach(({ page }) => {
@@ -263,8 +258,8 @@ export function failOnResizeLoops(spec: typeof import('@playwright/test').test):
 }
 
 /**
- * Round 84 (T315, A7d): pins the app's size before `page.goto` (the Size setting's stored step, `ui-scale-setting.ts`). A spec whose
- * window is large enough for Auto to grow the app (1750 x 1025 and up) and whose geometry belongs to the app's own 100 % pins 1.
+ * Pins the app's size before `page.goto` (the Size setting's stored step, `ui-scale-setting.ts`). A spec whose window is large enough
+ * for Auto to grow the app (1750 x 1025 and up) and whose geometry belongs to the app's own 100 % pins 1.
  */
 export async function pinUiScale(page: Page, step: number): Promise<void> {
   await page.addInitScript(value => localStorage.setItem('ps-replay-interceptor:ui-scale', String(value)), step);

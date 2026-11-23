@@ -6,13 +6,13 @@ import {
 } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A6c: the engine's fill with a delayed engine. `installEvalGate` holds the evaluation pool's messages
+ * The engine's fill with a delayed engine. `installEvalGate` holds the evaluation pool's messages
  * (no production code: an init script wraps the workers), so the spec decides when the engine answers. The scenes:
  *  - the tip of a variation: the untouched chips hold a placeholder, then fill, and no chip changes its box; a touched slot keeps
  *    the user's pick;
  *  - Execute pressed before the fill reads "Waits for engine…" and runs after it;
  *  - "Analyze game" running: no fill starts;
- *  - a replay turn (Q19 b): the first click on a chip starts the run, the slot whose tray is open stays empty, the other empty
+ *  - a replay turn: the first click on a chip starts the run, the slot whose tray is open stays empty, the other empty
  *    slot fills.
  */
 const TIP_GAME = 'gen9doublesou-2693620934';
@@ -86,7 +86,7 @@ test('at the tip of a variation the untouched chips fill, a touched slot keeps t
 });
 
 /**
- * Round 89 (#153, HM3b): "Back to the engine's pick". The engine fills all four chips; the user picks another tile in P1A, the tray
+ * "Back to the engine's pick". The engine fills all four chips; the user picks another tile in P1A, the tray
  * offers the button, and a click gives the slot back to the engine: the same pick text, the engine's mark, and no button. (Hard mode's
  * answer of the opponent is read in the unit specs; singles and VGC have no dock fixture with a fill here, the unit specs cover them.)
  */
@@ -219,7 +219,7 @@ test('Q19 b, at a replay turn: the first click on the flinched slot\'s chip star
 
   await releaseEval(page);
   await expect(dockChip(page, 'p2b')).toHaveAttribute('data-origin', 'engine', { timeout: 180_000 });
-  // The slot whose tray is open stays empty, whenever the result lands; it holds the engine's pick for when the tray closes (A7a, ruling 1a).
+  // The slot whose tray is open stays empty, whenever the result lands; it holds the engine's pick for when the tray closes.
   await expect(dockChip(page, 'p2a')).toHaveAttribute('aria-expanded', 'true');
   await expect(dockChip(page, 'p2a')).toHaveAttribute('data-empty', 'true');
   await expect(dockChip(page, 'p2a')).toContainText(/engine: .+ · choose/);

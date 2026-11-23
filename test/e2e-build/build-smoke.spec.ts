@@ -10,24 +10,18 @@ const fixtureReplay = JSON.parse(
 );
 
 /**
- * PRODUCTION-BUILD smoke test. The dev suite runs against unminified
- * sources, which hid a build-only failure for as long as the feature has
- * existed: @pkmn/sim serializes battle references as
- * `[${obj.constructor.name}:id]`, so minified class names round-tripped
- * into objects that were no longer Pokemon/Side instances. Every search in
- * the worker threw `e?.getMoveRequestData is not a function`, the sweep
- * swallowed each one as a per-turn gap, and "Analyze game" produced an
- * EMPTY graph in the built app while dev looked perfect (2026-08-12).
+ * PRODUCTION-BUILD smoke test. The dev suite runs against unminified sources, which hid a build-only failure: @pkmn/sim serializes
+ * battle references as `[${obj.constructor.name}:id]`, so minified class names round-tripped into objects that were no longer
+ * Pokemon/Side instances. Every search in the worker threw `e?.getMoveRequestData is not a function`, the sweep swallowed each one as
+ * a per-turn gap, and "Analyze game" produced an EMPTY graph in the built app while dev looked perfect.
  *
- * The guard is deliberately end-to-end and minimal: if a real position can
- * round-trip through the built worker and come back as a ranked search
- * result, class identity survived minification.
+ * The guard is deliberately end-to-end and minimal: if a real position can round-trip through the built worker and come back as a
+ * ranked search result, class identity survived minification.
  */
 /**
- * Round 77 (the release check): the start load grew from 1,675 to 1,765 kB gzip when the engine protocol's request
- * builder reached the main thread through a static import, and with it the simulator's Pokemon class. The main thread
- * builds positions in workers and through the lazy facades of src/lib/lazy/; no file of the start load holds the
- * simulator. `getFullDetails` is a method name of @pkmn/sim's Pokemon that minification keeps.
+ * The start load holds no simulator: the main thread builds positions in workers and through the lazy facades of src/lib/lazy/, and
+ * a static import of the engine protocol's request builder would pull in the simulator's Pokemon class (1,675 to 1,765 kB gzip).
+ * `getFullDetails` is a method name of @pkmn/sim's Pokemon that minification keeps.
  */
 test('the start load holds no simulator code', async ({ request }) => {
   const html = await (await request.get('/')).text();
@@ -41,9 +35,9 @@ test('the start load holds no simulator code', async ({ request }) => {
 });
 
 /**
- * Round 81 (T298): a lazy chunk that a deploy removed. The first request for the replay parser's chunk answers 404, as
- * production did for a page built before the deploy of 1.0.2; the minified preload helper raises vite:preloadError,
- * the page reloads once, and the next load of the replay finds the chunk.
+ * A lazy chunk that a deploy removed. The first request for the replay parser's chunk answers 404, as production did for a page
+ * built before a deploy; the minified preload helper raises vite:preloadError, the page reloads once, and the next load of the replay
+ * finds the chunk.
  */
 test('a lazy chunk missing after a deploy reloads the page once, and the next load works', async ({ page }) => {
   test.setTimeout(120_000);
@@ -81,7 +75,7 @@ test.describe.serial('production build', () => {
   });
 
   /**
-   * Round 89 (ruling 49): the production build carries both feature flags off (src/lib/feature-flags.ts). Opponent reads my move has no
+   * The production build carries both feature flags off (src/lib/feature-flags.ts). Opponent reads my move has no
    * Setup checkbox, though an earlier nightly stored hardMode true, and the Game review is neither on the page nor in the text of the
    * panel; the Lines fold is still there. A dev server with the variables set shows both (test/e2e/hard-mode.spec.ts, game-review.spec.ts).
    */
@@ -118,7 +112,7 @@ test.describe.serial('production build', () => {
 
       // Any typed worker error is a build-integrity failure — collect them
       // rather than only asserting the visible outcome, so a regression names
-      // its own cause instead of just "no points". Round 59: the tracer also
+      // its own cause instead of just "no points". The tracer also
       // keeps each worker's speed-layer reports, so the gate checks every
       // evaluation worker on its own.
       await page.addInitScript(() => {

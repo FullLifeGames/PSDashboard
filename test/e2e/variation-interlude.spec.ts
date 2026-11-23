@@ -7,14 +7,14 @@ import { lightEngine } from './dock-helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
-// Round 88 (T348, #84): a replacement on both sides is an interlude, not a turn. Every pointer turn inside a variation shows the
+// A replacement on both sides is an interlude, not a turn. Every pointer turn inside a variation shows the
 // bodies the branch frame shows at that turn, offers Execute Turn, and asks for no replacement; the slider and the turn counts
-// count real turns. The rows compare the dock with the frame and never name a species: T314 will change which bodies a play-out
-// fields. Round 89 (P6a): the slider ends at the larger of the replay's end and the variation's tip (`sliderMax`), so a short
+// count real turns. The rows compare the dock with the frame and never name a species: the bodies a play-out fields may change.
+// The slider ends at the larger of the replay's end and the variation's tip (`sliderMax`), so a short
 // play-out leaves it at the replay's end.
-//   - Doubles, a play-out: the replay of GitHub issue #4 (gen9vgc2025regg-2335527677), played out by the engine with Fast
+//   - Doubles, a play-out: the replay gen9vgc2025regg-2335527677, played out by the engine with Fast
 //     play-out. The run is deterministic: four turns inside the replay's eight, a replacement on one side after turns 2 and 3 (the
-//     engine's bodies are four a side since #124, so no turn holds one on both sides any more). The slider reads the replay's end,
+//     engine's bodies are four a side, so no turn holds one on both sides). The slider reads the replay's end,
 //     the stripe and the history count the four real turns, every inner turn shows the frame's bodies.
 //   - Doubles, by hand: Doubles OU gen9doublesou-2693620934 turn 6, where Shadow Ball takes Dragonite down, Brave Bird takes
 //     Sinistcha down and its recoil takes Zapdos down, so both sides choose replacements (P1A, P1B and P2B). Executed with the
@@ -122,7 +122,7 @@ test.describe('the dock on the inner turns of a variation with a replacement', (
     await page.getByRole('button', { name: /Variation moves/ }).click();
     await expect(page.getByText(/replacement \(P[12]\)/).first()).toBeVisible();
 
-    // The inner turns, 2 to the last played one (the tip is the live position, which was always right).
+    // The inner turns, 2 to the last played one (the tip is the live position).
     for (let turn = 2; turn < 1 + played; turn++) await expectDockMatchesFrame(page, turn, 'issue replay');
   });
 

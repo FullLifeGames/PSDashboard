@@ -7,7 +7,7 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (B7a): the turn card's "Open matrix" button opens the turn's matrix as a dialog. One test per game type, singles (Gen 6 OU
+ * The turn card's "Open matrix" button opens the turn's matrix as a dialog. One test per game type, singles (Gen 6 OU
  * 655336) and Doubles OU (912884), both on turn 8: at 1400 px the dialog fits the window, names the played and the engine choices in
  * words and plays a clicked cell out as a variation; at 390 px it fits the screen and the page itself does not scroll sideways, the
  * wide table scrolls inside the dialog. Escape closes it and hands the focus back to the button.
@@ -107,12 +107,10 @@ for (const game of GAMES) {
     }
     await page.setViewportSize({ width: 1400, height: 900 });
 
-    // Escape closes it and the focus returns to the card's button
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(button).toBeFocused();
 
-    // a cell plays exactly that pair out as a variation and closes the dialog
     await button.click();
     await expect(dialog).toBeVisible();
     await table.locator('td button').first().click();

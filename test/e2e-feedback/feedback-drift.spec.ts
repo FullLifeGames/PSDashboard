@@ -19,17 +19,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPORT_DIR = join(__dirname, '..', '..', 'docs', 'reports');
 const DUMP = process.env.FEEDBACK_DUMP === '1';
-/** Round 59: '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
+/** '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
 const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
 /**
- * Round 61: a search-budget form (search/budget.ts syntax); unset keeps the app's default. Round 67 (T111):
- * parsed here before any page opens, so a typo stops the run instead of measuring the default (the browser
- * reads a bad form as the default).
+ * A search-budget form (search/budget.ts syntax); unset keeps the app's default. Parsed here before any page opens, so a typo stops
+ * the run instead of measuring the default (the browser reads a bad form as the default).
  */
 const SEARCH_BUDGET = process.env.FEEDBACK_SEARCH_BUDGET;
 parseSearchBudget(SEARCH_BUDGET);
 const perfByReplay: Record<string, unknown> = {};
-/** Round 88 (T328): how long one single read of the debug handle may take before the page counts as dead. */
+/** How long one single read of the debug handle may take before the page counts as dead. */
 const READ_TIMEOUT_MS = 120_000;
 
 /**
@@ -97,7 +96,7 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     const wait = await waitForSweepEnd(page);
-    // Round 88 (T328): the single reads race a timeout as well; the generous bound covers the serialising of a full dump.
+    // The single reads race a timeout as well; the generous bound covers the serialising of a full dump.
     const read = async <R>(fn: () => R | Promise<R>): Promise<R> => {
       try {
         return await guardedEvaluate(page, fn, { evalTimeoutMs: READ_TIMEOUT_MS });

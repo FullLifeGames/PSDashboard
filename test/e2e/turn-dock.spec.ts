@@ -6,9 +6,9 @@ import {
 } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A6c: the tasks of the spec's success criteria 1 to 5 at 1366 x 768 with no variation standing, each
+ * The tasks at 1366 x 768 with no variation standing, each
  * held to its click count (loading the fixture and waiting for the exact pickers do not count; Done is never needed, Execute
- * closes the tray). Doubles OU runs on turn 5 of `gen9doublesou-2693620934`, where all four active slots acted (plan C2): Zapdos
+ * closes the tray). Doubles OU runs on turn 5 of `gen9doublesou-2693620934`, where all four active slots acted: Zapdos
  * Knock Off and Dragonite Rock Slide on one side, Farigiraf Trick Room and Glimmora Sludge Bomb on the other. The Tera and Mega
  * tasks are in `turn-dock-vgc.spec.ts`, counted on their own.
  */

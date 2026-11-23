@@ -5,11 +5,10 @@ import {
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 88 (T316, #56): the workspace's replay frames hide the two choosers that do nothing in the app (Color scheme, Music). Play,
- * Last turn, Next turn, Go to turn..., Reset, Speed and Switch sides stay and work (the gate of 08.11.2026 brought the three turn
- * buttons back, which T316 had hidden), and the
- * dock's top row belongs to the side the frame shows near: at load (P1, P2 with ?p2), after Switch sides and after a rebuild of the
- * frame. Singles and doubles. State is read from the frame's own battle (`Replays.battle`), never from a click count.
+ * The workspace's replay frames hide the two choosers that do nothing in the app (Color scheme, Music). Play, Last turn, Next turn,
+ * Go to turn..., Reset, Speed and Switch sides stay and work, and the dock's top row belongs to the side the frame shows near: at load
+ * (P1, P2 with ?p2), after Switch sides and after a rebuild of the frame. Singles and doubles. State is read from the frame's own battle
+ * (`Replays.battle`), never from a click count.
  */
 const DOUBLES = 'gen9doublesou-2693620934';
 /** The turn each fixture is loaded at: singles at turn 2 (the fixture has four), doubles at turn 5. */

@@ -5,7 +5,7 @@ test.beforeAll(installReplayEmbedCache);
 
 type Request = { protocol: string; options: { p1: { id: string; label: string }[]; p2: { id: string; label: string }[] }; state: string };
 
-/** User gate 28.10.2026 (round 77, "1a 2a 3a 4a 5a 6a"): another engine plugs into the Evaluation panel. */
+/** Another engine plugs into the Evaluation panel. */
 test('an engine added by address evaluates the position, and the dropdown and the panel name it', async ({ page }) => {
   test.setTimeout(180_000);
   await routeOfflineFixtures(page);
@@ -34,7 +34,7 @@ test('an engine added by address evaluates the position, and the dropdown and th
 
   await page.getByRole('button', { name: /^(Re-)?[Ee]valuate$/ }).click();
   // The first engine evaluation builds its request on the simulator in the main thread, which the unbundled dev server
-  // serves module by module: under the full suite that took more than 30 seconds (round 77).
+  // serves module by module: under the full suite that took more than 30 seconds.
   await expect.poll(() => asked.length, { timeout: 90_000 }).toBeGreaterThan(0);
   expect(asked[0].protocol).toBe('ps-dashboard-engine/1');
   expect(asked[0].options.p1.length).toBeGreaterThan(0);

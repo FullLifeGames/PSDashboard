@@ -3,7 +3,7 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A7b, ruling 12b: the lead picker at turn 0 wears the dock's look and stands where the dock stands.
+ * The lead picker at turn 0 wears the dock's look and stands where the dock stands.
  * Doubles OU fixture. At 1366 x 768: it is the last child of the left column, directly under the timeline (nothing but the column's
  * flow between them), P1 stands above P2, Start sits in the bar's last column at the width of Execute's column, and picking a lead
  * changes no tile's box (the order mark stands in the flag row). At 390 x 844 the fixed bar keeps to 60 % of the window, the page

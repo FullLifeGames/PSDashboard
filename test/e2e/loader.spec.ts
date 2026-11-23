@@ -70,7 +70,7 @@ test.describe('PS Dashboard', () => {
 
     await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
-    // The panel opens after the spread solve (T234) and the editor's pools (round 77, D5): under the full suite the
+    // The panel opens after the spread solve and the editor's pools: under the full suite the
     // unbundled dev server needs more than the default five seconds for both.
     await expect(dialog).toBeVisible({ timeout: 30_000 });
 
@@ -107,7 +107,7 @@ test.describe('PS Dashboard', () => {
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
 
-    // Ability is a select: the species' real abilities first, then every other ability of the generation (T308, issue #2).
+    // Ability is a select: the species' real abilities first, then every other ability of the generation.
     const abilitySelect = garchompCard.getByLabel('Garchomp ability');
     await expect(abilitySelect.locator('option', { hasText: 'Rough Skin' })).toHaveCount(1, { timeout: 10000 });
     await expect(abilitySelect.locator('option', { hasText: 'Sand Veil' })).toHaveCount(1);

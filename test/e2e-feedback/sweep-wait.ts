@@ -4,10 +4,10 @@ import type { Page } from '@playwright/test';
  * The wait for the analysis sweep of the feedback harness (`feedback-drift.spec.ts`), in a module of its own so
  * that a plain spec can import it (`test/regression/feedback-sweep-wait.spec.ts`).
  *
- * Round 88 (T328, #64): every `page.evaluate` of the harness races a timeout. In round 86 the 573756 test ran out
- * of memory in the renderer: all workers closed, the page's own timer stopped, `page.evaluate` never returned and
- * Playwright raised no `crash` event, so neither the stall check nor the cap below was reached and the run held the
- * machine for the whole 40 minute test timeout. Three timed-out polls in a row now end the wait.
+ * Every `page.evaluate` of the harness races a timeout: a renderer that ran out of memory (the 573756 test) closed all workers and
+ * stopped the page's own timer, `page.evaluate` never returned and Playwright raised no `crash` event, so neither the stall check
+ * nor the cap below was reached and the run held the machine for the whole 40 minute test timeout. Three timed-out polls in a row
+ * end the wait.
  */
 
 export interface SweepWaitOptions {
@@ -71,7 +71,7 @@ export function isRendererDead(error: unknown): boolean {
 }
 
 /**
- * What one poll says. Round 89 (G13b): the sweep's end is not the report's end. The early-lines stage starts the moment the sweep
+ * What one poll says. The sweep's end is not the report's end. The early-lines stage starts the moment the sweep
  * ends and writes lines into the graph turn by turn; a dump taken while it runs holds however many turns it had reached, so two
  * runs differed. The end is the stage's end (it names itself inactive when every turn holds lines, one failed or Stop).
  */
@@ -94,8 +94,7 @@ function judgePoll(state: SweepPoll, now: { settled: boolean; stalled: boolean }
  * minutes without a progress tick is declared a wedge; the slowest healthy
  * per-turn step in the baseline was far under one minute. The stable reason
  * string (no elapsed seconds) feeds the report so determinism diffs stay
- * clean. A page whose evaluate times out three polls in a row is dead
- * (round 88, T328): the same stable reason rule holds.
+ * clean. A page whose evaluate times out three polls in a row is dead: the same stable reason rule holds.
  */
 export async function waitForSweepEnd(
   page: Page,

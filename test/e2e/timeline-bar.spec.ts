@@ -3,10 +3,10 @@ import { installReplayEmbedCache, routeOfflineFixtures, startVariationAt } from 
 import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 88 (T345, #81): the timeline bar keeps its slider in line at every width. At a ladder of window widths, with and without a
+ * The timeline bar keeps its slider in line at every width. At a ladder of window widths, with and without a
  * variation, in a singles replay and a doubles replay: every item on the step buttons' row has its centre within 1 px of theirs
- * (the 1050 px query used to hang the items from the top of the row: the slider sat 6 px high, 9 px with a variation); the slider is
- * at least 200 px wide (the user's ruling of 07.11.2026: below that the line chip and Discard variation take a second row); and at
+ * (items hung from the top of the row put the slider 6 px high, 9 px with a variation); the slider is
+ * at least 200 px wide (below that the line chip and Discard variation take a second row); and at
  * 640 px and less the slider's own row draws the thin track without the grey block of the 28 px touch box.
  */
 const WIDTHS = [2560, 1920, 1440, 1100, 1051, 1050, 1000, 800, 700, 641, 640, 390];

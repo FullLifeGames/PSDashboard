@@ -1,10 +1,10 @@
 /**
- * Round 90 (#222): saved engine results for the browser specs that judge a view, not the engine. `scripts/capture-eval-store.mjs` runs
+ * Saved engine results for the browser specs that judge a view, not the engine. `scripts/capture-eval-store.mjs` runs
  * the analysis once per game and settings in the browser and writes the IndexedDB records (`StoredEval`, src/lib/eval-cache-store.ts) to
  * `test/e2e/fixtures/eval-store/`; a spec seeds them before the analysis (`eval-store-seed.ts`), so "Analyze game" reads the store.
  *
- * This module holds the parts that need no browser: the file form, the cache-version rewrite (a score-touching round needs no new capture,
- * ruling Q4a of round 90) and the two failure paths, each naming the capture command: a record that does not fit, and a page that starts
+ * This module holds the parts that need no browser: the file form, the cache-version rewrite (a score-touching change needs no new capture)
+ * and the two failure paths, each naming the capture command: a record that does not fit, and a page that starts
  * a search although the store was seeded. `test/regression/eval-store-fixtures.spec.ts` holds them.
  */
 
@@ -33,8 +33,8 @@ const S_AUTO: EvalStoreSettings = { mode: 'auto', depth: 1, samples: 1, tera: 'a
 
 /**
  * The captures: one file per replay, settings and turns. A spec names its file with `evalStoreFileName(replay, settings, turns)`. The
- * replay is the fixture of the same id under packages/eval-engine/test/fixtures/ or test/e2e-feedback/fixtures/. Round 90, steps E2
- * and E3: the Game review rows except the Auto row, the single turns of lines-play and the sweeps of win-paths. Hard-mode stays live.
+ * replay is the fixture of the same id under packages/eval-engine/test/fixtures/ or test/e2e-feedback/fixtures/. These specs read them:
+ * the Game review rows except the Auto row, the single turns of lines-play and the sweeps of win-paths. Hard-mode stays live.
  */
 export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'gen9ou-2658662321', settings: S_MCTS },

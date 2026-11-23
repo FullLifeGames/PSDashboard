@@ -3,9 +3,9 @@ import { dockReplays, installReplayEmbedCache, routeOfflineFixtures } from './he
 import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 84 (A7f, ruling 19a): the top bar stays on one line with a long format name. The user's game was a Champions VGC replay
+ * The top bar stays on one line with a long format name. The game was a Champions VGC replay
  * ("[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)", SpiringOcean against sigueinventando): the support links wrapped to a second line
- * because the match took its whole text as its basis. Now the match takes what the menus and links leave, the format tag shortens
+ * because the match took its whole text as its basis. The match takes what the menus and links leave, the format tag shortens
  * first with an ellipsis and holds its full name in a title, and the player names shorten only after it. The fixture is the Champions
  * VGC corpus game with its `format` and `players` replaced; the rules still come from its `formatid` and log.
  */
@@ -59,8 +59,8 @@ for (const viewport of [{ width: 2560, height: 1290 }, { width: 1366, height: 76
 }
 
 /**
- * Round 88 (#107): the Setup panel opened off the screen on a phone. At 640 px and less the top bar wraps and the Setup button
- * stands at the left of its row, so a panel anchored at the button's right edge ran past the window's left edge. Now the panel spans
+ * The Setup panel opened off the screen on a phone. At 640 px and less the top bar wraps and the Setup button
+ * stands at the left of its row, so a panel anchored at the button's right edge ran past the window's left edge. The panel spans
  * the bar like the Load panel; above 640 px it keeps its place under the button, its right edge on the button's.
  */
 async function openSetupPanel(page: Page, viewport: { width: number; height: number }) {
@@ -74,7 +74,7 @@ async function openSetupPanel(page: Page, viewport: { width: number; height: num
   const panel = page.locator('.ps-setup-panel');
   await expect(panel).toBeVisible();
   // `.ps-btn:hover` lifts the button by 1 px over 0.1 s, and the click leaves the pointer on it: a box read during that
-  // transition is up to 1 px off the panel's anchor (0.58 px in the CI run of D9, 0.93 px in the merge of lane H), and one read after
+  // transition is up to 1 px off the panel's anchor (0.58 px and 0.93 px were read in CI), and one read after
   // it is 1 px off for good. The spec means the layout boxes, so the pointer leaves and the lift settles before the read.
   await page.mouse.move(2, viewport.height - 2);
   await expect(button).toHaveCSS('transform', 'none');
@@ -118,7 +118,7 @@ for (const width of [641, 1366]) {
 }
 
 /**
- * Round 89 (FB-1, forum replay gen9natdexdraft-2713067801): on a phone, with a live branch at turn 33, "Setup ▾" ran over "Report
+ * On a phone, with a live branch at turn 33 (forum replay gen9natdexdraft-2713067801), "Setup ▾" ran over "Report
  * issue": the actions took no width of their own beside the support links. The status ("Variation tip: Turn 33"), Game, Setup and the
  * links each keep their own box, and the buttons stay on one line. The status text is set to the long form before the read (the
  * fixture's branch reads a short turn); no render follows.

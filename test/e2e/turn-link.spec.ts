@@ -3,7 +3,7 @@ import { expectReplayTurn, installReplayEmbedCache, routeOfflineFixtures } from 
 import { lightEngine } from './dock-helpers';
 
 /**
- * Round 89 (lane L): `?replay=<id>&turn=<n>` opens the replay on that turn, as if the user had moved the timeline there: the
+ * `?replay=<id>&turn=<n>` opens the replay on that turn, as if the user had moved the timeline there: the
  * replay frame shows the turn and the slider stands on it. A turn past the end clamps to the slider's last position, a non-number
  * and a missing `turn` leave the replay on turn 1, and the embedded view (`?embed=1`) reads the same address. A singles replay
  * (the fixture, four turns) and a doubles replay (Doubles OU 2693620934, eight turns).

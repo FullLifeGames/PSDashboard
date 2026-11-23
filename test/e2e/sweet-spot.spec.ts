@@ -4,10 +4,10 @@ import { fixtureReplay, installReplayEmbedCache, routeOfflineFixtures, startVari
 import { lightEngine, loadDockReplay, openVariationHistory, pinUiScale } from './dock-helpers';
 
 /**
- * Round 84 (T315, A7d, spec addendum A, "the sweet spot"): an opt-in measurement, never part of a run until `PS_SWEET_SPOT=1` is set.
+ * An opt-in measurement, never part of a run until `PS_SWEET_SPOT=1` is set.
  * At 100 % it finds, per scene, the smallest window at which the left column fits without scrolling and the evaluation column shows
  * its head: the smallest height at five widths and the smallest width at a tall window, in steps of 10 px. The scenes are a replay
- * turn and a variation, in singles and in doubles; the variation is measured with the history panel closed (it starts so, A7f) and open. The numbers go to `test-results/sweet-spot.json`
+ * turn and a variation, in singles and in doubles; the variation is measured with the history panel closed (it starts so) and open. The numbers go to `test-results/sweet-spot.json`
  * (merged scene by scene), and decide whether Auto's room of 1400 x 820 px stands.
  *
  *   PS_SWEET_SPOT=1 PS_DEV_PORT=<port> npx playwright test test/e2e/sweet-spot.spec.ts --project=chromium

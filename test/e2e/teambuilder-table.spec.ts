@@ -3,7 +3,7 @@ import { generateReplayHtml } from '../../src/lib/replay-html';
 import { TABLE_PART_MODS, TEAMBUILDER_TABLE_URL, cutTablePart, tablePartScript } from '../../src/lib/teambuilder-table';
 
 /**
- * Round 85 (T318): the sweep behind the part of the teambuilder table. Two replay frames, built by the app's own builder: one
+ * The sweep behind the part of the teambuilder table. Two replay frames, built by the app's own builder: one
  * loads Showdown's whole `teambuilder-tables.js`, the other the part's script through the swap hook. In each, the replay
  * client's Dex reads every species, move, item, ability and type its data lists, for every generation (`Dex.mod('gen1')` to
  * `Dex.mod('gen8')` and the Generation 9 `Dex`) and every mod the client names (`TABLE_PART_MODS`). The part holds when both

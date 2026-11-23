@@ -4,7 +4,7 @@ import { expectReplaySettled, fixturePath, installReplayEmbedCache, openTrayMore
 import { openVariationHistory } from './dock-helpers';
 
 /**
- * Round 82 (forced dice), criterion 5: the draft league replay DzBQ5azlO5l, turn 13. Noivern's Air Slash left Cobalion's flinch
+ * The draft league replay DzBQ5azlO5l, turn 13. Noivern's Air Slash left Cobalion's flinch
  * undrawn in the game (Cobalion answered with Heavy Slam). The user picks the chip "Flinch" and executes: the
  * branch frame shows Cobalion flinching, and the display line of the forced die stands before it ("Forced: Air Slash flinch,
  * 30 %"). The nickname of Cobalion in this game is "King Bradley", which the frame prints.
@@ -21,7 +21,7 @@ test('Air Slash with the chip "Flinch": the branch frame shows Cobalion flinchin
 
   await waitForExactPickers(page, 13);
 
-  // Round 84 (turn dock): the move through the tray, the dice behind "Dice · What if" (the tray of the slot that moved).
+  // the move through the tray, the dice behind "Dice · What if" (the tray of the slot that moved).
   await pickMove(page, 'p1a', 'Air Slash');
   const tray = await openTrayMore(page, 'p1a');
   const flinch = tray.getByRole('group', { name: 'Flinch', exact: true }).getByRole('button', { name: 'Flinch', exact: true });
@@ -43,7 +43,7 @@ test('Air Slash with the chip "Flinch": the branch frame shows Cobalion flinchin
   expect(mark).toBeGreaterThanOrEqual(0);
   expect(flinched).toBeGreaterThan(mark);
   expect(shown.filter(entry => entry.startsWith('Forced: Air Slash flinch'))).toHaveLength(1);
-  // the history row lists the die as well (round 84, ruling 18a: the closed history opens first, a role query skips hidden rows)
+  // the history row lists the die as well (the closed history opens first, a role query skips hidden rows)
   await openVariationHistory(page);
   await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('P1 Air Slash: flinch');
 });

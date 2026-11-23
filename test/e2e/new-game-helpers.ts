@@ -2,9 +2,7 @@ import { expect, type Browser, type Page } from '@playwright/test';
 import { routeOfflineFixtures } from './helpers';
 import { lightEngine } from './dock-helpers';
 
-/**
- * Round 89 (lane H, #105): the helpers the new-game specs share (the share link, the slider's state, a second browser context).
- */
+/** The helpers the new-game specs share (the share link, the slider's state, a second browser context). */
 
 /** Light engine settings and the offline replay fixtures; call it before `page.goto`. */
 export async function prepare(page: Page): Promise<void> {

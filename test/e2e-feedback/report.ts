@@ -19,7 +19,7 @@ export interface DriftMeta {
   alignmentByReplay: Record<string, AlignmentSummary | null>;
   /** Per-replay count of analytic-vs-sampled KO-odds mismatches (probe budget exhausted). */
   koMismatchByReplay?: Record<string, number>;
-  /** Round 59 gate runs (FEEDBACK_SIM_FAST set): the perf trace per replay (pass times, speed-layer counters). */
+  /** Speed-layer gate runs (FEEDBACK_SIM_FAST set): the perf trace per replay (pass times, speed-layer counters). */
   perfByReplay?: Record<string, unknown>;
 }
 

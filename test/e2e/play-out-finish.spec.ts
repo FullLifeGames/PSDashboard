@@ -4,7 +4,7 @@ import { fixturePath, installReplayEmbedCache, routeOfflineFixtures, startVariat
 
 test.beforeAll(installReplayEmbedCache);
 
-// Round 88 (T347, #83): the end of a play-out leaves the replay where the user watches it. Singles and doubles both run
+// The end of a play-out leaves the replay where the user watches it. Singles and doubles both run
 // (Fast play-out: the singles replay hits the 100-turn cap in about 30 seconds, the doubles replay ends its battle after a
 // dozen turns). The branch frame is read through Replays.battle, the slider through the bar's "T<turn>/<max>" label.
 const REPLAYS = [
@@ -62,9 +62,9 @@ async function playOutFromVariation(page: Page, file: string) {
 
 test.describe('the end of a play-out', () => {
   for (const [name, file] of REPLAYS) {
-    // One play-out from a variation at turn 2 serves two rows of round 88: the frame that plays during the run (Play and Hyperfast
-    // pressed in the frame) and Watch from turn N after the notice. Each keeps its old title as a step, so a red step names its row
-    // (round 90, E4: one run instead of two, about 110 seconds on the CI runner per game type).
+    // One play-out from a variation at turn 2 serves two rows: the frame that plays during the run (Play and Hyperfast
+    // pressed in the frame) and Watch from turn N after the notice. Each keeps its own title as a step, so a red step names its row
+    // (one run per game type, about 110 seconds on the CI runner).
     test(`${name}: one play-out from a variation at turn 2, a frame that plays on and Watch from turn N`, async ({ page }) => {
       test.setTimeout(360_000);
       const frame = await playOutFromVariation(page, file);
@@ -94,7 +94,7 @@ test.describe('the end of a play-out', () => {
       });
 
       await test.step(`${name}: Watch from turn N plays the variation from N while the frame plays past N`, async () => {
-        // The step before left the frame at Hyperfast; Watch plays from N at the speed the user chose, so the old row's speed returns.
+        // The step before left the frame at Hyperfast; Watch plays from N at the speed the user chose, so that speed returns.
         await frame.locator('.speedchooser button[value="normal"]').click({ timeout: 10_000 });
         // Let the frame play past the start of the run, then press Watch.
         await frame.evaluate(() => { const battle = (window as ReplayWindow).Replays?.battle as { paused?: boolean; play?: () => void } | undefined; if (battle?.paused) battle.play?.(); });
@@ -121,7 +121,7 @@ test.describe('the end of a play-out', () => {
       const frame = await branchFrame(page);
       await expect(notice(page)).toBeVisible({ timeout: 180_000 });
 
-      // Before: the run left the variation and swapped the main replay in at the start turn.
+      // The run keeps the variation: it does not swap the main replay in at the start turn.
       const atNotice = await frameState(frame);
       await page.waitForTimeout(3000);
       await expect(branchIframe(page)).toHaveCount(1);
@@ -175,7 +175,7 @@ test.describe('the end of a play-out', () => {
   }
 });
 
-// Round 88 (T343, #79): a run from the turn 0 view names turn 0, and Watch from turn 0 plays the branch frame from its team
+// A run from the turn 0 view names turn 0, and Watch from turn 0 plays the branch frame from its team
 // preview while the slider reads T1 (the variation line has no turn 0). Singles and doubles (the doubles replay brings its
 // leads preselected, two per side).
 test.describe('a play-out from turn 0', () => {

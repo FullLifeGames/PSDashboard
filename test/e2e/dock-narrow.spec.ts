@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const width of [1000, 390]) {
   test(`a narrow window (${width} px): the dock stands fixed at the lower edge, the page pads by its height, the tray is a sheet above it`, async ({ page }) => {
-    // Round 84 (turn dock, A6b): at 1050 px and below the layout stacks and the dock leaves the column's flow.
+    // at 1050 px and below the layout stacks and the dock leaves the column's flow.
     test.setTimeout(120_000);
     await page.setViewportSize({ width, height: 800 });
     await page.reload();
@@ -35,7 +35,7 @@ for (const width of [1000, 390]) {
     const rightBox = (await page.locator('.ps-main-right').boundingBox())!;
     expect(rightBox.y + rightBox.height).toBeLessThanOrEqual(box.y + 1);
 
-    // Above 640 px two chips a row; at 640 px and below one chip a row (round 84, A7c, ruling 11a): four rows in doubles, each 46 px.
+    // Above 640 px two chips a row; at 640 px and below one chip a row: four rows in doubles, each 46 px.
     // Execute takes its own row under the chips, the app's 40 px minimum at 640 px.
     const first = (await dockChip(page, 'p1a').boundingBox())!;
     const partner = (await dockChip(page, 'p1b').boundingBox())!;

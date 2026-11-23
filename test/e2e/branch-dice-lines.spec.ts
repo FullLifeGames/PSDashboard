@@ -5,7 +5,7 @@ import { branchFrameLog } from '../../src/lib/branch-log';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
 /**
- * Round 82 (forced dice), step A7b, decision 6a: the replay client prints the display line of a forced die (a `|-message|` line the
+ * The replay client prints the display line of a forced die (a `|-message|` line the
  * branch log carries, `src/lib/branch-dice-lines.ts`) right where the die decided, and the frozen /v1.0.2/ viewer plays the same
  * client. The page is the branch frame's own HTML on a real log with one message line put after the first move of turn 2.
  */

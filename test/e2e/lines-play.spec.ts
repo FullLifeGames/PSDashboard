@@ -9,12 +9,12 @@ import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (#104), step G3: the Lines section under a turn and the click ▶ Play. One test per game type: the tree searches one turn
+ * The Lines section under a turn and the click ▶ Play. One test per game type: the tree searches one turn
  * (the panel's own "Analyze this position"), the section shows its lines, and the click on ▶ Play opens a variation that plays the
  * line's turns with the line's dice: the history lists the line's turns, and the forced dice it marks are the dice the tooltip of
  * the button lists (the chips are the shown ones among them). Singles, Doubles OU, VGC, Champions OU and Champions VGC.
  *
- * Round 90 (#222), step E3: the row judges the Lines section and the click, not the search, so "Analyze this position" reads the saved
+ * The row judges the Lines section and the click, not the search, so "Analyze this position" reads the saved
  * result of the turn (the capture analyzed the candidate turns, scripts/capture-eval-store.mjs; `EVAL_STORE=live` runs the row live).
  * The variation ▶ Play opens is a new position: its own evaluation runs live, and the guard stands down from the click.
  */
@@ -45,8 +45,8 @@ async function readBlock(block: Locator) {
 }
 
 /**
- * The panel lands on the game report when the first report of a game appears (`useReportView`, since before this lane), which can
- * happen right after the analysis of a turn finishes: the turn's view then closes under the test (round 89 G3: Champions OU read
+ * The panel lands on the game report when the first report of a game appears (`useReportView`), which can
+ * happen right after the analysis of a turn finishes: the turn's view then closes under the test (Champions OU read
  * "element is not visible" for the whole timeout). A click on the turn's column in the graph opens the turn's view again; the loop
  * accepts the view only when it stays for a moment.
  */
@@ -64,7 +64,7 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number) {
 }
 
 /**
- * The Lines section starts closed under its `Lines` toggle, like the Explanation (round 89, the user's note on X1): a turn shows no
+ * The Lines section starts closed under its `Lines` toggle, like the Explanation: a turn shows no
  * line until the toggle opens it. Check it closed, open it, check the lines are there.
  */
 async function openLines(panel: Locator) {

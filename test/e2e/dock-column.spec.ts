@@ -5,12 +5,11 @@ import { fixturePath, installReplayEmbedCache, pickMove, routeOfflineFixtures, w
 import { TASK_VIEWPORT, failOnResizeLoops, lightEngine, loadDockReplay, openVariationHistory, pinUiScale, variationPanel } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A7a, ruling 4a: the dock follows the column's content directly. At 2560 x 1290 the column is shorter
+ * The dock follows the column's content directly. At 2560 x 1290 the column is shorter
  * than the window, so nothing may push the Raw Protocol Log toggle and the dock to the window's foot (a gap of about 400 px opened
  * under the timeline), and nothing may lie over its content: with the column scrolled to its end the dock starts at or below the
- * bottom of what stands above it. Once on a replay turn and once at a variation's forced replacement with the history panel showing
- * (the user's screenshot of 01.11.2026). The 1366 x 768 case keeps `.ps-main-left` at `scrollTop` 0 (`expectDockLayout`, held by
- * the task specs).
+ * bottom of what stands above it. Once on a replay turn and once at a variation's forced replacement with the history panel showing.
+ * The 1366 x 768 case keeps `.ps-main-left` at `scrollTop` 0 (`expectDockLayout`, held by the task specs).
  */
 test.beforeAll(installReplayEmbedCache);
 failOnResizeLoops(test);
@@ -18,7 +17,7 @@ test.use({ viewport: { width: 2560, height: 1290 } });
 
 test.beforeEach(async ({ page }) => {
   await lightEngine(page);
-  // Round 84 (T315): Auto would take 150 % at this window; the geometry here is the app's own 100 % (scale.spec holds the 150 % case).
+  // Auto would take 150 % at this window; the geometry here is the app's own 100 % (scale.spec holds the 150 % case).
   await pinUiScale(page, 1);
   await routeOfflineFixtures(page);
 });
@@ -78,7 +77,7 @@ test('a variation\'s forced replacement with the history panel closed and open: 
   await page.locator('.ps-execute-btn').click();
 
   await expect(page.locator('.ps-force-switch-note').first()).toBeVisible({ timeout: 60_000 });
-  // Round 84 (A7f): the panel stands closed (no cell shows); the geometry holds closed and open.
+  // the panel stands closed (no cell shows); the geometry holds closed and open.
   await expect(variationPanel(page)).toBeVisible();
   await expect(page.getByText('Variation result').first()).toBeHidden();
   expectFollowsContent(await columnGeometry(page), 'forced replacement, history closed');
@@ -92,8 +91,8 @@ test('a variation\'s forced replacement with the history panel closed and open: 
 });
 
 /**
- * Round 84 (A7i, ruling 20a): at 1366 x 768 the Save / Share panel slid under the sticky dock. Save Branch and Copy Share Link now
- * stand on the toggle line, so both lie above the dock; Copy Share Link fills the link field while the history is closed.
+ * At 1366 x 768 the Save / Share panel slid under the sticky dock. Save Branch and Copy Share Link stand on the toggle line, so both lie
+ * above the dock; Copy Share Link fills the link field while the history is closed.
  */
 test('a variation at 1366 x 768: Save Branch and Copy Share Link stand above the dock, and the link shows with the history closed', async ({ page }) => {
   test.setTimeout(240_000);

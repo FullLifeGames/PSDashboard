@@ -9,7 +9,7 @@ import {
 import { routeOfflineFixtures } from './helpers';
 
 /**
- * Round 90 (#222): the browser half of the saved engine results (the file form and the two failure paths are in `eval-store.ts`).
+ * The browser half of the saved engine results (the file form and the two failure paths are in `eval-store.ts`).
  * A spec that judges a view calls `openReplayAnalysis(page, replay, { seed })`: the records go into the app's own store before the
  * reload, so "Analyze game" reads them, and the returned guard fails the spec, naming the capture command, when the page starts a search.
  * `EVAL_STORE=live` runs the same rows without the seed (a check that the saved results still equal a live run).

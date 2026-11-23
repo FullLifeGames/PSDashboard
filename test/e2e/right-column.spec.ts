@@ -3,9 +3,9 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A7b, ruling 9a: the right column ends on the line of the dock's foot. Evaluation and Play out keep
+ * The right column ends on the line of the dock's foot. Evaluation and Play out keep
  * their height at the top; the Battle Statistics panel takes the rest as a closed panel whose list scrolls inside it. At 1366 x 768
- * and 1707 x 860 (the user's 2560 x 1440 at 150 %, in CSS pixels) the panel's bottom lies within 2 px of the dock's bottom, the
+ * and 1707 x 860 (2560 x 1440 at 150 %, in CSS pixels) the panel's bottom lies within 2 px of the dock's bottom, the
  * column itself does not scroll while Evaluation fits, and the list is the part that scrolls and fades. The shared-branch view
  * uses the same column and keeps its panel.
  */
@@ -53,7 +53,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 1707, height: 860
 }
 
 /**
- * Round 88 (T346, #82): a window too short for Evaluation and the statistics together scrolls the whole column; the statistics
+ * A window too short for Evaluation and the statistics together scrolls the whole column; the statistics
  * panel never shrinks to a strip. A tall Evaluation panel (a stand-in height of 780 px, what the ranked choices of a doubles or
  * VGC turn take) is held at four window sizes that cross both root scales (1920 x 1000 reads 100 %, 1920 x 1050 reads 125 %).
  * With the column scrolled to its end, the first Pokemon entry lies whole inside the list and inside the column, above the

@@ -26,8 +26,6 @@ test.describe('PS Dashboard', () => {
     // The panel lives beside the battle in the right column (chess-style).
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
-    // ONE entry point: the sweep analyzes the game, lands on the report
-    // overview; clicking a turn opens that turn's full view.
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
 
@@ -49,7 +47,6 @@ test.describe('PS Dashboard', () => {
     expect(debugShape).not.toBeNull();
     expect(debugShape!.running).toBe(false);
     expect(debugShape!.sweptScores).toBeGreaterThan(0);
-    // The eval-error trail is present and clean on the healthy fixture.
     expect(debugShape!.evalErrorSlots).toBeGreaterThan(0);
     expect(debugShape!.evalErrorCount).toBe(0);
     expect(debugShape!.analyses).not.toBeNull();
@@ -70,8 +67,6 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-choice-main').first()).toContainText(/\d+%/);
     await expect(panel.locator('.ps-eval-choice').first()).toHaveAttribute('title', /guaranteed at least/);
 
-    // The solved matrix behind the rankings opens on demand: every pair at
-    // its win probability, equilibrium mixes on the headers.
     await panel.locator('button.ps-eval-matrix-toggle').click();
     const matrix = panel.locator('table');
     await expect(matrix).toBeVisible();
@@ -102,7 +97,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Variation tip: Turn 2/)).toBeVisible({ timeout: 60_000 });
 
-    // …auto re-evaluation surfaces the next recommendations for the walk
+    // auto re-evaluation surfaces the next recommendations for the walk
     // (the click also arms Auto for the turns that follow).
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first())
@@ -192,14 +187,11 @@ test.describe('PS Dashboard', () => {
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await expect(panel).toBeVisible();
-    // One entry point: the sweep analyzes the game; clicking the turn opens
-    // its full view with the bar and combined choices.
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-bar-p1')).toContainText('%');
-    // Recommendations are combined two-slot choices ("A + B").
     await expect(panel.locator('.ps-eval-choice').first()).toContainText('+');
 
     // The chat-posted team sheet surfaces in the stats panel as SHEET data.
@@ -211,7 +203,7 @@ test.describe('PS Dashboard', () => {
     // so the honest copy says the choice never surfaced while the engine's
     // combined lines still render.
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible({ timeout: 120_000 });
-    // The summary sits closed under its toggle (T294).
+    // The summary sits closed under its toggle.
     const summary = panel.locator('.ps-eval-analysis .ps-eval-analysis-summary');
     await expect(summary).toBeHidden();
     // The card holds two closed toggles, Explanation and Lines: the summary sits under the first.

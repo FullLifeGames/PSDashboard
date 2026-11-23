@@ -7,7 +7,7 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (#153): Hard mode. A click on the engine's top move of player 1 plays the turn out in a variation; the opponent answers with
+ * Hard mode. A click on the engine's top move of player 1 plays the turn out in a variation; the opponent answers with
  * the reply that hurts that move most when the setting is on (the lowest cell of the clicked row in the card's matrix: a matrix pass
  * counts every cell), and with its best row when it is off. One test per game type; each plays both arms on the same turn: singles
  * (Gen 6 OU 655336), Doubles OU, VGC (Scarlet/Violet) and Champions OU. The variation's history row names the choices the executed turn held.
@@ -74,7 +74,7 @@ async function openPage(page: Page, replay: ReplayData, hardMode: boolean): Prom
 }
 
 /**
- * Round 89 (#153, HM-2): the setting is called "Opponent reads my move" and lives in the Setup menu. Opens the menu, hands the box to
+ * The setting is called "Opponent reads my move" and lives in the Setup menu. Opens the menu, hands the box to
  * `check` and closes the menu again, so the pickers under it stay clickable.
  */
 async function withSetupBox(page: Page, check: (box: Locator) => Promise<void>): Promise<void> {
@@ -144,7 +144,7 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   const partsIn = (label: string): string[] => partsOf(label, names);
   // arm one: Hard mode on, on the first turn whose worst reply is not the opponent's best row (the last candidate otherwise)
   // each arm gets its own browser context: the preferences live in localStorage, which pages of one context share, and a page that
-  // persists them after the other page's init script ran would hand its setting over (CI run 43662351755: the "off" page read the
+  // persists them after the other page's init script ran would hand its setting over (the "off" page read the
   // "on" page's Hard mode). Two tabs of one user do share the stored value in the app; each keeps its own until the next load.
   const onContext = await browser.newContext();
   contexts.push(onContext);

@@ -9,14 +9,14 @@ import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (#130), step G8b: "How could <player> have won?" under the Game review's Endgame row. One test per game type: the sweep
+ * "How could <player> have won?" under the Game review's Endgame row. One test per game type: the sweep
  * analyzes the game, the review offers the row for the player who lost (and for nobody else), a click opens the panel, the three
- * steps arrive in the ruled order, each with a line and its play button or one sentence, and a luck path that was found plays to the
+ * steps arrive in order, each with a line and its play button or one sentence, and a luck path that was found plays to the
  * loser's win under ▶ Play, its forced-dice marks among the dice of the button's tooltip. Closing the panel and opening the row again
- * answers from the client's memo. Gen 6 OU 649664 (singles, the scene of the issue), Champions VGC 2695803506 and VGC 2629703929
+ * answers from the client's memo. Gen 6 OU 649664 (singles), Champions VGC 2695803506 and VGC 2629703929
  * (doubles, 1 v 1 and 1 v 2) and Doubles OU 912045.
  *
- * Round 90 (#222), step E3: the sweep before the row is the game's analysis, which the saved engine results hold (scripts/capture-eval-store.mjs;
+ * The sweep before the row is the game's analysis, which the saved engine results hold (scripts/capture-eval-store.mjs;
  * `EVAL_STORE=live` runs it live). The row's own search, "How could X have won?", is an on-request job that stores nothing, so it runs live
  * in every game type: the guard stands down from the click on the Endgame row.
  */
@@ -56,7 +56,6 @@ for (const game of GAMES) {
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
 
-    // the row stands for the player who lost and for nobody else
     const entry = review.getByRole('button', { name: new RegExp(`^Endgame · T\\d+ · How could ${loser} have won\\?$`) });
     await expect(entry).toBeVisible();
     await expect(review.getByRole('button', { name: /How could .* have won\?/ })).toHaveCount(1);
@@ -66,7 +65,7 @@ for (const game of GAMES) {
     const win = review.getByRole('region', { name: `How could ${loser} have won?` });
     await expect(win).toBeVisible();
 
-    // three steps, in the order of the ruling, each one as it finishes
+    // three steps in order, each one as it finishes
     const steps = win.locator('[data-step]');
     await expect(steps).toHaveCount(3, { timeout: 400_000 });
     expect(await steps.locator('.ps-winpaths-step-title').allTextContents()).toEqual(['1 · A stronger play', '2 · Luck', `3 · A mistake by ${winner}`]);

@@ -15,15 +15,9 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch divergence: healed mid-cascade turns branch silently; the ended final turn is guarded', async ({ page }) => {
-    // The REAL draft replay (not the shared 4-turn fixture): its endgame
-    // is the premature-end family's home — the UNHEALED choice replay dies
-    // from turn 56 (five forced switches fed into a kill zone), while the
-    // app's per-turn snapshot healing arrives live on every turn through
-    // 67. Pin both defenses on the real replay: t56 branches with NO
-    // divergence notice (healing works), and the real final turn (68)
-    // cannot be branched at all — the button is disabled with the
-    // end-position explanation, so the ended-arrival notice stays a
-    // defense-in-depth path rather than a reachable state here.
+    // The REAL draft replay (not the shared 4-turn fixture): the UNHEALED choice replay dies from turn 56 (five forced switches fed into a
+    // kill zone), while the app's per-turn snapshot healing arrives live on every turn through 67. t56 branches with NO divergence notice
+    // (healing works), and the real final turn (68) cannot be branched at all: the button is disabled with the end-position explanation.
     test.setTimeout(300_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
     await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
@@ -38,9 +32,8 @@ test.describe('PS Dashboard', () => {
 
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    // Executing a turn here funnels through the same healed reconstruction
-    // the old materialize button used — t56 must arrive LIVE and play.
-    // Round 84 (turn dock): each slot gets the first enabled move through its tray, as the columns did.
+    // Executing a turn here funnels through the healed reconstruction: t56 must arrive LIVE and play.
+    // Each slot gets the first enabled move through its tray.
     await pickMove(page, 'p1a');
     await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
@@ -50,48 +43,18 @@ test.describe('PS Dashboard', () => {
     await discardVariation(page);
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
-    // The end snapshot is the post-battle sentinel: no play-out is offered there (round 77, A-6: the bar says the game
-    // ended), and none arms.
+    // The end snapshot is the post-battle sentinel: no play-out is offered there (the bar says the game ended), and none arms.
     await expect(page.locator('button', { hasText: 'Let it play out' })).toHaveCount(0);
     await expect(page.getByText('The game ended at this position: nothing left to play out.')).toBeVisible();
     await expect(page.getByText(/Engine is playing both sides/)).toHaveCount(0);
     await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
   });
 
-  // Round 70 (user gate 17.10., 2a): known red until T243. Under the log's dice p2 sends Heatran into Mienshao's Knock Off
-  // at turn 61 and p1 wins at turn 67. Over 16 arrival dice in Node (probe docs/perf/probes/2026-10-15-playout) v1 wins 16
-  // for p2 and passes this pin 14 times, round 70 wins 14 and passes 12; head to head, round 70 as p2 wins 16 of 16
-  // against v1 as p1, and round 70 as p1 takes one of 16 from v1 as p2. The pin stays the target: T243 measures the four
-  // pairings again after the re-fit T224.
-  // Round 76 (T243 with T258): the healer race follows the simulator's sequence of hits and heals, and over the 16 dice
-  // the engine against itself wins 16 for p2 and passes this pin 14 times (v1 of round 69 the same; probe
-  // docs/perf/probes/2026-10-23-r76/lanes/S/playout), so the pin is armed again.
   test('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
-    // Round 19 finding, round 42 pin: from turn 56 (p1 Kyurem Ice Beam, p2
-    // into Slowking) the play-out used to send Heatran into Mienshao's Knock
-    // Off at turn 62 and lose it, then crawl 21 turns to a 5% win. With the
-    // forced switch searched as a tree node the engine sacks Muk-Alola first
-    // (turn 58) and keeps Heatran for the finish (turn 65, 59% HP left).
-    // Round 63 (T16, every verified outcome one ply deeper): the play-out
-    // follows the Monte-Carlo ranking at turn 59 (p1 Stealth Rock, p2 Scald)
-    // and p2 wins at turn 62 without sending either.
-    // Round 64 (user gate 08.10., "2a"): the pin keeps the intent, not the
-    // switch order. Muk-Alola is p2's top switch in no line, and the order
-    // held only through near ties (0.001 to 0.005) that the Monte-Carlo
-    // reference decides the other way; with the state-split verify step (T119)
-    // p2 sends Heatran at turn 61 and wins at turn 66. What the pin forbids is
-    // the crawl: p2 (Bene) wins the play-out by turn 70.
-    // Round 67 (user gate 11.10., "5b"): at turn 57 Iron Head, Earth Power and
-    // Freeze-Dry lie within 0.01 and the Monte-Carlo reference decides none of
-    // them; the line it plays wins at turn 72 after six p2 switches, the
-    // turn-56 switch into Slowking included (every other turn-57 choice wins by
-    // turn 66). The pin keeps the core: p2 wins by turn 75 with at most six
-    // switches.
-    // Round 89 (user gate 21.11.): a stat drop no longer counts while its holder can switch it away (#196), and the forced
-    // replacement searches the turn after it (#197). P2 now alternates Slowking and Heatran while Mienshao stays locked
-    // into Knock Off. Over 16 arrival dice in Node (probe docs/perf/probes/2026-11-09-r89/lanes/M/sb5) p2 wins 15 of 16,
-    // with 5.63 switches on average (range 2 to 10); the CI run plays nine switches and wins at turn 71. The bound moves
-    // from six to ten switches; the turn bound stays at 75.
+    // The failure it guards: from turn 56 (p1 Kyurem Ice Beam, p2 into Slowking) a play-out that sent Heatran into Mienshao's Knock Off
+    // lost it, then crawled 21 turns to a 5% win. The pin keeps the intent, not the switch order; what it forbids is the crawl. P2 alternates
+    // Slowking and Heatran while Mienshao stays locked into Knock Off: over 16 arrival dice in Node p2 wins 15 of 16, with 5.63 switches on
+    // average (range 2 to 10), and the CI run plays nine switches and wins at turn 71. So the bounds are ten switches and turn 75.
     // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -113,7 +76,7 @@ test.describe('PS Dashboard', () => {
 
     await page.locator('button', { hasText: 'Let it play out' }).click();
     await expect(page.getByText(/Play-out finished|Play-out stopped/)).toBeVisible({ timeout: 500_000 });
-    // Round 84 (A7f): innerText reads the rendered text, so the closed history opens first.
+    // innerText reads the rendered text, so the closed history opens first.
     await openVariationHistory(page);
     const lines = (await page.locator('.ps-panel', { hasText: 'Variation moves' }).innerText()).split('\n');
     // P2's switch targets in play order: the right half of a turn's move row
@@ -129,8 +92,8 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Variation tip: Turn (\d+)/.exec(await page.getByText(/Variation tip: Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
-    // The finished run leaves the frame where the user watches it (round 88, T347: no return to the start turn; the last
-    // turn still does not drag the pointer to the tip); the click goes to the tip, which names the winner.
+    // The finished run leaves the frame where the user watches it (no return to the start turn; the last turn does not drag the pointer to
+    // the tip either); the click goes to the tip, which names the winner.
     await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
@@ -150,11 +113,9 @@ test.describe('PS Dashboard', () => {
   });
 
   test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone (round 77)', async ({ page }) => {
-    // User report 28.10.2026: in the draft replay, a few turns from turn 0, one turn back and a new choice. The rebuild kept
-    // the variation right, but the frame kept the old line and the new turn appended after its tail: the frame played the
-    // old attack and then the new one. With that fixed, the frame reloaded for the rebuilt line and the new turn went out
-    // while the embed script still loaded, so the frame never showed it. The embed comes a second late here, as from the
-    // network. Turn 2 is Ice Beam first and Freeze-Dry after the step back.
+    // Scene: in the draft replay, a few turns from turn 0, one turn back and a new choice. The frame must hold the rebuilt line only (not the
+    // old attack and then the new one), and the new turn must reach it although the embed script still loads: the embed comes a second late
+    // here, as from the network. Turn 2 is Ice Beam first and Freeze-Dry after the step back.
     test.setTimeout(180_000);
     await routeSlowReplayEmbed(page, 1000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -233,7 +194,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
-    // T280: the frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s more than before.
+    // The frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s.
     test.setTimeout(150_000);
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
@@ -246,9 +207,8 @@ test.describe('PS Dashboard', () => {
 
     const logLength = () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').length);
-    // T280: both lengths count once the frame has played everything it holds. Read while it still played turn 2, the
-    // appended growth came from turn 2 itself, and Last turn's return to the start of turn 2 landed above that reading
-    // on a slow runner (the Tests runs on dev, 29.10.2026).
+    // Both lengths count once the frame has played everything it holds. Read while it still played turn 2, the appended growth came from
+    // turn 2 itself, and Last turn's return to the start of turn 2 landed above that reading on a slow runner.
     const settledLogLength = async () => {
       await expectReplaySettled(frame!);
       return logLength();
@@ -267,10 +227,9 @@ test.describe('PS Dashboard', () => {
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
 
-    // Round 88 (gate of 08.11.2026): the frame's Last turn and Next turn are back. The variation from turn 2 covers turns 3 and 4
-    // after the two Executes: Last turn shortens the log of the same frame, and Next turn twice brings it back. The timeline's own
-    // moves of the frame stay with frame-controls.spec.ts: right after the frame's clicks the pointer may already stand on turn 3,
-    // and a move to 3 then changes nothing (the master run of fa103de read the log unchanged).
+    // The frame's Last turn and Next turn: the variation from turn 2 covers turns 3 and 4 after the two Executes. Last turn shortens the log
+    // of the same frame, and Next turn twice brings it back. The timeline's own moves of the frame stay with frame-controls.spec.ts: right
+    // after the frame's clicks the pointer may already stand on turn 3, and a move to 3 then changes nothing.
     await frame!.locator('button', { hasText: 'Last turn' }).click();
     await expect.poll(logLength).toBeLessThan(afterLength);
     await frame!.locator('button', { hasText: 'Next turn' }).click();
@@ -318,7 +277,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
-    // T281: the frame plays the variation's turn to its end first, about 10 s at normal speed.
+    // The frame plays the variation's turn to its end first, about 10 s at normal speed.
     test.setTimeout(150_000);
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -332,9 +291,9 @@ test.describe('PS Dashboard', () => {
     expect(frame).toBeTruthy();
     await expectReplayTurnAtLeast(frame!, 2);
 
-    // T281: the frame plays the variation's turn in on its own (animate default), and the app repeats its seek for
-    // 1.2 s. A seek that lands after a pause plays again, and the Play button never shows (the Tests runs of e93499a,
-    // 29.10.2026). Once the frame has played everything, it rests unpaused at the end of its log: pause, then play.
+    // The frame plays the variation's turn in on its own (animate default), and the app repeats its seek for 1.2 s. A seek that lands after
+    // a pause plays again, and the Play button never shows. Once the frame has played everything, it rests unpaused at the end of its log:
+    // pause, then play.
     await expectReplaySettled(frame!);
     await frame!.locator('button', { hasText: 'Pause' }).click();
     await expect.poll(() => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.paused)).toBe(true);
@@ -370,7 +329,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
 
-    // Round 84 (turn dock): the chips name the active bodies (the "What will X do?" header is gone).
+    // the chips name the active bodies.
     await expect(dockChip(page, 'p1a')).toContainText('Garchomp');
     await expect(dockChip(page, 'p2a')).toContainText('P2');
 
@@ -414,7 +373,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
-    // Cancel keeps the variation (FB4a); the second answer discards it.
+    // Cancel keeps the variation; the second answer discards it.
     await discardVariation(page, { confirm: false });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await discardVariation(page);
@@ -431,8 +390,8 @@ test.describe('the branch frame plays executed turns', () => {
   });
 
   test('the first turn of a new variation plays in from its start (round 77)', async ({ page }) => {
-    // User report 28.10.2026: Iron Head into Recover opened a variation, and the frame showed the end of that turn at
-    // once, while every later turn played out. The branch frame mounts after the turn ran; it opens on the turn's start.
+    // Scene: Iron Head into Recover opened a variation, and the frame showed the end of that turn at once, while every later turn played
+    // out. The branch frame mounts after the turn ran; it opens on the turn's start.
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await page.locator('.ps-branch-bar input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();

@@ -3,10 +3,10 @@ import { installReplayEmbedCache, pickMove, moveTimeline, startVariationAt } fro
 import { copiedLink, openInFreshContext, prepare, timelineState } from './new-game-helpers';
 
 /**
- * Round 89 (lane H, #105), stage H5: the share link of a game and the state file of a game, in the browser. A player copies the
+ * The share link of a game and the state file of a game, in the browser. A player copies the
  * link in the middle of a game (the main line, a variation, a turn he stands on) and a teammate opens it in a fresh browser
  * context: the same main line, the same variation, the same turn, the seed in the saved list. A game's state file restores the
- * game on a fresh page. Singles (Gen 9 OU) and VGC (doubles type). Round 90 (E5): the version 1 link of a replay branch and the
+ * game on a fresh page. Singles (Gen 9 OU) and VGC (doubles type). The version 1 link of a replay branch and the
  * newer or damaged links are read in test/ui/components/App.new-game.spec.tsx.
  */
 test.beforeAll(installReplayEmbedCache);

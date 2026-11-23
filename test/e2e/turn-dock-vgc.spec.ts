@@ -6,14 +6,14 @@ import {
 } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A6c: the two VGC scenes, counted on their own at 1366 x 768 with no variation standing.
- * Scarlet/Violet VGC (task 4, Tera): turn 3 of `gen9vgc2026regi-2573391549`, where all four slots acted and Zacian terastallizes
+ * The two VGC scenes, counted on their own at 1366 x 768 with no variation standing.
+ * Scarlet/Violet VGC (Tera): turn 3 of `gen9vgc2026regi-2573391549`, where all four slots acted and Zacian terastallizes
  * (P2A). The user's side has not: chip P1A, "Tera (type)", Execute. The bench shows the four brought bodies only.
  * Champions VGC (Mega Evolve): turn 1 of `gen9championsvgc2026regma-2623421463`, before Blastoisinite is used (the game logs the
  * Mega Evolution in turn 2, and a side takes it once, so a later turn has none left to click): chip P2A, "Mega Evolve", Execute.
  * Champions has no Tera toggle. The bench lists the brought bodies only. A side that fielded its whole selection lists those bodies;
- * a short side (2625939941, the criterion 5 case: the user's side fielded three) lists its fielded bodies plus the guess of the
- * world the app plays, the heaviest (ADR 0024, round 89), so that game's bench is not pinned here. The bench is read on this second
+ * a short side (2625939941: the user's side fielded three) lists its fielded bodies plus the guess of the
+ * world the app plays, the heaviest (ADR 0024), so that game's bench is not pinned here. The bench is read on this second
  * game, where both sides fielded four (test/regression/dock-bring-fixture.spec.ts reads the lists without a world).
  */
 const SV_VGC = 'gen9vgc2026regi-2573391549';

@@ -4,7 +4,7 @@ import { fixturePath, installReplayEmbedCache, openTrayMore, pickMove, routeOffl
 import { branchFrameEntries, openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (#114, the user's ruling 31 of 13.11.2026): a move whose later hits roll accuracy (Triple Axel, Population Bomb) shows
+ * A move whose later hits roll accuracy (Triple Axel, Population Bomb) shows
  * one "Hits" row of the counts 1 to N under its "Hit" row. The user sets a count, Execute plays it, and the branch frame, the
  * history row and the mark in the frame say it once.
  * - Singles, Scarlet/Violet OU smogtours-gen9ou-752301, turn 12: "carry me"'s Triple Axel knocked Glimmora out on hit 2. "1 hit"
@@ -82,7 +82,7 @@ test('VGC: "5 hits" for Population Bomb plays five hits and Dondozo faints', asy
   await expect(page.getByRole('group', { name: 'Forced dice' })).toContainText('Population Bomb: 5 hits');
 });
 
-// Round 89 (F5, the wave-tester's finding 1): Glimmora's Toxic Debris answers hit 1 and Glimmora faints on hit 2, so a forced
+// Glimmora's Toxic Debris answers hit 1 and Glimmora faints on hit 2, so a forced
 // "3 hits" plays two. The frame line reads what the game did, whole, and the history row says how many hits played.
 test('singles: "3 hits" on Glimmora reads "2 landed" with the whole reason, not Toxic Debris and a cut at the quote', async ({ page }) => {
   test.setTimeout(240_000);

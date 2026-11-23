@@ -5,7 +5,7 @@ import { installReplayEmbedCache, routeOfflineFixtures, type ReplayWindow } from
 test.beforeAll(installReplayEmbedCache);
 
 /**
- * Round 77 (branching swarm, 28.10.2026): a cold first load left the frame empty with "$ is not defined".
+ * A cold first load left the frame empty with "$ is not defined".
  * replay-embed.js appends its sixteen scripts as dynamic scripts, and those run in the order they arrive:
  * graphics.js extends $.easing at load time, stops halfway when jQuery comes later, BattleBackdrops stays
  * undefined, and the battle never builds. Here jQuery arrives after graphics.js on purpose.
@@ -32,7 +32,7 @@ test('the replay frame builds when jQuery arrives after graphics.js', async ({ p
 });
 
 /**
- * Round 77 (user report 28.10.2026): the Stealth Rock around both Pokémon of 562428 turn 12 showed as empty
+ * The Stealth Rock around both Pokémon of 562428 turn 12 showed as empty
  * boxes. graphics.js prefixes the effect sprites with Dex.fxPrefix only when Dex already exists, the embed
  * runs its scripts in any order, and a sprite left as "rock1.png" has no base in the blob document. The
  * document's base names Showdown's fx folder (src/lib/replay-html.ts). The sprites come from the network.

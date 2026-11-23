@@ -9,7 +9,7 @@ import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
 /**
- * Round 89 (#104), step G4: the Game review under the game report. One test per game type: the sweep analyzes the whole game, the
+ * The Game review under the game report. One test per game type: the sweep analyzes the whole game, the
  * report view lists the turns the cards grade per player, the graph carries one mark per listed row (a circle for player 1, a square
  * for player 2), a click on a listed turn opens it, and ▶ Play on a row's line opens a variation that plays the line from that turn.
  * Singles, VGC (Scarlet/Violet) and Champions VGC (short games: the sweep is the cost).
@@ -19,10 +19,10 @@ const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
 
 test.beforeAll(installReplayEmbedCache);
-// A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this (G4c).
+// A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this.
 test.use({ actionTimeout: 60_000 });
 
-// Round 90 (#222), steps E2 and E3: these rows judge the view, so they read saved engine results (`EVAL_STORE=live` runs them live; the
+// These rows judge the view, so they read saved engine results (`EVAL_STORE=live` runs them live; the
 // capture is scripts/capture-eval-store.mjs). The Auto row below keeps its live search: it judges the pipeline that searches after the report.
 /** Singles runs the matrix on its early turns in auto, and a matrix turn holds no line: that row sweeps with the tree on every turn. */
 const GAMES = [
@@ -87,7 +87,7 @@ for (const game of GAMES) {
     const turn = Number(((await row.getByRole('button').first().textContent()) ?? '').replace(/^T/, ''));
     const play = row.getByRole('button', { name: '▶ Play' }).first();
     guard.pause(); // the variation a line opens is a new position: its own evaluation may search
-    // the button stands inline in the row's 10 px text, not as a full-size button (round 89, G4b)
+    // the button stands inline in the row's 10 px text, not as a full-size button
     expect((await play.boundingBox())!.height, 'the play button is inline').toBeLessThan(26);
     const tooltip = (await play.getAttribute('title')) ?? '';
     lap('▶ Play clicked');
@@ -103,9 +103,9 @@ for (const game of GAMES) {
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
     await expect(page.getByRole('button', { name: /Let it play out/ })).toBeEnabled();
 
-    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen (G4b: it stood out of sight).
-    // While the variation is on screen the panel shows its evaluation, never the report: its button goes back to the main line (G4d,
-    // as "Main line" of the Line selector does) and lands on the Game review the line was played from (G13b).
+    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen.
+    // While the variation is on screen the panel shows its evaluation, never the report: its button goes back to the main line (as
+    // "Main line" of the Line selector does) and lands on the Game review the line was played from.
     await panel.getByRole('button', { name: 'Back to the main line' }).click();
     await expect(review).toBeVisible();
     await expect(panel.getByRole('button', { name: /← Game report/ })).toHaveCount(0);
@@ -113,7 +113,7 @@ for (const game of GAMES) {
     const question = review.getByRole('alertdialog');
     await expect(question).toContainText('replace the existing variation');
     await expect(question).toBeInViewport();
-    // both buttons keep their words whole on one line, as the same height (G4d: they broke into letters in the right column)
+    // both buttons keep their words whole on one line, at the same height (they broke into letters in the right column)
     const replaceBox = (await question.getByRole('button', { name: 'Replace' }).boundingBox())!;
     const cancelBox = (await question.getByRole('button', { name: 'Cancel' }).boundingBox())!;
     expect(replaceBox.height, 'Replace on one line').toBeLessThan(40);
@@ -125,7 +125,7 @@ for (const game of GAMES) {
 }
 
 /**
- * Round 89 (#104), step G13 (ruling G2b, kept by G7a): singles in Auto run the matrix on the early turns, which keeps no lines. After
+ * Singles in Auto run the matrix on the early turns, which keeps no lines. After
  * the report the app searches every graded matrix turn with the trees and keeps only the lines: the review's header shows the stage,
  * every graded early row then holds its lines in the stored result, and ▶ Play on one opens a variation that starts at its turn.
  */

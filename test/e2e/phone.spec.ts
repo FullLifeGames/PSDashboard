@@ -3,9 +3,9 @@ import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures } fro
 import { Clicks, DOUBLES_SLOTS, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A7c, rulings 10a and 11a: the app on a phone (390 x 844, touch). The replay's battle scene shrinks to
+ * The app on a phone (390 x 844, touch). The replay's battle scene shrinks to
  * the frame's width with the log under it, the page never scrolls sideways, the dock shows one chip a row (doubles: four rows at the
- * dock's 46 px) with the whole choice, the top bar takes two lines, and the task of criterion 1 (a move instead of the played one)
+ * dock's 46 px) with the whole choice, the top bar takes two lines, and the task of picking a move instead of the played one
  * takes the same three clicks as at 1366 x 768.
  */
 const DOUBLES = 'gen9doublesou-2693620934';
@@ -34,8 +34,8 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   await expect(frameOf(page).locator('html')).toHaveClass(/ps-phone/);
   const battleBox = (await battle.boundingBox())!;
   const logBox = (await frameOf(page).locator('.battle-log').boundingBox())!;
-  // Round 84 (A7e): the scale is the frame's width over the battle's border box (642), so the scene's right edge is the frame's width
-  // (Showdown's inline scale(width / 640) overshot by 1.1 px until the document's rule took !important). The numbers sit in the message.
+  // The scale is the frame's width over the battle's border box (642), so the scene's right edge is the frame's width
+  // (Showdown's inline scale(width / 640) overshoots by 1.1 px unless the document's rule takes !important). The numbers sit in the message.
   const inside = await frameOf(page).locator('html').evaluate(root => ({
     width: root.clientWidth,
     battleRight: root.querySelector('.battle')!.getBoundingClientRect().right,
@@ -54,9 +54,9 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   expect(sideways, 'horizontal scroll of the page').toBeLessThanOrEqual(0);
 });
 
-// Round 88 (T316, #56): the frame hides Color scheme and Music (before, Music was cut on the 362 px frame). After the gate of
-// 08.11.2026 Last turn, Next turn and Go to turn... are back, so row 1 holds six buttons and takes two lines on a phone, as in 1.1.0.
-// The speed chooser fits its row, and nothing of either row reaches past the document's edge. The widths go to the test's annotations.
+// The frame hides Color scheme and Music (Music was cut on the 362 px frame). Last turn, Next turn and Go to turn... stay, so row 1 holds
+// six buttons and takes two lines on a phone. The speed chooser fits its row, and nothing of either row reaches past the document's edge.
+// The widths go to the test's annotations.
 test('the frame\'s controls fit the phone frame: row 1 in at most two lines, the speed chooser whole, nothing past the edge', async ({ page }) => {
   test.setTimeout(120_000);
   const frame = frameOf(page);
@@ -111,11 +111,11 @@ test('the dock: four chip rows of 46 px with the whole choice, Execute under the
   }
   const execute = (await page.locator('.ps-execute-btn').boundingBox())!;
   expect(execute.y).toBeGreaterThanOrEqual(boxes[3].y + boxes[3].height);
-  // The top bar: two lines at most. Its height is below three lines' (74 px before).
+  // The top bar: two lines at most. Its height is below three lines'.
   const bar = (await page.locator('.ps-topbar').boundingBox())!;
   expect(bar.height, 'height of the top bar').toBeLessThan(64);
   // A row is a run of children whose boxes overlap in height: the children of one row differ in height and sit centred, so their
-  // tops differ by several px (the A7c run bucketed the tops by tens and counted one row twice).
+  // tops differ by several px (bucketing the tops by tens counted one row twice).
   const rows = await page.locator('.ps-topbar > *').evaluateAll(elements => {
     const boxes = elements.map(element => element.getBoundingClientRect()).sort((a, b) => a.top - b.top);
     const found: { top: number; bottom: number }[] = [];

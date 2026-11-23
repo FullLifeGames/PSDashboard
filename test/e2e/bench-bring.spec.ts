@@ -7,13 +7,11 @@ import { lightEngine, loadDockReplay, openVariationHistory, variationPanel } fro
 
 test.beforeAll(installReplayEmbedCache);
 
-// Round 88 (T314, #55): a bench offers only bodies the side could have brought. The replay of GitHub issue #4
-// (gen9vgc2025regg-2335527677, a bring-four game): P1 fielded Clefable, Dusclops, Ursaluna and Gastrodon, so its bench holds no
-// Torracat and no Tsareena (the report: "allowed me to send in torracat as 5th mon"). P2 fielded three bodies (Overqwil,
-// Archaludon, Pelipper), so its fourth is unknown: since round 89 (#124) the rebuild plays the heaviest world of that guess, so P2's
-// bench holds its fielded bodies and the guess (a body of its team preview), never the whole six. The filter reads the same on the
-// replay's own turns (a stored position), on the What-if's turns (a stored position of the variation, the live tip) and at a
-// forced replacement.
+// A bench offers only bodies the side could have brought. Replay gen9vgc2025regg-2335527677 (bring four): P1 fielded Clefable, Dusclops,
+// Ursaluna and Gastrodon, so its bench holds no Torracat and no Tsareena. P2 fielded three bodies (Overqwil, Archaludon, Pelipper), so its
+// fourth is unknown: its bench holds its fielded bodies and the guess (a body of its team preview) of the heaviest world, never all six.
+// The filter reads the same on the replay's own turns (a stored position), on the What-if's turns (a stored position of the variation,
+// the live tip) and at a forced replacement.
 const FILE = 'interlude-vgc-2335527677.json';
 const P1_BROUGHT = /Clefable|Dusclops|Ursaluna|Gastrodon/;
 const P1_HOME = /Torracat|Tsareena/;
@@ -110,11 +108,10 @@ test('doubles, bring four: the What-if tip, its inner turn and its forced replac
   await expectBenches(page, 'variation inner turn');
 });
 
-// Round 89 (#124): Champions VGC 2625939941, doubles. P1 fielded Farigiraf, Basculegion and Lopunny and never its fourth body (Ceruledge,
-// Ninetales-Alola or Kingambit); P2 brought Aerodactyl, Kingambit, Farigiraf and Sylveon and left Kangaskhan and Torkoal home. Before
-// the issue the engine kept six bodies per side and could rank a switch to Kangaskhan; now the rebuild trims both sides to four, P1's
-// fourth is the heaviest world's guess, and the other worlds blend into the values. Singles (Battle Stadium Singles) have no e2e
-// fixture: the same code is read by the unit rows of the worlds (replay-context-worlds, bench-sweep).
+// Champions VGC 2625939941, doubles. P1 fielded Farigiraf, Basculegion and Lopunny and never its fourth body (Ceruledge, Ninetales-Alola
+// or Kingambit); P2 brought Aerodactyl, Kingambit, Farigiraf and Sylveon and left Kangaskhan and Torkoal home. The rebuild trims both sides
+// to four: P1's fourth is the heaviest world's guess, and the other worlds blend into the values. Singles have no e2e fixture: the unit
+// rows of the worlds (replay-context-worlds, bench-sweep) read the same code.
 const CHAMPIONS_SHORT = 'gen9championsvgc2026regma-2625939941';
 const P2_HOME_BODIES = /Kangaskhan|Torkoal/;
 const P1_FIELDED = /Farigiraf|Basculegion|Lopunny/;

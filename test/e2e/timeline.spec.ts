@@ -40,9 +40,9 @@ test.describe('PS Dashboard', () => {
 
   test('a long forward slider jump lands the scene instead of hanging on "seeking..."', async ({ page }) => {
     test.setTimeout(150_000);
-    // A long, chatty log makes the embed fast-forward in >300ms chunks — the
-    // chained continuation that scene.pause()'s interruptionCount bump used
-    // to cancel (the old post-seek pause(): a permanent "seeking..." hang).
+    // A long, chatty log makes the embed fast-forward in >300ms chunks, the
+    // chained continuation that scene.pause()'s interruptionCount bump could
+    // cancel (a permanent "seeking..." hang).
     // Every log line is a DOM write while seeking, so line count is the load.
     // Self-consistent synthetic replay: appending turns to a real fixture
     // would reference mons its log never introduced and error the parser.
@@ -168,7 +168,7 @@ test.describe('PS Dashboard', () => {
     });
 
     test('a move past the variation\'s tip plays on the main line there, after the replace confirm (round 77)', async ({ page }) => {
-      // User report 28.10.2026: a one-turn variation at turn 5, then ▶ to turn 28 and Brave Bird there. The line stayed
+      // Scene: a one-turn variation at turn 5, then ▶ to turn 28 and Brave Bird there. The line stayed
       // "variation" across the uncovered turns, the move extended the variation instead, ran at its tip against Kyurem
       // ("no longer knows Brave Bird") and pulled the pointer back. Here: a one-turn variation at turn 1, ▶ to turn 3.
       test.setTimeout(120_000);
@@ -225,7 +225,7 @@ test.describe('PS Dashboard', () => {
 
       // Straight from the freshly loaded replay (main line, no variation):
       // the branch rebuild resets the eval to idle, and the loop's first
-      // evaluation must fire on its own — this sat at "0 turns played".
+      // evaluation must fire on its own, or the run sits at "0 turns played".
       await page.locator('button', { hasText: 'Let it play out' }).click();
       await expect(page.getByText(/Engine is playing both sides from turn 1/)).toBeVisible({ timeout: 60_000 });
       // Proof it actually played: a live counter past zero, or (the small
@@ -276,14 +276,14 @@ test.describe('PS Dashboard', () => {
       // turn-1 prefix produced a variation whose moves list started at
       // turn 1 and whose first turn fell back to the main line.
       await page.locator('button', { hasText: 'Let it play out' }).click();
-      // Round 88 (T343, #79): the run starts at turn 0, the turn the leads come in; the status line says so.
+      // The run starts at turn 0, the turn the leads come in; the status line says so.
       await expect(page.locator('.ps-playout-progress')).toContainText('from turn 0', { timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0', { timeout: 60_000 });
       await expect(history).toContainText('lead');
 
       // When the run ends the view stays on a VARIATION position (the line chip stays on gold), not a main-line
-      // fallback, and the notice offers the watch from turn 0 (round 88, T347 and T343: the pointer takes the frame's
+      // fallback, and the notice offers the watch from turn 0 (the pointer takes the frame's
       // turn instead of returning to turn 1).
       await expect(page.getByText(/Play-out (finished|stopped)/)).toBeVisible({ timeout: 120_000 });
       await expect(page.getByRole('button', { name: /Watch from turn 0/ })).toBeVisible();
@@ -311,7 +311,7 @@ test.describe('PS Dashboard', () => {
       await expect(history).toContainText('Turn 0');
       // Two leads per side, slot-ordered ("lead X + Y").
       await expect(history).toContainText('+');
-      // The doubles branch opens with a chip for each of the four actives (round 84: the per-slot controls became chips).
+      // The doubles branch opens with a chip for each of the four actives.
       await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
     });
 
@@ -353,7 +353,7 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
       await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
 
-      // The user's report of 30.10.2026 (Champions VGC 2646618972): back on T0, the same picks started again hung at
+      // Scene (Champions VGC 2646618972): back on T0, the same picks started again hung at
       // "Variation tip"; discarding the variation first worked.
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();

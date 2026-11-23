@@ -18,7 +18,7 @@ export const fixtureReplay: ReplayData = JSON.parse(readFileSync(fixturePath('re
 
 export type ReplayWindow = Window & {
   Replays?: {
-    /** The embed's own music flag: false at load, then true once its update sees the muted `BattleSound` (round 88, T316). */
+    /** The embed's own music flag: false at load, then true once its update sees the muted `BattleSound`. */
     muted?: boolean;
     battle?: {
       turn?: number;
@@ -27,7 +27,7 @@ export type ReplayWindow = Window & {
       seeking?: number | null;
       atQueueEnd?: boolean;
       viewpointSwitched?: boolean;
-      /** The side the frame shows near: Switch sides and the ?p2 flag set it (round 88, T316). */
+      /** The side the frame shows near: Switch sides and the ?p2 flag set it. */
       nearSide?: { sideid?: string } | null;
       messageFadeTime?: number;
     };
@@ -42,7 +42,7 @@ export async function expectReplayTurn(
 ) {
   // The embed script loads from play.pokemonshowdown.com; under full-suite
   // load it can take a while before Replays.battle exists at all — wait for
-  // readiness first so slow CDN responses don't eat the turn timeout (G25).
+  // readiness first so slow CDN responses don't eat the turn timeout.
   await expect.poll(async () => frame.evaluate(() =>
     !!(window as ReplayWindow).Replays?.battle
   ), { timeout: 30_000 }).toBe(true);
@@ -64,8 +64,8 @@ export async function expectReplayTurnAtLeast(frame: Frame, turn: number) {
 }
 
 /**
- * Waits until the frame has played everything it holds: no seek running and the battle at the end of its steps (T280,
- * T281). Until then the frame plays its turn in, and the app repeats a seek for 1.2 s (`useReplayFrame`), so a reading
+ * Waits until the frame has played everything it holds: no seek running and the battle at the end of its steps. Until then the frame
+ * plays its turn in, and the app repeats a seek for 1.2 s (`useReplayFrame`), so a reading
  * or a click before that races the frame, and a slow runner loses the race.
  */
 export async function expectReplaySettled(frame: Frame) {
@@ -78,7 +78,7 @@ export async function expectReplaySettled(frame: Frame) {
 /** The four slots a chip can stand for: side and field position. A singles game has `p1a` and `p2a` only. */
 export type DockSlotKey = 'p1a' | 'p1b' | 'p2a' | 'p2b';
 
-/** Round 84 (turn dock): the chip of one slot. Its `data-chip` is the side and the slot index (`p10`, `p11`, `p20`, `p21`). */
+/** The chip of one slot. Its `data-chip` is the side and the slot index (`p10`, `p11`, `p20`, `p21`). */
 export const dockChip = (page: Page, slot: DockSlotKey): Locator =>
   page.locator(`.ps-dock-chip[data-chip="${slot.slice(0, 2)}${slot[2] === 'a' ? 0 : 1}"]`);
 
@@ -100,7 +100,7 @@ async function openChip(page: Page, chip: Locator, { timeout }: TrayOptions = {}
   return dockTray(page);
 }
 
-/** Round 84 (turn dock): opens the tray of one slot. A tray that stands for this slot already stays as it is. */
+/** Opens the tray of one slot. A tray that stands for this slot already stays as it is. */
 export function openTray(page: Page, slot: DockSlotKey, options?: TrayOptions): Promise<Locator> {
   return openChip(page, dockChip(page, slot), options);
 }
@@ -115,9 +115,9 @@ export async function openTrayMore(page: Page, slot: DockSlotKey, options?: Tray
 }
 
 /**
- * Round 84 (turn dock): picks a move of one slot in its tray: the named one, else the first enabled one (what the old column
- * helper took). The tile click makes it the slot's own choice (a draft entry), so the executed turn names this move in this
- * slot whatever the seed was. Returns the move's name once the chip shows it.
+ * Picks a move of one slot in its tray: the named one, else the first enabled one. The tile click makes it the slot's own choice
+ * (a draft entry), so the executed turn names this move in this slot whatever the seed was. Returns the move's name once the chip
+ * shows it.
  */
 export async function pickMove(page: Page, slot: DockSlotKey, move?: string | RegExp, options?: TrayOptions): Promise<string> {
   const tray = await openTray(page, slot, options);
@@ -139,16 +139,16 @@ export async function pickSwitch(page: Page, slot: DockSlotKey, body: string | R
  * the first body that may enter. The pick executes at once, whatever the engine's fill holds for the slot.
  */
 export async function pickForcedReplacement(page: Page, options?: TrayOptions): Promise<void> {
-  // Round 84 (A7a): the engine fills the forced slot too, so its chip no longer reads "choose a replacement"; the chip carries data-forced.
+  // The engine fills the forced slot too, so its chip never reads "choose a replacement"; it carries data-forced.
   const tray = await openChip(page, page.locator('.ps-dock-chip[data-forced="true"]:not([inert])').first(), options);
   await tray.locator('.ps-switchbtn:enabled').first().click({ timeout: options?.timeout });
 }
 
 /**
- * Round 84 (A7e): moves the timeline slider to `turn`. Chromium takes `fill()` on the range input, as every spec did before. WebKit's
- * range input does not take it (the A7d run: "T5/" never showed in WebKit through `fill()`, while a click with the pointer moved the
- * slider), so there the helper clicks the track where the turn lies (the thumb is about 16 px wide, so the click may land a turn
- * or two off) and settles on the turn with the arrow keys, which the input handles natively.
+ * Moves the timeline slider to `turn`. Chromium takes `fill()` on the range input. WebKit's range input does not ("T5/" never
+ * showed in WebKit through `fill()`, while a click with the pointer moved the slider), so there the helper clicks the track where the
+ * turn lies (the thumb is about 16 px wide, so the click may land a turn or two off) and settles on the turn with the arrow keys, which
+ * the input handles natively.
  */
 export async function moveTimeline(page: Page, turn: number): Promise<void> {
   const slider = page.locator('.ps-branch-bar input[type="range"]');
@@ -171,8 +171,8 @@ export async function moveTimeline(page: Page, turn: number): Promise<void> {
 }
 
 /**
- * Round 89 (user ruling 40, FB4a): Discard variation asks first once a turn was played. The bar's button opens the question, the
- * question's own button discards. `confirm: false` cancels instead and leaves the variation.
+ * Discard variation asks first once a turn was played. The bar's button opens the question, the question's own button discards.
+ * `confirm: false` cancels instead and leaves the variation.
  */
 export async function discardVariation(page: Page, options?: { confirm?: boolean }) {
   // The bar counts a turn only once it has played; a click before that discards without the question.
@@ -188,10 +188,8 @@ export async function discardVariation(page: Page, options?: { confirm?: boolean
  * Unified-timeline helper: moves the slider to `turn`, gives EVERY active slot an explicit move through its tray, executes,
  * and waits for the rebuilt sim's history entry: after this a live variation covers `turn` and the pointer sits on its tip.
  *
- * Round 84 (turn dock): the slots start with the logged choice, so the helper picks in every slot the move the old column
- * helper took (the first enabled one; `p1Move` for the first P1 slot), and the executed turn stays the one the specs always
- * executed. The explicit pick also fills a slot with no logged action (a flinch, a faint before the move), which would hold
- * Execute locked.
+ * The slots start with the logged choice, so the helper picks in every slot the first enabled move (`p1Move` for the first P1 slot).
+ * The explicit pick also fills a slot with no logged action (a flinch, a faint before the move), which would hold Execute locked.
  */
 export async function startVariationAt(page: Page, turn: number, options?: { p1Move?: string | RegExp }) {
   if (turn > 1) {
@@ -223,13 +221,13 @@ export async function startVariationAt(page: Page, turn: number, options?: { p1M
   await expect(page.locator('.ps-force-switch-note')).toHaveCount(0, { timeout: 30_000 });
 }
 
-/** Opens the top bar's Setup menu and clicks one of its entries (round 77: the team actions moved there). */
+/** Opens the top bar's Setup menu and clicks one of its entries. */
 export async function fromSetup(page: Page, entry: string) {
   await page.getByRole('button', { name: 'Setup', exact: true }).click();
   await page.locator('.ps-setup-panel').getByRole('button', { name: entry, exact: true }).click();
 }
 
-/** Opens the top bar's Load panel (round 84, Q20 a: once a replay is loaded the loader lives there, not in the column) and returns it. */
+/** Opens the top bar's Load panel (once a replay is loaded the loader lives there, not in the column) and returns it. */
 export async function openLoader(page: Page): Promise<Locator> {
   await page.locator('.ps-loader-toggle').click();
   const panel = page.locator('.ps-loader-panel');
@@ -251,7 +249,7 @@ export async function waitForExactPickers(page: Page, turn?: number) {
 
 // The embed script is fetched from play.pokemonshowdown.com by every test's
 // iframe; occasional CDN stalls were the root of the flaky `Replays.battle`
-// timeouts (G25). Fetch it once per file and serve all its tests from memory.
+// timeouts. Fetch it once per file and serve all its tests from memory.
 let replayEmbedCache: Buffer | null = null;
 
 /** Fills the embed cache; every spec file calls it from its own `test.beforeAll`. */
@@ -260,13 +258,13 @@ export async function installReplayEmbedCache(): Promise<void> {
     const response = await fetch('https://play.pokemonshowdown.com/js/replay-embed.js');
     if (response.ok) replayEmbedCache = Buffer.from(await response.arrayBuffer());
   } catch {
-    // Fall through — tests then hit the CDN directly like before.
+    // Fall through: tests then hit the CDN directly.
   }
 }
 
 /**
  * Serves the cached embed script late, as a browser gets it from the network: a frame still loads while the app already
- * posts to it (round 77, the appended turn the user never saw). Registered after the offline routes, so it wins.
+ * posts to it. Registered after the offline routes, so it wins.
  */
 export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise<void> {
   await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
@@ -280,7 +278,7 @@ export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise
 }
 
 /**
- * Round 84 (turn dock): five corpus games with played turns, byte copies of `.fit-corpus` files. The hand-written doubles and
+ * Five corpus games with played turns, byte copies of `.fit-corpus` files. The hand-written doubles and
  * VGC fixtures hold no played turn, so the dock's seed (the logged choice of every slot) needs these. Served by their ids.
  */
 export const dockReplays: ReplayData[] = [
@@ -321,7 +319,7 @@ export async function routeOfflineFixtures(page: Page): Promise<void> {
 }
 
 /**
- * Round 89 (ruling 49): Depth lives in the Setup menu, not in the Evaluation header. These two helpers open the menu, read or pick the
+ * Depth lives in the Setup menu, not in the Evaluation header. These two helpers open the menu, read or pick the
  * Depth select, and close the menu again (Escape), so the next click lands on the page.
  */
 export async function readDepth(page: Page): Promise<string> {

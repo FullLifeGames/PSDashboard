@@ -5,10 +5,10 @@ import { dockChip, fixturePath, installReplayEmbedCache, openTray, pickForcedRep
 import { DOUBLES_SLOTS, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
- * Round 84 (turn dock), step A7a, ruling 2a: a forced replacement gets the engine's choice like any slot. The draft replay of the
+ * A forced replacement gets the engine's choice like any slot. The draft replay of the
  * pivot spec (U-turn against Chilly Reception at turn 1) ends the turn with a forced replacement of P1, then of P2 (singles). At
  * each the chip reads the engine's switch with the mark "engine", Execute appears and sends it; a bench click would send a body in
- * at once, as before (`pickForcedReplacement`, held by the pivot spec).
+ * at once (`pickForcedReplacement`, held by the pivot spec).
  */
 test.beforeAll(installReplayEmbedCache);
 
@@ -45,12 +45,12 @@ test('a forced replacement: the engine fills the slot, Execute sends it, on both
 });
 
 /**
- * Round 84 (A7c, ruling 16a; A7d: a scene the sim fixes): doubles, both slots of P1 forced. The hand-written replay
+ * Doubles, both slots of P1 forced. The hand-written replay
  * `gen9doubles-forced-test` gives Pikachu and Eevee a Memento each, and Memento faints its user when it hits (accuracy 100, no
  * damage roll decides it), so the executed turn 1 leaves P1A and P1B to replace from a bench of four (Raichu, Jolteon, Vaporeon,
  * Flareon) and P2 untouched. The engine fills both. A bench click in P1A while P1B holds only the engine's pick records the choice and
- * sends nothing; Execute stays and sends the turn with the user's pick in P1A and the engine's in P1B. (The A7c case took turn 6 of a
- * corpus game whose two faints depend on the damage rolls; the sim never asked for both replacements there.)
+ * sends nothing; Execute stays and sends the turn with the user's pick in P1A and the engine's in P1B. (Turn 6 of a corpus game, whose
+ * two faints depend on the damage rolls, never made the sim ask for both replacements.)
  */
 const BENCH = ['Raichu', 'Jolteon', 'Vaporeon', 'Flareon'];
 
@@ -83,7 +83,7 @@ test('two forced slots of one side: a bench click records the choice while the o
   const tray = await openTray(page, 'p1a');
   await tray.locator('.ps-switchbtn:enabled', { hasText: body }).click();
   await expect(p1a).toContainText(body);
-  // Nothing went out: the old behaviour sent the turn at once and the position moved on within a worker round trip.
+  // Nothing went out: a sent turn would have moved the position on within a worker round trip.
   await page.waitForTimeout(2_000);
   await expect(p1a).toHaveAttribute('data-forced', 'true');
   await expect(p1a).not.toHaveAttribute('data-origin', 'engine');
@@ -98,7 +98,7 @@ test('two forced slots of one side: a bench click records the choice while the o
 });
 
 /**
- * Round 84 (A7f): the partner of a forced replacement takes no input. Same hand-written replay, but only Pikachu uses Memento, so
+ * The partner of a forced replacement takes no input. Same hand-written replay, but only Pikachu uses Memento, so
  * P1A alone must be replaced and Eevee (P1B) keeps its place: the position asks nothing of it, so its chip stands inert like the
  * chips of the waiting side (P2A, P2B), while P1A's chip stays live and the engine fills it.
  */
@@ -133,9 +133,9 @@ test('one forced slot in doubles: its partner stands inert like the waiting side
 });
 
 /**
- * Round 84 (A7h): the bench click that comes while the engine's run for the replacement is still under way. Champions VGC
+ * The bench click that comes while the engine's run for the replacement is still under way. Champions VGC
  * 2625939941, turn 1 with the logged picks: Flip Turn asks P1B for a replacement and the fill starts its run for that request. The
- * user sends a body at once (ruling 2a), so the next request, the moves of turn 2, begins with that run still going. It carries
+ * user sends a body at once, so the next request, the moves of turn 2, begins with that run still going. It carries
  * the same evalViewKey (`variation:2`), and its result is the replacement's analysis: the fill must not settle on it. It starts its
  * own run, and all four chips of turn 2 take the engine's pick with Execute ready.
  */

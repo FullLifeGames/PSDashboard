@@ -56,7 +56,7 @@ test.describe('PS Dashboard', () => {
     await expect.poll(async () => frame!.evaluate(() =>
       (window as ReplayWindow).Replays?.battle?.viewpointSwitched ?? false
     ), { timeout: 30_000 }).toBe(true);
-    // The mirrored loader link keeps the perspective flag. Round 84 (Q20 a): the loader is the top bar's Load panel now.
+    // The mirrored loader link keeps the perspective flag; the loader is the top bar's Load panel.
     const panel = await openLoader(page);
     await expect(panel.getByLabel('Replay URL or ID')).toHaveValue(/\?p2$/);
   });

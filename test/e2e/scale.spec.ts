@@ -3,10 +3,10 @@ import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures, wait
 import { Clicks, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
 /**
- * Round 84 (T315, A7d, spec addendum A): the app grows with large windows. At 2560 x 1290 Auto takes 150 %: the app fills the window
+ * The app grows with large windows. At 2560 x 1290 Auto takes 150 %: the app fills the window
  * (the vh rules divide by the scale), the left column does not scroll, the replay frame's content scales with the app (Chromium
  * carries the root's zoom into the frame, WebKit needs the frame follower), the timeline slider's pointer lands where it shows, and
- * the task of criterion 1 (a move instead of the played one: chip, tile, Execute) takes the same three clicks. The setting
+ * the task of picking a move instead of the played one (chip, tile, Execute) takes the same three clicks. The setting
  * overrides Auto, persists across a reload, and a step that leaves the app less than 1050 px is disabled and says why.
  */
 const DOUBLES = 'gen9doublesou-2693620934';
@@ -75,8 +75,8 @@ test('Auto at 2560 x 1290 takes 150 %: the app fills the window, the column does
   expect(facts.frameVisual / facts.frameCss, 'the frame element\'s scale').toBeCloseTo(1.5, 1);
   // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands about 963 px wide on the screen. In
   // WebKit a frame that kept its 100 % layout shows it at 642. Playwright's boundingBox() of an element inside a zoomed frame reads page
-  // coordinates divided by the zoom (641 for 963; the A7d run), and the engines read the rect inside in different units (Chromium in
-  // the frame's CSS px, WebKit in screen px; the A7e run), so the width on the screen is the battle's share of the document times the
+  // coordinates divided by the zoom (641 for 963), and the engines read the rect inside in different units (Chromium in
+  // the frame's CSS px, WebKit in screen px), so the width on the screen is the battle's share of the document times the
   // frame's rect on the screen.
   await expect(frameOf(page).locator('.battle')).toBeVisible({ timeout: 60_000 });
   const shown = await battleOnScreen(page);
@@ -119,7 +119,7 @@ test('task 1 at 150 %, a move instead of the played one: the same 3 clicks (chip
   await expect(variationPanel(page)).toContainText(name);
 });
 
-/** Round 84 (A7f, ruling 18a): the history panel stands closed under its toggle, so a doubles variation with a turn in it still fits. */
+/** The history panel stands closed under its toggle, so a doubles variation with a turn in it still fits. */
 test('a doubles variation with its history at 150 %: the left column does not scroll while the panel is closed', async ({ page }) => {
   test.setTimeout(180_000);
   await loadDockReplay(page, DOUBLES, TURN);
@@ -162,7 +162,7 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   // The choice persists across a reload: the root carries it before anything renders, and the select shows it.
   await page.reload();
   expect(await rootScale(page)).toBe('2');
-  // The address names the replay (round 89, H12a): the reload opens it again, so the loader field is gone and the page needs no second load.
+  // The address names the replay: the reload opens it again, so the loader field is gone and the page needs no second load.
   await waitForExactPickers(page, TURN);
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
   size = await openSetup(page);
@@ -171,7 +171,7 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   // A narrower window disables the steps that would leave under 1050 px (1600 / 1.75 = 914) and holds the chosen 200 % back to 150 %.
   // The options are read through their `disabled` property: toBeDisabled() and toBeEnabled() retarget an element inside a <label> to the
   // label's control (Playwright's `retarget` with `follow-label`), so on an option of this select they read the select, which is never
-  // disabled (the A7d run: "Received: enabled" for an option whose attribute and label were right; the ui spec of the menu follows the
+  // disabled ("Received: enabled" for an option whose attribute and label were right; the ui spec of the menu follows the
   // same resize). The label text is read as it is.
   await page.setViewportSize({ width: 1600, height: 1000 });
   await expect(size.locator('option', { hasText: /^175 %/ })).toHaveJSProperty('disabled', true);

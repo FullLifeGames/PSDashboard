@@ -6,7 +6,7 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
 /**
- * Round 79 (T290): the replacement after a knockout, as a note on the card of the next turn. Two real fixtures serve the loader:
+ * The replacement after a knockout, as a note on the card of the next turn. Two real fixtures serve the loader:
  * a Gen 9 OU game in which Toxapex comes in on turn 6 (the card of turn 7 carries the note, the card of turn 6 none) and a
  * Doubles OU game in which Flamigo and Sylveon come in together on turn 2 (one sentence names both slots). A reload serves the
  * note from the stored sweep. The default e2e replay has a knockout the simulator does not reproduce, so it shows no note.
@@ -62,7 +62,7 @@ test.describe('the replacement note', () => {
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 7');
     await expect(note).not.toContainText(/blunder|mistake|inaccuracy/i);
 
-    // A reload serves the note from the stored sweep. Round 89 (lane H, H4c): the address names the open replay, so the reload
+    // A reload serves the note from the stored sweep. The address names the open replay, so the reload
     // brings the game back by itself; typing the id into the start page's loader would race the page that is replacing it.
     await expect(page).toHaveURL(/[?&]replay=gen9ou-2658662321/);
     await page.reload();

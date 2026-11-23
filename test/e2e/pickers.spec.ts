@@ -5,7 +5,7 @@ import {
 
 test.beforeAll(installReplayEmbedCache);
 
-// Round 84 (turn dock): the pickers are the dock's chips and trays. A chip opens its slot's tray (move tiles, the targets of the
+// The pickers are the dock's chips and trays. A chip opens its slot's tray (move tiles, the targets of the
 // pending move, bench tiles); the dice, the What-if loader and all choices sit behind the tray's "Dice · What if".
 test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -16,7 +16,7 @@ test.describe('PS Dashboard', () => {
   test('the loaded replay shows P1 and P2 chips whose trays list moves and switches', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
 
-    // Round 80 (T297): the pickers themselves carry the load wait. The Battle Statistics panel shows its "P1" first, and
+    // The pickers themselves carry the load wait. The Battle Statistics panel shows its "P1" first, and
     // under the full suite the pickers came more than five seconds after it.
     const chips = page.locator('.ps-dock-chip');
     await expect(chips.first()).toBeVisible({ timeout: 15000 });
@@ -34,14 +34,10 @@ test.describe('PS Dashboard', () => {
     const tray = await openTray(page, 'p1a');
     const earthquake = tray.locator('.ps-movebtn', { hasText: 'Earthquake' });
     await expect(earthquake.locator('.ps-type-tag')).toHaveText('Ground');
-    // Range history: shifted when spread inference started overlaying
-    // damage-consistent EVs (51–60.9%), then again when the goodness-of-fit
-    // forfeit rejected this synthetic log's hand-authored damage numbers —
-    // no legal spread fits them, so the degenerate solve (Bold 0-Atk
-    // Garchomp) falls back to the species default and Earthquake hits real.
-    // The snapshot picker feeds the same guessed sets (nature/EV spread)
-    // into the same calc, so the pinned range carries over unchanged.
-    // Round 84 (turn dock): the tile's bar shows the whole-percent range; the exact range sits in the tile's tooltip.
+    // The synthetic log's hand-authored damage numbers fit no legal spread, so the solve (Bold 0-Atk
+    // Garchomp) falls back to the species default and Earthquake hits real. The snapshot picker feeds
+    // the same guessed sets (nature/EV spread) into the same calc.
+    // The tile's bar shows the whole-percent range; the exact range sits in the tile's tooltip.
     await expect(earthquake).toHaveAttribute('title', /69\.8% - 82\.2%/, { timeout: 10000 });
   });
 
@@ -51,10 +47,10 @@ test.describe('PS Dashboard', () => {
 
     await fromSetup(page, 'Edit Player');
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
-    // The editor opens after the spread solve (T234), more than five seconds under the full suite (round 77).
+    // The editor opens after the spread solve, more than five seconds under the full suite.
     await expect(editor).toBeVisible({ timeout: 30_000 });
     await expect(editor.getByLabel('Garchomp HP EVs')).toBeVisible();
-    // Round 76 (T234): the editor opens on the solved spread (the fixture's Garchomp: 252 Atk / 252 Spe / 4 SpD, 508 of the 510 EVs),
+    // The editor opens on the solved spread (the fixture's Garchomp: 252 Atk / 252 Spe / 4 SpD, 508 of the 510 EVs),
     // and a typed value is cut to what the total leaves. The spread is therefore edited from the bottom: free the points, then spend them.
     await editor.getByLabel('Garchomp Spe EVs').fill('4');
     await editor.getByLabel('Garchomp SpD EVs').fill('0');
@@ -105,7 +101,7 @@ test.describe('PS Dashboard', () => {
     }).toPass({ timeout: 15000 });
     await expect(dockChip(page, 'p2a')).toContainText(p2Move);
 
-    // While the rebuilt position lands the pickers stand in for it and take no input (round 77): click until the pick holds.
+    // While the rebuilt position lands the pickers stand in for it and take no input: click until the pick holds.
     await expect(async () => {
       const tray = await openTray(page, 'p1a', { timeout: 3000 });
       await tray.locator('.ps-movebtn', { hasText: 'Stone Edge' }).click({ timeout: 3000 });
@@ -249,7 +245,7 @@ test.describe('PS Dashboard', () => {
 
     await discharge.click();
     const moreTray = await openTrayMore(page, 'p1a');
-    // Round 84 (A4): the dice are a table, one column per target; each head names its slot and body.
+    // The dice are a table, one column per target; each head names its slot and body.
     const heads = moreTray.locator('.ps-dice-table .ps-dice-heading');
     for (const [index, target] of ['P2A Bulbasaur', 'P2B Charmander', 'P1B Eevee'].entries()) {
       await expect(heads.nth(index), target).toHaveText(target, { timeout: 15000 });

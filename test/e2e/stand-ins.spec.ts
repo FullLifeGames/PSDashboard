@@ -8,12 +8,11 @@ import { installReplayEmbedCache, openTray, routeOfflineFixtures, waitForExactPi
 import { routeSmogon } from './smogon-routes';
 
 /**
- * Round 88 (F, #101): the stats panel marks the bodies a side never showed. Gen 4 has no team preview, so a game lists the bodies that
+ * The stats panel marks the bodies a side never showed. Gen 4 has no team preview, so a game lists the bodies that
  * entered and the log's |teamsize| says the rest: smogtours-gen4ou-544639 shows 3 of P1's 6 (singles), a simulator-made Gen 4 Doubles OU
  * log shows the two leads of each side (doubles). The format's usage file is a slice of the cached Gen 4 OU stats with its teammate lists;
- * the Gen 4 doubles file does not exist, so the doubles game reads the generation's OU file (stage 5 of the build). Each stand-in carries
- * "Not revealed (guessed from teammate usage)"; the shown bodies carry nothing. Written in round 88 and not run there (the integrator
- * ran feedback beside the lane); run it with the lane's Playwright config before the wave merges.
+ * the Gen 4 doubles file does not exist, so the doubles game reads the generation's OU file. Each stand-in carries
+ * "Not revealed (guessed from teammate usage)"; the shown bodies carry nothing.
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const regression = (name: string) => JSON.parse(readFileSync(join(here, '../regression/fixtures', `${name}.json`), 'utf-8'));
@@ -71,7 +70,7 @@ test('doubles: both sides show two of six and the panel lists four stand-ins on 
 });
 
 /**
- * Round 88 (M2, #101): the What-if's switch tiles wear the "guessed" badge on the bodies the panel marks and on no other. The panel is
+ * The What-if's switch tiles wear the "guessed" badge on the bodies the panel marks and on no other. The panel's
  * P1 column is the reference (its `.ps-stats-standin` lines; P2 has other stand-ins), so a row proves that `ReplayWorkspace` feeds the tile's provider from the same infos.
  */
 async function expectBenchBadges(page: Page) {

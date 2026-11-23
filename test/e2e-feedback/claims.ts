@@ -4,9 +4,8 @@ import { summarizeTurn } from '../../packages/eval-engine/src/summary';
 import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim, type TurnClaim } from './corpus';
 
 /**
- * Pure comparison brain of the drift harness. WARN-ONLY by construction:
- * every status is report content — nothing here throws or fails a test.
- * Pinned in test/regression/feedback-claims.spec.ts.
+ * Pure comparison brain of the drift harness. WARN-ONLY by construction: every status is report content, nothing here
+ * throws or fails a test. Pinned in test/regression/feedback-claims.spec.ts.
  */
 
 /**

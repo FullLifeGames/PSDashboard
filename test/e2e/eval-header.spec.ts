@@ -4,11 +4,11 @@ import { dockChip, dockTray } from './helpers';
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
 /**
- * Round 89 (ruling 49): the Evaluation panel's header is one row at the desktop width of the right column (1280 px and wider):
+ * The Evaluation panel's header is one row at the desktop width of the right column (1280 px and wider):
  * "Evaluation", the engine controls, "Tera" and the checkbox "Always on" share one line, and the row "Game graph" with
- * "Analyze game" stays its own row below. Depth and Samples are rows of the Setup menu now (ruling 49), so a stored matrix depth adds nothing
+ * "Analyze game" stays its own row below. Depth and Samples are rows of the Setup menu, so a stored matrix depth adds nothing
  * to the header. At 390 px the header may wrap. The spec reads the boxes of the header's children; the
- * screenshots at 1280 and 390 px go to SHOTS_DIR when it is set (the gate's folder of the round).
+ * screenshots at 1280 and 390 px go to SHOTS_DIR when it is set.
  */
 test.beforeAll(installReplayEmbedCache);
 

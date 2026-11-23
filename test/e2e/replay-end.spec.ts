@@ -5,7 +5,7 @@ import { dockReplays, fixturePath, installReplayEmbedCache, moveTimeline, routeO
 import { lightEngine } from './dock-helpers';
 
 /**
- * Round 89 (lane H, #105), H19a (user ruling 13.11.2026): a replay shows its result at its end, as a game does: the dock's place
+ * A replay shows its result at its end, as a game does: the dock's place
  * reads "<winner> won the battle!" with no chip and no Execute, and the turn before still offers its picker. Singles and doubles.
  */
 const winnerOf = (log: string) => log.match(/\|win\|(.+)/)![1].trim();
