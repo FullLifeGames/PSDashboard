@@ -164,7 +164,7 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (ro
   });
 });
 
-/** The Champions tables with some weights of their own for one run (both game types), as static-ruleset.spec.ts does. */
+/** The Champions tables with some weights of their own for one run (both game types), as weights.spec.ts does. */
 async function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_WEIGHTS>, run: () => Promise<T>): Promise<T> {
   const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
   Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);

@@ -10,7 +10,7 @@ import type { BranchMoveOption, SimPokemonInfo } from '../src/branch-engine';
  * (Dragon-weak) behind it: with no partner pick one dart goes to each, so the preview prices one hit on Snorlax; when the
  * partner's pick shields it (Protect, going first), both darts land on Snorlax. The simulator's answer for the move comes
  * from protectBlocks: stubbed to "Protect does not stop it" the shield does not count and the preview is back at one dart.
- * protect-at-use.spec.ts holds protectBlocks itself against real battles.
+ * body.spec.ts holds protectBlocks itself against real battles.
  */
 const blocks = vi.hoisted(() => ({ forced: undefined as boolean | undefined }));
 vi.mock('../src/calc/protect.ts', async importOriginal => {

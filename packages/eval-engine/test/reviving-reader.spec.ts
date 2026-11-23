@@ -20,7 +20,7 @@ function makeSet(species: string, moves: string[], level = 100): PokemonSet {
   };
 }
 
-/** The scene of revival-blessing.spec.ts: Magikarp fell, Pawmot (slot b in doubles) uses Revival Blessing, the battle stops at the request. */
+/** The scene of choices.spec.ts: Magikarp fell, Pawmot (slot b in doubles) uses Revival Blessing, the battle stops at the request. */
 function revivalBattle(doubles: boolean): Battle {
   const p1 = [makeSet('Magikarp', ['Splash'], 1), makeSet('Pawmot', ['Revival Blessing', 'Nuzzle']), makeSet('Snorlax', ['Curse'])];
   const p2 = doubles

@@ -22,7 +22,7 @@ const EXCLUDED: Record<string, string> = {
   pursuit: 'turn', round: 'turn', firepledge: 'turn', grasspledge: 'turn', waterpledge: 'turn',
   stompingtantrum: 'turn', temperflare: 'turn', lashout: 'turn', fusionbolt: 'turn', fusionflare: 'turn',
   beatup: 'turn', trumpcard: 'turn',
-  // The hit number: asked once per hit by the multi-hit step (move-facts.ts hitsFactor, test/multi-hit.spec.ts).
+  // The hit number: asked once per hit by the multi-hit step (move-facts.ts hitsFactor, test/move-facts.spec.ts).
   tripleaxel: 'per hit', triplekick: 'per hit',
   // Writes the battle, draws from the PRNG or writes the log.
   furycutter: 'writes', rollout: 'writes', iceball: 'writes', ficklebeam: 'writes', risingvoltage: 'writes',

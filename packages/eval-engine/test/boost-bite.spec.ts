@@ -298,7 +298,7 @@ describe('the twin battle runs in the mode of the battle it answers for (user 12
     expect(control.boostsBiting).toBeCloseTo(control.boosts, 12);
   });
 
-  // 13.10.2026: a Haze on the field wipes the stage for every foe (the foes in front gate it, boost-bite-front.spec.ts); a Haze on
+  // 13.10.2026: a Haze on the field wipes the stage for every foe (the foes in front gate it, boost-bite.drops.spec.ts); a Haze on
   // the bench only takes its own foe out of the share.
   test('a Champions doubles board: a foe with Haze on the bench, three without: the stage counts for the three quarters it bites', () => {
     const battle = battleOf(CHAMPIONS_DOUBLES, [champion('Garchomp', ['crunch', 'splash']), champion('Garchomp', ['crunch', 'splash'])],

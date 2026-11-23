@@ -396,7 +396,7 @@ function draws(run: () => unknown, root: SimPosition): number {
 
 describe('fork counts: a missing secondary class costs one forced draw, never a chase with probe seeds', () => {
   // The rows count forks with the speed layer's copy counter, so they switch the layer on for themselves, as
-  // contact-hits.spec.ts does; under EVAL_SIM_FAST=0 (the CI job with the layer forced off) the counter stays at 0.
+  // contact.spec.ts does; under EVAL_SIM_FAST=0 (the CI job with the layer forced off) the counter stays at 0.
   beforeAll(() => configureSimFast(SIM_FAST_DEFAULT));
   afterAll(() => resetSimFastForTests());
   const { board, root } = board1v1({ species: 'Pikachu', moves: ['firefang'] }, { species: 'Vaporeon', moves: ['splash'] });
