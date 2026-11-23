@@ -58,3 +58,46 @@ describe('a doubles observation does not move the Choice verdict (T31 guard)', (
     expect(corroborateChoiceItem('p1', 'Garchomp', 'Choice Band', teams, observations, 9)).toBe('contradicted');
   });
 });
+
+describe('choice-lock-defender-ability', () => {
+  const garchomp = (): PokemonSet => set('Garchomp', ['dragonclaw', 'splash'], { item: 'Choice Band', ability: 'Rough Skin' });
+  const dragonite = (ability: string): PokemonSet => set('Dragonite', ['splash'], { ability, item: '' });
+
+  /** The fraction of its HP Dragonite loses to Dragon Claw in one real turn, a hit with no critical. */
+  function dragonClawFraction(format: string): number {
+    const doubles = format.includes('doubles');
+    const battle = battleOf(format, doubles ? [garchomp(), set('Corviknight', ['splash'])] : [garchomp()],
+      doubles ? [dragonite('Multiscale'), set('Corviknight', ['splash'])] : [dragonite('Multiscale')]);
+    const target = battle.sides[1].active[0];
+    const before = target.hp;
+    battle.makeChoices(doubles ? 'move dragonclaw 1, move splash' : 'move dragonclaw', doubles ? 'move splash, move splash' : 'move splash');
+    expect(battle.log.join('\n')).not.toMatch(/\|-crit\|/);
+    expect(before).toBe(target.maxhp);
+    return (before - target.hp) / target.maxhp;
+  }
+
+  const observation = (fraction: number) => [{
+    attackerSpecies: 'Garchomp', defenderSpecies: 'Dragonite', attackerSide: 'p1' as const,
+    moveId: 'dragonclaw', observedFraction: fraction, lethal: false,
+    attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
+  }];
+
+  describe('the defender of the Choice item check has its own ability (T157)', () => {
+    for (const format of ['gen9customgame', 'gen9doublescustomgame']) {
+      const kind = format.includes('doubles') ? 'doubles' : 'singles';
+
+      test(`${kind}: Dragonite with Multiscale at full HP corroborates the Band the simulator's hit shows`, () => {
+        const fraction = dragonClawFraction(format);
+        expect(fraction).toBeGreaterThan(0.1);
+        const teams = { p1Team: [garchomp()], p2Team: [dragonite('Multiscale')] };
+        expect(corroborateChoiceItem('p1', 'Garchomp', 'Choice Band', teams, observation(fraction), 9)).toBe('corroborated');
+      });
+
+      test(`${kind}: a defender with no ability on the set ranges the species' abilities, Multiscale among them`, () => {
+        const fraction = dragonClawFraction(format);
+        const teams = { p1Team: [garchomp()], p2Team: [dragonite('')] };
+        expect(corroborateChoiceItem('p1', 'Garchomp', 'Choice Band', teams, observation(fraction), 9)).toBe('corroborated');
+      });
+    }
+  });
+});
