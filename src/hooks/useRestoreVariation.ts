@@ -14,17 +14,16 @@ export interface SavedVariation {
 }
 
 /**
- * Round 77 (user gate 28.10.2026, 3a): a saved variation rebuilds from its start turn with its history and
- * pending choices, through the rebuild every deviation takes (a turn-0 variation re-seeds its leads from its
- * lead entry). The pinned teams ride along explicitly: a pin set just before has not reached this render's
- * team sources yet.
+ * A saved variation rebuilds from its start turn with its history and pending choices, through the rebuild every deviation takes
+ * (a turn-0 variation re-seeds its leads from its lead entry). The pinned teams ride along explicitly: a pin set just before has
+ * not reached this render's team sources yet.
  */
 export function useRestoreVariation(inputs: Omit<RebuildContext, 'bringOnly' | 'landPointer' | 'replayData'> & {
   replayData: RebuildContext['replayData'] | null;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
   setViewTurn: (turn: number) => void;
   setViewLine: (line: 'main' | 'variation') => void;
-  /** A new game's dice seed (round 89, #105): a variation that starts at turn 0 starts the game's own battle again. */
+  /** A new game's dice seed: a variation that starts at turn 0 starts the game's own battle again. */
   gameSeed?: string;
 }) {
   const {

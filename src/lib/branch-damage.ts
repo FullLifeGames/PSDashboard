@@ -27,20 +27,18 @@ export interface DamagePreviewInputs {
   fieldState: BranchSimState['field'] | null;
   gen: number;
   /**
-   * The Tera type each slot's armed toggle would take, null when off. The
-   * preview reads it as the calc reads a Pokémon after the click: attacking
-   * and defending in its Tera type (T20). Mega, Ultra Burst and Z stay out.
+   * The Tera type each slot's armed toggle would take, null when off. The preview reads it as the calc reads a Pokémon after the
+   * click: attacking and defending in its Tera type. Mega, Ultra Burst and Z stay out.
    */
   teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] };
   /**
-   * Both sides' picks so far (live tip or draft). The preview reads what the
-   * defender's partner chose: a Protect there turns the second Dragon Dart
-   * back onto the defender (T124).
+   * Both sides' picks so far (live tip or draft). The preview reads what the defender's partner chose: a Protect there turns the
+   * second Dragon Dart back onto the defender.
    */
   choices?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
   /**
-   * The live battle of the branch when the viewed position is its tip (round 73, T202): a hit the calc cannot price (a lone foe
-   * behind a screen under a forced spread) is played on a copy of it. Left out, that hit shows no range.
+   * The live battle of the branch when the viewed position is its tip: a hit the calc cannot price (a lone foe behind a screen under
+   * a forced spread) is played on a copy of it. Left out, that hit shows no range.
    */
   battle?: LiveHit['battle'] | null;
 }
@@ -73,9 +71,8 @@ function fieldFacts(slots: SlotsBySide, choices: ChoicesBySide, attacker: SimPok
 }
 
 /**
- * Round 82 (forced dice): what the slot's chosen move adds to the calc's context. The move lists the damage of each step of its
- * roll; a crit forced on this target prices it as a crit; a forced hit count prices a multi-hit move for that count. Other
- * moves, and the chosen move on a target without a forced crit, keep the plain preview.
+ * What the slot's chosen move adds to the calc's context: a crit forced on this target prices it as a crit, a forced hit count prices a
+ * multi-hit move for that count. Other moves keep the plain preview.
  */
 function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | null, move: BranchMoveOption, target: string): Partial<NonNullable<DamageContext>> {
   if (!chosen || chosen.moveId !== toId(move.name)) return {};
@@ -86,9 +83,9 @@ function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | nul
 }
 
 /**
- * Round 83 (the user, 01.11.2026: "the damage on P1B is missing"): a move whose Dex target is `allAdjacent` (Earthquake, Surf)
- * hits every body next to its user, the user's partner among them, and the preview lists the partner's row after the foes'.
- * `damage-preview-partner.spec.ts` holds this reading to the simulator's targets for every damaging move of the Dex.
+ * A move whose Dex target is `allAdjacent` (Earthquake, Surf) hits every body next to its user, the user's partner among them, and
+ * the preview lists the partner's row after the foes'. `test/regression/damage-preview-partner.spec.ts` holds this reading to the
+ * simulator's targets for every damaging move of the Dex.
  */
 export const hitsPartner = (move: Pick<BranchMoveOption, 'targetType'>): boolean => move.targetType === 'allAdjacent';
 
@@ -102,11 +99,9 @@ interface SlotDamageArgs {
   context: DamageContext;
   calc: CalcSingleDamageRange;
   battle?: LiveHit['battle'] | null;
-  /** The Tera type each slot has armed, by side. */
   armed: { p1: (string | null)[]; p2: (string | null)[] };
 }
 
-/** The calc's context for a hit of the slot's attacker into the body at a side and slot, with the forced dice of its chosen move. */
 function hitContext({ active, slots, choices, context, battle, armed }: SlotDamageArgs) {
   const attackerSide = slots.p1.includes(active) ? 'p1' : 'p2';
   const attackerSlot = slots[attackerSide].indexOf(active);
@@ -122,7 +117,6 @@ function hitContext({ active, slots, choices, context, battle, armed }: SlotDama
   const chosen = pick?.kind === 'move' ? pick : null;
   return (side: 'p1' | 'p2', slot: number, move: BranchMoveOption): DamageContext => ({
     ...(context?.gameType === 'Doubles' ? { ...context, ...fieldFacts(slots, choices, active, side, slot), ...liveHit(side, slot) } : context),
-    // the partner stands behind the screens of its own side, which is the attacker's
     ...(side === attackerSide ? { defenderSideConditions: context?.attackerSideConditions } : {}),
     ...forcedContext(chosen, move, `${side}${String.fromCharCode(97 + slot)}`),
   });
@@ -130,7 +124,6 @@ function hitContext({ active, slots, choices, context, battle, armed }: SlotDama
 
 const rowLabel = (side: 'p1' | 'p2', slot: number): string => `${side.toUpperCase()}${String.fromCharCode(65 + slot)}`;
 
-/** Per-move damage of one active slot: targeted entries, the best untargeted range, and spread breakdowns. */
 function slotDamage(args: SlotDamageArgs) {
   const { active, moves, enemySide, enemyActives, slots, calc } = args;
   const defaults: DamageResult[] = [];
@@ -150,7 +143,6 @@ function slotDamage(args: SlotDamageArgs) {
     }
 
     if (enemyActives.length === 0) return;
-    // Untargeted moves (spread/self/singles): one range per living enemy (G6).
     const perTarget = enemyActives.map(enemy => rowInto(enemySide, enemy.index, enemy.active, move));
     const best = perTarget.reduce((currentBest, candidate) =>
       candidate.result.maxPercent > currentBest.result.maxPercent ? candidate : currentBest,
@@ -163,7 +155,6 @@ function slotDamage(args: SlotDamageArgs) {
   return { defaults, spread, targets: Object.fromEntries(targetEntries) };
 }
 
-/** The active slots as the calc sees them once the armed Tera toggles take effect. */
 function withTera(slots: (SimPokemonInfo | null)[], tera: (string | null)[] | undefined): (SimPokemonInfo | null)[] {
   if (!tera?.some(Boolean)) return slots;
   return slots.map((info, slot) => {
@@ -172,7 +163,6 @@ function withTera(slots: (SimPokemonInfo | null)[], tera: (string | null)[] | un
   });
 }
 
-/** The damage preview for both sides — the pure core of the picker's preview effect. */
 export function computePreviewDamage(inputs: DamagePreviewInputs, calc: CalcSingleDamageRange): { p1: SideDamage; p2: SideDamage } {
   const { p1MovesBySlot, p2MovesBySlot, fieldState, gen } = inputs;
   const p1ActiveSlots = withTera(inputs.p1ActiveSlots, inputs.teraBySlot?.p1);

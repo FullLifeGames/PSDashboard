@@ -1,9 +1,9 @@
 import type { BranchSlotChoice, DieOffer, ForcedDie, LiveHit, ResolvedSideCommand } from '@fulllifegames/eval-engine';
 
 /**
- * Round 82 (forced dice), step A7a: what the panel asks the engine about the position it shows. The engine's offers read the live
- * battle on copies and never write it (`offeredDice` for one slot's chosen move, `offeredOrderDice` and `offeredEndDice` for the
- * turn once both sides have chosen). The engine arrives through the lazy chunk, so the caller hands it in.
+ * What the panel asks the engine about the position it shows. The engine's offers read the live battle on copies and never write it
+ * (`offeredDice` for one slot's chosen move, `offeredOrderDice` and `offeredEndDice` for the turn once both sides have chosen). The
+ * engine arrives through the lazy chunk, so the caller hands it in.
  */
 
 type Battle = LiveHit['battle'];
@@ -21,13 +21,11 @@ interface Engine {
 export interface DiceAsk {
   battle: Battle;
   choices: { p1: Choices; p2: Choices };
-  /** The slots that must act this turn, per side. */
   required: { p1: boolean[]; p2: boolean[] };
-  /** Both sides have chosen every required slot: the turn's own dice (order, end of turn) can be read. */
   turnReady: boolean;
   /**
-   * The replay's log, for a stored position the user views before a branch starts there (round 82, step A7b): the log's dice come from
-   * its lines. Without it the battle's own first-turn PRNG names them (a branch's live battle).
+   * The replay's log, for a stored position the user views before a branch starts there: the log's dice come from its lines.
+   * Without it the battle's own first-turn PRNG names them (a branch's live battle).
    */
   replayLog?: string;
 }
@@ -35,7 +33,6 @@ export interface DiceAsk {
 export interface DiceOffers {
   /** The dice of each slot's chosen move, by the sim's slot name ("p1a"). */
   bySlot: Record<string, DieOffer[]>;
-  /** The dice of the turn: speed ties, first movers, the end of the turn. */
   turn: DieOffer[];
   /** What the log shows for the first turn of a branch, by die; empty on later turns. */
   logged: ForcedDie[];
@@ -54,7 +51,6 @@ function slotOffers(engine: Engine, ask: DiceAsk): Record<string, DieOffer[]> {
   return offers;
 }
 
-/** The turn's commands on a copy, the way the live battle gets them; a refused click ends the play. */
 function turnPlay(engine: Engine, ask: DiceAsk): ((battle: Battle) => void) | null {
   const commands: { side: 'p1' | 'p2'; command: string }[] = [];
   for (const side of ['p1', 'p2'] as const) {

@@ -6,7 +6,6 @@ import {
   detectRolls, rollToCopy, type BiggestRoll, type RollFlip,
 } from '@fulllifegames/eval-engine';
 
-/** The graph slices the analyses read — matches useEvaluation's graph. */
 export interface AnalysisGraphData {
   results: (EvalResult | null)[];
   scores: (number | null)[];
@@ -14,29 +13,21 @@ export interface AnalysisGraphData {
   playedOutcome: (number | null)[];
   verified: Parameters<typeof analyzeTurn>[0]['verified'][];
   sensitivity: Parameters<typeof analyzeTurn>[0]['sensitivity'][];
-  /** The auto mode's per-turn phase (null where the sweep never resolved one). */
   faintedFractions?: (number | null)[];
-  /** Round 86 (T304): the engine's score of the next root with the game's biggest roll's die turned over; the report's sentence reads it. */
+  /** The engine's score of the next root with the game's biggest roll's die turned over; the report's sentence reads it. */
   rollFlip?: RollFlip | null;
 }
 
 /**
- * Round 64 (T123): how many bodies each side brought, as the protocol's
- * `|teamsize|` line before turn 1 states it (VGC: 4 of the 6 team preview
+ * How many bodies each side brought, as the protocol's `|teamsize|` line before turn 1 states it (VGC: 4 of the 6 team preview
  * lists); null for a side the log does not size.
  */
 function broughtCounts(snapshots: TurnSnapshot[]): { p1: number | null; p2: number | null } {
-  // Round 88 (F, #101): the one `|teamsize|` reader of replay-core.
   return teamSizes(snapshots[0]?.log ?? []);
 }
 
-/**
- * Round 63 (T18): the turn's phase for the near sentence — the sweep's own
- * measure first (it counts the bodies a VGC side brought), else the fallen
- * share of the pre-turn snapshot (manual modes record no phase); null
- * without either. Round 64 (T123): the snapshot share counts the bodies a
- * side brought, not the six its team preview lists.
- */
+/** The turn's phase for the near sentence: the sweep's own measure, else the fallen share of the pre-turn snapshot over the bodies a side
+ *  brought (not the six its team preview lists); null without either. */
 export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSnapshot[], turn: number): number | null {
   const recorded = graph.faintedFractions?.[turn - 1];
   if (recorded !== undefined && recorded !== null) return recorded;
@@ -49,9 +40,8 @@ export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSna
 }
 
 /**
- * Round 69 (T51 review): the share of every swept turn, as the turn card takes it. Only the auto engine records its
- * phase in the graph, so a Matrix or MCTS sweep leaves `faintedFractions` empty; the graph tooltips read this list
- * instead and print at the same map as the card, the side rows and the bar in every engine mode.
+ * The share of every swept turn, as the turn card takes it. Only the auto engine records its phase in the graph, so a Matrix or MCTS
+ * sweep leaves `faintedFractions` empty; the graph tooltips read this list instead, so every engine mode prints the same map.
  */
 export function graphFaintedFractions(graph: AnalysisGraphData, snapshots: TurnSnapshot[]): (number | null)[] {
   return graph.scores.map((_, index) => turnFaintedFraction(graph, snapshots, index + 1));
@@ -65,18 +55,12 @@ export interface TurnAnalysisContext {
 }
 
 type TurnReads = NonNullable<Parameters<typeof analyzeTurn>[0]['reads']>;
-/** Each player's own tendencies from the replay log (parseTendencies). */
 export type ReplayTendencies = NonNullable<Parameters<typeof analyzeTurn>[0]['tendencies']>;
 
-/**
- * What analyzeTurn reads from the turn's own protocol against the pre-turn
- * snapshot: the sacks (when asked) and, round 67 (T22), the dice markers and
- * move hits, so the luck sentences can tell a roll from a re-read.
- */
 function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks: boolean) {
   const events = context.turnEventsIndex[turn];
   const before = context.snapshots[turn - 1] ?? null;
-  // Round 75 (T160): the turn's generation and mod read the Dex (hazards, accuracies, secondaries); no board, no snapshot, no sacks.
+  // The turn's generation and mod read the Dex (hazards, accuracies, secondaries); no board, no snapshot, no sacks.
   const actives = context.activesForTurn(turn);
   const rules = actives ? { gen: actives.gen, mod: actives.mod } : undefined;
   return {
@@ -85,7 +69,7 @@ function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks
   };
 }
 
-/** Round 69 (T177): the replay's generation (round 75, T160: and mod), read from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
+/** The replay's generation and mod, from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
 function replayRulesOf(context: TurnAnalysisContext): { gen?: number; mod?: RulesMod } {
   for (let turn = 1; turn < context.snapshots.length; turn++) {
     const actives = context.activesForTurn(turn);
@@ -94,8 +78,6 @@ function replayRulesOf(context: TurnAnalysisContext): { gen?: number; mod?: Rule
   return {};
 }
 
-/** One argument assembly for analyzeTurn — the per-turn view and the report
- *  walk used to paste the same block at two sites. */
 export function analyzeTurnAt(args: {
   turn: number;
   graph: AnalysisGraphData;
@@ -129,17 +111,14 @@ export function analyzeTurnAt(args: {
     actives: context.activesForTurn(turn),
     playedHistory: context.playedHistory,
     faintedFraction: turnFaintedFraction(graph, context.snapshots, turn),
-    // Round 69 (T51): the after score is the next turn's position and prints at that turn's share, as its graph node does.
     faintedFractionAfter: turnFaintedFraction(graph, context.snapshots, turn + 1),
     ...(args.unansweredSeen ? { unansweredSeen: args.unansweredSeen } : {}),
     ...(args.decidedSeen ? { decidedSeen: args.decidedSeen } : {}),
   });
 }
 
-/** Streak-detector history (narrative channel): per side per turn, who
- *  attacked whom with what — read from the replay's own snapshots and
- *  protocol lines, render-time only. Gaps push null (breaks streaks; the
- *  detector fails closed). */
+/** Streak-detector history: per side per turn, who attacked whom with what, from the replay's snapshots and protocol lines. Gaps push
+ *  null (breaks streaks; the detector fails closed). */
 function historyEntryFor(
   side: 'p1' | 'p2',
   playedTurn: PlayedTurn | null,
@@ -197,7 +176,6 @@ export function computeTurnReads(
   };
 }
 
-/** The side the log's win line names, else null (a game the log does not finish). */
 export function replayWinnerOf(replayData: ReplayData): 'p1' | 'p2' | null {
   const name = replayData.log.match(/\|win\|(.+)/)?.[1]?.trim();
   if (!name) return null;
@@ -206,10 +184,6 @@ export function replayWinnerOf(replayData: ReplayData): 'p1' | 'p2' | null {
   return null;
 }
 
-/**
- * The replay-derived context of the analyses: the snapshots, the log's turn events, the pre-turn actives per side and the played
- * history. Round 86 (T304): the sweep's biggest-roll stage builds it from the sweep's own arrays, the hook from the graph state.
- */
 export function buildAnalysisContext(args: {
   snapshots: TurnSnapshot[];
   turnEventsIndex: string[][];
@@ -221,10 +195,8 @@ export function buildAnalysisContext(args: {
   return {
     snapshots,
     turnEventsIndex,
-    // Null-move guard board context: the PRE-TURN active species per side,
-    // anything but exactly one live active per side passes null and keeps
-    // the guard off (fail closed). Singles meet that every turn; a doubles
-    // endgame with one body left per side meets it too.
+    // Null-move guard board context: the pre-turn active species per side; anything but exactly one live active per side passes null
+    // and keeps the guard off (fail closed).
     activesForTurn: (turn: number) => {
       const snapshot = snapshots[turn - 1] ?? null;
       if (!snapshot) return null;
@@ -246,21 +218,16 @@ interface ReportWalkArgs {
   replayData: ReplayData;
   graph: AnalysisGraphData;
   context: TurnAnalysisContext;
-  /** Round 47: the walk reads the opponent model like the turn card, so the dump and the pins see the card's text. */
   tendencies: ReplayTendencies | null;
 }
 
-/** The report walk: analyze every swept turn once, with the entry/decided announcement bookkeeping. */
 function analysesOf(args: ReportWalkArgs): (TurnAnalysis | null)[] {
-  // The report walk speaks each entry sentence once: keys of already-spoken
-  // unanswered stages accumulate turn by turn, so a mon's tenth entry stays
-  // quiet here while the per-turn card (no set passed) keeps its sentence.
+  // The report walk speaks each entry sentence once: keys of already-spoken unanswered stages accumulate, so a mon's tenth entry stays
+  // quiet here while the per-turn card keeps its sentence.
   const unansweredSeen = new Set<string>();
-  // The decided/near announcements share the walk regime — the state stays
-  // on every decided turn, the sentence speaks once.
+  // The decided/near announcements share the walk regime: the state stays on every decided turn, the sentence speaks once.
   const decidedSeen = new Set<string>();
   return args.graph.results.map((_, index) => {
-    // Round 64 (T123): a bar that left the decided zone frees the side's decided and forced sentences again.
     const bar = args.graph.scores[index];
     if (bar !== null && bar !== undefined) releaseBrokenClaims(decidedSeen, bar);
     const analysis = analyzeTurnAt({
@@ -273,14 +240,12 @@ function analysesOf(args: ReportWalkArgs): (TurnAnalysis | null)[] {
       const signal = analysis[key].unanswered;
       if (signal) unansweredSeen.add(unansweredSeenKey(key, signal));
       const decided = analysis[key].decided;
-      // Round 64 (review): a claim remembers whether it was spoken inside the decided zone (releaseBrokenClaims).
       if (decided?.announce) noteSpokenClaim(decidedSeen, decidedSeenKey(key, { species: decided.species }), key, analysis.scoreBefore);
       const near = analysis[key].nearDecided;
       if (near?.announce) {
         decidedSeen.add(decidedSeenKey(key, { species: near.species, removes: near.removes }));
       }
       const forced = analysis[key].forcedWin;
-      // Round 63: whenever the sentence speaks, the 0.9 proof and the open event under it (T19) alike.
       if (forcedWinSpeaks(forced, key === 'p1' ? analysis.scoreBefore : -analysis.scoreBefore)) {
         noteSpokenClaim(decidedSeen, forcedWinSeenKey(key), key, analysis.scoreBefore);
       }
@@ -289,16 +254,14 @@ function analysesOf(args: ReportWalkArgs): (TurnAnalysis | null)[] {
   });
 }
 
-/** The protocol dice anchor of the luck claims (crits, misses, rolled statuses). */
 function diceTurnsOf(context: TurnAnalysisContext): ReadonlySet<number> {
   const replayRules = replayRulesOf(context);
   return diceEventTurns(context.turnEventsIndex, replayRules.gen, replayRules.mod);
 }
 
 /**
- * Round 86 (T304): the roll the report would name, for the sweep's last stage to play the other way. It reads the report's own walk, the
- * replay's winner and the report's dice turns, so the stage and the sentence name one roll. Null without a winner or with fewer than
- * three analyzed turns, where the report speaks of none.
+ * The roll the report would name, for the sweep's last stage to play the other way, so the stage and the sentence name one roll. Null
+ * without a winner or with fewer than three analyzed turns, where the report speaks of none.
  */
 export function namedRollOf(args: ReportWalkArgs): BiggestRoll | null {
   const winner = replayWinnerOf(args.replayData);
@@ -307,14 +270,12 @@ export function namedRollOf(args: ReportWalkArgs): BiggestRoll | null {
   return known.length < 3 ? null : rollToCopy(known, winner, diceTurnsOf(args.context));
 }
 
-/** The report walk, then the game report (three analyzed turns minimum). */
 export function computeGameReportData(args: ReportWalkArgs & { winner: 'p1' | 'p2' | null }): { report: GameReport; analyses: (TurnAnalysis | null)[] } | null {
   const analyses = analysesOf(args);
   if (analyses.filter(Boolean).length < 3) return null;
   const report = buildGameReport(
     analyses, [args.replayData.players[0], args.replayData.players[1]], args.winner, true,
     diceTurnsOf(args.context),
-    // Round 86 (T304): the sweep's last stage played the biggest roll the other way; its next root's score rides in the graph.
     args.graph.rollFlip ?? null,
   );
   return { report, analyses };

@@ -1,10 +1,9 @@
 import { useCallback, useRef } from 'react';
 
 /**
- * Round 84 (turn dock), A7b (ruling 9a): a list that scrolls inside its panel fades out over its last 36 px while more follows
- * (stats-panel.css reads `data-more="true"`). The mark goes onto the element from its scroll position, a ResizeObserver (the panel
- * or the window changed) and a MutationObserver (the content changed); no React state, so a scroll repaints nothing but the mask.
- * The list at its end, or one that fits, carries no mark. Returns a callback ref; the listeners go with the element.
+ * A list that scrolls inside its panel fades out over its last 36 px while more follows (stats-panel.css reads `data-more="true"`).
+ * The mark goes onto the element from its scroll position, a ResizeObserver and a MutationObserver; no React state, so a scroll
+ * repaints nothing but the mask. The list at its end, or one that fits, carries no mark. Returns a callback ref.
  */
 export function useScrollFade(): (element: HTMLElement | null) => void {
   const release = useRef<(() => void) | null>(null);

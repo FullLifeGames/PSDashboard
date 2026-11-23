@@ -8,19 +8,15 @@ import {
 import { replayBuildOptions, replaySolveOptions } from './team-build-options';
 import type { SmogonSetAssumptions } from './smogon-sets';
 
-/** Everything the app reads out of a replay log before any Smogon data arrives. */
 export interface AppTeamSeed {
   observations: DamageObservation[];
   speedOrders: SpeedOrderObservation[];
   hpEvidence: HiddenPowerEvidence[];
   gen: number;
-  /** The inferred infos the enrich memos start from. */
   rawInfos: { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
-  /** The species the set assumptions are fetched for (the app's `revealedSpecies`). */
   species: string[];
 }
 
-/** The log-only half of the app's team chain; `parsed` skips a second parse. */
 export function appTeamSeed(
   log: string,
   parsed?: Pick<ReturnType<typeof parseReplayLogWithObservations>, 'observations' | 'speedOrders' | 'hpEvidence'>,
@@ -46,12 +42,9 @@ export interface AppTeams {
 }
 
 /**
- * The app's team build as one function: enriched infos with the
- * hidden-power resolver and the damage judge (round 67, T130: one decision
- * for panel and build), the two-stage spread solve, then the build with
- * the solved spreads and the HP evidence. It models the settled state the
- * sweep waits for — the lazy resolver has landed and the Smogon data is in —
- * of a replay nobody edited: no pasted team, no edited or stored sets.
+ * The app's team build as one function: enriched infos with the hidden-power resolver and the damage judge, the two-stage spread
+ * solve, then the build with the solved spreads and the HP evidence. It models the settled state the sweep waits for (the lazy
+ * resolver has landed and the Smogon data is in) of a replay nobody edited: no pasted team, no edited or stored sets.
  */
 export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
   usageStats: SmogonUsageStats | null;
@@ -60,8 +53,8 @@ export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
   const { usageStats, setAssumptions } = knowledge;
   const hpResolver = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
     seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(log));
-  // Round 88 (F, #101): the sides of a game without team preview that showed fewer bodies than their `|teamsize|`, filled as the panel's are.
-  // Round 89 (#117): a generated-team format fills them from its random-set file, which the set fetch carries.
+  // The sides of a game without team preview that showed fewer bodies than their `|teamsize|`, filled as the panel's are; a
+  // generated-team format fills them from its random-set file, which the set fetch carries.
   const infos = enrichTeamInfos(withStandIns(seed.rawInfos, log, usageStats, undefined, setAssumptions?.randomSets), usageStats, setAssumptions, { p1: hpResolver('p1'), p2: hpResolver('p2') }, judgeItemsByDamage);
   const shared = { p1Info: infos.p1, p2Info: infos.p2, usageStats, setAssumptions };
   const inferredSpreads = solveReplaySpreads(log, seed.observations,

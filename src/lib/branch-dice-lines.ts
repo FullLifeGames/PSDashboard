@@ -3,17 +3,15 @@ import { foldHitReports, resultWord, wordsOf } from './branch-dice';
 import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
 /**
- * Round 82 (forced dice), step A7b, decision 6a: the lines the frame shows for the dice the user forced. A line before the event a
- * forced die decided ("Forced: Air Slash flinch, 60 %", the chance of the result the click forced, decision 14a) and, for a forced die that took
- * no effect, a line at the end of its action ("Forced burn had no effect", with the report's reason). The lines live in the display
- * of the branch log, never in the battle's log: `branchFrameLog` puts them in. The replay client prints a `|-message|` line as it
- * is, and the frozen `/v1.0.2/` viewer plays the same client, so a shared branch shows the marks as well.
+ * The lines the frame shows for the dice the user forced: one before the event a forced die decided ("Forced: Air Slash flinch,
+ * 60 %", the chance of the result the click forced) and, for a die that took no effect, one at the end of its action ("Forced burn
+ * had no effect", with the report's reason). They live in the display of the branch log, never in the battle's log (`branchFrameLog`
+ * puts them in). The replay client prints a `|-message|` line as it is, and the frozen `/v1.0.2/` viewer plays the same client, so a
+ * shared branch shows the marks as well.
  */
 
-/** The protocol line the replay client renders as plain text in the battle log. */
 export const DIE_LINE = '|-message|';
 
-/** A display line and the place it goes: before the line at index `at` of the shown log. */
 export interface DieLine { at: number; text: string }
 
 /**
@@ -31,7 +29,6 @@ export interface TurnWindow {
 
 const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text.slice(1);
 
-/** A chance as a percent with up to one decimal. */
 const percent = (chance: number): string => `${Math.round(chance * 1000) / 10} %`;
 
 /**
@@ -54,7 +51,6 @@ export function dieText(report: DieReport, words: DieWords): string {
   return chance === undefined ? text : `${text}, ${percent(chance)}`;
 }
 
-/** What the die decided, as a noun for "Forced ... had no effect". */
 function noun(report: DieReport, words: DieWords): string {
   const { name, result } = report.die;
   if (name.kind === 'accuracy' && 'happens' in result) return result.happens ? 'hit' : 'miss';
@@ -62,11 +58,10 @@ function noun(report: DieReport, words: DieWords): string {
   return lowerFirst(resultWord(report.die, words));
 }
 
-/** "Forced 10 hits had no effect: ...", or "Forced 10 hits, 5 landed: ..." for a count the game cut short after hits that landed (round 89). */
+/** "Forced 10 hits had no effect: ...", or "Forced 10 hits, 5 landed: ..." for a count the game cut short after hits that landed. */
 const noEffectText = (report: DieReport, words: DieWords): string =>
   `Forced ${noun(report, words)}${report.landed === undefined ? ' had no effect' : `, ${report.landed} landed`}${report.reason ? `: ${report.reason}` : ''}`;
 
-/** The lines that open the next action or end the turn (the simulator's protocol; the dice module's reports read the same ones). */
 function startsAction(line: string): boolean {
   const type = line.split('|')[1];
   if (line === '|') return true;
@@ -76,7 +71,6 @@ function startsAction(line: string): boolean {
 
 const endsTurn = (line: string): boolean => ['upkeep', 'turn', 'win', 'tie'].includes(line.split('|')[1]);
 
-/** The shown-log index of a battle-log index inside the turn: one line for each split triple and each plain line before it. */
 function shownIndex(window: TurnWindow, battleIndex: number): number {
   let count = 0;
   for (let index = window.battleStart; index < battleIndex; count++) {
@@ -91,9 +85,9 @@ function firstFrom(log: readonly string[], from: number, match: (line: string) =
 }
 
 /**
- * Round 89 (F5): the place after the `|-hitcount|` line of the move a count of hits belongs to, in the shown log of the turn. A count
- * the game cut short is read there, next to "The Pokémon was hit 1 time!", and not behind the end-of-turn lines. Nothing when the
- * move shows no hit count (it never ran, or it was blocked).
+ * The place after the `|-hitcount|` line of the move a count of hits belongs to, in the shown log of the turn. A count the game cut
+ * short is read there, next to "The Pokémon was hit 1 time!", and not behind the end-of-turn lines. Nothing when the move shows no
+ * hit count (it never ran, or it was blocked).
  */
 function afterHitCount(window: TurnWindow, name: DieName): number | undefined {
   if (name.kind !== 'hit-count') return undefined;
@@ -137,7 +131,6 @@ export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords
  */
 const asField = (text: string): string => text.replaceAll('|', '\u00a6');
 
-/** The shown log with the display lines in it, each before the line at its index (several lines at one index keep their order). */
 export function withDieLines(log: readonly string[], lines: readonly DieLine[]): readonly string[] {
   if (lines.length === 0) return log;
   const sorted = lines.map((line, order) => ({ ...line, order })).sort((a, b) => a.at - b.at || a.order - b.order);
@@ -153,19 +146,17 @@ export function withDieLines(log: readonly string[], lines: readonly DieLine[]):
 
 type Battle = LiveHit['battle'];
 
-/** What the executor reads before it plays the turn: the lengths of both logs and the names of the bodies that stand there. */
 export interface TurnStart { battleStart: number; shownStart: number; words: DieWords }
 
-/** Read before the turn plays: the dice report counts the battle's log from here, and the names belong to the bodies at the turn's start. */
 export const turnStart = (battle: Battle, shown: readonly string[]): TurnStart =>
   ({ battleStart: battle.log.length, shownStart: shown.length, words: wordsOf(battle) });
 
 /**
- * The part of a history entry that holds the dice of the turn just played, the report, its display lines and its marks for the
- * history row and the share link (step A7c): empty for a turn
- * without a forced die, so the entry keeps today's shape. `waiting` is true while a forced replacement is pending; the turn is still complete when its actions
- * are over (the `|upkeep` line shows it): a body that fainted at the end of the turn asks for a replacement after the last
- * action drew its dice. A switch in the middle of the turn (a pivot move) leaves the rest of the actions to play.
+ * The part of a history entry that holds the dice of the turn just played: the report, its display lines and its marks for the
+ * history row and the share link; empty for a turn without a forced die. `waiting` is true while a forced replacement is pending;
+ * the turn is still complete when its actions are over (the `|upkeep` line shows it): a body that fainted at the end of the turn
+ * asks for a replacement after the last action drew its dice. A switch in the middle of the turn (a pivot move) leaves the rest of
+ * the actions to play.
  */
 export function entryDice(
   report: DiceReport | undefined, start: TurnStart, battle: Battle, shown: readonly string[], waiting: boolean,

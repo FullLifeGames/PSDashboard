@@ -3,17 +3,16 @@ import { foldHitReports } from './branch-dice';
 import { isInterlude } from './variation-turns';
 
 /**
- * Round 82 (forced dice), step A7c, decision 6a: what the history rows and the share links say about the dice the user forced in
- * a turn. A mark is the label of one die (`notationDice`, the words of the chips and the frame lines) and, for a die that took
- * no effect, the report's reason. Marks are sorted to the side that holds the die, and they live on the history entry, computed
- * when the turn plays (the entry has no battle to name the moves with later).
+ * What the history rows and the share links say about the dice the user forced in a turn. A mark is the label of one die
+ * (`notationDice`, the words of the chips and the frame lines) and, for a die that took no effect, the report's reason. Marks are
+ * sorted to the side that holds the die, and they live on the history entry, computed when the turn plays (the entry has no battle
+ * to name the moves with later).
  */
 
 export interface DieMark {
   label: string;
-  /** Set when the die took no effect: the report's reason, empty when the report gave none. */
   noEffect?: string;
-  /** Round 89: the hits that landed when the game cut a forced count short (a die that did something, not "no effect"). */
+  /** The hits that landed when the game cut a forced count short (a die that did something, not "no effect"). */
   played?: number;
 }
 
@@ -21,12 +20,11 @@ export interface DiceMarks { p1: DieMark[]; p2: DieMark[] }
 
 type Side = keyof DiceMarks;
 
-/** The marks of a report: none for a turn without a forced die. */
 export function diceMarksOf(report: DiceReport | undefined, words: DieWords): DiceMarks | undefined {
   if (!report || report.forced.length === 0) return undefined;
   const marks: DiceMarks = { p1: [], p2: [] };
   const folded = foldHitReports(report.forced);
-  // a count says the first hit lands, so the first hit's own mark ("Triple Axel: hits") does not stand beside it (round 89, F5)
+  // a count says the first hit lands, so the first hit's own mark ("Triple Axel: hits") does not stand beside it
   const counted = (entry: DieReport) => entry.took === 'applied' && entry.die.name.kind === 'accuracy' && entry.die.name.hit === undefined && 'happens' in entry.die.result && entry.die.result.happens
     && folded.some(other => other.die.name.kind === 'hit-count' && other.die.name.slot === entry.die.name.slot && other.die.name.moveId === entry.die.name.moveId && (other.die.name.targetSlot === undefined || other.die.name.targetSlot === entry.die.name.targetSlot));
   for (const entry of folded.filter(held => !counted(held))) {
@@ -36,7 +34,6 @@ export function diceMarksOf(report: DiceReport | undefined, words: DieWords): Di
   return marks;
 }
 
-/** The text of a mark in a row or a link: the label, "(3 landed)" for a count the game cut short after three hits, "(no effect)" for a die that took none. */
 export const markText = (mark: DieMark): string =>
   mark.noEffect === undefined ? mark.label : `${mark.label} (${mark.played === undefined ? 'no effect' : `${mark.played} landed`})`;
 

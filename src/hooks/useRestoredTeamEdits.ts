@@ -3,11 +3,9 @@ import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { loadTeamEdits } from '../lib/team-edits-store';
 
 /**
- * Round 89 (T9c): puts the replay's saved editor edit back once the fresh inference exists, before any stored import text applies
- * on top (the import effect of `useTeamKnowledge` runs after the render that restores). The restore is a render-phase reconcile
- * keyed on the replay and its inference, never an effect, and it runs only while nothing was edited in this session: an edit or an
- * import the user made since the load is never overwritten when the inference changes later. A record that fits no inferred team
- * is ignored.
+ * Puts the replay's saved editor edit back once the fresh inference exists, before any stored import text applies on top. A
+ * render-phase reconcile, never an effect; it runs only while nothing was edited in this session, so a later edit or import is
+ * never overwritten. A record that fits no inferred team is ignored.
  */
 export function useRestoredTeamEdits(args: {
   replayId: string | undefined;

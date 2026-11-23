@@ -20,28 +20,24 @@ export interface TeamKnowledgeInputs {
   replayData: ReplayData | null;
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
-  /** The damage judge loaded with the inference (round 67, T130); absent, the enrichment judges no item. */
+  /** The damage judge loaded with the inference; absent, the enrichment judges no item. */
   itemJudge?: ItemDamageJudge | null;
   observations: DamageObservation[];
   speedOrders: SpeedOrderObservation[];
   hpEvidence: HiddenPowerEvidence[];
   usageStats: ReturnType<typeof useSmogonUsageStats>;
   setAssumptions: ReturnType<typeof useSmogonSetAssumptions>;
-  /** Edited team knowledge changes the sim's inputs — App refreshes a live branch. */
   onTeamsEdited: (next: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }) => void;
-  /** The spread solve runs off the main thread (round 38). */
   replayWorker: ReplayWorkerClient;
 }
 
-/** Manual team edits and the editor/sets-panel UI state, reset per replay. */
 function useTeamEdits(replayId: string | undefined, p1Info: OpponentTeamInfo | null, opponentInfo: OpponentTeamInfo | null) {
   const [editedP1Info, setEditedP1Info] = useState<OpponentTeamInfo | null>(null);
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
   const [setsPanelOpen, setSetsPanelOpen] = useState(false);
-  // A freshly loaded replay must start clean: no team edits carried over
-  // from the previous replay (host pages can inject replays repeatedly).
-  // Render-phase adjustment, not an effect (the react-hooks v6+ gate).
+  // A freshly loaded replay starts clean: no team edits carried over from the previous one (host pages can inject replays
+  // repeatedly). A render-phase adjustment, not an effect.
   const [editsReplayId, setEditsReplayId] = useState(replayId);
   if (editsReplayId !== replayId) {
     setEditsReplayId(replayId);
@@ -49,7 +45,6 @@ function useTeamEdits(replayId: string | undefined, p1Info: OpponentTeamInfo | n
     setEditedP2Info(null);
     setEditorSide(null);
   }
-  // Round 89 (T9c): the edit saved in the editor comes back before the stored import text applies on top of it.
   useRestoredTeamEdits({
     replayId, p1Info, opponentInfo, edited: { p1: editedP1Info, p2: editedP2Info }, setEdited: { p1: setEditedP1Info, p2: setEditedP2Info },
   });
@@ -59,7 +54,6 @@ function useTeamEdits(replayId: string | undefined, p1Info: OpponentTeamInfo | n
   };
 }
 
-/** An import's text read and held to both views of the teams: the parsed sides, or the message that stops it. */
 function checkedImport(
   text: string, current: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }, game: ImportGame,
   shown: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null },
@@ -74,14 +68,12 @@ function checkedImport(
   return invalid.length > 0 ? { error: `Nothing was imported. ${invalid.join(' ')}` } : { parsed };
 }
 
-/** Import/export sets text, persisted per replay and re-applied on load. */
 function useSetsIO(args: {
   replayData: ReplayData | null;
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
   effectiveP1Info: OpponentTeamInfo | null;
   effectiveP2Info: OpponentTeamInfo | null;
-  /** The stats view the export reads (round 70, T205): the import holds its values to it too (round 77). */
   shownP1Info: OpponentTeamInfo | null;
   shownP2Info: OpponentTeamInfo | null;
   replayGenNumber: number;
@@ -94,15 +86,11 @@ function useSetsIO(args: {
     setEditedP1Info, setEditedP2Info, onTeamsEdited,
   } = args;
   const pendingStoredSetsRef = useRef<string | null>(null);
-  /** The editor's legal pools of this replay's species (round 77, D5), read by the import's checks once loaded. */
   const poolsRef = useRef<{ replayId: string; pools: EditorPools } | null>(null);
   useEffect(() => {
-    // Sets imported for this replay earlier are re-applied once the fresh
-    // inference is available (see the effect below).
     pendingStoredSetsRef.current = replayData?.id ? readImportText(replayData.id) : null;
   }, [replayData?.id]);
 
-  /** Loads the legal pools the import checks against; a failed load leaves the import with the checks that need no pools. */
   const loadPools = useCallback(async () => {
     if (!replayData || !effectiveP1Info || !effectiveP2Info) return;
     const species = [...effectiveP1Info.pokemon, ...effectiveP2Info.pokemon].map(pokemon => pokemon.species);
@@ -115,9 +103,9 @@ function useSetsIO(args: {
   }, [replayData, effectiveP1Info, effectiveP2Info, replayGenNumber]);
 
   /**
-   * Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. A routed
-   * import (round 89, #105: the sets of a new game belong to its record) hands the checked infos to `route` and applies, stores
-   * and refreshes nothing itself; a side the text leaves out is null there.
+   * Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. A routed import
+   * (the sets of a new game belong to its record) hands the checked infos to `route` and applies nothing itself; a side the text
+   * leaves out is null there.
    */
   const applySetsText = useCallback((text: string, route?: (next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }) => void): string | null => {
     if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
@@ -133,13 +121,12 @@ function useSetsIO(args: {
     try {
       localStorage.setItem(`ps-replay-interceptor:sets:${replayData.id}`, text);
     } catch {
-      // Storage full/blocked — the import still applies for this session.
+      // Storage full/blocked: the import still applies for this session.
     }
     onTeamsEdited({ p1: nextP1, p2: nextP2 });
     return null;
   }, [replayData, effectiveP1Info, effectiveP2Info, shownP1Info, shownP2Info, replayGenNumber, setEditedP1Info, setEditedP2Info, onTeamsEdited]);
 
-  // Re-apply this replay's stored sets once the fresh inference exists.
   useEffect(() => {
     if (!pendingStoredSetsRef.current || !p1Info || !opponentInfo) return;
     const stored = pendingStoredSetsRef.current;
@@ -151,10 +138,9 @@ function useSetsIO(args: {
 }
 
 /**
- * Round 76 (T234): the team editor and the sets panel start from the infos the stats panel shows, and those carry the solved
- * spreads only once a solve has run. A panel that opens before it would show (and an export would write) the usage guesses, and
- * the import would take them as the user's own input. The open waits for the solve (a settled one answers at once; no solve
- * possible, as before the evidence or the Smogon data arrive, opens at once).
+ * The team editor and the sets panel start from the infos the stats panel shows, and those carry the solved spreads only once a solve
+ * has run; a panel that opens earlier would show the usage guesses and the import would take them as the user's own input. The open
+ * waits for the solve (a settled one answers at once; with no solve possible, it opens at once).
  */
 function useOpenAfterSolve(getInferredSpreads: ReturnType<typeof useSpreadSolve>['getInferredSpreads']) {
   return useCallback((open: () => void) => {
@@ -172,14 +158,11 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const { hpResolverFor, replayGenNumber } = useHpResolver(replayData, hpEvidence, usageStats);
   const sheetTeams = useSheetTeams(replayData);
 
-  // Both sides enrich together: each open item is judged against the hits it dealt into the other side as the
-  // panel builds it (round 67, T130), and the build reads these same infos.
   const enriched = useMemo(() => {
     const empty = { pokemon: [] };
     const inferred = { p1: p1Info ?? empty, p2: opponentInfo ?? empty };
-    // Round 88 (F, #101): a side of a game without team preview that showed fewer bodies than its `|teamsize|` gets the pasted bodies
-    // it lacks, then stand-ins from the format's teammate statistics, before the enrichment, as buildAppTeams does. Round 89 (#117): a
-    // generated-team format takes them from its random-set file, which the set fetch carries.
+    // A side of a game without team preview that showed fewer bodies than its `|teamsize|` gets the pasted bodies it lacks, then stand-ins
+    // from the format's teammate statistics (a generated-team format: from its random-set file), as buildAppTeams does.
     const randomSets = setAssumptions.assumptions?.randomSets;
     const sized = replayData ? withStandIns(inferred, replayData.log, usageStats.stats, { p1: paste.pastedSets ?? [] }, randomSets) : inferred;
     const both = enrichTeamInfos(sized, usageStats.stats, setAssumptions.assumptions,
@@ -190,7 +173,6 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const effectiveP1Info = useMemo(() => {
     if (edits.editedP1Info) return edits.editedP1Info;
     const base = enriched.p1;
-    // A pasted team overlays the player's side as green "manual" data (G15).
     if (base && paste.pastedSets && paste.pastedSets.length > 0) {
       return applyPastedTeam(base, paste.pastedSets).info;
     }
@@ -228,7 +210,6 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
     editorSide: edits.editorSide,
     setEditorSide: (side: 'p1' | 'p2' | null) => (side ? openAfterSolve(() => edits.setEditorSide(side)) : edits.setEditorSide(null)),
     setsPanelOpen: edits.setsPanelOpen,
-    // The import checks against the editor's pools: they load before the panel opens (a failed load opens it anyway).
     setSetsPanelOpen: (open: boolean) => (open
       ? openAfterSolve(() => void loadPools().then(() => edits.setSetsPanelOpen(true)))
       : edits.setSetsPanelOpen(false)),
@@ -238,9 +219,8 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
 }
 
 /**
- * Round 76 (T234): a solved item can replace the guessed one, and the coherence vetoes read the item (a Choice item drops a guessed
- * status move). The overlay changes the item only, so the moves of such a Pokémon are settled again under the solved item, as the
- * build settles them; the rest of the entry stays as the overlay left it.
+ * A solved item can replace the guessed one, and the coherence vetoes read the item (a Choice item drops a guessed status move), so the
+ * moves of such a Pokémon are settled again under the solved item, as the build settles them.
  */
 function settleMovesUnderSolvedItem(
   shown: OpponentTeamInfo, before: OpponentTeamInfo,
@@ -253,7 +233,6 @@ function settleMovesUnderSolvedItem(
   };
 }
 
-/** Stats-panel team views: sheet knowledge + solved spreads applied. */
 function useTeamStats(args: {
   effectiveP1Info: OpponentTeamInfo | null;
   effectiveP2Info: OpponentTeamInfo | null;
@@ -281,7 +260,6 @@ function useTeamStats(args: {
   return { statsP1Info, statsP2Info, sensitivityTargetsFor };
 }
 
-/** Paste status lines for the loader (match count, ignored-paste warning). */
 function useTeamStatus(args: { paste: ReturnType<typeof useTeamPaste>; p1Info: OpponentTeamInfo | null }) {
   const { paste, p1Info } = args;
   const teamPasteStatus = useMemo(() => {
@@ -299,11 +277,8 @@ function useTeamStatus(args: { paste: ReturnType<typeof useTeamPaste>; p1Info: O
   return { teamPasteStatus, teamPasteError: paste.teamPasteParseError || teamPasteMismatch };
 }
 
-/**
- * Save from the team editor: apply the edit, write it per replay (round 89, T9c), close the editor, refresh. The record holds every
- * edited side, an import's included, so it replaces the stored import text: a reload restores the record and nothing is left to
- * apply on top.
- */
+/** Save from the team editor: the record holds every edited side, an import's included, so it replaces the stored import text
+ *  and a reload restores it alone. */
 function useSaveTeam(args: {
   replayId: string | undefined;
   effectiveP1Info: OpponentTeamInfo | null;
