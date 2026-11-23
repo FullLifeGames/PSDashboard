@@ -4,7 +4,7 @@ import { createRootPosition, legalChoices } from '../src/forward-model';
 import { reconstructWithPoints } from './replacement-points';
 
 /**
- * Round 79 (T290): the protocol's request rounds on scripted logs: singles, doubles with one and two slots, both sides at once,
+ * The protocol's request rounds on scripted logs: singles, doubles with one and two slots, both sides at once,
  * a replacement that falls to an entry hazard, and the lines that are no replacement (a pivot, the last body of a side).
  */
 
@@ -77,7 +77,6 @@ describe('onReplacement: the hook at the open request', () => {
     for (const { point, serialized, serializedAgain } of run.points) {
       // Read-only: reading it twice gives the same bytes, and the request is still open when the hook fires.
       expect(serializedAgain).toBe(serialized);
-      // The serialized battle is the open request: a side with forced slots lists switches, a waiting side the wait sentinel.
       const root = createRootPosition(serialized);
       for (const side of ['p1', 'p2'] as const) {
         const choices = legalChoices(root, side).map(option => option.choice);

@@ -7,7 +7,7 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 72 (T256, step 7d): the answers of `protectorStops` are shared per Dex, so a first question on a body is rare. The
+ * The answers of `protectorStops` are shared per Dex, so a first question on a body is rare. The
  * memo is exact only if what a protector's handler reads about a hit is the attack and the HitProtect handlers on the field.
  * This sweep plays every protector of the Dex (the Protect family of dex-facts/protect.ts) against a class of attacks on boards
  * that differ in everything else a handler could read (status, lockedmove, items, abilities, HP, stages, terrain, weather, the
@@ -39,7 +39,6 @@ interface Board { label: string; apply: Mutation }
 
 const monOf = (rules: Rules, species: string, moves: string[]) => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
 
-/** A fresh board: side two's first body hits side one's first body. */
 function freshBoard(rules: Rules): Battle {
   const mine = [monOf(rules, 'Blissey', ['splash'])];
   const theirs = [monOf(rules, 'Shuckle', ['splash'])];
@@ -98,7 +97,6 @@ function handBoards(dex: Battle['dex'], doubles: boolean): Board[] {
   return boards;
 }
 
-/** One board per ability of the Dex on the attacker, then on the defender; one per item with a handler on the attacker. */
 function dexBoards(dex: Battle['dex'], everyItem: boolean): Board[] {
   const boards: Board[] = [];
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
@@ -113,7 +111,6 @@ function dexBoards(dex: Battle['dex'], everyItem: boolean): Board[] {
   return boards;
 }
 
-/** One move per class of what the protectors' handlers read: protect flag, contact, target, category, priority, Z and Max. */
 function attackClasses(dex: Battle['dex']): string[] {
   const seen = new Map<string, string>();
   for (const move of dex.moves.all()) {
@@ -136,7 +133,6 @@ function probeAttacks(dex: Battle['dex']): string[] {
   ].filter((id): id is string => !!id);
 }
 
-/** The simulator's answer: the protector's own handler on a copy of the board, with the copy's bodies and the attack. */
 function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
   const copy = copyOf(battle);
   copy.prng = new FixedDice({});

@@ -8,7 +8,7 @@ import { serializeLiveBattle } from '../src/serialize';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 79 (T290): the replacement points of a replay, twice. `reconstructWithPoints` plays the app's reconstruction of a
+ * The replacement points of a replay, twice. `reconstructWithPoints` plays the app's reconstruction of a
  * fixture with the capture hook on; the specs hold its points to `replacementRounds`, the same points read from the protocol alone.
  */
 
@@ -20,7 +20,7 @@ export interface CapturedPoint { point: ReplacementPoint; serialized: string; se
 /** The app's reconstruction of a fixture up to `targetTurn` (default: past the last turn), with or without the hook. */
 export async function reconstructWithPoints(fixture: string, options: { hook?: boolean; targetTurn?: number } = {}) {
   const replay = loadFixture(fixture);
-  // The app's worker loads the game's mod before it builds the sets (round 75).
+  // The app's worker loads the game's mod before it builds the sets.
   await loadSimMods(getBranchSimulatorFormat(replay));
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });

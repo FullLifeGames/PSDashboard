@@ -4,7 +4,7 @@ import { analyzeReplacements, matchReplacementOption, replacementSpeciesOf, type
 import type { EvalResult, RankedChoice } from '../src/types';
 
 /**
- * Round 79 (T290): the unit of the replacement note. The played pick is found in the engine's ranked list by species (doubles: as
+ * The unit of the replacement note. The played pick is found in the engine's ranked list by species (doubles: as
  * a set over the forced slots), the regret is read off the list, and nothing is graded: the record carries no tier.
  */
 

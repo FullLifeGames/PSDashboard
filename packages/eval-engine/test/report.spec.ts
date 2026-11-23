@@ -35,7 +35,6 @@ describe('game report (multi-turn root cause)', () => {
       mk(3, -0.2, -0.5),
       mk(4, -0.5, -0.7),
     ], names, 'p2');
-    // Scores favor Beta from turn 3 onward, so turn 2's play was decisive.
     expect(report.turningPoint).toBe(2);
     expect(report.summary).toContain('Beta won');
     expect(report.summary).toContain('turn 2');
@@ -131,7 +130,7 @@ describe('game report (multi-turn root cause)', () => {
     expect(report.summary).toContain('Scald');
     expect(report.summary).toContain('switching to Dragapult');
     expect(report.summary).toContain('turn 2');
-    // Round 6: the played move's true odds ground the seed parenthetical.
+    // The played move's true odds ground the seed parenthetical.
     expect(report.summary).toContain('(kills ~43% of the time');
   });
 
@@ -149,7 +148,6 @@ describe('game report (multi-turn root cause)', () => {
       mk(1, 0.1, 0.0, { p1: misplay('Tackle', 'Surf', 0.18) }),
       mk(2, 0.0, -0.2, { p2: misplay('Growl', 'Protect', 0.4, true) }),
       mk(3, -0.2, -0.3, { p1: misplay('Splash', 'Toxic', 0.3), p2: misplay('Leer', 'Recover', 0.2) }),
-      // Below the regret threshold — never listed.
       mk(4, -0.3, -0.35, { p1: misplay('Peck', 'Fly', 0.1) }),
       mk(5, -0.35, -0.5, { p2: misplay('Bite', 'Crunch', 0.25) }),
     ], names, 'p2');
@@ -174,7 +172,6 @@ describe('game report (multi-turn root cause)', () => {
       mk(2, -0.1, -0.4),
       mk(3, -0.4, -0.7),
     ], names, 'p2');
-    // The sack appears as a flagged chip but never as a seed of the loss.
     expect(report.misplays).toHaveLength(1);
     expect(report.misplays[0]).toMatchObject({ turn: 1, side: 'p1', sacrifice: true });
     expect(report.summary).not.toContain('seeds of the loss');
@@ -190,7 +187,7 @@ describe('game report (multi-turn root cause)', () => {
       riskPayoff: payoff,
       riskPaidOff: true,
     });
-    // Round 67 (T59): the read's side holds its ground on the turn (a read on a lost turn leaves the list).
+    // The read's side holds its ground on the turn (a read on a lost turn leaves the list).
     const report = buildGameReport([
       mk(1, 0.3, 0.1, { p2: read('Flip Turn', 0.3, 0.25) }),
       mk(2, 0.1, 0.2),
@@ -275,7 +272,6 @@ describe('game report (multi-turn root cause)', () => {
     // but nine clean turns keep the game off the floor.
     expect(report.accuracy?.p1).toBeLessThan(80);
     expect(report.accuracy?.p1).toBeGreaterThan(30);
-    // p2 never had a graded turn — no number is claimed.
     expect(report.accuracy?.p2).toBeNull();
   });
 
@@ -340,9 +336,9 @@ describe('null-swapped recommendations (round 5)', () => {
 });
 
 /**
- * Round 86 (T304, spec gate 2a): the report's biggest-roll sentence holds both chances of the side that rolled. 562428 turn 11: Tapu
- * Bulu's 80 % Stone Edge missed Ikki, and the winner (p1) stood well ahead after it; a hit would have left it further ahead. 573756
- * turn 73 reads the same way for p2 (the shapes of both scenes, the numbers of the copy's engine score are in test/regression/rolled-copy.spec.ts).
+ * The report's biggest-roll sentence holds both chances of the side that rolled. 562428 turn 11: Tapu Bulu's 80 % Stone Edge missed Ikki,
+ * and the winner (p1) stood well ahead after it; a hit would have left it further ahead. 573756 turn 73 reads the same way for p2 (the shapes
+ * of both scenes, the numbers of the copy's engine score are in test/regression/rolled-copy.spec.ts).
  */
 describe('the biggest roll in the game report (T304)', () => {
   const stoneEdge = {
@@ -391,7 +387,6 @@ describe('luck-report', () => {
 
   describe('T22 report: the luck ledger in two parts', () => {
     test('649664 shape: the rolls hold under half of the ledger, so no "The rolls decided it" and the luck line names only what the rolls gave', () => {
-      // The big swing sits before the favor boundary (turn 4), so it stays in the ledger.
       const report = buildGameReport([
         mk(1, -0.3, -0.1, { chanceDelta: 0.3, rolledFor: forP1 }),
         mk(2, -0.1, -0.2, { chanceDelta: -0.05, rolledFor: none }),
@@ -611,7 +606,6 @@ describe('win-reason-order', () => {
     riskPaidOff: true,
   });
 
-  /** Round 63 (T18): the order of the game report's winner story. */
   describe('T18 point 4: the reads examples read in turn order', () => {
     test('singles, 655336: the bigger payoff on turn 27 is named after the read on turn 13', () => {
       const analyses: TurnAnalysis[] = [];
@@ -623,7 +617,6 @@ describe('win-reason-order', () => {
       }
       const report = buildGameReport(analyses, names, 'p1');
       expect(report.summary).toContain('Alpha won it on reads: Dragon Dance on turn 13 (+16%) and Dragon Claw on turn 27 (+38%).');
-      // The report's read list keeps its own order and content.
       expect(report.reads.map(entry => entry.turn)).toEqual([13, 27]);
     });
 
@@ -638,12 +631,7 @@ describe('win-reason-order', () => {
     });
   });
 
-  /**
-   * Decision 16, the tip sentence: since round 50 a conversion needs the bar
-   * to hold for the winner from its turn on, so it can never name a turn
-   * before the tip. This pins that order: a sweep the bar dropped again is no
-   * conversion, and the report's "From turn N" never precedes "tipped on turn M".
-   */
+  /** A conversion needs the bar to hold for the winner from its turn on, so it never names a turn before the tip: the report's "From turn N" never precedes "tipped on turn M". */
   describe('T18: the conversion never comes before the tip', () => {
     const swept = (species: string): SideAnalysis => ({ ...quietSide(), decided: { species, announce: true } });
 

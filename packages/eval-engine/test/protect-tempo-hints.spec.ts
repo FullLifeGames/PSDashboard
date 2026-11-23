@@ -9,13 +9,10 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 3a): Protect and its kin earn the damage they deny, up to the flinch-sized ceiling of
- * T42's pair term, the way the side protectors do. T42 gave a Protect a tempo only where the foes KO its user together and
- * neither alone; a Protect in front of a lone heavy hit stayed the 0.25 support floor, 16th to 42nd of 42 legal combos in
- * VGC 2630685175 turn 7 (where it was one of the four answers the equilibrium wall stood on). The reading comes from the
- * simulator the same way: the shield's own onTryHit, asked from stand-ins that leave the battle alone. The Protect covers its
- * user only (the partner stands outside it), so only the user's share of a spread hit counts. Both rule sets run it,
- * Scarlet/Violet and Pokémon Champions.
+ * Protect and its kin earn the damage they deny, up to the flinch-sized ceiling of the pair term, the way the side protectors do. A Protect
+ * in front of a lone heavy hit would stay at the 0.25 support floor (VGC 2630685175 turn 7: 16th to 42nd of 42 legal combos). The reading
+ * comes from the simulator: the shield's own onTryHit, asked from stand-ins that leave the battle alone. The Protect covers its user only
+ * (the partner stands outside it), so only the user's share of a spread hit counts. Both rule sets run it, Scarlet/Violet and Pokémon Champions.
  */
 
 await loadSimMods('gen9championsou');
@@ -24,7 +21,6 @@ interface Rules {
   name: string;
   format: string;
   level: number;
-  /** Champions reads the sets' evs as Stat Points. */
   evs?: PokemonSet['evs'];
 }
 
@@ -34,15 +30,13 @@ const RULES: Rules[] = [
 ];
 
 const SUPPORT_FLOOR = 0.25;
-/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS, the T42 pair term). */
+/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS). */
 const CEILING = 0.3;
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
 const hintOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => combinedOptionHints(rootOf(battle), side, [option(choice)])[0];
-/** The tempo a Protect part earns over the idle pair: the hint of `<protector>, splash` minus the two support floors. */
 const tempoOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => hintOf(battle, side, choice) - 2 * SUPPORT_FLOOR;
 const aimedAt = (battle: Battle, moveId: string) => (['normal', 'any', 'adjacentFoe'].includes(battle.dex.moves.get(moveId).target) ? ' 1' : '');
-/** A move a battle can use: real, not a Max or Z move, not from a later game. */
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 
 describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
@@ -59,7 +53,6 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
     if (hp !== undefined) battle.sides[0].active[0]!.sethp(hp);
     return battle;
   }
-  /** Whether p1's slot 1 faints when p1 opens with `shield` and p2's Garchomp uses `attack` at a 1-HP body. */
   function faintsInSim(shield: string, attack: string): boolean {
     const battle = board(shield, attack, 1);
     battle.choose('p1', 'move 1, move 1');
@@ -75,7 +68,6 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
 
   describe('Protect earns the damage it denies, up to a flinch (extends T42)', () => {
     test('a heavy single-target hit: the simulator turns it away, the hint earns the ceiling', () => {
-      // From the simulator: at 1 HP a Dragon Claw KOs the user, a Protect turns it away.
       expect(faintsInSim('splash', 'dragonclaw')).toBe(true);
       expect(faintsInSim('protect', 'dragonclaw')).toBe(false);
       const battle = board('protect', 'dragonclaw', undefined, 'Pikachu');
@@ -108,7 +100,6 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
       const denied = deniedBy(battle, 'rockslide', true);
       expect(denied).toBeGreaterThan(0);
       expect(tempoOf(battle, 'p1', choice('protect'))).toBeCloseTo(Math.min(CEILING, denied), 10);
-      // The partner's far larger share (a Pikachu under the same hit) stays outside the shield.
       const partner = battle.sides[0].active[1]!;
       const partnerShare = Math.min(singleMoveFraction(battle.sides[1].active[0]!, partner, 'rockslide', battle) * 0.75, partner.hp / partner.maxhp);
       expect(partnerShare).toBeGreaterThan(denied);
@@ -144,7 +135,6 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
       const snorlax = pair.sides[0].active[0]!;
       const hit = singleMoveFraction(pair.sides[1].active[0]!, snorlax, 'dragonclaw', pair);
       expect(hit).toBeGreaterThan(0);
-      // Set the HP just under two hits and over one.
       snorlax.sethp(Math.floor(snorlax.maxhp * hit * 1.35));
       expect(tempoOf(pair, 'p1', choice('protect'))).toBeCloseTo(CEILING, 10);
     });
@@ -185,7 +175,6 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
       expect(probes.length).toBeGreaterThanOrEqual(5);
       const seen = probes.map(probe => `${probe} ${stoppedInSim(shield, probe)}`);
       expect(probes.map(probe => `${probe} ${readStops(shield, probe)}`)).toEqual(seen);
-      // The class is real: each shield stops something and lets something through.
       expect(seen.some(line => line.endsWith('true'))).toBe(true);
       expect(seen.some(line => line.endsWith('false'))).toBe(true);
     });

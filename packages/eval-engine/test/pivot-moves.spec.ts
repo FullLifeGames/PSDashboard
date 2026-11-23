@@ -12,14 +12,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 70 (N1): two hand lists of eight names (played.ts, search/options.ts) said which moves hand the user a switch, and
- * both held Teleport for every generation. The Dex sets `selfSwitch` on Teleport from Gen 8 on only; before that it switches
- * nobody (Gen 4 to 7 write `|-fail|`, Gen 1 to 3 write nothing). Revival Blessing carries `selfSwitch` too, but its request
- * revives a fainted ally. The reading now comes from
- * the Dex (pivot-moves.ts) and this sweep plays every move of every generation and the Champions mod against the simulator:
- * a lead with a living and a fainted bench body uses the move, and the move is a pivot when the battle then asks for a
- * switch of the living lead and accepts a living body. The root matrix and the played-action parser are held to the same
- * answers on the simulator's own logs.
+ * The Dex sets `selfSwitch` on Teleport from Gen 8 on only; before that it switches nobody (Gen 4 to 7 write `|-fail|`, Gen 1 to 3 write
+ * nothing). Revival Blessing carries `selfSwitch` too, but its request revives a fainted ally. The sweep plays every move of every
+ * generation and the Champions mod against the simulator: a lead with a living and a fainted bench body uses the move, and the move is a
+ * pivot when the battle then asks for a switch of the living lead and accepts a living body. The root matrix and the played-action parser
+ * are held to the same answers on the simulator's own logs.
  */
 
 await loadSimMods('gen9championsou');
@@ -62,7 +59,6 @@ function scene(rules: Rules, moveId: string, doomed = false): Battle {
   return battle;
 }
 
-/** The simulator's answer: the lead stays alive, the battle asks p1 for a switch, and it accepts the living bench body. */
 function simPivots(rules: Rules, moveId: string): boolean {
   const battle = scene(rules, moveId);
   battle.choose('p1', 'move 1');
@@ -110,7 +106,6 @@ describe.each(RULES)('$name: every move played against the Dex reading (round 70
     test('doubles: the same moves pivot, so the reading holds for both game types', () => {
       const answers = moves.map(move => ({ id: move.id, answer: simPivotsInDoubles(rules, move.id) }));
       expect(answers.filter(entry => entry.answer).map(entry => entry.id).sort()).toEqual([...PIVOTS[rules.name]].sort());
-      // A move the battle refuses at this setup is no pivot of the reading either.
       expect(answers.filter(entry => entry.answer === null && isPivotMove(dex, entry.id)).map(entry => entry.id)).toEqual([]);
     });
   }
@@ -156,7 +151,7 @@ describe('the played-action parser names no move the simulator never pivots with
   const targetAfter = (rules: Rules, name: string, between: string[]) =>
     parsePlayedActions([`|move|p1a: Snorlax|${name}|p2a: Chansey`, ...between, '|switch|p1a: Blissey|Blissey|100/100'], gameOf(rules)).p1?.pivotTarget;
 
-  // Round 75 (T160): the parser reads the Dex of the log's generation and mod, so the census is per generation.
+  // The parser reads the Dex of the log's generation and mod, so the census is per generation.
   describe.each(RULES)('$name', rules => {
     const every = movesOf(rules, scene(rules, 'tackle'));
 

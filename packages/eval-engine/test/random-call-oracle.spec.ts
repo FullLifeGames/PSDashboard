@@ -3,10 +3,9 @@ import { randomCallMoves } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 6, FINDING W1: `RANDOM_CALL_MOVES` in ko-odds.ts (read by search/leaf.ts and cell-blend.ts, and by
- * pair/guards.ts through the same export) holds the moves whose result depends on a move chosen elsewhere, so the one-turn
- * model refuses to price them. The Dex marks them with `callsMove`: seven moves, where the hand list named four (Sleep Talk,
- * Metronome, Assist, Copycat) and missed Mirror Move, Me First and Nature Power (Past in Generation 9, live in Generations 3 to 7).
+ * `RANDOM_CALL_MOVES` in ko-odds.ts (read by search/leaf.ts, cell-blend.ts and pair/guards.ts) holds the moves whose result depends on a
+ * move chosen elsewhere, so the one-turn model refuses to price them. The Dex marks them with `callsMove`: seven moves (Sleep Talk,
+ * Metronome, Assist, Copycat, Mirror Move, Me First and Nature Power; Nature Power is Past in Generation 9, live in Generations 3 to 7).
  * In every view the corpus plays:
  *  - the moves the Dex marks `callsMove`, over all views, are the set (derived from the Dex, no hand list);
  *  - each of them is played, and the simulator writes a `|move|` line "[from] move: <its name>" for the move it called;
@@ -21,7 +20,6 @@ const real = (view: SimView, id: string): boolean => {
 const callers = (view: SimView): string[] => view.dex.moves.all()
   .filter(move => real(view, move.id) && (move as unknown as { callsMove?: boolean }).callsMove).map(move => move.id);
 
-/** Whether a turn of the move, with the user ahead of or behind the foe (three seeds), writes the line of a move it called. */
 function calls(view: SimView, id: string): boolean {
   const name = view.dex.moves.get(id).name;
   const { target, sleepUsable } = view.dex.moves.get(id);
@@ -38,7 +36,6 @@ function calls(view: SimView, id: string): boolean {
   return false;
 }
 
-// Round 75 (T160): the set is the view's own Dex's (randomCallMoves), not a global one.
 describe('randomCallMoves is held to the simulator (round 72)', () => {
   test('the sets are every move the Dex marks callsMove, over all views', () => {
     const marked = [...new Set(ALL_VIEWS.flatMap(callers))].sort();

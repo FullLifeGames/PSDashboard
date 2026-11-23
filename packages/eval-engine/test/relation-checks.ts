@@ -5,7 +5,7 @@ import { createMatchupCache, evaluatePosition, type StaticRuleset } from '../src
 import { copyOf, FixedDice } from '../src/sim-ask/index';
 
 /**
- * Round 72 (T240): the relation checks on search-made leaves. A relation is a
+ * The relation checks on search-made leaves. A relation is a
  * statement about the static score that holds on any board, whatever the
  * search built: own HP down never raises it, foe HP down never lowers it, a
  * stage on a body that cannot act adds nothing, and swapped sides negate.
@@ -26,7 +26,6 @@ export interface ManifestEntry {
 }
 
 export interface RelationSubject extends ManifestEntry {
-  /** 'root' for the fixture's own position, else the pair of choices that made the leaf. */
   kind: 'root' | 'leaf';
   /** The fixture file's name without folder and extension: one per manifest entry, shared by a root and its leaves. */
   position: string;
@@ -42,19 +41,17 @@ export interface Violation {
   detail: string;
   /** The size of the break in score units (an HP series: the break over the step of 10 % of the maximum HP). */
   size: number;
-  /** An HP series: the largest wrong-way change of the score at one HP point inside the broken step (T248, design gate 2a). */
+  /** An HP series: the largest wrong-way change of the score at one HP point inside the broken step. */
   jump?: number;
-  /** The body that changed: its side, its index in side.pokemon and the HP before and after (HP series only). */
   body?: { side: 0 | 1; index: number; fromHp: number; toHp: number };
 }
 
 /** The tolerance of every relation: the residuals are floating-point noise (largest measured on the roots: 1.7e-16). */
 export const TOLERANCE = 1e-9;
 
-/** T248, design gate 2a: a wrong-way change of the score at one HP point above this is a break that goes; a smaller slope stays as an expected failure with its reason. */
+/** A wrong-way change of the score at one HP point above this is a break that goes; a smaller slope stays as an expected failure with its reason. */
 export const JUMP_LIMIT = 1e-3;
 
-/** The static evaluation the engine ships, with a fresh matchup cache per call. */
 export const realEvaluator: Evaluator = (battle, ruleset) => evaluatePosition(battle, createMatchupCache(ruleset));
 
 const FIXTURES = new URL('./fixtures/', import.meta.url);
@@ -69,10 +66,7 @@ export const readSerialized = (entry: ManifestEntry): string =>
 export const reviveBattle = (serialized: string, ruleset: StaticRuleset): Battle =>
   positionBattle(createRootPosition(serialized, ruleset));
 
-/**
- * The same battle with the two sides exchanged: p1's side becomes p2's, with its index and id. The helper changes
- * the revived battle in place and swaps back on a second call.
- */
+/** The same battle with the two sides exchanged (p1's side becomes p2's, with its index and id), in place: a second call swaps back. */
 export function swapSides(battle: Battle): Battle {
   const [first, second] = battle.sides;
   const sides = battle.sides as unknown as Battle['sides'] & { [i: number]: typeof first };
@@ -87,7 +81,6 @@ export function swapSides(battle: Battle): Battle {
   return battle;
 }
 
-/** The first, the middle and the last of a list, or all of it when it holds three or fewer. */
 export function pickByStride<T>(items: readonly T[], count = 3): T[] {
   if (items.length <= count) return [...items];
   const picks = new Set<number>();
@@ -103,10 +96,6 @@ export interface SweepResult {
   ended: number;
 }
 
-/**
- * The one-ply sweep: three legal choices per side picked by stride, every pair advanced under the fixed seed. A
- * root without a choice for a side (a request that waits) has no leaves.
- */
 export function sweepLeaves(root: RelationSubject, perSide = 3): SweepResult {
   const position = createRootPosition(root.serialized, root.ruleset);
   const p1 = pickByStride(legalChoices(position, 'p1'), perSide);
@@ -127,7 +116,6 @@ export function sweepLeaves(root: RelationSubject, perSide = 3): SweepResult {
   return { leaves, ended };
 }
 
-/** The fixture file's name without folder and extension: one per manifest entry, shared by a root and its leaves. */
 export const positionName = (entry: ManifestEntry): string => entry.file.split('/').pop()!.replace(/(\.position)?\.json$/, '');
 
 export const rootSubject = (entry: ManifestEntry): RelationSubject => ({
@@ -136,10 +124,7 @@ export const rootSubject = (entry: ManifestEntry): RelationSubject => ({
 
 const HP_STEPS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] as const;
 
-/**
- * The largest wrong-way change of the score at one HP point when the body goes down from `fromHp` to `toHp` one point at
- * a time (the score of p1 rises as p1's body loses HP, or falls as p2's body loses HP). The body ends at `toHp`.
- */
+/** The largest wrong-way change of the score at one HP point as the body goes from `fromHp` down to `toHp` one point at a time. */
 function largestJump(
   battle: Battle, mon: Pokemon, subject: RelationSubject, evaluate: Evaluator, side: 0 | 1, fromHp: number, toHp: number,
 ): number {
@@ -175,7 +160,6 @@ function hpSeriesViolations(
         if (hp >= previousHp) continue;
         mon.hp = hp;
         const score = evaluate(battle, subject.ruleset);
-        // Own HP down must not raise the score; foe HP down must not lower it (p1's view).
         const delta = side === 0 ? score - previous : previous - score;
         if (delta > TOLERANCE) {
           const jump = largestJump(battle, mon, subject, evaluate, side, previousHp, hp);
@@ -198,11 +182,10 @@ function hpSeriesViolations(
 export const ownHpDown = (subject: RelationSubject, evaluate: Evaluator): Violation[] =>
   hpSeriesViolations(subject, evaluate, 0, 'ownHpDown');
 
-/** R2: a p2 body with less HP never makes p1's score lower (the r69 monotony probe, T199 in VGC). */
+/** R2: a p2 body with less HP never makes p1's score lower. */
 export const foeHpDown = (subject: RelationSubject, evaluate: Evaluator): Violation[] =>
   hpSeriesViolations(subject, evaluate, 1, 'foeHpDown');
 
-/** The stages the relation gives a fainted body: attack, special attack and speed at +2. */
 const IDLE_BOOSTS = { atk: 2, spa: 2, spe: 2 } as const;
 
 /** R3: a fainted body (it cannot act) carrying stages leaves the score as it was. */
@@ -231,20 +214,18 @@ export function idleStage(subject: RelationSubject, evaluate: Evaluator): Violat
   return violations;
 }
 
-/** The stats the relation raises by 4 on an active body that every foe in front KOs before it acts (speed untouched), where the body stands on no stage: a stage it holds already is not overwritten. */
+/** The stats raised by 4 on an active body that every foe in front KOs before it acts (speed untouched); a stage it holds already is not overwritten. */
 const IDLE_ACTIVE_STATS = ['atk', 'spa'] as const;
 
-/** The share of the maximum HP the body is left with: low enough that one hit of a foe in front decides. */
 const IDLE_HP_SHARE = 0.05;
 
 /** The quantile of the damage roll that is the lowest roll of the simulator (random(16) answers 15), and no critical hit. */
 const LOW_ROLL = { quantile: 0.99, chance: false } as const;
 
 /**
- * T249 (round 73): whether the foe moves before the body and one hit of a move it can click takes the body's HP, asked
- * of the simulator on a copy of the battle. The order is the simulator's: the best priority of a damaging move of each
- * (the Dex), then the action speed (Trick Room is in it). The hit is the simulator's damage step at the lowest roll
- * without a critical hit, for a move that always hits one target; a Choice lock leaves the locked move, and a move
+ * Whether the foe moves before the body and one hit of a move it can click takes the body's HP, asked of the simulator on a copy of the
+ * battle: the best priority of a damaging move of each (the Dex), then the action speed (Trick Room is in it); the hit is the damage step
+ * at the lowest roll without a critical hit, for a move that always hits one target; a Choice lock leaves the locked move, and a move
  * without PP is not clicked.
  */
 function koesFirst(battle: Battle, foe: Pokemon, body: Pokemon): boolean {
@@ -274,7 +255,6 @@ function koesFirst(battle: Battle, foe: Pokemon, body: Pokemon): boolean {
   });
 }
 
-/** The active bodies of a side that every foe in front KOs first at the HP the relation gives them: the subjects of R3b. */
 export function idleActiveBodies(battle: Battle, side: 0 | 1): Pokemon[] {
   const foes = battle.sides[1 - side].active.filter((mon): mon is Pokemon => !!mon && mon.hp > 0);
   if (foes.length === 0) return [];

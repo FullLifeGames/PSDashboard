@@ -16,24 +16,20 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 88 (T336, #72): the prover lets the class in which a secondary effect fired take the proof of the class in which it did not,
- * when the effect only helps the side that moved (`endgame/prover-helping.ts`). The rule reads the positions the cell drew, never a name,
- * so the sweep holds it against the simulator: for every Dex move with a boost entry under 100 percent (a drop on the foe, a gain
- * for the user), in every generation and mod the corpus plays, the cell is drawn through `endgameChildren` and the fired class is
- * compared with the unfired one. Oracle: the Dex entry. The fired position must be the unfired one with exactly the entry's stages
- * added (the boost lines that landed), and the reading says "only helps the mover" exactly when no Speed stage moved (Trick Room, Gyro
- * Ball and Electro Ball turn a slower foe into a gain for it). The reactors are rows: a target with Defiant, Competitive, Contrary or
- * Mirror Armor, a White Herb or an Eject Pack answers the drop with a change the Dex entry does not carry, so the classes keep their
- * proofs; an Opportunist or a Mirror Herb copies the user's gain; a Contrary user turns its gain into a drop. Doubles: the cell fold
- * refuses a combined choice (`planCellEvents`), so a doubles cell draws no class and the rule never reaches it; the sweep holds that
- * for the same moves. Every question leaves the battles it reads standing (`standing`).
+ * The prover lets the class in which a secondary effect fired take the proof of the class in which it did not, when the effect only helps
+ * the side that moved (`endgame/prover-helping.ts`). The rule reads the positions the cell drew, never a name; the sweep holds it to the Dex
+ * entry for every move with a boost entry under 100 percent, in every generation and mod the corpus plays: the fired position is the unfired
+ * one plus exactly the entry's stages, and the reading says "only helps the mover" exactly when no Speed stage moved (Trick Room, Gyro Ball
+ * and Electro Ball turn a slower foe into a gain for it). The reactors are rows: Defiant, Competitive, Contrary, Mirror Armor, a White Herb or
+ * an Eject Pack answer the drop with a change the Dex entry does not carry, so the classes keep their proofs; an Opportunist or a Mirror Herb
+ * copies the user's gain; a Contrary user turns its gain into a drop. In doubles the cell fold refuses a combined choice (`planCellEvents`),
+ * so no class is drawn and the rule never reaches it; the sweep holds that for the same moves.
  */
 await loadSimMods('gen9championsou');
 
 type Entry = { chance?: number; boosts?: Record<string, number>; self?: { boosts?: Record<string, number> } };
 interface Reading { effectId: string; target: Record<string, number>; self: Record<string, number> }
 
-/** The entries of a move that draw a die and change boosts, as the Dex states them. */
 function boostEntries(move: DexMove): Reading[] {
   const raw = move as unknown as { secondaries?: Entry[] | null; secondary?: Entry | null };
   const entries = raw.secondaries ?? (raw.secondary ? [raw.secondary] : []);
@@ -70,7 +66,6 @@ function classesOf(cell: EndgameChildren) {
   return { plain, fired };
 }
 
-/** The stages the fired class must show over the unfired one by the Dex: the entries that came true, clamped to the game's range. */
 function expectedStages(from: Record<string, number>, change: Record<string, number>): Record<string, number> {
   const next = { ...from };
   for (const [stat, by] of Object.entries(change)) next[stat] = Math.max(-6, Math.min(6, (next[stat] ?? 0) + by));
@@ -78,9 +73,8 @@ function expectedStages(from: Record<string, number>, change: Record<string, num
 }
 
 /**
- * Whether the positions differ in nothing but the stages of the bodies and the roll's facts (the oracle's half of "only the boost lines
- * landed"). Round 89 (#148): the roll's facts hold the damage and the critical hit the roll drew (`moveHitData`, which the simulator reads
- * only inside the move that made it; `moveHitDataIsMoveLocal` below holds that claim against the Dex).
+ * Whether the positions differ in nothing but the stages of the bodies and the roll's facts (the damage and the critical hit the roll
+ * drew: `moveHitData`, which the simulator reads only inside the move that made it; `moveHitDataIsMoveLocal` below holds that claim).
  */
 function sameButStages(unfired: Battle, fired: Battle): boolean {
   const drop = new Set(['hp', 'lastDamage', 'hurtThisTurn', 'damage', 'damageValue', 'totalDamage', 'boosts', 'log', 'inputLog', 'messageLog', 'sentLogPos', 'sentRequests', 'prng', 'prngSeed', 'turn', 'lastMoveLine', 'hints', 'effectOrder', 'quickClawRoll', 'speed', 'speedOrder', 'moveHitData']);
@@ -128,7 +122,6 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class (ro
         const unfired = positionBattle(cell.children[plain].position);
         const firedBattle = positionBattle(child.position);
         const want = (side: 0 | 1, pick: (entry: Reading) => Record<string, number>) => expectedStages(stagesOf(unfired, side), Object.assign({}, ...named.map(pick)));
-        // the simulator shows exactly the boost lines of the Dex entry: this foe has no ability or item that answers
         expect(`${move.id} ${child.key} user ${JSON.stringify(stagesOf(firedBattle, 0))}`).toBe(`${move.id} ${child.key} user ${JSON.stringify(want(0, entry => entry.self))}`);
         expect(`${move.id} ${child.key} foe ${JSON.stringify(stagesOf(firedBattle, 1))}`).toBe(`${move.id} ${child.key} foe ${JSON.stringify(want(1, entry => entry.target))}`);
         expect(`${move.id} ${child.key} same ${sameButStages(unfired, firedBattle)}`).toBe(`${move.id} ${child.key} same true`);
@@ -146,11 +139,9 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class (ro
   });
 
   /**
-   * Round 89 (#148): the critical hit is a fact of the roll, like the damage, and sits outside the class model (the prover answers
-   * "barring a crit", `prover.ts`). The fired class and the unfired class are drawn through `drawChild` with the die forced, all four
-   * pairings of crit and no crit: the positions must differ in the stages the Dex entry names and in nothing else, and the rule must
-   * read "only helps the mover" as the Dex does, whichever child rolled the crit. A seed lets no child crit by luck; this row does not
-   * lean on one.
+   * The critical hit is a fact of the roll, like the damage, and sits outside the class model (the prover answers "barring a crit",
+   * `prover.ts`). Both classes are drawn through `drawChild` with the die forced, all four pairings of crit and no crit: the positions
+   * differ in the stages the Dex entry names and in nothing else, and the reading follows the Dex whichever child rolled the crit.
    */
   if (mode === 'singles') test('every move, the crit forced both ways in each class: the reading follows the Dex', () => {
     let witnessed = 0;
@@ -224,7 +215,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     return rule.exists && (rule.isNonstandard === null || rule.isNonstandard === undefined) && (reactor.on === 'foe' || rules.generation >= 3);
   };
 
-  /** `benchLevel` moves the bench body's level only: another position, so another cell seed (round 89, #148). */
+  /** `benchLevel` moves the bench body's level only: another position, so another cell seed. */
   const playRow = (reactor: Reactor, kind: 'drop' | 'gain', benchLevel?: number): void => {
     const move = kinds[kind];
     const holder = { ...(reactor.ability ? { ability: reactor.ability } : {}), ...(reactor.item ? { item: reactor.item } : {}) };
@@ -235,7 +226,6 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     const battle = battleOf(rules.singles, [user], [foe, bench]);
     const { cell } = drawCell(battle, 'singles', move!);
     const { plain, fired } = classesOf(cell);
-    // Gens 1 and 2 draw no class; from Gen 3 every row must play a fired class, or it proves nothing
     if (rules.generation < 3) { expect(cell.plain).toBe(true); return; }
     expect(`${reactor.name} ${move!.id} fired ${fired.length > 0 && plain >= 0}`).toBe(`${reactor.name} ${move!.id} fired true`);
     const sources = helpedSources(cell, 'p1');
@@ -245,7 +235,6 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
       const expected = reactor[kind];
       expect(`${reactor.name} ${move!.id} ${child.key} ${onlyHelpsMover(unfired, firedBattle, 'p1')}`).toBe(`${reactor.name} ${move!.id} ${child.key} ${expected}`);
       expect(`${reactor.name} ${move!.id} ${child.key} source ${sources[index] >= 0}`).toBe(`${reactor.name} ${move!.id} ${child.key} source ${expected}`);
-      // a row that expects "no" must show the answer in the simulator's own position, or it proves nothing
       if (!expected) expect(sameButStages(unfired, firedBattle) && JSON.stringify(stagesOf(firedBattle, 1)) === JSON.stringify(stagesOf(unfired, 1)) && JSON.stringify(stagesOf(firedBattle, 0)) === JSON.stringify(stagesOf(unfired, 0))).toBe(false);
     }
   };
@@ -256,11 +245,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     }
   }
 
-  /**
-   * Round 89 (#148): the control rows over eight boards that differ in the bench body's level only. Each board is another position,
-   * so the cell draws other seeds, and a seed that lands a crit on a representative child must not change the reading: the old rows
-   * played one seed per board and passed or failed by luck when the cell's seeds changed (round 89, A5).
-   */
+  /** The control rows over eight boards that differ in the bench body's level only: a seed that lands a crit on a representative child must not change the reading. */
   const control = REACTORS[0];
   for (const kind of ['drop', 'gain'] as const) {
     for (let level = 0; level < 8; level++) {
@@ -274,7 +259,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
 });
 
 /**
- * Round 89 (#148): the claim behind the crit as a roll fact. A move's `moveHitData` (the crit, the type modifier, the bypass of
+ * The claim behind the crit as a roll fact. A move's `moveHitData` (the crit, the type modifier, the bypass of
  * Protect) is a record of ONE hit: the simulator writes it while the move runs and reads it through `Pokemon.getMoveHitData(move)`
  * with the move in progress, so after the turn nothing reads it and the helping rule may strip it from its comparison (a comment
  * would not hold that; these rows do).

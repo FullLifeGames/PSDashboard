@@ -36,7 +36,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
   return battle;
 }
 
-/** Sets every listed body to `hp` (slot order per side) and serializes. */
 function serializeAt(battle: Battle, hp: { p1?: number[]; p2?: number[] }): string {
   for (const side of ['p1', 'p2'] as const) {
     (hp[side] ?? []).forEach((value, index) => { battle.sides[side === 'p1' ? 0 : 1].pokemon[index].hp = value; });
@@ -60,10 +59,9 @@ describe('forced-win prover (round 35)', () => {
   });
 
   test('a stalling first candidate no longer starves the second: the sure strike goes first, whatever the ranking says', () => {
-    // Round 89 (A5f-7): no greedy scout filters the stalling line out. Round 89 (P3): the position has a sure strike (Seismic Toss
-    // kills the Chansey at 1 HP, and the Chansey has no damaging move), which the proof tries before the ranking and on cells of
-    // its own, so Splash first reads the win the Toss-first ranking reads, at the same cells. The budget no longer decides
-    // between the two orders in this position; the next row holds a position where the ranking still decides.
+    // No greedy scout filters the stalling line out. The position has a sure strike (Seismic Toss kills the Chansey at 1 HP, and the Chansey
+    // has no damaging move), which the proof tries before the ranking and on cells of its own, so Splash first reads the win the Toss-first
+    // ranking reads, at the same cells; the next row holds a position where the ranking still decides.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled', 'Recover'])],
@@ -123,7 +121,7 @@ describe('forced-win prover (round 35)', () => {
 
   test('a position without a line costs the proof its budget and no more', () => {
     // Protect and Substitute on both sides: no line ends, so the full proof refutes the candidates inside the cell and state
-    // budgets and proves nothing (round 89, A5f-7: no greedy scout stops it first).
+    // budgets and proves nothing.
     const serialized = serializeAt(makeBattle(
       [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
       [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
@@ -287,10 +285,9 @@ describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () =
     expect(proof.caveat).toBe('sampled-rolls');
   });
 
-  // Round 89, final gate (B3a): Champions VGC 2694684816 turn 8 found a proof of mass 1 in 3 turns before A5's priced dice; now 36 of the 100
-  // cells are unpriced faint splits and the production budget ends with no proof (mass 0). Whether the win is certain by the game is open:
-  // the pricing of a split that follows a crit is #155 and the class plan's read of slot a with one body per side is #156 (both 1.3.0). The
-  // row turns red when either lands; the pin then moves to the proof it finds.
+  // Champions VGC 2694684816 turn 8: 36 of the 100 cells are unpriced faint splits and the production budget ends with no proof (mass 0).
+  // Whether the win is certain by the game is open: the pricing of a split that follows a crit, and the class plan's read of slot a with one
+  // body per side. The row turns red when either lands; the pin then moves to the proof it finds.
   test('doubles, Champions VGC 2694684816 turn 8: no proof within the production budget (#155, #156)', async () => {
     const board = scene('scout-miss-gen9championsvgc2026regmc-2694684816-t8');
     await loadSimMods('gen9championsdoublescustomgame');
@@ -324,7 +321,6 @@ describe('forced-win-doubles-replies', () => {
 
   const SEEDS: PRNGSeed[] = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20]];
 
-  /** Turns in which `choice` ends the game for p1 against `reply`, over five seeds. */
   function p1WinsThisTurn(serialized: string, choice: string, reply: string): number {
     return SEEDS.filter(seed => {
       const battle = deserializeBattleExact(serialized);
@@ -381,8 +377,8 @@ describe('forced-win-doubles-replies', () => {
       const protect = replies.find(reply => reply.label === 'Astral Barrage + Protect');
       expect(protect).toBeDefined();
       expect(p1WinsThisTurn(board.serialized, line, protect!.choice)).toBe(0);
-      // The full proof runs for the three ranked lines against every legal reply (round 89, A5f-7: no greedy scout before it), and
-      // Zamazenta's Protect escapes each of them, so the proof holds no mass.
+      // The full proof runs for the three ranked lines against every legal reply, and Zamazenta's Protect escapes each of them, so the proof
+      // holds no mass.
       const proof = proveForcedWin(root, { side: 'p1', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
       expect(proof.mass).toBe(0);
     });
@@ -393,7 +389,6 @@ describe('forced-win-doubles-replies', () => {
       const replies = legalChoices(root, 'p1', { tera: board.tera });
       expect(replies).toHaveLength(42);
       const request = { side: 'p2' as const, rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause };
-      // The production call: the full proof starts for the first three lines of the ranking, and every one is refuted.
       expect(board.rootOrder[0]).toBe('move knockoff 1, move heatwave');
       const proof = proveForcedWin(root, request);
       expect(proof.mass).toBe(0);
@@ -444,7 +439,6 @@ describe('plain-dice-scenes', () => {
   }
   const scene = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/forced-win/plain-dice-${name}.json`, import.meta.url), 'utf-8')) as Scene;
 
-  /** One root candidate by itself with the production budget (the proving move of a scene that A5f5's scout proved). */
   function alone(board: Scene) {
     const root = createRootPosition(board.serialized, board.ruleset);
     const prover = new Prover(board.side, { tera: board.tera, sleepClause: board.sleepClause, ruleset: board.ruleset }, { ...PROVER_BUDGET }, { states: 0, cells: 0 });
@@ -486,7 +480,6 @@ describe('plain-dice-scenes', () => {
       await loadSimMods('gen9doublescustomgame');
       const { cells } = alone(board);
       const worst = cells.find(cell => cell.proven.mass < 1)?.cell;
-      // the cell the proof reads at its root with the hold: the mass of the proof is the sum of the shares of the proven children
       const shares = (worst?.children ?? []).map(child => child.share);
       expect(shares.reduce((sum, share) => sum + share, 0)).toBeCloseTo(1, 12);
       expect(shares.some(share => Math.abs(share - 1 / 3) < 1e-9)).toBe(true);

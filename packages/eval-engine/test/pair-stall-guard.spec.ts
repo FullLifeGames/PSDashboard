@@ -6,13 +6,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 70: the pair plan sends a cell to the plain mean before anything is drawn when a move's success is rolled (spec
- * rule F1: a Protect used again after a Protect). The guard listed twelve move names: Wide Guard and Quick Guard among them,
- * which the simulator never rolls (their onTry asks only that someone acts after them), and not Mat Block, which it does
- * not roll either. A Wide Guard after a Protect fell back for nothing. The rule now comes from the Dex: a self-targeted
- * stalling move with a volatile is the Protect family, the moves whose volatile carries the stall counter's roll. Held here
- * against the simulator: every move that stops hits is played with a stall volatile on its user over eight seeds, in both
- * rule sets (Scarlet/Violet and the Champions mod).
+ * The pair plan sends a cell to the plain mean before anything is drawn when a move's success is rolled (a Protect used again after
+ * a Protect). The guard reads the Dex: a self-targeted stalling move with a volatile is the Protect family. Wide Guard, Quick Guard
+ * and Mat Block are not in it: the simulator never rolls them (their onTry asks only that someone acts after them). Held against the
+ * simulator: every move that stops hits is played with a stall volatile on its user over eight seeds, in both rule sets
+ * (Scarlet/Violet and the Champions mod).
  */
 
 await loadSimMods('gen9championsou');
@@ -29,11 +27,10 @@ describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex (rou
   const board = (moveId: string, seed?: string): Battle =>
     battleOf(rules.format, [mon('Blissey', [moveId, 'splash']), mon('Blissey', ['splash'])], [mon('Pikachu', ['splash']), mon('Pikachu', ['splash'])], seed);
 
-  /** Whether the user's move went through (the move line, no failure line of its own). */
   const succeeded = (battle: Battle): boolean =>
     battle.log.some(line => line.startsWith('|move|p1a')) && !battle.log.some(line => line.startsWith('|-fail|p1a'));
 
-  /** Plays one turn with `moveId`, optionally with the stall counter at 27 (three Protects in a row). */
+  /** `stalled` sets the stall counter to 27 (three Protects in a row). */
   function turn(moveId: string, seed: string, stalled: boolean): Battle {
     const battle = board(moveId, seed);
     if (stalled) for (let uses = 0; uses < 3; uses++) battle.sides[0].active[0]!.addVolatile('stall');
@@ -48,7 +45,6 @@ describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex (rou
     return SEEDS.some(seed => !succeeded(turn(moveId, seed, true)));
   }
 
-  /** The engine's guard for the same move: does a cell with it, the user holding a stall volatile, go to the fallback. */
   function guardFires(moveId: string): boolean {
     const battle = board(moveId);
     battle.sides[0].active[0]!.addVolatile('stall');
@@ -56,7 +52,6 @@ describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex (rou
   }
 
   const dex = board('splash').dex;
-  /** Every move that sets a volatile or a side condition on its user's side: the field the stop-the-hit moves come from. */
   const candidates = dex.moves.all().filter(move => move.exists && move.gen <= 9 && !move.isMax && !move.isZ &&
     move.category === 'Status' && (move.target === 'self' || move.target === 'allySide') && !!(move.volatileStatus || move.sideCondition));
 

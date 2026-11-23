@@ -9,14 +9,13 @@ import { dexOfRules, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#135): a `|move|` line that another effect wrote for a body is not the body's click. The simulator writes it with
+ * A `|move|` line that another effect wrote for a body is not the body's click. The simulator writes it with
  * `|[from] <effect>` when a move runs with a source effect: Magic Bounce and Dancer (an Ability), Magic Coat and Snatch (the volatile
- * of a move that relays another body's move). The rebuild read the first move line of a slot as the click and sent a move the body lacks;
- * the simulator refused the choice and the side played `default`. A lock continuation (`lockedmove`) and a move that runs early under its
+ * of a move that relays another body's move). Read as the body's click, such a line sends a move the body lacks: the simulator refuses the
+ * choice and the side plays `default`. A lock continuation (`lockedmove`) and a move that runs early under its
  * own click (Pursuit) also write a `[from]`, and their lines are the body's click.
  *
- * Rows: the rule on written lines (every shape of the effect, old formats included); the four mechanisms played on the simulator in
- * singles and doubles; then a sweep over the rule sets the corpus plays (Gens 1 to 9, Champions), singles and doubles. The sweep's oracle
+ * The sweep runs over the rule sets the corpus plays (Gens 1 to 9, Champions), singles and doubles. Its oracle
  * is the simulator: the turn's public lines go through `getMainChoice`, and the choice it writes, played on a fresh copy of the board
  * with the foe's click, makes the same battle log. It plays every Dex ability as the holder against a move to reflect, a dance, a move to
  * snatch and a switch; every Dex move with a condition as the holder's click against the same probes; and every move that locks its user
@@ -71,10 +70,6 @@ function play(battle: Battle, clicks: Clicks): void {
 
 interface Played { events: string[]; choice: string; accepted: boolean; same: boolean; relayed: string[]; kept: string[] }
 
-/**
- * Plays the scene, reads the last turn's public lines the way the rebuild does, and asks `getMainChoice` for side p2. The choice is played
- * on a fresh board (the same turns before it) with p1's click: it is accepted and makes the same battle log, line for line.
- */
 function roundTrip(scene: Scene): Played | null {
   const dex = dexOfRules(scene.rules);
   const original = build(scene);
@@ -99,7 +94,6 @@ const holderOf = (rules: Rules, moves: string[], ability?: string): PokemonSet =
   ...mon(rules, { species: 'Snorlax', moves, gender: 'M' }), ...(ability && rules.generation >= 3 ? { ability } : {}),
 });
 
-/** The sides of a case: p1 leads with the probe user (Pikachu) and has a body to switch to; p2 leads with the holder (a splashing partner in doubles). */
 function scene(rules: Rules, mode: Mode, probe: string[], holder: PokemonSet, turns: Clicks[]): Scene {
   const body = (species: string, moves: string[]) => mon(rules, { species, moves, gender: 'M' });
   const p1 = mode === 'singles'
@@ -155,7 +149,6 @@ const firstOf = (rules: Rules, keep: (move: DexMove) => boolean, count = 1): Dex
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && keep(move)).slice(0, count);
 };
 
-/** What the Dex says about the volatile a move sets on its user: the move locks its user into its next turns (`onLockMove`). */
 const locksUser = (rules: Rules, move: DexMove): boolean => {
   const dex = dexOfRules(rules);
   const volatile = move.volatileStatus ?? move.self?.volatileStatus;
@@ -190,7 +183,6 @@ describe('the sweep: every Dex ability and move that can write a move line for a
         result.kept.forEach(source => seen.kept.add(source));
       };
 
-      // every Dex ability, as the holder whose click is Splash (a sample of the list plus every ability whose handler dispatches a move)
       const abilities = rules.generation >= 3 ? dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen
         && (ability.isNonstandard === null || ability.isNonstandard === undefined || ability.isNonstandard === 'Past')) : [];
       const chosen = new Set(sweepSelection(abilities, 'moves').map(ability => ability.id));
@@ -200,7 +192,6 @@ describe('the sweep: every Dex ability and move that can write a move line for a
         for (const probe of probes) check(`ability ${ability.id}`, holderOf(rules, ['splash'], ability.name), probe);
       }
 
-      // every Dex move with a condition, as the holder's click (a sample of the list plus every move whose condition dispatches a move)
       const withCondition = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
         && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && !!move.condition);
       const picked = new Set(sweepSelection(withCondition, 'moves').map(move => move.id));
@@ -223,7 +214,6 @@ describe('the sweep: every Dex ability and move that can write a move line for a
         result.relayed.forEach(source => seen.relayed.add(source));
       }
 
-      // the list of what the rule skipped holds the entries the Dex has: an ability, Magic Coat, Snatch; a lock continuation and Pursuit stay
       if (rules.generation >= 3) expect([...seen.kept].some(source => /Pursuit$/.test(source)), `${name}: Pursuit's own line was played and kept, seen ${[...seen.relayed]} / ${[...seen.kept]}`).toBe(true);
       if (rules.generation >= 5) expect(seen.relayed.has('ability'), `${name}: an Ability line was played`).toBe(true);
       if (rules.generation >= 3) {

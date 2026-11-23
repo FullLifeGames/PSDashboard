@@ -11,9 +11,8 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 72 (T239, step 6): the last two stand-ins of the engine's Protect readers ask the simulator through the module
- * (src/sim-ask/). Each sweep plays the Dex against the simulator's own answer, with the development check on, so a
- * handler that writes the live battle fails here as `AskLeak`.
+ * The engine's Protect readers ask the simulator through the module (src/sim-ask/). Each sweep plays the Dex against the simulator's own
+ * answer, with the development check on, so a handler that writes the live battle fails here as `AskLeak`.
  *  - protectorStops (search/hints.ts): every protector of the Dex against one attack of every class the Dex holds (Z and Max
  *    moves, contact and not, every target and priority), the contact punishers included. The simulator's answer is the
  *    protector's own handler run on a copy of the battle with the copy's bodies and the real attack.
@@ -41,7 +40,6 @@ const PROTECT_RULES: Rules[] = [
 const monOf = (rules: Rules, species: string, moves: string[], extra: Partial<PokemonSet> = {}) =>
   set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...extra });
 
-/** A board whose first body of side one holds `moves`; singles or doubles by the rules. */
 function boardOf(rules: Rules, moves: string[], ability = 'No Ability'): Battle {
   const mine = [monOf(rules, 'Blissey', moves, { ability })];
   const theirs = [monOf(rules, 'Shuckle', ['splash'])];
@@ -49,7 +47,6 @@ function boardOf(rules: Rules, moves: string[], ability = 'No Ability'): Battle 
   return battleOf(rules.format, mine, theirs);
 }
 
-/** One move per class of what the protectors' handlers read: flags, Z or Max power, target, category, priority. */
 function attackClasses(dex: Battle['dex']): string[] {
   const seen = new Map<string, string>();
   for (const move of dex.moves.all()) {
@@ -60,7 +57,6 @@ function attackClasses(dex: Battle['dex']): string[] {
   return [...seen.values()];
 }
 
-/** What one question could leave on the bodies beyond the module's own fingerprint of the battle. */
 const hitData = (...things: object[]) => things.map(thing => JSON.stringify((thing as { moveHitData?: unknown }).moveHitData ?? null));
 
 /** The simulator's answer: the protector's own handler on a copy of the battle, with the copy's bodies and the real attack. */
@@ -101,12 +97,10 @@ describe.each(PROTECT_RULES)('$name: protectorStops asks the simulator (round 72
     }
     expect(wrong, protector).toEqual([]);
     expect(fingerprint(battle, hitData(source, target))).toBe(before);
-    // The question is not vacuous: a protector stops some class of attack.
     expect(stopped, protector).toBeGreaterThan(0);
   });
 });
 
-/** ModifyMove handlers of abilities exist from Generation 3. */
 const ABILITY_RULES: Rules[] = [3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `Generation ${gen}`, format: `gen${gen}customgame`, level: 100, doubles: false }))
   .concat([{ name: 'Pokémon Champions', format: 'gen9championscustomgame', level: 50, doubles: false, evs: CHAMPIONS_EVS }]);
 

@@ -20,9 +20,9 @@ import type { StaticRuleset } from '../src/eval-function';
 import { playedSetupMove, type SideAnalysis } from '../src/analysis';
 
 /**
- * Round 89 (#108): the matchers take the order bound of a body that fell before it acted. The bound is optional: absent, both matchers
- * pick as before. Present, they drop the options it rules out before the pick: a move id of `moves`, and a switch when `switchOut` is set.
- * A bound that rules out every option is no proof (the log and the queue disagree), and the pick is the one without it.
+ * The matchers take the order bound of a body that fell before it acted (optional; absent, both pick as before). Present, they drop the options
+ * it rules out before the pick: a move id of `moves`, and a switch when `switchOut` is set. A bound that rules out every option is no proof
+ * (the log and the queue disagree), and the pick is the one without it.
  */
 const option = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Reply' });
 const move = (name: string, targetLoc: number | null = null): PlayedAction => ({ kind: 'move', name, tera: false, targetLoc });
@@ -128,7 +128,6 @@ const fixture = (name: string): Position =>
 
 const slotsOf = (position: Position, side: 'p1' | 'p2'): (PlayedAction | null)[] => position.keepPlayed[`${side}Slots`] ?? [];
 
-/** The analysis' own rule: the exact combo, or with a hidden slot any consistent one. */
 const matched = (options: { choice: string; label: string }[], slots: (PlayedAction | null)[]) =>
   findPlayedOption(options, slots) ?? (slots.some(action => action === null) ? findConsistentOptions(options, slots)[0] ?? null : null);
 
@@ -186,7 +185,6 @@ describe('setup-move detection', () => {
   test('singles: the played move is recognized by name', () => {
     expect(setupMoveClicked(side({ playedRaw: { kind: 'move', name: 'Swords Dance' } }), dex)).toBe('Swords Dance');
     expect(setupMoveClicked(side({ playedRaw: { kind: 'move', name: 'Ice Beam' } }), dex)).toBeNull();
-    // A switch to a Pokémon nicknamed after a setup move is not a setup move.
     expect(setupMoveClicked(side({ playedRaw: { kind: 'switch', name: 'Curse' } }), dex)).toBeNull();
     expect(setupMoveClicked(side({}), dex)).toBeNull();
   });

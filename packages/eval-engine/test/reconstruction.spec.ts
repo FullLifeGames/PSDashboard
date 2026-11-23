@@ -152,14 +152,11 @@ describe('Replay reconstruction regression suite', () => {
       },
     });
 
-    // One pass produced every boundary before the target…
     expect([...captured.keys()]).toEqual([1, 2]);
     for (const [turn, state] of captured) {
       expect(JSON.parse(state).turn).toBe(turn);
       expect(JSON.parse(state).ended).toBe(false);
     }
-    // …and the runtime itself is the final position, same as a per-turn run
-    // (whose state fidelity the checkpoint test above already covers).
     expect(runtime.battleStream.battle?.turn).toBe(targetTurn);
   });
 
@@ -530,10 +527,8 @@ describe('Replay reconstruction regression suite', () => {
 });
 
 describe('Turn-synchronized replay of a video-reconstructed log', () => {
-  // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers,
-  // Sleep Talk/Rest loops, and a taunt-blocked turn 1. Before the turn-sync
-  // guard the block replayer ran ~5 turns ahead of the simulator here, so
-  // pending state like Future Sight silently vanished from every branch.
+  // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers, Sleep Talk/Rest loops, and a taunt-blocked turn 1. Without the
+  // turn-sync guard the block replayer ran ~5 turns ahead of the simulator, so pending state like Future Sight vanished from every branch.
   function loadGplReplay() {
     return JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
   }
@@ -546,9 +541,7 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
     // attribution in this log) both surface as revealed items.
     expect(p2Team.find(set => set.species === 'Iron Valiant')?.item).toBe('Life Orb');
     expect(p1Team.find(set => set.species === 'Uxie')?.item).toBe('Rocky Helmet');
-    // Rotom-Wash TRICKED its scarf away and received Black Sludge — the
-    // sludge's later self-damage reveals must not overwrite the set item
-    // (the old pin institutionalized exactly that pollution).
+    // Rotom-Wash TRICKED its scarf away and received Black Sludge: the sludge's later self-damage reveals must not overwrite the set item.
     expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Choice Scarf');
   });
 
@@ -604,7 +597,6 @@ describe('hax alignment records', () => {
     const replay = loadFixtureReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const snapshots = parseReplayLog(replay.log);
-    // The fixture carries |turn|1..4, so a target of 5 replays every block.
     const targetTurn = 5;
     const snapshot = snapshots.find(entry => entry.turn === targetTurn) ?? null;
 
@@ -615,16 +607,13 @@ describe('hax alignment records', () => {
     const first = await reconstruct();
     const second = await reconstruct();
 
-    // One record per block replayed (turns 1..targetTurn-1), ascending.
     expect(first.haxAlignment.map(record => record.turn))
       .toEqual(Array.from({ length: targetTurn - 1 }, (_, index) => index + 1));
     for (const record of first.haxAlignment) {
-      // Round 86 (T306): a turn plays under seed index 0 with the log's dice forced, no search (before: candidatesTried >= 1 and a searched seed)
       expect({ via: record.via, candidatesTried: record.candidatesTried, seed: record.seed }).toEqual({ via: 'forced', candidatesTried: 0, seed: '1,2,3,4' });
       expect(typeof record.actual.softMismatches).toBe('number');
       expect(record.actual.endedMismatch).toBe(false);
     }
-    // Determinism: the same replay plays the same seed schedule (draft T48).
     expect(second.haxAlignment.map(record => record.seed))
       .toEqual(first.haxAlignment.map(record => record.seed));
   });

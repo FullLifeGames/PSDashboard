@@ -14,14 +14,10 @@ import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 
 /**
- * Round 64 (T121): an Eject Pack or Eject Button switch is the protocol's
- * answer to a request the slot's own item made. The simulator writes
- * `[from]` on a switch only for a move's selfSwitch; an item's switch
- * follows its `|-enditem|` on the slot. Before, the forced list skipped
- * those switches and the sim brought its first free body (751407 t1:
- * Gholdengo instead of Dragonite, and Ogerpon's Knock Off took Gholdengo's
- * Choice Scarf), and a holder hit before it acted had the ejection switch
- * sent as its turn's choice.
+ * An Eject Pack or Eject Button switch is the protocol's answer to a request the slot's own item made. The simulator writes `[from]` on a
+ * switch only for a move's selfSwitch; an item's switch follows its `|-enditem|` on the slot, so the forced list takes it from there (751407
+ * turn 1: Gholdengo instead of Dragonite, and Ogerpon's Knock Off took Gholdengo's Choice Scarf; a holder hit before it acted had the
+ * ejection switch sent as its turn's choice).
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -59,11 +55,9 @@ describe('the forced list reads the switch an item made', () => {
 });
 
 /**
- * Round 64 review: what the simulator writes around a switch that follows an
- * item line, per generation. An ejection asks for the replacement, so the
- * sim writes the request break (`|`) between the item line and the switch;
- * a Pursuit that pops the Air Balloon of a body on its way out writes the
- * switch right after the item line.
+ * What the simulator writes around a switch that follows an item line, per generation. An ejection asks for the replacement, so the sim
+ * writes the request break (`|`) between the item line and the switch; a Pursuit that pops the Air Balloon of a body on its way out writes
+ * the switch right after the item line.
  */
 describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop', () => {
   const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({
@@ -78,7 +72,6 @@ describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop
     }
     return battle;
   };
-  /** Plays turn 1 (and p1's forced answer), then reads it back as the reconstruction does. */
   const readTurn = (format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [string, string], forcedAnswer?: string) => {
     const played = make(format, p1, p2);
     played.choose('p1', choices[0]);
@@ -127,7 +120,6 @@ describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop
   });
 });
 
-/** The sim's own public log of the block that ends at `|turn|boundary`. */
 function simBlock(battle: Battle, boundary: number): string[] {
   const log = battle.log;
   const end = log.lastIndexOf(`|turn|${boundary}`);
@@ -135,7 +127,6 @@ function simBlock(battle: Battle, boundary: number): string[] {
   return log.slice(start + 1, end).filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|'));
 }
 
-/** The species of the first switch-in on `slot` after the item line `item` left it. */
 function switchAfterItem(lines: string[], slot: string, item: string): string | null {
   const itemIndex = lines.findIndex(line => line.startsWith(`|-enditem|${slot}:`) && line.split('|')[3] === item);
   if (itemIndex < 0) return null;
@@ -143,10 +134,7 @@ function switchAfterItem(lines: string[], slot: string, item: string): string | 
   return switchLine?.split('|')[3].split(',')[0].trim() ?? null;
 }
 
-/**
- * The live pass the app and the bank run (boundary capture with snapshot
- * correction, choice locks on); `read` sees each listed boundary's board.
- */
+/** The live pass the app and the bank run (boundary capture with snapshot correction, choice locks on); `read` sees each listed boundary's board. */
 async function boundaries<T>(replay: Replay, p1Team: PokemonSet[], p2Team: PokemonSet[], turns: number[], read: (battle: Battle) => T) {
   const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
   const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
@@ -209,7 +197,7 @@ describe('the sim brings the body the protocol shows (round 64, T121)', () => {
         hattereneName: body(battle, 1, 'Hatterene').name,
       };
     });
-    // The sim names a body by the replay's own name for it (a nickname, T238).
+    // The sim names a body by the replay's own name for it (a nickname).
     const { hattereneName, ...rest } = seen.get(3)!;
     expect(rest).toEqual({ saltCure: hattereneName, ejected: 'Walking Wake', walkingWakeCured: false, hatterene: '' });
   });
@@ -243,7 +231,6 @@ function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
 const publicLines = (log: string[]) =>
   log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|') && !line.startsWith('|t:|'));
 
-/** Plays turn 1 (the holder at `hpShare` of its HP, p1's forced switch answered), then reads it back as the rebuild does. */
 function readTurn(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [string, string], forcedAnswer: string, hpShare: number) {
   const played = make(format, p1, p2);
   const holder = played.sides[0].active[0]!;
@@ -417,10 +404,8 @@ describe('locked-slot-choice', () => {
     });
 
     test('doubles: a choice-locked slot that flinches defaults to its enabled move', async () => {
-      // gen9vgc2026regi-2630452654 t4: Miraidon sat locked into Snarl and
-      // flinched. No action line, so the rebuild defaulted to `move 1` (Volt
-      // Switch, disabled), the sim rejected the side, and Iron Valiant played
-      // Protect instead of its Encore.
+      // gen9vgc2026regi-2630452654 turn 4: Miraidon sat locked into Snarl and flinched. No action line, so the rebuild defaulted to `move 1`
+      // (Volt Switch, disabled), the sim rejected the side, and Iron Valiant played Protect instead of its Encore.
       const log = [
         '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU',
         '|poke|p1|Blissey, F|', '|poke|p1|Snorlax, M|', '|poke|p1|Hitmontop, M|',
@@ -523,17 +508,12 @@ describe('powered-choices', () => {
   const splash = (format: Format) => (format === 'doubles' ? 'move 1, move 1' : 'move 1');
   const foe = (format: Format) => (format === 'doubles' ? ' 1' : '');
 
-  /** The public lines of a battle's log. */
   const publicLines = (battle: Battle) =>
     battle.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|'));
 
-  /** The lines of p2's tested body that mark a Z-move or a Dynamax. */
   const powerLines = (events: string[]) => events.filter(line => /^\|(-zpower\||-start\|p2a: [^|]*\|Dynamax|move\|p2a)/.test(line));
 
-  /**
-   * Plays `clicks` for p2's tested body (p1 splashes), then has the rebuild choose the last click again on a board that stands at the
-   * start of that turn. Returns what the game showed, what the rebuild's turn showed, and whether the simulator took the click.
-   */
+  /** Plays `clicks` for p2's tested body (p1 splashes), then has the rebuild choose the last click again on a board that stands at the start of that turn. */
   function replayLastTurn(gen: 7 | 8, format: Format, tested: PokemonSet, clicks: string[]) {
     const played = make(gen, format, tested);
     const board = make(gen, format, tested);
@@ -555,7 +535,6 @@ describe('powered-choices', () => {
   const GARCHOMP = mon('Garchomp', 'Dragonium Z', 'Rough Skin', ['Dragon Dance', 'Outrage', 'Earthquake', 'Stealth Rock']);
   const CORVIKNIGHT = mon('Corviknight', 'Leftovers', 'Pressure', ['Brave Bird', 'Roost', 'Body Press', 'Iron Defense']);
 
-  /** The rebuilt turn shows the Z-power, the Dynamax and the powered move the game showed. */
   function expectSameTurn(gen: 7 | 8, format: Format, tested: PokemonSet, clicks: string[], powered: string) {
     const result = replayLastTurn(gen, format, tested, clicks);
     expect(result.accepted, `the simulator takes "${result.choice}"`).toBe(true);

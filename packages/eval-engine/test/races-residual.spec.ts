@@ -4,10 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { statusResidual } from '../src/score/races';
 
 /**
- * Round 60 (T95) prover: the static's per-turn status residual against what
- * the simulator takes in one turn, gens 1 to 9. The fractions live in the
- * sim's code (data/conditions.js and the gen mods), not in its data, so the
- * static keeps a table and this test keeps the table honest.
+ * The static's per-turn status residual against what the simulator takes in one turn, gens 1 to 9. The fractions live in the sim's code
+ * (data/conditions.js and the gen mods), not in its data, so the static keeps a table and this test keeps the table honest.
  */
 const chansey: PokemonSet = {
   name: 'Chansey', species: 'Chansey', item: '', ability: '', moves: ['Splash'], nature: '', gender: '',

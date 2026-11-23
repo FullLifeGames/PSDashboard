@@ -11,12 +11,10 @@ import { faintedSlots, logGoesOn, mayDisguise, shownBodyIds, type ProtocolBench 
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 73 (T250): a side that shows fewer species than its bring count keeps all six bodies, because the bring lists are
- * trimmed together or not at all (replay-format.ts, the symmetric rule of game 452654). At a forced replacement the protocol
- * never answers, the rebuild used to send the first living body of the bench: a phantom the player never brought
- * (gen9championsvgc2026regmbbo3-2687970740: Rotom-Heat and Swampert fought for Power Police's side). The game leaves the slot
- * empty; the simulator accepts that pass only when no living body waits on the bench, so the rebuild retires the bench bodies
- * the whole protocol never shows and answers pass.
+ * A side that shows fewer species than its bring count keeps all six bodies (replay-format.ts, the symmetric bring rule of game
+ * 452654). At a forced replacement the protocol never answers, so the rebuild retires the bench bodies the whole protocol never
+ * shows and answers pass: the simulator accepts that pass only when no living body waits on the bench
+ * (gen9championsvgc2026regmbbo3-2687970740: Rotom-Heat and Swampert fought for Power Police's side, phantoms the player never brought).
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -122,7 +120,6 @@ function board(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [str
   return battle;
 }
 
-/** What the protocol says about the side: these bodies shown, and by default a faint on both slots in the block. */
 const benchOf = (species: string[], fainted = [0, 1], goesOn = true): ProtocolBench => ({
   shown: new Set(species.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))), fainted: new Set(fainted), goesOn,
 });

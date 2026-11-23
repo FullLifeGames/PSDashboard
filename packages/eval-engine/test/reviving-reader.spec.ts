@@ -7,8 +7,8 @@ import { switchInsOf } from '../src/branch/forced-slots';
 import type { SimBattle } from '../src/branch/types';
 
 /**
- * Round 89 (C7): whether a request asks for a fainted body (Revival Blessing) is read in one module, `forward/request-reviving.ts`.
- * The reader is held to the simulator's own request (`reviving` on the user's party entry) and the two callers that used to copy it
+ * Whether a request asks for a fainted body (Revival Blessing) is read in one module, `forward/request-reviving.ts`.
+ * The reader is held to the simulator's own request (`reviving` on the user's party entry) and the two callers that copy it
  * (`switchInSlots` of the forward model, `switchInsOf` of the branch layer) agree with it, in singles and doubles.
  */
 

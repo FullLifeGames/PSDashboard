@@ -12,11 +12,9 @@ import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 73 (T212): a `|-start|` line the block shows and the rebuilt board lacks is played through the simulator's own
- * addVolatile on the body, without a list of effects. The scene: smogtours-gen9ou-752733 turn 14, where the game's
- * Garganacl survives Moonblast at 5 % and starts Salt Cure on Iron Valiant; a simulator that K.O.s the Garganacl first
- * (as in the bank's rounds before the dice alignment found a seed for it) leaves the board without Salt Cure for turns 15
- * to 17, and Iron Valiant takes none of its residual damage.
+ * A `|-start|` line the block shows and the rebuilt board lacks is played through the simulator's own addVolatile on the body, without a
+ * list of effects. The scene: smogtours-gen9ou-752733 turn 14, where the game's Garganacl survives Moonblast at 5 % and starts Salt Cure on
+ * Iron Valiant; a simulator that K.O.s the Garganacl first leaves the board without Salt Cure for turns 15 to 17.
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -86,7 +84,6 @@ function board(format: string, p1: PokemonSet[], p2: PokemonSet[]): LiveBattle {
 
 const FORMATS = { singles: 'gen9customgame', doubles: 'gen9doublescustomgame' } as const;
 const filler = (species: string, ability: string) => mon(species, ability, ['Splash']);
-/** p1's first body uses the move on p2's first body, everybody else splashes. */
 function duel(kind: 'singles' | 'doubles', attacker: PokemonSet) {
   const p1 = kind === 'singles' ? [attacker] : [attacker, filler('Eevee', 'Run Away')];
   const p2 = kind === 'singles' ? [filler('Magikarp', 'Swift Swim')] : [filler('Magikarp', 'Swift Swim'), filler('Ditto', 'Limber')];
@@ -236,10 +233,7 @@ describe('the sweep: the lines the simulator writes for a started volatile start
   const bodies = (format: string) =>
     board(format, [filler('Pikachu', 'Static'), filler('Eevee', 'Run Away')].slice(0, size(format)), [filler('Eevee', 'Run Away'), filler('Pikachu', 'Static')].slice(0, size(format)));
   const tally = { checked: 0, ok: 0, notAdded: 0, noStartLine: 0, notReproduced: [] as string[], differs: [] as string[] };
-  /**
-   * Measured when the rule was written: two conditions per format. Stockpile writes a count (`stockpile1`), a token no
-   * condition names; Attract checks the genders of the body and a source its line does not carry.
-   */
+  /** Two conditions per format: Stockpile writes a count (`stockpile1`), a token no condition names; Attract checks the genders of the body and a source its line does not carry. */
   const KNOWN_NOT_REPRODUCED = 32;
 
   for (const format of formats) {

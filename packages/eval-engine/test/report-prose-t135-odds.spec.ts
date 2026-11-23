@@ -2,10 +2,8 @@ import { test, expect, describe } from 'vitest';
 import { deniedEndSentence } from '../src/denied-end';
 
 /**
- * Round 67 (T135 point 4): at odds 1 the denied early end has no roll that
- * could fail, yet the sentence said "one sure KO ... but the roll failed".
- * The Champions VGC census game shows it (2695803506 t2: Kingambit one sure
- * KO from clearing the rest); the knock-out never came.
+ * At odds 1 the denied early end has no roll that could fail, yet the sentence said "one sure KO ... but the roll failed". The Champions
+ * VGC census game shows it (2695803506 turn 2: Kingambit one sure KO from clearing the rest); the knock-out never came.
  */
 
 const denied = { turn: 73, side: 'p2' as const, species: 'Garchomp', removes: 'Corviknight', turnsRemaining: 66 };

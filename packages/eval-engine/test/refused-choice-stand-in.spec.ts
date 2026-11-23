@@ -7,16 +7,16 @@ import { mon, RULES, RULES_WITH_DOUBLES, standing, type Mode, type Rules } from 
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#143): a move the simulator refuses turned the whole side to `default`. The simulator refuses a move the body lacks and a
- * move its request marks disabled (`side.js` chooseMove); the rebuild sent the move the log shows. VGC 2318522075 turn 7: Disable stops
- * Dragonite's Extreme Speed, and the log shows `-activate|p2b: Dragonite|move: Struggle`; the rebuild sends `move struggle`, the simulator
- * refuses, the side plays `default`, and the partner loses its action. The click now falls back to a stand-in of the request: the first
- * enabled move with the shown move's Dex category and the simulator's `actionPriority`, else the slowest request move. The target and the
+ * A move the simulator refuses turned the whole side to `default`: it refuses a move the body lacks and a move its request marks disabled
+ * (`side.js` chooseMove). VGC 2318522075 turn 7: Disable stops Dragonite's Extreme Speed, and the log shows `-activate|p2b: Dragonite|move:
+ * Struggle`; the rebuild sends `move struggle`, the simulator refuses, the side plays `default`, and the partner loses its action. The click
+ * falls back to a stand-in of the request: the first enabled move with the shown move's Dex category and the simulator's `actionPriority`,
+ * else the slowest request move. The target and the
  * partner's action stay. A Z-move or Max move that the request offers stays as the log shows it (the simulator maps it onto its base move).
  *
  * The sweep: every Dex condition with an `onDisableMove` handler is put on the body as a volatile (with its `move` in each of the four
  * moves' places), against every shown move. When the request disables the shown move, the choice is another enabled request move and the
- * simulator accepts it; when it does not, the choice is the shown move as before. The rows run in every rule set the corpus plays (Gens 1
+ * simulator accepts it; when it does not, the choice is the shown move. The rows run in every rule set the corpus plays (Gens 1
  * to 9, Champions), singles and doubles (the partner's switch stays), and prove the live battle unchanged (`standing`).
  */
 await loadSimMods('gen9championsou');
@@ -33,7 +33,6 @@ function board(rules: Rules, mode: Mode, items: { a?: string } = {}): Battle {
   return battleOf(mode === 'singles' ? rules.singles : rules.doubles!, p1, side('Dragonite').map(set => ({ ...set, name: set.species })));
 }
 
-/** The Dex conditions with an `onDisableMove` handler: the volatiles that can disable a move. */
 function disablers(battle: Battle): string[] {
   const dex = battle.dex;
   const ids = new Set(Object.keys((dex.data as unknown as { Conditions: object }).Conditions));
@@ -49,7 +48,6 @@ const eventsOf = (mode: Mode, shown: string): string[] => [
   ...(mode === 'doubles' ? ['|switch|p1b: Raichu|Raichu, F|100/100'] : []),
 ];
 
-/** The simulator takes the choice for p1 (the side's whole choice, as the rebuild sends it), and the choice is taken back. */
 function accepted(battle: Battle, choice: string): boolean {
   const took = battle.choose('p1', choice);
   battle.undoChoice('p1');

@@ -7,7 +7,7 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the per-turn HP a body in a race gains or loses at
+ * The per-turn HP a body in a race (gen9draft-2058494320, a Swords Dance turn) gains or loses at
  * the end of the turn, from the simulator and not from a list of names. The reader plays three end-of-turns on a
  * copy of the battle (the HP of the actives set to 3/4 before each, so that no cap bends the reading) and gives the
  * mean loss per turn as a fraction of each active's max HP. Every scene is held to the simulator's own idle turns on a
@@ -24,7 +24,6 @@ const mon = (species: string, extra: Partial<PokemonSet> = {}) => set(species, [
 
 const actives = (battle: Battle): Pokemon[] => battle.sides.flatMap(side => side.active.filter((entry): entry is Pokemon => !!entry));
 
-/** The simulator's own idle turns: HP back to 3/4 before each of three turns, everybody Splashing; the mean loss per turn. */
 function played(battle: Battle): number[] {
   const bodies = actives(battle);
   const lost = bodies.map(() => 0);
@@ -38,7 +37,6 @@ function played(battle: Battle): number[] {
   return lost.map(sum => sum / 3);
 }
 
-/** What the reader says for every active of a fresh copy, against the idle turns of another. */
 function readAgainstSimulator(build: () => Battle): { read: number[]; real: number[] } {
   const battle = build();
   const reader = residualReader(battle);
@@ -266,8 +264,8 @@ describe('residual-memo-state', () => {
 
   /**
    * The Future Sight the simulator makes (data/conditions.ts `futuremove`): it lands when the battle's turn count has reached its `endingTurn`
-   * (`getOverflowedTurnCount`, a method of the battle that reads `turn`). Round 89 (#149, A8-7): the cost probe's third singles search
-   * (gen9ou-2658660641#44, turn 47) answered a board whose Future Sight lands from the memo's entry of the turn before, where it does not.
+   * (`getOverflowedTurnCount`, a method of the battle that reads `turn`). A search (gen9ou-2658660641 turn 47) answered a board whose
+   * Future Sight lands from the memo's entry of the turn before, where it does not.
    */
   const futureSightEnding = (turn: number, endingTurn: number): Tweak => battle => {
     futureSight(battle);

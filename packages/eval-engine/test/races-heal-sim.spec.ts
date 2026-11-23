@@ -8,13 +8,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 76 (T258): the heal rate of a move from the simulator. A heal move without a ratio in the Dex (Shore Up: half
- * the HP, two thirds in sand; the Moonlight family: by weather; Jungle Healing: a quarter; Heal Pulse: the target's HP,
- * which in singles is the foe's) used to fall back to one half. healProfile now plays the move on a twin battle under
- * the live weather and terrain and reads the HP the click leaves per turn over a full cycle of the sleep and wish
- * moves. This sweep plays every heal move of the Dex in every generation and the Champions mod, under every weather
- * and the Grassy terrain, on a live battle, and holds healProfile to what it saw. The scenes: Shore Up in sand, the
- * Moonlight family, a heal pulse in singles (it heals the foe).
+ * The heal rate of a move from the simulator. A heal move without a ratio in the Dex (Shore Up: half the HP, two thirds in sand; the
+ * Moonlight family: by weather; Jungle Healing: a quarter; Heal Pulse: the target's HP, which in singles is the foe's) gets its rate from
+ * healProfile, which plays the move on a twin battle under the live weather and terrain and reads the HP the click leaves per turn over a
+ * full cycle of the sleep and wish moves. This sweep plays every heal move of the Dex in every generation and the Champions mod, under
+ * every weather and the Grassy terrain, on a live battle, and holds healProfile to what it saw.
  */
 
 await loadSimMods('gen9championscustomgame');

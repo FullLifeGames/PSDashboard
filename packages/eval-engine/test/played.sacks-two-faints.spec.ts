@@ -6,14 +6,8 @@ import { detectSacks, type SackInfo, loggedMoves, parsePlayedActions, parsePlaye
 import type { EvalResult, RankedChoice } from '../src/types';
 
 /**
- * Round 67 (T135 point 1, rule A): a turn that cost a side two bodies was
- * judged by its first sack-shaped faint alone; the others were only named.
- * The sack leniency rests on a deliberate, cheap loss, so every own faint of
- * the turn is judged now: the framing holds only when each fallen body earns
- * it under its own shape's gate, and a plain loss next to a feed blocks it.
- * Corpus (P4, base-1010-1): no faint of the four two-faint side-turns earns a
- * sack, so no corpus verdict moves; bank doubles: 10 of 34 such side-turns
- * carry a stricter gate behind a low-HP feed (P5).
+ * A turn that cost a side two bodies: every own faint is judged, the framing holds only when each fallen body earns it under its own shape's
+ * gate, and a plain loss next to a feed blocks it.
  */
 
 const mon = (name: string, speciesForme: string, hpPercent: number, isActive: boolean) => ({
@@ -72,7 +66,7 @@ describe('T135 point 1: detection keeps the shape of every own faint', () => {
 const choiceEv = (choice: string, label: string, worstCase: number, ev: number): RankedChoice =>
   ({ choice, label, worstCase, expected: worstCase, ev, punishedBy: 'Reply' });
 
-/** The Uxie sack of the round-12 tests: regret 0.2 is a mistake, a low-HP feed alone demotes it to an inaccuracy. */
+/** The Uxie sack: regret 0.2 is a mistake, a low-HP feed alone demotes it to an inaccuracy. */
 const uxieTurn = (sack: SackInfo) => {
   const result: EvalResult = {
     score: 0.1, interval: 0.05, depthCompleted: 2,
@@ -127,11 +121,7 @@ describe('hazard-sack', () => {
     log: [],
   });
 
-  /**
-   * Round 63 (T17): a body switched in during the turn's switch phase that
-   * falls to entry hazards before it acts is its own sack shape — the attack
-   * aimed at it hits nothing and the next body comes in free (653785 t19).
-   */
+  /** A body switched in during the turn's switch phase that falls to entry hazards before it acts is its own sack shape: the attack aimed at it hits nothing (653785 turn 19). */
   describe('the hazard sack', () => {
     test('singles, 653785 t19: Weavile switched into Stealth Rock at 22% is a hazard sack', () => {
       const events = [

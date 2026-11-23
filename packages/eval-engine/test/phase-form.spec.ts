@@ -8,15 +8,9 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 69 (S9, T102, decision 17): the model form of the static in standard
- * singles. Phase on the two big weights (bodies and matchup, weight plus an
- * addend times the share of fainted mons) and the status fold (statusFix at
- * the weight of bodies, so a Poison Heal body under toxic is no longer
- * discounted like a plain one). Fitted on the r69-b0 capture, 10,350
- * positions of 1,363 sets, out of fold better than the table in 20 of 20
- * seeds (log-loss -21 bp, Brier -7 bp); the other four families keep their
- * tables. The switch (EVAL_STATIC_FORM=0 or setStaticForm(false)) gives the
- * table's score back exactly.
+ * The model form of the static in standard singles: phase on the two big weights (bodies and matchup, weight plus an addend times
+ * the share of fainted mons) and the status fold (statusFix at the weight of bodies). The switch (EVAL_STATIC_FORM=0 or
+ * setStaticForm(false)) gives the table's score back exactly.
  */
 
 const SINGLES = 'gen9customgame';
@@ -25,7 +19,6 @@ const mon = (species: string, extra: Partial<Parameters<typeof set>[2]> = {}) =>
 
 afterEach(() => setStaticForm(null));
 
-/** The share of fainted mons of both sides, counted here from the board. */
 const faintedShare = (battle: Battle): number => {
   const all = battle.sides.flatMap(side => side.pokemon as Pokemon[]);
   return all.filter(pokemon => pokemon.fainted || pokemon.hp <= 0).length / all.length;

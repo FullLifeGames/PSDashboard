@@ -4,7 +4,7 @@ import { replayRuleset } from '@fulllifegames/replay-core';
 import { readManifest, type ManifestEntry } from './relation-checks';
 
 /**
- * Round 72 (T240): the guard of the relation fixture. The 34 serialized positions already sit under
+ * The guard of the relation fixture. The 34 serialized positions already sit under
  * fixtures/positions/ and fixtures/champions/ (bank and holdout games, tracked); the manifest names them, so the
  * relation specs read one list and a lane that edits one of those files breaks this spec, which names the file.
  */

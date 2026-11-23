@@ -68,14 +68,12 @@ describe('played-action parsing', () => {
     expect(slept.prevented?.p2).toBe('slp');
     expect(slept.prevented?.p1).toBeUndefined();
 
-    // Taunt block carries the blocking move.
     const taunted = parsePlayedActions([
       '|cant|p1a: Uxie|move: Taunt|Stealth Rock',
       '|move|p2a: Salazzle|Flamethrower|p1a: Uxie',
     ], logRules(''));
     expect(taunted.prevented?.p1).toBe('move: Taunt');
 
-    // A side that acted BEFORE the cant keeps its action, no reason.
     const moved = parsePlayedActions([
       '|move|p2a: Rhydon|Avalanche|p1a: Noivern',
       '|cant|p2a: Rhydon|flinch',
@@ -281,7 +279,6 @@ describe('655336 t25: the sack recognition', () => {
 const ranked = (choice: string, label: string, worstCase: number, expected: number, ev: number, punishedBy: string | null): RankedChoice =>
   ({ choice, label, worstCase, expected, ev, punishedBy });
 
-/** The turn at one set of numbers: Protect is the engine's best, the switch is the played row. */
 const t25 = (numbers: { score: number; protect: [number, number, number]; lopunny: [number, number, number] }, overrides: Partial<AnalyzeTurnParams> = {}) => {
   const result: EvalResult = {
     score: numbers.score, interval: 0, depthCompleted: 2,
@@ -306,7 +303,7 @@ const t25 = (numbers: { score: number; protect: [number, number, number]; lopunn
 describe('655336 t25: the gate at both sets of numbers', () => {
   /** The feedback dump at a2e7c2b: score 0.6958, Protect -0.6779, the switch -0.7343, regret 0.0563. */
   const head = { score: 0.6958, protect: [-0.7263, -0.6224, -0.6779] as [number, number, number], lopunny: [-0.775, -0.7201, -0.7343] as [number, number, number] };
-  /** The round-70 dump (0da5ec7 to 8683fa9): score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156. */
+  /** An earlier feedback dump (0da5ec7 to 8683fa9): score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156. */
   const r70 = { score: 0.3337, protect: [-0.45, -0.3, -0.2773] as [number, number, number], lopunny: [-0.9, -0.7, -0.6929] as [number, number, number] };
 
   test('at the dump of the a2e7c2b engine the turn has no tier and no blame', () => {
@@ -400,7 +397,6 @@ describe('played-bounds-attach', () => {
   const settingsOf = (scene: Scene, over: Partial<EvalSettings> = {}): EvalSettings =>
     ({ depth: 1, samples: 1, mode: 'matrix', tera: false, sleepClause: false, ruleset: scene.ruleset, prove: false, keepPlayed: scene.played, ...over });
 
-  /** What the rows must carry: the bound of the root battle itself (the champions row also pins the report's two moves). */
   function expectedBounds(scene: Scene): PlayedBounds {
     const named = EXPECTED[scene.name];
     if (named) return named;
@@ -550,10 +546,8 @@ describe('a death after the mon\'s own dice-failed action', () => {
     expect(detectSacks(paralyzed, sackSnapshot(11), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'cant' } });
     const taunted = ['|cant|p1a: Dauni|move: Taunt|Toxic', '|move|p2a: Wall|Body Press|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt', '|faint|p1a: Dauni'];
     expect(detectSacks(taunted, sackSnapshot(11), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11 } });
-    // The opponent's miss says nothing about the fainted mon's own action.
     const theirMiss = ['|move|p2a: Wall|Stone Edge|p1a: Dauni|[miss]', '|-miss|p2a: Wall|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt|[from] Stealth Rock', '|faint|p1a: Dauni'];
     expect(detectSacks(theirMiss, sackSnapshot(11), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11 } });
-    // The stayed shape carries the flag too.
     expect(detectSacks(missed, sackSnapshot(46), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true, rolled: 'miss' } });
   });
 
@@ -589,19 +583,17 @@ describe('a death after the mon\'s own dice-failed action', () => {
     const rolled = run({ name: 'Garchomp', hpFraction: 0.11, rolled: 'miss' });
     expect(rolled.p1.sacrifice).toBeUndefined();
     expect(rolled.p1.tier).toBe('mistake');
-    // Without the roll the low-HP feed reads as before: demoted, framed as a sack.
+    // Without the roll the low-HP feed demotes the verdict and frames a sack.
     const fed = run({ name: 'Garchomp', hpFraction: 0.11 });
     expect(fed.p1.sacrifice).toEqual({ name: 'Garchomp', hpFraction: 0.11 });
     expect(fed.p1.tier).toBe('inaccuracy');
-    // A rolled death whose move carried no knock-out chance stays a feed (conservative).
     const noOdds = run({ name: 'Garchomp', hpFraction: 0.11, rolled: 'miss' }, false);
     expect(noOdds.p1.sacrifice).toBeTruthy();
   });
 
   test('labeled doubles odds may be the partner slot\'s: a rolled death stays a feed (final review, finding 3)', () => {
-    // Round 56: a doubles option's odds name one slot's move and target, which may be the partner's. Until
-    // the odds name their attacker, the rule reads labeled odds as none: the same turn as the rolled case
-    // above, with a label on the odds, frames the sack like the case without odds.
+    // A doubles option's odds name one slot's move and target, which may be the partner's: odds without their attacker read as none, so the
+    // same turn as the rolled case above, with a label on the odds, frames the sack like the case without odds.
     const result: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
       perSide: {

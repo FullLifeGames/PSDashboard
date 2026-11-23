@@ -7,13 +7,10 @@ import { oracleTagAbove } from './oracle-tag';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * Round 63 (T81): the static asks the simulator for a move's power at use,
- * but only the handlers listed in POWER_MOVES. This census keeps the list
- * honest: every power handler of the Dex (basePowerCallback, onBasePower,
- * damageCallback) in every generation the bank and the corpus play is
- * either asked or named below with the reason it stays out; every asked
- * handler leaves the battle as it was; and each asked move's memo class
- * covers what its answer reads.
+ * The static asks the simulator for a move's power at use, but only the handlers listed in POWER_MOVES. This census holds the list to the
+ * Dex: every power handler (basePowerCallback, onBasePower, damageCallback) in every generation the bank and the corpus play is either asked
+ * or named below with the reason it stays out; every asked handler leaves the battle as it was; and each asked move's memo class covers what
+ * its answer reads.
  */
 
 const EXCLUDED: Record<string, string> = {
@@ -26,8 +23,8 @@ const EXCLUDED: Record<string, string> = {
   tripleaxel: 'per hit', triplekick: 'per hit',
   // Writes the battle, draws from the PRNG or writes the log.
   furycutter: 'writes', rollout: 'writes', iceball: 'writes', ficklebeam: 'writes', risingvoltage: 'writes',
-  // Counters the rebuilt battle does not pin (volatile layers, a field counter, the fallen of the last turn). Last Respects and
-  // Rage Fist left the list in round 76 (T265): the rebuild plays the hits, and totalFainted is pinned from the snapshot.
+  // Counters the rebuilt battle does not pin (volatile layers, a field counter). Last Respects and Rage Fist are asked: the rebuild plays
+  // the hits, and totalFainted is pinned from the snapshot.
   spitup: 'unpinned', echoedvoice: 'unpinned', retaliate: 'unpinned',
   // Priced by a rule of the static: the halving moves and the level moves (fixedDamage), Tera Blast and
   // Hidden Power (move-use.ts); the reactive moves and Final Gambit read 0 by design; Psywave rolls.

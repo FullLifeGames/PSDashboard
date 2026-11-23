@@ -4,8 +4,8 @@ import type { PokemonSet } from '@pkmn/sim';
 import { planCellEvents } from '../src/cell-blend';
 import { openOf, type Cell } from '../src/endgame/prover-order';
 
-// Round 89 (#115): the open class of a forced-win sentence carries the effects that came true (`hit-nokill+brn`,
-// `hit-nokill+boosts:spd`); openOf reads its outcome through splitClassKey and splitOutcome, not a split at every colon.
+// The open class of a forced-win sentence carries the effects that came true (`hit-nokill+brn`, `hit-nokill+boosts:spd`); openOf reads its
+// outcome through splitClassKey and splitOutcome, not a split at every colon.
 
 function set(name: string, species: string, moves: string[]): PokemonSet {
   return { name, species, item: '', ability: 'No Ability', moves, nature: 'Serious', gender: '', evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100 };
@@ -36,7 +36,6 @@ describe('openOf reads the outcome of a class that carries an effect', () => {
     expect(entry).toBeDefined();
     const open = openOf(battle, cell(`move ${id}`, 'move softboiled'), `p1:hit-nokill+${effect}`, 'p1');
     expect(open).toEqual({ side: 'p1', moveId: id, label: move, odds: expect.any(Number), kind: 'kill' });
-    // The plain classes keep their reading.
     expect(openOf(battle, cell(`move ${id}`, 'move softboiled'), 'p1:hit-nokill', 'p1')?.kind).toBe('kill');
     expect(openOf(battle, cell(`move ${id}`, 'move softboiled'), 'p1:miss', 'p1')?.kind).toBe('hit');
     expect(openOf(battle, cell(`move ${id}`, 'move softboiled'), 'p1:hit-kill', 'p1')).toBeUndefined();

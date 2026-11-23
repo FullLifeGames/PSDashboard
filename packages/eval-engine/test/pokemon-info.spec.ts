@@ -13,14 +13,11 @@ import { checkedRolls, drawTurn, rootOf, rollSet } from './calc-roll-oracle';
 import { calcSingleDamageRange } from '../src/damage-calc';
 
 /**
- * Round 69, T161 (spec decision 31): the HP a percent sighting stands for is the middle of the HPs the
- * simulator's own display (getHealth) shows as that percent. Gen 7 and later round the percent up, Champions
- * rounds it down, and a Gen 6 game without the HP Percentage Mod shows 48 pixels, so the old
- * `round(percent * maxhp / 100)` left the range the format allows (Champions: the low edge, every time).
- * The checker holds sightedHp against getHealth itself, over every maximum HP from 50 to 700 and every shown
- * value, and the corrections against a battle that played the hit (battle G is the game, battle A the
- * simulator's own run with another seed). The engine runs a VGC game on the Doubles OU format (a Champions VGC
- * game on the Champions doubles format), so those two formats carry the VGC rows.
+ * The HP a percent sighting stands for is the middle of the HPs the simulator's own display (getHealth) shows as that percent. Gen 7 and
+ * later round the percent up, Champions rounds it down, and a Gen 6 game without the HP Percentage Mod shows 48 pixels. The checker holds
+ * sightedHp against getHealth itself, over every maximum HP from 50 to 700 and every shown value, and the corrections against a battle that
+ * played the hit (battle G is the game, battle A the simulator's own run with another seed). The engine runs a VGC game on the Doubles OU
+ * format (a Champions VGC game on the Champions doubles format), so those two formats carry the VGC rows.
  */
 await loadSimMods('gen9championsou');
 
@@ -31,7 +28,6 @@ const set = (species: string, moves: string[], level = 50): PokemonSet => ({
 });
 
 interface Case {
-  /** What the case stands for beside its format. */
   label: string;
   format: string;
   /** The denominator the game shows: 100 for percentages, 48 for the pixels of a Gen 6 game without the percent rule. */
@@ -56,7 +52,6 @@ function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[], seed = 1):
   });
 }
 
-/** A body at any maximum HP: the display reads only hp and maxhp. */
 const bodyAt = (battle: Battle, maxhp: number): HpDisplayBody & { hp: number } => {
   const body = battle.sides[0].pokemon[0];
   body.maxhp = maxhp;
@@ -69,13 +64,11 @@ function inReplayMode(battle: Battle, scale: 100 | 48): void {
   battle.reportPercentages = scale === 100;
 }
 
-/** What the simulator shows for an HP: the numerator of the `n/scale` part of getHealth. */
 function shownAt(body: HpDisplayBody, hp: number): number {
   body.hp = hp;
   return Number(/^(\d+)\//.exec(body.getHealth().shared)![1]);
 }
 
-/** Every HP that shows each numerator, asked from getHealth itself, hp 1 to maxhp. */
 function allowedHps(body: HpDisplayBody): Map<number, number[]> {
   const out = new Map<number, number[]>();
   for (let hp = 1; hp <= body.maxhp; hp++) {
@@ -138,7 +131,6 @@ describe('T161 sightedHp against the simulator getHealth', () => {
     expect(sightedHp(body, { hp: 101, maxhp: 100 })).toBeNull();
     // The game shows exact HP here (not 100 or 48): the display of the body is percent, so there is no match.
     expect(sightedHp(body, { hp: 250, maxhp: 311 })).toBeNull();
-    // Pixels asked of a Gen 9 body.
     expect(sightedHp(body, { hp: 24, maxhp: 48 })).toBeNull();
   });
 
@@ -155,7 +147,6 @@ describe('T161 sightedHp against the simulator getHealth', () => {
   });
 });
 
-/** The scene the corrections run on: a hit on the first body, then a switch that leaves it benched. */
 interface Scene {
   format: string;
   doubles: boolean;
@@ -174,7 +165,6 @@ const teamsOf = (doubles: boolean) => ({
   p2: [set('Pikachu', ['Thunderbolt', 'Splash']), set('Rotom', ['Thunderbolt', 'Splash'])].slice(0, doubles ? 2 : 1),
 });
 
-/** The public log of the game: the viewers' lines only (a `|split|` line is followed by the private line, then the public one). */
 function publicLog(battle: Battle): string {
   const lines = battle.log;
   return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
@@ -209,10 +199,8 @@ describe.each(SCENES)('T161 the corrections write the middle of the range ($form
     for (let seed = 1; seed <= 12; seed++) {
       const game = play(scene, seed);
       const snapshot = snapshotAt(game.log, 3);
-      // The simulator's own run drew other damage; the correction hands it the game's sightings.
       const own = play(scene, seed + 1000);
       correctBattleFromSnapshot(own.battle, snapshot);
-      // Snorlax took the first hit and left the field (benched, a sighting), Blissey stands on it (active).
       for (const [name, isActive] of [['Snorlax', false], ['Blissey', true]] as const) {
         const sighted = snapshot.p1.pokemon.find(pokemon => pokemon.name === name)!;
         expect(sighted.isActive, name).toBe(isActive);
@@ -320,7 +308,6 @@ describe('champions-roll-oracle', () => {
     attacker: () => PokemonSet;
     moveId: string;
     setup?: Parameters<typeof rootOf>[3];
-    /** The move's choice text for the attacker's slot (appended after the move id), e.g. 'mega'. */
     suffix?: string;
   }
 
@@ -411,7 +398,6 @@ describe('hp-percent-readout', () => {
     { label: 'Gen 4', format: 'gen4ou' },
   ];
 
-  /** The display modes a battle can be built with: the format's own, exact HP (a custom game), percent forced, pixels. */
   const MODES: { label: string; exact: boolean; percentages: boolean | null }[] = [
     { label: 'the format\'s own', exact: false, percentages: null },
     { label: 'exact HP', exact: true, percentages: false },
@@ -426,7 +412,6 @@ describe('hp-percent-readout', () => {
     });
   }
 
-  /** The reference: the simulator's display on the 100 scale for this HP, asked in percent mode; 0 where it shows a faint. */
   function logPercent(battle: Battle, body: HpDisplayBody, hp: number): number {
     const saved = { exact: battle.reportExactHP, percentages: battle.reportPercentages, hp: body.hp };
     battle.reportExactHP = false;

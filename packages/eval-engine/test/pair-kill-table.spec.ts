@@ -104,7 +104,6 @@ describe('kill tables from the calc, checked at the drawn roll (round 56)', () =
     expect(hand.snapshot.helpingHand).toBe(true);
     expect(hand.snapshot.defenderPartner).toBe('friendguard');
     expect(hand.snapshot.screens).toContain('reflect');
-    // Dragon Claw into Snorlax and Moonblast into Garchomp: both rolls land on their tables.
     expect(check(drawn)).toEqual({ checked: 2, mismatched: 0 });
   });
 
