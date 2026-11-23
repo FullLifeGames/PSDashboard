@@ -5,12 +5,8 @@ import { dieKey, plainKey, tieName, type Answer, type DieName, type DieResult, t
 import type { BattleWatch } from './watch.ts';
 
 /**
- * Round 82 (forced dice), decisions D4 and D5: the dice of a forced turn. Both classes stand over the battle's own PRNG
- * (`inner`: the plain PRNG, or a `LoggedRollPRNG` on a branch's first turn) and call it first on every draw, so the stream
- * advances exactly as it would without them. Then they read the draw's name from `recognize` and answer: the natural
- * value, the natural turn's value, or the forced one.
- *
- * `getSeed`, `setSeed` and `clone` go to `inner`; the simulator never sees a difference except in the numbers.
+ * The PRNG classes of a forced turn. They stand over the battle's own PRNG (`inner`) and call it first on every draw, so the stream advances
+ * as it would without them; `getSeed`, `setSeed` and `clone` go to `inner`.
  */
 abstract class WatchedPRNG extends PRNG {
   protected readonly inner: PRNG;
@@ -18,9 +14,9 @@ abstract class WatchedPRNG extends PRNG {
   /** The high-level call in flight (chance, sample, shuffle): `PRNG` routes each through `random`. */
   private shape: Draw | null = null;
   /**
-   * Round 89 (#104): the draws nothing names, outside a shuffle (a shuffle is a tie of bodies in an event order: the tie of move
-   * actions is a die of the module, the others change the order of the log lines and no outcome). A turn that has any follows the
-   * stream there (a duration, a target picked at random), so a line that forces every die still depends on the seed.
+   * The draws nothing names, outside a shuffle (a shuffle is a tie of bodies in an event order: the tie of move actions is a die of the module,
+   * the others change the order of the log lines and no outcome). A turn that has any follows the stream there (a duration, a random target),
+   * so a line that forces every die still depends on the seed.
    */
   unnamed = 0;
 
@@ -30,14 +26,12 @@ abstract class WatchedPRNG extends PRNG {
     this.watch = watch;
   }
 
-  /** A draw is about to be answered; `name` is its die, or null when nothing names it. */
   protected saw?(name: DieName | null): void;
 
-  /** What to return for a recognized draw; `natural` is the value the stream gave. */
   protected abstract decide(name: DieName, draw: Draw, natural: number): number;
 
   override setSeed(seed: PRNGSeed): void {
-    // PRNG's constructor calls this before `inner` exists.
+    // PRNG's constructor calls this before `inner` exists
     if (this.inner) this.inner.setSeed(seed);
     else super.setSeed(seed);
   }
@@ -94,14 +88,10 @@ const isMoveAction = (item: unknown): item is MoveAction =>
   typeof item === 'object' && item !== null && (item as { choice?: unknown }).choice === 'move'
   && typeof (item as { pokemon?: { getSlot?: unknown } }).pokemon?.getSlot === 'function';
 
-/** The slots of the move actions in a segment of a shuffled list, in their order. */
 const moveSlots = (items: readonly unknown[], start: number, end: number): string[] =>
   items.slice(start, end).filter(isMoveAction).map(item => item.pokemon.getSlot());
 
-/**
- * The order of `slots` that keeps their current order as far as the pairs allow and puts the first of each pair ahead of the
- * second: the next slot is the earliest one that no pair still holds back.
- */
+/** The order of `slots` that keeps their current order as far as the pairs allow and puts the first of each pair ahead of the second. */
 function respecting(slots: readonly string[], pairs: readonly (readonly [string, string])[]): string[] {
   const left = [...slots];
   const order: string[] = [];
@@ -120,7 +110,6 @@ export class RecordingPRNG extends WatchedPRNG {
   readonly ties: string[][] = [];
   /** The chance of every chance die drawn, per die key (numerator over denominator of the first draw). */
   readonly chances = new Map<string, number>();
-  /** The name of every die drawn, per die key. */
   readonly names = new Map<string, DieName>();
   /** The shape of the first draw of every die, per die key (a sample's items tell the results of the die). */
   readonly shapes = new Map<string, Draw>();
@@ -149,15 +138,12 @@ export class RecordingPRNG extends WatchedPRNG {
   }
 }
 
-/** What the forced turn saw of one forced die. */
 export interface DieNote {
-  /** How many times the simulator drew it. */
   draws: number;
   /** A draw gave no way to produce the forced answer (a 100 percent accuracy forced to miss). */
   noChance: boolean;
   /** The answer does not fit the die (a step the roll lacks, a result of another kind): nothing was forced. */
   unfit?: boolean;
-  /** The chance of the first draw, numerator over denominator, when the draw was a chance. */
   chance?: number;
   /** `battle.log.length` at the first draw. */
   logIndex?: number;
@@ -168,14 +154,13 @@ export interface DieNote {
 }
 
 /**
- * The real turn's dice. A forced die answers as the user forced it; every other recognized die answers what the natural
- * turn drew for it (the next unused answer under its key, when the call has the same shape), so a forced die that changes
- * the number of draws moves no other action's dice; every draw nothing names follows the stream.
+ * The real turn's dice: a forced die answers as forced; every other recognized die answers what the natural turn drew for it (the next unused
+ * answer under its key, when the call has the same shape), so a forced die that changes the number of draws moves no other action's dice;
+ * a draw nothing names follows the stream.
  */
 export class ForcedDicePRNG extends WatchedPRNG {
   readonly notes = new Map<string, DieNote>();
   private readonly forced = new Map<string, ForcedDie>();
-  /** The forced speed ties, by pair key. */
   private readonly ties = new Map<string, ForcedDie>();
   private readonly record: NaturalRecord;
   private readonly cursors = new Map<string, number>();
@@ -202,9 +187,8 @@ export class ForcedDicePRNG extends WatchedPRNG {
   }
 
   /**
-   * A shuffle that holds move actions is a speed tie: the stream shuffled it as it would without the module, and the forced
-   * pairs now put their first body ahead of the second wherever both stand in the segment (Gens 8 and 9 shuffle a pair more
-   * than once in a turn, so every shuffle that holds both is held to the order).
+   * A shuffle that holds move actions is a speed tie: the stream shuffles it as it would without the module, and the forced pairs then put their
+   * first body ahead of the second wherever both stand in the segment (Gens 8 and 9 shuffle a pair more than once in a turn).
    */
   protected override shuffled(items: unknown[], start: number, end: number): void {
     const slots = moveSlots(items, start, end);
@@ -248,17 +232,14 @@ export class ForcedDicePRNG extends WatchedPRNG {
     return note;
   }
 
-  /**
-   * Round 89 (P2): the keys of the dice the turn has drawn without a forced answer, one entry for each die with a draw so far. A forced
-   * die answers through `force` and is not among them; the caller already knows it.
-   */
+  /** The keys of the dice the turn has drawn without a forced answer; a forced die answers through `force` and is not among them. */
   drawnKeys(): ReadonlySet<string> {
     return new Set([...this.cursors].filter(([, count]) => count > 0).map(([key]) => key));
   }
 
   protected override decide(name: DieName, draw: Draw, natural: number): number {
     const key = dieKey(name);
-    // Round 88 (T337): a later hit looks up its own die first, then the die that covers every hit, and notes under the key it used
+    // a later hit looks up its own die first, then the die that covers every hit, and notes under the key it used
     const forcedKey = name.hit && !this.forced.has(key) ? plainKey(name) : key;
     const forced = this.forced.get(forcedKey);
     if (forced) return this.force(forcedKey, forced, draw, natural);
@@ -302,7 +283,6 @@ export class ForcedDicePRNG extends WatchedPRNG {
     return answer;
   }
 
-  /** The learned raw answer of a die's draw, the stream's own after the script ends, or the word that no sequence reaches the answer. */
   private scripted(script: readonly number[] | null, draw: number, natural: number): Answered {
     if (script === null) return { noChance: true };
     return { value: draw < script.length ? script[draw] : natural };

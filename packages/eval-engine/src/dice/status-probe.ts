@@ -2,16 +2,10 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { FixedDice, copyOf } from '../sim-ask/copy.ts';
 
 /**
- * Round 82 (forced dice), step A3b: what a status check draws and which way it goes. The check of a condition on the body
- * about to move is the condition's own `BeforeMove` handler. The simulator writes the polarity of each handler its own way:
- * full paralysis stops the body when the chance comes true, the thaw frees it, the confusion check lets it go on when the
- * chance comes true up to Gen 6 and hits it from Gen 7 on. The user's answer says what the body does, so the module reads the
- * polarity from the handler: it calls the handler alone on a copy of the battle, with the question module's `FixedDice`
- * (round 72's rule: the dice of a question come from there) answering every chance "yes", and reads whether the handler
- * stopped the move (a return of `false`).
- *
- * The probe names no condition: it asks the Dex entry of the die's `effectId` for its `onBeforeMove` and runs it. It plays on a
- * copy and leaves the battle it reads untouched.
+ * What a status check draws and which way it goes: the condition's own `BeforeMove` handler is the check, and its polarity differs by handler (full
+ * paralysis stops the body when the chance comes true, the thaw frees it, the confusion check lets it go on up to Gen 6 and hits it from Gen 7 on).
+ * The module reads the polarity by calling the Dex entry of the die's `effectId` alone on a copy, with the question module's `FixedDice` answering
+ * every chance "yes", and asking whether the handler stopped the move (a return of `false`); the battle it reads stays untouched.
  */
 
 export interface CheckProbe {

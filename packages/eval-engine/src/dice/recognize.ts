@@ -2,33 +2,9 @@ import type { Battle } from '@pkmn/sim';
 import type { DieName, Draw, SecondaryEntry } from './types.ts';
 import type { AllyList, BattleWatch } from './watch.ts';
 
-/**
- * Round 82 (forced dice), decision D3: which draw is which die. `recognize` maps one draw of the simulator's PRNG to the name
- * of a die, or to null for a draw this module leaves to the stream. Two rules, in this order (docs/adr/0002):
- *
- * 1. The hook rule. The simulator runs a hook right before some draws: `Accuracy` before the accuracy chance, `ModifyCritRatio`
- *    before the crit (Gen 2 on). The watch arms the hook; the draw that follows is that die.
- * 2. The script rule, for draws no hook announces. The damage roll is the draw inside `battle.randomizer` (Gens 3 and up) or a
- *    `random(217, 256)` inside `getDamage` (Gens 1 and 2); the Gen 1 crit is the chance inside `getDamage`.
- *
- * Round 82, step A3a: the same two rules name the secondary effect (the entries `ModifySecondaries` returned in Gens 3 and up,
- * the script's own chance in tryMoveHit in Gens 1 and 2), the self effect (`random(100)` in `selfDrops`), the hit count (a
- * `sample` or `random` with no event in flight inside the hit loop), and the draws inside a handler that name their event:
- * `StallMove` is a stalling move that succeeds again, `BasePower` a chance that changes a move's power.
- *
- * Round 82, step A3b: a chance a condition draws in its `BeforeMove` handler is a status check of the body about to move
- * (full paralysis, the thaw, the infatuation, the confusion check); the chance of an item's or an ability's `FractionalPriority`
- * handler (Gen 4: the item's `BeforeTurn`) is a die that lets its holder act first. The second kind runs when the queue is
- * built, with no move in flight: the holder is the event's target. Gens 2 and 3 draw that die once at the start of the turn,
- * outside any action, and read it from `battle.quickClawRoll`: no draw of the turn is named for it (`rollsAtTurnStart`).
- *
- * The numbers of both rules live in this one table (hook probe, lanes/A/p1-hooks.md, exceptions 1 to 3); the sweeps hold it to
- * the simulator for every generation and the Champions mod.
- */
+/** Maps one draw of the simulator's PRNG to the name of a die, or null for a draw left to the stream (ADR 0002: the hook rule, then the script rule). */
 
-/** How a generation writes the damage roll and where its raw value sits relative to the damage. */
 interface RollShape {
-  /** The script call the draw sits in. */
   scope: 'randomizer' | 'getDamage';
   from: number;
   to?: number;
@@ -39,7 +15,6 @@ interface RollShape {
 }
 
 interface GenShape {
-  /** The crit has a `ModifyCritRatio` hook before it. */
   critHook: boolean;
   /** `chance` (`randomChance(n, d)`) or `random` (`random(256) < n`). */
   critCall: 'chance' | 'random';
@@ -55,9 +30,8 @@ const ROLL_RANGE: RollShape = { scope: 'getDamage', from: 217, to: 256, steps: 3
 const hitCountScope = (gen: number): string => (gen <= 3 ? 'tryMoveHit' : 'hitStepMoveHitLoop');
 
 /**
- * Whether a numerator is the one Gens 1 and 2 draw for a secondary entry (`chance(n, 256)` in `tryMoveHit`). An entry with no
- * chance draws nothing. Gen 1 rounds the percent up to 256ths and, for one kind of entry, takes one off (the script's own
- * comment says which); the draw shows which of the two it was. Gen 2 scales to 255.
+ * Whether a numerator is the one Gens 1 and 2 draw for a secondary entry (`chance(n, 256)` in `tryMoveHit`). Gen 1 rounds the percent up to
+ * 256ths and, for one kind of entry, takes one off (the script's own comment says which); the draw shows which of the two. Gen 2 scales to 255.
  */
 function legacyDraws(gen: number, entry: SecondaryEntry, numerator: number | undefined): boolean {
   if (entry.chance === undefined) return false;
@@ -68,7 +42,6 @@ function legacyDraws(gen: number, entry: SecondaryEntry, numerator: number | und
   return numerator === Math.floor(entry.chance * 255 / 100);
 }
 
-/** The id of a secondary entry as a die names it: the status, the condition, the boosted stats, or its self effect. */
 export function secondaryEffectId(entry: SecondaryEntry): string {
   if (entry.status) return entry.status;
   if (entry.volatileStatus) return entry.volatileStatus;
@@ -94,7 +67,6 @@ export function genShape(gen: number): GenShape {
   return { critHook: true, critCall: 'chance', roll: ROLL_SIXTEEN };
 }
 
-/** Whether the draw has the shape of the generation's damage roll (the caller checks the script call). */
 const isRollCall = (draw: Draw, shape: RollShape): boolean =>
   draw.call === 'random' && draw.from === shape.from && draw.to === shape.to;
 
@@ -105,10 +77,7 @@ function isCritDraw(draw: Draw, shape: GenShape, watch: BattleWatch): boolean {
   return draw.call === 'chance' || (draw.from === 256 && draw.to === undefined);
 }
 
-/**
- * The name of the die this draw is, read at the moment of the draw from the watch and the battle's state.
- * `gen` is the battle's generation (Champions plays as Gen 9).
- */
+/** The name of the die this draw is, read at the moment of the draw from the watch and the battle's state; `gen` is the battle's generation (Champions plays as Gen 9). */
 export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName | null {
   const { battle, armed } = watch;
   const first = pickedDie(draw, watch) ?? firstMoverDie(draw, battle) ?? endOfTurnDie(draw, watch);
@@ -127,9 +96,8 @@ export function recognize(draw: Draw, watch: BattleWatch, gen: number): DieName 
 }
 
 /**
- * Round 88 (T337): a move whose every hit rolls its own accuracy (`multiaccuracy`) draws the accuracy of hit N at `move.hit` N
- * (the first hit's draw runs before the loop with `move.hit` 0); the die of a later hit carries the number. Skill Link and Loaded
- * Dice clear the flag, so their draws name no hit.
+ * A move whose every hit rolls its own accuracy (`multiaccuracy`) draws the accuracy of hit N at `move.hit` N (the first hit's draw runs
+ * before the loop with `move.hit` 0); the die of a later hit carries the number. Skill Link and Loaded Dice clear the flag, so their draws name no hit.
  */
 function hitOf(move: { multiaccuracy?: boolean; hit?: number }): { hit?: number } {
   return move.multiaccuracy && typeof move.hit === 'number' && move.hit >= 2 ? { hit: move.hit } : {};
@@ -161,7 +129,6 @@ function scriptedSecondary(draw: Draw, watch: BattleWatch, gen: number, base: Ba
   return { ...base, targetSlot: battle.activeTarget?.getSlot(), kind: 'secondary', effectId: secondaryEffectId(entry) };
 }
 
-/** The secondary effect, by the rule of the generation. */
 function secondaryDie(draw: Draw, watch: BattleWatch, gen: number, base: Base): DieName | null {
   const scope = watch.scope();
   if (gen >= 3) return scope === 'secondaries' ? hookedSecondary(draw, watch, base) : null;
@@ -185,11 +152,10 @@ function handlerDie(draw: Draw, battle: Battle, base: Base): DieName | null {
 }
 
 /**
- * Round 82, step A4: a proc of the move's hit. An ability's handler draws a chance (a contact ability, Cursed Body, Poison Touch,
- * Toxic Chain) or a number from 0 to 99 (Effect Spore) when its holder was hit or hit; an item's handler draws a chance under
- * `Damage` (the Focus Band). The die names the user of the move, the body that was hit (the event's target) and the holder's
- * ability or item. The Gens 3 and 4 Effect Spore then picks its status with a `sample` under the same event: that pick is its own
- * die, told apart by `:option`.
+ * A proc of the move's hit. An ability's handler draws a chance (a contact ability, Cursed Body, Poison Touch, Toxic Chain) or a number from
+ * 0 to 99 (Effect Spore) when its holder was hit or hit; an item's handler draws a chance under `Damage` (the Focus Band). The die names the
+ * user of the move, the body that was hit (the event's target) and the holder's ability or item. The Gens 3 and 4 Effect Spore then picks its
+ * status with a `sample` under the same event: that pick is its own die, told apart by `:option`.
  */
 function procDie(draw: Draw, battle: Battle, base: Base): DieName | null {
   const event = battle.event as { id?: string; target?: { getSlot?: () => string } } | undefined;
@@ -215,7 +181,7 @@ function hitCountDraw(draw: Draw, battle: Battle, scope: string | null, gen: num
   return scope === hitCountScope(gen) && (draw.call === 'sample' || draw.call === 'random') && quiet && !counted.hit && !!counted.multihit;
 }
 
-/** The dice of a move that are not accuracy, crit or roll (A3a): secondaries, self effects, hit counts, stalling, power. */
+/** The dice of a move that are not accuracy, crit or roll: secondaries, self effects, hit counts, stalling, power. */
 function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Base): DieName | null {
   const { battle } = watch;
   const scope = watch.scope();
@@ -232,10 +198,10 @@ function recognizeMoveDraw(draw: Draw, watch: BattleWatch, gen: number, base: Ba
 }
 
 /**
- * Round 89 (#137): the two draws that sample a body. `getRandomTarget` samples the standing foes in doubles for a move aimed at none
- * (it runs before the move is in flight, so the watch hands over the user and the move it was called with); `dragIn` takes the body
- * that comes in from `getRandomSwitchable`'s `sample` over the bench (the watch hands over the slot dragged out). A draw inside
- * a handler that the drag's switch-in or the target's redirect runs is not this call's own: only the innermost call counts.
+ * The two draws that sample a body. `getRandomTarget` samples the standing foes in doubles for a move aimed at none (it runs before the move is
+ * in flight, so the watch hands over the user and the move it was called with); `dragIn` takes the body that comes in from
+ * `getRandomSwitchable`'s `sample` over the bench (the watch hands over the slot dragged out). A draw inside a handler that the drag's
+ * switch-in or the target's redirect runs is not this call's own: only the innermost call counts.
  */
 function pickedDie(draw: Draw, watch: BattleWatch): DieName | null {
   if (draw.call !== 'sample') return null;
@@ -262,9 +228,9 @@ function firstMoverDie(draw: Draw, battle: Battle): DieName | null {
 }
 
 /**
- * Round 82, step A4: a chance a handler draws under `Residual`, the end of the turn (Shed Skin, Harvest, Healer, the Gen 2 thaw).
- * No move is in flight; the holder is the event's target. A handler that asked for the holder's allies (Healer) draws once for
- * each ally that has a status, and the die names that ally: the watch gives the allies in order.
+ * A chance a handler draws under `Residual`, the end of the turn (Shed Skin, Harvest, Healer, the Gen 2 thaw). No move is in flight; the holder
+ * is the event's target. A handler that asked for the holder's allies (Healer) draws once for each ally that has a status, and the die names
+ * that ally: the watch gives the allies in order.
  */
 function endOfTurnDie(draw: Draw, watch: BattleWatch): DieName | null {
   const { battle } = watch;
@@ -278,14 +244,12 @@ function endOfTurnDie(draw: Draw, watch: BattleWatch): DieName | null {
   return ally ? { ...name, targetSlot: ally.getSlot() } : name;
 }
 
-/** The next ally with a status that a handler looping over its holder's allies is drawing for. */
 function nextAlly(allies: AllyList | null, holder: unknown, effectId: string): { getSlot(): string } | undefined {
   if (!allies || allies.holder !== holder || allies.effectId !== effectId) return undefined;
   allies.pending ??= allies.allies.filter(ally => ally.status);
   return allies.pending[allies.used++];
 }
 
-/** The kinds of effect that hold a Residual handler of a body. */
 const RESIDUAL_EFFECTS = new Set(['Ability', 'Item', 'Condition', 'Status']);
 
 /**

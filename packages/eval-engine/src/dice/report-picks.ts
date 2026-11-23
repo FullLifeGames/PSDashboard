@@ -4,12 +4,10 @@ import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
 /**
- * Round 89 (#137): the witnesses of the two dice that sample a body. A `random-target` die is the foe a move was aimed at when the
- * click named none: the draw runs before the move is in flight, so the witness is the `|move|` line the draw is followed by, which
- * names the target. A `drag` die is the body that came in: the `|drag|` line of the slot dragged out names it.
+ * The witnesses of the two dice that sample a body. A `random-target` die's witness is the `|move|` line the draw is followed by, which names the
+ * target (the draw runs before the move is in flight); a `drag` die's is the `|drag|` line of the slot dragged out.
  */
 
-/** The first line from `from` on of the given kind for the slot that `matches`. */
 function lineFrom(log: readonly string[], from: number, type: string, slot: string, matches: (fields: string[]) => boolean): string | undefined {
   return log.slice(from).find(line => {
     const fields = parts(line);
@@ -19,7 +17,6 @@ function lineFrom(log: readonly string[], from: number, type: string, slot: stri
 
 const nameOf = (ident: string | undefined): string => (ident ?? '').split(':').slice(1).join(':').trim();
 
-/** The die was drawn: the line that follows shows the body the answer names, or says what happened instead. */
 export function pickReport(w: Witness, battle: Battle): DieReport {
   const { name, result } = w.die;
   const log = battle.log;

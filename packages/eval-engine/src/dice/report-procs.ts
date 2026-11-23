@@ -3,18 +3,7 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/**
- * Round 82 (forced dice), step A4: the witnesses of the dice an ability or an item draws: the procs of a hit (a contact
- * ability, Cursed Body, Poison Touch, Toxic Chain, Effect Spore, the Focus Band) and the end of the turn (Shed Skin, Harvest,
- * Healer, the Gen 2 thaw). Each reads the lines between the die's draw and the next draw of any die; the protocol writes the
- * effect with the ability's or the item's own name (`[from] ability: Static`, `-activate|...|item: Focus Band`), a thaw as a
- * `-curestatus` of the holder.
- *
- * - yes: a line shows the effect; none is `blocked` (the draw ran and said yes, and a rule of the target stopped it: immunity,
- *   a status it already has, a hit that was not lethal).
- * - no: no line shows it; a line that does is `no-chance`.
- * - a result that is a status word (Effect Spore): the status the effect's line names equals the word.
- */
+/** The witnesses of the dice an ability or an item draws (the procs of a hit, the end of the turn); each reads the lines between the die's draw and the next draw of any die. */
 
 /** The kinds whose lines end at the next draw, not at the next action. */
 export const SPAN_KINDS: ReadonlySet<string> = new Set(['ability-proc', 'item-proc', 'end-of-turn']);

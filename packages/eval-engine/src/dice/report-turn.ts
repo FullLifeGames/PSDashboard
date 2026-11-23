@@ -4,12 +4,7 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport, ForcedDie } from './types.ts';
 
-/**
- * Round 82 (forced dice), step A3b: the witnesses of the dice that belong to the body's turn and not to its move: the status
- * checks of the attacker (full paralysis, the thaw, the infatuation, the confusion check) and, in the same file after them, the
- * order of the turn. Each reads the protocol after the draw and says `applied` or `blocked`, and the reasons of a die that was
- * never drawn.
- */
+/** The witnesses of the dice that belong to the body's turn and not to its move (the status checks, the order of the turn); each reads the protocol after the draw. */
 
 /** The line names the condition in one of its arguments after the body (`|cant|p1a: X|par`, `|-activate|p1a: X|move: Attract`). */
 function mentions(line: string, id: string): boolean {
@@ -65,7 +60,6 @@ export function statusNoDraw(input: ReportInput, moveName: string, turn: readonl
  */
 const startsMove = (line: string): boolean => !line.includes('|[from]') || line.includes('|[from] item:');
 
-/** The slots of the bodies that acted in the lines, in the order of their first action (a `|move|` that starts an action, or a `|cant|`). */
 export function actionOrder(lines: readonly string[]): string[] {
   const order: string[] = [];
   for (const line of lines) {
@@ -92,7 +86,6 @@ export function tieReport(w: Witness, log: readonly string[], start: number): Di
   return went === first ? applied(w) : otherwise(w, 'blocked', `${first} was forced first but ${went} acted first`);
 }
 
-/** Why a die of the turn's order was never drawn. Null for the kinds that belong to a move. */
 export function orderNoDraw(input: ReportInput): DieReport | null {
   const { die } = input;
   const { slot, targetSlot, kind } = die.name;

@@ -2,20 +2,15 @@ import { toId } from '@fulllifegames/replay-core';
 import { dieKey, type DieName, type ForcedDie } from './types.ts';
 
 /**
- * Round 86 (the log's dice, T306): the phantom procs. An ability or an item that draws a chance when its holder is hit (Cute Charm, Static,
- * Flame Body, Poison Point, Cursed Body, Effect Spore, the attacker's Poison Touch and Toxic Chain, the Focus Band) is a die of kind
- * `ability-proc` or `item-proc`. The log shows such a die only when it came true, as a line that names the effect (`[from] ability:
- * Cute Charm`, `item: Focus Band`). The rebuild forces the dice the log shows and leaves the rest to the hidden dice of the frozen seed, so
- * a seed that says yes gave a body an infatuation, a burn or a paralysis that the game never showed (573756: Conscripts carried `attract`
- * from turn 2 to turn 10). A proc die the forced turn draws and the log does not show on that hit is forced not to happen.
+ * A proc die (an ability's or item's chance when its holder is hit) shows in the log only when it came true, so one the forced turn draws and
+ * the log does not show is forced not to happen; else a seed's yes gives a body an infatuation, burn or paralysis the game never showed.
  */
 
-/** The kinds this module reads: the module's own names for a proc of an ability and of an item. */
 const PROC_KINDS: ReadonlySet<string> = new Set(['ability-proc', 'item-proc']);
 
 const EFFECT = /\b(?:ability|item): ([^|\]]+)/g;
 
-/** The effects a block's lines name, each with the line that names it. The text after `ability:` or `item:` is the effect's name in the Dex. */
+/** The effects a block's lines name, each with its line; the text after `ability:` or `item:` is the effect's name in the Dex. */
 function shownEffects(lines: readonly string[]): { id: string; line: string }[] {
   return lines.flatMap(line => [...line.matchAll(EFFECT)].map(match => ({ id: toId(match[1]), line })));
 }

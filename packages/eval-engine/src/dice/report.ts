@@ -9,32 +9,9 @@ import { endNoDraw, procReport, SPAN_KINDS } from './report-procs.ts';
 import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
 /**
- * Round 82 (forced dice), decision D9: what became of a forced die. The real turn's PRNG notes whether the simulator drew the
- * die and whether the draw could give the answer; this module reads the protocol's own lines after the draw and says
- * `applied` (the protocol shows the answer), `no-draw` (the simulator never drew it, for both answers: a move that hits
- * without an accuracy draw, a move that always crits), `no-chance` (a draw ran and has no way to give the answer) or `blocked` (the draw ran and the answer was given, but the effect did not land). The reason is the
- * protocol line that shows why, or a short sentence.
- *
- * The witness per kind (the user's answer against the lines of the action, from the log index of the first draw to the next
- * action):
- * - accuracy: yes needs no `|-miss|` for the target and an effect line for it, no needs the `|-miss|`. The die of a later hit of a
- *   multi-accuracy move (round 88, T337) reads the target's `|-hitcount|` instead: no is applied when the chain ended just before
- *   that hit, yes when the count reaches it.
- * - crit: yes needs the `|-crit|` line, no needs none. The Gen 2 crit compares a number to a threshold the draw does not
- *   show, so the module answers 0 or 255 and the protocol decides.
- * - damage roll: the draw ran, so a damage line for the target (or the Substitute's `[damage]` activation) has to follow.
- * - secondary: the effect line of the entry (a `|-status|`, a `|cant|` flinch, a `|-start|`, a `|-boost|` or `|-unboost|`) after
- *   the draw, for the target (for the user when the entry is a self effect).
- * - self effect: a `|-boost|` or `|-unboost|` of the move's own stats on the user.
- * - hit count: the `|-hitcount|` line equals the count; a count no draw gives is `no-chance` (the learner found none).
- * - stalling: no `|-fail|` for the user in the action means it succeeded.
- * - power: the handler's own `|-activate|` line for its move means the stronger draw.
- * - status check: yes shows as the body's own `|move|` after the draw, no as a stop (report-turn.ts).
- * - speed tie: the order of the two bodies' first actions in the turn's lines.
- * - first mover: the activation line of the item or the ability after the draw; the start-of-turn roll of Gens 2 and 3 by the holder's place in the turn's order.
- * - random target, drag (report-picks.ts): the `|move|` line after the draw names the foe, the `|drag|` line of the slot the body.
- * - proc, end of turn (report-procs.ts): a line between the die's draw and the next draw that shows the effect (the ability's or the item's
- *   label, a status line, a thaw), none for a no.
+ * What became of a forced die: the real turn's PRNG notes whether the simulator drew it and whether the draw could give the answer, and this module
+ * reads the protocol's lines after the draw and says `applied` (the protocol shows the answer), `no-draw` (the simulator never drew it, for both
+ * answers), `no-chance` (a draw ran and has no way to give the answer) or `blocked` (the draw ran and the answer was given, but the effect did not land).
  */
 
 export interface ReportInput {
@@ -58,7 +35,6 @@ function startsAction(line: string): boolean {
   return type === 'cant' || type === 'switch' || type === 'drag' || type === 'upkeep' || type === 'turn' || type === 'win' || type === 'tie';
 }
 
-/** The lines of the action that holds the draw at log index `from`. */
 function windowOf(log: readonly string[], from: number): string[] {
   const lines: string[] = [];
   for (let index = from; index < log.length; index++) {
@@ -71,21 +47,18 @@ function windowOf(log: readonly string[], from: number): string[] {
 /** Lines that say what a hit was like, not that it did something. */
 const MARKERS = new Set(['-miss', '-crit', '-supereffective', '-resisted', '-hitcount', '-immune', '-fail', '-notarget', '-block', '-anim', '-prepare', '-singleturn', '-hint', '-nothing', 'move']);
 
-/** A line about the target that shows the hit did something: damage, a status, a boost, a start, the Substitute taking the hit. */
 function isEffect(line: string): boolean {
   const type = parts(line)[1];
   if (type === '-activate') return line.includes('[damage]');
   return type.startsWith('-') && !MARKERS.has(type);
 }
 
-/** The `|-miss|` line for the target: Gens 3 and up name user and target, Gens 1 and 2 only the user. */
 function missFor(line: string, targetSlot: string | undefined): boolean {
   const fields = parts(line);
   if (fields[1] !== '-miss') return false;
   return fields[3] === undefined || targetSlot === undefined || slotOfIdent(fields[3]) === targetSlot;
 }
 
-/** A line that stops a move: an immunity, a failure, no target, a block, a miss, a Protect-like activation (an `-activate` that is no `[damage]`). */
 function isBlocker(line: string, targetSlot: string | undefined): boolean {
   const type = parts(line)[1];
   if (type === '-miss') return missFor(line, targetSlot);
@@ -94,11 +67,9 @@ function isBlocker(line: string, targetSlot: string | undefined): boolean {
   return type === '-activate' && !line.includes('[damage]') && about(line, targetSlot);
 }
 
-/** Lines a move that did nothing leaves behind. */
 const QUIET = new Set(['debug', '-nothing', '']);
 
 
-/** Why the simulator never drew the die, read from the protocol of the turn. */
 function noDraw(input: ReportInput): DieReport {
   const early = orderNoDraw(input) ?? pickNoDraw(input);
   if (early) return early;
@@ -123,9 +94,9 @@ function noDraw(input: ReportInput): DieReport {
 }
 
 /**
- * The line that stopped the move before it did anything. For a later hit's die only a line before the first hit's effect on the
- * target counts (round 89, F5): after that effect the chain's own lines say what happened (an ability answering the hit, a miss of
- * a later hit, the faint), and `hitNoDraw` reads the count from `|-hitcount|`.
+ * The line that stopped the move before it did anything. For a later hit's die only a line before the first hit's effect on the target counts:
+ * after that effect the chain's own lines say what happened (an ability answering the hit, a miss of a later hit, the faint), and `hitNoDraw`
+ * reads the count from `|-hitcount|`.
  */
 function firstBlocker(action: readonly string[], name: DieName): string | undefined {
   const later = name.kind === 'accuracy' && name.hit !== undefined;
@@ -133,7 +104,6 @@ function firstBlocker(action: readonly string[], name: DieName): string | undefi
   return (effect < 0 ? action : action.slice(0, effect)).find(line => isBlocker(line, name.targetSlot));
 }
 
-/** The move ran and a hit followed: why the simulator drew no die for it, read from the lines of the action. */
 function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['moves']['get']>, action: string[]): DieReport {
   const { die } = input;
   const { targetSlot, kind } = die.name;
@@ -154,16 +124,13 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
-/**
- * The hits the target's `|-hitcount|` line counts in the lines of a move's action, or nothing when it shows none. A target that
- * fainted in the chain gets the line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads as the target too.
- */
+/** A target that fainted in the chain gets the `|-hitcount|` line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads as the target too. */
 function hitCountIn(action: readonly string[], targetSlot: string | undefined): number | undefined {
   const line = action.find(entry => parts(entry)[1] === '-hitcount' && (about(entry, targetSlot) || slotOfIdent(parts(entry)[2]) === targetSlot?.slice(0, 2)));
   return line === undefined ? undefined : Number(parts(line)[3]);
 }
 
-/** Round 88 (T337): a later hit's die the simulator never drew: the chain ended before that hit, or the move rolls one accuracy for every hit here (Skill Link, Loaded Dice). */
+/** A later hit's die the simulator never drew: the chain ended before that hit, or the move rolls one accuracy for every hit here (Skill Link, Loaded Dice). */
 function hitNoDraw(input: ReportInput, move: string, action: readonly string[]): DieReport {
   const { die } = input;
   const count = hitCountIn(action, die.name.targetSlot);
@@ -174,7 +141,7 @@ function hitNoDraw(input: ReportInput, move: string, action: readonly string[]):
   return { die, took: 'no-draw', reason: `${move} rolls no accuracy for hit ${hit} here: one roll covers every hit` };
 }
 
-/** Round 88 (T337): the accuracy die of a later hit: no needs the chain to end just before it, yes needs the count to reach it. */
+/** The accuracy die of a later hit: no needs the chain to end just before it, yes needs the count to reach it. */
 function hitReport(w: Witness, happens: boolean): DieReport {
   const hit = w.die.name.hit!;
   const count = hitCountIn(w.action, w.targetSlot);
@@ -192,7 +159,7 @@ function accuracyReport(w: Witness, happens: boolean): DieReport {
   if (!happens) return missed ? applied(w) : otherwise(w, 'no-chance', `${w.name} hit although the die gave a miss`);
   if (missed) return otherwise(w, 'blocked', `${w.name} missed although the die gave a hit`);
   // A line after the hit's first effect on the target is not a block: an ability or item that answers the damage (Emergency Exit,
-  // Eject Button) writes an `-activate` there, after the damage line (round 82, A6: the pause specs found it).
+  // Eject Button) writes an `-activate` there, after the damage line.
   const effect = w.action.findIndex(line => about(line, w.targetSlot) && isEffect(line));
   const blocker = w.action.slice(0, effect < 0 ? undefined : effect).find(line => isBlocker(line, w.targetSlot));
   if (blocker) return otherwise(w, 'blocked', `${w.name} hit and did nothing: ${shows(blocker)}`);
@@ -235,7 +202,6 @@ export function reportOf(input: ReportInput): DieReport {
   return witnessOf(witness, battle, input.start);
 }
 
-/** The witness of the die's kind. */
 function witnessOf(witness: Witness, battle: Battle, start: number): DieReport {
   const { kind } = witness.die.name;
   const { result } = witness.die;

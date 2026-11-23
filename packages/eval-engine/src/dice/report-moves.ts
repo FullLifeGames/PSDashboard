@@ -3,11 +3,7 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/**
- * Round 82 (forced dice), step A3a: the witnesses of the dice of a move that are not accuracy, crit or roll (the secondary,
- * the self effect, the hit count, a stalling move, a chance of power) and the reasons of a secondary that was never drawn.
- * Each reads the protocol after the draw and says `applied`, `blocked` or `no-chance` as `report.ts` does for the first three.
- */
+/** The witnesses of the dice of a move that are not accuracy, crit or roll, and the reasons a secondary was never drawn; each reads the protocol after the draw. */
 
 /** Names the ability or the item in a body's Dex entry that carries the handler `handler`, or null. */
 function holderOf(battle: Battle, slot: string | undefined, handler: string): string | null {
@@ -39,7 +35,6 @@ function secondaryRemoved(input: ReportInput, moveName: string): string | null {
 /** The lines after the draw, to the end of the turn: a flinch shows when its target tries to move, later than the action. */
 const restOf = (battle: Battle, from: number): string[] => battle.log.slice(from);
 
-/** Whether the protocol after the draw shows the effect of a secondary entry named by `effectId` (status, flinch, condition, boosts). */
 function effectLandedLines(w: Witness, rest: string[], battle: Battle): boolean {
   const effectId = w.die.name.effectId ?? 'effect';
   const target = w.targetSlot;

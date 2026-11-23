@@ -1,10 +1,7 @@
 import type { DieReport, ForcedDie } from './types.ts';
 import type { DieNote } from './prng.ts';
 
-/**
- * Round 82 (forced dice): the small readers of the protocol's lines every report witness shares (`report.ts` and
- * `report-moves.ts`): the fields of a line, the body a line is about, and the witness a draw hands to its report.
- */
+/** The small readers of the protocol's lines every report witness shares: the fields of a line, the body a line is about, and the witness a draw hands to its report. */
 
 export const parts = (line: string): string[] => line.split('|');
 export const slotOfIdent = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
@@ -14,7 +11,6 @@ export const about = (line: string, slot: string | undefined): boolean => slot =
 
 export const shows = (line: string): string => `the protocol shows "${line}"`;
 
-/** What every witness reads: the die, the notes of its draw and the lines of the action that holds it. */
 export interface Witness {
   die: ForcedDie;
   seen: Pick<DieReport, 'chance' | 'logIndex'>;
