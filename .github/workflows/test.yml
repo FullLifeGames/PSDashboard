@@ -39,13 +39,14 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # The four Vitest projects: the root specs, each package's suite, and the app suite under test/ui/.
+      # Round 90 (F8): the app (root specs), replay-core and ui projects. The engine project runs in the two jobs below, once with the
+      # speed layer forced off and once forced on; the default mode reads the same levers as forced on and only steps back quietly where forced on throws.
       - name: Run the Node suites
-        run: npm run test:regression
+        run: npx vitest run --project app --project replay-core --project ui
 
-  # Round 59: the Node suites cover the adopted speed layer; one more run forces it off (the kill
-  # switch) and one forces it on (a break throws instead of falling back). Release 1.0.0: both ran
-  # after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
+  # Round 59: the engine suite runs once with the speed layer forced off (the kill switch) and once forced on (a break throws instead
+  # of falling back). Release 1.0.0: both ran after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
+  # Round 90 (F8): they are the only runs of the engine project (Node suites left it out).
   # Round 78: on simulator 0.10.12 the forced-off pass ran past 20 minutes (12 on 0.10.11), the
   # forced-on pass still takes 12.
   engine-speed-layer:
@@ -106,8 +107,8 @@ jobs:
   # parts below run them with DICE_SWEEPS=full. Their size comes from the run of 17.11.2026 (CI-1, the first run of the job): parts 1 and 2 hold
   # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
   # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest
-  # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Not a required check until the user makes it one (branch protection names
-  # the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
+  # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Required since round 90 (user 23.11.2026): the three parts are checks of their own, so branch protection lists
+  # "Full sweeps, the other specs, part 1 of 3", "part 2 of 3" and "part 3 of 3" (full-sweep-job.spec.ts holds the nine contexts). `full-sweep-job.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
   # sweep spec to the part with the least time, and keep every part under 25 minutes of wall time.
   full-sweeps:
     name: Full sweeps, the other specs, part ${{ matrix.part }} of 3

@@ -55,7 +55,7 @@ describe('a new game in the app', () => {
     expect(listGames()).toHaveLength(1);
     expect(listGames()[0].players).toEqual(['Alice', 'Bob']);
     // the address names the game (H12a), so a reload brings it back
-    expect(window.location.search).toBe(`?game=${listGames()[0].id}`);
+    await waitFor(() => expect(window.location.search).toBe(`?game=${listGames()[0].id}`));
     expect(screen.queryByRole('dialog', { name: 'New game' })).toBeNull();
     const bar = document.querySelector('.ps-topbar') as HTMLElement;
     expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
