@@ -8,6 +8,7 @@ import { ratchetBase, ratchetOverrides } from './eslint.ratchet.mjs'
 import { importZones } from './eslint.zones.mjs'
 import namesPlugin from './eslint.names.mjs'
 import dexPlugin from './eslint.dex.mjs'
+import prosePlugin from './eslint.prose.mjs'
 
 export default defineConfig([
   // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them), and .claude/ holds the local agent
@@ -45,5 +46,19 @@ export default defineConfig([
     ignores: ['packages/replay-core/src/rules-dex.ts'],
     plugins: { dex: dexPlugin },
     rules: { 'dex/no-global-dex-read': 'error' },
+  },
+  // Dash rule: the report's prose sources and every label of src/components carry no em or en dash (see eslint.prose.mjs).
+  {
+    files: [
+      'packages/eval-engine/src/prose/{clauses,phrases,line}.ts',
+      'packages/eval-engine/src/{summary,report,win-reason,denied-end,biggest-roll,standoff}.ts',
+    ],
+    plugins: { prose: prosePlugin },
+    rules: { 'prose/no-dash': 'error' },
+  },
+  {
+    files: ['src/components/**/*.{ts,tsx}'],
+    plugins: { prose: prosePlugin },
+    rules: { 'prose/no-dash': ['error', { emptyValue: true }] },
   },
 ])
