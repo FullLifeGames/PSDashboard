@@ -11,10 +11,9 @@ import { bankTeamsFor, bankWorldsFor } from './bank-build';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B2: the twelve feedback fixtures rebuilt the way the bank builds them (pinned
- * Smogon data, `bankTeamsFor`) with the app's reconstruction, with every turn's record, emitted block and boundary position kept for
- * the rows of `forced-reconstruction.spec.ts`. The reconstruction stops before each game's last block, as the feedback run's drift
- * line counts it (356 turns).
+ * The twelve feedback fixtures rebuilt the way the bank builds them (pinned Smogon data, `bankTeamsFor`) with the app's reconstruction,
+ * with every turn's record, emitted block and boundary position kept for the rows of `forced-reconstruction.spec.ts`. The
+ * reconstruction stops before each game's last block, as the feedback run's drift line counts it (356 turns).
  */
 
 export const FIXTURES = [
@@ -55,11 +54,11 @@ export interface Rebuilt {
 
 /** Rebuilds a fixture like the app: teams as the bank builds them, the 16-seed (or later the forced) reconstruction, boundaries captured. */
 export async function rebuild(id: string, options: { naked?: boolean; corpus?: boolean; through?: number; bare?: boolean } = {}): Promise<Rebuilt> {
-  // Round 86 (B9): `corpus` reads a replay of the local fit corpus (the bank's replays) with the disk-cached Smogon data the bank pins
+  // `corpus` reads a replay of the local fit corpus (the bank's replays) with the disk-cached Smogon data the bank pins
   const replay = JSON.parse(readFileSync(options.corpus ? join('.fit-corpus', `${id}.json`) : join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
   await loadSimMods(getBranchSimulatorFormat(replay));
   const parsed = parseReplayLogWithObservations(replay.log);
-  // Round 86 (B4b): `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
+  // `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
   const built = options.naked
     ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), usageStats: null, reason: 'no teams' }
     : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: options.corpus ? diskCachedSmogonFetcher() : pinnedFetcher });
@@ -75,7 +74,7 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
     format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: lastTurn,
     snapshot: snapshotFor(lastTurn), playerNames: [replay.players[0], replay.players[1]],
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
-    // Round 89 (#124): the heaviest world, the one the app's main line stores; a pinned or bring-all game has the one world it had.
+    // The heaviest world, the one the app's main line stores; a pinned or bring-all game has the one world it had.
     bringOnly: bankWorldsFor(replay, parseReplayLog(replay.log), built.usageStats)[0].bringOnly,
     deadlineMs: 600_000,
     capturePositions: options.bare ? undefined : { snapshotFor, onPosition: (turn, battle) => { positions.set(turn, serializeLiveBattle(battle)); } },

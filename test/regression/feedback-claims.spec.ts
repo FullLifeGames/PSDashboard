@@ -5,12 +5,9 @@ import { evaluateItem, validateCorpus } from '../e2e-feedback/claims';
 import { renderReport } from '../e2e-feedback/report';
 
 /**
- * The claim evaluator is the drift harness's comparison brain — pinned here
- * with synthetic analyses so the browser run stays on-demand while the
- * logic is gated. Statuses: truth → ok | drift | pending (unpinned);
- * gap → gap-open (engine still says what baseline observed) | gap-moved |
- * pending (no baseline yet). WARN-ONLY by design: statuses are report
- * content, the evaluator itself never throws.
+ * The claim evaluator is the drift harness's comparison brain, pinned with synthetic analyses so the browser run stays on demand.
+ * Statuses: truth gives ok | drift | pending (unpinned); gap gives gap-open (the engine still says what the baseline observed) |
+ * gap-moved | pending (no baseline yet). Warn only: statuses are report content, the evaluator itself never throws.
  */
 
 const side = (over: Record<string, unknown> = {}) => ({
@@ -108,8 +105,7 @@ describe('claim evaluator', () => {
 });
 
 describe('corpus validation', () => {
-  // Generous means above every fixture's real length: 573756 runs 139 turns
-  // and carries pins deep into its endgame (t138).
+  // Generous means above every fixture's real length: 573756 runs 139 turns and carries pins deep into its endgame (t138).
   const turns = Object.fromEntries(FEEDBACK_REPLAYS.map(id => [id, 150]));
 
   test('the shipped corpus is well-formed against generous turn counts', () => {
@@ -150,8 +146,7 @@ describe('drift report rendering', () => {
   });
 
   test('a runner-constructed error entry renders as ERROR, never silence', () => {
-    // The evaluator never emits 'error' — the runner builds these when a
-    // replay cannot be graded at all (the 653785 wedged-sweep baseline).
+    // The evaluator never emits 'error': the runner builds these when a replay cannot be graded at all.
     const errorResult = { item: truthAt(12), status: 'error' as const, details: ['sweep wedged at 10/26 — no progress for 360s'] };
     const meta = { commit: 'abc1234', date: '2026-08-14', settingsLine: 'd2s3 auto', wallTimes: {}, noticeByReplay: {}, evalErrorsByReplay: {}, alignmentByReplay: {} };
     const { markdown } = renderReport([errorResult], meta);
@@ -187,7 +182,7 @@ describe('drift report rendering', () => {
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · faint');
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · fallback');
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · seeded ');
-    // Round 86 (ruling C2): the turns that play under another seed than index 0 stand beside the fallback turns
+    // The turns that play under another seed than index 0 stand beside the fallback turns
     expect(markdown).toContain('seeded-replay perfect 11/12 · soft 1 · seeded 3 · fallback 1');
     expect(markdown).not.toContain('no-sweep');
   });

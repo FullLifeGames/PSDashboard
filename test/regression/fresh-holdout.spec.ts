@@ -8,10 +8,9 @@ import {
 } from '../../scripts/fresh-holdout.mjs';
 
 /**
- * Round 86 (the fresh VGC holdout, step H2): scripts/fresh-holdout.mjs draws a holdout of rated ladder games that no
- * tracked file, no local note and no .fit-corpus file names. The rule is written and deterministic: per format by
- * rating, one game per player pair over the whole draw. The fixture below stands in for the public replay search, so
- * no spec here touches the network.
+ * scripts/fresh-holdout.mjs draws a holdout of rated ladder games that no tracked file, no local note and no .fit-corpus file names.
+ * The rule is written and deterministic: per format by rating, one game per player pair over the whole draw. The fixture below stands
+ * in for the public replay search, so no spec here touches the network.
  */
 
 type Row = { id: string; format: string; rating: number | null; players: string[] };

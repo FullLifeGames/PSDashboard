@@ -2,7 +2,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { dexOf, logRules, toId, type RulesDex } from '@fulllifegames/replay-core';
 
 /**
- * Round 89 (#146): the oracle of `logged-move-corpus.spec.ts`, its own reading of a log. For each body it lists the moves the log
+ * The oracle of `logged-move-corpus.spec.ts`, its own reading of a log. For each body it lists the moves the log
  * shows as the body's own and where each came from, and it says which of them a built set lacks. It does not call the inference's
  * `ownMove`: the sweep holds that reader to the log.
  *
@@ -22,9 +22,7 @@ import { dexOf, logRules, toId, type RulesDex } from '@fulllifegames/replay-core
 export type Via = 'own' | 'transform' | 'from-move';
 export interface LoggedBody {
   side: 'p1' | 'p2';
-  /** Every species name the log shows for this nickname (switch details, forme changes). */
   species: Set<string>;
-  /** The booked moves, each with the kinds of line that book it. */
   moves: Map<string, Set<Via>>;
   /** The nickname is shared by several species of the side: the inference reads a body by nickname and cannot tell them apart. */
   sharedNick: boolean;
@@ -125,11 +123,10 @@ export interface Gap {
   side: 'p1' | 'p2';
   species: string;
   move: string;
-  /** The kinds of line that book the move: the owner of the gap follows from them. */
   via: Via[];
-  /** The body also holds a move a `[from] move:` line shows: the build's booking of the caller takes a slot a fifth move then lacks (#140). */
+  /** The body also holds a move a `[from] move:` line shows: the build's booking of the caller takes a slot a fifth move then lacks. */
   fromMoveBody: boolean;
-  /** The body may be a Zoroark behind its Illusion (the Dex gives a team member the ability), whose moves the log shows under another name (#141). */
+  /** The body may be a Zoroark behind its Illusion (the Dex gives a team member the ability), whose moves the log shows under another name. */
   illusion: boolean;
   /** The body's nickname is shared by several species of its side (the gen 2 log "???"): the inference cannot tell them apart. */
   sharedNick: boolean;

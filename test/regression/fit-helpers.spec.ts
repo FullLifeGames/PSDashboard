@@ -71,8 +71,8 @@ describe('fit helpers', () => {
     expect(brierScore(samples, k0, k1)).toBeLessThanOrEqual(brierScore(samples, constant) + 1e-9);
   });
 
-  // Round 48: the phase fit used to stop after 500 fixed gradient steps, a fifth of the way along its slow
-  // direction (the k1 column carries a tenth of k0's curvature). Every K pin read an intermediate state.
+  // The phase fit runs to the maximum: the k1 column carries a tenth of k0's curvature, so 500 fixed gradient steps stop a fifth of
+  // the way along the slow direction and every K pin reads an intermediate state.
   test('the phase fit runs to the maximum: the gradient vanishes and long gradient descent agrees', () => {
     const samples = synth(1.0, 3.0);
     const { k0, k1 } = fitPhaseK(samples);
@@ -181,10 +181,8 @@ describe('cv helpers (round 8)', () => {
   });
 
   test('cross-validation prefers the causal basis under collinearity', () => {
-    // Kernversprechen der Runde: Outcome hängt nur an Spalte 0 (A);
-    // Spalte 1 (B) = A + Rauschen. Die Basis MIT A (B maskiert) muss die
-    // Basis NUR-B out-of-fold schlagen — Koeffizienten-SEs könnten das
-    // unter Kollinearität nicht entscheiden, CV muss es.
+    // The outcome depends only on column 0 (A); column 1 (B) = A + noise. The basis with A (B masked) must beat the basis with B only
+    // out of fold: coefficient SEs could not decide that under collinearity, CV must.
     let seed = 42;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
     const samples: CvSample[] = [];
@@ -203,10 +201,9 @@ describe('cv helpers (round 8)', () => {
 });
 
 /**
- * Round 64 (T127): the static's weights fitted in today's model form at the
- * fixed K of winprob.ts, P = sigmoid(K(game type, phase) · tanh(Σ w·g)), one
- * weight per column shared by both game types, a doubles override where the
- * doubles table differs, the columns at 0 in both tables held.
+ * The static's weights fitted in today's model form at the fixed K of winprob.ts, P = sigmoid(K(game type, phase) · tanh(Σ w·g)),
+ * one weight per column shared by both game types, a doubles override where the doubles table differs, the columns at 0 in both
+ * tables held.
  */
 describe('weights at a fixed K (round 64, T127)', () => {
   const K = { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } };
@@ -302,7 +299,7 @@ describe('weights at a fixed K (round 64, T127)', () => {
     expect(kept.verdict.adopt).toBe(false);
   });
 
-  // Round 65: the pre-registered holds (the two sign-unsure weights and the boost weights of variant E) are a report option.
+  // The pre-registered holds (the two sign-unsure weights and the boost weights of variant E) are a report option.
   test('a held weight keeps its start in the fit, the bands and the proposal', () => {
     const samples = corpus([1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], 600, 5);
     const names = ['bodies', 'boosts', 'tailwind', 'sweep'];
@@ -404,7 +401,6 @@ describe('calibration lib', () => {
     expect(mergeDumps(slices)).toEqual(sortSamples(samples));
   });
 
-  // Round 65 (D26): the doubles verdict reads the bank's dump together with the holdout's, one comma list per side.
   test('a comma list loads every dump in order, a single path loads one', () => {
     const dir = mkdtempSync(join(tmpdir(), 'calibration-lib-'));
     const bank = join(dir, 'bank.jsonl');
@@ -416,7 +412,6 @@ describe('calibration lib', () => {
     expect(keys(load(holdout))).toEqual(['gen9doublesou-2#3', 'gen9vgc2026regi-3#4']);
   });
 
-  // Round 67 (T114): one bank run pairs the root's solved game value against its score.
   test('a field flag reads another number as the score; a sample without it keeps its score', () => {
     const { argv, aField, bField } = takeFieldArgs(['a.jsonl', '--b-field', 'gameValue', 'b.jsonl', '--quality', 'hq']);
     expect(argv).toEqual(['a.jsonl', 'b.jsonl', '--quality', 'hq']);
@@ -430,9 +425,8 @@ describe('calibration lib', () => {
 });
 
 /**
- * Round 48: a paired verdict carries its error bar. One replay yields up to
- * eight positions with ONE outcome, so the bootstrap resamples replays, not
- * positions, and a row reads as a verdict only when its band clears zero.
+ * A paired verdict carries its error bar. One replay yields up to eight positions with ONE outcome, so the bootstrap resamples
+ * replays, not positions, and a row reads as a verdict only when its band clears zero.
  */
 describe('paired bands (round 48)', () => {
   interface BankSample extends Sample { quality: 'hq' | 'std'; luckAgainstFavored: boolean }
@@ -477,7 +471,6 @@ describe('paired bands (round 48)', () => {
     const lines = bandLines(result);
     expect(lines[0]).toContain('joined n=120');
     expect(lines[1]).toBe(' full:');
-    // Pooled rows come first: all phases, then per game type.
     expect(lines[2]).toBe('   all      all       +0 [+0, +0]  se 0  n=120/30g  P(B better)=0%  unmoved');
     expect(lines[3].startsWith('   singles  all ')).toBe(true);
     expect(lines.at(-1)).toBe('bank verdict: no gain resolved; no harm; no warnings');
@@ -499,7 +492,6 @@ describe('paired bands (round 48)', () => {
     const verdict = bankVerdict(result);
     expect(verdict.gain).toHaveLength(0);
     expect(verdict.harm.map((row: BandRow) => `${row.view} ${row.gameType}`)).toContain('full singles');
-    // The mirror image reads as a gain.
     const mirrored = pairedBands(b, a);
     expect(rowOf(mirrored.rows, 'full', 'all', 'all').reading).toBe('B better');
     expect(bankVerdict(mirrored).gain.length).toBeGreaterThan(0);
@@ -522,7 +514,7 @@ describe('paired bands (round 48)', () => {
     expect(rowOf(result.rows, 'full', 'doubles', 'all').reading).toBe('unmoved');
   });
 
-  // Round 49: a fix that moved 38 of 833 positions read +1 bp [+0, +2], resolved and irrelevant.
+  // A fix that moved 38 of 833 positions read +1 bp [+0, +2], resolved and irrelevant.
   test('harm and warnings need size: a resolved shift under 5 bp is a note', () => {
     const a = bank();
     const small = pairedBands(a, a.map(sample => against(sample, 0.0001)));
@@ -540,11 +532,9 @@ describe('paired bands (round 48)', () => {
   });
 
   /**
-   * Round 62 (D25): under one fixed K the bank pays for scale. A root that
-   * reads doubles early flatter and late steeper wins on the bank without a
-   * single better decision (doubles −35 bp from rescaling alone). The second
-   * table gives each side its own K per game type and phase, so only a
-   * better ordering of the positions reads as a gain.
+   * Under one fixed K the bank pays for scale: a root that reads doubles early flatter and late steeper wins on the bank without a
+   * single better decision (doubles −35 bp from rescaling alone). The second table gives each side its own K per game type and
+   * phase, so only a better ordering of the positions reads as a gain.
    */
   describe('own K per phase (round 63, T52 step 1)', () => {
     const scaled = (samples: BankSample[], gameType: string, phase: string, by: number) =>

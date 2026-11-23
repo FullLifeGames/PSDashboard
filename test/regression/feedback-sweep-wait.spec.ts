@@ -3,11 +3,10 @@ import type { Page } from '@playwright/test';
 import { guardedEvaluate, waitForSweepEnd } from '../e2e-feedback/sweep-wait';
 
 /**
- * Round 88 (T328, #64): the feedback harness stops on a dead renderer within minutes. Round 86's 573756 test ran
- * out of memory in the renderer: every worker closed, the page's timer stopped, `page.evaluate` never returned and
- * Playwright raised no `crash` event, so the run held the machine for the whole 40 minute test timeout.
- * A fake page stands for each state; the poll times are scaled down to milliseconds. The harness is the same for
- * singles, doubles and VGC (it reads the debug handle after the sweep and knows no game type).
+ * The feedback harness stops on a dead renderer within minutes. A renderer that ran out of memory closes every worker and stops the
+ * page's timer: `page.evaluate` never returns and Playwright raises no `crash` event, so a run would hold the machine for the whole
+ * 40 minute test timeout. A fake page stands for each state; the poll times are scaled down to milliseconds. The harness is the same
+ * for singles, doubles and VGC (it reads the debug handle after the sweep and knows no game type).
  */
 
 const FAST = { pollMs: 5, evalTimeoutMs: 15 };

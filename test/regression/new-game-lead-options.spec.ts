@@ -4,7 +4,7 @@ import { loadSimMods, startGameLog } from '@fulllifegames/eval-engine';
 import { gameLeadOptions } from '../../src/lib/new-game/lead-options';
 import { newGameRecord, type NewGameRecord } from '../../src/lib/new-game/record';
 
-/** Round 89 (lane H, #105), stage H3: a new game offers its record's teams to the lead picker, in a format with team preview and in one without. */
+/** A new game offers its record's teams to the lead picker, in a format with team preview and in one without. */
 
 const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({
   name: species, species, item: '', ability: '', moves: ['Earthquake', 'Protect'], nature: '', gender: '',

@@ -6,11 +6,10 @@ import { join } from 'node:path';
 import dexPlugin from '../../eslint.dex.mjs';
 
 /**
- * Round 75 (T160, decision D1): the rule dex/no-global-dex-read. The global Dex of @pkmn/sim (and of @pkmn/dex) is Generation 9 on
- * Scarlet/Violet, so a read of it is wrong for the type chart of Gens 1 to 5, a species' older stats and abilities, and the
- * Pokémon Champions mod. replay-core, eval-engine and the app read rules only through rules-dex.ts; the rule fails `npm run lint` on any other value
- * reference to an imported `Dex`. It replaces the census spec of round 67: no exceptions, and a new read is a lint error, not a number.
- * The rule reads code, not games: a singles and a doubles log reach it the same way.
+ * The rule dex/no-global-dex-read. The global Dex of @pkmn/sim (and of @pkmn/dex) is Generation 9 on Scarlet/Violet, so a read of it is
+ * wrong for the type chart of Gens 1 to 5, a species' older stats and abilities, and the Pokémon Champions mod. replay-core,
+ * eval-engine and the app read rules only through rules-dex.ts; the rule fails `npm run lint` on any other value reference to an
+ * imported `Dex`. The rule reads code, not games: a singles and a doubles log reach it the same way.
  */
 const RULE = 'dex/no-global-dex-read';
 const linter = new Linter();

@@ -14,10 +14,9 @@ import type { ReplayJobResponse, RolledCopyJob } from '../../src/lib/replay-jobs
 import { rebuild, type FixtureId, type Rebuilt } from './forced-reconstruction-support';
 
 /**
- * The replay jobs are the SAME computation the main thread ran, moved into
- * a worker (round 38): the worker handler must hand out the byte-identical
- * positions and the identical solved spreads — otherwise the exact-position
- * store, the eval cache, and the feedback corpus would silently drift.
+ * The replay jobs are the same computation the main thread ran, moved into a worker: the worker handler must hand out the
+ * byte-identical positions and the identical solved spreads, or the exact-position store, the eval cache and the feedback corpus
+ * would silently drift.
  */
 const TARGET = 20;
 

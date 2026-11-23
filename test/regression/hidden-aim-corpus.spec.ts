@@ -3,11 +3,11 @@ import { describe, expect, test } from 'vitest';
 import { CORPUS, rebuildThrough } from './rebuild-through';
 
 /**
- * Round 89 (#136): the protocol hides the target of a move that fails before it animates (`|move|p2b: Sableye|Disable||[still]`), and the
- * rebuild aimed it at the foe in slot a: the Disable or Encore that failed on a fresh switch-in landed on the body in slot a, and the
- * rebuilt body carried a volatile the game never gave it. Each row rebuilds a corpus game through the turn, like the bank does: the move
- * line of the block hides its target as the log's does, and the foe in slot a has no such volatile at the next boundary.
- * The unit rows and the sweep are in `packages/eval-engine/test/hidden-aim.spec.ts`.
+ * The protocol hides the target of a move that fails before it animates (`|move|p2b: Sableye|Disable||[still]`), and the rebuild
+ * aimed it at the foe in slot a: the Disable or Encore that failed on a fresh switch-in landed on the body in slot a, and the rebuilt
+ * body carried a volatile the game never gave it. Each row rebuilds a corpus game through the turn, like the bank does: the move line
+ * of the block hides its target as the log's does, and the foe in slot a has no such volatile at the next boundary. The unit rows
+ * and the sweep are in `packages/eval-engine/test/hidden-aim.spec.ts`.
  */
 interface Row { id: string; turn: number; type: string; line: RegExp; victim: string; volatile: string }
 

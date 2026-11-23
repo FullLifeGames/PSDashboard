@@ -10,10 +10,7 @@ import {
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../../src/lib/smogon-stats';
 
-/**
- * The committed feedback fixtures must stay parseable and long enough for
- * every corpus turn — the cheap, always-on half of the drift harness.
- */
+/** The committed feedback fixtures stay parseable and long enough for every corpus turn: the cheap, always-on half of the drift harness. */
 test('feedback fixtures parse and cover every corpus turn', () => {
   const turnsByReplay: Record<string, number> = {};
   for (const id of FEEDBACK_REPLAYS) {
@@ -29,18 +26,12 @@ test('feedback fixtures parse and cover every corpus turn', () => {
 });
 
 /**
- * 573756: p1's Toxapex died to a Stomping Tantrum with 23% left. Read as a
- * damage reading, that knock-out hit made every rung whose weakest roll
- * exceeds 23% look wrong and solved a physically defensive Toxapex (Bold
- * 252 Def, Tantrum 45% where the real hit did 59%) over the specially
- * defensive prior; read as a lower bound, the physical hits settle Def at
- * 0. The mirror image on the attacker side: Melmetal's knock-outs read as
- * small hits had solved it to 0 Atk. (Without Smogon fills the special
- * side stays at the base guess: no special hit measured it.)
- * Round 64 (T122): every clean physical hit fits Def 0 and Def 232 alike
- * (lane H's 53-line reading), so the old Def 0 was the tie-break toward the
- * prior; the solve now refills the open budget as far as the lines allow.
- * What the knock-out must not do is pull the fit off the clean hits.
+ * 573756: p1's Toxapex died to a Stomping Tantrum with 23% left. Read as a damage reading, that knock-out hit made every rung whose
+ * weakest roll exceeds 23% look wrong and solved a physically defensive Toxapex (Bold 252 Def, Tantrum 45% where the real hit did 59%)
+ * over the specially defensive prior; read as a lower bound, the physical hits settle Def at 0. The mirror image on the attacker side:
+ * Melmetal's knock-outs read as small hits had solved it to 0 Atk. (Without Smogon fills the special side stays at the base guess: no
+ * special hit measured it.) Every clean physical hit fits Def 0 and Def 232 alike, so the solve refills the open budget as far as the
+ * lines allow. What the knock-out must not do is pull the fit off the clean hits.
  */
 test('573756: the lethal-aware fit drops the knock-out bias on both sides', () => {
   const replay = JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', 'smogtours-gen8ou-573756.json'), 'utf-8')) as { log: string };
@@ -56,7 +47,6 @@ test('573756: the lethal-aware fit drops the knock-out bias on both sides', () =
   expect(melmetal!.evs.atk).toBe(252);
 });
 
-/** The harness's set fixtures, served the way hermetic.ts serves them. */
 const fixtureFetcher = async (url: string) => {
   const path = url.replace(/^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/, '').replace(/\/{2,}/g, '/');
   const file = join('test', 'e2e-feedback', 'fixtures', 'smogon', `${path.replace(/[^a-z0-9.]+/gi, '_')}.json`);
@@ -65,13 +55,9 @@ const fixtureFetcher = async (url: string) => {
 };
 
 /**
- * Round 33: the corpus runs with the published sets the app now loads.
- * 573756 under gen8ou sets: p1's Toxapex takes the specially defensive
- * curated set (SpD 252, Def 0 fitted from the physical knock-outs), and
- * Corviknight the curated 248/136/124 spread. Round 40: the log's 303/303
- * pins Toxapex at 248 HP EVs; the SpD claim stands beside it. Round 64
- * (T122): the open budget refills toward the prior, so the exact split moved
- * (248/20/240); the claim is the specially defensive set at 248 HP.
+ * The corpus runs with the published sets the app loads. 573756 under gen8ou sets: p1's Toxapex takes the specially defensive curated
+ * set (SpD 252, Def 0 fitted from the physical knock-outs), and Corviknight the curated 248/136/124 spread. The log's 303/303 pins
+ * Toxapex at 248 HP EVs and the open budget refills toward the prior (248/20/240); the claim is the specially defensive set at 248 HP.
  */
 test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', async () => {
   for (const name of ['_sets_gen6ou.json.json', '_sets_gen8ou.json.json']) {
@@ -90,9 +76,8 @@ test('573756: the set fixtures feed the curated Toxapex and Corviknight sets', a
 });
 
 /**
- * Round 37: 573756 t72, Magnezone (base 60) attacked before Garchomp. No
- * legal Magnezone spread reaches a Garchomp's slowest common spread, so the
- * solver gives it the Choice Scarf and the Timid 252 Speed that carries it.
+ * 573756 t72: Magnezone (base 60) attacked before Garchomp. No legal Magnezone spread reaches a Garchomp's slowest common spread,
+ * so the solver gives it the Choice Scarf and the Timid 252 Speed that carries it.
  */
 test('573756: Magnezone holds the Choice Scarf the move order proves', async () => {
   const replay = JSON.parse(readFileSync(join('test', 'e2e-feedback', 'fixtures', 'smogtours-gen8ou-573756.json'), 'utf-8')) as { log: string };
@@ -106,20 +91,16 @@ test('573756: Magnezone holds the Choice Scarf the move order proves', async () 
 });
 
 /**
- * Round 49: the census replays are doubles games without corpus items. The
- * drift run turns red on any data.pkmn.cc request that has no pin, and a
- * red census replay leaves no row in the report, so the always-on half
- * checks here what the run would trip over: the fixture's shape, ten played
- * turns, the game type, a readable bring of four on both sides of a VGC
- * game (without it the app evaluates six bodies a side), and a pin (body or
- * 404 marker) behind every Smogon URL the replay's format asks for.
- * Round 67: Champions OU joins as the one singles census game; every other
- * census game is doubles.
+ * The census replays are doubles games without corpus items (Champions OU is the one singles census game). The drift run turns red on
+ * any data.pkmn.cc request that has no pin, and a red census replay leaves no row in the report, so the always-on half checks here
+ * what the run would trip over: the fixture's shape, ten played turns, the game type, a readable bring of four on both sides of a VGC
+ * game (without it the app evaluates six bodies a side), and a pin (body or 404 marker) behind every Smogon URL the replay's format
+ * asks for.
  */
 const SINGLES_CENSUS: readonly string[] = ['gen9championsou-2628340185'];
 
 test('census fixtures are doubles games (Champions OU singles) with every Smogon input pinned', async () => {
-  // Round 75 (T160): the census holds Champions games, whose inference reads the registered mod.
+  // The census holds Champions games, whose inference reads the registered mod.
   await loadSimMods('gen9championsou');
   expect(FEEDBACK_CENSUS_REPLAYS.filter(id => (FEEDBACK_REPLAYS as readonly string[]).includes(id))).toEqual([]);
   expect(FEEDBACK_CORPUS.filter(item => (FEEDBACK_CENSUS_REPLAYS as readonly string[]).includes(item.replay))).toEqual([]);

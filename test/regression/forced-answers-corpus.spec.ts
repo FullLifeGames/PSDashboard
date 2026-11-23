@@ -3,12 +3,11 @@ import { describe, expect, test } from 'vitest';
 import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
 
 /**
- * Round 89 (#131, #144): the forced answers of the rebuild. A replacement request is answered from the log's switch lines, and a Revival
- * Blessing request from the log's `-heal ... [from] move: Revival Blessing` line. Before, the list kept the species of each switch line and
- * dropped its slot, so a pair written b before a filled the slots in the wrong order (VGC 2454075999: Ditto in p2b copied Raging Bolt instead
- * of Zamazenta), a request the log leaves half empty sent one bench body into two slots (Champions VGC 2682059865), and the revive request
- * took the next switch species or the first living body, which the simulator refuses ("You have to pass to a fainted Pokémon"; the
- * rebuild then plays `default`, the first fainted body of the party).
+ * The forced answers of the rebuild. A replacement request is answered from the log's switch lines, and a Revival Blessing request
+ * from the log's `-heal ... [from] move: Revival Blessing` line. Each answer keeps the slot of its switch line: a pair written b before
+ * a fills the slots in the log's order (VGC 2454075999: Ditto in p2b copies Zamazenta, not Raging Bolt); a request the log leaves half
+ * empty sends no bench body into two slots (Champions VGC 2682059865); a revive request takes the body the log names, since the
+ * simulator refuses a living one ("You have to pass to a fainted Pokémon").
  *
  * Each row rebuilds a corpus game like the bank does, through the turn, and compares the turn's emitted block with the log's block. The
  * unit rows with the same causes are in `packages/eval-engine/test/forced-answers.spec.ts`.

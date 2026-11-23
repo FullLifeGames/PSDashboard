@@ -5,9 +5,8 @@ import { deserializeBattleExact } from '@fulllifegames/eval-engine';
 import { rebuild } from './forced-reconstruction-support';
 
 /**
- * Round 89 (#106): the PP a move has left, on the corpus games where Revival Blessing (1 PP) was used and the same body moves again. The
- * Evaluation panel ranked the move first at the next boundary: the rebuilt slot read 1/1 where the game's read 0/1. Three scenes of the
- * probe of lanes/C/c1-pp.txt (40 games with the move, 12 of them wrong at a boundary before the fix):
+ * The PP a move has left, on the corpus games where Revival Blessing (1 PP) was used and the same body moves again. The Evaluation
+ * panel ranked the move first at the next boundary: the rebuilt slot read 1/1 where the game's read 0/1. Three scenes:
  * - cause A, singles: 2692599072 turn 5, Pawmot's built Leppa Berry eats in the rebuild and restores the move; the log shows no berry;
  * - cause B, doubles: 2695388932 turn 8, the rebuild knocks Rabsca out before it acts, so the move never runs there;
  * - the guard, singles: 2691485449 turns 13 and 14, the log shows the Leppa Berry, so the move reads 1/1 at turn 14 and stays on offer.

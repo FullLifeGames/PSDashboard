@@ -4,30 +4,16 @@ import { ENDGAME_FIXTURES } from './endgame-fixtures';
 import { proveForcedWin, MIN_FORCED_MASS, type ForcedWinCaveat } from '@fulllifegames/eval-engine';
 
 /**
- * The forced-win prover over the synthetic endgames (round 35): the proofs
- * the spec expects, the clean failures, and the mass cases, pinned from the
- * first sighting against the round-34 solver values. Findings: fixed damage
- * proves without the crit label (toss-race-2v3 in 2); a speed tie reads one
- * half however many ties precede the deciding one (toss-race-even, the
- * 2HKO tie); the two walls without an attack lose in 3 (one-v-two-breaker,
- * where the solver capped at 0.294); with classes the draws never showed
- * left open, the burned heal war, the PP lock, and the Scarf lock prove
- * for p2 over three to five turns on the sampled rolls (healer-burned and
- * choice-locked at mass 1 once a missing class inherits the proof of the
- * class that dominates it, struggle-lock 0.99584 at round 89, five digits); focus-blast-range (a
- * twelve-turn miss chain) read 0.9999 in rounds 35 and 88 (round 86 lost the
- * proof to 163 cells against the budget's 100, and round 88, T336, brought it
- * back: the class in which the Special Defense drop fired takes the proof of
- * the class in which it did not), and reads no proof at 100 cells since round
- * 89, where each cell rolls its own dice (281 to 420 cells; the room test
- * below holds 0.99 to 0.99995 in 12 turns at 5,000); the six-turn heal war
- * healer-vs-band and its doubles twin read mass 1 since round 89 (A5f-7), once
- * the full proof stopped waiting for a greedy five-turn line;
- * fixed-vs-ghost and the sack fail at the depth cap or
- * at unpriced cells, honestly; doubles proofs carry the sampled-rolls
- * label, a doubles speed tie prices each order as one half since round 67
- * (doubles-ohko-tie, a coin flip like the singles ohko-tie), and
- * the doubles spread cells stay unpriced.
+ * The forced-win prover over the synthetic endgames: the proofs the spec expects, the clean failures, and the mass cases. Fixed damage
+ * proves without the crit label (toss-race-2v3 in 2); a speed tie reads one half however many ties precede the deciding one
+ * (toss-race-even, the 2HKO tie); the two walls without an attack lose in 3 (one-v-two-breaker, where the solver capped at 0.294);
+ * with classes the draws never showed left open, the burned heal war, the PP lock and the Scarf lock prove for p2 over three to five
+ * turns on the sampled rolls (healer-burned and choice-locked at mass 1, once a missing class inherits the proof of the class that
+ * dominates it; struggle-lock 0.99584, five digits). focus-blast-range (a twelve-turn miss chain) reads no proof at 100 cells: each
+ * cell rolls its own dice (281 to 420 cells; the room test below holds 0.99 to 0.99995 in 12 turns at 5,000). The six-turn heal war
+ * healer-vs-band and its doubles twin read mass 1. fixed-vs-ghost and the sack fail at the depth cap or at unpriced cells, honestly;
+ * doubles proofs carry the sampled-rolls label, a doubles speed tie prices each order as one half (doubles-ohko-tie, a coin flip like
+ * the singles ohko-tie), and the doubles spread cells stay unpriced.
  */
 interface Expected { side: 'p1' | 'p2'; mass: number | null; turns?: number; maxTurns?: number; caveat?: ForcedWinCaveat; digits?: number }
 
@@ -48,16 +34,15 @@ const EXPECTED: Record<string, Expected> = {
   'toxic-stall': { side: 'p2', mass: 1, turns: 2, caveat: 'barring-crit' },
   'one-v-two-breaker': { side: 'p1', mass: 1, turns: 4, caveat: 'barring-crit' },
   'two-v-one-sack': { side: 'p1', mass: null },
-  // Round 88 (T336, #72): back at 0.9999 in 12 turns. Round 89 (A5, T322): each cell now rolls its own dice, so "hit, then miss" and
-  // "miss, then hit" leave the Blissey a few HP apart and the memo no longer merges them; the proof needs 281 to 420 cells where
-  // PROVER_BUDGET.cells allows 100, and the row reads no proof at the production budget (user ruling of 10.11.2026, 22a). The
-  // game still holds 0.99994 (Gengar loses only if all eight Focus Blasts miss and its Struggles fall short); the next test gives
-  // the prover room, so the T336 rule (the class in which the Special Defense drop fired takes the proof of the class in which it
-  // did not, endgame/prover-helping.ts) and the game's number stay guarded.
+  // Each cell rolls its own dice, so "hit, then miss" and "miss, then hit" leave the Blissey a few HP apart and the memo does not merge
+  // them: the proof needs 281 to 420 cells where PROVER_BUDGET.cells allows 100, and the row reads no proof at the production
+  // budget. The game still holds 0.99994 (Gengar loses only if all eight Focus Blasts miss and its Struggles fall short); the next
+  // test gives the prover room, so the rule that the class in which the Special Defense drop fired takes the proof of the class in
+  // which it did not (endgame/prover-helping.ts) and the game's number stay guarded.
   'focus-blast-range': { side: 'p1', mass: null },
   'struggle-lock': { side: 'p2', mass: 0.99584, digits: 5, turns: 5, caveat: 'sampled-rolls' },
-  // The six-turn heal war (the game: Toxapex falls in every one of 10,000 simulated games, by turn 6 in 88 % of them). Round 89
-  // (A5f-7): the proof starts for the three ranked lines without the greedy five-turn scout that used to gate it, so it reads the win.
+  // The six-turn heal war (the game: Toxapex falls in every one of 10,000 simulated games, by turn 6 in 88 % of them). The proof starts
+  // for the three ranked lines, so it reads the win.
   'healer-vs-band': { side: 'p2', mass: 1, maxTurns: 9, caveat: 'sampled-rolls' },
   'healer-burned': { side: 'p2', mass: 1, turns: 4, caveat: 'sampled-rolls' },
   'choice-locked': { side: 'p2', mass: 1, turns: 3, caveat: 'sampled-rolls' },

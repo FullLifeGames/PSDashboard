@@ -9,15 +9,15 @@ import { CORPUS } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
- * Round 89 (#75 step 2, ruling 27): the item rung. A knockout that no spread of the set reaches (read by the game's display bounds, step 1) is the
- * log's word that the guessed item is wrong; the solver swaps in the first usage-listed boost item that makes every knockout of the attacker reach.
- * Rows read through the bank's and the app's build with the disk-cached Smogon data (local: skip without `.fit-corpus`):
- *  - VGC 2565721987 turn 6: Iron Bundle's Icy Wind takes Landorus from a shown 100 and the built best roll (Focus Sash, Timid, 252 Special Attack) is
- *    0.857; the best spread alone reaches 0.939. The usage list of Iron Bundle holds Choice Specs, which reaches.
- *  - Guards: Calyrex-Shadow of VGC 2169441191 (the format's usage file has no entry for the species: nothing to offer, the Covert Cloak stays),
- *    Samurott-Hisui of Champions VGC 2670219140 (a single line, below the two observations a solve needs), Chi-Yu of Doubles OU 2694468410 (the
- *    Choice Specs fits Overheat, but the Doubles OU lines leave the fit above the forfeit line, so the prior stands: proposal P8), and
- *    Lopunny-Mega of Gen 6 OU 648453 (an item the species needs is never swapped).
+ * The item rung. A knockout that no spread of the set reaches (read by the game's display bounds) is the log's word that the guessed
+ * item is wrong; the solver swaps in the first usage-listed boost item that makes every knockout of the attacker reach. Rows read
+ * through the bank's and the app's build with the disk-cached Smogon data (local: skip without `.fit-corpus`):
+ *  - VGC 2565721987 turn 6: Iron Bundle's Icy Wind takes Landorus from a shown 100 and the built best roll (Focus Sash, Timid, 252
+ *    Special Attack) is 0.857; the best spread alone reaches 0.939. The usage list of Iron Bundle holds Choice Specs, which reaches.
+ *  - Guards: Calyrex-Shadow of VGC 2169441191 (the format's usage file has no entry for the species: nothing to offer, the Covert Cloak
+ *    stays), Samurott-Hisui of Champions VGC 2670219140 (a single line, below the two observations a solve needs), Chi-Yu of Doubles
+ *    OU 2694468410 (the Choice Specs fits Overheat, but the Doubles OU lines leave the fit above the forfeit line, so the prior
+ *    stands), and Lopunny-Mega of Gen 6 OU 648453 (an item the species needs is never swapped).
  */
 interface Row {
   /** A feedback fixture (tracked, built with its pinned Smogon data) instead of a replay of the local corpus. */

@@ -37,8 +37,8 @@ test('cache keys: unchanged at the default, tagged under a form', () => {
 });
 
 test('the team-preview lead keeps its own matrix under auto, whatever the tree thresholds and early splits', () => {
-  // Round 61 review: the bank never samples turn 0, so the lead keeps the matrix until a measurement moves it;
-  // round 63 (T110): its own budget field, apart from the early splits of both game types.
+  // The bank never samples turn 0, so the lead keeps the matrix until a measurement moves it; it has its own budget field, apart from the
+  // early splits of both game types.
   expect(resolveAutoLeadSettings()).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
   const early = { earlyDepth: 2, earlySamples: 3, treeFrom: 0.25 } as const;
   configureSearchBudget({ ...SEARCH_BUDGET_DEFAULT, singles: early, doubles: early });

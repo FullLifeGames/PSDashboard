@@ -53,9 +53,8 @@ describe('search orchestrator', () => {
   });
 
   test('parity includes pivot pairs — the orchestrated matrix names the follow-ups', async () => {
-    // The app's worker-pool path builds its root options through the choices
-    // RPC; a bare "U-turn" row there while the sync path enumerated pairs was
-    // exactly the user-visible defect (the matrix never showed "U-turn → X").
+    // The worker-pool path builds its root options through the choices RPC: a bare "U-turn" row there would hide the "U-turn → X"
+    // pairs the sync path enumerates.
     const root = serialize(makeBattle(
       [
         makeSet('Mien', 'Mienshao', ['U-turn', 'Close Combat'], 100),
@@ -175,19 +174,17 @@ describe('search orchestrator', () => {
 });
 
 /**
- * Round 70: the horizon-trend probe runs from every base draw of a decisive cell of several draws (the seeds its value was
- * priced with) and compares each child with its own leaf. The orchestrator keeps the cell's draws from the executor's cell
- * values, asks for one probe per draw, and books the mean of the answers' trends. A cell of one draw gets the probe of
- * before the round, one job on its first child, booked as the child's score against the cell's value; so does an executor
+ * The horizon-trend probe runs from every base draw of a decisive cell of several draws and books the mean of the answers' trends.
+ * A cell of one draw gets one probe on its first child, booked as the child's score against the cell's value; so does an executor
  * that answers no trend.
  */
 describe('the trend probe over the base draws (round 70)', () => {
   const SETTINGS = { depth: 1, samples: 3, tera: false, prove: false } as const;
 
   /**
-   * A 2x2 matrix whose four cells all hold 0.2: every row and column ties, so the layers price every decisive cell. Each
-   * cell reports `draws` base draws (none for one); a probe of a draw answers with `trend(draw index)` when the protocol
-   * has it, and every probe with the score 1.1 (0.9 above the cell). The depth is 1, so every sub-search is a trend probe.
+   * A 2x2 matrix whose four cells all hold 0.2: every row and column ties, so the layers price every decisive cell. Each cell
+   * reports `draws` base draws (none for one); a probe of a draw answers `trend(draw index)` when the protocol has it, and every
+   * probe scores 1.1 (0.9 above the cell). The depth is 1, so every sub-search is a trend probe.
    */
   function tiedExecutor(draws: number, trend?: (index: number) => number) {
     const probes: EvalSubSearchJob[] = [];

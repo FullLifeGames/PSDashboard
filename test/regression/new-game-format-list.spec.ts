@@ -3,9 +3,9 @@ import { formatNote, loadPanelGroups, panelGroups, searchGroups, CALIBRATED_FORM
 import type { FormatGroup } from '../../src/lib/new-game/format-options';
 
 /**
- * Round 89 (lane H, #105), stage H4: the list of the New game dialog. The simulator's whole list, the five measured families on
- * top under "Calibrated", the Generation 9 Custom Games under "Custom Game", then a group per generation; the search finds a
- * format by its name or its id. Its own file: the Champions mod registers once per process.
+ * The list of the New game dialog: the simulator's whole list, the five measured families on top under "Calibrated", the Generation 9
+ * Custom Games under "Custom Game", then a group per generation; the search finds a format by its name or its id. Its own file: the
+ * Champions mod registers once per process.
  */
 
 describe('the dialog\'s format list', () => {

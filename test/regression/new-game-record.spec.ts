@@ -16,9 +16,9 @@ import {
 } from '../../src/lib/new-game/store';
 
 /**
- * Round 89 (lane H, #105), stage H2: the game record and its log (app library). The record is the truth and the log its replay:
- * header from the format's own battle, body from the simulator, no clock lines; the replay data carries the explicit format so
- * no helper infers it from the id; the store keeps at most 20 games; the format list is the registry's playable formats.
+ * The game record and its log (app library). The record is the truth and the log its replay: header from the format's own battle,
+ * body from the simulator, no clock lines; the replay data carries the explicit format so no helper infers it from the id; the store
+ * keeps at most 20 games; the format list is the registry's playable formats.
  */
 
 const entry = (turnNumber: number, extra: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
@@ -55,8 +55,8 @@ describe('the log of a game', () => {
     expect(assembleGameLog(['|t:|0', '|gametype|singles'], ['|start', '|t:|5', '|turn|1'])).toBe('|gametype|singles\n|start\n|turn|1');
   });
 
-  // Round 89 (#105, H7, tester finding 5): the Champions formats play on a Custom Game stand-in, whose debug flag writes "|debug|" lines
-  // that Showdown prints only in a Custom Game. The frame shows what Showdown shows: the chosen format decides.
+  // The Champions formats play on a Custom Game stand-in, whose debug flag writes "|debug|" lines that Showdown prints only in a
+  // Custom Game. The frame shows what Showdown shows: the chosen format decides.
   test.each([
     ['Gen 9 OU', 'gen9ou'], ['Doubles OU', 'gen9doublesou'], ['Scarlet/Violet VGC', 'gen9vgc2025regi'],
     ['Champions VGC', 'gen9championsvgc2026regmc'], ['Champions OU', 'gen9championsou'],
@@ -107,7 +107,7 @@ describe('the record', () => {
     expect(lead.createdAt).toBe('2026-11-12T10:00:00.000Z');
   });
 
-  // Round 89, H8 (wave-tester finding 8): the tip turn that waits for its replacement rides in the record's optional `pending`.
+  // The tip turn that waits for its replacement rides in the record's optional `pending`.
   test('a pending tip turn is kept without positions, leaves the main line alone, and the finished turn takes it away', async () => {
     const record = await recordOf('gen9ou');
     const lead = appendTurn(record, { entries: [entry(0, { leadChoices: { p1: ['A'], p2: ['B'] } })], lines: ['|start', '|turn|1'] });

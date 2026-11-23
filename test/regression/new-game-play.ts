@@ -9,8 +9,8 @@ import { gameStartParams } from '../../src/hooks/branch/game-rebuild';
 import { leadHistoryEntry, replayHistoryEntry } from '../../src/hooks/branch/replay-entry';
 
 /**
- * Round 89 (lane H, #105), stage H5: a new game played through the calls the hooks make, for the specs of the share link and the
- * state file (the invariant spec of H3, `new-game-log.spec.ts`, keeps its own copy of the loop with the re-adopting mode).
+ * A new game played through the calls the hooks make, for the specs of the share link and the state file (`new-game-log.spec.ts`
+ * keeps its own copy of the loop with the re-adopting mode).
  */
 
 export const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({

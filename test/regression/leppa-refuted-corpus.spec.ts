@@ -6,11 +6,11 @@ import { CORPUS } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
 /**
- * Round 89 (#132): a Pokémon that spends a move's last PP and shows no item line held no Leppa Berry. Champions OU 2692599072
- * turn 5: Pawmot uses Revival Blessing, its only PP, and no berry line follows; the rebuilt Pawmot held the Leppa Berry of the
- * Smogon set, ate it and offered Revival Blessing a second time. Each row reads a corpus game (local: the rows skip without
- * `.fit-corpus`) through the bank's and the app's build with the disk-cached Smogon data. The unit rows and the sweep that holds the
- * rule to the simulator are in `packages/replay-core/test/leppa-refuted.spec.ts` and `pp-trigger-sweep.spec.ts`.
+ * A Pokémon that spends a move's last PP and shows no item line held no Leppa Berry. Champions OU 2692599072 turn 5: Pawmot uses
+ * Revival Blessing, its only PP, and no berry line follows; the rebuilt Pawmot held the Leppa Berry of the Smogon set, ate it and
+ * offered Revival Blessing a second time. Each row reads a corpus game (local: the rows skip without `.fit-corpus`) through the
+ * bank's and the app's build with the disk-cached Smogon data. The unit rows and the sweep that holds the rule to the simulator are
+ * in `packages/replay-core/test/leppa-refuted.spec.ts` and `pp-trigger-sweep.spec.ts`.
  */
 
 interface Row { id: string; type: string; side: 'p1' | 'p2'; body: string; what: string; leppa: boolean }

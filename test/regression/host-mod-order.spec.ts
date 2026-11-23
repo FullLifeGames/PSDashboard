@@ -6,7 +6,7 @@ import { bankTeamsFor } from './bank-build';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 
 /**
- * Round 75 (T160, decision D2): the hosts load the Champions mod before the inference reads the resolver. A Pokémon Champions
+ * The hosts load the Champions mod before the inference reads the resolver. A Pokémon Champions
  * game reads the registered Champions Dex (replay-core's rulesDex), which loads on demand; without it the inference throws
  * instead of reading Scarlet/Violet. Three things are held here:
  *  - the order itself: a Champions replay throws before the load and infers after it; a replay of any other format loads nothing

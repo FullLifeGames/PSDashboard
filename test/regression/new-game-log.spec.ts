@@ -12,11 +12,11 @@ import { leadHistoryEntry, replayHistoryEntry } from '../../src/hooks/branch/rep
 import type { BranchRuntime } from '@fulllifegames/eval-engine';
 
 /**
- * Round 89 (lane H, #105), stage H3: the invariant of a new game. The record is the truth and its log the replay: a game of eight
- * turns, played two ways through the calls the hooks make (a continuous runtime, and a runtime adopted from the stored position at
- * the tip before every turn, as when the user comes back from a variation), grows its record by promotion, and the log it grew
- * equals the log the rebuild writes from the record's entries, byte for byte. Every position serializes equal and the parser reads
- * one snapshot per turn plus the tip. One row per family, Scarlet/Violet and Champions; the Champions realm loads its mod first.
+ * The invariant of a new game. The record is the truth and its log the replay: a game of eight turns, played two ways through the
+ * calls the hooks make (a continuous runtime, and a runtime adopted from the stored position at the tip before every turn, as when
+ * the user comes back from a variation), grows its record by promotion, and the log it grew equals the log the rebuild writes from
+ * the record's entries, byte for byte. Every position serializes equal and the parser reads one snapshot per turn plus the tip. One
+ * row per family, Scarlet/Violet and Champions; the Champions realm loads its mod first.
  */
 
 const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({

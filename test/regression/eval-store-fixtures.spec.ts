@@ -7,9 +7,8 @@ import {
 } from '../e2e/eval-store';
 
 /**
- * Round 90 (#222), step E2: the saved engine results that browser specs seed instead of searching. The helper rewrites the cache version
- * of a saved record to the current one (a score-touching round needs no new capture) and fails fast, naming the capture command, when a
- * record does not fit or the page starts a search anyway.
+ * The saved engine results that browser specs seed instead of searching. The helper rewrites the cache version of a saved record to
+ * the current one and fails fast, naming the capture command, when a record does not fit or the page starts a search anyway.
  */
 const record = (key: string, extra: Record<string, unknown> = {}) => ({
   key, result: { score: 0.5, rows: [] }, depth: 1, samples: 1, mode: 'mcts', tera: 'auto', savedAt: 0, ...extra,

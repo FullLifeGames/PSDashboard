@@ -11,10 +11,10 @@ import type { BranchHistoryEntry } from '../../src/lib/branch-history';
 import { FAMILIES, bareEntry, playRecord } from './new-game-play';
 
 /**
- * Round 89 (lane H, #105), stage H5: the share link of a game, version 2. The link holds what the game is made of (the format,
- * both teams, the seed, the leads and every choice) and nothing the reader can play again: the log, the positions and the names a
- * Dex knows stay out. The reader plays the entries on the format's own simulator and gets the record the sharer had. Version 1
- * links (a replay's branch) read as they did; a version this app does not know reads as a newer link.
+ * The share link of a game, version 2. The link holds what the game is made of (the format, both teams, the seed, the leads and every
+ * choice) and nothing the reader can play again: the log, the positions and the names a Dex knows stay out. The reader plays the
+ * entries on the format's own simulator and gets the record the sharer had. Version 1 links (a replay's branch) read as they did; a
+ * version this app does not know reads as a newer link.
  */
 
 /** What a rebuild replays of an entry: the rest is what the rebuild writes again. */

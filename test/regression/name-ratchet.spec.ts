@@ -7,10 +7,9 @@ import namesPlugin from '../../eslint.names.mjs';
 import { censusOf, loadUniverse, ROOT } from '../../scripts/name-census.mjs';
 
 /**
- * Round 72 (T236): the name ratchet. AGENTS.md says our code translates and reads library data and never writes species,
- * move, item or ability names; the lessons' census found about 440 such literals in packages/*\/src. The rule
- * names/no-new-dex-name counts a Dex name literal per file against scripts/name-baseline.json, which only shrinks: a pair that
- * is not in the baseline fails `npm run lint`, a pair that left the code does not.
+ * The name ratchet. AGENTS.md says our code translates and reads library data and never writes species, move, item or ability names.
+ * The rule names/no-new-dex-name counts a Dex name literal per file against scripts/name-baseline.json, which only shrinks: a pair
+ * that is not in the baseline fails `npm run lint`, a pair that left the code does not.
  *
  * The rule reads names, not formats: a singles log and a doubles log reach it the same way, so there is no game-type case.
  * Its limit: it sees a new name per file (a second `reflect` in a file that has one passes); the twin detector
