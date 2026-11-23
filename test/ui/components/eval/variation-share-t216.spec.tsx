@@ -13,11 +13,10 @@ vi.mock('../../../../src/components/PlayOutBar', () => ({ PlayOutBar: () => null
 vi.mock('../../../../src/components/BattleStatsPanel', () => ({ BattleStatsPanel: () => null }));
 
 /**
- * Round 70 (T216): a variation point in the graph and the panel's bar of the same position print one number, at the
- * fainted share of the variation's own board (not the main line's share of that turn number, and not the opening map),
- * in every engine mode. Expected values come from the formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10
- * at 0.5), not from winPercent. Scene: late game, the main line stood at 3 of 8 bodies down on turn 7, the variation
- * lost one more body and stands at 4 of 8; the live result scores 0.79 for Alice.
+ * A variation point in the graph and the panel's bar of the same position print one number, at the fainted share of the variation's own
+ * board (not the main line's share of that turn number, and not the opening map), in every engine mode. Expected values come from the
+ * formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10 at 0.5), not from winPercent. Scene: late game, the main line stood at
+ * 3 of 8 bodies down on turn 7, the variation lost one more body and stands at 4 of 8; the live result scores 0.79 for Alice.
  */
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const pct = (score: number, share = 0) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
@@ -132,7 +131,7 @@ describe('the workspace feeds the variation board shares from the branch history
       },
       engine: {
         smogonPending: false,
-        // round 89 (#130, G8b): the Lines host mounts the win-path hook, which reads the position source and the effective rules
+        // the Lines host mounts the win-path hook, which reads the position source and the effective rules
         acquire: { makeReplayAcquire: vi.fn() },
         evalView: {
           effectiveTera: false, effectiveSleepClause: true, effectiveRuleset: undefined,

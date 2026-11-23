@@ -8,10 +8,8 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
 /**
- * Round 82 (forced dice), step A7a, moved to the dock in round 84 (A3b): the dice chips on a real battle. The dock asks the
- * simulator which dice the chosen move draws once a tray opens "Dice · What if", shows one set of chips per slot (one per target
- * of a spread move), and a click edits the slot's choice, which the dock hands to `onSetChoice` like any other pick. A closed
- * tray asks nothing and shows no chips.
+ * The dock asks the simulator which dice the chosen move draws once a tray opens "Dice · What if": one set of chips per slot (one per target
+ * of a spread move). A closed tray asks nothing.
  */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
@@ -175,7 +173,6 @@ describe('the dock dice of the turn', () => {
     const latest = renderDock(tied(), { first: { p1: [tackle], p2: [tackle] } });
     await openDice('P1');
     const order = await screen.findByRole('group', { name: 'Move order' });
-    // Round 84 (A4): the dice of the turn stand under the table in a section of their own, "This turn"
     expect(within(screen.getByRole('group', { name: 'Dice of the turn' })).getByText('This turn')).toHaveClass('ps-tray-label');
     expect(within(order).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Alpha Mon first', 'Beta Mon first']);
     await userEvent.click(within(order).getByRole('button', { name: 'Beta Mon first' }));

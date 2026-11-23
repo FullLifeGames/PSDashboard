@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { TargetRow } from '../../../../src/components/dock/TargetRow';
 import { moveOption } from '../../fixtures/sim-state';
 
-/** Round 84 (turn dock), step A3c: the e2e specs read a target button's text ("P2A Bulbasaur"); flex items lay out without spaces. */
+/** The e2e specs read a target button's text ("P2A Bulbasaur"); flex items lay out without spaces. */
 describe('TargetRow', () => {
   test('a target button reads its slot, its name and its HP with spaces between', () => {
     const move = moveOption('Thunderbolt', {

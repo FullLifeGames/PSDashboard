@@ -8,10 +8,6 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { displayName } from '../../../../src/lib/branch-history';
 import { simState, switchOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the free-choice picker and the What-if loader of the old FightSection spec, now parts of the
- * tray's "Dice · What if" section, plus the labels of the old switch-labels spec.
- */
 const pool = vi.hoisted(() => ({ list: ['Dragon Claw', 'Fire Fang'] as string[], calls: [] as unknown[][] }));
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async (...args: unknown[]) => { pool.calls.push(args); return pool.list; } }));
 

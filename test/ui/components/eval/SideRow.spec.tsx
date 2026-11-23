@@ -19,7 +19,6 @@ describe('SideRow', () => {
     expect(screen.queryByText('difference:')).toBeNull();
   });
 
-  // Round 89 (#153, HM-2): the engine-move buttons of a row (the tick, the engine's line, the better line) carry the title of the Setup setting.
   test.each([[false, 'Play this turn in a variation; the opponent plays its top choice.'],
     [true, 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']])(
     'the engine-move titles follow the setting (opponentReads %s)', (opponentReads, title) => {
@@ -58,7 +57,7 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  // Round 89 (LN-4): the better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
+  // The better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
   test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
     const line = (steps: [string, string][], extra = {}) => ({
@@ -197,8 +196,8 @@ describe('SideRow', () => {
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
   });
 
-  // Round 89 (X1a part 1, 649664 T24 and T23): "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's
-  // description of a stand-in as a choice and ticked it. A body knocked out before it moved has no choice in the log.
+  // "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's description of a stand-in as a choice and
+  // ticked it (649664 t23 and t24). A body knocked out before it moved has no choice in the log.
   test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
     const standIn = rankedChoice('move painsplit', 'stayed in (KO’d before acting)', 0.11);
     const best = rankedChoice('move painsplit', 'Pain Split', 0.11);

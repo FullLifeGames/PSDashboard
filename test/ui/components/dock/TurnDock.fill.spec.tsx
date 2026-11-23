@@ -12,11 +12,6 @@ import type { PlayedAtPosition } from '../../../../src/lib/played-pick';
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
 
-/**
- * Round 84 (turn dock), step A5: what the dock shows of the engine's fill at the live tip: a placeholder of the chip's own size
- * while the run is pending, the origin mark on a filled chip, the note while the game analysis runs, and the waiting Execute.
- */
-
 type Props = Parameters<typeof TurnDock>[0];
 
 const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...(targetLoc ? { targetLoc } : {}) });
@@ -110,7 +105,6 @@ describe('TurnDock fill, marks', () => {
     const props = renderDock('singles', fill, { onSetChoice: vi.fn(() => { order.push('set'); }) }, state);
     await userEvent.click(chip('P1'));
     await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Stone Edge/ }));
-    // round 89 (#153): the pick goes along, for Hard mode
     expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 0, expect.objectContaining({ moveId: 'stoneedge' }));
     expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'stoneedge' }), 0);
     expect(order).toEqual(['user', 'set']);
@@ -230,7 +224,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
     await closed(() => userEvent.click(chip(first)));
     await closed(() => userEvent.keyboard('{Escape}'));
     await closed(() => userEvent.click(document.body));
-    // Another chip's tray closes the first one's and opens its own.
     await userEvent.click(chip(first));
     vi.mocked(fill.release).mockClear();
     await userEvent.click(chip(second));
@@ -253,7 +246,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
     const state = simState(kind, others);
     const fill = withDeferred(deferredMove);
     const props = renderDock(kind, fill, {}, state);
-    // The label counts the deferred pick as chosen.
     expect(execute()).toBeEnabled();
     expect(execute()).toHaveTextContent('Execute Turn');
     await userEvent.click(chip(first));
@@ -388,9 +380,8 @@ describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', ()
 
 
 /**
- * Round 89 (#153, HM3b, user gate 15.11.2026): "Back to the engine's pick" in the open tray of a slot that holds a user pick that
- * differs from what the fill chose. The click asks the fill (`restore`) for the choice and writes it like any pick, but without telling
- * the fill that the user chose: the slot is the engine's again. Singles and doubles; in doubles per slot.
+ * The click asks the fill (`restore`) for the choice and writes it like any pick, but without telling the fill that the user chose: the slot
+ * is the engine's again. Singles and doubles; in doubles per slot.
  */
 describe.each(['singles', 'doubles'] as const)('TurnDock fill, Back to the engine\'s pick, %s', (kind) => {
   const first = kind === 'doubles' ? 'P1A' : 'P1';
@@ -532,7 +523,6 @@ describe('TurnDock, doubles', () => {
     expect(onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'move', moveId: 'flareblitz', targetLoc: expect.any(Number) }), 0);
     expect(chip('P1A')).toHaveTextContent('Flare Blitz');
     expect(chip('P1A')).not.toHaveAttribute('data-origin', 'played');
-    // the other slots keep their seed
     expect(chip('P1B')).toHaveAttribute('data-origin', 'played');
   });
 
@@ -552,7 +542,6 @@ describe('TurnDock, doubles', () => {
     expect(sent.p2[1]).toMatchObject({ kind: 'move', moveId: 'taunt' });
   });
 
-  // Round 90 (E5): the browser row "doubles target buttons identify and highlight the selected target" of pickers.spec.
   test('a pending move shows one target button per foe with its slot and name, and a press moves the highlight', async () => {
     render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
     await userEvent.click(chip('P1B'));
@@ -588,8 +577,7 @@ describe('TurnDock, singles', () => {
     expect(onExecuteTurn.mock.calls[0][0]).toMatchObject({ p1: [{ moveId: 'earthquake' }], p2: [{ kind: 'switch', speciesId: 'rotomwash' }] });
   });
 
-  // Round 90 (E5): the browser rows "the dock picks moves without Smogon stats" and "the dock accepts custom move choices from the tray's
-  // choice picker" of pickers.spec. A position with no logged action starts empty; a pick fills the chip as the user's own.
+  // A position with no logged action starts empty; a pick fills the chip as the user's own.
   test('a tile pick and a choice from the tray\'s picker each fill an empty chip as the user\'s own pick', async () => {
     render(<Harness base={simState('singles')} played={{ p1: null, p2: null }} spies={{}} />);
     expect(chip('P1')).toHaveAttribute('data-empty', 'true');

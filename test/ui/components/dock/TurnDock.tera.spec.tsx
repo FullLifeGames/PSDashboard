@@ -12,9 +12,8 @@ import { NO_MODIFIERS, moveOption, pokemon, simState, targetOption } from '../..
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
 
 /**
- * Round 84 (turn dock), step A3b: the Tera cases of the old BranchPanel spec (T20 decision 18, T124 points 1, 2 and 4) against the
- * dock. A gimmick toggle sits in the open tray and reaches the damage preview of every tile; one Tera per side and turn; an armed
- * toggle belongs to one position. A tile keeps the calc's own range in its tooltip, so the numbers are read from there.
+ * One Tera per side and turn; an armed toggle belongs to one position. A tile keeps the calc's own range in its tooltip, so the numbers are
+ * read from there.
  */
 type Props = Parameters<typeof TurnDock>[0];
 
@@ -108,8 +107,8 @@ describe('the Tera toggle reaches the damage preview (T20, decision 18)', () => 
     await userEvent.click(toggle('Mega Evolve'));
     expect(toggle('Mega Evolve')).toHaveAttribute('aria-pressed', 'true');
     expect(toggle('Tera (Ground)')).toHaveAttribute('aria-pressed', 'false');
-    // The number before the click cannot show a leak: no recomputation may have landed yet (T126). The defender's Tera
-    // recomputes the preview for sure, and that recomputation reads P1's armed Mega too.
+    // The number before the click cannot show a leak: no recomputation may have landed yet. The defender's Tera recomputes the preview for
+    // sure, and that recomputation reads P1's armed Mega too.
     const megaLeftOut = calcRange(garchomp, { ...ferrothorn, teraType: 'Fire' }, earthquake, 'Singles');
     expect(megaLeftOut).not.toBe(calcRange({ ...garchomp, teraType: 'Ground' }, { ...ferrothorn, teraType: 'Fire' }, earthquake, 'Singles'));
     await userEvent.click(chip('P2'));
@@ -170,7 +169,6 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     render(<Stateful base={fixture} first={picks} />);
     await userEvent.click(chip('P1A'));
     await userEvent.click(toggle('Tera (Fire)'));
-    // P1A's Tera reaches its own tile ...
     await showsRange(() => tile(/Flare Blitz/), calcRange({ ...incineroar, teraType: 'Fire' }, rillaboom, flareBlitz, 'Doubles'));
     await userEvent.click(chip('P1B'));
     const bug = toggle('Tera (Bug)');
@@ -178,11 +176,9 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     expect(bug).toHaveAttribute('title', 'P1A already terastallizes this turn.');
     await userEvent.click(bug);
     expect(bug).toHaveAttribute('aria-pressed', 'false');
-    // ... and P1B's tile stays as the calc reads the untoggled Amoonguss.
     const plain = calcRange(amoonguss, rillaboom, pollenPuff, 'Doubles');
     expect(plain).not.toBe(calcRange({ ...amoonguss, teraType: 'Bug' }, rillaboom, pollenPuff, 'Doubles'));
     await showsRange(() => tile(/Pollen Puff/), plain);
-    // Released on P1A, the Tera is free for P1B again.
     await userEvent.click(chip('P1A'));
     await userEvent.click(toggle('Tera (Fire)'));
     await userEvent.click(chip('P1B'));

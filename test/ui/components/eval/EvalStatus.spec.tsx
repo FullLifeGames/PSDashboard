@@ -48,13 +48,12 @@ describe('EvalStatus', () => {
     expect(screen.queryByText(/Position changed/)).toBeNull();
   });
 
-  // Round 88 (T343, #79): a run from the turn 0 view names turn 0, the turn the leads come in.
+  // A run from the turn 0 view names turn 0, the turn the leads come in.
   test('a run from turn 0 names turn 0 in the status line', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 0, turns: 0, atTurn: 1 }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 0. 0 turns played, now at turn 1.');
   });
 
-  // Round 89 (#119): after Stop the status line says the engine finishes the turn in flight, as the bar does.
   test('a stopping run says the engine finishes the turn in flight', () => {
     const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 3, atTurn: 8, stopping: true }} />);
     const line = screen.getByRole('status');

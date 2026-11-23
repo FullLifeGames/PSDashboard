@@ -10,10 +10,7 @@ import type { PlayedAtPosition } from '../../../../src/lib/played-pick';
 // The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
 
-/**
- * Round 84 (turn dock), step A3b: the choice cases of the old BranchPanel and SideControls specs, against the dock. A position
- * without a played record starts without picks, so these cases click the way a user does at the tip.
- */
+/** A position without a played record starts without picks, so these cases click the way a user does at the tip. */
 
 describe('TurnDock.choices', () => {
   type Props = Parameters<typeof TurnDock>[0];
@@ -74,8 +71,8 @@ describe('TurnDock.choices', () => {
     });
   });
 
-  // Round 84 (A7j): a bench click at a forced replacement publishes its pick before the send goes out; the chip shows that body and Execute
-  // reads "Executing..." while the replacement plays.
+  // A bench click at a forced replacement publishes its pick before the send goes out: the chip shows that body and Execute reads
+  // "Executing..." while the replacement plays.
   describe.each(['singles', 'doubles'] as const)('a forced replacement that is going out (%s)', type => {
     test('the chip shows the clicked body and Execute reads "Executing..."', () => {
       const forced = simState(type, {
@@ -198,7 +195,7 @@ describe('TurnDock.choices', () => {
       expect(chip('P1B')).toBeEnabled();
     });
 
-    // Round 89 (#105, H7, tester finding 9): Urshifu fainted and Incineroar's Parting Shot asks for a switch in the same turn.
+    // Urshifu fainted and Incineroar's Parting Shot asks for a switch in the same turn.
     test('doubles: a fainted slot that is not asked, beside a partner that must switch out, waits for the switch instead of claiming an empty bench', () => {
       const base: BranchSimState = simState('doubles');
       const downed = pokemon('Urshifu', { fainted: true, hp: 0, hpPercent: 0, isActive: true, activeSlot: 0 });
@@ -213,7 +210,7 @@ describe('TurnDock.choices', () => {
     });
   });
 
-  // Round 77, B5: P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
+  // P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
   describe('the side that does not replace takes no input (B5)', () => {
     const down = (side: 'p1' | 'p2') => ({ [`${side}ForceSwitch`]: true, [`${side}ForceSwitches`]: [true, false] });
 
@@ -238,8 +235,8 @@ describe('TurnDock.choices', () => {
       expect(screen.queryByText(/Waiting for/)).toBeNull();
     });
 
-    // Round 84 (A7f): the partner of a forced replacement is asked nothing, so its chip takes the waiting side's state (user's own test,
-    // Champions VGC: P2B fainted and P2A stood live though the position asked nothing of it).
+    // The partner of a forced replacement is asked nothing, so its chip takes the waiting side's state (Champions VGC: P2B fainted and P2A
+    // stood live though the position asked nothing of it).
     test('doubles: the partner of the one forced slot takes no input, the forced slot stays live', () => {
       const { rerender } = render(<TurnDock {...props({ simState: simState('doubles', down('p2')) })} />);
       expect(chip('P2A')).not.toHaveAttribute('inert');
@@ -268,7 +265,6 @@ describe('TurnDock.choices', () => {
   });
 });
 
-/** Round 84 (turn dock): the open tray, the strip, and the states a position can be in. */
 type Props = Parameters<typeof TurnDock>[0];
 
 const move = (moveId: string, moveName: string, extra: object = {}): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...extra });
@@ -452,7 +448,6 @@ describe('the states of a position', () => {
     expect(screen.getByRole('status')).toHaveTextContent('The battle ended in a tie. Go back a turn to play it another way.');
   });
 
-  // Round 89 (#153, HM-2, ruling 45 HM3a): while the Setup setting is on, the strip opens with the note and a button that turns it off.
   test.each([['singles'], ['doubles']] as const)('the strip names the setting while "Opponent reads my move" is on, with a button that turns it off (%s)', async kind => {
     const onOpponentReadsChange = vi.fn();
     const { rerender } = render(<TurnDock {...props({ simState: simState(kind), source: 'stored' })} />);

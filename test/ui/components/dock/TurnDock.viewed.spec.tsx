@@ -9,10 +9,8 @@ import { pickerFromSerialized, type PickerSource } from '../../../../src/lib/pic
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
 /**
- * Round 82 (forced dice), step A7b, moved to the dock in round 84 (A3b): the chips at a viewed replay position. A stored position
- * has its own revived battle (no branch yet), the chips read the log's dice from the replay's lines (`loggedDiceAt`), and the
- * picks go to the draft like any other pick. A position that is only approximated has no battle: once the tray opens "Dice ·
- * What if" the strip says the dice wait for the exact one.
+ * A stored position has its own revived battle (no branch yet), and the chips read the log's dice from the replay's lines (`loggedDiceAt`). A
+ * position that is only approximated has no battle: once the tray opens "Dice · What if" the strip says the dice wait for the exact one.
  */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
@@ -104,7 +102,7 @@ describe('the dock dice chips at a viewed position', () => {
     expect(read.at.some(args => args[1] === 'the replay log')).toBe(true);
     expect(read.turn).toEqual([]);
     await user.click(within(crit).getByRole('button', { name: 'No crit' }));
-    // the crit needs the hit: the panel sets it with the crit (decision 5a)
+    // the crit needs the hit: the panel sets it with the crit
     await waitFor(() => expect(latest.picks.p1[0]?.dice?.map(die => [die.name.kind, die.result])).toEqual([['crit', { happens: false }], ['accuracy', { happens: true }]]));
   });
 

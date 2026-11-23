@@ -22,12 +22,10 @@ function props(overrides: Partial<Props> = {}): Props {
 const select = (label: string) => within(screen.getByText(label)).getByRole('combobox');
 
 describe('EvalControls', () => {
-  // Round 89 (ruling 49): Depth and Samples moved to the Setup menu (SetupMenu.spec.tsx); the header keeps the title, the engine link, Tera and "Always on".
   test('the header holds the title, Tera and "Always on", and no Depth or Samples in any mode', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
-    // Round 89 (FB-1): the engine's description is the heading's title, not a line of text.
     expect(screen.queryByText(/built-in engine/)).toBeNull();
     expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Built-in engine: it plays the turns in the simulator.');
     for (const shown of [prefs, { ...prefs, mode: 'auto' as const }, { ...prefs, mode: 'mcts' as const }, { ...prefs, depth: 2 as const }]) {
@@ -54,7 +52,6 @@ describe('EvalControls', () => {
     expect(screen.getByRole('checkbox', { name: 'Always on' })).toBeChecked();
   });
 
-  // Round 89 (#153, HM-2): the setting left the Evaluation row for the Setup menu (SetupMenu.spec.tsx) and lost the name "Hard mode".
   test('the Evaluation row holds no checkbox for the opponent\'s reply, in any engine', () => {
     const { rerender } = render(<EvalControls {...props()} />);
     expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();

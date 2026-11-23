@@ -6,11 +6,10 @@ import { createBranchStateFromBattle } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 
 /**
- * Moved to the dock in round 84 (A3b): the tile of the open tray reads the range from its tooltip.
- * Round 73 (T202, design gate 3a): Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The
- * calculator spreads the move over every foe and holds no screen factor for the one target the simulator plays, so the preview
- * hands the live battle of the branch to the engine and shows the simulator's own range. Without a live battle it shows no range.
- * The oracle is the simulator: it plays the move and the HP the foe loses lies in the shown range.
+ * Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The calculator spreads the move over every foe and
+ * holds no screen factor for the one target the simulator plays, so the preview hands the live battle of the branch to the engine and shows
+ * the simulator's own range. Without a live battle it shows no range. The oracle is the simulator: it plays the move and the HP the foe
+ * loses lies in the shown range. The tile of the open tray reads the range from its tooltip.
  */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 

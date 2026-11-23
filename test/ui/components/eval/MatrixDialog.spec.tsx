@@ -97,7 +97,6 @@ describe('MatrixDialogButton', () => {
     expect(headerOf(table, 'Body Press')).toHaveTextContent(/played/);
     expect(headerOf(table, 'Leech Seed')).toHaveTextContent(/engine/);
     expect(headerOf(table, '→ Rotom-Wash')).not.toHaveTextContent(/played|engine/);
-    // every header shows its weight, 0% included
     expect(headerOf(table, 'Earthquake')).toHaveTextContent('100%');
     expect(headerOf(table, 'Swords Dance')).toHaveTextContent('0%');
     expect(headerOf(table, 'Body Press')).toHaveTextContent('0%');
@@ -116,7 +115,6 @@ describe('MatrixDialogButton', () => {
     expect(bobCell).toHaveTextContent(/worst/);
     expect(bobCell).toHaveAttribute('title', expect.stringContaining("worst reply to Bob's Body Press"));
     expect(aliceCell).not.toBe(bobCell);
-    // the percentages are the matrix's own
     expect(aliceCell).toHaveTextContent(`${winPercent(result.matrix!.values[1][2])}%`);
   });
 
@@ -162,7 +160,6 @@ describe('MatrixDialogButton', () => {
     // the wide table scrolls in its own box, the dialog does not grow sideways
     const scroller = table.parentElement!;
     expect(scroller).toHaveStyle({ overflow: 'auto' });
-    // labels wrap, they are not cut to an ellipsis
     const label = headerOf(table, 'Fake Out → Rillaboom 5 + Spore → Tornadus 5');
     expect(label.style.whiteSpace).not.toBe('nowrap');
     expect(label.style.textOverflow).not.toBe('ellipsis');
@@ -203,7 +200,6 @@ describe('MatrixDialogButton', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
     expect(screen.getByTitle(/^Swords Dance × Body Press:/).tagName).toBe('TD');
     const table = screen.getByRole('table');
-    // older results match by label
     expect(headerOf(table, 'Swords Dance')).toHaveTextContent(/played/);
     expect(headerOf(table, 'Earthquake')).toHaveTextContent(/engine/);
     expect(within(table).queryByText(/worst/)).toBeNull();

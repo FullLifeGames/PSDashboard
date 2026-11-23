@@ -5,10 +5,6 @@ import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { SwitchRow } from '../../../../src/components/dock/SwitchRow';
 import { simState, switchOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the cases of the old SwitchBtn and switch-labels specs that the bench tile keeps: the sprite,
- * the label of a nicknamed body, the HP bar by health, the played flag, and the reasons a body is out. The compact chip is gone.
- */
 type Props = Parameters<typeof SwitchRow>[0];
 
 function row(overrides: Partial<Props> = {}) {

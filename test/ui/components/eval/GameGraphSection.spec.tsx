@@ -8,7 +8,6 @@ import { leadAnalysis, turnAnalysis, misplayedSide } from '../../fixtures/analys
 import type { TurnAnalysis } from '@fulllifegames/eval-engine';
 
 const names: [string, string] = ['Alice', 'Bob'];
-/** Round 89 (FB-1): the description line left the layout; the "Game graph" heading carries it as its title. */
 const hintTitle = (mode: string) => `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
 const headingTitle = () => screen.getByText('Game graph').getAttribute('title');
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
@@ -31,8 +30,6 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('Game graph')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Analyze game' }));
     expect(wired.onAnalyzeGame).toHaveBeenCalledTimes(1);
-    // Round 67 (T109): the deeper stage left with Think deeper, so the hint names none.
-    // Round 89 (FB-1): no description line takes space; the heading's title names the configured mode.
     expect(screen.queryByText(/^graph:/)).toBeNull();
     expect(headingTitle()).not.toMatch(/deeper/i);
     expect(headingTitle()).toBe(hintTitle('depth 2'));
@@ -49,7 +46,7 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('analyzing… turn 4/10')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    // Round 63 default (T110): auto runs early singles turns on the matrix.
+    // auto runs early singles turns on the matrix.
     expect(headingTitle()).toBe(hintTitle('auto (matrix early, MCTS late)'));
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
@@ -59,7 +56,7 @@ describe('GameGraphSection', () => {
     expect(headingTitle()).toBe(hintTitle('MCTS'));
   });
 
-  // Round 77 (C1): a single evaluation that took over a running sweep leaves a status line instead of a silent stop.
+  // A single evaluation that took over a running sweep leaves a status line instead of a silent stop.
   test('a sweep that a single evaluation stopped says where it stopped and offers Analyze again', () => {
     const stopped = evalGraph('singles', { running: false, stopped: { done: 1, total: 2 } });
     render(<GameGraphSection {...props({ graph: stopped })} />);
@@ -198,9 +195,8 @@ describe('GameGraphSection.review', () => {
   });
 
   /**
-   * Round 89 (#104), G4d: with a variation open the panel shows the variation's evaluation and neither the report nor the review, and
-   * nothing said where they went (the tester, both game types). Where the report's button stands, a button names the way back and
-   * does what "Main line" of the Line selector does; no report to return to, no button.
+   * With a variation open the panel shows the variation's evaluation and neither the report nor the review. Where the report's button
+   * stands, a button names the way back and does what "Main line" of the Line selector does; no report to return to, no button.
    */
   describe('GameGraphSection: the way back from a variation', () => {
     const inVariation = (overrides: Partial<GameGraphSectionProps> = {}) => props({ showReportView: false, report: null, reviewAnalyses: null, currentLine: 'variation', ...overrides });

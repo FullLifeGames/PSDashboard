@@ -8,10 +8,8 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { typeBg } from '../../../../src/lib/type-colors';
 
 /**
- * Round 69 (T182), moved to the dock in round 84 (A3b): with the Tera toggle pressed, a move tile reads the type the move lands
- * with after the click (Tera Blast Fairy, Tera Starstorm Stellar), in its tag and its color. The state is the engine's real one,
- * built from simulator battles. Singles and doubles share the tray; VGC is a doubles format and takes the same path. The compact
- * tooltip that started with the type is gone with the compact chips: the tag shows the type.
+ * With the Tera toggle pressed, a move tile reads the type the move lands with after the click (Tera Blast Fairy, Tera Starstorm Stellar), in
+ * its tag and its color. The state is the engine's real one, built from simulator battles. VGC is a doubles format and takes the same path.
  */
 const set = (species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet => ({
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
@@ -47,7 +45,6 @@ describe('the Tera toggle labels the move tiles (T182)', () => {
     dock(stateOf('gen9customgame', [chomp()], [foe('Snorlax')]));
     await open('P1');
     expect(tile(/Tera Blast/)).toHaveTextContent('Normal');
-    // the tinted tile carries its full type color as --type (typeTileVars)
     expect(tile(/Tera Blast/).style.getPropertyValue('--type')).toBe(typeBg('Normal'));
     await userEvent.click(toggle());
     expect(tile(/Tera Blast/)).toHaveTextContent('Fairy');

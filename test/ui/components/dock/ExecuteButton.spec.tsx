@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { ExecuteButton } from '../../../../src/components/dock/ExecuteButton';
 import { RawLogToggle } from '../../../../src/components/dock/RawLogToggle';
 
-/** Round 84 (turn dock), step A3b: the cases of the old PanelStatus spec that the dock keeps. The strip's lines are in TurnDock.choices.spec. */
 describe('ExecuteButton', () => {
   test('waits for every slot and names what is missing, runs the turn, and shows the running turn', async () => {
     const onClick = vi.fn();
@@ -33,7 +32,6 @@ describe('ExecuteButton, waiting for the engine', () => {
     expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
     await userEvent.click(screen.getByRole('button'));
     expect(onClick).not.toHaveBeenCalled();
-    // A turn that runs wins over the wait.
     rerender(<ExecuteButton ready executing waits label="Execute Turn" onClick={onClick} />);
     expect(screen.getByRole('button', { name: 'Executing…' })).toBeDisabled();
   });

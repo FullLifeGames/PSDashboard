@@ -9,11 +9,6 @@ import { gimmickView } from '../../../../src/hooks/useSideControlsState';
 import { pickerStateFromSnapshot } from '../../../../src/lib/picker-state';
 import { NO_MODIFIERS, simState } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the gimmick cases of the old FightSection, SideControls and snapshot-tera-toggle specs. The row
- * shows what the slot's gimmick state holds and reports a click; the dock wires it to the slot's pending move (C4) or, with none,
- * arms the next pick.
- */
 describe('ModifierRow', () => {
   test('shows the toggle armed and reports the click', async () => {
     const modifiers = { ...NO_MODIFIERS, teraType: 'Steel' };
@@ -68,7 +63,7 @@ describe('the gimmick toggle in the open tray', () => {
   });
 });
 
-/** Round 67 (T136 point 2): the fast snapshot picker carries the Tera type, so the toggle shows before the exact position arrives. */
+/** The fast snapshot picker carries the Tera type, so the toggle shows before the exact position arrives. */
 const mon = (name: string, active: boolean): TurnSnapshot['p1']['pokemon'][number] => ({
   name, speciesForme: name, hp: 100, maxhp: 100, hpPercent: 100, status: '', fainted: false, isActive: active,
   boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 100, gender: '',

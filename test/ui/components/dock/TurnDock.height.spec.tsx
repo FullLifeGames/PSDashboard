@@ -19,7 +19,7 @@ afterEach(() => {
   document.documentElement.style.removeProperty('--ps-dock-h');
 });
 
-/** Round 84 (A6b): the fixed dock of a narrow window tells the page its height; it stands for singles and doubles, and goes with the dock. */
+/** The fixed dock of a narrow window tells the page its height; it stands for singles and doubles, and goes with the dock. */
 describe('the dock reports its height', () => {
   test.each(['singles', 'doubles'] as const)('a %s dock writes --ps-dock-h and removes it when it unmounts', kind => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 132 } as DOMRect);

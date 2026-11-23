@@ -5,10 +5,7 @@ import { GameGraphSection, type GameGraphSectionProps } from '../../../../src/co
 import { evalGraph, evalResult, gameReport } from '../../fixtures/eval-result';
 import { misplayedSide, turnAnalysis } from '../../fixtures/analysis';
 
-/**
- * Round 89 (ruling 49): with the flag VITE_FEATURE_GAME_REVIEW off (the default of every build), the report view shows the cards and the
- * graph and nothing of the Game review: no section, no marks on the graph, no legend, and no text that names it.
- */
+/** With VITE_FEATURE_GAME_REVIEW off (the default of every build) the report view shows the cards and the graph and nothing of the Game review. */
 const names: [string, string] = ['Alice', 'Bob'];
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 

@@ -7,11 +7,10 @@ import { evalResult } from '../../fixtures/eval-result';
 import { singlesLine } from '../../fixtures/lines';
 
 /**
- * Round 89 (#104), step G13 (ruling G2b, kept by G7a): which graded singles turns the game analysis searches once more with the
- * trees, and what that search is told. The rule is the report's own graded rule (`gradedSides`). Step G14b (ruling G9a, option L):
- * the stage covers every graded turn in Auto, singles and doubles, and asks the search for the line pass (`LINE_PASS` extra iterations
- * per tree); a result is done when it carries the pass (`linePass`), not when it holds lines, since a tree turn holds lines from the
- * sweep already.
+ * Which graded singles turns the game analysis searches once more with the trees, and what that search is told. The rule is the report's
+ * own graded rule (`gradedSides`). The stage covers every graded turn in Auto, singles and doubles, and asks the search for the line pass
+ * (`LINE_PASS` extra iterations per tree); a result is done when it carries the pass (`linePass`), not when it holds lines, since a tree turn
+ * holds lines from the sweep already.
  */
 const MATRIX: TurnEvalSettings = { depth: 1, samples: 3, mode: 'matrix' };
 const TREE: TurnEvalSettings = { depth: 1, samples: 1, mode: 'mcts' };

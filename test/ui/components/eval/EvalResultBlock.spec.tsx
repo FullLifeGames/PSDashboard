@@ -51,7 +51,6 @@ describe('EvalResultBlock', () => {
     expect(screen.getByTitle(/^Earthquake × Leech Seed:/).tagName).toBe('TD');
   });
 
-  // Round 89 (#153, HM-2): the ranked rows are an engine-move click target too; their title ends with the sentence of the other targets.
   test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply the opponent plays, by the Setup setting; a result with no handler has no click sentence', kind => {
     const shared = { result: evalResult(kind), playerNames: names, status: 'done' as const, onPickChoice: vi.fn() };
     const titles = () => [...document.querySelectorAll('button.ps-eval-choice')].map(button => button.getAttribute('title') ?? '');
@@ -85,7 +84,7 @@ describe('EvalResultBlock', () => {
   });
 });
 
-// Round 89 (LN-4): one card shows one line per row; the panel's ranked row reads the later steps of the line the Lines section shows.
+// One card shows one line per row; the ranked row reads the later steps of the line the Lines section shows.
 describe('EvalResultBlock: the row\'s "then ..." follows the Lines section', () => {
   const pick = (label: string, slots = 1) => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
   test.each([

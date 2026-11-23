@@ -11,7 +11,6 @@ describe('AnalyzePositionButton', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // Round 67 (T109, gate answer 5b): one job left, a gap turn's first analysis; the deeper stage is gone.
   test('names the settings the gap turn runs at, and the click starts it', async () => {
     const onAnalyze = vi.fn();
     const { rerender } = render(<AnalyzePositionButton onAnalyze={onAnalyze} target={{ depth: 2, samples: 3, mode: 'matrix' }} disabled={false} />);

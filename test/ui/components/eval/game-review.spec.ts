@@ -15,7 +15,7 @@ import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analys
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../../fixtures/lines';
 
-/** Round 89 (#104), step G4, ruling 33 (4a): the Game review lists the graded turns only, as the turn cards grade them. */
+/** The Game review lists the graded turns only, as the turn cards grade them. */
 const host: LinesHost = { rules: { gen: 9, mod: undefined } };
 /** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and Pepitopalotin's Hydro Pump are each side's top choice. */
 const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
@@ -41,7 +41,6 @@ describe('gradedTier: the turn card\'s own reading of "graded"', () => {
   test('a sack and a read that paid off are shown on the card in place of the regret chip, so they are not graded', () => {
     expect(gradedTier(gradedP2('mistake', { sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBeNull();
     expect(gradedTier(gradedP2('blunder', { riskPaidOff: true }))).toBeNull();
-    // an inaccuracy keeps its chip beside the sack, as the card shows it
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true, sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBe('inaccuracy');
   });
 
@@ -182,9 +181,8 @@ describe('gameReview, doubles', () => {
       'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
       'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
     );
-    // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);
-    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out (round 89, G16)
+    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out
     const passing = { ...doublesLine, steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)) };
     const again = gameReview({ analyses, results: [null, null, null, { ...results[3]!, lines: [passing] }], playerNames: DOUBLES_NAMES, doubles: true, host });
     expect(again[0].rows[0].lines[0].text).toContain('then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost');
@@ -206,10 +204,9 @@ describe('gameReview, doubles', () => {
 });
 
 /**
- * Round 89 (#104), G4d: the report page said "read paid off +9%" and, one list below, "inaccuracy −9%" for the same click. The
- * report lists a read from `riskPaidOff` unless the side lost ground, and keeps it off its misplays; the review and the marks
- * read the same two facts through `gradedTier`. The real report is built for every combination, singles (p2) and doubles (both
- * sides graded on one turn).
+ * The report page said "read paid off +9%" and, one list below, "inaccuracy −9%" for the same click. The report lists a read from
+ * `riskPaidOff` unless the side lost ground, and keeps it off its misplays; the review and the marks read the same two facts through
+ * `gradedTier`. The real report is built for every combination, singles (p2) and doubles (both sides graded on one turn).
  */
 describe('the review and the report list one verdict per side', () => {
   const combos = [
@@ -239,7 +236,6 @@ describe('the review and the report list one verdict per side', () => {
   });
 });
 
-/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number; a line that differs from its row is told apart. */
 describe('gameReview: the end of each line beside its row (G10)', () => {
   test('singles: each line ends at its own value and knows whether it differs from the row the head prints', () => {
     const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
@@ -285,7 +281,6 @@ describe('gameReview: the end of each line beside its row (G10)', () => {
   });
 });
 
-/** Round 89 (#104), step G11 (ruling G8a): the review's line text names the rank of the first answer. */
 describe('gameReview: the answer of each line (G11)', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
 
@@ -298,7 +293,6 @@ describe('gameReview: the answer of each line (G11)', () => {
     const [engine, played] = view[1].rows[0].lines;
     expect(engine.text).toBe("Hydro Pump vs Draining Kiss (Tzon's second choice in this search), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
     expect(played.text).toBe("Hyper Voice vs Draining Kiss (Tzon's second choice in this search)");
-    // a result without a ranking names no rank
     results[19] = { ...withLines([singlesLine]), perSide: { p1: [], p2: [] } };
     const bare = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
     expect(bare[1].rows[0].lines[0].text).toBe("Hydro Pump vs Draining Kiss (not among Tzon's ranked choices), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");

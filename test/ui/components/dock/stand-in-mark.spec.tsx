@@ -18,9 +18,8 @@ import { simState, switchOption } from '../../fixtures/sim-state';
 import type { BringWorld } from '@fulllifegames/eval-engine';
 
 /**
- * Round 88 (F, #101, ruling 2): a body the log never showed (a stand-in) wears the stats panel's marker wherever the user can pick it
- * in the What-if: the dock's switch tile, its "All choices" list and the lead picker. A revealed body wears none, and a marked tile
- * still switches. Singles and doubles run the same tile path; the rows below play both.
+ * A body the log never showed (a stand-in) wears the stats panel's marker wherever the user can pick it in the What-if: the dock's switch
+ * tile, its "All choices" list and the lead picker. Singles and doubles run the same tile path.
  */
 const rules = logRules('|gen|4|\n|tier|[Gen 4] OU');
 const info = (...species: [string, boolean][]): OpponentTeamInfo => ({
@@ -150,9 +149,8 @@ describe('the marker of a stand-in in the lead picker', () => {
 });
 
 /**
- * Round 89 (lane B, #117): a body that came from the format's random-set data (a Random Battle) wears its own words, in the same places:
- * the switch tile, the All choices list, the lead picker, singles and doubles. The bodies are the real output of `withStandIns` on logs
- * the simulator played, so the provenance the lookup reads is the provenance the fill writes.
+ * A body from the format's random-set data (a Random Battle) wears its own words in the same places. The bodies are the real output of
+ * `withStandIns` on logs the simulator played, so the provenance the lookup reads is the provenance the fill writes.
  */
 describe('the marker of a random-set stand-in', () => {
   const game = (id: string) => JSON.parse(readFileSync(`packages/replay-core/test/fixtures/random-${id}.json`, 'utf-8')) as { log: string; randomSets: never };

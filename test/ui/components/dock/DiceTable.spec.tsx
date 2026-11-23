@@ -4,13 +4,6 @@ import userEvent from '@testing-library/user-event';
 import type { DieOffer, DieWords, ForcedDie, DieName } from '@fulllifegames/eval-engine';
 import { DiceTable } from '../../../../src/components/dock/DiceTable';
 
-/**
- * Round 83 (the user, 01.11.2026: "which hit you're controlling is not really defined"), moved to the table in round 84 (A4):
- * the dice of a move are a table with one column per target and one row per kind of die. The head of a column names its target
- * by slot and name, so two bodies of one species stay apart; the die's caption is the label of its row; a move with one target
- * keeps one column without a head.
- */
-
 describe('DiceTable', () => {
   const NAMES: Record<string, string> = { p1a: 'Calyrex', p1b: 'Calyrex', p2a: 'Calyrex', p2b: 'Ninetales' };
   const words: DieWords = { move: () => 'Earthquake', effect: id => id, slot: slot => NAMES[slot] ?? slot };
@@ -43,7 +36,7 @@ describe('DiceTable', () => {
         const hit = within(dice).getByRole('group', { name: `Hit against ${target}` });
         expect(within(hit).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Hits', 'Misses']);
       }
-      // Round 84 (A6a): the cell's label names the slot, so the two bodies named Calyrex (P2A and P1B) stay apart by it.
+      // The cell's label names the slot, so the two bodies named Calyrex (P2A and P1B) stay apart by it.
       expect(within(dice).queryAllByRole('group', { name: 'Hit against Calyrex' })).toHaveLength(0);
       expect(within(dice).getAllByRole('group', { name: 'flinch against P2B Ninetales' })).toHaveLength(1);
     });
@@ -178,7 +171,6 @@ describe('the Hits row of a multi-accuracy move', () => {
     expect(screen.queryByRole('group', { name: 'Hits' })).toBeNull();
   });
 
-  // Round 89 (ruling 34 F4a): a holder whose ability or item fixes the count gets the row without a choice
   test.each([['p1a', 'Skill Link', 3], ['p1b', 'Loaded Dice', 3], ['p1a', 'Skill Link', 10]] as const)('a fixed count (%s, %s, %i hits) reads "Hits: N (name)" under the Hit row, with no chip to click', (slot, fixedBy, hits) => {
     const fixed: DieOffer = { name: { slot, moveId: 'tripleaxel', kind: 'hit-count' }, results: [{ hits }], fixedBy };
     const onToggle = vi.fn();

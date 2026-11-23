@@ -8,11 +8,10 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
 /**
- * Round 89 (#114, F3; the user's ruling 31): the dock on a live battle for a move whose later hits roll accuracy. The engine's offer
- * (F1) names a die per hit; the table folds them into one "Hits" row of the counts 1 to N under "Hit", and a click on the count k
- * sets the first hit, hits 2 to k and the miss of hit k + 1 (`chainResults`), the way the engine plays them. Scarlet/Violet and
- * Champions, singles and doubles (a body on slot b in the four-slot dock). The panel reads the move's hits from the Dex through the
- * offer, so a team of six (VGC) shows the same row; the sweeps of the engine play VGC.
+ * The engine's offer names a die per hit; the table folds them into one "Hits" row of the counts 1 to N under "Hit", and a click on the count k
+ * sets the first hit, hits 2 to k and the miss of hit k + 1 (`chainResults`), the way the engine plays them. Scarlet/Violet and Champions,
+ * singles and doubles (a body on slot b in the four-slot dock). The panel reads the move's hits from the Dex through the offer, so a team of
+ * six (VGC) shows the same row.
  */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 const shown = vi.hoisted(() => ({ logged: [] as unknown[] }));
@@ -93,7 +92,6 @@ describe.each(CASES)('the dock Hits row: %s', (_label, format, champions, double
     expect(tags(diceOf(latest.picks))).toEqual(['1:true', ...chainResults(count, hits).map(({ hit, happens }) => `${hit}:${happens}`)]);
     await waitFor(() => expect(within(screen.getByRole('group', { name: 'Hits' })).getByRole('button', { name: `${count} hits` })).toHaveAttribute('aria-pressed', 'true'));
 
-    // a second click on the same count gives the hit dice back, the first hit stays set
     await userEvent.click(within(screen.getByRole('group', { name: 'Hits' })).getByRole('button', { name: `${count} hits` }));
     expect(tags(diceOf(latest.picks))).toEqual(['1:true']);
     expect(diceOf(latest.picks)[0].name).toEqual({ slot, moveId: id, targetSlot: 'p2a', kind: 'accuracy' });
@@ -134,7 +132,6 @@ describe.each(CASES)('the dock Hits row: %s', (_label, format, champions, double
   });
 });
 
-// Round 89 (ruling 34 F4a): a holder whose ability or item fixes the count gets one row without a choice, "Hits: 5 (Skill Link)".
 describe.each(CASES)('the dock Hits row of a holder that fixes the count: %s', (_label, format, champions, doubles) => {
   const chip = doubles ? 'P1B' : 'P1';
   const holderBoard = (extra: { ability?: string; item?: string }): Battle => diceBattle({

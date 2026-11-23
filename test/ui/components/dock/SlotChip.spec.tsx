@@ -4,11 +4,7 @@ import { SlotChip } from '../../../../src/components/dock/SlotChip';
 import type { DockSlotModel } from '../../../../src/components/dock/dock-model';
 import { moveOption, switchOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), A7b, ruling 8a (variant A of the chip page): the chip takes the tile's type edge on the left (the same
- * `typeTileVars` source) and, at its right across both lines, the chosen move's type tag or the incoming body's sprite. An empty
- * chip has neither. The chip's box does not depend on the state (the CSS side is `styles.spec.ts`).
- */
+/** The chip's box does not depend on the state (the CSS side is `test/regression/styles.spec.ts`). */
 function slot(over: Partial<DockSlotModel>): DockSlotModel {
   return {
     side: 'p1', slot: 0, label: 'P1A', name: 'Greninja', species: 'Greninja', hpPercent: 80, fainted: false, moves: [], switches: [],

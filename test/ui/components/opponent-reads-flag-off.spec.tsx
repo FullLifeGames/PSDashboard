@@ -7,10 +7,10 @@ import { exploreTitle } from '../../../src/components/eval/turn-copy';
 import type { DockModel } from '../../../src/components/dock/dock-model';
 
 /**
- * Round 89 (ruling 49): with the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), the Setup menu has no checkbox
- * "Opponent reads my move", the dock has no note "Opponent reads your move" with "Turn off", and no title names the reply rule, even
- * when the caller still passes the setting as on (the stored hardMode of an earlier nightly). The two components do not depend on the
- * game type; the dock row runs on both models only through its empty slot lists.
+ * With the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), the Setup menu has no checkbox "Opponent reads my move", the dock
+ * has no note "Opponent reads your move" with "Turn off", and no title names the reply rule, even when the caller still passes the setting
+ * as on (the stored hardMode of an earlier nightly). The two components do not depend on the game type; the dock row runs on both models
+ * only through its empty slot lists.
  */
 beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
 afterEach(() => vi.unstubAllEnvs());
