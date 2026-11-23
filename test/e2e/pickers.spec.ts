@@ -45,30 +45,6 @@ test.describe('PS Dashboard', () => {
     await expect(earthquake).toHaveAttribute('title', /69\.8% - 82\.2%/, { timeout: 10000 });
   });
 
-  test('the dock picks moves without Smogon stats', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
-
-    // The chip reads the pick as notation: the bare move name, no raw command (pickMove waits for the name on the chip).
-    await pickMove(page, 'p1a');
-    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-empty', 'true');
-  });
-
-  test('the dock accepts custom move choices from the tray\'s choice picker', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
-
-    // The free-choice dropdown lives behind "Dice · What if".
-    const tray = await openTrayMore(page, 'p1a');
-    const picker = tray.locator('select[aria-label^="Choice picker"]');
-    await expect(picker).toBeVisible({ timeout: 15000 });
-    await picker.selectOption({ index: 1 });
-
-    // The chip shows the pick as the user's own (no "played" mark) in notation (B1).
-    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-empty', 'true');
-    await expect(dockChip(page, 'p1a')).not.toHaveAttribute('data-origin', 'played');
-  });
-
   test('saving player edits refreshes the pickers and exposes EV controls', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
@@ -149,18 +125,6 @@ test.describe('PS Dashboard', () => {
     await expect(tray.locator('.ps-movebtn-pp').first()).toHaveText(/\d+\/\d+/);
   });
 
-  test('selecting moves for both sides enables Execute Turn', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(dockChip(page, 'p1a')).toBeVisible({ timeout: 15000 });
-
-    await pickMove(page, 'p1a');
-    await pickMove(page, 'p2a');
-
-    const execBtn = page.locator('button', { hasText: 'Execute Turn' });
-    await expect(execBtn).toBeVisible({ timeout: 5000 });
-    await expect(execBtn).toBeEnabled();
-  });
-
   test('branching can load a hypothetical move from the legal pool', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     // The what-if controls live behind "Dice · What if" — open it,
@@ -199,51 +163,6 @@ test.describe('PS Dashboard', () => {
       await expect(trayLast.locator('.ps-movebtn', { hasText: 'Fire Blast' })).toBeVisible({ timeout: 3000 });
       await expect(trayLast.locator('.ps-movebtn', { hasText: 'Earthquake' })).toHaveCount(0, { timeout: 3000 });
     }).toPass({ timeout: 15000 });
-  });
-
-  test('doubles branch shows slot chips and blocks duplicate simultaneous switches', async ({ page }) => {
-    await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    // Doubles targeting needs the real request — the dwell upgrade delivers it.
-    await waitForExactPickers(page);
-
-    const chips = page.locator('.ps-dock-chip');
-    await expect(chips).toHaveCount(4);
-    await expect(chips.nth(0)).toContainText('P1A');
-    await expect(chips.nth(1)).toContainText('P1B');
-    await expect(chips.nth(2)).toContainText('P2A');
-    await expect(chips.nth(3)).toContainText('P2B');
-
-    // Each slot's tray lists its switch tiles without a tab switch.
-    const trayA = await openTray(page, 'p1a');
-    await expect(trayA.locator('.ps-switchbtn').first()).toBeVisible({ timeout: 5000 });
-    await trayA.locator('.ps-switchbtn').first().click();
-    const trayB = await openTray(page, 'p1b');
-    await expect(trayB.locator('.ps-switchbtn').first()).toBeVisible();
-    await expect(trayB.locator('.ps-switchbtn').first()).toBeDisabled();
-  });
-
-  test('doubles target buttons identify and highlight the selected target', async ({ page }) => {
-    await page.locator('input[type="text"]').fill('gen9doubles-test');
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    // Doubles targeting needs the real request — the dwell upgrade delivers it.
-    await waitForExactPickers(page);
-
-    // Round 84 (turn dock): the target buttons of a move show once the move is the slot's pending pick.
-    const pikachuTray = await openTray(page, 'p1a');
-    await pikachuTray.locator('.ps-movebtn', { hasText: 'Thunderbolt' }).click();
-    const bulbasaurTarget = pikachuTray.locator('.ps-target-btn[title^="Thunderbolt into Bulbasaur"]');
-    const charmanderTarget = pikachuTray.locator('.ps-target-btn[title^="Thunderbolt into Charmander"]');
-    await expect(bulbasaurTarget).toBeVisible();
-    await expect(charmanderTarget).toBeVisible();
-    await expect(bulbasaurTarget).toContainText('P2A Bulbasaur');
-    await expect(charmanderTarget).toContainText('P2B Charmander');
-
-    await charmanderTarget.click();
-    await expect(charmanderTarget).toHaveClass(/ps-target-btn-selected/);
-    await expect(bulbasaurTarget).not.toHaveClass(/ps-target-btn-selected/);
   });
 
   test('picking a doubles move or target leaves every move button in place', async ({ page }) => {

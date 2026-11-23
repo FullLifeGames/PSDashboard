@@ -99,6 +99,20 @@ describe('TurnDock, doubles', () => {
     expect(sent.p2[1]).toMatchObject({ kind: 'move', moveId: 'taunt' });
   });
 
+  // Round 90 (E5): the browser row "doubles target buttons identify and highlight the selected target" of pickers.spec.
+  test('a pending move shows one target button per foe with its slot and name, and a press moves the highlight', async () => {
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
+    await userEvent.click(chip('P1B'));
+    await userEvent.click(tray().getByRole('button', { name: /^Pollen Puff/ }));
+    const first = tray().getByTitle(/^Pollen Puff into Rillaboom/);
+    const second = tray().getByTitle(/^Pollen Puff into Tornadus/);
+    expect(first).toHaveTextContent('P2A Rillaboom');
+    expect(second).toHaveTextContent('P2B Tornadus');
+    await userEvent.click(second);
+    expect(second).toHaveClass('ps-target-btn-selected');
+    expect(first).not.toHaveClass('ps-target-btn-selected');
+  });
+
   test('a slot without a logged action reads "no logged move · choose", and Execute waits for it', () => {
     render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
     expect(chip('P2B')).toHaveTextContent('no logged move · choose');
@@ -119,5 +133,24 @@ describe('TurnDock, singles', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Execute Turn' }));
     await waitFor(() => expect(onExecuteTurn).toHaveBeenCalledTimes(1));
     expect(onExecuteTurn.mock.calls[0][0]).toMatchObject({ p1: [{ moveId: 'earthquake' }], p2: [{ kind: 'switch', speciesId: 'rotomwash' }] });
+  });
+
+  // Round 90 (E5): the browser rows "the dock picks moves without Smogon stats" and "the dock accepts custom move choices from the tray's
+  // choice picker" of pickers.spec. A position with no logged action starts empty; a pick fills the chip as the user's own.
+  test('a tile pick and a choice from the tray\'s picker each fill an empty chip as the user\'s own pick', async () => {
+    render(<Harness base={simState('singles')} played={{ p1: null, p2: null }} spies={{}} />);
+    expect(chip('P1')).toHaveAttribute('data-empty', 'true');
+    await userEvent.click(chip('P1'));
+    await userEvent.click(tray().getByRole('button', { name: /Earthquake/ }));
+    expect(chip('P1')).toHaveTextContent('Earthquake');
+    expect(chip('P1')).not.toHaveAttribute('data-empty', 'true');
+
+    expect(chip('P2')).toHaveAttribute('data-empty', 'true');
+    await userEvent.click(chip('P2'));
+    await userEvent.click(tray().getByRole('button', { name: /Dice · What if/ }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Choice picker for P2' }), 'switch:2');
+    expect(chip('P2')).not.toHaveAttribute('data-empty', 'true');
+    expect(chip('P2')).not.toHaveAttribute('data-origin', 'played');
+    expect(chip('P2')).toHaveTextContent('→ ');
   });
 });

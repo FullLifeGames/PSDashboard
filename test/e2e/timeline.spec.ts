@@ -9,14 +9,6 @@ test.describe('PS Dashboard', () => {
     await page.goto('/');
   });
 
-  test('shows the always-visible timeline bar with slider', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.locator('input[type="range"]')).toBeVisible({ timeout: 10000 });
-    // "Branch Here" is gone as a concept — the pickers are always live.
-    await expect(page.locator('button', { hasText: 'Branch Here' })).toHaveCount(0);
-    await expect(page.getByText('Timeline')).toBeVisible();
-  });
-
   test('branch turn slider updates turn display', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const slider = page.locator('input[type="range"]');

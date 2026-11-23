@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { test, expect, type Route } from '@playwright/test';
 import { routeSmogon } from './smogon-routes';
-import { fixturePath, fixtureReplay, fromSetup, installReplayEmbedCache, openLoader, routeOfflineFixtures } from './helpers';
+import { fixturePath, fromSetup, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
 test.beforeAll(installReplayEmbedCache);
 
@@ -9,21 +9,6 @@ test.describe('PS Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     await routeOfflineFixtures(page);
     await page.goto('/');
-  });
-
-  test('renders the app header', async ({ page }) => {
-    await expect(page.locator('h1')).toHaveText('PS Dashboard');
-  });
-
-  test('shows replay loader with URL input and load button', async ({ page }) => {
-    const input = page.locator('input[type="text"]');
-    await expect(input).toBeVisible();
-    await expect(input).toHaveValue(/replay\.pokemonshowdown\.com/);
-    await expect(page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ })).toBeVisible();
-  });
-
-  test('defaults to the featured draft replay', async ({ page }) => {
-    await expect(page.locator('input[type="text"]')).toHaveValue(/gen9draft-2058494320/);
   });
 
   test('loads an exported replay HTML file from disk', async ({ page }) => {
@@ -165,12 +150,6 @@ test.describe('PS Dashboard', () => {
     await expect(dialog.getByRole('alert')).toContainText('=== p1');
   });
 
-  test('landing screen explains the unified timeline workflow', async ({ page }) => {
-    await expect(page.getByText('Find the decision point')).toBeVisible();
-    await expect(page.getByText('Play a different move')).toBeVisible();
-    await expect(page.getByText('Compare the lines')).toBeVisible();
-  });
-
   test('loads a replay and shows match info', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
@@ -183,42 +162,6 @@ test.describe('PS Dashboard', () => {
     const iframe = page.locator('iframe[title="PS Replay"]');
     await expect(iframe).toBeVisible({ timeout: 10000 });
     await expect(page.locator('iframe')).toHaveCount(1);
-  });
-
-  test('the loader input reflects the loaded replay link', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    // The default draft link gives way to the canonical link of what loaded —
-    // whichever path (typed URL, file, share link) brought the replay in.
-    // Round 84 (Q20 a): the loader moved from the column into the top bar's Load panel.
-    const panel = await openLoader(page);
-    await expect(panel.getByLabel('Replay URL or ID')).toHaveValue(
-      `https://replay.pokemonshowdown.com/${fixtureReplay.id}`, { timeout: 10000 });
-  });
-
-  test('with a replay loaded the loader folds into the Load button: the panel loads another replay and closes', async ({ page }) => {
-    // Round 84 (turn dock, Q20 a): the column holds no loader once a replay is loaded; the start page keeps it.
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.ps-main-left input[aria-label="Replay URL or ID"]')).toHaveCount(0);
-    await expect(page.locator('.ps-main-left').getByText('Load Replay')).toHaveCount(0);
-    await expect(page.locator('.ps-topbar-actions .ps-loader-toggle')).toBeVisible();
-
-    // Escape and a click beside the panel close it.
-    const panel = await openLoader(page);
-    await expect(panel.locator('input[aria-label="Load exported replay file"]')).toHaveCount(1);
-    await expect(panel.locator('summary')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(panel).toHaveCount(0);
-    await openLoader(page);
-    await page.locator('.ps-topbar-match').click();
-    await expect(panel).toHaveCount(0);
-
-    // A URL load from the panel replaces the replay and closes the panel.
-    const again = await openLoader(page);
-    await again.getByLabel('Replay URL or ID').fill('gen9doubles-test');
-    await again.getByRole('button', { name: 'Load', exact: true }).click();
-    await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(again).toHaveCount(0);
   });
 
   test('an exported replay dropped anywhere on the page loads while a replay is loaded', async ({ page }) => {
@@ -238,20 +181,6 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('Beta', { exact: true }).first()).toBeVisible();
     // The panel closed after the load.
     await expect(page.locator('.ps-loader-panel')).toHaveCount(0);
-  });
-
-  test('team paste section is available', async ({ page }) => {
-    const details = page.locator('details');
-    await expect(details).toBeVisible();
-    await details.locator('summary').click();
-    await expect(page.locator('textarea')).toBeVisible();
-    await expect(page.locator('button', { hasText: 'Save Team' })).toBeVisible();
-  });
-
-  test('the Setup menu offers Edit Opp after loading a replay', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await page.getByRole('button', { name: 'Setup', exact: true }).click({ timeout: 10000 });
-    await expect(page.locator('.ps-setup-panel').getByRole('button', { name: 'Edit Opp' })).toBeVisible();
   });
 
   test('Battle Statistics panel appears after loading replay', async ({ page }) => {

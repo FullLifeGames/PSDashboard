@@ -23,21 +23,6 @@ test.describe('support', () => {
     await page.goto('/');
   });
 
-  test('the header carries Beta, Report issue and the creator link before and after a replay loads', async ({ page }) => {
-    const header = page.locator('.ps-app-header');
-    await expect(header).toContainText('Beta');
-    await expect(header.getByRole('button', { name: 'Report issue' })).toBeVisible();
-    await expect(header.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toHaveAttribute('href', 'https://fulllifegames.com');
-    await expect(page.locator('h1')).toHaveCount(1);
-
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    const links = page.locator('.ps-topbar .ps-support-links');
-    await expect(links).toContainText('PS Dashboard');
-    await expect(links).toContainText('Beta');
-    await expect(links.getByRole('button', { name: 'Report issue' })).toBeVisible();
-    await expect(links.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeVisible();
-  });
-
   test('Report issue opens a dialog that offers the state file and the filled issue form', async ({ page, context }) => {
     // User request 28.10.2026: a dialog with a download button and a link replaces the tab and the download that the
     // click started by itself.

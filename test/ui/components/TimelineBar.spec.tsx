@@ -31,6 +31,14 @@ describe('TimelineBar', () => {
     expect(screen.queryByRole('group', { name: 'Line selector' })).toBeNull();
   });
 
+  // Round 90 (E5): the browser row "shows the always-visible timeline bar with slider" of timeline.spec.
+  test('the bar is always there: the title, the slider, and no "Branch Here" button', () => {
+    render(<TimelineBar {...props()} />);
+    expect(screen.getByText('Timeline')).toBeVisible();
+    expect(screen.getByRole('slider', { name: 'Timeline turn selector' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Branch Here/ })).toBeNull();
+  });
+
   test('the arrows step the turn; the first step back opens the team preview, T0 is pressed there', async () => {
     const wired = props({ viewTurn: 1 });
     const { rerender } = render(<TimelineBar {...wired} />);

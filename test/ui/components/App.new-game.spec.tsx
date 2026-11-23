@@ -321,6 +321,35 @@ describe('a new game in the app', () => {
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
   });
 
+  // Round 90 (E5): the browser rows "a version 1 link of a replay branch opens its read-only view as before; one of a game offers no
+  // Load Original Replay" and "a link of a newer version names its version; a damaged game link says so" of new-game-share.spec
+  // (the newer version is the row above).
+  test('a version 1 link of a replay branch opens its read-only view with Load Original Replay; one that names a game offers New Replay only', async () => {
+    const branch = {
+      version: 1 as const, replayId: 'gen9ou-test-123', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Alice', 'Bob'] as [string, string], branchTurn: 2,
+      createdAt: '2026-04-29T08:00:00.000Z', choices: [{ turnNumber: 2, p1Choice: 'move 1', p2Choice: 'move 2' }],
+      finalLog: '|player|p1|Alice|\n|player|p2|Bob|\n|turn|1\n|turn|2',
+    };
+    window.location.hash = `#branch=${encodeBranchShare(branch)}`;
+    const { unmount } = render(<App />);
+    expect(screen.getByText('Shared Branch', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load Original Replay' })).toBeInTheDocument();
+    unmount();
+    window.location.hash = `#branch=${encodeBranchShare({ ...branch, replayId: 'newgame-m7nj3hx23e' })}`;
+    render(<App />);
+    expect(screen.getByText('Shared Branch', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Replay' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load Original Replay' })).toBeNull();
+  });
+
+  test('a damaged game link says so on the start page and leaves no hash', () => {
+    window.location.hash = `#branch=${encodeShareJson({ version: 2, kind: 'game' })}`;
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent('invalid or damaged');
+    expect(window.location.hash).toBe('');
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+  });
+
   test('a replay loaded by id writes ?replay=<id>; a ?replay= link still loads and stays as written', async () => {
     const replay = replayData('singles');
     stubReplayFetch([replay]);

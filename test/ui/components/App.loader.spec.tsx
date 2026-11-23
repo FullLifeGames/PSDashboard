@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
@@ -62,4 +62,60 @@ describe('the replay loader in the app', () => {
     await userEvent.click(toggle());
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(second.id);
   });
+});
+
+/**
+ * Round 90 (E5, #222, #191 item 3): the start page and the Load panel, as the browser rows of `loader` and `support` read them. The
+ * checks are text and state of the app's own markup; they need no replay iframe, so they run here.
+ */
+describe('the start page and the Load panel', () => {
+  test('the start page: one header with Beta, Report issue and the creator link; the featured draft link and a Load button; the three guide steps; the team paste', async () => {
+    render(<App />);
+    const header = document.querySelector('.ps-app-header') as HTMLElement;
+    expect(document.querySelectorAll('h1')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PS Dashboard');
+    expect(header).toHaveTextContent('Beta');
+    expect(within(header).getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
+    expect(within(header).getByRole('link', { name: 'by Bene (FullLifeGames)' })).toHaveAttribute('href', 'https://fulllifegames.com');
+
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    expect(input).toHaveValue('https://replay.pokemonshowdown.com/gen9draft-2058494320');
+    expect(screen.getByRole('button', { name: 'Load', exact: true })).toBeInTheDocument();
+    const guide = screen.getByLabelText('Unified timeline workflow');
+    for (const step of ['Find the decision point', 'Play a different move', 'Compare the lines']) expect(within(guide).getByText(step)).toBeInTheDocument();
+
+    const details = document.querySelector('details') as HTMLElement;
+    await userEvent.click(within(details).getByText(/Paste your team/));
+    expect(details).toHaveAttribute('open');
+    expect(within(details).getByRole('textbox')).toBeVisible();
+    expect(within(details).getByRole('button', { name: 'Save Team' })).toBeInTheDocument();
+  });
+
+  test('with a replay loaded the loader input holds its canonical link, the top bar carries the support links, and the Load panel closes on Escape and on a click on the match', async () => {
+    const replay = replayData('singles');
+    stubReplayFetch([replay]);
+    render(<App />);
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Replay URL or ID' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Replay URL or ID' }), `${replay.id}{Enter}`);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    expect(document.querySelector('.ps-app-header')).toBeNull();
+    const links = document.querySelector('.ps-topbar .ps-support-links') as HTMLElement;
+    expect(links).toHaveTextContent('PS Dashboard');
+    expect(links).toHaveTextContent('Beta');
+    expect(within(links).getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
+    expect(within(links).getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeInTheDocument();
+
+    await userEvent.click(toggle());
+    const panel = () => document.querySelector('.ps-loader-panel') as HTMLElement | null;
+    expect(screen.getByRole('textbox', { name: 'Replay URL or ID' })).toHaveValue(`https://replay.pokemonshowdown.com/${replay.id}`);
+    expect(panel()!.querySelector('input[aria-label="Load exported replay file"]')).not.toBeNull();
+    expect(panel()!.querySelector('summary')).not.toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(panel()).toBeNull();
+    await userEvent.click(toggle());
+    expect(panel()).not.toBeNull();
+    await userEvent.click(document.querySelector('.ps-topbar-match') as HTMLElement);
+    expect(panel()).toBeNull();
+    await act(async () => {});
+  }, 60_000);
 });
