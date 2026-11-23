@@ -1,7 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { proveForcedWin } from '../src/endgame/prover';
 import { strongerStep } from '../src/endgame/win-paths/stronger';
-import { mon, playLine, REQUEST, serializedBoard, won, type Board } from './win-paths-support';
+import { mon, playLine, REQUEST, serializedBoard, won, type Board, playLineOn } from './win-paths-support';
+import { readFileSync } from 'node:fs';
+import type { ReplayData } from '@fulllifegames/replay-core';
+import { loadSimMods } from '../src/forward/sim-mods';
+import { serializeLiveBattle } from '../src/serialize';
+import { searchPosition } from '../src/search/position';
+import { reconstruct } from './arrival-turn';
 
 /**
  * Round 89 (#130), step G7a: a stronger play. The side that lost may pick any choice at the turn; the opponent answers with its best
@@ -122,4 +128,44 @@ describe('a stronger play, doubles', () => {
     expect(step.line!.steps[0].p2.choice).toMatch(/^move (splash|growl), move (splash|growl)$/);
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, step.line!, seed), 'p1')).toBe(true);
   }, 240_000);
+});
+
+await loadSimMods('gen9championsou');
+
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/e2e-feedback/fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
+
+describe('a stronger play on the corpus', () => {
+  test('649664 t23: devin has a choice that wins in more than half of the dice whatever BKC answers, and its line plays to the win', async () => {
+    const name = 'smogtours-gen6ou-649664';
+    const rebuild = () => reconstruct(name, 23, fixture(name));
+    const { runtime } = await rebuild();
+    const serialized = serializeLiveBattle(runtime.battleStream.battle!);
+    const ranking = searchPosition(serialized, { depth: 1, samples: 1, mode: 'matrix', ruleset: 'standard', tera: true });
+    const rootOrder = ranking.perSide.p2.map(row => row.choice);
+    const today = proveForcedWin(serialized, { side: 'p2', rootOrder, tera: true, ruleset: 'standard' });
+    const step = strongerStep(serialized, REQUEST('p2', { rootOrder, tera: true, ruleset: 'standard' }));
+    console.info(`649664 t23 for devin: ${step.line?.label}: wins within ${step.line?.steps.length} steps in ${Math.round((step.chance ?? 0) * 1000) / 10} % of the dice whatever BKC answers (played: none in the log); the production prover reads ${today.mass}`);
+    expect(step.status).toBe('found');
+    expect(step.played).toBeUndefined();
+    expect(step.chance!).toBeGreaterThan(0.5);
+    expect(step.chance!).toBeGreaterThanOrEqual(today.mass);
+    expect(step.line!.label).toBe('High Jump Kick');
+    expect(step.spent.cells).toBeLessThan(600);
+    expect(won(await playLineOn((await rebuild()).runtime, step.line!), 'p2')).toBe(true);
+  }, 300_000);
+
+  test('Champions VGC 2695803506 t10: juacox300 (doubles 1 v 1), every legal reply of Delphox-Mega is answered inside the budget', async () => {
+    const name = 'gen9championsvgc2026regmc-2695803506';
+    const { runtime } = await reconstruct(`champions/${name}`, 10, fixture(name));
+    const serialized = serializeLiveBattle(runtime.battleStream.battle!);
+    const ranking = searchPosition(serialized, { depth: 1, samples: 1, mode: 'matrix', ruleset: 'champions', tera: true });
+    const rootOrder = ranking.perSide.p2.map(row => row.choice);
+    const step = strongerStep(serialized, REQUEST('p2', { rootOrder, tera: true, ruleset: 'champions' }));
+    // no own choice of the burned Kingambit wins within three turns against every reply (Protect, then the burn): the production
+    // prover at 100 and 400 cells read mass 0 on this board as well (probe G5), and the step answers every reply inside its budget
+    expect(step.status).toBe('none');
+    expect(step.chance).toBeUndefined();
+    expect(step.line).toBeUndefined();
+    expect(step.spent.cells).toBeLessThan(600);
+  }, 300_000);
 });
