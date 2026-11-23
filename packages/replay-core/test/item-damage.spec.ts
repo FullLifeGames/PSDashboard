@@ -1,11 +1,19 @@
+import './champions-mod';
 import { test, expect, describe } from 'vitest';
-import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
+import { Battle, Teams, toID, type PokemonSet, Dex } from '@pkmn/sim';
 import { calculate, Field, Generations, Move, Pokemon } from '@smogon/calc';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { judgeItemsByDamage } from '../src/team/item-damage';
-import { guessedEvs, guessedField, revealedField, unknownField } from '../src/team-info';
-import type { LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo } from '../src/types';
-import './champions-mod';
+import { guessedEvs, guessedField, revealedField, unknownField, enrichTeamInfo } from '../src/team-info';
+import type { LoggedHit, OpponentTeamInfo, PokemonEvs, RevealedPokemonInfo, DamageObservation } from '../src/types';
+import * as championsMod from '@pkmn/mods/champions';
+import { calcGenerationFor, calcModOf } from '../src/calc-gen';
+import { buildSolveContext, observationError } from '../src/spreads/fit';
+import { enrichTeamInfos } from '../src/team/damage-ruleouts';
+import { buildTeamsFromReplay } from '../src/team-builder';
+import type { PokemonSetAssumption, SetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
+import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
+import { toId } from '../src/ids';
 
 /**
  * The damage judge (round 67, T130, decision 18): an item candidate falls
@@ -271,5 +279,239 @@ describe('the defender\'s unproven item and ability widen the hull (T130, ruling
     const boosted = play([rhyperior('Solid Rock')], [blissey('Choice Specs')], [['move irondefense', 'move flashcannon']]);
     const refuted = judgeItemsByDamage(attackerIn(boosted, 'Blissey'), PLAIN, teams([builtAs('Rhyperior', 'Leftovers', 'Solid Rock', BULKY)]));
     expect(refuted.sort()).toEqual(['choicescarf', 'leftovers']);
+  });
+});
+
+describe('item-damage-champions', () => {
+  Dex.formats.extend(championsMod.Formats);
+
+  type Kind = 'singles' | 'doubles';
+  const FORMAT: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsdoublescustomgame' };
+  const sp = (spread: Partial<PokemonEvs>): PokemonEvs => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...spread });
+  const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+  const set = (species: string, item: string, ability: string, moves: string[], nature: string, spread: Partial<PokemonEvs>): PokemonSet => ({
+    name: species, species, item, ability, moves, nature, evs: sp(spread), ivs: { ...ALL_31 }, level: 50, gender: '',
+  });
+
+  const WYRDEER_SPREAD = sp({ hp: 2, atk: 32, spe: 32 });
+  const GARCHOMP_SPREAD = sp({ hp: 32, def: 32, spe: 2 });
+  const wyrdeer = (item: string) => set('Wyrdeer', item, 'Sap Sipper', ['Psyshield Bash'], 'Adamant', WYRDEER_SPREAD);
+  const garchomp = () => set('Garchomp', 'Leftovers', 'Sand Veil', ['Swords Dance'], 'Impish', GARCHOMP_SPREAD);
+  const blissey = () => set('Blissey', 'Leftovers', 'Natural Cure', ['Protect'], 'Calm', { hp: 32, spd: 32 });
+
+  /** The spectators' log of one turn: Wyrdeer (p2) hits Garchomp (p1) with Psyshield Bash; null when the roll crit or the simulator drew no clean hit. */
+  function turnLog(kind: Kind, item: string, seed: number): string | null {
+    const doubles = kind === 'doubles';
+    const battle = new Battle({
+      formatid: toID(FORMAT[kind]), seed: [1, 2, 3, seed],
+      p1: { name: 'Alpha', team: Teams.pack(doubles ? [garchomp(), blissey()] : [garchomp()]) },
+      p2: { name: 'Beta', team: Teams.pack(doubles ? [wyrdeer(item), blissey()] : [wyrdeer(item)]) },
+    });
+    if (battle.requestState === 'teampreview') {
+      battle.choose('p1', 'default');
+      battle.choose('p2', 'default');
+    }
+    battle.choose('p1', doubles ? 'move swordsdance, move protect' : 'move swordsdance');
+    battle.choose('p2', doubles ? 'move psyshieldbash 1, move protect' : 'move psyshieldbash');
+    const lines = battle.log;
+    const log = lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
+    return /\|-crit\|/.test(log) || !/\|move\|p2a: Wyrdeer\|Psyshield Bash/.test(log) ? null : log;
+  }
+
+  /** The clean log with the highest roll of the scene (a weak roll cannot tell an item from the defender as built); the hit the judge reads is the simulator's own. */
+  function sceneOf(kind: Kind, item: string): { log: string; attacker: RevealedPokemonInfo } {
+    let best: { log: string; attacker: RevealedPokemonInfo } | null = null;
+    for (let seed = 1; seed <= 120; seed++) {
+      const log = turnLog(kind, item, seed);
+      if (!log) continue;
+      const attacker = inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === 'Wyrdeer');
+      if (attacker?.hits?.length && (!best || attacker.hits[0].observed > best.attacker.hits![0].observed)) best = { log, attacker };
+    }
+    if (!best) throw new Error('no clean Psyshield Bash in 120 seeds');
+    return best;
+  }
+
+  const garchompInfo = (): RevealedPokemonInfo => ({
+    species: 'Garchomp', moves: [], ability: revealedField('Sand Veil'), item: revealedField('Leftovers'), teraType: unknownField(),
+    evs: guessedEvs(GARCHOMP_SPREAD), nature: guessedField('Impish'), level: 50, gender: '',
+  });
+  const teamsOf = () => ({ p1: { pokemon: [garchompInfo()] }, p2: { pokemon: [] as RevealedPokemonInfo[] } });
+  const CANDIDATES = ['Life Orb', 'Leftovers', 'Sitrus Berry', 'Focus Sash'];
+  const hitOf = (attacker: RevealedPokemonInfo): LoggedHit => attacker.hits![0];
+
+  describe('the damage judge on a Champions game (T159, R10)', () => {
+    for (const kind of ['singles', 'doubles'] as const) {
+      test(`${kind}: the log of a Champions game names its format and its hit`, () => {
+        const { attacker } = sceneOf(kind, '');
+        expect(hitOf(attacker)).toMatchObject({ move: 'psyshieldbash', gen: 9, doubles: kind === 'doubles', attacker: { species: 'Wyrdeer' }, defender: { species: 'Garchomp', side: 'p1' } });
+        // The hit carries the log's tier name ('[Gen 9 Champions] OU'), not a format id: it must still price on generation 0.
+        expect(hitOf(attacker).format).toMatch(/champions/i);
+        expect(calcGenerationFor(hitOf(attacker).gen, calcModOf(hitOf(attacker).format)).num).toBe(0);
+      });
+
+      test(`${kind}: Wyrdeer without a boost item hits at the mod's power 90 and the judge rules out no item`, () => {
+        const { attacker } = sceneOf(kind, '');
+        // The scene is a scene only if the base game's power would have read as a boost: priced at the base Dex's
+        // Psyshield Bash, the hit lies above the strongest unboosted spread.
+        const hit = hitOf(attacker);
+        const gen = calcGenerationFor(9, 'champions');
+        const basePower = Dex.forGen(9).moves.get('psyshieldbash').basePower;
+        const modPower = Dex.dexes.champions.moves.get('psyshieldbash').basePower;
+        expect(modPower).toBeGreaterThan(basePower);
+        const body = (species: string, options: ConstructorParameters<typeof Pokemon>[2]) => new Pokemon(gen, species, { level: 50, ...options });
+        const defender = body('Garchomp', { nature: 'Impish', ability: 'Sand Veil', item: 'Leftovers', evs: GARCHOMP_SPREAD });
+        const strong = body('Wyrdeer', { nature: 'Adamant', ability: 'Sap Sipper', evs: { atk: 32 } });
+        const reread = calculate(gen, strong, defender, new Move(gen, 'Psyshield Bash', { overrides: { basePower } }), new Field()).damage as number[];
+        expect(hit.observed - 0.02).toBeGreaterThan(Math.max(...reread) / defender.maxHP());
+        expect(judgeItemsByDamage(attacker, CANDIDATES, teamsOf())).toEqual([]);
+      });
+
+      test(`${kind}: a hit only Life Orb explains rules out Leftovers, Sitrus Berry and Focus Sash`, () => {
+        const { attacker } = sceneOf(kind, 'Life Orb');
+        expect(judgeItemsByDamage(attacker, CANDIDATES, teamsOf()).sort()).toEqual(['focussash', 'leftovers', 'sitrusberry']);
+      });
+
+      test(`${kind}: a Choice Band hit, which the Champions mod marks Past, is explained by no item that exists there`, () => {
+        // The simulator still plays Choice Band; the calculator's generation 0 lists neither Band nor Specs, so no candidate
+        // reaches a x1.5 hit and the judge drops the hit rather than refute what the holder may carry.
+        const { attacker } = sceneOf(kind, 'Choice Band');
+        expect(judgeItemsByDamage(attacker, CANDIDATES, teamsOf())).toEqual([]);
+      });
+    }
+  });
+
+  describe('the spread solver reads the same Champions hit on Stat Points (T159, decision 7)', () => {
+    const SOLVER_FORMAT: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' };
+    for (const kind of ['singles', 'doubles'] as const) {
+      test(`${kind}: the spread the simulator played fits the hit at the mod's power, a weaker one does not`, () => {
+        const { attacker } = sceneOf(kind, '');
+        const hit = hitOf(attacker);
+        const observation: DamageObservation = {
+          attackerSpecies: 'Wyrdeer', defenderSpecies: 'Garchomp', attackerSide: 'p2', moveId: 'psyshieldbash', observedFraction: hit.observed,
+          lethal: false, attackerBoosts: {}, defenderBoosts: hit.defender.boosts, attackerStatus: '', screens: [], weather: '',
+        };
+        const sets = { p1: [garchomp()], p2: [wyrdeer('')] };
+        const ctx = buildSolveContext([observation], sets, SOLVER_FORMAT[kind], []);
+        expect(observationError(ctx, observation, 'p2:wyrdeer', { evs: WYRDEER_SPREAD, nature: 'Adamant' })).toBe(0);
+        expect(observationError(ctx, observation, 'p2:wyrdeer', { evs: sp({ spe: 32 }), nature: 'Hardy' })).toBeGreaterThan(0);
+      });
+    }
+  });
+});
+
+const slot = (value: string, options?: string[]): SetAssumption => ({ value, sourceDetail: 's', ...(options ? { options } : {}) });
+const evs = (hp: number, atk: number, def: number, spa: number, spd: number, spe: number) => ({ hp, atk, def, spa, spd, spe });
+const publishedSet = (species: string, item: SetAssumption, moves: SetAssumption[], nature: string, spread: ReturnType<typeof evs>): PokemonSetAssumption => ({
+  species, sourceDetail: 's', item, moves, spread: { value: '', sourceDetail: 's', nature, evs: spread },
+});
+const usage = (species: string, items: [string, number][], moves: [string, number][], spreads: [string, ReturnType<typeof evs>, number][] = []): PokemonUsageStats => ({
+  species, rawCount: 1000, abilities: [],
+  items: items.map(([value, probability]) => ({ value, probability, sourceDetail: 'u' })),
+  moves: moves.map(([value, probability]) => ({ value, probability, sourceDetail: 'u' })),
+  spreads: spreads.map(([nature, value, probability]) => ({ value: nature, nature, evs: value, probability, sourceDetail: 'u' })),
+});
+
+const gholdengoSets = (): PokemonSetAssumption => ({
+  ...publishedSet('Gholdengo', slot('Leftovers', ['Leftovers', 'Metal Coat']),
+    [slot('Protect'), slot('Nasty Plot'), slot('Make It Rain'), slot('Shadow Ball', ['Shadow Ball', 'Dazzling Gleam'])], 'Modest', evs(248, 0, 40, 112, 24, 84)),
+  alternatives: [
+    publishedSet('Gholdengo', slot('Choice Specs'), [slot('Make It Rain'), slot('Shadow Ball'), slot('Power Gem', ['Power Gem', 'Focus Blast']), slot('Trick')], 'Modest', evs(100, 0, 44, 252, 0, 112)),
+    publishedSet('Gholdengo', slot('Choice Scarf'), [slot('Make It Rain'), slot('Shadow Ball'), slot('Thunderbolt'), slot('Trick')], 'Timid', evs(0, 0, 0, 252, 4, 252)),
+  ],
+});
+const moltresSet = () => publishedSet('Moltres-Galar', slot('Leftovers'),
+  [slot('Fiery Wrath'), slot('Nasty Plot'), slot('Air Slash'), slot('Protect')], 'Modest', evs(252, 0, 0, 192, 0, 64));
+const incineroarSet = () => publishedSet('Incineroar', slot('Sitrus Berry'),
+  [slot('Fake Out'), slot('Knock Off'), slot('Parting Shot'), slot('Flare Blitz')], 'Careful', evs(252, 4, 0, 0, 252, 0));
+
+const sets: SmogonSetAssumptions = {
+  format: 'gen9doublesou', source: 's',
+  pokemon: { gholdengo: gholdengoSets(), moltresgalar: moltresSet(), incineroar: incineroarSet() },
+};
+const usageStats: SmogonUsageStats = {
+  format: 'gen9doublesou', month: 'm', source: 's', pokemon: Object.fromEntries([
+    usage('Gholdengo',
+      [['Choice Specs', 0.252], ['Leftovers', 0.189], ['Grassy Seed', 0.188], ['Choice Scarf', 0.106], ['Life Orb', 0.088], ['Shuca Berry', 0.042],
+        ['Focus Sash', 0.038], ['Metal Coat', 0.035], ['Air Balloon', 0.019]],
+      [['Make It Rain', 0.99], ['Shadow Ball', 0.9], ['Protect', 0.6], ['Nasty Plot', 0.55], ['Dazzling Gleam', 0.3], ['Trick', 0.27], ['Power Gem', 0.1]],
+      [['Timid', evs(4, 0, 0, 252, 0, 252), 0.133]]),
+  ].map(entry => [toId(entry.species), entry])),
+};
+
+/** Turn 2 of the excerpt is 938644's turn 14: Moltres-Galar 90 % to 24 % from a Tera-Fairy spread Dazzling Gleam. */
+const scene = [
+  '|player|p1|Alpha|', '|player|p2|Beta|', '|gametype|doubles', '|gen|9', '|tier|[Gen 9] Doubles OU',
+  '|poke|p1|Incineroar, M|', '|poke|p1|Moltres-Galar|', '|poke|p1|Ursaluna, F|', '|poke|p1|Sinistcha|',
+  '|poke|p2|Ursaluna, M|', '|poke|p2|Gholdengo|', '|poke|p2|Sinistcha|', '|poke|p2|Moltres-Galar|',
+  '|teamsize|p1|4', '|teamsize|p2|4', '|start',
+  '|switch|p1a: Ignis Flame|Incineroar, M|30/100', '|switch|p1b: Black Sun|Moltres-Galar|84/100',
+  '|switch|p2a: Fearless|Ursaluna, M|100/100', '|switch|p2b: Cooldown|Gholdengo, tera:Fairy|22/100',
+  '|turn|1',
+  '|move|p1a: Ignis Flame|Fake Out|p2a: Fearless', '|-damage|p2a: Fearless|91/100',
+  '|move|p1b: Black Sun|Nasty Plot|p1b: Black Sun', '|-boost|p1b: Black Sun|spa|2',
+  '|', '|-heal|p1b: Black Sun|90/100|[from] item: Leftovers', '|upkeep',
+  '|turn|2',
+  '|move|p2b: Cooldown|Dazzling Gleam|p1a: Ignis Flame|[spread] p1a,p1b', '|-supereffective|p1b: Black Sun',
+  '|-damage|p1a: Ignis Flame|0 fnt', '|-damage|p1b: Black Sun|24/100', '|faint|p1a: Ignis Flame',
+  '|-ability|p1b: Black Sun|Berserk|boost', '|-boost|p1b: Black Sun|spa|1',
+  '|', '|upkeep', '|turn|3',
+].join('\n');
+
+function chain(log: string, data: { usageStats: SmogonUsageStats; setAssumptions: SmogonSetAssumptions }, species: string) {
+  const raw = { p1: inferOpponentTeam(log, 'p1'), p2: inferOpponentTeam(log, 'p2') };
+  const infos = enrichTeamInfos(raw, data.usageStats, data.setAssumptions, {}, judgeItemsByDamage);
+  const team = buildTeamsFromReplay(log, { p1Info: infos.p1, p2Info: infos.p2, ...data }).p2Team;
+  const mon = infos.p2.pokemon.find(entry => entry.species === species)!;
+  return { panel: mon.item.value, built: team.find(entry => entry.species === species)!.item, ruledOut: mon.ruledOut?.items ?? [] };
+}
+
+describe('938644 t14: the logged hit rules Metal Coat out for panel and build (T130)', () => {
+  test('doubles: today\'s per-side enrichment plays the Nasty Plot set\'s Metal Coat', () => {
+    const p2Info = enrichTeamInfo(inferOpponentTeam(scene, 'p2'), usageStats, sets);
+    expect(p2Info.pokemon.find(entry => entry.species === 'Gholdengo')!.item.value).toBe('Metal Coat');
+  });
+
+  test('doubles: the joint enrichment rules Metal Coat out, and panel and build play the usage majority Choice Specs', () => {
+    const { panel, built, ruledOut } = chain(scene, { usageStats, setAssumptions: sets }, 'Gholdengo');
+    expect(ruledOut).toContain('metalcoat');
+    expect({ panel, built }).toEqual({ panel: 'Choice Specs', built: 'Choice Specs' });
+  });
+
+  test('without a judge the joint enrichment is the per-side enrichment', () => {
+    const raw = { p1: inferOpponentTeam(scene, 'p1'), p2: inferOpponentTeam(scene, 'p2') };
+    expect(enrichTeamInfos(raw, usageStats, sets, {})).toEqual({
+      p1: enrichTeamInfo(raw.p1, usageStats, sets), p2: enrichTeamInfo(raw.p2, usageStats, sets),
+    });
+  });
+});
+
+describe('singles: the same decision from a simulated game (T130)', () => {
+  const BULKY = { nature: 'Calm', evs: { hp: 252, spd: 252 } };
+  const mon = (species: string, item: string, ability: string, moves: string[], spread: { nature: string; evs: object }, teraType?: string): PokemonSet => ({
+    name: species, species, item, ability, moves, nature: spread.nature, level: 100, gender: '', teraType,
+    evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...spread.evs }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+  } as PokemonSet);
+
+  test('a Choice Specs Gholdengo that showed only Dazzling Gleam plays Choice Specs, not the slot\'s Metal Coat', () => {
+    const battle = new Battle({
+      formatid: toID('gen9ou'), seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: Teams.pack([mon('Moltres-Galar', 'Leftovers', 'Berserk', ['Protect', 'Nasty Plot'], BULKY)]) },
+      p2: { name: 'Beta', team: Teams.pack([mon('Gholdengo', 'Choice Specs', 'Good as Gold', ['Dazzling Gleam'], { nature: 'Modest', evs: { spa: 252, spe: 252, hp: 4 } }, 'Fairy')]) },
+    });
+    battle.choose('p1', 'team 1');
+    battle.choose('p2', 'team 1');
+    battle.choose('p1', 'move nastyplot');
+    battle.choose('p2', 'move dazzlinggleam terastallize');
+    const lines = battle.log;
+    const log = lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
+    const singlesSets: SmogonSetAssumptions = {
+      format: 'gen9ou', source: 's', pokemon: {
+        gholdengo: gholdengoSets(),
+        moltresgalar: publishedSet('Moltres-Galar', slot('Leftovers'), [slot('Nasty Plot'), slot('Protect'), slot('Fiery Wrath'), slot('Hurricane')], 'Calm', evs(252, 0, 0, 0, 252, 4)),
+      },
+    };
+    const { panel, built, ruledOut } = chain(log, { usageStats, setAssumptions: singlesSets }, 'Gholdengo');
+    expect(ruledOut).toContain('metalcoat');
+    expect({ panel, built }).toEqual({ panel: 'Choice Specs', built: 'Choice Specs' });
   });
 });
