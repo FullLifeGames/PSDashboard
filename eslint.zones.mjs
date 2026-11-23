@@ -24,6 +24,19 @@ export const importZones = [
     'Packages import each other by name and never reach src/ or the UI layer.'),
   zone(['packages/replay-core/src/**/*.ts'], '^@fulllifegames/eval-engine',
     'replay-core sits below the engine.'),
+  // The branch's turn runner stays out of a turn without a forced die: it loads the simulator and the dice module as types or by a dynamic
+  // import (typescript-eslint's rule knows `import type`; it replaces the package zone for this one file, so it repeats that zone's pattern).
+  {
+    files: ['packages/eval-engine/src/branch/execute.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [
+        { regex: `${UI_LAYER}|${OUT_OF_PACKAGE}`, message: 'Packages import each other by name and never reach src/ or the UI layer.' },
+        { regex: '^@pkmn/|(^|/)dice/', allowTypeImports: true,
+          message: 'execute.ts loads the simulator and the dice module as types or with a dynamic import, so a turn without a forced die never pays for them.' },
+      ] }],
+    },
+  },
   zone(['packages/*/test/**/*.ts'], OUT_OF_TEST_DIR,
     'Package tests import their own sources relatively (../src/...) and the sibling package by name; nothing outside the package.'),
   zone(['packages/replay-core/test/**/*.ts'], '^@fulllifegames/eval-engine',

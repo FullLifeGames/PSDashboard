@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import { describe, expect, test } from 'vitest';
 import { loadSimMods } from '../src/forward/sim-mods';
 import type { DiceReport } from '../src/dice/types';
@@ -90,17 +89,5 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('a forced d
     expect(result.ok).toBe(false);
     expect(battle.turn).toBe(1);
     expect(battle.log.length).toBe(length);
-  });
-});
-
-describe('the module stays out of a turn without a forced die', () => {
-  const source = readFileSync(new URL('../src/branch/execute.ts', import.meta.url), 'utf-8');
-
-  test('execute.ts imports the simulator and the dice module as types or with a dynamic import only', () => {
-    const imports = source.split(/\r?\n/).filter(line => /^import\b/.test(line));
-    for (const line of imports) {
-      if (/from '@pkmn\//.test(line) || /from '\.\.\/dice\//.test(line)) expect(line).toMatch(/^import type\b/);
-    }
-    expect(source).toMatch(/import\('\.\.\/dice\/turn\.ts'\)/);
   });
 });
