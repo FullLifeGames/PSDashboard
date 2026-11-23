@@ -105,7 +105,7 @@ npm run dev              # local Vite server
 | `npm run test:ui` | the app suite alone: components and hooks under jsdom with Testing Library |
 | `npm run test:coverage` | the whole Vitest suite with the v8 coverage provider (`@vitest/coverage-v8`, pinned to vitest's version); it writes `coverage-final.json` and the summary to `.calibration/coverage/` and takes about an hour on devbox |
 | `node scripts/cov-compare.mjs <before> <after> <root>` | two `coverage-final.json` files of the same source: statements, branches, functions and lines per package, and every item the first covers and the second does not (exit 1; exit 2 when a source file changed between the runs) |
-| `node scripts/rows-collect.mjs <out.json> [vitest list arguments]` | the rows of the suite by project and full name, listed without playing them (`vitest list --json`); set `DICE_SWEEPS=full` for the full list |
+| `node scripts/rows-collect.mjs <out.json> [vitest list arguments]` | the rows of the suite by project and full name, listed without playing them (`vitest list --json --staticParse=false`: the files run to collect, so helper-registered sweep parts are listed); set `DICE_SWEEPS=full` for the full list |
 | `node scripts/rows-compare.mjs <before.json> <after.json> [--map <table.json>]` | two such lists: rows lost or gained (exit 1); a table maps renamed rows by exact name or prefix |
 | `npm run test:e2e` | browser flows against fixture replays; rows that judge a view seed saved engine results, `EVAL_STORE=live` runs them live |
 | `npm run capture:eval-store` | captures those saved engine results again (`-- --only <replay id>` for one replay); run it when a seeded row fails and names it |

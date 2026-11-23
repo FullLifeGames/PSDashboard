@@ -1,6 +1,6 @@
 // Lists the rows of the Vitest suite without playing them, for `rows-compare.mjs`.
 // Usage: node scripts/rows-collect.mjs <out.json> [--raw <vitest list --json output>] [vitest list arguments...]
-// Runs `vitest list --json` (the files are collected, so test.each titles are filled in) and writes one entry per row
+// Runs `vitest list --json --staticParse=false` (the files are run to collect, so helper-registered rows and test.each titles are filled in) and writes one entry per row
 // ({ name, file, projectName }); prints the row count per project. Set DICE_SWEEPS the same way for both lists you compare.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -8,6 +8,12 @@ import { pathToFileURL } from 'node:url';
 
 export function rowsOfList(raw) {
   return raw.map(row => ({ name: row.name, file: row.file, projectName: row.projectName ?? '-' }));
+}
+
+// `vitest list` parses files statically by default and finds no suite in a file that registers its rows through a helper (the sweep parts
+// `landed-hit-sweep*`, `blocked-effects-sweep*`, `dice-logged-crit-*`); the files are therefore run to collect their rows.
+export function listArgs(rest) {
+  return ['vitest', 'list', '--json', ...(rest.some(arg => arg.startsWith('--staticParse')) ? [] : ['--staticParse=false']), ...rest];
 }
 
 export function countPerProject(rows) {
@@ -23,7 +29,7 @@ function main(args) {
   let text;
   if (rawAt >= 0) text = readFileSync(rest[rawAt + 1], 'utf8');
   else {
-    const run = spawnSync('npx', ['vitest', 'list', '--json', ...rest], { encoding: 'utf8', maxBuffer: 1 << 30 });
+    const run = spawnSync('npx', listArgs(rest), { encoding: 'utf8', maxBuffer: 1 << 30 });
     if (run.status !== 0) { console.error(run.stderr); return 1; }
     text = run.stdout;
   }
