@@ -13,7 +13,7 @@ name: Feedback
 # expression. The fixtures of the harness are tracked
 # (test/e2e-feedback/fixtures), so a run needs no data download.
 # Every job runs on ubuntu-24.04 and Node 24.21.0, the image and version of bank.yml (round 76: pin exact versions).
-# test/regression/feedback-workflow.spec.ts pins these properties.
+# test/regression/workflows.spec.ts pins these properties.
 
 on:
   push:

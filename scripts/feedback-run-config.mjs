@@ -27,7 +27,7 @@ const ALLOWED_KEYS = new Set(['name', 'runs']);
 /**
  * What the harness writes into docs/reports (test/e2e-feedback/feedback-drift.spec.ts) and the artifact keeps: one full
  * dump per replay (FEEDBACK_DUMP=1), the drift report as JSON and as Markdown, and the run's log.
- * test/regression/feedback-workflow.spec.ts holds these patterns to the harness's own file names.
+ * test/regression/workflows.spec.ts holds these patterns to the harness's own file names.
  */
 export const DUMP_FILE = /^feedback-full-[A-Za-z0-9._-]+\.json$/;
 export const DRIFT_JSON = 'feedback-drift.json';

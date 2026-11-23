@@ -108,7 +108,7 @@ jobs:
   # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
   # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest
   # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Required since round 90 (user 23.11.2026): the three parts are checks of their own, so branch protection lists
-  # "Full sweeps, the other specs, part 1 of 3", "part 2 of 3" and "part 3 of 3" (full-sweep-job.spec.ts holds the nine contexts). `full-sweep-job.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
+  # "Full sweeps, the other specs, part 1 of 3", "part 2 of 3" and "part 3 of 3" (workflows.spec.ts holds the nine contexts). `workflows.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
   # sweep spec to the part with the least time, and keep every part under 25 minutes of wall time.
   full-sweeps:
     name: Full sweeps, the other specs, part ${{ matrix.part }} of 3
@@ -187,7 +187,7 @@ jobs:
   # after them stays the one required check, so branch protection needs no change. One job took 33.9 minutes on 22.11.2026 (49 of
   # its 50 on a slow runner). The lists balance the seconds of the Playwright report of r90-e (run 45078312352 at E3, play-out-finish cut from 496 to an estimated 390 seconds by E4), summed
   # over the two workers of a part: about 996, 997 and 1000 seconds, so about 8 minutes of wall time each (two workers) plus a
-  # minute of setup. The regression spec `browser-flows-parts` holds every file of test/e2e/ in exactly one part: a new file goes
+  # minute of setup. The browser-flows-parts rows of the workflows regression spec hold every file of test/e2e/ in exactly one part: a new file goes
   # into the part with the least seconds, and a part stays under 30 minutes. The files go to Playwright as path filters
   # (regular expressions on the path); the same spec holds each entry to one file.
   browser:

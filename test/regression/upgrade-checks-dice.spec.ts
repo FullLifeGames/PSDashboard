@@ -4,7 +4,7 @@ import { upgradeChecks } from '../../scripts/upgrade-pkmn.mjs';
 /**
  * Round 82 (forced dice), step A7d (gate answer 1b): a plain run plays a sample of the dice sweeps, so the checks a new
  * simulator needs before it ships name the full ones (`DICE_SWEEPS=full`), which read every move of every rule set. Round 89 (D6b):
- * the other sweep specs run full in their own CI job, and the checks name it too (`full-sweep-job.spec.ts` holds that job's list).
+ * the other sweep specs run full in their own CI job, and the checks name it too (`workflows.spec.ts` holds that job's list).
  */
 describe('the checks the upgrade script prints', () => {
   const text = upgradeChecks('0.10.9');
