@@ -6,11 +6,7 @@ import { dexOfRules, SWEEP_CASES, sweepMoves, type DexMove } from './dice-sweep-
 import { clickedOf, moveScene, type Scene } from './dice-logged-sweep-support';
 import { sweepMovesOf, writeSummaries } from './dice-logged-sweep-rows';
 
-/**
- * D9b (#125): the secondary and self-effect rows of the logged sweep (the accuracy rows, the small groups and the census stay in
- * `dice-logged-sweep.spec.ts`, which describes the sweep), a part of the former file under the same titles. Its helpers are in
- * `dice-logged-sweep-rows.ts`.
- */
+/** The secondary and self-effect rows of the logged sweep; the accuracy rows, the small groups and the census are in `dice-logged-sweep.spec.ts`. */
 await loadSimMods('gen9championsou');
 // a full sweep plays every Dex move of a rule set in one test
 vi.setConfig({ testTimeout: 900_000 });
@@ -39,7 +35,7 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
     const keep = (move: DexMove): boolean => ownSelf(move);
     const result = sweepMovesOf('self-effect', rules, mode, keep, move => sceneOf(move));
     expect(result.failures).toEqual([]);
-    // a rule set whose Dex has no such move plays none (Gen 1 has no stat change of the user as a secondary)
+    // Gen 1 has no stat change of the user as a secondary
     expect(result.witnesses > 0 || sweepMoves(rules, keep).moves.length === 0).toBe(true);
   });
 

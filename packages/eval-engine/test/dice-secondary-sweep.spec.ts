@@ -10,12 +10,12 @@ import {
   sweepMoves, sweepTargets, VGC_RULES, type DexMove, type SecondaryEntry, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A3a: the secondary sweep. Every move with a secondary entry, singles and doubles with every
-// target on its own, each entry its own die (Fire Fang's burn and flinch), the accuracy forced to hit so the entry is drawn,
-// then the entry forced to happen and not to. The attacker is faster than the foe so a flinch can land. The report is held
-// against an independent witness of the protocol (`effectShown`). The rule rows follow: King's Rock and Razor Fang add a
-// flinch, Serene Grace doubles the chance the report names, Shield Dust, Covert Cloak and Sheer Force remove the entries
-// (`no-draw` with the reason), a Substitute takes the hit. The self effect with a chance closes the file.
+// The secondary sweep. Every move with a secondary entry, singles and doubles with every target on its own, each entry its own die
+// (Fire Fang's burn and flinch), the accuracy forced to hit so the entry is drawn, then the entry forced to happen and not to. The
+// attacker is faster than the foe so a flinch can land. The report is held against an independent witness of the protocol
+// (`effectShown`). The rule rows follow: King's Rock and Razor Fang add a flinch, Serene Grace doubles the chance the report names,
+// Shield Dust, Covert Cloak and Sheer Force remove the entries (`no-draw` with the reason), a Substitute takes the hit. The self
+// effect with a chance closes the file.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -59,7 +59,6 @@ const verdictKey = (took: DieReport['took']): keyof Tally =>
 
 interface Case { mode: Mode; move: DexMove; board: Battle; clicks: { p1: string; p2: string }; tally: Tally }
 
-/** Forces one entry to happen or not on every slot it can draw for; the problems found. */
 function forceEntry({ mode, move, board, clicks, tally }: Case, entry: SecondaryEntry, happens: boolean): string[] {
   const id = secondaryEffectId(entry);
   const verdicts: { slot: string; report: DieReport; problem: string | null }[] = [];
@@ -89,7 +88,6 @@ function forceEntry({ mode, move, board, clicks, tally }: Case, entry: Secondary
   return problems;
 }
 
-/** Forces every entry of one move to happen and not to; the problems found. */
 function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = false): string[] {
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', vgc, FAST);
   let clicks = sweepClicks(mode, move.target);
@@ -137,7 +135,6 @@ describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('t
   test('the sweep exercised the moves', () => conclude(name, some, skipped, tally));
 });
 
-/** One forced secondary of a move on an outfitted board: the report and whether the effect shows. */
 function forcedEntry(
   rules: Rules, mode: Mode, a: Parameters<typeof outfitBoard>[2], t: Parameters<typeof outfitBoard>[3], entry: SecondaryEntry, happens: boolean,
 ) {
@@ -148,7 +145,6 @@ function forcedEntry(
   return { report: report.forced[1], shown: effectShown(battle, start, entry, 'p2a', 'p1a') && missesOf(battle, start, 'p2a') === 0, battle, start };
 }
 
-/** Whether the rule set has the item or ability (the Dex of the game decides). */
 const has = (rules: Rules, kind: 'items' | 'abilities', id: string): boolean => {
   const dex = dexOfRules(rules);
   const entry = dex[kind].get(id);

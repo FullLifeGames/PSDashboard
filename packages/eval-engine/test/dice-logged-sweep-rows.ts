@@ -7,16 +7,14 @@ import { dexOfRules, picksOne, sweepMoves, SWEEP_CASES, type DexMove } from './d
 import { clickedOf, moveScene, scan, witnessesWanted, type Scan, type Scene } from './dice-logged-sweep-support';
 
 /**
- * D9b (#125): what the five specs of the logged sweep share. `dice-logged-sweep.spec.ts` (accuracy and the small groups),
- * `dice-logged-crit-doubles-a.spec.ts`, `dice-logged-crit-doubles-b.spec.ts`, `dice-logged-crit-singles.spec.ts` and
- * `dice-logged-secondary.spec.ts` hold the rows of the former one file under the same titles; the doubles crits of the 18 cases
- * (`SWEEP_CASES`) split in two halves by their measured time, and a rule set that joins `RULES` lands in the second half.
- * The scene helpers and the scan live in `dice-logged-sweep-support.ts`; the rest of the old file's top is here.
+ * What the specs of the logged sweep share (`dice-logged-sweep.spec.ts`, the crit specs, `dice-logged-secondary.spec.ts`). The doubles
+ * crits of the 18 cases (`SWEEP_CASES`) split in two halves by their measured time; a rule set that joins `RULES` lands in the second half.
+ * The scene helpers and the scan live in `dice-logged-sweep-support.ts`.
  */
 export const WANT = witnessesWanted();
 export const summaries: string[] = [];
 
-/** Writes the summaries of a spec where `DICE_SWEEP_LOG` points (the main spec there, a part of the split beside it with its own suffix). */
+/** Writes the summaries where `DICE_SWEEP_LOG` points; a split part adds its own suffix. */
 export function writeSummaries(part?: string): void {
   const logPath = process.env.DICE_SWEEP_LOG;
   if (logPath) writeFileSync(part ? `${logPath}.${part}` : logPath, summaries.join('\n') + '\n', 'utf8');
@@ -29,20 +27,18 @@ export function writeSummaries(part?: string): void {
  */
 const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && picksOne(move.target);
 /**
- * The moves the full sweep (`DICE_SWEEPS=full`, 04.11.2026) found that `loggedDice` cannot repeat, each group with its cause. The main rows leave
- * them out; one known row per group plays them and stays red until the reader (B3, lane B's files) or a die (lane A's files) covers the cause.
- * Names stand here because the sweep's oracle is the simulator's own log of each move; the code that fixes a cause reads the Dex, not these ids.
+ * The moves the full sweep (`DICE_SWEEPS=full`) found that `loggedDice` cannot repeat, each group with its cause. The main rows leave
+ * them out; one known row per group plays them and stays red until the reader or a die covers the cause. Names stand here because
+ * the sweep's oracle is the simulator's own log of each move; the code that fixes a cause reads the Dex, not these ids.
  */
 export const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
 ];
 
-/** Whether the move is a gap of this game type (a gap may hold in singles and stay open in doubles). */
 const gapped = (mode: Mode, id: string): boolean => GAPS.some(gap => gap.modes.includes(mode) && gap.moves.includes(id));
 const lowAccuracy = (move: DexMove): boolean => typeof move.accuracy === 'number' && move.accuracy < 100;
 
-/** What a block of a case counted, for the log and the census. */
 export function total(label: string, moves: number, scans: Scan[]): Scan {
   const sum: Scan = { scanned: 0, skipped: 0, witnesses: 0, named: 0, rollFaints: 0, failures: [], why: {} };
   for (const entry of scans) {
@@ -54,7 +50,6 @@ export function total(label: string, moves: number, scans: Scan[]): Scan {
   return sum;
 }
 
-/** Plays every move of a list through `sceneOf` and checks that the forced turn gives the log's turn. */
 export function sweepMovesOf(
   label: string, rules: Rules, mode: Mode, keep: (move: DexMove) => boolean, sceneOf: (move: DexMove) => Scene | null, foesOnly = true, withGaps = false,
 ): Scan {
@@ -73,13 +68,12 @@ export function sweepMovesOf(
   return sum;
 }
 
-/** The cases of a block: the rule sets and game types, and whether the rule set has the moves at all. */
 const KINDS = {
   accuracy: { keep: (move: DexMove) => lowAccuracy(move), channels: ['misses'] },
   crit: { keep: (move: DexMove) => move.category !== 'Status', channels: ['crits'] },
 } as const;
 
-/** The rule sets whose doubles crits `dice-logged-crit-doubles-a.spec.ts` plays (about 660 of the 1,200 s under `DICE_SWEEPS=full`); the other doubles cases are part b's. */
+/** The rule sets whose doubles crits `dice-logged-crit-doubles-a.spec.ts` plays (about 660 of the 1,200 s under `DICE_SWEEPS=full`); the others are part b's. */
 const CRIT_DOUBLES_A = ['Champions', 'Gen 8', 'Gen 5', 'Gen 4'];
 type SweepCase = typeof SWEEP_CASES[number];
 export const CRIT_CASES: Record<'singles' | 'doublesA' | 'doublesB', SweepCase[]> = {
@@ -88,7 +82,6 @@ export const CRIT_CASES: Record<'singles' | 'doublesA' | 'doublesB', SweepCase[]
   doublesB: SWEEP_CASES.filter(entry => entry.mode === 'doubles' && !CRIT_DOUBLES_A.includes(entry.rules.name)),
 };
 
-/** The rows of one kind (accuracy or crit) over a list of cases, under the title the old file gave both kinds. */
 export function registerKindRows(cases: SweepCase[], kinds: (keyof typeof KINDS)[]): void {
   describe.each(cases)('the logged accuracy and crit dice give the log\'s turn: $name', ({ rules, mode }) => {
     const dex = dexOfRules(rules);

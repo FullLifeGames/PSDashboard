@@ -3,15 +3,13 @@ import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn
 import { correctActivesFromProtocol } from '../src/branch/corrections';
 
 /**
- * Round 78 (@pkmn 0.10.12): Gens 1 to 4 play their entry inside BattleActions#switchIn now; the gen 4 mod's runSwitch,
- * which ran EntryHazard and SwitchIn, is gone. EntryHazard brings the hazards, Healing Wish and Lunar Dance,
- * AfterSwitchInSelf the gen 1 and 2 status conditions, AfterEntryHazard the gen 3 weather abilities after turn 0, and a
- * Knocked-Off Pokémon drops a regained item. A body the boundary correction puts in (playEntry in entry-effects.ts) ran
- * only runSwitch, so in Gens 3 and 4 it took no Spikes or Stealth Rock. The sweep plays every Dex entry these events
- * reach, in each generation, two ways: the simulator's own entry (a replacement after a faint, or a switch at the
- * boundary), and the correction of a protocol that shows the same entry. The entering body and its side must match.
- * Gen 9 rows hold the path of Gens 5 on, where runSwitch plays the entry. (Gen 1 and 2 `residualdmg` is a volatile that a
- * switch-out clears, so no entering body carries it.)
+ * Gens 1 to 4 play their entry inside BattleActions#switchIn (@pkmn 0.10.12). EntryHazard brings the hazards, Healing Wish and
+ * Lunar Dance, AfterSwitchInSelf the gen 1 and 2 status conditions, AfterEntryHazard the gen 3 weather abilities after turn 0, and
+ * a Knocked-Off Pokémon drops a regained item. A body the boundary correction puts in (playEntry in entry-effects.ts) must play
+ * all of them: in Gens 3 and 4 it takes Spikes and Stealth Rock. The sweep plays every Dex entry these events reach, in each
+ * generation, two ways: the simulator's own entry (a replacement after a faint, or a switch at the boundary), and the correction
+ * of a protocol that shows the same entry. The entering body and its side must match. Gen 9 rows hold the path of Gens 5 on, where
+ * runSwitch plays the entry. (Gen 1 and 2 `residualdmg` is a volatile that a switch-out clears, so no entering body carries it.)
  */
 
 type Body = Battle['sides'][number]['pokemon'][number];
@@ -60,7 +58,6 @@ const drain = (battle: Battle) => {
   while (battle.queue.list.length > 0) battle.runAction(battle.queue.shift()!);
 };
 
-/** The simulator's own entry: the replacement after Tauros's faint, or a switch at the boundary. */
 function simulatorEntry(row: Row, afterFaint: boolean): Battle {
   const battle = make(row);
   if (afterFaint) {
@@ -76,7 +73,6 @@ function simulatorEntry(row: Row, afterFaint: boolean): Battle {
   return battle;
 }
 
-/** The correction: the simulator kept Tauros on the field, the protocol shows the entry (after Tauros's faint). */
 function correctedEntry(row: Row, afterFaint: boolean): Battle {
   const battle = make(row);
   if (afterFaint) playTurnTwo(battle, false);
@@ -86,7 +82,6 @@ function correctedEntry(row: Row, afterFaint: boolean): Battle {
   return battle;
 }
 
-/** What an entry can change: the entering body and the side it entered. */
 function entryState(battle: Battle) {
   const body = battle.sides[0].active[0]!;
   const side = battle.sides[0];

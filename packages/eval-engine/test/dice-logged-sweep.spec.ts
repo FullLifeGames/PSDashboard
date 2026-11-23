@@ -17,22 +17,15 @@ import { GAPS, registerKindRows, summaries, sweepMovesOf, total, WANT, writeSumm
 import { battleOf } from './power-oracle';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B2: the sweep of the log reader. The simulator is the oracle. For every Dex
- * entry of every kind of die the log names, in every generation and mod the corpus plays (Gens 1 to 9, the Champions mod; singles
- * everywhere, doubles from Gen 3), a turn plays under one seed and writes a log; the dice `loggedDice` reads from that log, forced
- * on the same board under another seed, must give the log's turn (`scoreAlignment` perfect). The kinds: accuracy, crit, secondary
- * and self-effect (every move with a chance entry, also under Serene Grace and Sheer Force), hit-count (the multi-accuracy
- * moves join the main rows since round 88, T337, and have the Triple Axel row of ruling Q4: the accuracy die of each hit), status-check (every condition whose handler draws), speed-tie
- * and, new in this round, stalling (the `|-fail|` of a second Protect, read with the condition the caller names). The last block counts the kinds the log may show and the
- * reader does not name (the census of the ledger). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry.
+ * The sweep of the log reader, the simulator as oracle: for every Dex entry of every kind of die the log names, in every generation
+ * and mod the corpus plays (Gens 1 to 9, the Champions mod; singles everywhere, doubles from Gen 3), a turn plays under one seed and
+ * writes a log; the dice `loggedDice` reads from it, forced on the same board under another seed, must give the log's turn
+ * (`scoreAlignment` perfect). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry. The crit and secondary
+ * rows are in the sibling specs; the helpers they share are in `dice-logged-sweep-rows.ts`.
  *
- * KNOWN (`test.fails`, red today): the causes the full sweep
- * found in the reader (`GAPS`); each has a plain row that holds the sweep finds a seed pair to repair, so a row never goes green because it
- * played nothing. Moves aimed at a random foe in doubles stay out (see `randomAim`).
- *
- * D9b (#125): the crit rows moved to `dice-logged-crit-doubles-a.spec.ts`, `dice-logged-crit-doubles-b.spec.ts` and `dice-logged-crit-singles.spec.ts`,
- * the secondary and self-effect rows to `dice-logged-secondary.spec.ts`; every row keeps its full name. The dice job then spreads the 2,700 seconds
- * of the full sweep over its workers. The helpers the five files share are in `dice-logged-sweep-rows.ts`. This file keeps the accuracy rows and every small group.
+ * KNOWN (`test.fails`): the causes the full sweep found in the reader (`GAPS`); each has a plain row that holds the sweep finds a
+ * seed pair to repair, so a row never goes green because it played nothing. Moves aimed at a random foe in doubles stay out (see
+ * `randomAim`).
  */
 await loadSimMods('gen9championsou');
 // a full sweep plays every Dex move of a rule set in one test (about two minutes for the crits of a doubles cell)
@@ -45,8 +38,8 @@ const multiAccuracy = (move: DexMove): boolean => !!(move as unknown as { multia
 const stalling = (move: DexMove): boolean => !!(move as unknown as { stallingMove?: boolean }).stallingMove;
 
 /**
- * The moves the full sweep found the reader missed (04.11.2026) and B3 fixed, each group with its cause. One plain row per group plays them
- * through every rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
+ * The moves the full sweep found the reader missed, each group with its cause. One plain row per group plays them through every
+ * rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
  */
 const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rules, mode: Mode) => boolean }[] = [
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
@@ -71,7 +64,6 @@ describe.each(SWEEP_CASES)('the moves the reader once missed hold on another see
         return scene && { ...scene, pool: 40, want: 10 };
       }, false, true);
       expect(result.failures).toEqual([]);
-      // a rule set that lacks the moves plays none
       expect(result.witnesses > 0 || present.length === 0, 'the sweep found a seed pair the log repairs').toBe(true);
     });
   }
@@ -118,9 +110,9 @@ describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', 
     expect(result.witnesses > 0 || sweepMoves(rules, move => multi(move) && Array.isArray(multihitOf(move))).moves.length === 0).toBe(true);
   });
 
-  // Ruling Q4 (04.11.2026): the accuracy of one hit of a multi-accuracy move (Triple Axel, Triple Kick) was no die the module named, so a chain
-  // that broke after two hits came back as an accuracy yes and three hits. Round 88 (T337, #73): the die of each later hit carries its `hit`,
-  // and the reader writes hits 2 to the count as yes and the next hit as no from the Dex's hit count (`hitsIn`), so the row holds.
+  // A later hit of a multi-accuracy move (Triple Axel, Triple Kick) is a die of its own: it carries its `hit`, and the reader writes
+  // hits 2 to the count as yes and the next hit as no from the Dex's hit count (`hitsIn`). Without it a chain that broke after two
+  // hits came back as an accuracy yes and three hits.
   const chain = sweepMoves(rules, multiAccuracy).moves.length > 0;
   const hitsIn = (log: string[]): number => Math.max(0, ...log.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3])));
   const rows = () => sweepMovesOf('multi-accuracy', rules, mode, multiAccuracy, move => {
@@ -143,7 +135,6 @@ describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', 
   });
 });
 
-/** The scene of a status check: Snorlax stands under the condition and uses a plain move. */
 function checkScene(rules: Rules, mode: Mode, check: typeof CHECKS[number], moveId: string): Scene {
   return {
     board: seed => {
@@ -196,7 +187,6 @@ describe.each(SWEEP_CASES)('the logged speed tie gives the log\'s turn: $name', 
   });
 });
 
-/** The `|-fail|` lines of a body in a turn's lines. */
 const failsOf = (lines: string[], slot: string): number => lines.filter(line => line.startsWith('|-fail|') && line.split('|')[2].startsWith(slot)).length;
 
 /** A stalling move used twice in a row: the second use is the logged turn, the first plays plain on both seeds. */
@@ -221,8 +211,8 @@ function stallScene(rules: Rules, mode: Mode, move: DexMove): Scene | null {
   };
 }
 
-// The log shows a second Protect that failed as `|-fail|`: `loggedDice` names the stalling die for it (2629703929 turn 10: the base was perfect
-// by seed luck, the plain forced turn broke it; B3 builds the reader, the caller names the condition that makes the move draw).
+// The log shows a second Protect that failed as `|-fail|`: `loggedDice` names the stalling die for it (2629703929 turn 10: the base
+// was perfect by seed luck, the plain forced turn broke it); the caller names the condition that makes the move draw.
 describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $name', ({ rules, mode }) => {
   const { moves } = sweepMoves(rules, stalling, false);
   let played: { failures: string[]; sum: Scan } | null = null;
@@ -255,8 +245,8 @@ describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $
 
 describe('the kinds the log may show and the reader does not name: the census of the ledger', () => {
   const named: readonly DieKind[] = ['accuracy', 'crit', 'secondary', 'self-effect', 'hit-count', 'status-check', 'speed-tie', 'stalling', 'random-target', 'drag'];
-  // damage-roll is no reader kind: the faint step (B4) forces it from a search, the log shows the HP only
-  // round 89 (#137): the two kinds that sample a body (`random-target`, `drag`) are reader kinds since step G2; their sweeps are `dice-random-target-sweep.spec.ts` and `dice-drag-sweep.spec.ts`
+  // damage-roll is no reader kind: the faint step forces it from a search, the log shows the HP only
+  // the two kinds that sample a body (`random-target`, `drag`) are reader kinds; their sweeps are `dice-random-target-sweep.spec.ts` and `dice-drag-sweep.spec.ts`
   const unnamed = DIE_KINDS.filter(kind => !named.includes(kind) && kind !== 'damage-roll');
 
   test('the kinds that stay unnamed, with their Dex entries and the corpus turns that carry the event', () => {
@@ -287,8 +277,8 @@ describe('the kinds the log may show and the reader does not name: the census of
   });
 });
 
-// Round 89 (#114): the offer names a die per later hit of a multi-accuracy move, and `loggedOptions` reads the accuracy targets of a click
-// from the offer for a move the log writes with no target. The list stays one entry per target (the reconstruction plays it, ADR 0022).
+// The offer names a die per later hit of a multi-accuracy move, and `loggedOptions` reads the accuracy targets of a click from the
+// offer for a move the log writes with no target. The list stays one entry per target (the reconstruction plays it, ADR 0022).
 describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the accuracy targets of a click are one per target for a multi-accuracy move: $name', ({ rules, mode }) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
 

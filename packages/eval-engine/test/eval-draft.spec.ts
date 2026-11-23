@@ -7,15 +7,11 @@ import { searchPosition } from '../src/search';
 import { resolveTeraPreference } from '../src/tera';
 
 /**
- * End-to-end pin of the draft-replay T50 finding (the default app replay,
- * committed as a fixture): burned Cryogonal recovering into Kyurem's Iron
- * Head 2HKO ties the Heatran switch by static equilibrium EV — the fixed
- * horizon cannot split a coin flip. The horizon-trend layers must surface
- * the switch: its decisive cells BUILD under one ply of lookahead (Heatran
- * walls Iron Head and takes over) while the Recover stall BLEEDS, and 2b
- * folds that trend into the VALUES — the switch leads by EV, not just tie
- * order. Assertions stay coarse (direction, ordering) so weight tuning
- * cannot break them.
+ * The draft replay's Cryogonal finding (the default app replay, committed as a fixture): burned Cryogonal recovering into Kyurem's
+ * Iron Head 2HKO ties the Heatran switch by static equilibrium EV, which the fixed horizon cannot split. The horizon-trend layers
+ * must surface the switch: its decisive cells build under one ply of lookahead (Heatran walls Iron Head and takes over) while the
+ * Recover stall bleeds, and the trend folds into the values, so the switch leads by EV, not just tie order. Assertions stay coarse
+ * (direction, ordering) so weight tuning cannot break them.
  */
 
 describe('draft replay end-to-end verdicts', () => {
@@ -42,8 +38,7 @@ describe('draft replay end-to-end verdicts', () => {
       samples: 1 as const, tera,
       sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
     };
-    // Find by label, not slot number — bench slots are a reconstruction
-    // detail; the pin is about WHICH Pokémon leads the ranking.
+    // Find by label: bench slots are a reconstruction detail.
     const rows = (depth: 1 | 2) => {
       const p2 = searchPosition(serialized, { ...settings, depth, samples: 1 }).perSide.p2;
       return {
@@ -56,22 +51,17 @@ describe('draft replay end-to-end verdicts', () => {
     const d1 = rows(1);
     expect(d1.recover).toBeTruthy();
     expect(d1.heatran).toBeTruthy();
-    // 2b folds the probe trends into the values under the standing
-    // equilibrium (no re-solve): the building switch leads the bleeding
-    // stall BY VALUE already at depth 1.
+    // The probe trends fold into the values under the standing equilibrium (no re-solve): the building switch leads the bleeding
+    // stall by value already at depth 1.
     expect(d1.heatran.ev).toBeGreaterThan(d1.recover.ev);
     expect(d1.p2.indexOf(d1.heatran)).toBeLessThan(d1.p2.indexOf(d1.recover));
 
-    // The 2b success criterion verbatim: at depth ≥ 2 the stall falls below
-    // the building switch BY VALUE.
+    // At depth 2 or more the stall falls below the building switch by value.
     const d2 = rows(2);
     expect(d2.heatran.ev).toBeGreaterThan(d2.recover.ev);
-    // Round 6 (analytic blend): the crit-tail boundary cells around the
-    // Slowking column and the Flash Cannon row re-priced from single-seed
-    // values to class means, re-ordering the near-tied wall pair (ev gap
-    // ~0.001; the Heatran column itself carries no boundary event). WHICH
-    // wall leads is a coin flip — the pin is that a wall switch leads and
-    // the stall sits below by value.
+    // The crit-tail boundary cells around the Slowking column and the Flash Cannon row price as class means, which orders the
+    // near-tied wall pair (ev gap ~0.001; the Heatran column itself carries no boundary event). Which wall leads is a coin flip: the
+    // pin is that a wall switch leads and the stall sits below by value.
     expect(d2.p2[0].label).toMatch(/^→ (Heatran|Slowking)$/);
   });
 });

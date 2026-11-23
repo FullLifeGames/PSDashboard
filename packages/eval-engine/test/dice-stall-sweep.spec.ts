@@ -8,12 +8,11 @@ import {
   clicksAccepted, dexOfRules, dieOf, explained, forcedOn, missesOf, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A3a: the stalling sweep and the power rows. Every move with the Dex's `stallingMove` is used
-// twice in a row; the second use draws whether it succeeds, forced to succeed and to fail, held against the `|-fail|` line. The
-// first use draws nothing: a forced die there is no draw. A move that fails before the draw (a move that works on the first
-// turn only) reads no draw with the protocol's line. The power rows follow: a chance that changes a move's power, read from
-// the Dex's handler as calc/fickle.ts does, forced to happen and not to, held against the handler's own `|-activate|` line and
-// against the damage.
+// The stalling sweep and the power rows. Every move with the Dex's `stallingMove` is used twice in a row; the second use draws
+// whether it succeeds, forced to succeed and to fail, held against the `|-fail|` line. The first use draws nothing: a forced die
+// there is no draw. A move that fails before the draw (a move that works on the first turn only) reads no draw with the protocol's
+// line. The power rows follow: a chance that changes a move's power, read from the Dex's handler as calc/fickle.ts does, forced to
+// happen and not to, held against the handler's own `|-activate|` line and against the damage.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -30,7 +29,6 @@ const stallDie = (moveId: string, happens: boolean): ForcedDie => ({ name: { slo
 
 const failedBy = (lines: string[], slot: string): boolean => lines.some(line => line.startsWith('|-fail|') && line.split('|')[2].startsWith(slot));
 
-/** The problem with a report of a forced stalling die on the second use, or null when the report and the protocol agree. */
 function problemOf(report: DieReport, happens: boolean, failed: boolean): string | null {
   switch (report.took) {
     case 'applied': return failed !== happens ? null : `applied but the protocol shows ${failed ? 'a fail' : 'no fail'}`;
@@ -48,7 +46,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
     return [];
   }
   const problems: string[] = [];
-  // the first use draws nothing: the die is never drawn
   const first = forcedOn(board, clicks, [stallDie(move.id, true)]);
   tally.cases++;
   if (first.report.forced[0].took !== 'no-draw' || !explained(first.report.forced[0].reason)) problems.push(`first use: ${first.report.forced[0].took} ${why(first.report.forced[0])}`);

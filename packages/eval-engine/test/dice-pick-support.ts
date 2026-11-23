@@ -8,9 +8,9 @@ import { mon, playClicks, sweepSelection, SWEEPS_FULL, type Mode, type Rules } f
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#137): the boards and readers the two sweeps of the random draws share (`dice-random-target-sweep.spec.ts`,
- * `dice-drag-sweep.spec.ts`). The simulator draws a random target (`getRandomTarget`) and a random body to drag in
- * (`getRandomSwitchable`); the module names each as a die whose draw is a `sample` over bodies.
+ * The boards and readers the two sweeps of the random draws share (`dice-random-target-sweep.spec.ts`, `dice-drag-sweep.spec.ts`).
+ * The simulator draws a random target (`getRandomTarget`) and a random body to drag in (`getRandomSwitchable`); the module names
+ * each as a die whose draw is a `sample` over bodies.
  *
  * Every board has a bench: two bodies behind the leads in singles and doubles, four in VGC (the team of six), all of different
  * species so that a body's name tells which one the draw picked.
@@ -22,7 +22,6 @@ export interface PickBoard {
   rules: Rules;
   mode: Mode;
   vgc: boolean;
-  /** The moves of the attacker (p1a, a Snorlax) and the click it makes. */
   attacker: string[];
   attackerItem?: string;
   /** The moves of the foe in p2a (a Vaporeon, or a Persian when it carries moves: faster than the Snorlax) and its item. */
@@ -33,7 +32,6 @@ export interface PickBoard {
   seed?: string;
 }
 
-/** The teams: leads first, the bench behind them (the same species on both sides, so the bodies' names stay distinct within a side). */
 export function pickBoard(input: PickBoard): Battle {
   const { rules, mode, vgc } = input;
   const bench = BENCH.slice(0, vgc ? 4 : 2).map(species => mon(rules, { species, moves: ['splash'] }));
@@ -48,7 +46,6 @@ export function pickBoard(input: PickBoard): Battle {
   return battleOf(doubles ? rules.doubles! : rules.singles, p1, p2, input.seed ?? '1,2,3,4');
 }
 
-/** The clicks of a turn: p1a's click and p2a's click (a doubles side's second body splashes). */
 export function pickClicks(mode: Mode, p1a: string, p2a = 'move 1'): { p1: string; p2: string } {
   return mode === 'singles' ? { p1: p1a, p2: p2a } : { p1: `${p1a}, move 1`, p2: `${p2a}, move 1` };
 }
@@ -63,7 +60,6 @@ export function publicHalf(lines: readonly string[]): string[] {
   return out;
 }
 
-/** What the natural turn drew, per die key, and its lines. */
 export interface Recorded {
   names: ReadonlyMap<string, DieName>;
   shapes: ReadonlyMap<string, Draw>;
@@ -86,13 +82,10 @@ export function recorded(board: Battle, clicks: { p1: string; p2: string }): Rec
   return { names: recording.names, shapes: recording.shapes, lines: publicHalf(copy.log.slice(start)).filter(line => !line.startsWith('|t:|')) };
 }
 
-/** The dice of one kind a recorded turn named. */
 export const ofKind = (turn: Recorded, kind: DieName['kind']): [string, DieName][] => [...turn.names].filter(([, name]) => name.kind === kind);
 
-/** The slot of a protocol ident (`p2a: Vaporeon`). */
 export const slotIn = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
 
-/** The name of a protocol ident (`p2a: Vaporeon` gives `Vaporeon`). */
 export const nameIn = (ident: string | undefined): string | undefined => ident?.split(':').slice(1).join(':').trim();
 
 /** The target the `|move|` line of a body's move names, by slot: `undefined` when the turn shows no such line or it names none. */
@@ -101,7 +94,6 @@ export function aimOf(lines: readonly string[], userSlot: string, moveId: string
   return slotIn(line?.[4]);
 }
 
-/** The bodies a `|drag|` line brought in, by the slot they took. */
 export function draggedIn(lines: readonly string[]): { slot: string; name: string }[] {
   return lines.map(line => line.split('|')).filter(fields => fields[1] === 'drag').map(fields => ({ slot: slotIn(fields[2])!, name: nameIn(fields[2])! }));
 }
@@ -114,9 +106,9 @@ export function sweepItems(rules: Rules) {
 }
 
 /**
- * Round 89 (#137, X1a): the scene where a click bends. The user's first turn plays `moveId` with the click `first`; the second
- * turn clicks Splash while the faster foe's Encore lands on it first and bends the click to the last move used, a click with no target.
- * Null when the simulator refuses a click (a move with an unmet condition).
+ * The scene where a click bends: the user's first turn plays `moveId` with the click `first`; the second turn clicks Splash while the
+ * faster foe's Encore lands first and bends the click to the last move used, a click with no target. Null when the simulator refuses
+ * a click (a move with an unmet condition).
  */
 export function bentScene(input: { rules: Rules; mode: Mode; vgc: boolean }, moveId: string, first: string): { board: Battle; clicks: { p1: string; p2: string } } | null {
   const { rules, mode, vgc } = input;

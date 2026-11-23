@@ -11,12 +11,12 @@ import { moverBoard, moverClicks, moversOf, tieBoard, tieClicks } from './dice-o
 import { CHECKS } from './dice-status-support';
 import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks } from './dice-sweep-support';
 
-// Round 82 (forced dice), step A4: AGENTS.md asks that a stand-in which calls a Dex handler proves the live battle unchanged. Five
-// functions of the module ask the simulator a question on a copy of the battle: `offeredDice` (the move's own `ModifyMove` and the
-// `ModifySecondaries` event), `probeCheck` (a condition's `BeforeMove` handler), `offeredOrderDice` (the natural turn), `readsStartRoll`
-// (the action speed with the roll flipped) and `learnHitCount` (forced turns on copies). Each row reads the `standing` of the battle
-// (`fingerprint` over every body, plus the turn, the roll, the queue and the move in flight) before and after the question, in every
-// rule set and game type, for each kind of question.
+// A stand-in that calls a Dex handler proves the live battle unchanged (AGENTS.md). Five functions of the module ask the simulator a
+// question on a copy of the battle: `offeredDice` (the move's own `ModifyMove` and the `ModifySecondaries` event), `probeCheck` (a
+// condition's `BeforeMove` handler), `offeredOrderDice` (the natural turn), `readsStartRoll` (the action speed with the roll flipped)
+// and `learnHitCount` (forced turns on copies). Each row reads the `standing` of the battle (`fingerprint` over every body, plus the
+// turn, the roll, the queue and the move in flight) before and after the question, in every rule set and game type, for each kind of
+// question.
 await loadSimMods('gen9championsou');
 
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);

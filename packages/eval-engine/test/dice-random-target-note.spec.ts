@@ -8,13 +8,13 @@ import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rule
 import { clicksAccepted, dexOfRules, forcedOn, isCharge, isDelayed, SWEEP_CASES, sweepMoves, VGC_RULES, type DexMove } from './dice-sweep-support';
 import { bentScene, ofKind, pickBoard, pickClicks, publicHalf, recorded } from './dice-pick-support';
 
-// Round 89 (X1a, ruling 39): the note "The click cannot force random targets. The seed decides them." stood under nearly every doubles
-// line. The simulator samples a foe for every click that names no target (`getRandomTarget`), and a spread move such as Earthquake or a
-// field move such as Spikes gets one too, but `getMoveTargets` ignores it: the sample cannot change the turn, and the note was false.
-// For every rule set with doubles (Gens 3 to 9 and Champions), doubles and VGC, every Dex move that reaches the sweep: the user's click
-// that names no target (a spread or field move clicked plain) and the click an Encore bends (any move), the die of the user's move forced
-// to each standing foe. A move whose two plays show the same log (the target field of the `|move|` line aside) and the same bodies is a
-// move whose sample changes nothing; the Dex targets of such moves must be exactly `AIM_FREE_TARGETS`, the rule the line's note reads.
+// The simulator samples a foe for every click that names no target (`getRandomTarget`), and a spread move such as Earthquake or a
+// field move such as Spikes gets one too, but `getMoveTargets` ignores it: the sample cannot change the turn, so the note "The click
+// cannot force random targets. The seed decides them." must not stand under such a line. For every rule set with doubles (Gens 3 to
+// 9 and Champions), doubles and VGC, every Dex move that reaches the sweep: the user's click that names no target (a spread or field
+// move clicked plain) and the click an Encore bends (any move), the die of the user's move forced to each standing foe. A move whose
+// two plays show the same log (the target field of the `|move|` line aside) and the same bodies is a move whose sample changes
+// nothing; the Dex targets of such moves must be exactly `AIM_FREE_TARGETS`, the rule the line's note reads.
 await loadSimMods('gen9championsou');
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
@@ -32,7 +32,6 @@ const effects = (lines: readonly string[]): string =>
     return [...fields.slice(0, 4), ...fields.slice(5)].join('|');
   }).join('\n');
 
-/** What a sample can do to one scene: undefined where the scene draws no random target; else whether the two foes' plays differ. */
 function sampleChanges(board: Parameters<typeof forcedOn>[0], clicks: { p1: string; p2: string }, moveId: string): boolean | undefined {
   const turn = recorded(board, clicks);
   const key = dieKey(pick(moveId));
@@ -59,7 +58,6 @@ function chosen(moves: readonly DexMove[]): DexMove[] {
 
 type Scene = { board: Parameters<typeof forcedOn>[0]; clicks: { p1: string; p2: string } };
 
-/** The scenes of a move: its own click with no target, the click an Encore bends, and for a scripted move one where a foe's attack hits the user first. */
 function scenesOf(input: { rules: Rules; mode: Mode; vgc: boolean }, move: DexMove): Scene[] {
   const { rules, mode, vgc } = input;
   const scenes: Scene[] = [];
@@ -107,7 +105,6 @@ describe('what the simulator does with a sampled random target: the Dex targets 
       if (!AIM_FREE_TARGETS.has(target) && entry.damaging > 0 && entry.differing.length === 0) problems.push(`${target}: no move of ${entry.same.join(', ')} changed with its sample, the rule says it does`);
     }
     expect(problems).toEqual([]);
-    // the sweep meets both kinds of target: a spread move (its sample changes nothing) and a move that aims
     const spread = ['allAdjacentFoes', 'allAdjacent'].filter(target => dex.moves.all().some(move => move.exists && move.target === target));
     expect(spread.some(target => drawn.get(target)?.same.length), 'a spread move with a drawn target').toBeTruthy();
     expect([...drawn].some(([target, entry]) => !AIM_FREE_TARGETS.has(target) && entry.differing.length > 0), 'a move whose sample matters').toBe(true);

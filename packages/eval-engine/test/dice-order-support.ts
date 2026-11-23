@@ -6,11 +6,7 @@ import { dexOfRules } from './dice-sweep-support';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 82 (forced dice), lane A3b: the boards the two order specs share (the sweep of the speed tie and the first-mover die, and
- * the spec of the offer). Bodies of equal speed for the tie; a slow holder against a fast body for the die that lets a holder act
- * first.
- */
+/** The boards the two order specs share: bodies of equal speed for the tie, a slow holder against a fast body for the die that lets a holder act first. */
 
 const slotOfIdent = (ident: string): string => ident.split(':')[0].trim();
 
@@ -24,7 +20,6 @@ export function moveOrder(battle: Battle, start: number): string[] {
     .map(row => slotOfIdent(row[2]));
 }
 
-/** Bodies of equal speed: the same species and set on every place, all of them tackle. */
 export function tieBoard(rules: Rules, mode: Mode, seed: string): Battle {
   const body = () => mon(rules, PIKACHU(['tackle']));
   return mode === 'singles'

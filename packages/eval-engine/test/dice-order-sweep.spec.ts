@@ -11,19 +11,18 @@ import {
 import { forcedOn, SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-// Round 82 (forced dice), lane A3b: the order of the turn. Two dice decide who moves first inside one priority bracket: the
-// speed tie (a shuffle of the move actions that tie in speed; Gens 8 and 9 shuffle a pair several times in one turn) and the
-// die that lets one body act first (Quick Claw, Quick Draw). Every rule set the corpus plays, singles and doubles.
+// The order of the turn. Two dice decide who moves first inside one priority bracket: the speed tie (a shuffle of the move actions
+// that tie in speed; Gens 8 and 9 shuffle a pair several times in one turn) and the die that lets one body act first (Quick Claw,
+// Quick Draw). Every rule set the corpus plays, singles and doubles.
 //
-// The tie: bodies of equal speed (the same species with the same set) all use Tackle. One pair of them is forced to go in each
-// of the two orders on several seeds, the witness is the order of the `|move|` lines; in doubles the four bodies give six
-// pairs, and one row forces a whole order of the four. Every other action's dice stay the natural turn's, and the stream after
-// the turn is the natural one.
+// The tie: bodies of equal speed (the same species with the same set) all use Tackle. One pair of them is forced to go in each of
+// the two orders on several seeds, the witness is the order of the `|move|` lines; in doubles the four bodies give six pairs, and
+// one row forces a whole order of the four. Every other action's dice and the stream after the turn stay the natural ones.
 //
 // The first-mover die: a slow body holds the item or the ability, a fast body faces it, both use a move of priority 0. Forced to
-// happen, the holder moves first; forced not to, it moves last even on a seed where the natural draw would have let it go
-// first. Gen 4 draws in `BeforeTurn`, Gens 5 to 9 and Champions in `FractionalPriority`; Gens 2 and 3 draw the roll once at
-// the start of each turn, the simulator reads it from `battle.quickClawRoll` in the action speed.
+// happen, the holder moves first; forced not to, it moves last even on a seed where the natural draw would have let it go first.
+// Gen 4 draws in `BeforeTurn`, Gens 5 to 9 and Champions in `FractionalPriority`; Gens 2 and 3 draw the roll once at the start of
+// each turn, the simulator reads it from `battle.quickClawRoll` in the action speed.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -35,7 +34,6 @@ afterAll(() => {
 const why = (report: DieReport): string => `${report.took}: ${report.reason ?? 'no reason'}`;
 const SEEDS = Array.from({ length: 6 }, (_, index) => [1, 2, 3, 4].map(offset => (index + 1) * 11 + offset).join(','));
 
-/** The order a plain turn gives on this board. */
 function naturalOrder(board: Battle, clicks: { p1: string; p2: string }): string[] {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();
@@ -123,9 +121,7 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
   });
 });
 
-// The first-mover die ---------------------------------------------------------------------------------------------------
 
-/** Whether the plain turn on this seed lets the holder go first by its die. */
 function naturalActivates(board: Battle, mover: FirstMover, rules: Rules): boolean {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();

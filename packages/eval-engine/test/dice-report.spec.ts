@@ -9,9 +9,9 @@ import {
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-// Round 82 (forced dice), decision D9: the report of a forced turn. `applied` when the protocol shows the answer, `no-draw`
-// when the simulator never drew the die, `no-chance` when the draw cannot give the answer, `blocked` when the draw ran and
-// the effect did not land. Every row reads the report next to the protocol's own lines.
+// The report of a forced turn: `applied` when the protocol shows the answer, `no-draw` when the simulator never drew the die,
+// `no-chance` when the draw cannot give the answer, `blocked` when the draw ran and the effect did not land. Every row reads the
+// report next to the protocol's own lines.
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: 8 }, (_, index) => seedOf(index));

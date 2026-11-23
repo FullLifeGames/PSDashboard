@@ -28,11 +28,11 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { AccuracyRecord, RollRecord } from '../src/pair/prng';
 
 /**
- * Round 86 (A9b): the doubles trees key their root draws. A tree draws a root cell once at its first visit; the draw runs under the
- * pair recorder (`drawKeyed`), `readPattern` names its class the way the sampler names its own, and the key goes into the tree's
- * root book (`keyedAdvance`, `pair/tree-key.ts`). Rows: (a) identity with the plain advance, (b) the key equals the sampler's class
- * key, (c) a guarded cell and a cell without an uncertain event book no key and the singles keys stay, (d) the merge prices each
- * class by the trees that drew it, (e) the clones of a keyed draw equal the plain draw's.
+ * The doubles trees key their root draws. A tree draws a root cell once at its first visit; the draw runs under the pair recorder
+ * (`drawKeyed`), `readPattern` names its class the way the sampler names its own, and the key goes into the tree's root book
+ * (`keyedAdvance`, `pair/tree-key.ts`). Rows: (a) identity with the plain advance, (b) the key equals the sampler's class key, (c) a
+ * guarded cell and a cell without an uncertain event book no key and the singles keys stay, (d) the merge prices each class by the
+ * trees that drew it, (e) the clones of a keyed draw equal the plain draw's.
  */
 await loadSimMods('gen9championsou');
 
@@ -43,19 +43,17 @@ const SPEED = { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4,
 // Two targets whose speeds stay apart after a paralysis: Snorlax at half speed would tie with a Munchlax in the residual order, and so would a Dragonite at 50.
 const slow = () => [pairSet('Slow1', 'Snorlax', ['Rest', 'Protect']), pairSet('Slow2', 'Chansey', ['Rest', 'Protect'])];
 
-/** The keyed draw's module: a function of A9b's first commit, or a failure that says it is not there. */
 async function keyedModule(): Promise<typeof import('../src/pair/tree-key')> {
   return import('../src/pair/tree-key');
 }
 
-/** The sampler's blend of a cell (the plan's classes), for the keys a tree draw may name. */
 function blendOf(root: SimPosition, p1: string, p2: string): CellBlend {
   const blend = blendIfPlanned(root, p1, p2);
   if (!blend) throw new Error(`no class plan for ${p1} / ${p2}`);
   return blend;
 }
 
-/** The blend, or null when the sampler prices the cell by its fallback (r89 A5 gate: a cell's own seeds can reach a read the plan refuses). */
+/** The blend, or null when the sampler prices the cell by its fallback (a cell's own seeds can reach a read the plan refuses). */
 function blendIfPlanned(root: SimPosition, p1: string, p2: string): CellBlend | null {
   const cell = pairCellSample(root, p1, p2, 3, cache);
   return cell.kind === 'sample' && cell.sample.blend ? cell.sample.blend : null;
@@ -128,8 +126,8 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       for (let iteration = 0; iteration < 40; iteration++) {
         const drawn = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, treeSeed(iteration, 1));
         expect(drawn).not.toBeNull();
-        // Round 86 (T323): the hashed seeds reach a paralysed target that cannot move on the same turn (a read the pair plan
-        // falls back on, `cant:par`), which the five lattice seeds never drew in forty iterations: such a draw books no key.
+        // The hashed seeds reach a paralysed target that cannot move on the same turn (a read the pair plan falls back on,
+        // `cant:par`), which the five lattice seeds never drew in forty iterations: such a draw books no key.
         if (drawn!.classKey === null) {
           expect(drawn!.log.some(line => line.startsWith('|cant|')), `iteration ${iteration}`).toBe(true);
           continue;
@@ -137,7 +135,6 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
         seen.add(drawn!.classKey);
       }
       expect(blend.classes.map(cls => cls.key)).toEqual(expect.arrayContaining([...seen]));
-      // the die that names the board shows: some seed of the forty draws the effect (or the miss)
       expect([...seen].some(key => key.includes(board.token)), `${[...seen]}`).toBe(true);
       expect(seen.size).toBeGreaterThan(1);
     });
@@ -155,7 +152,7 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       let planned = 0;
       for (const cell of keyed) {
         const [i, j] = [Math.floor(cell.key / 10_000), cell.key % 10_000];
-        // r89 A5 gate: Thunderbolt / Rest is a cell whose own seeds (T324) reach a paralysed read, so the sampler falls back and has no blend.
+        // Thunderbolt / Rest is a cell whose own seeds reach a paralysed read, so the sampler falls back and has no blend.
         const blend = blendIfPlanned(root, stats.p1Options[i].choice, stats.p2Options[j].choice);
         if (!blend) continue;
         planned++;
@@ -199,7 +196,7 @@ describe('(c) a guarded cell and a cell without an uncertain event book no key; 
       const board = rootOf(battleOf('gen9customgame', [set('Blissey', ['waterfall'])], [set('Snorlax', ['thunder'])]));
       const stats = mctsTreeSearch(board.serialized, settings, 0);
       const keys = new Set(stats.cells.map(cell => cell.classKey).filter(Boolean));
-      // the planner's keys: the two sides' outcomes joined with `|`, as before this round (no pair-plan key has that shape)
+      // the planner's keys: the two sides' outcomes joined with `|` (no pair-plan key has that shape)
       expect(keys.size).toBeGreaterThan(0);
       for (const key of keys) expect(String(key)).toMatch(/^(hit-nokill|hit-kill|miss|none)[^=]*\|(hit-nokill|hit-kill|miss|none)/);
     } finally {
@@ -263,9 +260,9 @@ describe('(e) the clones of a keyed draw equal the plain draw\'s', () => {
 });
 
 /**
- * Round 89 (#59, T322 block 1): the four trees of one search draw each root cell by quantile (`search/root-quantile.ts`): tree k
- * answers a die of chance p so that floor(4p) to ceil(4p) of the four trees see it come true, where the seeds of the stream gave
- * 0 to 4. A cell is checked when it holds the board's attack and the foe does not protect; its class key is read per tree.
+ * The four trees of one search draw each root cell by quantile (`search/root-quantile.ts`): tree k answers a die of chance p so that
+ * floor(4p) to ceil(4p) of the four trees see it come true, where the seeds of the stream gave 0 to 4. A cell is checked when it
+ * holds the board's attack and the foe does not protect; its class key is read per tree.
  */
 describe('(f) a real search draws its root cells by quantile: a die of chance p comes true in floor(4p) or ceil(4p) of four trees', () => {
   const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
@@ -273,7 +270,6 @@ describe('(f) a real search draws its root cells by quantile: a die of chance p 
   const thunderbolt = { move: 'thunderbolt', chance: 0.1, token: '+par' };
   const stoneEdge = { move: 'stoneedge', chance: 0.2, token: 'miss' };
 
-  /** Per root cell that holds the attack: the class key of each of the four trees (undefined where a tree booked none). */
   function keysPerCell(serialized: string, attack: string, own: (choice: string) => boolean): Map<string, (string | undefined)[]> {
     const found = new Map<string, (string | undefined)[]>();
     for (let offset = 0; offset < 4; offset++) {

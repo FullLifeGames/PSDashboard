@@ -43,7 +43,7 @@ async function turn63(): Promise<string> {
 
 describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
   test('draft 2058494320, variation turn 63: the lines agree with the score, and the advice is an attack, not U-turn', { timeout: 300_000 }, async () => {
-    // User report 28.10.2026: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % against Dragapult at
+    // A user's state file: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % against Dragapult at
     // 45 % (Choice Specs) and Muk-Alola. The panel read "puffelmaedchen 15 % · Bene 85 %" above lines that advised
     // U-turn for Bene at 16 %: the trees saw Bene winning, the verify round re-priced Kyurem's row with the one-ply
     // sampler (84 to 93 % for P1), and the floor of 0.9 kept the sampler. The replay never terastallized (Tera Auto bans it).
@@ -57,7 +57,7 @@ describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
   });
 
   test('Champions VGC 2628166702 turn 7: a thin pool leaves the cell to the sampler, and the prover proves the win', { timeout: 300_000 }, async () => {
-    // The CI holdout of round 77: the last pair, p1 won the game. The four trees visited Dark Pulse into Protect 24
+    // A CI holdout game, its last pair, p1 won the game. The four trees visited Dark Pulse into Protect 24
     // times (8, 6, 5, 5) and read about 0.1; one ply deeper the sampler reads the win (Protect holds once, the next
     // Dark Pulse lands), and the prover proves it in two turns against every reply. Waiving the floor for that thin
     // pool ranked Dark Pulse third (0.14), and the prover, which tries the ranked moves in order, found no proof.
@@ -68,12 +68,12 @@ describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
     const result = await searchTreesOrchestrated(createLocalTreeExecutor(position.serialized, position.ruleset), {
       depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, ruleset: position.ruleset,
     });
-    // Round 86 (T323, hashed tree seeds): the trees' dice follow the Dex and Water Spout joins Dark Pulse as a proven win: both
+    // The trees' dice follow the Dex (hashed tree seeds) and Water Spout joins Dark Pulse as a proven win: both
     // rows read 1 and the order between two proven wins is a tie. The row holds the proof, not the order.
     expect(result.perSide.p1[0].ev).toBeCloseTo(1, 6);
     expect(result.perSide.p1.find(choice => choice.label === 'Dark Pulse')!.ev).toBeCloseTo(1, 6);
-    // r89 A5 gate (stage 2b, #60): the endgame's plain children read the cell's own seed list; the three draws of this cell's
-    // list no longer show the proof (forcedWin undefined, score 0.7987; before: { side: 'p1', mass: 1 } and score 1). The two rows above
+    // The endgame's plain children read the cell's own seed list; the three draws of this cell's list do not show the proof
+    // (forcedWin undefined, score 0.7987; the proof would be { side: 'p1', mass: 1 } and score 1). The two rows above
     // still read the win through the sampler. The proof is a sampled-rolls result, so the row holds the sampler's win only.
     expect(result.score).toBeGreaterThan(0.5);
   });

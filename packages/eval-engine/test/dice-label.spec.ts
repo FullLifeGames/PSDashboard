@@ -3,11 +3,7 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { dieLabel, type DieWords } from '../src/dice/die-label';
 import { DIE_KINDS, type DieKind, type DieName, type ForcedDie } from '../src/dice/types';
 
-/**
- * Round 82 (forced dice), step A5: one text per forced die for history rows, shares and frame lines (A6) and for the chips
- * (A7). The text says what the die decided in the user's words; names of moves, effects and bodies come from a reader the
- * caller hands in (the Dex of the game's rule set), so the file holds no move, ability or item name.
- */
+/** One text per forced die for history rows, shares, frame lines and chips; names come from a reader the caller hands in. */
 
 const WORDS: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
 const name = (kind: DieKind, extra: Partial<DieName> = {}): DieName => ({ slot: 'p1a', moveId: 'tackle', targetSlot: 'p2a', kind, ...extra });
@@ -31,7 +27,6 @@ describe('the label of a forced die', () => {
     expect(label({ name: name('crit'), result: { happens: false } })).toBe('Move tackle: no crit');
     expect(label({ name: name('secondary', { effectId: 'flinch' }), result: { happens: false } })).toBe('Move tackle: no Effect flinch');
     expect(label({ name: name('hit-count', { targetSlot: undefined }), result: { hits: 4 } })).toBe('Move tackle: 4 hits');
-    // the count of a multi-accuracy move (round 89, #114) can be one
     expect(label({ name: name('hit-count'), result: { hits: 1 } })).toBe('Move tackle: 1 hit');
     expect(label({ name: name('damage-roll'), result: { step: 0 } })).toBe('Move tackle: damage roll 1');
     expect(label({ name: { slot: 'p1a', moveId: '', targetSlot: 'p2a', kind: 'speed-tie' }, result: { first: 'p2a' } })).toBe('Speed tie: Body p2a first');
@@ -58,13 +53,11 @@ describe('the label of a forced die', () => {
     expect(label({ name: { slot: 'p2a', moveId: '', kind: 'drag' }, result: { option: 'Chansey' } })).toBe('Body p2a: dragged out for Chansey');
   });
 
-  // Round 89 (G13b, tester, third pass): "no Burn" beside "no crit". A reader that names a plain form writes a status as a common noun.
   test('a reader with a plain form writes a status or a volatile as a common noun inside the result', () => {
     const words: DieWords = { ...WORDS, effect: id => `Effect ${id}`, plain: id => (id === 'brn' ? 'burn' : `Effect ${id}`) };
     expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, words)).toBe('Move tackle: no burn');
     expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: true } }, words)).toBe('Move tackle: burn');
     expect(dieLabel({ name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: 'brn' }, result: { happens: false } }, words)).toBe('Move tackle: burn stops it');
-    // a reader without the form keeps the effect's own words
     expect(dieLabel({ name: name('secondary', { effectId: 'brn' }), result: { happens: false } }, WORDS)).toBe('Move tackle: no Effect brn');
   });
 

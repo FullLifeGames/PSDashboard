@@ -10,13 +10,12 @@ import { watchBattle } from '../src/dice/watch';
 import { boardOf, clicksOf, GRID_SCENES, playClicks, RULES, seedOf, type Mode } from './dice-fixtures';
 
 /**
- * Round 86 (T299): the namer is the module's naming outside a forced turn. The tree's scripted PRNGs ask it for the name of a
- * draw before they answer, so it must name every draw the way the forced turn's recording PRNG does, in every generation and
- * the Champions mod, and the roll mapping must put a script's roll on the step of the generation's own damage roll.
+ * The namer is the module's naming outside a forced turn: the tree's scripted PRNGs ask it for the name of a draw before they answer,
+ * so it must name every draw as the forced turn's recording PRNG does, in every generation and the Champions mod, and the roll
+ * mapping must put a script's roll on the step of the generation's own damage roll.
  */
 await loadSimMods('gen9championsou');
 
-/** A stream that asks the namer once per call of the simulator (a chance, a sample, a shuffle or a bare draw). */
 class NamingPRNG extends PRNG {
   readonly names: DieName[] = [];
   private namer: DrawNamer | null = null;

@@ -8,18 +8,17 @@ import { playClicks, sweepSelection, type Mode, type Rules } from './dice-fixtur
 import { attacker, CHECK_MOVES, CHECKS, started, type Check } from './dice-status-support';
 import { dexOfRules, forcedOn, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, type Tally } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A3b: the status checks of the attacker. The simulator draws them inside the attacker's own
-// action, in `BeforeMove`, before the move runs: full paralysis, the thaw, the infatuation and the confusion check (its
-// self-hit rolls its own damage). Every check, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and
-// doubles, with each of a few moves (a physical one, a spread one, a status move, a move that thaws its user), forced to
-// happen and not to. The witness is the protocol: `|cant|` for a stop, `|-curestatus|` for a thaw, `|-damage|` with
-// `[from] confusion` for the self-hit, the body's own `|move|` when it goes on.
+// The status checks of the attacker. The simulator draws them inside the attacker's own action, in `BeforeMove`, before the move
+// runs: full paralysis, the thaw, the infatuation and the confusion check (its self-hit rolls its own damage). Every check, in
+// every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and doubles, with each of a few moves (a physical one, a
+// spread one, a status move, a move that thaws its user), forced to happen and not to. The witness is the protocol: `|cant|` for a
+// stop, `|-curestatus|` for a thaw, `|-damage|` with `[from] confusion` for the self-hit, the body's own `|move|` when it goes on.
 //
-// "Happens" is what the body does: yes lets it go on (the paralysed body moves, the frozen body thaws, the infatuated body
-// moves, the confused body does not hit itself), no stops it. The simulator writes the draw's polarity its own way (the
-// confusion check lets the body go on when the chance comes true up to Gen 6 and hits it from Gen 7), so the module reads the
-// polarity from the condition's handler (status-probe.ts) and this sweep reads it from a plain turn whose draw a spy answers
-// "true". The reported chance is the chance of the answer. The Gen 2 thaw falls at the end of the turn (A4), Gen 1 has none.
+// "Happens" is what the body does: yes lets it go on (the paralysed body moves, the frozen body thaws, the infatuated body moves,
+// the confused body does not hit itself), no stops it. The simulator writes the draw's polarity its own way (the confusion check
+// lets the body go on when the chance comes true up to Gen 6 and hits it from Gen 7), so the module reads the polarity from the
+// condition's handler (status-probe.ts) and this sweep reads it from a plain turn whose draw a spy answers "true". The reported
+// chance is the chance of the answer. The Gen 2 thaw falls at the end of the turn, Gen 1 has none.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -70,7 +69,6 @@ function spy(board: Battle, clicks: { p1: string; p2: string }, effectId: string
 
 const SEEDS = ['1,2,3,4', '5,6,7,8'];
 
-/** A case: one check, one move, one board; both answers on both seeds. Returns the problems found. */
 function exercise(rules: Rules, mode: Mode, check: Check, moveId: string, tally: Tally): string[] {
   const dex = dexOfRules(rules);
   const move = dex.moves.get(moveId);
@@ -93,7 +91,6 @@ function exercise(rules: Rules, mode: Mode, check: Check, moveId: string, tally:
 
 interface Case { label: string; shown: DieReport; happens: boolean; defrosts: boolean; oracle: number | null; check: Check; battle: Battle; start: number }
 
-/** The problems of one forced answer: the report against the oracle's chance and the protocol's lines. */
 function judge({ label, shown, happens, defrosts, oracle, check, battle, start }: Case, tally: Tally): string[] {
   if (oracle === null) {
     // Gens 5 and up: a move that thaws its user draws no thaw, the die is never drawn

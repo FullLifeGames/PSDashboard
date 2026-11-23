@@ -12,10 +12,9 @@ import { secondariesIn } from '../src/dice/secondaries';
 import { dexOfRules } from './dice-sweep-support';
 
 /**
- * Round 82 (forced dice), step A5: the simulator is the oracle of the log reader. A turn played on one seed writes a log;
- * its logged dice, forced on the same board under another seed, give a turn with the same accuracy, crits, secondaries,
- * hit counts, cants and move order. Every rule set the corpus plays, singles and doubles. The damage rolls stay with the
- * seed (the spec compares no HP).
+ * The simulator is the oracle of the log reader: a turn played on one seed writes a log; its logged dice, forced on the same board
+ * under another seed, give a turn with the same accuracy, crits, secondaries, hit counts, cants and move order. The damage rolls
+ * stay with the seed (the spec compares no HP).
  */
 await loadSimMods('gen9championsou');
 
@@ -81,7 +80,6 @@ describe.each(cases)('the log of a turn, forced on another seed, gives the same 
         const dice = loggedDice(log, options);
         if (dice.length === 0 || unevenCrits(log)) continue;
         played++;
-        // the natural turn on the other seed: does it differ from the log at all?
         const natural = boardOf(rules, scene, mode, seedOf(index + 40))!;
         const naturalStart = natural.log.length;
         playClicks(natural, clicks);

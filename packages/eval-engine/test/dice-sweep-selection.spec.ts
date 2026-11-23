@@ -2,9 +2,8 @@ import { readFileSync, readdirSync } from 'fs';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 /**
- * Round 82 (forced dice), step A7d (gate answer 1b): the full dice sweeps run only with `DICE_SWEEPS=full`. Without it
- * `sweepSelection` hands every sweep the same small sample of its list, so a plain run and the CI jobs of the engine project
- * stay light and still play every sweep. Every sweep file takes its moves and rows through it.
+ * The full dice sweeps run only with `DICE_SWEEPS=full`: without it `sweepSelection` hands every sweep the same small sample of its
+ * list, so a plain run and the CI jobs of the engine project stay light and still play every sweep.
  */
 
 async function fixtures(mode: string | undefined) {

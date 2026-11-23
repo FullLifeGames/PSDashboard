@@ -6,8 +6,8 @@ import { secondaryEffectId } from '../src/dice/recognize';
 import type { SecondaryEntry } from '../src/dice/types';
 
 /**
- * Round 82 (forced dice), step A6: `secondariesIn(dex)` is what the first turn's log reader takes from the Dex (the effect ids of a
- * move's secondaries that carry a chance below 100). It lives in the module beside `recognize.ts`, which names the ids.
+ * `secondariesIn(dex)` is what the first turn's log reader takes from the Dex (the effect ids of a move's secondaries that carry a
+ * chance below 100); it lives beside `recognize.ts`, which names the ids.
  */
 await loadSimMods('gen9championsou');
 

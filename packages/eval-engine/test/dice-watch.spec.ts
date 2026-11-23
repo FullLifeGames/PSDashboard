@@ -10,9 +10,8 @@ import { watchBattle } from '../src/dice/watch';
 import { boardOf, clicksOf, GRID_SCENES, playClicks, RULES, seedOf, stableLog, type Mode, type Rules } from './dice-fixtures';
 import { fingerprint } from './power-oracle';
 
-// Round 82 (forced dice), decision D1. The watch is a set of own-property wrappers on one battle for one forced turn. It
-// leaves no trace: the same log and seed, the same stable serialization, the same own keys, the battle copyable after, and
-// the speed layer's pre-check back in place.
+// The watch is a set of own-property wrappers on one battle for one forced turn. It leaves no trace: the same log and seed, the same
+// stable serialization, the same own keys, the battle copyable after, and the speed layer's pre-check back in place.
 await loadSimMods('gen9championsou');
 configureSimFast(SIM_FAST_DEFAULT);
 
@@ -128,8 +127,8 @@ describe('the watch reads the battle and writes nothing', () => {
   });
 });
 
-// Round 86 (T299): the tree's scripted PRNGs keep a watch on a forked battle while that battle is copied (a forced switch's
-// snapshot, a child's template). The wrappers are hidden from key walks, so such a copy carries no wrapper of the old watch.
+// The tree's scripted PRNGs keep a watch on a forked battle while that battle is copied (a forced switch's snapshot, a child's
+// template). The wrappers are hidden from key walks, so such a copy carries no wrapper of the old watch.
 describe.each(cases)('the wrappers are hidden from key walks: $rules.name $mode', ({ rules, mode }: { rules: Rules; mode: Mode }) => {
   const enumerable = (battle: Battle): string[] => [
     ...Object.keys(battle), ...Object.keys((battle as unknown as { actions: object }).actions),

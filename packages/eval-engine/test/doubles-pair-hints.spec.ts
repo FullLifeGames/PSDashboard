@@ -8,13 +8,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 69 (T42 part 1, decision 15): the doubles hints see the active pair.
- * Two attacks on one foe count more than the same attacks on two foes when
- * only the pair KOs; a redirection move is priced as the partner's damage it
- * covers; a Protect that denies the foes a KO only the pair can make carries a
- * tempo term. The orderings are held against the simulator: the same turns are
- * played there. Singles hints stay what they were (the terms live in the
- * combined path only).
+ * The doubles hints see the active pair: two attacks on one foe count more than the same attacks on two foes when only the pair
+ * KOs; a redirection move is priced as the partner's damage it covers; a Protect that denies the foes a KO only the pair can make
+ * carries a tempo term. The orderings are held against the simulator: the same turns are played there. Singles hints stay what they
+ * are (the terms live in the combined path only).
  */
 
 const FORMAT = 'gen9doublescustomgame';
@@ -23,10 +20,8 @@ const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.seria
 const option = (choice: string) => ({ choice, label: choice });
 const hintOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => combinedOptionHints(rootOf(battle), side, [option(choice)])[0];
 const SUPPORT_FLOOR = 0.25;
-/** A move a battle can use: real, not a Max or Z move, not from a later game. */
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 
-/** Foe HP lost in one turn when p1 plays `p1Choice` against two Splashing foes. */
 function damageOf(build: () => Battle, p1Choice: string, foe = 0): number {
   const battle = build();
   const mon = battle.sides[1].active[foe]!;
@@ -67,7 +62,7 @@ describe('pair focus: two slots on one foe (round 69, T42)', () => {
     const same = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 1');
     const split = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 2');
     expect(same).toBeGreaterThan(split);
-    // Each attack on its own is read as before: the split combo is the plain sum of its two fractions.
+    // Each attack on its own: the split combo is the plain sum of its two fractions.
     const mon = battle.sides[0].active[0]!;
     const fraction = singleMoveFraction(mon, battle.sides[1].active[0]!, 'thunderbolt', battle);
     expect(split).toBeCloseTo(2 * fraction, 10);
@@ -121,7 +116,6 @@ describe('redirection (round 69, T42)', () => {
     const covered = hintOf(battle, 'p1', `move ${move}, move dragonclaw 1`) - partner;
     expect(covered).toBeCloseTo(partner, 10);
     expect(covered).toBeGreaterThan(SUPPORT_FLOOR);
-    // Next to a partner with no damaging move it stays what any support move is.
     expect(hintOf(battle, 'p1', `move ${move}, move splash`)).toBeCloseTo(2 * SUPPORT_FLOOR, 10);
   });
 
@@ -192,8 +186,8 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
     const threatened = protector();
     threatened.sides[0].active[0]!.sethp(hp);
     expect(hintOf(threatened, 'p1', 'move protect, move splash')).toBeGreaterThan(hintOf(threatened, 'p1', 'move splash, move splash'));
-    // Round 70 (gate of 13.10. 20:26, 3a): a healthy Snorlax in front of two Dragon Claws now earns the damage the Protect denies
-    // (protect-tempo-hints.spec.ts); with no damaging foe there is nothing to deny and the Protect stays the floor.
+    // A healthy Snorlax in front of two Dragon Claws earns the damage the Protect denies (protect-tempo-hints.spec.ts); with no
+    // damaging foe there is nothing to deny and the Protect stays the floor.
     const idleFoes = battleOf(FORMAT, [set('Snorlax', ['splash', 'protect']), splash('Blissey')], [splash('Garchomp'), splash('Garchomp')]);
     expect(hintOf(idleFoes, 'p1', 'move protect, move splash')).toBeCloseTo(hintOf(idleFoes, 'p1', 'move splash, move splash'), 10);
   });

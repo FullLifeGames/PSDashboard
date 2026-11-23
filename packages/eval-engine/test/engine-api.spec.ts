@@ -11,7 +11,6 @@ import { createRootPosition } from '../src/forward/position.ts';
 const position = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf8')) as { serialized: string; turn: number };
 
-/** The root options the engine's own matrix uses. */
 function rootOptions(serialized: string) {
   const root = createRootPosition(serialized);
   return {

@@ -11,14 +11,12 @@ import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B2: the trial the logged-dice sweep plays for every Dex entry of a kind.
- * A turn plays on a board under one seed and writes a log; the dice the reader names from that log, forced on the same board
- * under another seed, must give a turn with the log's events (`scoreAlignment` perfect). A seed pair is a witness when the
- * other seed alone would differ from the log in the kind's channels, so the forcing has something to repair. The channels a
- * kind decides are named here; the rest of the turn is held to the log all the same.
+ * The trial the logged-dice sweep plays for every Dex entry of a kind: a turn plays on a board under one seed and writes a log; the
+ * dice the reader names from it, forced on the same board under another seed, must give a turn with the log's events
+ * (`scoreAlignment` perfect). A seed pair is a witness when the other seed alone would differ from the log in the kind's channels,
+ * so the forcing has something to repair.
  */
 
-/** The channels of `ProtocolEvents` a kind of die decides. */
 export type Channel = 'misses' | 'crits' | 'secondaries' | 'hitCounts' | 'cants' | 'confusionSelfHits' | 'moveOrder';
 
 /** How many seed pairs a move scans for witnesses: a 1 in 24 crit needs a dozen pairs to show itself in most moves. */
@@ -34,7 +32,6 @@ const otherSeed = (index: number): string => mixed(index * 2 + 1);
 const sameEntries = (a: Map<string, number> | string[], b: Map<string, number> | string[]): boolean =>
   JSON.stringify(a instanceof Map ? [...a].sort() : a) === JSON.stringify(b instanceof Map ? [...b].sort() : b);
 
-/** Whether two turns differ in a channel. */
 export function differsIn(a: ProtocolEvents, b: ProtocolEvents, channels: readonly Channel[]): boolean {
   return channels.some(channel => !sameEntries(a[channel], b[channel]));
 }
@@ -43,7 +40,6 @@ export function differsIn(a: ProtocolEvents, b: ProtocolEvents, channels: readon
 const unevenCrits = (log: string[]): boolean =>
   loggedActions(log).some(action => Object.entries(action.crits).some(([slot, crits]) => crits < (action.damaged[slot] ?? 0)));
 
-/** What one witness scan counted and which seed pairs the forced turn did not repair. */
 export interface Scan { scanned: number; skipped: number; witnesses: number; named: number; rollFaints: number; failures: string[]; why: Record<string, number> }
 
 /** A scene: the board under a seed (a charge move's first turn or a stalling move's first use already played), the two sides' clicks, what the caller names about the turn. */
@@ -51,15 +47,11 @@ export interface Scene {
   board(seed: string): Battle;
   clicks: { p1: string; p2: string };
   options: LoggedOptions;
-  /** The channels the kind decides; a pair is a witness when the other seed differs from the log in one of them. */
   channels: readonly Channel[];
-  /** How many seed pairs to scan for witnesses (a kind that needs a rare log, a broken chain, scans more). */
   pool?: number;
-  /** How many witnesses to find (the sweep's own number when absent). */
   want?: number;
   /** A kind that no channel of the alignment shows (the `|-fail|` of a stalling move) decides the witness from the two logs itself. */
   differs?(log: string[], naturalLog: string[]): boolean;
-  /** The kind of die the log must name in at least one witness. */
   kind?: ForcedDie['name']['kind'];
   /** The turn's own check of a forced turn on top of the perfect score (the stalling move's `|-fail|`). */
   extra?(log: string[], forcedLog: string[]): string | null;
@@ -83,7 +75,6 @@ function leftOut(scene: Scene, expected: ProtocolEvents, dice: readonly ForcedDi
   return unevenCrits(log) ? 'uneven crits' : null;
 }
 
-/** Plays the scene on seed pairs until `want` witnesses are found (or the pool is scanned) and forces the log's dice on each. */
 export function scan(scene: Scene, want: number): Scan {
   const result: Scan = { scanned: 0, skipped: 0, witnesses: 0, named: 0, rollFaints: 0, failures: [], why: {} };
   for (let index = 0; index < (scene.pool ?? POOL) && result.witnesses < (scene.want ?? want); index++) {
@@ -104,14 +95,13 @@ export function scan(scene: Scene, want: number): Scan {
     const score = scoreAlignment(expected, extractProtocolEvents(forcedLog));
     const own = scene.extra?.(log, forcedLog);
     if (own) result.failures.push(`seed ${index}: ${own}`);
-    // the log's turn has no faint: a faint in the forced turn is the other seed's damage roll killing a body the log's roll left alive (the faint step of B4, no die of the log)
+    // the log's turn has no faint: a faint in the forced turn is the other seed's damage roll killing a body the log's roll left alive (no die of the log)
     if (score.faintMismatches > 0) { result.rollFaints++; continue; }
     if (!isPerfectAlignment(score)) result.failures.push(`seed ${index}: ${JSON.stringify(score)}`);
   }
   return result;
 }
 
-/** The clicked move of every body of a board: the attacker's, the others splash. */
 export function clickedOf(moveId: string, mode: Mode): Map<string, string> {
   const clicked = new Map([['p1a', moveId], ['p2a', 'splash']]);
   if (mode === 'doubles') for (const slot of ['p1b', 'p2b']) clicked.set(slot, 'splash');
@@ -141,12 +131,10 @@ export function moveScene(
       return battle;
     },
     clicks, ...extra,
-    // what the app reads from the offers and the Dex of the click (`loggedOptions`): the rest of the options the caller names
     options: { ...extra.options, ...pick(loggedOptions(probe, clicks)) },
   };
 }
 
-/** Snorlax with an item or ability uses the move against a Vaporeon (the sweep's board with an outfit). */
 function outfitted(rules: Rules, mode: Mode, moveId: string, seed: string, outfit: { item?: string; ability?: string }): Battle {
   const base = { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...(rules.generation >= 2 ? { gender: 'M' as const } : {}) };
   const attacker = set('Snorlax', [moveId], { ...base, item: outfit.item ?? '', ability: outfit.ability ?? 'No Ability' });
@@ -155,7 +143,6 @@ function outfitted(rules: Rules, mode: Mode, moveId: string, seed: string, outfi
   return battleOf(rules.doubles!, [attacker, foe('Blissey')], [foe('Vaporeon'), foe('Vaporeon')], seed);
 }
 
-/** The seeds a sweep plays per move: two in a plain run, four with `DICE_SWEEPS=full`. */
 export const witnessesWanted = (): number => sweepSelection([0, 1, 2, 3], 'seeds').length;
 
 /** Every move of the Dex with a chance that changes its power (the census reads the whole list, as `dice-census.spec.ts` does). */

@@ -7,10 +7,10 @@ import { sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#104), step G4b: a stalling move the body did not click. VGC 2630452654 turn 4: Calyrex clicked Astral Barrage, Iron
- * Valiant's faster Encore made it repeat Protect, and the second Protect failed (`|-fail|`). The reader named the stalling die only
- * for the move the body clicked (round 86, T306), so the forced rebuild let that Protect succeed, left a stall counter of 9 on the
- * body and priced every later "+ Protect" of the game on it ("Protect: fails (89%)" at turn 5, where the game's Protect was sure).
+ * A stalling move the body did not click. VGC 2630452654 turn 4: Calyrex clicked Astral Barrage, Iron Valiant's faster Encore made it
+ * repeat Protect, and the second Protect failed (`|-fail|`). The reader must name the stalling die for a move the body did not click
+ * too: otherwise the forced rebuild lets that Protect succeed, leaves a stall counter of 9 on the body and prices every later
+ * "+ Protect" of the game on it ("Protect: fails (89%)" at turn 5, where the game's Protect was sure).
  *
  * The simulator is the oracle: for every stalling move of every generation and mod the corpus plays (singles everywhere, doubles from
  * Gen 3) the move is used once, then the log of its second use is read twice, once with the click on the move and once with the click
@@ -23,7 +23,6 @@ vi.setConfig({ testTimeout: 900_000 });
 const stalling = (move: DexMove): boolean => !!(move as unknown as { stallingMove?: boolean }).stallingMove;
 const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20', '21,22,23,24'];
 
-/** The lines of the turn the last clicks played: between the two `|turn|` lines. */
 const lastTurnLines = (log: string[]): string[] => {
   const turns = log.flatMap((line, index) => (line.startsWith('|turn|') ? [index] : []));
   return log.slice(turns[turns.length - 2] + 1, turns[turns.length - 1]);

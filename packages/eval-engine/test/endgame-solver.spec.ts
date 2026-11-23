@@ -107,7 +107,7 @@ describe('endgame children (round 34)', () => {
     expect(new Set(winners)).toEqual(new Set(['Alpha', 'Beta']));
   });
   test('doubles cells take the plain path and flag unpriced only when the draws disagree on a KO', () => {
-    // Round 67: a level above Blissey's, so no speed tie splits the cell (the tie has its own test below).
+    // A level above Blissey's, so no speed tie splits the cell (the tie has its own test below).
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -153,7 +153,7 @@ describe('endgame children (round 34)', () => {
     expect(children[0].share).toBe(1);
     expect(children[0].key).toBeUndefined();
   });
-  // Round 67 (T114): Machamp and Blissey share their speed; the order of Seismic Toss and Soft-Boiled is a coin.
+  // Machamp and Blissey share their speed; the order of Seismic Toss and Soft-Boiled is a coin.
   test('a doubles speed tie prices each order as a plain child of one half', () => {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],

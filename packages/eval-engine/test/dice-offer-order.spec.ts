@@ -12,12 +12,11 @@ import { dexOfRules, forcedOn, SWEEP_CASES, sweepBoard, sweepClicks } from './di
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-// Round 82 (forced dice), lane A3b: the dice the panel offers for the checks and the order of a turn, held to the simulator. A
-// status check is offered for the slot's choice when the body carries the condition and the condition's own handler draws a
-// chance for that move; the offer names exactly the status dice the natural turn draws, and every offered die, forced to either
-// answer, is drawn. The order dice read the turn on a copy: a speed tie is offered for every pair of bodies whose move actions
-// the simulator shuffles together, a first mover for every holder whose die the simulator draws (Quick Claw for a move of any
-// priority, Quick Draw for a damaging move), and neither for a board where nothing ties.
+// The dice the panel offers for the checks and the order of a turn, held to the simulator. A status check is offered when the body
+// carries the condition and the condition's own handler draws a chance for that move; every offered die, forced to either answer, is
+// drawn. The order dice read the turn on a copy: a speed tie for every pair of bodies whose move actions the simulator shuffles
+// together, a first mover for every holder whose die the simulator draws (Quick Claw for a move of any priority, Quick Draw for a
+// damaging move), neither where nothing ties.
 await loadSimMods('gen9championsou');
 
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
@@ -25,7 +24,6 @@ const choiceOf = (moveId: string, target: string, mode: Mode) => ({
   kind: 'move' as const, moveId, moveName: moveId, ...(mode === 'doubles' && NEEDS_AIM.has(target) ? { targetLoc: 1 } : {}),
 });
 
-/** The dice of the natural turn for slot p1a, by key. */
 function drawnKeys(board: ReturnType<typeof sweepBoard>, clicks: { p1: string; p2: string }, kind: string): string[] {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();

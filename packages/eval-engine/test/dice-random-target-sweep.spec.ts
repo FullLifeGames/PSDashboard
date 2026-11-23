@@ -8,7 +8,7 @@ import { loggedDice } from '../src/dice/logged-results';
 import { loggedOptions } from '../src/dice/turn';
 import { aimOf, bentScene, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
 
-// Round 89 (#137): the simulator draws a random target in two places that the log shows and the rebuild does not read. A move
+// The simulator draws a random target in two places that the log shows and the rebuild does not read. A move
 // that picks its foe at random (the Dex target `randomNormal`: Outrage, Thrash, Petal Dance, Uproar, Raging Fury, Struggle) draws it
 // in `getTarget`, and a move that an Encore bent to the last one (`OverrideAction`) draws it in `runMove`, both through
 // `getRandomTarget`, which samples the standing foes in doubles (`side.randomFoe`) and takes the one foe of singles without a draw.
@@ -28,7 +28,6 @@ const FOES = ['p2a', 'p2b'];
 const pick = (slot: string, moveId: string): DieName => ({ slot, moveId, kind: 'random-target' });
 const slotsOf = (items: readonly unknown[] | undefined): string[] => (items ?? []).map(item => (item as { getSlot(): string }).getSlot()).sort();
 
-/** The die of the user's move: named once, drawn over the standing foes, and each foe forced makes the move line name it. */
 function checkPicked(board: ReturnType<typeof pickBoard>, clicks: { p1: string; p2: string }, turn: Recorded, moveId: string): string[] {
   const problems: string[] = [];
   const dice = ofKind(turn, 'random-target');
@@ -54,8 +53,8 @@ function checkPicked(board: ReturnType<typeof pickBoard>, clicks: { p1: string; 
 }
 
 /**
- * Round 89 (G2): the log reader answers the draw. The lines of a turn that forced `foe` give a die of the same key whose answer is that
- * foe (a reader told that the game draws a random target, as `loggedOptions` tells it), and playing the board with the reader's die makes
+ * The log reader answers the draw: the lines of a turn that forced `foe` give a die of the same key whose answer is that foe (a
+ * reader told that the game draws a random target, as `loggedOptions` tells it), and playing the board with the reader's die makes
  * the move line name the foe again.
  */
 function readBack(board: ReturnType<typeof pickBoard>, clicks: { p1: string; p2: string }, lines: readonly string[], moveId: string, foe: string): string[] {
@@ -98,7 +97,6 @@ describe.each(DOUBLES)('a random-target move draws a die: $name', ({ rules, mode
   });
 });
 
-/** Every one-target move: the user clicked another move; the faster foe's Encore lands first and bends the click to the last move used. */
 const oneTarget = (move: DexMove): boolean => ['normal', 'adjacentFoe', 'any'].includes(move.target) && !isCharge(move);
 
 describe.each(CASES)('an Encore that bends a click draws the target of the bent move: $name', ({ rules, mode, vgc }) => {
@@ -106,7 +104,6 @@ describe.each(CASES)('an Encore that bends a click draws the target of the bent 
   const encores = dex.moves.get('encore').exists && dex.moves.get('encore').gen <= dex.gen;
   const { moves } = sweepMoves(rules, oneTarget);
   const scene = (moveId: string) => bentScene({ rules, mode, vgc }, moveId, mode === 'singles' ? 'move 1' : 'move 1 1');
-  /** The user ran the Encore's move after the Encore started on it. */
   const bent = (lines: readonly string[], moveId: string): boolean => {
     const started = lines.findIndex(line => line.startsWith('|-start|p1a') && line.endsWith('|Encore'));
     const ran = lines.findIndex(line => line.startsWith('|move|p1a') && line.split('|')[3].toLowerCase().replace(/[^a-z0-9]/g, '') === moveId);

@@ -9,9 +9,9 @@ import { watchBattle } from '../src/dice/watch';
 import { mon, RULES, seedOf, stableLog, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-// Round 82 (forced dice), decisions D5, D7 and D8. A forced die changes the number of draws of the turn (a forced hit after a
-// natural miss adds a crit and a roll). The other actions of the turn keep the dice the natural turn drew for them, the first
-// action's own new dice fall from the stream, and the stream after the turn stands where the natural turn leaves it.
+// A forced die changes the number of draws of the turn (a forced hit after a natural miss adds a crit and a roll). The other
+// actions of the turn keep the dice the natural turn drew for them, the first action's own new dice fall from the stream, and the
+// stream after the turn stands where the natural turn leaves it.
 await loadSimMods('gen9championsou');
 
 /** Pikachu (fast) kicks, Snorlax (slow) tackles; in doubles Blissey tackles Chansey and Chansey tackles Blissey. */
@@ -47,7 +47,6 @@ const kick = (kind: DieName['kind']): DieName => ({ slot: 'p1a', moveId: 'megaki
 const accuracy = (happens: boolean): ForcedDie => ({ name: kick('accuracy'), result: { happens } });
 const missed = (battle: Battle): boolean => segments(battle)[0].includes('|-miss|');
 
-/** The natural turn on a board, then the board for the forced turn: a plain turn first when `later`. */
 function pair(rules: Rules, mode: Mode, seed: string, later: boolean): { natural: Battle; live: Battle } {
   const [natural, live] = [board(rules, mode, seed), board(rules, mode, seed)];
   if (later) for (const battle of [natural, live]) turn(battle, REST[mode]);
@@ -58,7 +57,6 @@ function pair(rules: Rules, mode: Mode, seed: string, later: boolean): { natural
 const cases = RULES.flatMap(rules => (['singles', 'doubles'] as Mode[]).filter(mode => mode === 'singles' || rules.doubles)
   .flatMap(mode => [false, true].map(later => ({ rules, mode, later, label: `${rules.name} ${mode} ${later ? 'a later turn' : 'the first turn'}` }))));
 
-/** The seeds (up to `count`) on which the natural kick misses, or hits. */
 function seedsWhere(rules: Rules, mode: Mode, later: boolean, wantMiss: boolean, count: number): string[] {
   const found: string[] = [];
   for (let index = 0; found.length < count && index < 60; index++) {
@@ -139,7 +137,6 @@ describe.each(cases)('the stream of a forced turn: $label', ({ rules, mode, late
   });
 });
 
-/** Runs the module's turn on the live board: the copy plays the clicks, then the live battle does. */
 function playForcedTurnOn(live: Battle, mode: Mode, forced: ForcedDie[]) {
   const seen: Battle[] = [];
   const report = playForcedTurn({ live, forced, play: battle => { seen.push(battle); turn(battle, FIGHT[mode]); } });

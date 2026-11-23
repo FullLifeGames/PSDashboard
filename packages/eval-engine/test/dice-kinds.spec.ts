@@ -3,10 +3,8 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { DIE_KINDS } from '../src/dice/types';
 
-// Round 82 (forced dice): a kind of die is named by what the die decides, never by a Dex entry (AGENTS.md: our code reads
-// species, move, ability and item names from the Dex, it does not write them). The words of the kinds collide with no
-// move, ability, item, condition or species id of any generation or the Champions mod, and the types file needs no lint
-// exception for them.
+// A kind of die is named by what the die decides, never by a Dex entry: the words of the kinds collide with no move, ability, item,
+// condition or species id of any generation or the Champions mod.
 await loadSimMods('gen9championsou');
 
 const dexes = [...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `Gen ${gen}`, dex: rulesDex(gen) })), { name: 'Champions', dex: rulesDex(0) }];

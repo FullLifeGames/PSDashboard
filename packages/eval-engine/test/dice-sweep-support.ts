@@ -10,9 +10,9 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 82 (forced dice): the boards and the bookkeeping the three sweeps (accuracy, crit, damage roll) share. One case
- * is a rule set, a game type and a move: Snorlax uses the move against a Vaporeon (a pure Water type: no type immunity of
- * any generation reaches it), the other bodies splash. Every Dex read goes through `rulesDex`.
+ * The boards and the bookkeeping the three sweeps (accuracy, crit, damage roll) share. One case is a rule set, a game type and a
+ * move: Snorlax uses the move against a Vaporeon (a pure Water type: no type immunity of any generation reaches it), the other
+ * bodies splash. Every Dex read goes through `rulesDex`.
  */
 
 export type DexMove = ReturnType<ReturnType<typeof rulesDex>['moves']['get']>;
@@ -25,10 +25,9 @@ export const SWEEP_CASES: { rules: Rules; mode: Mode; name: string }[] = RULES.f
 
 /** Moves that reach a foe: the others (a side, the field, the user, an ally) draw no accuracy or crit against a foe. */
 const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent', 'randomNormal', 'scripted']);
-/** In doubles these moves need a target in the click. */
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
 
-/** Every move a rule set plays (the probe's filter: no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of (`whole`: the whole list, for a sweep that picks its own sample). */
+/** Every move a rule set plays (no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of (`whole`: the whole list, for a sweep that picks its own sample). */
 export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true, whole = false): { moves: DexMove[]; skipped: number } {
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
@@ -42,7 +41,8 @@ export const VGC_RULES: Rules[] = RULES.filter(rules => rules.doubles && (rules.
 
 /**
  * The board of a case: Snorlax with the move leads side p1, a Vaporeon leads side p2, in doubles a Blissey and a second Vaporeon
- * splash beside them. `vgc` gives each side a team of six (the four behind the leads splash), as a VGC team has. The custom game takes the whole team into the battle: it asks for no team preview here, so nobody is left at home.
+ * splash beside them. `vgc` gives each side a team of six (the four behind the leads splash). The custom game takes the whole team
+ * into the battle: it asks for no team preview here, so nobody is left at home.
  */
 export function sweepBoard(rules: Rules, moveId: string, mode: Mode, seed = '1,2,3,4', vgc = false, species = 'Snorlax'): Battle {
   const attacker = mon(rules, { species, moves: [moveId], gender: 'M' });
@@ -87,9 +87,8 @@ export const picksOne = (target: string): boolean => target === 'randomNormal' |
 export const isCharge = (move: DexMove): boolean => !!move.flags.charge;
 
 /**
- * A future move lands two turns later in the end-of-turn residual, when no move is in flight. The module names no die for it in
- * the turn it starts (the kind of die for it is an end-of-turn die, step A4): the sweeps hold that the report says `no-draw`
- * with that reason and the protocol shows no miss.
+ * A future move lands two turns later in the end-of-turn residual, when no move is in flight. The module names no die for it in the
+ * turn it starts: the sweeps hold that the report says `no-draw` with that reason and the protocol shows no miss.
  */
 export const isDelayed = (move: DexMove): boolean => !!move.flags.futuremove;
 
@@ -115,7 +114,6 @@ export function forcedOn(board: Battle, clicks: { p1: string; p2: string }, forc
 
 export const dieOf = (moveId: string, targetSlot: string, kind: DieName['kind']): DieName => ({ slot: 'p1a', moveId, targetSlot, kind });
 
-/** The protocol lines of the forced turn that start with `prefix`. */
 export const turnLines = (battle: Battle, start: number, prefix: string): string[] => battle.log.slice(start).filter(line => line.startsWith(prefix));
 
 const slotOfIdent = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
@@ -124,7 +122,6 @@ const slotOfIdent = (ident: string | undefined): string | undefined => ident?.sp
 export const missesOf = (battle: Battle, start: number, slot: string): number =>
   turnLines(battle, start, '|-miss|').filter(line => { const target = line.split('|')[3]; return target === undefined || slotOfIdent(target) === slot; }).length;
 
-/** The `|-crit|` lines of the turn about a slot. */
 export const critsOf = (battle: Battle, start: number, slot: string): number =>
   turnLines(battle, start, '|-crit|').filter(line => slotOfIdent(line.split('|')[2]) === slot).length;
 
@@ -132,11 +129,9 @@ export const critsOf = (battle: Battle, start: number, slot: string): number =>
 export const explained = (reason: string | undefined): boolean =>
   !!reason && /did not use|did not run|did nothing|lands two turns later|shows "|always crits|cannot miss|removed the secondary|fixed hit count|no stall draw/.test(reason);
 
-/** What a sweep counted; written to the log named by `DICE_SWEEP_LOG` when set. */
 export interface Tally { cases: number; applied: number; blocked: number; noChance: number; noDraw: number; bad: string[]; unexercised: string[] }
 export const newTally = (): Tally => ({ cases: 0, applied: 0, blocked: 0, noChance: 0, noDraw: 0, bad: [], unexercised: [] });
 
-/** The body in a slot (`p2a`, `p1b`). */
 export function monOf(battle: Battle, slot: string): Pokemon {
   return battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
 }
@@ -175,7 +170,6 @@ export function damageAtRaw(board: Battle, clicks: { p1: string; p2: string }, s
 }
 
 
-/** One entry of a move's `secondaries` as the Dex stores it (the fields the witnesses read). */
 export interface SecondaryEntry {
   chance?: number;
   status?: string;
@@ -187,16 +181,15 @@ export interface SecondaryEntry {
 const linesOf = (battle: Battle, start: number): string[][] => battle.log.slice(start).map(line => line.split('|'));
 const slotIn = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
 
-/** A boost or drop of one of the stats on a body, anywhere in the turn. */
 function boostShown(rows: string[][], slot: string, stats: string[]): boolean {
   return rows.some(row => (row[1] === '-boost' || row[1] === '-unboost') && slotIn(row[2]) === slot && stats.includes(row[3]));
 }
 
 /**
- * Whether the protocol of the turn shows the effect of a secondary entry: the independent witness of the secondary sweep. A
- * status is `|-status|`, a flinch is the `|cant|` line of the target, another condition a `|-start|`, a boost or a drop a
- * `|-boost|` or `|-unboost|` of the entry's stat on the target (on the user for a `self` entry). An entry with none of these
- * (a handler that picks the effect) shows by any of the lines that start something on the target.
+ * The independent witness of the secondary sweep: whether the protocol of the turn shows the effect of a secondary entry. A status is
+ * `|-status|`, a flinch is the `|cant|` line of the target, another condition a `|-start|`, a boost or a drop a `|-boost|` or
+ * `|-unboost|` of the entry's stat on the target (on the user for a `self` entry). An entry with none of these (a handler that
+ * picks the effect) shows by any of the lines that start something on the target.
  */
 export function effectShown(battle: Battle, start: number, entry: SecondaryEntry, targetSlot: string, userSlot: string): boolean {
   const rows = linesOf(battle, start);
@@ -209,7 +202,6 @@ export function effectShown(battle: Battle, start: number, entry: SecondaryEntry
   return rows.some(row => (row[1] === '-status' || row[1] === '-start') && slotIn(row[2]) === targetSlot);
 }
 
-/** A board with a free choice of the attacker's and the foe's outfit (species, item, ability) in one rule set and game type. */
 export function outfitBoard(
   rules: Rules, mode: Mode, a: { species: string; moves: string[]; item?: string; ability?: string }, t: { species: string; item?: string; ability?: string },
 ): Battle {

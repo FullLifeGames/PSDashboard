@@ -9,13 +9,13 @@ import { sweepSelection } from './dice-fixtures';
 import { forcedOn, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
 /**
- * Round 86 (the engine reads the dice), lane B, step B4b (T306): the phantom procs. An ability or an item that draws a chance when its
- * holder is hit (Cute Charm, Static, Flame Body, Poison Point, Cursed Body, Effect Spore, the attacker's Poison Touch and Toxic Chain,
- * the Focus Band) is a die the log shows only when it came true. The forced turn answers the dice the log shows and leaves the rest to
- * the hidden dice of the frozen seed, so a seed that says yes gave a body a Cute Charm infatuation, a burn or a paralysis the game never
- * showed (573756: Conscripts carried `attract` from turn 2 to 10). The faint step now forces such a die not to happen unless the log
- * shows its effect on the hit. This sweep plays every proc the census knows in every rule set the corpus plays, singles and doubles:
- * the log's turn is the turn with the proc forced to the log's answer, and the forced turn of another seed must show the same.
+ * The phantom procs: an ability or an item that draws a chance when its holder is hit (Cute Charm, Static, Flame Body, Poison Point,
+ * Cursed Body, Effect Spore, the attacker's Poison Touch and Toxic Chain, the Focus Band) is a die the log shows only when it came
+ * true. The forced turn answers the dice the log shows and leaves the rest to the hidden dice of the frozen seed, so a seed that says
+ * yes gave a body a Cute Charm infatuation, a burn or a paralysis the game never showed (573756: Conscripts carried `attract` from
+ * turn 2 to 10). The faint step forces such a die not to happen unless the log shows its effect on the hit. This sweep plays every
+ * proc the census knows in every rule set the corpus plays, singles and doubles: the log's turn is the turn with the proc forced to
+ * the log's answer, and the forced turn of another seed must show the same.
  */
 await loadSimMods('gen9championsou');
 
@@ -50,7 +50,6 @@ describe.each(SWEEP_CASES)('a proc the log does not show: $name', ({ rules, mode
     const lines = logged.battle.log.slice(logged.start);
     expect(mentions(logged.battle, logged.start, label), `${name} ${proc.id}: the log's turn shows no proc`).toBe(false);
     const expected = extractProtocolEvents(lines);
-    // seeds whose hidden dice say yes to the proc: the plain turn (only the hit forced) shows the effect
     const shows = (seed: string): boolean => {
       const turn = forcedOn(board(seed), clicks, [hitDie(proc.move)]);
       return mentions(turn.battle, turn.start, label);
@@ -99,7 +98,7 @@ describe.each(SWEEP_CASES)('a proc the log shows: $name', ({ rules, mode, name }
     const expected = extractProtocolEvents(lines);
     for (const seed of POOL.slice(0, 4)) {
       const result = faintStep({ battle: board(seed), expected, seed: seed as never, choices: clicks, lines }, [hitDie(proc.move)]);
-      // a seed whose hidden dice leave the log's Focus Band out ends the game early: the seed search takes that block (ruling Q2), nothing is forced
+      // a seed whose hidden dice leave the log's Focus Band out ends the game early: the seed search takes that block, nothing is forced
       if (result.dice === null) continue;
       expect(result.dice.filter(isProcDie), `${name} ${proc.id} seed ${seed}: the log's proc is not forced away`).toEqual([]);
     }

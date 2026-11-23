@@ -9,12 +9,10 @@ import { nameOf, present } from './dice-ability-support';
 import { playClicks, standing, sweepSelection, type Mode, type Rules } from './dice-fixtures';
 import { dexOfRules, outfitBoard, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-// Round 82 (forced dice), step A7e: a question to the simulator runs the handlers of the holders' abilities and items, so the
-// holders must see the context the simulator gives them. `runMove` sets the move in flight before `ModifyMove`; a stand-in that
-// raised the event on a copy without it made a Choice item's `choicelock` throw "Battle.activeMove is null" (the draft league
-// replay, turn 56). Every ability and item whose handler reads `battle.activeMove`, directly or through a volatile it adds, is
-// read from the simulator's data tables and played as the attacker's and as the foe's, with a move of each kind the offer reads.
-// The handlers that throw without the move play in every run; the other readers are sampled like the other sweeps.
+// A question to the simulator runs the handlers of the holders' abilities and items, so they need the context the simulator gives:
+// `runMove` sets the move in flight before `ModifyMove` (without it a Choice item's `choicelock` threw "Battle.activeMove is null",
+// the draft league replay, turn 56). Every ability and item whose handler reads `battle.activeMove` is read from the simulator's data
+// tables and played as attacker and as foe; the handlers that throw without the move play in every run, the others are sampled.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;

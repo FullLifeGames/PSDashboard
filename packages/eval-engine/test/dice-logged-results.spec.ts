@@ -7,9 +7,8 @@ import { loggedActions, loggedDice, mergeLoggedDice } from '../src/dice/logged-r
 import { dieKey, type ForcedDie } from '../src/dice/types';
 
 /**
- * Round 82 (forced dice), step A5, gate answer 19a: what the log rolled, read per action as forced dice. The reader is free of
- * simulator imports (it sits in the main bundle beside `hax-alignment.ts`), so this file holds it to the lines the simulator
- * and the replays write, and to the reader of the protocol's dice witnesses on every turn of the fixtures.
+ * What the log rolled, read per action as forced dice. The reader has no simulator imports (it sits in the main bundle beside
+ * `hax-alignment.ts`), so this file holds it to the lines the simulator and the replays write.
  */
 
 const show = (dice: readonly ForcedDie[]): string[] => dice.map(die => `${dieKey(die.name)} ${JSON.stringify(die.result)}`);
@@ -137,7 +136,7 @@ describe('the dice a log shows, action by action', () => {
     expect(loggedDice(selfOnly)).toEqual([]);
   });
 
-  // Round 88 (T338, #74): `self.chance` is drawn once per move from Gen 7, so one gain line against two struck foes is a yes
+  // `self.chance` is drawn once per move from Gen 7.
   test('a self chance is one die for the move: one gain line against two struck foes is a yes, none is a no', () => {
     const selfOf = (move: string) => (move === 'diamondstorm' ? 'self:def' : undefined);
     const spread = (gain: string) => lines(`
@@ -150,7 +149,7 @@ ${gain}`);
     expect(asked(spread(''))).toEqual(['p1a:diamondstorm::self-effect {"happens":false}']);
   });
 
-  // Round 88 (T337, #73): a move whose every hit rolls its accuracy writes `|-hitcount|` and no miss for a later hit
+  // Such a move writes `|-hitcount|` and no miss for a later hit.
   describe('the accuracy of each hit of a multi-accuracy move', () => {
     const hitsOf = (move: string) => (move === 'tripleaxel' ? 3 : undefined);
     const axe = (count: string, first = '|-damage|p2a: B|70/100') => lines(`
@@ -360,8 +359,7 @@ describe.each([
   });
 });
 
-// Round 89 (#137): the log names the foe a move was aimed at and the body a drag brought in; the simulator draws both with a `sample`
-// (`getRandomTarget`, `getRandomSwitchable`), the reader hands the answers over as the dice of those draws.
+// The simulator draws both with a `sample` (`getRandomTarget`, `getRandomSwitchable`); the reader hands the answers over as the dice of those draws.
 describe('the random target and the drag a log shows', () => {
   // Champions VGC 2658911747 turn 6: Sableye's Encore bends Gallade's click to Taunt, and the game drew Corviknight
   const ENCORE = lines(`

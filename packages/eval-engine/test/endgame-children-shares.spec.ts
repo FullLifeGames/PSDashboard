@@ -13,12 +13,12 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (P2, 1.2.0): the share of a flipped child. `pricedGroup` plays the recorded turn once with each chance die answered the
- * other way; the flipped branch is worth the chance of that answer times the chances of the other deciding dice that branch drew.
- * Before P2 it multiplied the recorded chances of every other deciding die, also one the branch never reached: Champions VGC
- * 2682637901 turn 6, a failed second Protect lets Aqua Jet end the game before Volcarona's paralysis die (1 in 8) is rolled, so its share
- * read 7/12 instead of 2/3. `FlippedTurn.drawn` names the dice a flipped branch drew again; the plain path's `delaySplit` prices a split
- * of the faints or the end that the recorded dice explain (a repeated Protect), for the prover's delay rule only.
+ * The share of a flipped child. `pricedGroup` plays the recorded turn once with each chance die answered the other way; the flipped
+ * branch is worth the chance of that answer times the chances of the other deciding dice that branch drew, never one the branch did
+ * not reach: Champions VGC 2682637901 turn 6, a failed second Protect lets Aqua Jet end the game before Volcarona's paralysis die
+ * (1 in 8) is rolled, so its share is 2/3, not 7/12. `FlippedTurn.drawn` names the dice a flipped branch drew again; the plain
+ * path's `delaySplit` prices a split of the faints or the end that the recorded dice explain (a repeated Protect), for the prover's
+ * delay rule only.
  */
 interface Scene { serialized: string; ruleset: 'champions' | 'standard' }
 const scene = (name: string): Scene => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as Scene;
@@ -33,7 +33,6 @@ async function afterFirstProtect(name: string): Promise<SimPosition> {
   return endgameChildren(root, OWN, 'move protect', 6).children[0].position;
 }
 
-/** The turn of one cell on its first seed, as the plain path plays it. */
 function turnOf(root: SimPosition, p1Choice: string, p2Choice: string, seedIndex = 0): FlipTurn {
   const seed = cellSeeds(root, p1Choice, p2Choice)[seedIndex];
   return {
@@ -61,7 +60,6 @@ describe.each(SCENE_1)('Champions VGC 2682637901 turn 6, the second Protect agai
 
   test('the flip of the Protect die did not draw the paralysis die, the flip of the paralysis die drew the Protect die', async () => {
     const child = await afterFirstProtect(name);
-    // a seed on which the second Protect held and the paralysis die was drawn: the recorded turn names both dice
     const index = cellSeeds(child, OWN, 'move protect').findIndex((_seed, at) => recordTurn(turnOf(child, OWN, 'move protect', at)).dice.length >= 2);
     expect(index, 'a seed where the repeat holds').toBeGreaterThanOrEqual(0);
     const turn = turnOf(child, OWN, 'move protect', index);

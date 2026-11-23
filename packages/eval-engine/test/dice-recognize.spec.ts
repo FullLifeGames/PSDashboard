@@ -8,11 +8,10 @@ import {
   boardOf, clicksOf, PIKACHU, playClicks, RULES, RULES_WITH_DOUBLES, seedOf, SNORLAX, type Mode, type Rules, type Scene,
 } from './dice-fixtures';
 
-// Round 82 (forced dice), decision D3. `recognize` maps one draw to the name of a die with two rules: the hook that ran right
-// before the draw (accuracy, the crit from Gen 2 on), and the script call that holds the draw (the damage roll, the Gen 1
-// crit). The spy below asks `recognize` for every draw the way the PRNG of the module does, so the lists are what the
-// module would see. Draws no kind of this step names (secondaries, the speed tie, target picks) come out as null and are
-// left out of the lists; later steps name them.
+// `recognize` maps one draw to the name of a die with two rules: the hook that ran right before the draw (accuracy, the crit from
+// Gen 2 on), and the script call that holds the draw (the damage roll, the Gen 1 crit). The spy below asks `recognize` for every
+// draw the way the PRNG of the module does, so the lists are what the module would see. Draws that no kind here names
+// (secondaries, the speed tie, target picks) come out as null and are left out of the lists.
 await loadSimMods('gen9championsou');
 
 interface Named { name: DieName; /** Whether a hook was armed for this draw. */ armed: boolean }
@@ -55,7 +54,6 @@ class NamingPRNG extends PRNG {
   }
 }
 
-/** Plays the scene's turn under the spy and returns what it named and the log. */
 function named(rules: Rules, scene: Scene, mode: Mode, seed: string): { names: Named[]; log: string[] } | null {
   const battle = boardOf(rules, scene, mode, seed);
   if (!battle) return null;
@@ -116,7 +114,7 @@ describe.each(RULES)('a Substitute in front changes no name: $name singles', (ru
         const played = named(rules, scene, 'singles', seed);
         if (!played) break;
         const miss = played.log.some(line => line.startsWith('|-miss|'));
-        // Air Slash draws its flinch (Round 82, A3a) behind a Substitute too: the hit went into the Substitute, the entry is still drawn
+        // Air Slash draws its flinch behind a Substitute too: the hit went into the Substitute, the entry is still drawn
         const expected = miss ? ['accuracy'] : ['accuracy', 'crit', 'damage-roll', ...(move === 'airslash' ? ['secondary'] : [])];
         expect(played.names.map(entry => entry.name.kind), `${move} ${seed}`).toEqual(expected);
         expect(played.names.every(entry => entry.name.targetSlot === 'p2a' && entry.name.moveId === move && entry.name.slot === 'p1a')).toBe(true);
@@ -147,8 +145,8 @@ describe.each(RULES_WITH_DOUBLES)('Rock Slide in doubles: $name', (rules: Rules)
         if (rules.generation === 3 && hit.includes(target)) expected.push(flinch(target));
       }
       if (rules.generation !== 3) expected.push(...hit.map(flinch));
-      // Round 89 (#137): a click that names no target (a spread move) still draws the simulator's random target, a sample over the two foes
-      // that `getRandomTarget` takes when the choice is queued and again when the move runs, before the move is in flight; the module
+      // A click that names no target (a spread move) still draws the simulator's random target, a sample over the two foes that
+      // `getRandomTarget` takes when the choice is queued and again when the move runs, before the move is in flight; the module
       // names each draw a die of the user and the move with no target slot, one key for every repeat
       const keys = played.names.map(entry => dieKey(entry.name));
       const picks = keys.filter(key => key.endsWith(':random-target'));
@@ -170,7 +168,7 @@ describe.each(RULES)('the confusion self-hit rolls a die of its own: $name', (ru
   };
 
   // Gens 1 and 2 compute the self-hit without a damage roll (Gen 1 inline, Gen 2 with noDamageVariance): only the check draws.
-  // The check is a die of its own (round 82, A3b: the status check of the body about to move); no move die follows a self-hit.
+  // The check is a die of its own (the status check of the body about to move); no move die follows a self-hit.
   test('the roll of the hurt body carries the condition and the check is the only other die', () => {
     let selfHits = 0;
     for (let index = 0; index < 40; index++) {
