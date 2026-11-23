@@ -7,7 +7,7 @@ import { moveOption, switchOption } from '../../fixtures/sim-state';
 /**
  * Round 84 (turn dock), A7b, ruling 8a (variant A of the chip page): the chip takes the tile's type edge on the left (the same
  * `typeTileVars` source) and, at its right across both lines, the chosen move's type tag or the incoming body's sprite. An empty
- * chip has neither. The chip's box does not depend on the state (the CSS side is `dock-css.spec.ts`).
+ * chip has neither. The chip's box does not depend on the state (the CSS side is `styles.spec.ts`).
  */
 function slot(over: Partial<DockSlotModel>): DockSlotModel {
   return {
