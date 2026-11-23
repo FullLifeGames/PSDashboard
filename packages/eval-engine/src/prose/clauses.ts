@@ -4,18 +4,11 @@ import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
 import { cameInstead, choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
-/**
- * The per-side clauses of the turn summary: paid-off reads, misplays,
- * inaccuracies, forced expectations, sacks, streaks, sensitivity hinges,
- * and unanswered entries. Every clause returns null when it has nothing to
- * say; the summary decides the order.
- */
+/** The per-side clauses of the turn summary; each returns null when it has nothing to say. */
 
-/** A flagged risk that won value over the safe guarantee — praised, not blamed. */
 function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
   const came = opponent.played ? `; ${cameInstead(opponentName, opponent)}` : '';
-  // Round 89 (G-Q2 b): the fair test's own numbers, the played cell against the safe cell in the clicked column.
   const held = side.safeAgainstClick;
   const beat = held ? `, and against it the play beat the safe line by ${winDeltaText(held.playedValue - held.safeValue)}` : '';
   const priced = side.played.punishedBy ? ` The floor priced in ${phraseReplies(side.played.punishedBy)}${came}${beat}.` : '';
@@ -23,16 +16,14 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, op
     ? side.riskPayoffTurn === 1 ? ' one turn later' : ` ${side.riskPayoffTurn} turns later`
     : '';
   const odds = side.hitStopped?.played ? undefined : side.played.koOdds;
-  // Round 63 (T18): the kill-range shape is a verb phrase of its own ("kills ~43% of the time"). Round 70 (4a): not for a hit the click stopped.
   const click = odds ? ` ${oddsPart('The click', odds, 'was')}.` : '';
   return `${name} ${playedVerb(side.played.label)}: a read that paid off${horizon}, ` +
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase, side.faintedFraction)} guaranteed).${priced}${click}`;
 }
 
 /**
- * Round 89 (B6a, G-Q1 a): the payoff cleared the margin, but the safe line did as well or better against the reply that came
- * (`safeAgainstClick` without `riskPaidOff`). The card says so, with the gap in the safe line's favour; a gap that rounds to
- * 0% reads "did as well". The one place for these words.
+ * The safe line did as well or better against the reply that came (`safeAgainstClick` without `riskPaidOff`); the one place for
+ * these words. A gap that rounds to 0% reads "did as well".
  */
 export function heldRiskClause(name: string, side: SideAnalysis): string | null {
   const held = side.safeAgainstClick;
@@ -48,31 +39,21 @@ export function heldRiskClause(name: string, side: SideAnalysis): string | null 
     `Against it the safe ${choiceNoun(side.safe.label)} ${versus}.${click}`;
 }
 
-/**
- * A charitable partial grade must say so — one slot's choice was never
- * visible (flinch/sleep), so the combo shown is the best consistent one.
- * Round 64 (T123): the read credit and the inaccuracy say it too.
- */
+/** One slot's choice was never visible (flinch, sleep), so the combo shown is the best consistent one. */
 const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
   side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
 
-/** Round 67 (T59): `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
+/** `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
 export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true, opponentName = 'the opponent'): string | null {
   if (side.riskPaidOff && !praised) return null;
   const clause = readClause(name, side, opponent, opponentName) ?? mistakeClause(name, side, opponent, opponentName);
   return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }
 
-/** The principal variation after a choice, as a ", then A · B → C · D" tail. */
 const lineOf = (choice: { line?: { p1: string; p2: string }[] }) =>
   choice.line && choice.line.length > 0 ? `, then ${formatLine(choice.line)}` : '';
 
-/**
- * An unpunished read gets neutral framing: the engine's line is "safe",
- * not "better" — maximin's guarantee always merely holds the current
- * assessment, and holding is no achievement. When the opponent model's
- * own best response matches the play, credit the read explicitly.
- */
+/** Neutral framing: the engine's line is "safe", not "better", because maximin's guarantee only holds the current assessment. */
 function unpunishedReadClause(
   name: string,
   side: SideAnalysis,
@@ -93,12 +74,7 @@ function unpunishedReadClause(
     `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase, side.faintedFraction)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
 }
 
-/**
- * The punished misplay reads in EV terms: what the choice was worth against
- * balanced play, vs what the engine's line was worth. A blunder earns the
- * word; a mistake keeps the softer framing. A null-swapped recommendation
- * drops the PV line and the why clause — both belong to the true best.
- */
+/** A null-swapped recommendation drops the PV line and the why clause: both belong to the true best. */
 function punishedMisplayClause(
   name: string,
   side: SideAnalysis,
@@ -134,15 +110,11 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis,
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
 
-/**
- * Round 63 (T17): the read credit of an untiered turn — praise on the card, never a verdict (648453 t13).
- * Round 67 (T22): `rolled` false (no roll went the residual's way) words the rider's swing as one with no roll behind it.
- */
+/** Praise on the card, never a verdict. `rolled` false (no roll went the residual's way) words the rider's swing as one with no roll behind it. */
 export function readCreditClause(name: string, side: SideAnalysis, ownLuck: number | null, rolled = true): string | null {
   const credit = side.readCredit;
   if (!credit || !side.played || !side.safe) return null;
-  // The gates read the pair's value before the rolls (round 63 fix): say so, and name the
-  // turn's own luck once it moved the side by an inaccuracy (649664 t15 ended on the floor).
+  // The gates read the pair's value before the rolls, so the sentence says so.
   const when = credit.payoffTurn
     ? `${credit.payoffTurn === 1 ? 'one turn later' : `${credit.payoffTurn} turns later`}, before the rolls,`
     : 'before the rolls,';
@@ -156,19 +128,15 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     `${partialNote(side, 'credited')}${luck}`;
 }
 
-/** The ride-along slot of `heldRiskClause`: a gamble or an inaccuracy risk that kept ground; a mistake or blunder speaks through `sideClause`. */
+/** The ride-along form of `heldRiskClause`; a mistake or blunder speaks through `sideClause` instead. */
 export function heldRiskNote(name: string, side: SideAnalysis): string | null {
   if (side.tier === 'mistake' || side.tier === 'blunder') return null;
   const clause = heldRiskClause(name, side);
   return clause ? `${clause}${partialNote(side, 'graded')}` : null;
 }
 
-/**
- * Sub-verdict note: a light imprecision worth naming, not blaming. Round 77 (562428 t12): a read that paid off speaks for the
- * inaccuracy, as the read clause does for a misplay.
- */
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
-  // Round 89 (B6a): a risk with `safeAgainstClick` speaks through `heldRiskClause`, or, on a side that lost ground, stays silent (D-Q2).
+  // A risk with `safeAgainstClick` speaks through `heldRiskClause`, not here.
   if (side.tier !== 'inaccuracy' || side.riskPaidOff || side.safeAgainstClick || !side.played || !side.best) return null;
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
@@ -176,14 +144,9 @@ export function inaccuracyClause(name: string, side: SideAnalysis): string | nul
     `${oddsNote(side)}${nullNote(side)}${conditionalNote(side)}${partialNote(side, 'graded')}`;
 }
 
-/**
- * A near-pure equilibrium SWITCH is an expectation worth prose: the side is
- * effectively forced to give something up, and the reader should hear that
- * as a sentence, not read it off a matrix header percentage.
- */
 export function forcedClause(name: string, side: SideAnalysis): string | null {
   if (!side.forcedMix) return null;
-  // The conditional already told this story — one equilibrium mention is enough.
+  // The conditional already told this story: one equilibrium mention is enough.
   if (side.conditional?.mixLabel === side.forcedMix.label) return null;
   const base = `The equilibrium all but commits ${name} to ${phrase(side.forcedMix.label)} ` +
     `here (${Math.round(side.forcedMix.weight * 100)}%)`;
@@ -193,11 +156,7 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
     : `${base}, but ${cameInstead(name, side)}.`;
 }
 
-/**
- * A deliberate low-cost sack: neutral framing, no blame vocabulary — the
- * engine cannot see the intent (Trick absorption, momentum), only the cost.
- * Round 64 (T123): the other bodies the side lost on the turn follow by name.
- */
+/** Neutral framing, no blame vocabulary: the engine cannot see the intent (Trick absorption, momentum), only the cost. */
 export function sackClause(name: string, side: SideAnalysis): string | null {
   const sentence = sackSentence(name, side);
   const others = side.sacrifice?.alsoFell;
@@ -208,7 +167,6 @@ function sackSentence(name: string, side: SideAnalysis): string | null {
   if (!side.sacrifice) return null;
   const pct = Math.round(side.sacrifice.hpFraction * 100);
   if (side.sacrifice.hazard) {
-    // Round 63 (T17): the switch-in the hazards took (653785 t19).
     return `${name} sacked ${side.sacrifice.name} (${pct}% HP) into the entry hazards; it fell before it could act, ` +
       'and the next Pokémon came in on a free switch' +
       (side.sacrifice.verified ? '; the payoff over the next turns repaid it, so it reads as a sacrifice, not a misplay.'
@@ -228,7 +186,7 @@ function sackSentence(name: string, side: SideAnalysis): string | null {
     : `${name} sacked ${side.sacrifice.name} (${pct}% HP): a low-cost trade, not graded as a misplay.`;
 }
 
-/** Multi-turn expectation: the narrative half of round 6 — never a grade. */
+/** A multi-turn expectation, never a grade. */
 export function streakClause(name: string, side: SideAnalysis): string | null {
   if (!side.streakOdds) return null;
   const streak = side.streakOdds;
@@ -242,10 +200,7 @@ export function streakClause(name: string, side: SideAnalysis): string | null {
   return `${name}'s ${nth} ${streak.moveLabel} into ${streak.defenderSpecies}: ${streak.event} fishing compounds to ~${pct}% across the streak.`;
 }
 
-/**
- * The verdict hinges on a guessed item: name the split so the reader knows
- * the grade depends on hidden information, not on the engine's confidence.
- */
+/** Names the split so the reader knows the grade depends on hidden information, not on the engine's confidence. */
 export function sensitivityClause(name: string, side: SideAnalysis): string | null {
   if (!side.sensitivity) return null;
   const alternatives = side.sensitivity.alternatives
@@ -254,13 +209,7 @@ export function sensitivityClause(name: string, side: SideAnalysis): string | nu
   return `${name}'s verdict hinges on ${side.sensitivity.species}'s item (${alternatives}).`;
 }
 
-/**
- * Entry-is-profit context (round 13): bringing in a mon the opponent has no
- * live race answer to is board logic worth naming, not a verdict (648453
- * t13: the Lopunny switch). The round-14 switch-in stage names the one
- * standing mon still holding the pair — the expert's literal "no remaining
- * switch-ins" state.
- */
+/** `heldBy` names the one standing mon still holding the pair; the unanswered entry is board logic, not a verdict. */
 export function unansweredClause(side: SideAnalysis): string | null {
   if (!side.unanswered) return null;
   if (side.unanswered.heldBy) {

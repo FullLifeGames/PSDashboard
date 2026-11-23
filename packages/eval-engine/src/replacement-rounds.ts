@@ -1,9 +1,6 @@
-/**
- * Round 79 (T290): the replacement requests of a replay, read from the protocol alone. A request round is the set of fainted
- * slots that are open when the first replacement enters; a replacement that faints again (an entry hazard) opens the next round,
- * and a faint that no switch answers (the game's last body, a forfeit) closes with its block. The capture hook of the
- * reconstruction (`onReplacement`) is held to this read by test/replacement-capture-sweep.spec.ts. Pure, no sim imports.
- */
+/** The replacement requests of a replay, read from the protocol alone (`test/replacement-capture-sweep.spec.ts` holds the capture hook to this read); no sim imports. */
+
+/** One request round: the slots a knockout leaves open when its first replacement enters, and the species the log sends in. */
 export interface ReplacementRound {
   /** The block's turn: the knockout turn. The replacement stands on the board of the next one. */
   turn: number;
@@ -15,6 +12,7 @@ export interface ReplacementRound {
   species: { p1: string[]; p2: string[] };
 }
 
+/** The request rounds of a log; a replacement that faints again (an entry hazard) opens the next round of its block. */
 export function replacementRounds(log: string): ReplacementRound[] {
   const rounds: ReplacementRound[] = [];
   let turn = 0;

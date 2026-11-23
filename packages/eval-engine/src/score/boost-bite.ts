@@ -10,38 +10,24 @@ import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
 import { stageStands } from './switch-out.ts';
 
+/** `boostsBiting`: `boosts` with every standing stage damped by the share of living foes it bites. */
+
 /**
- * Round 69 (T49, decision 16): boostsBiting, `boosts` with every standing
- * stage damped by the share of living foes it bites. A stage bites a foe when
- * the foe leaves it alone and the stage moves the 1v1 race of the pair
- * within BITE_TURNS in favour of the side it helps (score/boost-race.ts): the
- * holder wins the race with it, gets to act, and it made the difference. It
- * does not bite a foe that plays Unaware (the simulator's own ModifyBoost
- * answers, with the mon and the foe as attacker and target), that can click a
- * move that takes the stages away (removesStages, played in the simulator),
- * or that a wall holds anyway.
- *
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the foes in
- * front of the holder gate the whole stage. A stage means nothing to a foe the
- * holder does not live to meet: while a foe on the field can take the stages
- * away or KOs the holder before it acts, no foe counts for a boost; while a
- * foe on the field wins the race within the horizon, no foe off the field
- * counts for any stage (the bench is credited only behind a front the holder
- * survives; T218) and, T225, while the holder does not win the race against a
- * foe on the field within the horizon (a wall it needs six turns for keeps the
- * bench shut, though it cannot KO the holder either).
- *
- * 21.11.2026 (SB3c, the Gholdengo report): a drop counts only while its holder cannot switch out (score/switch-out.ts). The
- * simulator clears every stage of a body that leaves, so a holder that can leave carries its drop for a turn, not for the rest
- * of the game: the engine had read Gholdengo's -1 Special Attack as lasting, sent Glimmora in against it and expected it to
- * flee. A holder that is trapped or has no living bench keeps the value as before; the drop still weakens the holder's hits in
- * the damage reads of this turn.
+ * A stage bites a foe when the foe leaves it alone and the stage moves the 1v1 race of the pair within BITE_TURNS in favour of the
+ * side it helps (score/boost-race.ts). It does not bite a foe that plays Unaware (the simulator's own ModifyBoost answers), that can
+ * click a move that takes the stages away (`removesStages`), or that a wall holds anyway.
+ * The foes in front of the holder gate the whole stage: while a foe on the field can take the stages away or KOs the holder before it
+ * acts, no foe counts for a boost; while a foe on the field wins the race within the horizon, or the holder does not win it against
+ * one (a wall it needs six turns for), no foe off the field counts for any stage.
+ * A drop counts only while its holder cannot switch out (score/switch-out.ts): the simulator clears every stage of a body that
+ * leaves, so a holder that can leave carries its drop for a turn (the engine had read a -1 Special Attack as lasting and expected
+ * the holder to flee). A trapped holder, or one with no living bench, keeps the value; the drop still weakens its hits this turn.
  */
 
 /** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
 export function stageValue(active: Pokemon, stat: string, stage: number): number {
   const statusDiscount = EVAL_WEIGHTS.boostStatusDiscount[active.status] ?? 1;
-  // Defensive stages read at half the offensive weight (12 vs 6).
+  // Defensive stages read at half the offensive weight.
   const statWeight = stat === 'atk' || stat === 'spa' || stat === 'spe' ? 1 : 0.5;
   const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
   return Math.sign(stage) * statWeight * magnitude * statusDiscount;
@@ -53,11 +39,7 @@ const body = (species: string, moves: string[]): PokemonSet => ({
   level: 100, gender: '',
 });
 
-/**
- * The format of the twin battle that answers for `battle`: a singles custom game of the battle's generation, on the
- * Champions mod when the battle runs on it (the mode decides what a move does to a stage; the mod is registered
- * already, the battle stands on it).
- */
+/** The format of the twin battle that answers for `battle`: a singles custom game of its generation, on the Champions mod when the battle runs on it. */
 export function removalFormat(battle: Battle): string {
   return `gen${battle.gen}${isChampionsSimFormat(battle.format.id) ? 'champions' : ''}customgame`;
 }
@@ -91,14 +73,9 @@ function playedRemoval(format: string, moveId: string, benched: boolean): boolea
 const removals = new Map<string, boolean>();
 
 /**
- * Whether a move takes the positive stages off a boosted mon, as the
- * simulator plays it (Haze, Clear Smog, Freezy Frost, Topsy-Turvy, Heart Swap
- * and the moves that drag the mon out: those only with a bench behind it).
- * The Dex names the dragging moves (forceSwitch) and carries no flag for the
- * rest, so the answer is the played twin battle, once per twin format, move and
- * bench; test/boost-bite.spec.ts plays every move in singles and doubles
- * against it, on the base mode and on the Champions mod (`format` is the
- * twin's, from removalFormat).
+ * Whether a move takes the positive stages off a boosted mon, as the simulator plays it (Haze, Clear Smog, Freezy Frost, Topsy-Turvy,
+ * Heart Swap, and the moves that drag the mon out, those only with a bench behind it). The Dex carries no flag for the removals, so
+ * the answer is a played twin battle, once per twin format, move and bench (`format` comes from `removalFormat`).
  */
 export function removesStages(format: string, moveId: string, benched: boolean): boolean {
   const key = `${format}|${moveId}|${benched}`;
@@ -110,17 +87,16 @@ export function removesStages(format: string, moveId: string, benched: boolean):
   return removed;
 }
 
-/** The stats of a mon that carry a stage. */
 const stagedStats = (mine: Pokemon): (keyof BoostsTable)[] =>
   (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
 
-/** The stats the foe's hits read of the holder (round 79, T288): a shield is a Defense or Special Defense stage, whose damage reduction the race prices. */
+/** A shield is a Defense or Special Defense stage, whose damage reduction the race prices. */
 const shieldStat = (stat: keyof BoostsTable): boolean => stat === 'def' || stat === 'spd';
 
 /**
- * Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy
- * and evasion bite by the stage the foe leaves them). Round 79 (T288): a positive stage also bites when it takes the foe's
- * win away, whatever the holder's own clock (stageShields, score/boost-race.ts).
+ * Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy and
+ * evasion bite by the stage the foe leaves them). A positive stage also bites when it takes the foe's win away, whatever the
+ * holder's own clock (`stageShields`).
  */
 function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): boolean {
   const { stages } = pair;
@@ -133,11 +109,7 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
 /** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
 interface Gate { boosts: boolean; bench: boolean }
 
-/**
- * Round 79 (T288): the bench opens behind a front foe the holder wins within the horizon, and behind one that a standing
- * stage of the holder takes the win from (`shielded`: the holder holds the front with the stage standing, the foe wins
- * the race without it).
- */
+/** The bench opens behind a front foe the holder wins within the horizon, and behind one that a standing stage takes the win from (`shielded`). */
 function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace, shielded: (pair: PairRace) => boolean): Gate {
   const gate: Gate = { boosts: true, bench: true };
   for (const foe of front) {
@@ -150,7 +122,6 @@ function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (
   return gate;
 }
 
-/** The value of one holder's stages, summed over the foes each of them bites. */
 function holderBites(
   mine: Pokemon, foes: Pokemon[], removers: ReadonlySet<Pokemon>, idle: ReadonlySet<Pokemon>, battle: Battle, threat: ThreatOf,
   bodies: Bodies, hits: HitReader,

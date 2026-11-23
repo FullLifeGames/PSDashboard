@@ -1,10 +1,4 @@
-/**
- * Pure ranking math over a computed value matrix. No @pkmn/sim imports —
- * this module is safe for the main bundle, so a main-thread coordinator can
- * rank worker-computed values without pulling in the sim. The stages live
- * in ranking/: the matrix and cell helpers, the equilibrium solve, the
- * ordering, the tie groups, and the trend layers.
- */
+/** Pure ranking math over a computed value matrix, with no @pkmn/sim import so the main bundle can rank worker-computed values. */
 
 export { cellKey, reblendValue, TOP_EXPANSION } from './ranking/matrix.ts';
 export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix.ts';

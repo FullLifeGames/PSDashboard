@@ -2,14 +2,9 @@ import { toId } from '@fulllifegames/replay-core';
 import { TIER_THRESHOLDS } from './analysis.ts';
 import type { EvalResult, RankedChoice } from './types.ts';
 
-/**
- * Round 79 (T290): the replacement after a knockout, read like the lead decision of turn 0 (leads.ts) and shown as a note on the
- * card of the turn that follows. The root is the position at the open forced request: the replacing side's options are the bench
- * switches (doubles: one per forced slot, a pass where the bench cannot fill a slot), the other side waits. Nothing here grades:
- * no tier, no verdict, no input to the totals or the game report. Pure, no sim imports, main-bundle safe.
- */
+/** The replacement after a knockout, read like the lead decision of turn 0 (leads.ts) and shown as a note on the next card; nothing here grades. */
 
-/** Sweep payload of one replacement point (the `onReplacement` hook's point plus the root's result). */
+/** Sweep payload of one replacement point: the root is the open forced request, the replacing side's options are bench switches (a pass where the bench cannot fill a slot). */
 export interface ReplacementEvalData {
   /** The knockout turn; the replacement stands on the board of the next turn. */
   turn: number;
@@ -22,6 +17,7 @@ export interface ReplacementEvalData {
   played: { p1: string[]; p2: string[] };
 }
 
+/** The analysis of one side's replacement: the replay's pick against the engine's ranked options. */
 export interface ReplacementSideAnalysis {
   /** How many slots the side filled (doubles: 1 or 2). */
   slots: number;
@@ -38,6 +34,7 @@ export interface ReplacementSideAnalysis {
   options: RankedChoice[];
 }
 
+/** The analysis of one replacement point; a side with no slot to fill is null. */
 export interface ReplacementAnalysis {
   turn: number;
   ordinal: number;
@@ -54,11 +51,7 @@ const sameBody = (left: string, right: string): boolean => toId(left) === toId(r
 /** The base name of a forme (the log writes a mega-evolved body that returns as 'Mawile-Mega', the option names its set's species). */
 const sameBase = (left: string, right: string): boolean => toId(left.split('-')[0]) === toId(right.split('-')[0]);
 
-/**
- * Matches the species the replay sent in against a ranked option as an unordered set: the log names the slots in its own order,
- * the options in slot order. The first match in ranked order wins (equal values: '→ A + pass' and 'pass + → A'). The species
- * names meet exactly first, by their base name when no option meets exactly.
- */
+/** Matches the species the replay sent in against a ranked option as an unordered set; the first match wins, exact names before base names. */
 export function matchReplacementOption(options: RankedChoice[], species: string[]): RankedChoice | null {
   if (species.length === 0) return null;
   for (const same of [sameBody, sameBase]) {
@@ -86,6 +79,7 @@ function analyzeSide(data: ReplacementEvalData, side: 'p1' | 'p2'): ReplacementS
   return { slots, played, best, regret, agrees, onlyChoice: bodiesToChoose(options) <= 1, options: options.slice(0, 3) };
 }
 
+/** Reads one replacement point of the sweep into its two sides' analyses. */
 export function analyzeReplacements(data: ReplacementEvalData): ReplacementAnalysis {
   return { turn: data.turn, ordinal: data.ordinal, p1: analyzeSide(data, 'p1'), p2: analyzeSide(data, 'p2') };
 }

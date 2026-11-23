@@ -2,13 +2,8 @@ import type { EvalMatrix, EvalResult, RankedChoice } from '../types.ts';
 import { cellKey, type PvStep, type Ranked, type ValueMatrix } from './matrix.ts';
 import { solveMatrixGame, type MatrixSolution } from './solve.ts';
 
-/**
- * Ranking over a value matrix: per-side rows priced by the equilibrium,
- * the result record, the principal-variation lines, and the expansion
- * cells the deepening search chases.
- */
+/** Ranking over a value matrix: rows priced by the equilibrium, the result record, the PV lines and the expansion cells. */
 
-/** p1's rows: floor, punisher, mean, and equilibrium EV per option, ev-sorted (ties by floor). */
 function rankRows(matrix: ValueMatrix, solution: MatrixSolution, rootValue: number): RankedChoice[] {
   const { p1Options, p2Options, values } = matrix;
   return p1Options.map((option, i) => {
@@ -47,7 +42,6 @@ function rankColumns(matrix: ValueMatrix, solution: MatrixSolution, rootValue: n
         worstCase: -rootValue, expected: -rootValue, ev: -rootValue, punishedBy: null,
       };
     }
-    // p1-perspective: p2's worst case is the p1 maximum; negate into p2's own view.
     let worst = -Infinity;
     let punishedBy: string | null = null;
     let sum = 0;
@@ -67,7 +61,6 @@ function rankColumns(matrix: ValueMatrix, solution: MatrixSolution, rootValue: n
   }).sort((a, b) => b.ev - a.ev || b.worstCase - a.worstCase);
 }
 
-/** The solved matrix + mixes carried on the result for the Read lens. */
 function solvedMatrixOut(matrix: ValueMatrix, solution: MatrixSolution): EvalMatrix {
   const { p1Options, p2Options, values } = matrix;
   return {
@@ -83,9 +76,7 @@ function solvedMatrixOut(matrix: ValueMatrix, solution: MatrixSolution): EvalMat
 export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
   const { p1Options, p2Options, values } = matrix;
 
-  // The one-shot matrix game's equilibrium prices every choice: `ev` is the
-  // expected value against the opponent's mixture. The floor (worstCase)
-  // stays as the safety column — sorting goes by ev, ties by floor.
+  // `ev` is the expected value against the opponent's equilibrium mixture; `worstCase` (the floor) stays as the safety column.
   const solved = p1Options.length > 0 && p2Options.length > 0;
   const solution = solved ? solveMatrixGame(values) : { value: rootValue, p1Mix: [], p2Mix: [] };
 
@@ -114,10 +105,7 @@ export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
   };
 }
 
-/**
- * Attaches captured principal-variation lines to every ranked entry whose
- * worst-case cell was expanded by the deepening search.
- */
+/** Attaches captured PV lines to every ranked entry whose worst-case cell the deepening search expanded. */
 export function attachLines(matrix: ValueMatrix, ranked: Ranked, pvByCell: Map<number, PvStep[]>): void {
   const byChoiceP1 = new Map(matrix.p1Options.map((option, index) => [option.choice, index]));
   const byChoiceP2 = new Map(matrix.p2Options.map((option, index) => [option.choice, index]));
@@ -142,11 +130,7 @@ export function attachLines(matrix: ValueMatrix, ranked: Ranked, pvByCell: Map<n
   }
 }
 
-/**
- * The cells that decide the ranking: each side's top choices paired with
- * their punishing replies, deduped, capped. Cells whose child battle already
- * ended are exact and never worth deepening.
- */
+/** The cells that decide the ranking: each side's top choices with their punishing replies, deduped, capped; ended cells are exact and skipped. */
 export function selectExpansionCells(matrix: ValueMatrix, ranked: Ranked, cap: number): [number, number][] {
   const { p1Options, p2Options } = matrix;
   const byChoiceP1 = new Map(p1Options.map((option, index) => [option.choice, index]));

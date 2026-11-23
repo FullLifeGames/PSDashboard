@@ -1,10 +1,7 @@
 import type { EvalResult, RankedChoice } from '../types.ts';
 import { cellKey, type ValueMatrix } from './matrix.ts';
 
-/**
- * Tied leading rows: the coin-flip prefix the static ranking cannot split,
- * their decisive cells, and the one-ply probe cells the trend layers price.
- */
+/** Tied leading rows: the coin-flip prefix the static ranking cannot split, their decisive cells, and the probe cells the trend layers price. */
 
 /** Rows within this of the top EV are a coin flip the static ranking cannot split. */
 export const TIE_EPSILON = 0.02;
@@ -30,7 +27,6 @@ export interface TieRow {
   cells: [number, number][];
 }
 
-/** The ev-sorted tied prefix of one side's list within TIE_EPSILON of the top, one row per core. */
 function tiedPrefix(list: RankedChoice[]): { entry: RankedChoice; listIndex: number }[] {
   const cores = new Set<string>();
   const tied: { entry: RankedChoice; listIndex: number }[] = [];
@@ -45,18 +41,13 @@ function tiedPrefix(list: RankedChoice[]): { entry: RankedChoice; listIndex: num
   return tied;
 }
 
-/** The opponent's modal reply: the heaviest mix index (the first wins ties). */
 function modalIndex(oppMix: number[]): number {
   let modal = 0;
   oppMix.forEach((weight, index) => { if (weight > oppMix[modal]) modal = index; });
   return modal;
 }
 
-/**
- * The cells that decide a tied row: its punisher and the opponent's modal
- * reply. p1 rows fear the column MINIMUM, p2 columns fear the row MAXIMUM
- * (values are p1-perspective throughout).
- */
+/** p1 rows fear the column minimum, p2 columns the row maximum (values are p1-perspective throughout). */
 function decisiveCells(matrix: ValueMatrix, side: 'p1' | 'p2', own: number, modal: number): [number, number][] {
   const against = side === 'p1' ? matrix.values[own] : matrix.values.map(row => row[own]);
   let punish = 0;
@@ -68,12 +59,8 @@ function decisiveCells(matrix: ValueMatrix, side: 'p1' | 'p2', own: number, moda
 }
 
 /**
- * The tied leading rows per side: an ev-sorted PREFIX within TIE_EPSILON of
- * the top, each carrying its decisive cells. A gimmick variant tied with its
- * own core is NOT a stall-vs-progress question but a resource-spend one —
- * only the first row per core enters, so the plain-first convention stands.
- * Needs the solved mixes; a side whose entries cannot all be mapped back to
- * options yields no group.
+ * A gimmick variant tied with its own core is a resource-spend question, not stall-vs-progress, so only the first row per core
+ * enters (the plain-first convention). A side whose entries cannot all be mapped back to options yields no group.
  */
 export function tieGroups(matrix: ValueMatrix, result: EvalResult): TieRow[][] {
   const mixes = result.matrix?.mixes;
@@ -100,10 +87,7 @@ export function tieGroups(matrix: ValueMatrix, result: EvalResult): TieRow[][] {
   return groups;
 }
 
-/**
- * The cells whose one-ply trend the tiebreak still needs: decisive cells of
- * tied rows that are neither terminal nor already priced in `trends`.
- */
+/** The decisive cells of tied rows that are neither terminal nor already priced in `trends`. */
 export function selectTieProbeCells(
   matrix: ValueMatrix,
   result: EvalResult,
