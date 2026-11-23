@@ -1,6 +1,5 @@
-/* The turn 0 lead picker (components/LeadPanel.tsx, LeadSide.tsx) in the dock's look (round 84, A7b, ruling 12b). Its root is a dock
-   (`ps-dock ps-lead`), so the sticky or fixed foot, the status strip, the bar, the bench tiles (`.ps-dock .ps-switchbtn`, the selection
-   blue) and Execute's rules of dock.css apply as they are; only what the picker adds stands here. */
+/* The turn 0 lead picker (components/LeadPanel.tsx, LeadSide.tsx): its root is a dock (`ps-dock ps-lead`), so the dock rules of dock.css
+   apply as they are; only what the picker adds stands here. */
 
 .ps-lead-rows { display: grid; gap: 10px; min-width: 0; }
 .ps-lead-side { display: grid; gap: 8px; min-width: 0; }
@@ -22,7 +21,6 @@
   padding: 1px 7px;
   text-transform: uppercase;
 }
-/* The order of a pick (a, b, 3, 4) in the tile's flag row, in the forced badge's colors (contrast tokens of pickers.css). */
 .ps-lead-slot {
   display: inline-block;
   padding: 1px 6px;

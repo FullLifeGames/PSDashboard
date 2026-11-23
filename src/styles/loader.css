@@ -1,4 +1,4 @@
-/* Loader: the three-step guide on the replay loader screen (ReplayLoader). */
+/* Loader: the three-step guide on the replay loader screen. */
 
 .ps-loader-guide {
   display: grid;
@@ -49,8 +49,6 @@
   }
 }
 
-/* Round 84 (turn dock, Q20 a): with a replay loaded the loader is the Load button beside Setup; its panel opens under the button
-   like the Setup panel and holds the loader's body (ReplayLoader, variant menu). */
 .ps-loader-menu {
   position: relative;
   display: flex;

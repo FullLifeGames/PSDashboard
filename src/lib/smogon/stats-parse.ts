@@ -85,8 +85,8 @@ function fractionalProbabilityRows(
 }
 
 /**
- * Round 88 (F, #101): a teammate list as probability rows, sorted by share and then name. `probabilityOf` prices one raw entry;
- * four digits stay, because the stand-in step sums a few of them and the three-digit rounding of the other rows would tie them.
+ * A teammate list as probability rows, sorted by share and then name; four digits stay, because the stand-in step sums a few and
+ * three-digit rounding would tie them.
  */
 function teammateRows(
   entries: Record<string, number | string> | undefined,
@@ -157,7 +157,6 @@ function fractionalSpreadRows(
   return spreadRowsOf(numericEntries(entries), detail, normalizeFractionalProbability);
 }
 
-/** The optional field only where the file has the list: a species without one keeps the shape it had before. */
 const withTeammates = (teammates: UsageProbability[] | undefined): { teammates?: UsageProbability[] } => (teammates ? { teammates } : {});
 
 function parseDataPkmnStats(

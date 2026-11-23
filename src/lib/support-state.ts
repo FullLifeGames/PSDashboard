@@ -7,16 +7,11 @@ import { turnEntryCount } from './variation-turns';
 import { isGameId, type NewGameRecord } from './new-game/record';
 
 /**
- * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
- * report. It holds what a reproduction needs (the replay, the sets the app played with, the variation
- * with every slot choice, the viewed position, the messages on screen) and nothing beyond what the user
- * gave the app. The recorded positions of the variation stay out: they are large, and the rebuild
- * recomputes them from the choices.
- *
- * Round 89 (#105, H5): a new game has no replay to load, so its file carries the game's record in the optional `game` (the format,
- * both teams, the seed and every turn; its log is `replay.log`), and the restore opens the game from it. The version stays 1: a
- * new optional field is no break, a replay's file is the file of before to the byte, and an app that reads version 1 only meets a
- * game file at "Load the replay newgame-... first", a refusal and no misreading.
+ * The app's state as one readable file for a bug report: what a reproduction needs (the replay, the sets the app played with, the
+ * variation with every slot choice, the viewed position, the messages on screen) and nothing beyond what the user gave the app. The
+ * recorded positions of the variation stay out: they are large, and the rebuild recomputes them from the choices.
+ * A new game has no replay to load: its file carries the game's record in the optional `game`. Being optional keeps the version at 1;
+ * an app that reads version 1 only meets a game file at "Load the replay newgame-... first", a refusal and no misreading.
  */
 export const SUPPORT_STATE_KIND = 'ps-dashboard-state';
 export const SUPPORT_STATE_VERSION = 1;
@@ -39,7 +34,7 @@ export interface SupportState {
   variation: { startTurn: number | null; branching: boolean; history: SupportHistoryEntry[] };
   view: { turn: number; line: ViewLine; t0: boolean; viewingVariation: boolean; liveTip: boolean };
   choices: { draft: Choices; live: Choices };
-  /** Round 89 (#105, H5): the record of the open new game; absent for a replay (no key at all). */
+  /** The record of the open new game; absent for a replay (no key at all). */
   game?: NewGameRecord;
   /** The messages on screen when the file was written, by where they show. */
   messages: Record<string, string | null>;
@@ -95,7 +90,7 @@ export function supportStateProblem(value: unknown): string | null {
   return NOT_A_STATE;
 }
 
-/** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
+/** The viewed position as one line: its turn on the main line or in the variation, with the variation's start turn and length. */
 export function positionLabel(state: Pick<SupportState, 'view' | 'variation' | 'game'>): string {
   const { view, variation } = state;
   const turns = turnEntryCount(variation.history);
@@ -124,11 +119,9 @@ const FIELD_MAX = 600;
 const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD_MAX - 1)}…` : text);
 
 /**
- * The new-issue link with the issue form's fields filled (`.github/ISSUE_TEMPLATE/bug_report.yml`):
- * GitHub fills a form's text fields from query parameters named by their ids. The state file goes into the form's upload
- * field, which no link fills (round 88, user report 08.11.2026: the text box took no .json file). GitHub reads forms from the
- * default branch only, and without the form it opens a blank issue: the description then carries the same
- * facts (round 77, user report 28.10.2026: the issue held the title alone).
+ * The new-issue link with the issue form's fields filled (`.github/ISSUE_TEMPLATE/bug_report.yml`): GitHub fills a form's text
+ * fields from query parameters named by their ids. The state file goes into the form's upload field, which no link fills. GitHub
+ * reads forms from the default branch only, and without the form it opens a blank issue: the description then carries the same facts.
  */
 export function issueUrl(state: SupportState, fileName: string): string {
   const message = screenMessage(state);

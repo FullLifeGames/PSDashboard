@@ -1,9 +1,6 @@
-/* The turn dock (components/dock/): the chips at the foot of the replay column, the tray above them, the move tiles with their hit bars, the bench, and Execute.
-   Round 84, style 5 of the design gate (01.11.2026): the shell of the app's own buttons (.ps-btn) on dark, the type as a 4 px edge and a tag,
-   the selection in a darker .ps-btn blue (white and the tile's light texts read at 4.5 : 1 on it), the open chip in --ps-accent-warm, Execute in the .ps-btn-red gradient. The colors of the move tile's texts are
-   the tokens of pickers.css (test/regression/move-tile-contrast.spec.ts). The narrow windows (1050 px and 640 px) close the file. */
+/* The turn dock (components/dock/): chips, tray, move tiles with hit bars, bench and Execute. The colors of the move tile's texts are the
+   tokens of pickers.css (test/regression/contrast.spec.ts). The narrow windows (1050 px and 640 px) close the file. */
 
-/* ── The dock ── */
 .ps-dock {
   position: sticky;
   bottom: 0;
@@ -20,7 +17,7 @@
   align-items: baseline;
   font-size: 10px;
   color: var(--ps-muted);
-  /* Round 84, A4: opaque like the bar, so the column's text does not show through the sticky dock. */
+  /* Opaque like the bar, so the column's text does not show through the sticky dock. */
   background: var(--ps-bg-deep);
   padding: 3px 10px;
   border-radius: 8px 8px 0 0;
@@ -28,21 +25,20 @@
 .ps-dock-status:empty { display: none; }
 .ps-dock-status .ps-force-switch-note { margin: 0; padding: 2px 8px; font-size: 10px; }
 .ps-dock-status .ps-choice-error { margin: 0; flex: 1 0 100%; }
-/* Round 89 (#153, HM-2): the note "Opponent reads your move" and its "Turn off" button, the size of the Open matrix button; they wrap with the strip and never push the chips. */
 .ps-dock-status .ps-dock-turn-off { padding: 0 6px; font-size: 10px; line-height: 1.5; }
 
 .ps-dock-anchor { position: relative; }
 
 .ps-dock-bar {
   display: grid;
-  /* Round 84 (A6d): a fixed Execute column, so its label ("Select all active choices", "Waits for engine…") never changes a chip's width. */
+  /* A fixed Execute column, so its label ("Select all active choices", "Waits for engine…") never changes a chip's width. */
   grid-template-columns: minmax(0, 1fr) 150px;
   gap: 8px;
   padding: 8px 10px;
   background: linear-gradient(180deg, #26395c 0%, #18253e 100%);
   border: 1px solid rgba(183, 216, 255, 0.22);
-  /* Round 84 (A7a, ruling 4a): the dock follows the column's content now, so the bar is closed on all four sides; below 1050 px the dock
-     stands at the viewport's edge again and keeps its open bottom. */
+  /* The dock follows the column's content, so the bar is closed on all four sides; below 1050 px the dock stands at the viewport's edge
+       and keeps its open bottom. */
   border-radius: 10px;
   box-shadow: 0 -8px 22px rgba(6, 12, 24, 0.3);
 }
@@ -55,7 +51,6 @@
   gap: 8px;
 }
 
-/* ── A slot's chip ── */
 .ps-dock-chip {
   min-width: 0;
   display: grid;
@@ -65,8 +60,8 @@
   align-content: center;
   align-items: center;
   text-align: left;
-  /* Round 84 (A7b, ruling 8a): the tile's 4 px type edge on the left for every chip (the plain border color while nothing is
-     chosen), so the box does not change when a choice lands; the 8 px padding after it keeps the content where it stood. */
+  /* The tile's 4 px type edge on the left for every chip (the plain border color while nothing is chosen), so the box does not change
+       when a choice lands; the 8 px padding after it keeps the content where it stood. */
   padding: 4px 10px 4px 8px;
   border: 1px solid rgba(183, 216, 255, 0.22);
   border-left: 4px solid var(--type, rgba(183, 216, 255, 0.22));
@@ -78,7 +73,6 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: filter 0.15s;
 }
-/* The type tag or the incoming body's sprite stands at the right across both lines; the pick line keeps the middle column. */
 .ps-dock-chip[data-aside="true"] { grid-template-columns: auto minmax(0, 1fr) auto; }
 .ps-dock-aside { grid-column: 3; grid-row: 1 / 3; display: flex; align-items: center; }
 .ps-dock-sprite { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
@@ -112,8 +106,8 @@
   white-space: nowrap;
 }
 .ps-dock-chip[data-empty="true"] .ps-dock-pick { color: var(--ps-tile-sub); font-style: italic; font-weight: normal; }
-/* Round 84, A6a: the placeholder of a slot the engine has not filled. The pick line keeps its 16 px box; only a bar shows in it, and the
-   text inside it clips as always, so the chip's size never depends on what lands. */
+/* The placeholder of a slot the engine has not filled: only a bar shows in the pick line's 16 px box, and the text inside it clips, so
+   the chip's size never depends on what lands. */
 .ps-dock-pick[data-wait="busy"] {
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.05);
@@ -143,7 +137,6 @@
   vertical-align: middle;
 }
 
-/* ── Execute (scoped: the turn 0 lead picker has its own .ps-execute-btn in pickers.css) ── */
 .ps-dock .ps-execute-btn {
   align-self: stretch;
   width: 100%;
@@ -158,7 +151,6 @@
 .ps-dock .ps-execute-btn-ready { background: linear-gradient(180deg, #b04552 0%, #8a2937 100%); border-color: #7c2937; }
 .ps-dock .ps-execute-btn:hover:not(:disabled) { transform: none; filter: brightness(1.1); }
 
-/* ── The tray ── */
 .ps-tray {
   position: absolute;
   bottom: 100%;
@@ -177,7 +169,6 @@
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
   scrollbar-width: thin;
 }
-/* The dice are the one part that may grow the tray. */
 .ps-tray-roomy { max-height: min(560px, calc(70 * var(--ps-vh))); }
 .ps-tray-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .ps-tray-title { font-size: 12px; }
@@ -199,7 +190,6 @@
 .ps-tray-block .ps-custom-choice { margin-top: 0; }
 .ps-tray-hint { color: var(--ps-switch-sub); font-size: 11px; }
 
-/* ── The dice table (round 84, A4): a column per target, a row per kind of die ── */
 .ps-dice.ps-dice-table {
   display: grid;
   grid-template-columns: max-content repeat(var(--dice-cols, 1), minmax(0, 1fr));
@@ -214,7 +204,6 @@
 .ps-dice-table .ps-dice-wide { grid-column: 1 / -1; }
 .ps-dice-turn .ps-tray-label { display: block; margin-bottom: 2px; }
 
-/* ── Move tiles (style 5) ── */
 .ps-tile-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .ps-movebtn {
   position: relative;
@@ -286,7 +275,6 @@
 .ps-tile-bar-ko { color: var(--ps-tile-ko); font-weight: bold; }
 .ps-tile-none { color: var(--ps-tile-sub); font-size: 10px; }
 
-/* ── Hit bars (variant F): grey stays, the roll's striped part and the lowest roll's part take the hit's tone ── */
 .ps-hitbar {
   display: flex;
   box-sizing: border-box;
@@ -324,7 +312,6 @@
 .ps-legend-roll-yellow { background: repeating-linear-gradient(135deg, #e0c000 0 2px, rgba(224, 192, 0, 0.3) 2px 4px); }
 .ps-legend-roll-red { background: repeating-linear-gradient(135deg, #e02020 0 2px, rgba(224, 32, 32, 0.3) 2px 4px); }
 
-/* ── Targets ── */
 .ps-target-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; }
 .ps-target-btn {
   display: grid;
@@ -356,9 +343,8 @@
 .ps-target-btn-selected .ps-target-hp,
 .ps-target-btn-selected .ps-target-meta { color: #ffffff; }
 
-/* ── The bench (scoped: the lead picker shares the base .ps-switchbtn rules of pickers.css) ── */
-/* Round 84 (A7b): the played and engine badges stand in the tile's flag row on its top edge (`.ps-tile-flags`, out of the flow), so a
-   badge never changes a bench tile's box; the 10 px between the rows keeps the flags of one row off the tiles of the row above. */
+/* The played and engine badges stand in the tile's flag row on its top edge (`.ps-tile-flags`, out of the flow), so a badge never
+   changes a bench tile's box; the 10 px between the rows keeps the flags of one row off the tiles of the row above. */
 .ps-switch-row { display: flex; flex-wrap: wrap; gap: 10px 6px; }
 .ps-dock .ps-switchbtn { position: relative; padding: 4px 10px 4px 5px; border-color: rgba(183, 216, 255, 0.18); }
 .ps-dock .ps-switchbtn-selected {
@@ -372,14 +358,12 @@
 .ps-dock .ps-switchbtn-selected .ps-switchbtn-hp { color: #ffffff; }
 .ps-switch-hp-track { display: block; width: 60px; height: 4px; margin-top: 0; }
 
-/* The Raw Protocol Log toggle sits directly above the dock, in the column's flow: both follow the last panel (round 84, A7a, ruling 4a;
-   a `margin-top: auto` here pushed them to the foot of a tall window and left a gap under the timeline). The dock stays sticky at the
-   column's foot when the content is longer than the window. */
+/* The Raw Protocol Log toggle sits directly above the dock, in the column's flow: a `margin-top: auto` here pushed them to the foot of a
+   tall window and left a gap under the timeline. The dock stays sticky at the column's foot when the content is longer than the window. */
 
-/* ── Narrow windows (round 84, A6b) ──
-   At 1050 px the layout stacks (layout.css): the dock stands fixed at the viewport's lower edge across the full width, so the chips
-   stay in reach while the page scrolls. useDockHeight writes the dock's height as --ps-dock-h on the root element; the page pads by
-   it and the tray, a sheet of up to 70 % of the viewport, stands on top of the dock. Execute takes its own row under the chips. */
+/* At 1050 px the layout stacks (layout.css): the dock stands fixed at the viewport's lower edge across the full width. useDockHeight
+   writes the dock's height as --ps-dock-h on the root element; the page pads by it and the tray, a sheet of up to 70 % of the viewport,
+   stands on top of the dock. Execute takes its own row under the chips. */
 @media (max-width: 1050px) {
   .ps-app-root { padding-bottom: calc(16px + var(--ps-dock-h, 0px)); }
   .ps-dock {
@@ -404,15 +388,14 @@
   }
 }
 
-/* At 640 px the chips take one row each (round 84, A7c, ruling 11a: two a row cut the choice after about twelve letters at 390 px):
-   doubles four rows, singles two. The rows keep the dock's 46 px; the chips take the app's 640 px control sizes (layout.css gives its
-   buttons 40 px). useDockHeight follows the taller dock. */
+/* At 640 px the chips take one row each (two a row cut the choice after about twelve letters at 390 px): doubles four rows, singles
+   two. The rows keep the dock's 46 px; the chips take the app's 640 px control sizes (layout.css gives its buttons 40 px). */
 @media (max-width: 640px) {
   .ps-dock-rows { grid-auto-rows: auto; }
   .ps-dock-row { grid-template-columns: minmax(0, 1fr); grid-auto-rows: 46px; }
   .ps-dock-chip { min-height: 40px; }
   .ps-dock .ps-execute-btn { min-height: 40px; }
   .ps-tray { width: 100%; }
-  /* Round 84 (A6c): four tiles a row left about 80 px at 390 px and cut "Rock Slide"; two a row leave about 170. */
+  /* Four tiles a row left about 80 px at 390 px and cut "Rock Slide"; two a row leave about 170. */
   .ps-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

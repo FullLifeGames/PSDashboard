@@ -1,6 +1,5 @@
-/* Layout: the loaded-replay workspace (app root, the two columns, the top bar, the replay frame, the branch bar shell) and the breakpoints that stack it (ReplayWorkspace, AppTopBar, TimelineBar, WorkspaceEvalColumn). */
+/* Layout: the loaded-replay workspace (app root, the two columns, the top bar, the replay frame, the branch bar shell) and the breakpoints that stack it. */
 
-/* ── App layout ── */
 .ps-app-root {
   max-width: 1400px;
   margin: 0 auto;
@@ -10,9 +9,8 @@
   flex-direction: column;
 }
 
-/* Round 84 (A7b, ruling 9a): one grid row for both columns. Its height is the left column's content (the dock's foot), capped at the
-   layout's own height (`--ps-layout-h`, written by `useLayoutHeight`); the right column adds nothing to it (`contain: size`) and
-   ends on the same line. */
+/* One grid row for both columns. Its height is the left column's content (the dock's foot), capped at the layout's own height
+   (`--ps-layout-h`, written by `useLayoutHeight`); the right column adds nothing to it (`contain: size`) and ends on the same line. */
 .ps-main-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
@@ -30,9 +28,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  /* Round 84 (A7c): no padding below the dock; the shared grid row would end below its foot and the right column with it. */
-  /* Breathing room against the column's own scrollbar (the Advanced
-     button sat flush under it — overlay scrollbars cover ~10px). */
+  /* No padding below the dock: the shared grid row would end below its foot and the right column with it. */
+  /* Breathing room against the column's own scrollbar (overlay scrollbars cover about 10 px and the Advanced button sat flush under it). */
   padding-right: 10px;
 }
 
@@ -58,15 +55,14 @@
   border-radius: 7px 7px 0 0;
   padding: 4px 10px;
   gap: 4px 8px;
-  /* Round 77: where the support links do not fit beside a live branch's status, they take a line of their own. */
   flex-wrap: wrap;
 }
-/* Round 84 (A7f, ruling 19a): the bar stays on one line with a long format name. The match takes what the actions and the support
-   links leave (a zero basis, so its text never forces the wrap) and wraps only below a floor that holds the shortened tag and both
-   shortened names. Inside it the format tag shrinks first (a weight far above the names'), the names next; each clips with an
-   ellipsis and carries its full text in a title. The floor sits on a selector the stacked layout's `.ps-topbar > div` cannot beat. */
+/* The bar stays on one line with a long format name. The match takes what the actions and the support links leave (a zero basis, so
+   its text never forces the wrap) and wraps only below a floor that holds the shortened tag and both shortened names. Inside it the
+   format tag shrinks first (a weight far above the names'), the names next; each clips with an ellipsis and carries its full text in a
+   title. The floor sits on a selector the stacked layout's `.ps-topbar > div` cannot beat. */
 .ps-topbar-match {
-  /* Round 84 (A7c): in the stylesheet, so the 640 px block can give the match a line of its own. */
+  /* In the stylesheet, so the 640 px block can give the match a line of its own. */
   flex: 1 1 0;
   overflow: hidden;
 }
@@ -96,8 +92,8 @@
   white-space: nowrap;
 }
 
-/* Round 77 (user request 28.10.2026): one row. The branch status and the Setup menu sit between the match and the support
-   links; a long divergence notice shortens with an ellipsis and keeps its full text in the title. */
+/* One row: the branch status and the Setup menu sit between the match and the support links; a long divergence notice shortens with an
+   ellipsis and keeps its full text in the title. */
 .ps-topbar-actions {
   display: flex;
   gap: 6px;
@@ -114,7 +110,6 @@
 }
 .ps-setup-menu {
   position: relative;
-  /* A flex box, so the button sits in the middle of the row instead of on a text baseline. */
   display: flex;
   align-items: center;
 }
@@ -148,7 +143,6 @@
   font-size: 11px;
   color: #aabbcc;
 }
-/* Round 84 (T315, A7d): the Size select of the app's scale. Round 89 (ruling 49): Depth and Samples (SearchSelects) use the same row. */
 .ps-setup-size,
 .ps-setup-row {
   display: flex;
@@ -169,7 +163,6 @@
   border-radius: 4px;
 }
 
-/* The winner of an ended variation, where the pickers were. */
 .ps-branch-ended {
   margin-top: 6px;
   padding: 6px 10px;
@@ -198,9 +191,9 @@
   min-width: 0;
 }
 
-/* Round 88 (T345, #81): the bar wraps at every width, so the slider keeps its 200 px (timeline.css) and the line chip with
-   Discard variation (one wrapper) take a second row below it. The bar centres its items in every query: the 1050 px query used to hang
-   them from the top of the row, which put the slider 6 px (9 px with a variation) above the step buttons. */
+/* The bar wraps at every width, so the slider keeps its 200 px (timeline.css) and the line chip with Discard variation (one wrapper)
+   take a second row below it. The bar centres its items in every query: hanging them from the top of the row put the slider 6 px
+   (9 px with a variation) above the step buttons. */
 .ps-branch-bar {
   flex: 0 0 auto;
   display: flex;
@@ -216,7 +209,6 @@
   box-shadow: 0 6px 16px rgba(6,12,24,0.16);
 }
 
-/* The 900px breakpoint left 901–1050px cramped (G22) — stack earlier. */
 @media (max-width: 1050px) {
   .ps-app-root {
     height: auto;
@@ -254,8 +246,8 @@
 }
 
 @media (max-width: 640px) {
-  /* Round 84 (A7c, ruling 11a): two lines at most. The match takes the first, the menus and the support links share the second
-     (the name of the app is left out; the links keep their words). A long divergence notice shortens with its ellipsis. */
+  /* Two lines at most: the match takes the first, the menus and the support links share the second (the name of the app is left out; the
+       links keep their words). A long divergence notice shortens with its ellipsis. */
   .ps-topbar {
     align-items: center;
     flex-direction: row;
@@ -265,9 +257,8 @@
     flex: 1 0 100%;
   }
   .ps-topbar > .ps-topbar-actions {
-    /* Round 89 (FB-1): the basis is the actions' own width, not zero. With a zero basis the support links took their width first and
-       the status ("Branching · Turn 33"), Game and Setup ran over "Report issue"; now the links wrap to a third line when both do
-       not fit one. */
+    /* The basis is the actions' own width, not zero: with a zero basis the support links took their width first and the status
+           ("Branching · Turn 33"), Game and Setup ran over "Report issue"; now the links wrap to a third line when both do not fit one. */
     flex: 1 1 auto;
     flex-wrap: nowrap;
     min-width: 0;
@@ -278,8 +269,8 @@
     white-space: nowrap;
     gap: 8px;
   }
-  /* Round 88 (#107): the Setup panel spans the bar like the Load panel (loader.css): the button stands at the left of a wrapped row,
-     and a panel anchored at its right edge ran past the window's left edge. */
+  /* The Setup panel spans the bar like the Load panel (loader.css): the button stands at the left of a wrapped row, and a panel
+       anchored at its right edge ran past the window's left edge. */
   .ps-topbar { position: relative; }
   .ps-setup-menu { position: static; }
   .ps-setup-panel { left: 0; right: 0; }
@@ -290,5 +281,5 @@
     min-height: 40px;
     min-width: 40px;
   }
-  /* Round 84 (A7c, ruling 10a): the replay document fits itself to the frame's width (replay-phone.ts): no minimum width, no sideways scroll. */
+  /* The replay document fits itself to the frame's width (replay-phone.ts): no minimum width, no sideways scroll. */
 }

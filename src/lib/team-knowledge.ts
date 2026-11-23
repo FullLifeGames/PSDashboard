@@ -3,10 +3,8 @@ import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import { INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, type OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 /**
- * Guessed-item mons + their usage-plausible alternatives — the search
- * space for the sensitivity probes (flagged-verdict honesty). An item the
- * move order inferred is not probed (its alternatives contradict the
- * evidence), and a dropped Scarf stays dropped among the alternatives.
+ * Guessed-item mons and their usage-plausible alternatives, the search space for the sensitivity probes. An item the move order
+ * inferred is not probed (its alternatives contradict the evidence), and a dropped Scarf stays dropped among the alternatives.
  */
 export function buildSensitivityTargets(
   info: OpponentTeamInfo | null,

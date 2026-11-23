@@ -1,10 +1,9 @@
 import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
 /**
- * Round 89 (T9c): the sets a user saved in the team editor of a replay survive a reload. One record per replay holds the saved
- * infos whole, as the editor wrote them (the form the state file of `Report issue` stores): a reload shows exactly what the session
- * showed. The record leaves the page's memory, so it carries a version; a record of another version is left in storage and ignored,
- * and the app keeps reading version 1. The import text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
+ * The sets a user saved in the team editor of a replay survive a reload: one record per replay holds the saved infos whole. The
+ * record leaves the page's memory, so it carries a version; a record of another version is left in storage and ignored. The import
+ * text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
  */
 
 export const TEAM_EDITS_VERSION = 1;
@@ -12,13 +11,11 @@ export const TEAM_EDITS_VERSION = 1;
 export const teamEditsKey = (replayId: string): string => `ps-replay-interceptor:edits:${replayId}`;
 const importKey = (replayId: string): string => `ps-replay-interceptor:sets:${replayId}`;
 
-/** The saved sides: a side the user never edited is null and reads fresh from the inference. */
 export interface TeamEdits {
   p1: OpponentTeamInfo | null;
   p2: OpponentTeamInfo | null;
 }
 
-/** A readable team: an object whose bodies carry the fields the panels and the build read. */
 function isTeam(value: unknown): value is OpponentTeamInfo {
   if (typeof value !== 'object' || value === null || !Array.isArray((value as OpponentTeamInfo).pokemon)) return false;
   return (value as OpponentTeamInfo).pokemon.every(mon =>
@@ -37,7 +34,6 @@ function fits(saved: OpponentTeamInfo | null, shown: OpponentTeamInfo): boolean 
   return shown.pokemon.every(mon => species.has(mon.species));
 }
 
-/** Writes the replay's saved edit. A store that refuses the write (full or blocked) leaves the edit for this session only. */
 export function saveTeamEdits(replayId: string, edits: TeamEdits): void {
   try {
     localStorage.setItem(teamEditsKey(replayId), JSON.stringify({ version: TEAM_EDITS_VERSION, ...edits }));
@@ -65,7 +61,6 @@ export function loadTeamEdits(replayId: string, inferred: { p1: OpponentTeamInfo
   }
 }
 
-/** The text of the last sets import of a replay, or null for none (or a blocked store). */
 export function readImportText(replayId: string): string | null {
   try {
     return localStorage.getItem(importKey(replayId));

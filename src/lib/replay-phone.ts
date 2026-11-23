@@ -1,28 +1,23 @@
 /**
- * Round 84 (T315, A7c, ruling 10a): the replay document on a phone. Showdown's embed lays the battle out at 640 px (642 with its
- * border) with the log beside it, so a frame narrower than that showed the left 366 px of the battle at 390 px and cut the opponent's
- * side, the log and the Music control. Where the frame is narrower than the battle, the document shrinks the scene to the frame's
- * width (a transform; the negative margin below it lets the height follow), and the controls and the log stand under it at their
- * own size. The document decides by its own width, so the exported page behaves the same in a phone browser; the app follows the
- * document's height with `followContentHeight` (replay-frame-height.ts).
+ * The replay document on a phone: Showdown's embed lays the battle out at 640 px (642 with its border) with the log beside it, so a
+ * narrower frame cut the opponent's side, the log and the Music control. Where the frame is narrower, the document shrinks the scene
+ * to the frame's width and stands the controls and the log under it. It decides by its own width; the app follows its height
+ * with `followContentHeight` (replay-frame-height.ts).
  */
 
 /** The battle's box in the embed: 640 x 360 plus the 1 px border on each side. */
 export const PHONE_BATTLE = { width: 642, height: 362 } as const;
 
-/** A frame narrower than this is a phone frame. */
 export const PHONE_BREAKPOINT = PHONE_BATTLE.width;
 
-/** The class the document's root takes in phone mode, and the property that holds the scene's scale. */
 export const PHONE_CLASS = 'ps-phone';
 export const PHONE_SCALE_PROPERTY = '--ps-k';
 
 /**
- * Round 84 (A7e): the scale is the frame's width over the battle's border box (642 px), with no inset. The 1.1 px overshoot of A7c and
- * A7d was Showdown's own scaling, not a rounding: `Battle.onResize` (battle.js, with `autoresize` on) writes an inline
- * `transform: scale(width / 640)` and `margin-bottom` on the battle frame whenever the window is under 640 px, and an inline style beats
- * a plain rule, so the document drew the scene at 642 x width / 640 = 363.1 px in a 362 px frame whatever `--ps-k` said. The two
- * declarations below carry `!important`, which beats the inline ones, so `--ps-k` decides.
+ * The scale is the frame's width over the battle's border box (642 px), with no inset. `Battle.onResize` (battle.js, `autoresize` on)
+ * writes an inline `transform: scale(width / 640)` and `margin-bottom` on the battle frame whenever the window is under 640 px, and an
+ * inline style beats a plain rule: the scene drew at 642 x width / 640 = 363.1 px in a 362 px frame. The two declarations below carry
+ * `!important`, which beats the inline ones, so `--ps-k` decides.
  */
 export const PHONE_STYLES = `<style>
 html.${PHONE_CLASS} .wrapper.replay-wrapper{display:flex;flex-direction:column;padding-top:0 !important;margin-top:0;}

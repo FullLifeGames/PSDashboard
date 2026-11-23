@@ -5,12 +5,7 @@ import type {
 } from '@fulllifegames/replay-core';
 import type { ReplacementPoint, RollSelector, SimFastLever, SimFastReport, TurnAlignmentRecord } from '@fulllifegames/eval-engine';
 
-/**
- * The replay-side jobs the app hands to a worker (round 38): the spread
- * solve and the replay reconstruction, the two synchronous multi-second
- * computations that used to freeze the page. Every field is plain data —
- * the messages cross the worker boundary by structured clone.
- */
+/** The replay-side jobs the app hands to a worker (spread solve, reconstruction); every field is plain data (structured clone). */
 
 export interface SolveSpreadsJob {
   log: string;
@@ -32,22 +27,20 @@ export interface ReconstructJob {
   /** Per-turn snapshots (snapshots[turn - 1]); the target and every captured boundary correct from them. */
   snapshots: TurnSnapshot[];
   playerNames?: [string, string];
-  /** Damage record for the choice-lock context. */
   observations: DamageObservation[];
-  /** Round 89 (#124): `guessed` counts the trailing names of each list that are guesses (a short side's world). */
+  /** `guessed` counts the trailing names of each list that are guesses (a short side's world). */
   bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null;
   /**
-   * 'replay': the protocol's choices up to targetTurn with per-boundary
-   * healing, choice locks, and position capture (Evaluate, the sweep, a
-   * branch at turn N). 'lead': a fresh game to turn 1 with `leadOverride`
-   * (a turn-0 variation) — no snapshot corrections, no locks, no capture.
+   * 'replay': the protocol's choices up to targetTurn with per-boundary healing, choice locks and position capture (Evaluate, the
+   * sweep, a branch at turn N). 'lead': a fresh game to turn 1 with `leadOverride` (a turn-0 variation), without corrections,
+   * locks or capture.
    */
   mode: 'replay' | 'lead';
   leadOverride?: { p1: string[] | null; p2: string[] | null };
-  /** Round 89 (#105): the dice seed of a new game's lead job; absent for every replay (the default seed). */
+  /** The dice seed of a new game's lead job; absent for every replay (the default seed). */
   seed?: string;
   deadlineMs?: number;
-  /** Round 79 (T290): hand out the open replacement requests of the knockouts too (the sweep asks; other jobs skip the cost). */
+  /** Hand out the open replacement requests of the knockouts too (the sweep asks; other jobs skip the cost). */
   replacements?: boolean;
 }
 
@@ -68,8 +61,8 @@ export interface ReconstructOutcome {
 }
 
 /**
- * Round 86 (T304): the copy of a turn with the biggest roll's die turned over, played where the simulator is loaded. The job carries the
- * turn's start position (the sweep's boundary), the replay's log and the roll the report names; the worker finds the die in the log.
+ * The copy of a turn with the biggest roll's die turned over, played where the simulator is loaded. The worker finds the die in the
+ * log from the turn's start position (the sweep's boundary) and the roll the report names.
  */
 export interface RolledCopyJob {
   format: string;

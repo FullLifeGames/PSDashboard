@@ -17,10 +17,8 @@ export interface ReplayBuildSources {
 }
 
 /**
- * Names every option the builder knows, so a new one fails the type check
- * here until both blocks below have decided about it. The builder reads
- * several options by presence (`observations?.length`, `inferredSpreads`),
- * so a key a block leaves undefined is dropped instead of passed along.
+ * Names every option the builder knows, so a new one fails the type check here until both blocks below have decided about it. The
+ * builder reads several options by presence (`observations?.length`, `inferredSpreads`), so a key a block leaves undefined is dropped.
  */
 function passed<T>(block: Record<keyof T, unknown>): T {
   return Object.fromEntries(Object.entries(block).filter(([, value]) => value !== undefined)) as T;
@@ -55,8 +53,7 @@ export function replayBuildOptions(
     setAssumptions: sources.setAssumptions,
     inferredSpreads,
     hpEvidence: sources.hpEvidence,
-    // The solved spreads replace the raw evidence: the builder must not
-    // solve a second time from observations and speed orders.
+    // The solved spreads replace the raw evidence: the builder must not solve a second time.
     observations: undefined,
     speedOrders: undefined,
     randomSets: undefined,

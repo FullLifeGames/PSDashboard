@@ -1,8 +1,4 @@
-/**
- * Generates a standalone PS replay HTML page from a battle log string.
- * The generated HTML loads replay-embed.js from play.pokemonshowdown.com
- * which handles all rendering, animations, and playback controls.
- */
+/** Generates a standalone PS replay HTML page from a battle log; replay-embed.js from play.pokemonshowdown.com renders and plays it. */
 
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 import { tableSwapScript } from './teambuilder-table';
@@ -28,12 +24,9 @@ body{padding:0 0 12px;background:#344b6c;}
 </style>`;
 
 /**
- * Showdown's route table (play.pokemonshowdown.com/config/config.js). The
- * embed loader appends its dependencies as dynamic scripts, which run in
- * any order, and battledata.js reads `window.Config ? Config.routes.client
- * : default` at load time: a predefined Config WITHOUT routes crashes it
- * before Dex exists. Our mute stub therefore carries the routes; config.js
- * keeps its own when it has already run.
+ * Showdown's route table (play.pokemonshowdown.com/config/config.js). The embed loader appends its dependencies as scripts that
+ * run in any order, and battledata.js reads `Config.routes.client` at load time: a predefined Config without routes crashes it
+ * before Dex exists. The mute stub therefore carries the routes; config.js keeps its own when it has already run.
  */
 const PS_CONFIG_DEFAULTS = "{routes: {root: 'pokemonshowdown.com', client: 'play.pokemonshowdown.com', "
   + "dex: 'dex.pokemonshowdown.com', replays: 'replay.pokemonshowdown.com', users: 'pokemonshowdown.com/users', "
@@ -255,10 +248,8 @@ const TURN_TRACKER_SCRIPT = `
 </script>`;
 
 /**
- * The replay frame's height: the embed's battle, its two control rows and the body's bottom padding (445 px)
- * with a few pixels to spare for font rendering, so the document never scrolls (round 77, user request 28.10.2026:
- * the title under the controls went, and the frame shrank to its content). layout.css repeats it as the frame's
- * min-height; test/regression/replay-html.spec.ts holds the two equal.
+ * The replay frame's height: the embed's battle, its two control rows and the body's bottom padding (445 px) plus a few pixels for
+ * font rendering, so the document never scrolls. layout.css repeats it as the frame's min-height; replay-html.spec.ts holds them equal.
  */
 export const REPLAY_FRAME_HEIGHT = 456;
 
@@ -271,15 +262,14 @@ export function generateReplayHtml(opts: {
   seekTurn?: number;
   autoPlay?: boolean;
   reportTurn?: boolean;
-  /** Round 88 (T316): reports the side the frame shows near (`ps-side`), for the dock's row order. */
+  /** Reports the side the frame shows near (`ps-side`), for the dock's row order. */
   reportSide?: boolean;
-  /** Round 88 (T316): hides Color scheme and Music (replay-controls.ts). */
+  /** Hides Color scheme and Music (replay-controls.ts). */
   hideChoosers?: boolean;
-  /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
+  /** Viewer perspective: 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
-  /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
   fontAwesomeWoff2Url?: string;
-  /** Round 85 (T318): the script of the teambuilder table's part a replay reads, loaded in place of Showdown's file (teambuilder-table.ts). */
+  /** The script of the teambuilder table's part a replay reads, loaded in place of Showdown's file (teambuilder-table.ts). */
   teambuilderTableUrl?: string;
 }): string {
   const {
@@ -287,13 +277,11 @@ export function generateReplayHtml(opts: {
     reportTurn = false, reportSide = false, hideChoosers = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
-  // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
 
-  // Round 77 (user report 28.10.2026): graphics.js prefixes the effect sprites (Stealth Rock, Spikes, the move
-  // animations) with Dex.fxPrefix only when Dex already exists, and the embed runs its scripts in any order.
-  // A sprite left as "rock1.png" has no base in a blob document: the base names the folder the prefix names.
-  // The title lives in <title> only (user request 28.10.2026): shown under the controls it scrolled the frame.
+  // graphics.js prefixes the effect sprites (Stealth Rock, Spikes, the move animations) with Dex.fxPrefix only when Dex already
+  // exists, and the embed runs its scripts in any order. A sprite left as "rock1.png" has no base in a blob document: the <base>
+  // names the folder the prefix names. The title lives in <title> only: shown under the controls it scrolled the frame.
   return `<!DOCTYPE html>
 <meta charset="utf-8" />
 <base href="https://play.pokemonshowdown.com/fx/">
@@ -315,17 +303,13 @@ ${teambuilderTableUrl ? `${tableSwapScript(teambuilderTableUrl)}\n` : ''}${EMBED
 ${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}${sideTrackerScript(reportSide, viewpoint)}`;
 }
 
-/**
- * Creates a blob URL from HTML content for use in iframes.
- */
+/** Creates a blob URL from HTML content for use in iframes. */
 export function createBlobUrl(html: string): string {
   const blob = new Blob([html], { type: 'text/html' });
   return URL.createObjectURL(blob);
 }
 
-/**
- * Revokes a previously created blob URL.
- */
+/** Revokes a blob URL made by createBlobUrl. */
 export function revokeBlobUrl(url: string): void {
   if (url.startsWith('blob:')) {
     URL.revokeObjectURL(url);

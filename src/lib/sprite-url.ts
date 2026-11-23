@@ -2,13 +2,10 @@ import { toID } from '@pkmn/dex';
 import { dexOf, type GameRules } from '@fulllifegames/replay-core';
 
 /**
- * Builds play.pokemonshowdown.com sprite URLs. PS names sprite files after
- * the species ID of the base species plus the forme ID: every hyphen of the
- * base name goes ("Ting-Lu" → tinglu.png), the one before the forme stays,
- * and the forme loses its own ("Rotom-Wash" → rotom-wash.png,
- * "Urshifu-Rapid-Strike" → urshifu-rapidstrike.png). The Dex of the replay's
- * generation and mod (round 75, T160) says where the base name ends; cosmetic
- * formes keep their forme (gastrodon-east.png).
+ * Builds play.pokemonshowdown.com sprite URLs. PS names sprite files after the species ID of the base species plus the forme ID:
+ * every hyphen of the base name goes ("Ting-Lu" → tinglu.png), the one before the forme stays, and the forme loses its own
+ * ("Urshifu-Rapid-Strike" → urshifu-rapidstrike.png). The Dex of the replay's generation and mod says where the base name ends;
+ * cosmetic formes keep their forme (gastrodon-east.png).
  */
 function speciesSpriteId(name: string, rules: GameRules): string | null {
   const species = dexOf(rules).species.get(name);
@@ -18,7 +15,7 @@ function speciesSpriteId(name: string, rules: GameRules): string | null {
 }
 
 export function spriteUrl(species: string, rules: GameRules): string {
-  // "Greninja-*" (unrevealed forme) falls back to the base sprite (B19).
+  // "Greninja-*" (unrevealed forme) falls back to the base sprite.
   const name = species.replace(/-*$/, '');
   const id = speciesSpriteId(name, rules) ?? name
     .toLowerCase()
@@ -29,8 +26,8 @@ export function spriteUrl(species: string, rules: GameRules): string {
 }
 
 /**
- * Round 89 (FB-1): the sprite of the base species for a forme whose own file the folder lacks (Dragalge-Mega has none), read from the
- * Dex's `baseSpecies`; null for a base species, an unknown name or a base whose file name is the forme's own.
+ * The sprite of the base species for a forme whose own file the folder lacks (Dragalge-Mega has none); null for a base species, an
+ * unknown name or a base whose file is the forme's own.
  */
 export function baseSpriteUrl(species: string, rules: GameRules): string | null {
   const known = dexOf(rules).species.get(species.replace(/-*$/, ''));

@@ -5,7 +5,7 @@ import type {
   ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobResponse, RolledCopyJob, RolledCopyOutcome, SolveSpreadsJob,
 } from './types';
 
-/** The slice of the Worker interface the client uses — a test hands in a fake. */
+/** The slice of the Worker interface the client uses; a test hands in a fake. */
 export interface WorkerLike {
   postMessage(message: ReplayJobRequest): void;
   terminate(): void;
@@ -16,7 +16,7 @@ export interface WorkerLike {
 export interface ReconstructHandlers {
   onProgress?(turn: number, target: number): void;
   onPosition?(turn: number, serialized: string): void;
-  /** Round 79 (T290): an open replacement request of a knockout, serialized as the player faced it. */
+  /** An open replacement request of a knockout, serialized as the player faced it. */
   onReplacement?(point: ReplacementPoint, serialized: string): void;
 }
 
@@ -33,12 +33,9 @@ const spawnWorker = (): WorkerLike =>
   new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' }) as unknown as WorkerLike;
 
 /**
- * One worker for the replay jobs (spread solve, reconstruction), separate
- * from the evaluation pool so an evaluation's cancel never terminates a
- * reconstruction in flight. Jobs run one after another; cancelling the
- * running job terminates the worker (a synchronous run never yields to
- * onmessage), and the next job spawns a fresh one. The worker script is
- * the pool's — one bundle, cached by the browser.
+ * One worker for the replay jobs (spread solve, reconstruction), separate from the evaluation pool so an evaluation's cancel never
+ * terminates a reconstruction in flight. Jobs run one after another; cancelling the running job terminates the worker (a synchronous
+ * run never yields to onmessage) and the next job spawns a fresh one. The worker script is the pool's bundle.
  */
 export class ReplayWorkerClient {
   private readonly spawn: () => WorkerLike;
@@ -63,7 +60,7 @@ export class ReplayWorkerClient {
     return new Map(response.entries);
   }
 
-  /** Round 86 (T304): plays the turn with the biggest roll's die turned over; null where the log shows no such miss. */
+  /** Plays the turn with the biggest roll's die turned over; null where the log shows no such miss. */
   async rolledCopy(job: RolledCopyJob, signal?: AbortSignal): Promise<RolledCopyOutcome | null> {
     const response = await this.run({ type: 'rolledCopy', id: this.nextId++, job }, {}, signal);
     if (response.type !== 'rolledCopyResult') throw new Error('unexpected replay worker response');
@@ -75,7 +72,6 @@ export class ReplayWorkerClient {
     this.ensureWorker();
   }
 
-  /** Terminates the worker and rejects every job; a later job spawns anew. */
   dispose(): void {
     const cancelled = new Error(CANCELLED);
     for (const pending of this.queue) pending.reject(cancelled);
@@ -139,7 +135,6 @@ export class ReplayWorkerClient {
     }
   }
 
-  /** Finishes the active job and starts the next one. */
   private settle(finish: (pending: Pending) => void): void {
     const active = this.active;
     this.active = null;

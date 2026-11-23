@@ -10,19 +10,14 @@ import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobRes
 
 export type ReplayPost = (message: ReplayJobResponse) => void;
 
-/** Progress messages per job at most this often — a block runs in milliseconds. */
+/** Progress messages per job at most this often; a block runs in milliseconds. */
 const PROGRESS_INTERVAL_MS = 100;
 
-/**
- * The worker side of the replay jobs. Pure functions of their message: the
- * same code the main thread ran, so a reconstruction here yields the same
- * positions byte for byte (pinned by test/regression/replay-jobs.spec.ts).
- */
+/** The worker side of the replay jobs: the same code the main thread ran, so a reconstruction yields the same positions byte for byte. */
 export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPost): Promise<void> {
   try {
-    // Round 75 (T160): this worker is its own realm (its own simulator), and the main thread's load of the Champions mod does not
-    // reach it. Both jobs read the game's Dex from the log's tier line (the solve builds the sets, the reconstruction builds the
-    // choice-lock context) before the branch engine would load the mod, so the job loads it first.
+    // This worker is its own realm (its own simulator): the main thread's load of the Champions mod does not reach it. Both jobs read
+    // the game's Dex from the log's tier line before the branch engine would load the mod, so the job loads it first.
     await loadReplayMods(message.type === 'solveSpreads' ? { log: message.job.log } : { format: message.job.format, log: message.job.replayLog });
     if (message.type === 'solveSpreads') {
       const { job } = message;
@@ -40,13 +35,13 @@ export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPos
   }
 }
 
-/** Round 86 (T304): the copy of the turn with the roll's die turned over; null where the log shows no such miss. */
+/** The copy of the turn with the roll's die turned over; null where the log shows no such miss. */
 function playRolledCopy(job: RolledCopyJob): RolledCopyOutcome | null {
   const copy = rolledCopy({ position: job.position, replayLog: job.replayLog, turn: job.turn, roll: job.roll });
   return copy ? { serialized: copy.serialized, stage: copy.stage, terminal: copy.terminal } : null;
 }
 
-/** The boundaries (and, when the job asks, the open replacement requests) the replay hands out as messages. A broken one is a gap for the caller, never a failed job. */
+/** The boundaries (and, when the job asks, the open replacement requests) as messages. A broken one is a gap for the caller, never a failed job. */
 function capturePositionsFor(
   job: ReconstructJob, id: number, post: ReplayPost, snapshotFor: (turn: number) => TurnSnapshot | null,
 ): NonNullable<ReconstructParams['capturePositions']> {
@@ -71,7 +66,6 @@ function capturePositionsFor(
   };
 }
 
-/** One reconstruction: the protocol replay (healed, locked, captured) or the fresh lead game. */
 async function reconstruct(job: ReconstructJob, id: number, post: ReplayPost): Promise<ReconstructOutcome> {
   const lead = job.mode === 'lead';
   const snapshotFor = (turn: number) => snapshotAt(job.snapshots, turn);

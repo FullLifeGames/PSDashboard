@@ -1,8 +1,8 @@
-/* Pickers: the parts the turn dock, the turn 0 lead picker (LeadPanel) and the dice chips (components/branch/) share: HP bars, badges, switch chips, the Execute button, gimmick toggles, the choice picker, dice chips, choice errors, and the raw protocol log. The dock's own rules are in dock.css. */
+/* Pickers: the parts the turn dock, the turn 0 lead picker and the dice chips share (HP bars, badges, switch chips, Execute, gimmick toggles, choice picker, protocol log). */
 
-/* Round 83 (the user's design gate of 01.11.2026): the colors of the move tiles, the badges and the switch chips. A move tile gets
-   its type colors as --type, --type-on, --tint, --tint-low and --tint-edge (typeTileVars in src/lib/type-colors.ts);
-   test/regression/move-tile-contrast.spec.ts holds every text below at 4.5 : 1 or more on every type. */
+/* The colors of the move tiles, the badges and the switch chips. A move tile gets its type colors as --type, --type-on, --tint,
+   --tint-low and --tint-edge (typeTileVars in src/lib/type-colors.ts); test/regression/contrast.spec.ts holds every text below at
+   4.5 : 1 or more on every type. */
 :root {
   --ps-tile-text: #f6f9ff;
   --ps-tile-sub: #e2eaf5;
@@ -18,7 +18,6 @@
   --ps-switch-ring: #7cb7e8;
 }
 
-/* PS HP bar */
 .ps-hpbar-track {
   height: 6px;
   background: #555;
@@ -29,7 +28,7 @@
 }
 
 .ps-hpbar-fill {
-  display: block; /* round 84: a span stays inline without it and ignores its width */
+  display: block; /* a span stays inline without it and ignores its width */
   height: 100%;
   transition: width 0.4s ease;
   border-radius: 2px;
@@ -39,8 +38,8 @@
 .ps-hpbar-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
 .ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
 
-/* "played" marker on the move/switch actually taken at the viewed position; round 82: "forced" marks a move that carries forced
-   dice (a flag on the dock's tile). Round 83: a filled label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
+/* "played" marks the move or switch actually taken at the viewed position; "forced" marks a move that carries forced dice. A filled
+   label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
 .ps-played-badge,
 .ps-forced-badge,
 .ps-engine-badge,
@@ -57,9 +56,7 @@
 }
 .ps-played-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
 .ps-forced-badge { background: var(--ps-badge-forced-bg); color: var(--ps-badge-forced-fg); }
-/* Round 88 (F, #101): a stand-in, a body the log never showed, wears the forced badge's face. */
 .ps-guess-badge { background: var(--ps-badge-forced-bg); color: var(--ps-badge-forced-fg); }
-/* Round 84 (A7a): the engine's held-back pick wears the played badge's face, like the chip's own "engine" word. */
 .ps-engine-badge { background: var(--ps-badge-played-bg); color: var(--ps-badge-played-fg); }
 
 
@@ -90,7 +87,6 @@
 }
 .ps-switchbtn:hover:not(:disabled) { filter: brightness(1.12); }
 .ps-switchbtn:disabled { opacity: 0.3; cursor: not-allowed; }
-/* Round 83: the switch chips stay neutral, their selection is the same ring as a move tile's, in the app's accent. */
 .ps-switchbtn-selected {
   outline: 2px solid var(--ps-switch-ring);
   outline-offset: -1px;
@@ -122,7 +118,6 @@
   padding: 5px 8px;
 }
 
-/* Battle gimmick toggles (Tera/Mega/Z/Ultra, G7) */
 .ps-modifier-row {
   display: flex;
   flex-wrap: wrap;
@@ -147,7 +142,6 @@
   border-color: rgba(210,180,255,0.6);
   color: #fff;
 }
-/* Round 82 (forced dice): the chips of Advanced. One row per die, the caption first, then one chip per result. */
 .ps-dice {
   display: flex;
   flex-direction: column;
@@ -207,7 +201,6 @@
   color: var(--ps-tile-ko);
 }
 
-/* Rejected choice / failed execute feedback */
 .ps-choice-error {
   background: rgba(224,102,112,0.12);
   border: 1px solid rgba(224,102,112,0.35);
@@ -254,7 +247,6 @@
   color: #c8d7eb;
 }
 
-/* Log area */
 .ps-log {
   background: rgba(0,0,0,0.3);
   border-radius: 4px;

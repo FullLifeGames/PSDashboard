@@ -1,21 +1,15 @@
 import { PHONE_CLASS } from './replay-phone';
 
-/**
- * Round 84 (T315, A7c, ruling 10a): the property on the iframe element that holds the frame's height in phone mode. The frame's
- * style reads it with REPLAY_FRAME_HEIGHT as the fallback, so the desktop layout needs no write at all.
- */
+/** The iframe property that holds the frame's height in phone mode; the frame's style falls back to REPLAY_FRAME_HEIGHT. */
 export const FRAME_HEIGHT_PROPERTY = '--ps-frame-h';
 
 /**
- * Follows the content height of a same-origin replay document while it stands in phone mode (the scene, the controls and the log in
- * one column): the iframe's property takes the document's height on every change of its size or class, and gives it back when the
- * document returns to the desktop layout. Writes the element's style directly, no React state. Returns the disposer.
+ * Follows the content height of a same-origin replay document in phone mode into the iframe's property, and gives it back on the
+ * desktop layout. Writes the style directly, no React state. Returns the disposer.
  *
- * Round 84 (A7d): three rules keep it out of a ResizeObserver loop (the A7c run raised "loop completed with undelivered
- * notifications" 15 times in 19 tests). The observer is the frame document's own (`contentWindow.ResizeObserver`), so a page
- * observer never sees a body of another document, and the frame's own loop stays in the frame. It measures the body's box, the
- * content, and not the root's `scrollHeight`, which never falls below the viewport and so reads back the box it sized. And it
- * writes only when the height changed; the desktop layout writes nothing at all.
+ * Three rules keep it out of a ResizeObserver loop ("loop completed with undelivered notifications"): it observes with the frame
+ * document's own `contentWindow.ResizeObserver`; it measures the body's box, not the root's `scrollHeight` (never below the
+ * viewport, so it reads back the box it sized); it writes only when the height changed.
  */
 export function followContentHeight(iframe: HTMLIFrameElement): () => void {
   const doc = iframe.contentDocument;

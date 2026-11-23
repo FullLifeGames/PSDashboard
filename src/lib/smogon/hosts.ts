@@ -1,8 +1,6 @@
 /**
- * Where the Smogon data files live. data.pkmn.cc is @pkmn/smogon's
- * documented address and answers with a 301 to the GitHub Pages mirror
- * since 2026-09-03; browsers follow it, but a redirecting domain is one
- * more thing that can break. The wrapper tries the hosts in order.
+ * Where the Smogon data files live. data.pkmn.cc is @pkmn/smogon's documented address and answers with a 301 to the GitHub Pages
+ * mirror; a redirecting domain is one more thing that can break, so the wrapper tries the hosts in order.
  */
 const SMOGON_DATA_HOSTS = ['https://data.pkmn.cc', 'https://pkmn.github.io/smogon/data'] as const;
 
@@ -17,13 +15,10 @@ export function smogonDataPath(url: string): string | null {
 }
 
 /**
- * Tries the Smogon data hosts in order for a Smogon data URL: a network
- * failure or a status outside 2xx other than 404 moves on to the next
- * host; a 404 is an answer (the file is absent on the canonical data) and
- * returns as is. Foreign URLs pass through untouched. @pkmn/smogon builds
- * its URLs with a double slash ("https://data.pkmn.cc//sets/…"), so the
- * path is normalized before any host is tried. A response without an
- * `ok` field (a test fake that only offers `json()`) counts as success.
+ * Tries the Smogon data hosts in order for a Smogon data URL: a network failure or a status outside 2xx other than 404 moves on to
+ * the next host; a 404 is an answer (the file is absent on the canonical data) and returns as is. Foreign URLs pass through.
+ * @pkmn/smogon builds its URLs with a double slash ("https://data.pkmn.cc//sets/…"), so the path is normalized first. A response
+ * without an `ok` field (a test fake that only offers `json()`) counts as success.
  */
 export function withSmogonFallback(fetcher: SmogonFetch): SmogonFetch {
   return async (input, init) => {

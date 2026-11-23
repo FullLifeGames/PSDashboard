@@ -5,10 +5,8 @@ import {
 import { EV_STATS, canonicalMove, type EditorPools } from './team-editor';
 
 /**
- * Text import/export for both players' sets (perfect-information analysis).
- * Plain Showdown export blocks under `=== p1: … ===` / `=== p2: … ===`
- * headers — every block pastes cleanly into Showdown and the whole document
- * round-trips through parseSetsImport. Dependency-free like team-paste.
+ * Text import and export for both players' sets: Showdown export blocks under `=== p1: … ===` headers; the document round-trips through
+ * parseSetsImport.
  */
 
 const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -26,14 +24,12 @@ function knownValue(field: { value: string } | undefined): string {
   return value && !value.startsWith('(') ? value : '';
 }
 
-/** `Species (M) @ Item` — the export block's first line. */
 function headerLine(pokemon: RevealedPokemonInfo): string {
   const gender = pokemon.gender === 'M' || pokemon.gender === 'F' ? ` (${pokemon.gender})` : '';
   const item = itemSetValue(pokemon.item?.value ?? '');
   return `${pokemon.species}${gender}${item ? ` @ ${item}` : ''}`;
 }
 
-/** EVs, Nature, IVs — in Showdown's export order, only the known ones. */
 function spreadLines(pokemon: RevealedPokemonInfo): string[] {
   const lines: string[] = [];
   if (pokemon.evs && pokemon.evs.source !== 'unknown') {
@@ -45,8 +41,8 @@ function spreadLines(pokemon: RevealedPokemonInfo): string[] {
   const known = pokemon.ivs && pokemon.ivs.source !== 'unknown' ? pokemon.ivs.value : null;
   const ivLine = known ? statLine('IVs', known, 31) : null;
   if (ivLine) lines.push(ivLine);
-  // Round 76 (T234): the import (the library's) gives a set with a typed Hidden Power that type's own IVs unless the text lists
-  // IVs, and the build plays the IVs it has (31 when nothing says otherwise): all 31 stay explicit then.
+  // The import (the library's) gives a set with a typed Hidden Power that type's own IVs unless the text lists IVs, and the build
+  // plays the IVs it has (31 when nothing says otherwise): all 31 stay explicit then.
   else if (typedHiddenPowerId(pokemon.moves.map(move => move.name))) lines.push(statLine('IVs', ALL_31_IVS, 0)!);
   return lines;
 }
@@ -71,10 +67,9 @@ function exportSide(header: string, info: OpponentTeamInfo | null): string {
 }
 
 /**
- * Both teams as plain Showdown export blocks under `=== p1: … ===` headers. Every known value is written, and
- * `applyPastedTeam` reads every written value back as the user's own input, ahead of the solver. The caller passes the
- * infos the stats panel shows (round 70, T205): their spreads are the solved ones, so an import pins what the build
- * already plays; the enriched infos hold the guesses and would bring a refuted guess back.
+ * Both teams as `=== p1: … ===` export blocks. Every known value is written, and `applyPastedTeam` reads it back as the user's own
+ * input, ahead of the solver. The caller passes the infos the stats panel shows: their spreads are the solved ones, so an import pins
+ * what the build already plays; the enriched infos hold the guesses and would bring a refuted guess back.
  */
 export function buildSetsExport(params: {
   p1Name: string;
@@ -92,7 +87,6 @@ export function buildSetsExport(params: {
 
 const SIDE_HEADER = /^===\s*(p[12])\b[^=]*===\s*$/;
 
-/** Splits on `=== p1/p2 ===` headers; each side parses as a normal paste. */
 export function parseSetsImport(text: string): { p1: PastedSet[]; p2: PastedSet[] } {
   const result: { p1: PastedSet[]; p2: PastedSet[] } = { p1: [], p2: [] };
   let side: 'p1' | 'p2' | null = null;
@@ -124,13 +118,11 @@ export function parseSetsImport(text: string): { p1: PastedSet[]; p2: PastedSet[
   return result;
 }
 
-/** What the validator needs of a game: its generation and the editor's legal pools (`null` until they load). */
 export interface ImportGame { gen: number; pools: EditorPools | null }
 
 /**
- * The import's pools for the species of a game, loaded lazily (the move pools read learnsets). The pools the team editor offers
- * (`useEditorPools` in useTeamDraft.ts), except for a format id the simulator does not list: there the import accepts what the
- * generation's Custom Game plays, and the editor lists the standard pool (round 88, `PoolUse` in pokemon-options.ts).
+ * The import's pools for the species of a game, loaded lazily (the move pools read learnsets). The team editor's pools, except for a
+ * format id the simulator does not list: there the import accepts what the generation's Custom Game plays (`PoolUse` in pokemon-options.ts).
  */
 export async function loadImportPools(speciesList: string[], gen: number, format: string): Promise<EditorPools> {
   const options = await import('./pokemon-options');
@@ -157,12 +149,11 @@ type SideId = 'p1' | 'p2';
 
 /**
  * What an import cannot apply, one message per value (empty: the text is fine). The import is all or nothing: the caller applies
- * nothing while this list is not empty, as the team editor refuses a name the generation's Dex does not know. A move or an ability the species cannot have applies (round 83,
- * T308); the editor marks it with a note. Only values that differ
- * from what the panel already holds are checked, so the export of the panel itself always imports (a swapped ability, a move
- * copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load (`pools: null`),
- * as the editor stays free text until then. `shown` is the view the export reads (the stats panel's solved sets, round 70
- * T205): a value it holds counts as held too (round 77: a guessed Head Smash of Champions VGC 2695803506).
+ * nothing while the list is not empty. A move or an ability the species cannot have applies; the editor marks it with a note. Only
+ * values that differ from what the panel already holds are checked, so the export of the panel itself always imports (a swapped
+ * ability, a move copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load
+ * (`pools: null`). `shown` is the view the export reads (the stats panel's solved sets): a value it holds counts as held too (a
+ * guessed Head Smash of Champions VGC 2695803506).
  */
 export function validateSetsImport(
   parsed: { p1: PastedSet[]; p2: PastedSet[] },
@@ -227,7 +218,6 @@ const teraErrors: ValueCheck = (who, before, after, { pools }) => {
   return listed(pools.teraTypes, value) ? [] : [`${who}: ${value} is not a Tera type.`];
 };
 
-/** The value checks of one Pokémon, over the values the import changed against every view the panel holds of it. */
 function changedValueErrors(who: string, befores: RevealedPokemonInfo[], after: RevealedPokemonInfo, game: ImportGame): string[] {
   const { pools } = game;
   if (!pools) return [];
