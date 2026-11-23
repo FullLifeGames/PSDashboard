@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { rulesDex } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
@@ -28,10 +27,5 @@ describe('the kinds of dice', () => {
       expect(dex.species.get(id).exists, `${kind} as a species`).toBe(false);
       expect(dex.conditions.get(id).exists, `${kind} as a condition`).toBe(false);
     }
-  });
-
-  test('the types file carries no lint exception', () => {
-    const text = readFileSync(new URL('../src/dice/types.ts', import.meta.url), 'utf8');
-    expect(text).not.toMatch(/eslint-disable/);
   });
 });

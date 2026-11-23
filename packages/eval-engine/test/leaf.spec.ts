@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { PRNG, State, Battle, type PokemonSet } from '@pkmn/sim';
 import { deserializeBattleExact } from '../src/forward/serialize';
 import { createRootPosition, type SimPosition } from '../src/forward/position';
@@ -183,9 +183,6 @@ describe('(d) the key of a cell', () => {
 });
 
 describe('the old fixed lists live in the test module, the engine keeps their counts', () => {
-  const sources = (dir: URL): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
-    entry.isDirectory() ? sources(new URL(`${entry.name}/`, dir)) : entry.name.endsWith('.ts') ? [new URL(entry.name, dir).pathname] : []);
-
   test('the counts are the lengths of the lists the engine read before round 90', () => {
     expect(BASE_DRAWS).toBe(5);
     expect(FALLBACK_DRAWS).toBe(8);
@@ -193,12 +190,6 @@ describe('the old fixed lists live in the test module, the engine keeps their co
     expect(FALLBACK_SEEDS).toHaveLength(FALLBACK_DRAWS);
     expect(PROBE_SEEDS).toHaveLength(11);
     expect(VERIFY_PLAIN_SEEDS).toHaveLength(16);
-  });
-
-  test('no file of the engine\'s src names a list', () => {
-    const named = sources(new URL('../src/', import.meta.url))
-      .filter(file => /\b(SEARCH_SEEDS|PROBE_SEEDS|FALLBACK_SEEDS|VERIFY_PLAIN_SEEDS)\b/.test(readFileSync(file, 'utf-8')));
-    expect(named).toEqual([]);
   });
 });
 

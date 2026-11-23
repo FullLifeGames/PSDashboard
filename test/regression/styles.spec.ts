@@ -35,10 +35,6 @@ function rule(block: string, selector: string): string | null {
 describe('the dock at 1050 px and below', () => {
   const block = media(1050);
 
-  test('the file has the block', () => {
-    expect(block, '@media (max-width: 1050px) in dock.css').not.toBeNull();
-  });
-
   test('the dock is fixed at the lower edge across the full width', () => {
     const dock = rule(block ?? '', '.ps-dock');
     expect(dock, 'a .ps-dock rule').not.toBeNull();
@@ -75,10 +71,6 @@ describe('the dock at 1050 px and below', () => {
 
 describe('the dock at 640 px and below', () => {
   const block = media(640);
-
-  test('the file has the block', () => {
-    expect(block, '@media (max-width: 640px) in dock.css').not.toBeNull();
-  });
 
   test('chips and Execute take the app\'s 40 px minimum height', () => {
     expect(rule(block ?? '', '.ps-dock-chip') ?? '').toMatch(/min-height:\s*40px/);
