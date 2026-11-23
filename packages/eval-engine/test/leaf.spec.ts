@@ -1,13 +1,19 @@
 import { describe, expect, test } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { PRNG, State } from '@pkmn/sim';
+import { PRNG, State, Battle, type PokemonSet } from '@pkmn/sim';
 import { deserializeBattleExact } from '../src/forward/serialize';
 import { createRootPosition, type SimPosition } from '../src/forward/position';
 import { benchOrder } from '../src/search/bench-order';
-import { BASE_DRAWS, cellSeed, cellSeedList, treeSeed } from '../src/search/leaf';
+import { BASE_DRAWS, cellSeed, cellSeedList, treeSeed, battleFaintedFraction, leafValue, speedTie } from '../src/search/leaf';
 import { FALLBACK_DRAWS } from '../src/pair/sampler';
 import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import { cellHash, positionKey, positionSalt, rootSalt } from '../src/search/root-quantile';
+import { createMatchupCache, evaluatePosition } from '../src/eval-function';
+import { WINPROB_K_OF } from '../src/winprob';
+import type { Pokemon } from '@pkmn/sim';
+import { set as oracleSet } from './move-oracle';
+import { battleOf as oracleBattleOf } from './power-oracle';
+import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
 /**
  * Round 89 (#60, T324), A5 stage 1: a seed per cell. Round 88 (E1) and A1b: the fixed seeds roll one number at one draw index
@@ -193,5 +199,151 @@ describe('the old fixed lists live in the test module, the engine keeps their co
     const named = sources(new URL('../src/', import.meta.url))
       .filter(file => /\b(SEARCH_SEEDS|PROBE_SEEDS|FALLBACK_SEEDS|VERIFY_PLAIN_SEEDS)\b/.test(readFileSync(file, 'utf-8')));
     expect(named).toEqual([]);
+  });
+});
+
+const set = (species: string, moves: string[]): PokemonSet => ({
+  name: species, species, item: '', ability: '', moves, nature: 'Hardy', gender: '', level: 50,
+  evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+});
+const team = () => [set('Garchomp', ['Earthquake']), set('Corviknight', ['Body Press']), set('Primarina', ['Moonblast']), set('Kingambit', ['Kowtow Cleave'])];
+
+/** Four against four with one p2 Pokémon fainted on the bench (a quarter of a side, so the phase signal is not 0). */
+function battleOf(formatid: string): Battle {
+  const battle = new Battle({ formatid: formatid as never, seed: '1,2,3,4', p1: { name: 'A', team: team() }, p2: { name: 'B', team: team() } });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) battle.makeChoices('team 1234', 'team 1234');
+  const benched = battle.sides[1].pokemon[3];
+  benched.hp = 0;
+  benched.fainted = true;
+  battle.sides[0].pokemon[0].hp = Math.floor(battle.sides[0].pokemon[0].maxhp / 2);
+  return battle;
+}
+
+const expected = (raw: number, k: { k0: number; k1: number }, ff: number) => 2 / (1 + Math.exp(-(k.k0 + k.k1 * ff) * raw)) - 1;
+
+describe('the leaf prices a position with the K of its rule set (T138)', () => {
+  for (const [kind, formatid] of [['singles', 'gen9customgame'], ['doubles', 'gen9doublescustomgame']] as const) {
+    test(`each rule set reads its own phase K (${kind})`, () => {
+      const battle = battleOf(formatid);
+      const ff = battleFaintedFraction(battle);
+      expect(ff).toBeGreaterThan(0);
+      for (const ruleset of ['champions', 'standard', 'vgc'] as const) {
+        const cache = createMatchupCache(ruleset);
+        const raw = evaluatePosition(battle, createMatchupCache(ruleset));
+        expect(raw).not.toBe(0);
+        const k = WINPROB_K_OF[ruleset][kind];
+        expect(leafValue(battle, cache), ruleset).toBeCloseTo(expected(raw, k, ff), 12);
+      }
+    });
+  }
+});
+
+describe('speed-tie-gen1-par', () => {
+  const set = oracleSet;
+  const battleOf = oracleBattleOf;
+  const FORMAT = 'gen1customgame';
+  const fast = (species: string, moves: string[]) => set(species, moves, { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } });
+  const mover = (log: string[], from: number) => log.slice(from).filter(line => line.startsWith('|move|')).map(line => line.split('|')[2].slice(0, 2));
+
+  /** Starmie (fast) paralyzed by Snorlax's Thunder Wave in turn one; the position after it is the board. */
+  function paralyzed(seed: string): Battle {
+    const battle = battleOf(FORMAT, [fast('Starmie', ['tackle'])], [fast('Snorlax', ['thunderwave', 'tackle'])], seed);
+    battle.makeChoices('move tackle', 'move thunderwave');
+    return battle;
+  }
+
+  describe('Gen 1: a paralyzed faster body moves after the slower one', () => {
+    test('the quartered speed is the action speed, the played order follows it, and speedTie says no tie', () => {
+      let played = 0;
+      for (const seed of ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20', '21,22,23,24']) {
+        const battle = paralyzed(seed);
+        const [starmie, snorlax] = [battle.sides[0].active[0] as Pokemon, battle.sides[1].active[0] as Pokemon];
+        if (starmie.status !== 'par') continue; // Thunder Wave missed or the move was blocked in this seed
+        expect(starmie.getStat('spe', false, false), seed).toBeLessThan(starmie.getStat('spe', true, true));
+        expect(starmie.getActionSpeed(), seed).toBeLessThan(snorlax.getActionSpeed());
+        expect(speedTie(battle as never, 'move tackle', 'move tackle'), seed).toBe(false);
+        expect(cheapOracle(battle, ...SLOT_A)('tackle', 'tackle'), seed).toBe(false);
+        const from = battle.log.length;
+        battle.makeChoices('move tackle', 'move tackle');
+        const order = mover(battle.log, from);
+        if (order.length < 2) continue; // fully paralyzed this turn
+        played++;
+        expect(order, seed).toEqual(['p2', 'p1']);
+      }
+      expect(played).toBeGreaterThan(0);
+    });
+
+    test('setStatus alone leaves the Gen 1 speed as it was, which is why the sweep reads no change there', () => {
+      const battle = battleOf(FORMAT, [fast('Starmie', ['tackle'])], [fast('Snorlax', ['tackle'])]);
+      const starmie = battle.sides[0].active[0] as Pokemon;
+      const before = starmie.getActionSpeed();
+      starmie.setStatus('par');
+      expect(starmie.getActionSpeed()).toBe(before);
+    });
+  });
+});
+
+describe('tree-seed', () => {
+  const OFFSETS = [0, 1, 2, 3];
+  const ITERATIONS = 600;
+  const DRAWS = 12;
+  const PS = [0.10, 0.30, 0.85];
+
+  /** Draw n of the stream the seed starts: the number the simulator compares with a chance. */
+  function draws(seed: ReturnType<typeof treeSeed>): number[] {
+    const prng = new PRNG(seed);
+    return Array.from({ length: DRAWS }, () => prng.random());
+  }
+
+  /** Inside four standard errors of the binomial share. */
+  function inBand(share: number, p: number, n: number): boolean {
+    return Math.abs(share - p) <= 4 * Math.sqrt(p * (1 - p) / n);
+  }
+
+  describe('tree seeds follow the Dex chance (T323)', () => {
+    test('draw n falls under p in a binomial share of the streams, over all trees and in each tree', () => {
+      const streams = OFFSETS.map(offset => Array.from({ length: ITERATIONS }, (_, iteration) => draws(treeSeed(iteration, offset))));
+      const misses: string[] = [];
+      for (let n = 0; n < DRAWS; n++) {
+        for (const p of PS) {
+          const all = streams.flat();
+          const share = all.filter(stream => stream[n] < p).length / all.length;
+          if (!inBand(share, p, all.length)) misses.push(`all draw ${n} p ${p}: ${share.toFixed(3)}`);
+          streams.forEach((own, offset) => {
+            const ownShare = own.filter(stream => stream[n] < p).length / own.length;
+            if (!inBand(ownShare, p, own.length)) misses.push(`offset ${offset} draw ${n} p ${p}: ${ownShare.toFixed(3)}`);
+          });
+        }
+      }
+      expect(misses).toEqual([]);
+    });
+
+    test('the seed is a pure function of (offset, iteration), in the simulator\'s four-number form', () => {
+      for (const offset of [0, 1, 7, 15]) {
+        for (const iteration of [0, 1, 599]) {
+          expect(treeSeed(iteration, offset)).toBe(treeSeed(iteration, offset));
+          const parts = treeSeed(iteration, offset).split(',').map(Number);
+          expect(parts).toHaveLength(4);
+          for (const part of parts) {
+            expect(Number.isInteger(part)).toBe(true);
+            expect(part).toBeGreaterThan(0);
+            expect(part).toBeLessThanOrEqual(0xffff);
+          }
+        }
+      }
+    });
+
+    test('no two trees share a stream: not within an iteration, not over the whole schedule, and none is a SEARCH_SEED', () => {
+      const seen = new Map<string, string>();
+      for (let iteration = 0; iteration < ITERATIONS; iteration++) {
+        for (const offset of [...OFFSETS, 4, 5, 6, 7, 15]) {
+          const seed = treeSeed(iteration, offset);
+          const first = seen.get(seed);
+          expect(first, `offset ${offset} iteration ${iteration} repeats ${first}`).toBeUndefined();
+          seen.set(seed, `offset ${offset} iteration ${iteration}`);
+          expect(SEARCH_SEEDS).not.toContain(seed);
+        }
+      }
+    });
   });
 });
