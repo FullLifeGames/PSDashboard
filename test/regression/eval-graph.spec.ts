@@ -140,7 +140,7 @@ describe('graph merge monotonicity', () => {
   test('a matrix result of depth ≥ 2 is replaced by an MCTS-target sweep', () => {
     // Round 69 (T184): the configured engine decides. The deep matrix result no
     // longer outranks the tree, whether MCTS is the target via explicit prefs or
-    // the auto routing (the full table: supersedes-stored-t184.spec.ts).
+    // the auto routing (the full table: prefs.spec.ts).
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(true);
