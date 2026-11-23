@@ -8,12 +8,16 @@
 // refuses to raise a pin or add a new one unless --allow-raise is passed,
 // because a raise means a file grew past the gate.
 //
+// It also writes spec-count-ratchet.json, the spec files per test project: counts fall with the tree and rise only with --allow-raise,
+// for a new source module, a new sweep or a new browser flow that the pull request names.
+//
 // Usage: node scripts/update-lint-ratchet.mjs [--allow-raise]
 
 import { ESLint } from 'eslint';
 import { writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { compareCounts, countSpecs, currentBaseline, SPEC_COUNT_FILE } from './spec-counts.mjs';
 
 const RULES = ['max-lines', 'max-lines-per-function', 'complexity'];
 const LINE_OPTS = { skipBlankLines: true, skipComments: true };
@@ -94,6 +98,10 @@ async function loadExisting() {
 }
 
 const allowRaise = process.argv.includes('--allow-raise');
+const specCounts = countSpecs();
+const specRaises = compareCounts(currentBaseline(), specCounts)
+  .filter(entry => Object.keys(currentBaseline()).length > 0)
+  .map(({ project, baseline, count }) => `spec files in ${project}: ${baseline} -> ${count}`);
 const worst = await measure();
 const existing = await loadExisting();
 
@@ -119,6 +127,8 @@ for (const file of [...worst.keys()].sort()) {
   }
   overrides.push({ files: [file], rules });
 }
+
+raises.push(...specRaises);
 
 if (raises.length > 0 && !allowRaise) {
   console.error('Refusing to loosen the ratchet. These files grew past their pins:');
@@ -147,7 +157,9 @@ export const ratchetBase = ${JSON.stringify(base, null, 2)};
 export const ratchetOverrides = ${JSON.stringify(overrides, null, 2)};
 `;
 writeFileSync('eslint.ratchet.mjs', body);
+writeFileSync(SPEC_COUNT_FILE, `${JSON.stringify(specCounts, null, 2)}\n`);
 console.log(`eslint.ratchet.mjs written: ${overrides.length} pinned files, ${removed.length} pins released.`);
+console.log(`spec-count-ratchet.json written: ${JSON.stringify(specCounts)}`);
 for (const file of removed) console.log(`  released: ${file}`);
 if (allowRaise && raises.length > 0) {
   console.log('Raised with --allow-raise:');

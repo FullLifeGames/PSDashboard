@@ -125,16 +125,38 @@ describe('the two CI jobs that run the specs with DICE_SWEEPS=full', () => {
 
 describe('the job names that branch protection reads', () => {
   const names = WORKFLOW.map(line => /^ {4}name:\s*(.+)$/.exec(line)?.[1]).filter((name): name is string => name !== undefined);
+  const sweepParts = 'Full sweeps, the other specs, part ${{ matrix.part }} of 3';
+  const engineJobs = 'Engine suite, speed layer ${{ matrix.speed-layer }}';
 
-  // The five required checks plus the engine job's second matrix entry give the six contexts; GitHub matches a check by its whole name.
-  // "Browser flows" is the aggregate job of the three parts (round 90, E6; browser-flows-parts.spec.ts holds it); the parts and the sweep parts are no required checks.
-  test('the six required checks keep their names, and the jobs in parts take none of them', () => {
-    const parts = ['Full sweeps, the other specs, part ${{ matrix.part }} of 3', 'Browser flows, part ${{ matrix.part }} of 3'];
-    for (const added of parts) expect(names.filter(name => name === added)).toHaveLength(1);
-    expect(names.filter(name => !parts.includes(name))).toEqual([
+  // GitHub matches a check by its whole name, so a matrix job gives one context per entry. Round 90 (F8): the three full-sweep parts are
+  // required (user 23.11.2026), the engine job's two entries and the aggregate "Browser flows" stay; the browser parts are no required checks
+  // (browser-flows-parts.spec.ts holds the aggregate).
+  test('the jobs in parts and the required checks keep their names', () => {
+    expect(names.filter(name => name === 'Browser flows, part ${{ matrix.part }} of 3')).toHaveLength(1);
+    expect(names.filter(name => name !== 'Browser flows, part ${{ matrix.part }} of 3')).toEqual([
       'Node suites',
-      'Engine suite, speed layer ${{ matrix.speed-layer }}',
+      engineJobs,
       'Dice sweeps, every move',
+      sweepParts,
+      'Browser flows',
+      'Production build smoke',
+    ]);
+  });
+
+  test('the nine contexts branch protection must list', () => {
+    const contexts = names.filter(name => !name.startsWith('Browser flows, part')).flatMap(name => {
+      if (name === sweepParts) return [1, 2, 3].map(part => name.replace('${{ matrix.part }}', String(part)));
+      if (name === engineJobs) return ['forced off', 'forced on'].map(layer => name.replace('${{ matrix.speed-layer }}', layer));
+      return [name];
+    });
+    expect(contexts).toEqual([
+      'Node suites',
+      'Engine suite, speed layer forced off',
+      'Engine suite, speed layer forced on',
+      'Dice sweeps, every move',
+      'Full sweeps, the other specs, part 1 of 3',
+      'Full sweeps, the other specs, part 2 of 3',
+      'Full sweeps, the other specs, part 3 of 3',
       'Browser flows',
       'Production build smoke',
     ]);

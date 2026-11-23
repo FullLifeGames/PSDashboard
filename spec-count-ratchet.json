@@ -1,0 +1,9 @@
+{
+  "app": 161,
+  "replay-core": 128,
+  "eval-engine": 483,
+  "ui": 255,
+  "e2e": 46,
+  "e2e-feedback": 1,
+  "e2e-build": 1
+}
