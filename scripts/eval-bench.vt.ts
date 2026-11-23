@@ -1,9 +1,11 @@
-import { test, describe } from 'vitest';
+// The engine bench: forward-model and search throughput, printed to the console. It is no test, so it stays out of the suite: run it with
+// `npm run bench:eval` (vitest.bench.config.ts). EVALUATION.md, "5. Measuring the engine", names the command.
+import { test } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { advancePosition, createRootPosition } from '../src/forward-model';
-import { mctsSearch } from '../src/mcts';
-import { searchPosition } from '../src/search';
+import { advancePosition, createRootPosition } from '../packages/eval-engine/src/forward-model';
+import { mctsSearch } from '../packages/eval-engine/src/mcts';
+import { searchPosition } from '../packages/eval-engine/src/search';
 
 function makeSet(name: string, species: string, moves: string[], level = 50): PokemonSet {
   return {
@@ -53,39 +55,36 @@ function makeSixVsSix(): Battle {
   );
 }
 
-describe.skipIf(!process.env.EVAL_BENCH)('eval engine benchmark', () => {
+test('measures forward-model and search throughput', { timeout: 300000 }, () => {
+  const root = createRootPosition(serialize(makeSixVsSix()));
 
-  test('measures forward-model and search throughput', { timeout: 300000 }, () => {
-    const root = createRootPosition(serialize(makeSixVsSix()));
+  const forks = 50;
 
-    const forks = 50;
+  // Stage split: where does a fork's time actually go?
+  const serialized = root.serialized;
+  const deserializeStart = performance.now();
+  for (let i = 0; i < forks; i++) State.deserializeBattle(serialized);
+  console.log(`deserialize only: ${((performance.now() - deserializeStart) / forks).toFixed(1)} ms each`);
 
-    // Stage split: where does a fork's time actually go?
-    const serialized = root.serialized;
-    const deserializeStart = performance.now();
-    for (let i = 0; i < forks; i++) State.deserializeBattle(serialized);
-    console.log(`deserialize only: ${((performance.now() - deserializeStart) / forks).toFixed(1)} ms each`);
+  const stageBattle = State.deserializeBattle(serialized);
+  const serializeStart = performance.now();
+  for (let i = 0; i < forks; i++) JSON.stringify(State.serializeBattle(stageBattle));
+  console.log(`serialize only: ${((performance.now() - serializeStart) / forks).toFixed(1)} ms each`);
 
-    const stageBattle = State.deserializeBattle(serialized);
-    const serializeStart = performance.now();
-    for (let i = 0; i < forks; i++) JSON.stringify(State.serializeBattle(stageBattle));
-    console.log(`serialize only: ${((performance.now() - serializeStart) / forks).toFixed(1)} ms each`);
+  const forkStart = performance.now();
+  for (let i = 0; i < forks; i++) {
+    advancePosition(root, 'move 1', 'move 1', '1,2,3,4');
+  }
+  const forkMs = performance.now() - forkStart;
+  console.log(`advancePosition: ${(forks / (forkMs / 1000)).toFixed(1)} forks/sec (${(forkMs / forks).toFixed(1)} ms each)`);
 
-    const forkStart = performance.now();
-    for (let i = 0; i < forks; i++) {
-      advancePosition(root, 'move 1', 'move 1', '1,2,3,4');
-    }
-    const forkMs = performance.now() - forkStart;
-    console.log(`advancePosition: ${(forks / (forkMs / 1000)).toFixed(1)} forks/sec (${(forkMs / forks).toFixed(1)} ms each)`);
+  for (const settings of [{ depth: 1, samples: 1 }, { depth: 1, samples: 3 }, { depth: 2, samples: 1 }, { depth: 2, samples: 3 }] as const) {
+    const start = performance.now();
+    searchPosition(root.serialized, settings);
+    console.log(`search depth=${settings.depth} samples=${settings.samples}: ${((performance.now() - start) / 1000).toFixed(1)}s`);
+  }
 
-    for (const settings of [{ depth: 1, samples: 1 }, { depth: 1, samples: 3 }, { depth: 2, samples: 1 }, { depth: 2, samples: 3 }] as const) {
-      const start = performance.now();
-      searchPosition(root.serialized, settings);
-      console.log(`search depth=${settings.depth} samples=${settings.samples}: ${((performance.now() - start) / 1000).toFixed(1)}s`);
-    }
-
-    const mctsStart = performance.now();
-    mctsSearch(root.serialized, { depth: 1, samples: 1, mode: 'mcts' });
-    console.log(`mcts (600 iterations): ${((performance.now() - mctsStart) / 1000).toFixed(1)}s`);
-  });
+  const mctsStart = performance.now();
+  mctsSearch(root.serialized, { depth: 1, samples: 1, mode: 'mcts' });
+  console.log(`mcts (600 iterations): ${((performance.now() - mctsStart) / 1000).toFixed(1)}s`);
 });

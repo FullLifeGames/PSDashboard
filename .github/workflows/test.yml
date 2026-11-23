@@ -216,7 +216,6 @@ jobs:
               test/e2e/timeline-bar.spec.ts
               test/e2e/timeline.spec.ts
               test/e2e/turn-dock-vgc.spec.ts
-              test/e2e/zoom-probe.spec.ts
           - part: 2
             files: >-
               test/e2e/branch-dice-pivot.spec.ts

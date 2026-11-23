@@ -98,9 +98,10 @@ npm run dev              # local Vite server
 
 | Command | What it checks |
 | --- | --- |
-| `npm run lint` | ESLint with size and complexity ceilings and import zones |
+| `npm run lint` | ESLint with size and complexity ceilings, import zones, the name ratchet and the dash rule for the text the app shows |
 | `npm run build` | the production bundle |
 | `npm run build:packages` | compiles both packages to their `dist/` |
+| `npm run bench:eval` | the engine bench: forward-model and search throughput on a six against six position, printed to the console (outside the suite) |
 | `npm run test:regression` | the Vitest suite in four projects: app, replay-core, eval-engine, ui (`npx vitest` for watch mode, `--changed` for the tests behind your edits) |
 | `npm run test:ui` | the app suite alone: components and hooks under jsdom with Testing Library |
 | `npm run test:coverage` | the whole Vitest suite with the v8 coverage provider (`@vitest/coverage-v8`, pinned to vitest's version); it writes `coverage-final.json` and the summary to `.calibration/coverage/` and takes about an hour on devbox |

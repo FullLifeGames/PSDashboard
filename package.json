@@ -21,6 +21,7 @@
     "test:feedback": "node ./scripts/run-e2e.mjs --dev-port 5176 -c playwright.feedback.config.ts",
     "test:regression": "vitest run",
     "test:ui": "vitest run --project ui",
+    "bench:eval": "vitest run -c vitest.bench.config.ts",
     "test:coverage": "vitest run --coverage --maxWorkers=4 --testTimeout=180000 --hookTimeout=180000",
     "preview": "vite preview"
   },
