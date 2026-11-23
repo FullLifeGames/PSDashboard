@@ -7,10 +7,10 @@ import { battleOf } from './power-oracle';
 import { chancesCalled, liveState, turnOf } from './flip-turn-support';
 
 /**
- * Round 89 (A6-2, ruling 24, #145): the tie path of the plain endgame children plays each speed-tie order apart and prices the
- * dice inside it. `recordTurn` and `flipTurn` take the ties a turn is held to (`FlipTurn.ties`, the forcing PRNG's tie die by
- * pair), and `recordTurn` lists the pairs the natural turn tied (`ties`, the slots of every shuffle that held two move actions).
- * Held to an order, the turn plays that order in the recording and in every flip, and the live board stays as it was.
+ * The tie path of the plain endgame children plays each speed-tie order apart. `recordTurn` and `flipTurn` take the ties a turn
+ * is held to (`FlipTurn.ties`, the forcing PRNG's tie die by pair), and `recordTurn` lists the pairs the natural turn tied
+ * (`ties`, the slots of every shuffle that held two move actions). Held to an order, the turn plays that order in the recording
+ * and in every flip, and the live board stays as it was.
  */
 await loadSimMods('gen9championsou');
 

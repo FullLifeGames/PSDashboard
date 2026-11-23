@@ -4,9 +4,9 @@ import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, standing } from './dice-fixtures';
 
 /**
- * Round 89 (A6-1, ruling 24): the boards and the oracle the flip specs share. A turn is the board's clicks played on a copy of it;
- * the live board is only read. The oracle is the simulator's own `randomChance`: a spy over the stream of a plain turn writes down
- * the numerator and the denominator of every call, with the event and the effect that were running when it was made.
+ * The boards and the oracle the flip specs share. A turn is the board's clicks played on a copy of it; the live board is only
+ * read. The oracle is the simulator's own `randomChance`: a spy over the stream of a plain turn writes down the numerator and the
+ * denominator of every call, with the event and the effect that were running when it was made.
  */
 
 /** A turn of the board's clicks: every fork is a copy at the board's turn with a stream at the board's place. */

@@ -4,14 +4,10 @@ import { reconstructBranchRuntime } from '../src/branch-engine';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from '../src/branch/field-ids';
 
 /**
- * Round 60 (T92) prover: where the rebuild created a condition itself and the
- * snapshot knows it too, the snapshot's numbers must fit the sim's. Layers
- * must match; a duration must lie between the client's remaining minimum and
- * maximum (an extending item such as Damp Rock only the sim knows). Read at
- * the raw boundary (onRawBoundary), before the correction of that boundary.
- * Only conditions the sim's dex knows count: the client also files Future
- * Sight as a side condition (never ended without an -end line), which the
- * sim keeps as a slot condition and does not know by that id.
+ * Where the rebuild created a condition itself and the snapshot knows it too, the snapshot's numbers must fit the sim's: layers
+ * match, a duration lies between the client's remaining minimum and maximum (an extending item such as Damp Rock only the sim
+ * knows). Read at the raw boundary (onRawBoundary), before the correction of that boundary. Only conditions the sim's dex knows
+ * count: the client also files Future Sight as a side condition, which the sim keeps as a slot condition under another id.
  */
 
 type Turns = { minDuration?: number; maxDuration?: number } | undefined;

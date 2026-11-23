@@ -23,8 +23,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
     p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
     p2: { name: 'Beta', team: Teams.pack(p2Sets) },
   });
-  // Custom Game opens at team preview — commit the default order so the
-  // leads are actually on the field.
+  // Custom Game opens at team preview: commit the default order so the leads are on the field.
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
@@ -48,7 +47,7 @@ function makeDoublesBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return battle;
 }
 
-/** A battle still sitting at team preview — the turn-0 decision point. */
+/** A battle still sitting at team preview. */
 function makePreviewBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
   return new Battle({
     formatid: toID(formatid),
@@ -69,7 +68,7 @@ describe('sim forward model', () => {
     expect(p1Choices).toContain('move protect');
     expect(p1Choices).toContain('move substitute');
     expect(p1Choices).toContain('switch 2');
-    // gen 9: every request slot carries canTerastallize in Custom Game.
+    // Gen 9 Custom Game: every request slot carries canTerastallize.
     expect(p1Choices).toContain('move protect terastallize');
     expect(p1.find(option => option.choice === 'switch 2')?.label).toBe('→ Chansey');
   });
@@ -87,7 +86,7 @@ describe('sim forward model', () => {
       [makeSet('Machamp', 'Machamp', ['Karate Chop'], 100), makeSet('Chansey', 'Chansey', ['Protect'], 100)],
       [makeSet('Snorlax', 'Snorlax', ['Tackle'], 100)],
     )));
-    // Draft-league shape: only listed species hold Tera rights.
+    // Draft leagues: only listed species hold Tera rights.
     const allowance = { p1: ['Chansey'], p2: ['Snorlax'] };
     const p1 = legalChoices(root, 'p1', { tera: allowance }).map(option => option.choice);
     expect(p1).toContain('move karatechop');
@@ -139,15 +138,13 @@ describe('sim forward model', () => {
     const a = advancePosition(root, 'move dracometeor', 'move substitute', '1,2,3,4');
     const b = advancePosition(root, 'move dracometeor', 'move substitute', '1,2,3,4');
     expect(a.serialized).toBe(b.serialized);
-    // Wall-clock timestamp lines would break identity across second boundaries.
+    // A wall-clock timestamp line would break identity across second boundaries.
     expect(a.serialized).not.toContain('|t:|');
   });
 
   test('a mid-turn KO auto-resolves the forced switch, avoiding a replacement that dies on entry', () => {
-    // Explosion guarantees the p1 active faints. Pichu sits at 4% behind
-    // Stealth Rock (12.5% entry chip) — sending it in would faint it, which
-    // the greedy eval-trial must recognize, picking Blissey instead even
-    // though Pichu comes first in slot order.
+    // Explosion faints the p1 active. Pichu sits at 4% behind Stealth Rock (12.5% entry chip) and would faint on entry, so the
+    // greedy eval-trial must pick Blissey even though Pichu comes first in slot order.
     const battle = makeBattle(
       [
         makeSet('Electrode', 'Electrode', ['Explosion']),
@@ -165,7 +162,6 @@ describe('sim forward model', () => {
     const childBattle = positionBattle(child);
     expect(childBattle.turn).toBe(2); // back at a turn boundary
     expect(childBattle.sides[0].active[0]!.name).toBe('Blissey');
-    // Only Electrode fainted — Pichu was spared the suicide entry.
     expect(childBattle.sides[0].pokemon.filter(pokemon => pokemon.fainted).map(pokemon => pokemon.name))
       .toEqual(['Electrode']);
   });
@@ -202,7 +198,7 @@ describe('sim forward model', () => {
     };
     try {
       const child = advancePosition(root, 'move protect', 'move protect', '1,2,3,4');
-      // The evaluation path (depth-1 leaves) must not pay for serialization.
+      // Depth-1 leaves must not pay for serialization.
       expect(calls).toBe(0);
       void child.serialized;
       expect(calls).toBe(1);
@@ -214,9 +210,8 @@ describe('sim forward model', () => {
   });
 
   test('a fainted active under a stale move request is repaired by auto-replacement', () => {
-    // Snapshot corrections can faint an active without updating the request
-    // (rare diverged reconstructions) — the sim then auto-passes the dead
-    // slot and rejects every choice with "more choices than unfainted".
+    // A snapshot correction can faint an active without updating the request; the sim then auto-passes the dead slot and
+    // rejects every choice with "more choices than unfainted".
     const battle = makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Protect'])],
       [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
@@ -243,21 +238,15 @@ describe('sim forward model', () => {
     )));
     const p1 = legalChoices(root, 'p1');
     const choices = p1.map(option => option.choice);
-    // Single-target moves enumerate both living foe slots.
     expect(choices).toContain('move karatechop 1, move tackle 1');
     expect(choices).toContain('move karatechop 1, move tackle 2');
-    // Spread moves take no target.
     expect(choices).toContain('move rockslide, move tackle 1');
-    // Moves combine with switches in either slot.
     expect(choices).toContain('move karatechop 1, switch 3');
     expect(choices).toContain('switch 3, move tackle 1');
-    // Both slots can never take the same bench target.
     expect(choices.some(choice => /switch 3.*switch 3/.test(choice))).toBe(false);
-    // Tera on one slot or the other, never both at once.
     expect(choices).toContain('move karatechop 1 terastallize, move tackle 1');
     expect(choices).toContain('move karatechop 1, move tackle 1 terastallize');
     expect(choices.some(choice => (choice.match(/terastallize/g) ?? []).length > 1)).toBe(false);
-    // Labels name the target so PVs stay readable.
     expect(p1.find(option => option.choice === 'move karatechop 2, move tackle 1')?.label)
       .toBe('Karate Chop→Eevee + Tackle→Pikachu');
   });
@@ -270,7 +259,7 @@ describe('sim forward model', () => {
       ],
       [makeSet('Pikachu', 'Pikachu', ['Protect']), makeSet('Eevee', 'Eevee', ['Protect'])],
     );
-    // Eevee is down with no bench behind it — the slot stays empty.
+    // Eevee is down with no bench behind it: the slot stays empty.
     const eevee = battle.sides[1].active[1]!;
     eevee.hp = 0;
     eevee.faint();
@@ -279,7 +268,6 @@ describe('sim forward model', () => {
     const p1Choices = legalChoices(root, 'p1').map(option => option.choice);
     expect(p1Choices).toContain('move karatechop 1, move tackle 1');
     expect(p1Choices.some(choice => choice.includes('karatechop 2'))).toBe(false);
-    // The shorthanded side issues a plain one-slot choice for its living slot.
     expect(legalChoices(root, 'p2').map(option => option.choice)).toContain('move protect');
   });
 
@@ -389,8 +377,7 @@ describe('sim forward model', () => {
 
 describe('one-sided forced switch (waiting side)', () => {
   const midSwitchBattle = () => {
-    // Seismic Toss at level 100 deals a fixed 100: Pikachu at level 30
-    // faints, p2 must pick a replacement, p1 can only wait.
+    // Seismic Toss at level 100 deals a fixed 100: Pikachu at level 30 faints.
     const battle = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
       [
@@ -410,7 +397,6 @@ describe('one-sided forced switch (waiting side)', () => {
     expect(legalChoices(root, 'p1')).toEqual([{ choice: 'wait', label: '(waiting)' }]);
     expect(legalChoices(root, 'p2').map(option => option.choice)).toEqual(['switch 2']);
 
-    // The advance applies only the switching side and reaches a boundary.
     const next = advancePosition(root, 'wait', 'switch 2', '5,6,7,8');
     const nextBattle = positionBattle(next);
     expect(nextBattle.sides[1].active[0]?.species.name).toBe('Eevee');
@@ -465,12 +451,8 @@ describe('team preview (turn 0)', () => {
 });
 
 describe('happiness-move choice tokens (return102 family)', () => {
-  // Gen 6 requests display happiness moves with their computed base power
-  // ("Return 102" at the default 255 happiness) while the entry's `id`
-  // stays `return`. Tokens built from the display name produced
-  // `move return102`, which the sim rejects — silently gapping every turn
-  // with an active Return user across the gen6 feedback corpus and failing
-  // old-gen branching loudly (ledger: REGISTERED BUG 2026-08-14).
+  // Gen 6 requests display happiness moves with their computed base power ("Return 102" at the default 255 happiness)
+  // while the entry's `id` stays `return`; a token built from the display name (`move return102`) is rejected by the sim.
   const makeGen6Battle = (p1Sets: PokemonSet[], p2Sets: PokemonSet[], doubles = false): Battle => {
     const battle = new Battle({
       formatid: toID(doubles ? 'gen6doublescustomgame' : 'gen6customgame'),
@@ -495,10 +477,8 @@ describe('happiness-move choice tokens (return102 family)', () => {
     expect(choices).toContain('move return');
     expect(choices).toContain('move frustration');
     expect(choices).not.toContain('move return102');
-    // The label stays what the player sees.
     expect(p1.find(option => option.choice === 'move return')!.label).toContain('Return');
-    // The sim accepts the id token — the exact rejection the display-name
-    // token produced ("doesn't have a move matching return102").
+    // The sim accepts the id token; the display-name token was rejected with "doesn't have a move matching return102".
     const child = advancePosition(root, 'move return', 'move protect', '1,2,3,4');
     expect(positionBattle(child).turn).toBe(positionBattle(root).turn + 1);
   });
@@ -510,7 +490,7 @@ describe('happiness-move choice tokens (return102 family)', () => {
       true,
     )));
     const p1 = legalChoices(root, 'p1');
-    // Doubles choices are combined slot pairs — inspect the halves.
+    // Doubles choices are combined slot pairs.
     const returnChoices = p1.map(option => option.choice).filter(choice => choice.includes('return'));
     expect(returnChoices.length).toBeGreaterThan(0);
     for (const choice of returnChoices) {
@@ -521,13 +501,10 @@ describe('happiness-move choice tokens (return102 family)', () => {
 });
 
 describe('concealed trapping (Magnet Pull family)', () => {
-  // The sim marks a Magnet-Pull-trapped Steel type `trapped: 'hidden'` and
-  // deliberately keeps the REQUEST silent — the player has not seen the
-  // trapper's ability. The switch validation still rejects, so offering the
-  // switch was a guaranteed reject that killed the whole turn eval
-  // (smogtours-gen8ou-573756 t24/32/38/39/40: `p2 "switch 2": Can't
-  // switch: The active Pokémon is trapped`). The analyzer holds the full
-  // state — mirror the liveDisabled rule and consult the live field.
+  // The sim marks a Magnet-Pull-trapped Steel type `trapped: 'hidden'` and keeps the request silent (the player has not seen
+  // the trapper's ability), but switch validation still rejects. Offering the switch killed the whole turn eval
+  // (smogtours-gen8ou-573756 t24/32/38/39/40: `p2 "switch 2": Can't switch: The active Pokémon is trapped`). The analyzer
+  // holds the full state, so it mirrors the liveDisabled rule and consults the live field.
   const makeTrapBattle = (): Battle => {
     const battle = new Battle({
       formatid: toID('gen8customgame'),
@@ -551,7 +528,7 @@ describe('concealed trapping (Magnet Pull family)', () => {
   test('a hidden-trapped active offers no bench switches; the search completes', async () => {
     const battle = makeTrapBattle();
     const melmetal = battle.sides[1].active[0]!;
-    // Preconditions: the live field knows, the request conceals.
+    // The live field knows; the request conceals.
     expect(melmetal.trapped).toBeTruthy();
     expect((battle.sides[1].activeRequest?.active?.[0] as { trapped?: boolean } | undefined)?.trapped).toBeFalsy();
 
@@ -559,12 +536,10 @@ describe('concealed trapping (Magnet Pull family)', () => {
     const p2Choices = legalChoices(root, 'p2').map(option => option.choice);
     expect(p2Choices.some(choice => choice.startsWith('switch'))).toBe(false);
     expect(p2Choices).toContain('move thunderpunch');
-    // The free side keeps its bench.
     const p1Choices = legalChoices(root, 'p1').map(option => option.choice);
     expect(p1Choices.some(choice => choice.startsWith('switch'))).toBe(true);
 
-    // The real regression: a full search on the position must not die on a
-    // guaranteed-reject switch cell.
+    // A full search on the position must not die on a guaranteed-reject switch cell.
     const { searchPosition } = await import('../src/search');
     const result = searchPosition(root.serialized, { depth: 1, samples: 1, tera: false });
     expect(result.perSide.p2.some(option => option.choice.startsWith('switch'))).toBe(false);

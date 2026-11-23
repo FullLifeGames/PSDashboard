@@ -38,15 +38,14 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
   return battle;
 }
 
-/** The material static in win-prob units, as the leaf read it before round 33. */
+/** The material static in win-prob units, without the last-pair race. */
 const staticLeaf = (battle: Battle) =>
   wpUnits(evaluatePosition(battle, createMatchupCache()), battle.gameType === 'doubles', battleFaintedFraction(battle));
 
 describe('last-pair race static (round 33)', () => {
   test('the race winner reads the base plus the clock margin, capped', () => {
-    // A burned Toxapex with no damaging move (Recover, Haze) against a
-    // Choice Band Zapdos-Galar: the wall never lands, the Band breaks the
-    // heal economy — the loser clock is infinite, so the full margin applies.
+    // A burned Toxapex with no damaging move (Recover, Haze) against a Choice Band Zapdos-Galar: the Band breaks the heal
+    // economy and the loser clock is infinite, so the full margin applies.
     const battle = makeBattle(
       [makeSet('Pex', 'Toxapex', ['Recover', 'Haze'])],
       [makeSet('Zap', 'Zapdos-Galar', ['Stomping Tantrum', 'Close Combat'], 100, { item: 'Choice Band' })],
@@ -55,7 +54,7 @@ describe('last-pair race static (round 33)', () => {
     const race = lastPairRace(battle, createMatchupCache());
     expect(race).toEqual({ winner: 1, margin: 3 });
     expect(leafValue(battle, createMatchupCache())).toBeCloseTo(-LAST_PAIR_CAP, 10);
-    // 573756 t135–t137: the material static had this Toxapex ahead on HP.
+    // 573756 t135-t137: the material static had this Toxapex ahead on HP.
     expect(staticLeaf(battle)).toBeGreaterThan(-LAST_PAIR_CAP);
   });
 
@@ -81,9 +80,7 @@ describe('last-pair race static (round 33)', () => {
   });
 
   test('fixed-damage attackers race too: a Seismic Toss user is not a wall', () => {
-    // The threat proxy had priced Seismic Toss at 0 (no base power), so the
-    // race read a level-100 Machamp as never landing against a level-30
-    // Eevee — and the last-pair static declared the Eevee the winner.
+    // Seismic Toss has no base power; priced at 0, the race read a level-100 Machamp as never landing against a level-30 Eevee.
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Protect'])],
       [makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
@@ -121,8 +118,7 @@ describe('last-pair race static (round 33)', () => {
   });
 
   test('doubles: one living body per side, both on the field, races too', () => {
-    // Two bodies per side (the sim refuses a one-mon doubles preview); the
-    // partners faint, leaving one body per side on the field.
+    // Two bodies per side (the sim refuses a one-mon doubles preview); the partners faint, leaving one body per side.
     const battle = makeBattle(
       [makeSet('Pex', 'Toxapex', ['Recover', 'Haze']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Zap', 'Zapdos-Galar', ['Stomping Tantrum', 'Close Combat'], 100, { item: 'Choice Band' }), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -137,9 +133,8 @@ describe('last-pair race static (round 33)', () => {
   });
 
   test('the sweep variant fires only behind the flag when a decided sweeper stands', () => {
-    // A level-100 Machamp against two level-5 Pikachu: the decided-sweep
-    // profile sees it clearing both; with two bodies alive on p2 the
-    // strict last-pair rule stays out.
+    // A level-100 Machamp against two level-5 Pikachu: the decided-sweep profile sees it clearing both; with two bodies
+    // alive on p2 the strict last-pair rule stays out.
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Close Combat', 'Protect'])],
       [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 5), makeSet('Chu', 'Pikachu', ['Tackle', 'Growl'], 5)],

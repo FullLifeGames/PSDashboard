@@ -4,14 +4,7 @@ import { cellKey } from '../src/rank';
 import { keyedCellValue } from '../src/search/merge-pool';
 import type { MctsTreeStats } from '../src/types';
 
-/**
- * The MCTS root merge on synthetic trees: pooled cell means and the
- * equilibrium ranking over them, the starved-support verification (round 7:
- * which cells are chance-suspect, how the sampler's values replace them),
- * and the value rule that keeps a rich pool's depth under verification
- * (round 32). Moved here from eval-search.spec.ts when that file reached
- * its size pin.
- */
+/** The MCTS root merge on synthetic trees: pooled cell means, the equilibrium ranking, and the verification of chance-suspect cells. */
 
 describe('mcts merge pools tree-informed cells', () => {
   const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
@@ -32,29 +25,24 @@ describe('mcts merge pools tree-informed cells', () => {
     ]);
     const merged = mergeMctsTrees([t1, t2]);
     expect(merged.matrix).toBeTruthy();
-    // Pooled cell means with ONE static prior: (Σtotal + value)/(Σvisits + 1);
-    // the (B,Y) cell no tree expanded falls back to the root static.
+    // Pooled cell means with one static prior: (sum total + value) / (sum visits + 1); the (B,Y) cell no tree expanded falls
+    // back to the root static.
     expect(merged.matrix!.values[0][0]).toBeCloseTo((4.8 + 1.0 + 0.5) / 11, 10);
     expect(merged.matrix!.values[0][1]).toBeCloseTo((0.4 + 0.2) / 3, 10);
     expect(merged.matrix!.values[1][0]).toBeCloseTo((-0.9 - 0.4) / 4, 10);
     expect(merged.matrix!.values[1][1]).toBeCloseTo(0.1, 10);
-    // Row A dominates the pooled game — the equilibrium ranking says so.
     expect(merged.perSide.p1[0].label).toBe('A');
     expect(merged.perSide.p1.length).toBe(2);
-    // HYBRID: the merged score is the summed-marginal visit-mean formula —
-    // top-visited p1 mean 6/10, top-visited p2 mean (6−2)/15.
+    // The merged score is the summed-marginal visit mean: top-visited p1 mean 6/10, top-visited p2 mean (6-2)/15.
     expect(merged.score).toBeCloseTo((6 / 10 + 4 / 15) / 2, 10);
     expect(merged.interval).toBeCloseTo(Math.abs(4 / 15 - 6 / 10), 10);
   });
 });
 
 describe('starved support cells are verified before the verdict', () => {
-  // Draft t56 mechanism in miniature: each root cell fixes ONE chance
-  // outcome per tree, so a 1-2 visit cell can carry a lucky sample (the
-  // Draco Meteor that missed) and the equilibrium solve trusts it at face
-  // value — the sack row dominates on noise. The fix: cells the solve's
-  // support leans on with too few pooled visits are re-priced by the matrix
-  // mode's multi-seed cell sampler and REPLACE the tree value.
+  // Draft t56 in miniature: each root cell fixes one chance outcome per tree, so a 1-2 visit cell can carry a lucky sample (the
+  // Draco Meteor that missed) and the solve trusts it at face value. Cells the solve's support leans on with too few pooled
+  // visits are re-priced by the matrix mode's multi-seed cell sampler, which replaces the tree value.
   const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
   const mk = (marginals: Pick<MctsTreeStats, 'p1N' | 'p1W' | 'p2N' | 'p2W'>, cells: MctsTreeStats['cells'], extra: Partial<MctsTreeStats> = {}): MctsTreeStats => ({
@@ -62,9 +50,8 @@ describe('starved support cells are verified before the verdict', () => {
     ...marginals, visits: 25, depth: 2,
     rootValue: 0.5, cells, result: emptyResult, ...extra,
   });
-  // Row Safe: well-visited, converged at −0.2. Row Sack: (Sack,X) starved
-  // at 2+1 visits with a lucky +0.5; (Sack,Y) never expanded (reads the
-  // rosy root static 0.5).
+  // Row Safe: well-visited, converged at -0.2. Row Sack: (Sack,X) starved at 2+1 visits with a lucky +0.5; (Sack,Y) never
+  // expanded (reads the rosy root static 0.5).
   const t1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, [
     { key: cellKey(0, 0), visits: 12, total: -2.4, value: -0.2, ended: false },
     { key: cellKey(0, 1), visits: 8, total: -1.6, value: -0.2, ended: false },
@@ -102,16 +89,13 @@ describe('starved support cells are verified before the verdict', () => {
     expect(merged.matrix!.values[1][0]).toBeCloseTo(-0.8, 10); // replaced, not pooled
     expect(merged.matrix!.values[1][1]).toBeCloseTo(-0.8, 10);
     expect(merged.perSide.p1[0].label).toBe('Safe');
-    // HYBRID: the score is the summed-marginal visit-mean — verification
-    // must not move it (records stay comparable).
+    // Verification must not move the summed-marginal visit-mean score (records stay comparable).
     expect(merged.score).toBeCloseTo(unverified.score, 10);
   });
 
   test('trees that DISAGREE on a well-visited cell flag it too', () => {
-    // Visits measure subtree exploration, not chance samples — a cell with
-    // plenty of pooled visits still carries at most one transition outcome
-    // per tree. Here (Safe,Y) has 19 pooled visits in both trees but the
-    // trees saw opposite outcomes (−0.33 vs +0.36) — chance-suspect.
+    // Visits measure subtree exploration, not chance samples: a cell with plenty of pooled visits still carries one transition
+    // outcome per tree. (Safe,Y) has 19 pooled visits in both trees but the trees saw opposite outcomes (-0.33 vs +0.36).
     const d1 = mk({ p1N: [20, 2], p1W: [-4, 1], p2N: [20, 2], p2W: [-4, 1] }, [
       { key: cellKey(0, 0), visits: 12, total: -2.4, value: -0.2, ended: false },
       { key: cellKey(0, 1), visits: 10, total: -3.3, value: -0.3, ended: false },
@@ -129,9 +113,8 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('boundary support cells are chance-suspect regardless of visit stats (round 7)', () => {
-    // (Safe,X) is rich and agreeing — the visit/spread rules trust it. But
-    // as a boundary cell its K fixed outcomes cannot represent an
-    // accuracy×killFraction split: suspect by construction.
+    // (Safe,X) is rich and agreeing, so the visit and spread rules trust it; as a boundary cell its K fixed outcomes cannot
+    // represent an accuracy x killFraction split, so it is suspect by construction.
     const cells = [
       { key: cellKey(0, 0), visits: 12, total: -2.6, value: -0.2, ended: false },
       { key: cellKey(0, 1), visits: 8, total: -1.8, value: -0.2, ended: false },
@@ -147,9 +130,7 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('a boundary cell that ended the game still verifies; a plain ended cell stays excluded (round 7)', () => {
-    // A mutual-kill range ends the game in EVERY drawn class — the ended
-    // flag is exactly why the pool cannot see the other class. Non-boundary
-    // ended cells keep today's exclusion.
+    // A mutual-kill range ends the game in every drawn class, which is why the pool cannot see the other class.
     const cells = [
       { key: cellKey(0, 0), visits: 1, total: 2.0, value: 1, ended: true },
       { key: cellKey(0, 1), visits: 8, total: -1.8, value: -0.2, ended: false },
@@ -165,8 +146,7 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('verified-cell diagnostics attach sorted by (i, j) (round 7)', () => {
-    // The pooled executor returns chunk results in completion order — an
-    // unsorted attach would be run-nondeterministic.
+    // The pooled executor returns chunk results in completion order; an unsorted attach would be nondeterministic.
     const diag = (i: number, j: number) => ({
       i, j, p1Choice: 'Sack', p2Choice: 'Y', missing: ['miss'],
       analytic: { miss: 0.2, 'hit-kill': 0.8 }, sampled: { 'hit-kill': 3 },
@@ -178,15 +158,13 @@ describe('starved support cells are verified before the verdict', () => {
     ]);
     const merged = mergeMctsTrees([t1, t2], verified);
     expect(merged.koDiagnostics?.map(d => [d.i, d.j])).toEqual([[0, 1], [1, 1]]);
-    // No verify round → no diagnostics key at all.
     expect(mergeMctsTrees([t1, t2]).koDiagnostics).toBeUndefined();
   });
 
   test('a rich, agreeing boundary cell keeps the tree continuation under the analytic split (round 32)', () => {
-    // Four trees played (Safe,X) out to about −0.96 with plenty of visits;
-    // the sampler says a 5% kill class exists (−1) and the open class reads
-    // a one-ply static of +0.03. Verification must not replace depth with
-    // the static (573756 t138): value ≈ 0.05·(−1) + 0.95·(−0.96).
+    // Four trees played (Safe,X) out to about -0.96 with plenty of visits; the sampler says a 5% kill class exists (-1) and
+    // the open class reads a one-ply static of +0.03. Verification must not replace depth with the static (573756 t138):
+    // value = 0.05 * (-1) + 0.95 * (-0.96).
     const rich = (offset: number) => mk({ p1N: [40, 2], p1W: [-38, 1], p2N: [40, 2], p2W: [-38, 1] }, [
       { key: cellKey(0, 0), visits: 30, total: -28.8 - offset * 0.1, value: -0.9, ended: false },
       { key: cellKey(0, 1), visits: 8, total: -1.6, value: -0.2, ended: false },
@@ -203,10 +181,8 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('a played-out cell without a blend keeps the pooled value; a middlegame or starved one takes the sampler (round 32)', () => {
-    // Depth outranks the one-ply sampler only where the pool has played the
-    // cell out (|continuation| at or beyond the depth floor). A rich
-    // middlegame pool at −0.3 keeps the round-7 sampler (655336 t24/t26), a
-    // starved cell (one visit per tree) takes the sampler as before.
+    // Depth outranks the one-ply sampler only where the pool has played the cell out (|continuation| at or beyond the depth
+    // floor). A rich middlegame pool at -0.3 keeps the sampler (655336 t24/t26), as does a starved cell (one visit per tree).
     const richPlain = (offset: number, mean: number) => mk({ p1N: [30, 3], p1W: [30 * mean, 1.5], p2N: [30, 3], p2W: [30 * mean, 1.5] }, [
       { key: cellKey(0, 0), visits: 20, total: 20 * mean + offset * 0.2, value: mean, ended: false },
       { key: cellKey(1, 0), visits: 1, total: 0.5, value: 0.5, ended: false },
@@ -225,9 +201,8 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('a rich, agreeing boundary cell below the depth floor keeps the sampler blend (round 32)', () => {
-    // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw × Return while
-    // the sampler's static read +0.08; a middlegame mean over exploration is
-    // not a verdict, so the round-7 sampler stands.
+    // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw x Return while the sampler's static read +0.08; a middlegame mean
+    // over exploration is not a verdict, so the sampler stands.
     const mid = (offset: number) => mk({ p1N: [40, 2], p1W: [20, 1], p2N: [40, 2], p2W: [20, 1] }, [
       { key: cellKey(0, 0), visits: 30, total: 15.6 - offset * 0.1, value: 0.5, ended: false },
     ]);
@@ -238,10 +213,8 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('a rich, agreeing cell with two open classes keeps the sampler blend (round 32)', () => {
-    // Hit and miss both continue the game. Every tree may have drawn the
-    // hit, so the pool's continuation says nothing about the miss class;
-    // substituting it would erase the 10% miss (655336 t23, the round-7
-    // healing). The sampler's blend stands.
+    // Hit and miss both continue the game. Every tree may have drawn the hit, so the pool's continuation says nothing about
+    // the miss class; substituting it would erase the 10% miss (655336 t23). The sampler's blend stands.
     const rich = (offset: number) => mk({ p1N: [40, 2], p1W: [-38, 1], p2N: [40, 2], p2W: [-38, 1] }, [
       { key: cellKey(0, 0), visits: 30, total: -28.8 - offset * 0.1, value: -0.9, ended: false },
     ]);
@@ -256,9 +229,8 @@ describe('starved support cells are verified before the verdict', () => {
   });
 
   test('a disagreeing boundary cell keeps the sampler blend (the round-7 case)', () => {
-    // One tree rode the other outcome of a root roll: the pool's means are
-    // −0.9 / 0.3 / −0.9 and cannot be assigned to classes here, so the
-    // sampler's analytic blend stands exactly as before round 32.
+    // One tree rode the other outcome of a root roll: the pool's means are -0.9 / 0.3 / -0.9 and cannot be assigned to
+    // classes, so the sampler's analytic blend stands.
     const split = (mean: number) => mk({ p1N: [30, 3], p1W: [30 * mean, 1.5], p2N: [30, 3], p2W: [30 * mean, 1.5] }, [
       { key: cellKey(0, 0), visits: 20, total: 21 * mean - mean, value: mean, ended: false },
     ]);
@@ -294,9 +266,8 @@ describe('tree disagreement is visit-weighted (round 33)', () => {
   });
 
   test('a played-out pool with one thin outlier keeps its depth in the merge (573756 t137)', () => {
-    // Four trees on (Safe,X): three deep at about −0.94 with 200 visits, one
-    // thin at −0.70 with 54; the sampler's one-ply static reads +0.06. The
-    // old max−min rule (0.24 > 0.15) handed the cell to the static.
+    // Four trees on (Safe,X): three deep at about -0.94 with 200 visits, one thin at -0.70 with 54; the sampler's one-ply
+    // static reads +0.06. A max-min spread rule (0.24 > 0.15) would hand the cell to the static.
     const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
     const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
     const mk = (visits: number, mean: number): MctsTreeStats => ({
@@ -339,7 +310,7 @@ describe('per-class continuation (round 33)', () => {
     const merged = mergeMctsTrees(trees, new Map([[cellKey(0, 0), { i: 0, j: 0, value: -0.04, ended: false, blend }]]));
     // 0.8 · pooled hit continuation (≈ −0.96) + 0.2 · sampler miss mean (0.2)
     expect(merged.matrix!.values[0][0]).toBeCloseTo(0.8 * -0.96 + 0.2 * 0.2, 1);
-    // The old one-open-class rule kept the sampler's −0.15 here: two open classes, no assignment.
+    // Two open classes: a one-open-class rule would keep the sampler's -0.15.
     expect(merged.matrix!.values[0][0]).toBeLessThan(-0.6);
   });
 
@@ -388,7 +359,6 @@ describe('row completion for the verify step (round 33)', () => {
     expect(pairs).not.toContain('B×Y'); // rich
     expect(jobs.length).toBeLessThanOrEqual(12);
     for (const job of jobs) expect(job.samples).toBe(VERIFY_SAMPLES);
-    // No starved jobs: nothing to complete.
     expect(rowCompletedCells(trees, merged, [])).toEqual([]);
   });
 
@@ -469,7 +439,7 @@ describe('the merge weighs a keyed cell by the Dex (round 89, T322, #59)', () =>
       const expected = (shape.wHeavy * mean(heavy) + shape.wLight * mean(light)) / (shape.wHeavy + shape.wLight);
       expect(merged.matrix!.values[0][0]).toBeCloseTo(expected, 10);
       expect(keyedCellValue(cells)).toBeCloseTo(expected, 10);
-      // the visit pool sits near the heavy class: the two differ
+      // The visit pool sits near the heavy class, so the two differ.
       const pool = cells.reduce((sum, c) => sum + c.total, 0) / cells.reduce((sum, c) => sum + c.visits, 0);
       expect(Math.abs(expected - pool)).toBeGreaterThan(0.03);
     });
@@ -523,7 +493,7 @@ describe('the merge weighs a keyed cell by the Dex (round 89, T322, #59)', () =>
         tree([light[0]], 10), tree([heavy[0]], 11), tree([heavy[1]], 12), tree([heavy[2]], 13, 'B'),
       ];
       expect(mergeMctsTrees(trees).perSide.p1[0].line).toEqual(line(11));
-      // No keyed tree in the principal cell: today's rule, the first tree that agrees.
+      // No keyed tree in the principal cell: the first tree that agrees.
       const bare = (entry: Cell): Cell => ({ ...entry, classKey: undefined, classWeight: undefined });
       const unkeyed = [tree([bare(heavy[0])], 20), tree([bare(heavy[1])], 21)];
       expect(mergeMctsTrees(unkeyed).perSide.p1[0].line).toEqual(line(20));

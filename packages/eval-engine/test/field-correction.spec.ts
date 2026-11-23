@@ -7,12 +7,7 @@ import { advancePositionWithLog, createRootPosition } from '../src/forward-model
 import { serializeBattleStable } from '../src/forward/serialize';
 import { SEEDS, stableLog, withSimFast } from './sim-fast-helpers';
 
-/**
- * Round 60 (T92): the snapshot correction wrote side conditions without
- * their layers (Spikes priced NaN, the sim skipped the damage; Toxic Spikes
- * never poisoned badly), let corrected weather last forever and left
- * corrected terrain without its state.
- */
+/** The snapshot correction writes side conditions with their layers, weather with its duration and terrain with its state. */
 
 const mon = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy', gender: '',

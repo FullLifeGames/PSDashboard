@@ -9,16 +9,7 @@ import { DECIDED_SCORE, HEALTHY_SACK_FLOOR } from '../src/turn-analysis/types';
 import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
 import { resolveTeraPreference } from '../src/tera';
 
-/**
- * End-to-end pin of the GPL game-report findings that drove this plan:
- *  - T22: Bene's Stealth Rock must not read as a mistake (victim-aware
- *    hazards + damage-consistent spreads).
- *  - T26: Pres' Iron Jugulis sack must not read as a mistake (the coverage
- *    term prices Rhydon's irreplaceability against Salazzle).
- *  - T29: Bene's Uxie sack reads as a sacrifice, never an unpunished risk.
- *  - Clefable is not simmed with Magic Guard (it visibly took rocks chip).
- * Assertions stay coarse (tiers, flags) so weight tuning cannot break them.
- */
+/** The GPL game-report turns on the real reconstruction; assertions stay coarse (tiers, flags) so weight tuning cannot break them. */
 
 describe('GPL replay end-to-end verdicts', () => {
   test('the four findings hold on the committed fixture', { timeout: 240000 }, async () => {
@@ -65,50 +56,36 @@ describe('GPL replay end-to-end verdicts', () => {
     };
 
     const t22 = await analyze(22);
-    // Stealth Rock into a rock-weak roster is not a mistake.
     expect(t22.p1.regret === null || t22.p1.regret < TIER_THRESHOLDS.mistake ||
       t22.p1.tier === 'inaccuracy' || t22.p1.tier === undefined).toBe(true);
 
     const t26 = await analyze(26);
-    // Sacking the redundant Jugulis (keeping Rhydon for Salazzle) is not a
-    // mistake once coverage prices the sole answer.
+    // Sacking the redundant Jugulis keeps Rhydon, the sole answer to Salazzle.
     expect(t26.p2.tier === undefined || t26.p2.tier === 'inaccuracy' || !!t26.p2.sacrifice).toBe(true);
 
     const t29 = await analyze(29);
-    // Feeding a 9%-HP Uxie is a sacrifice, not a risk.
+    // A 9%-HP Uxie is fed in as a sacrifice.
     expect(t29.p1.riskUnpunished).toBeFalsy();
     if (t29.p1.tier) expect(t29.p1.sacrifice).toBeTruthy();
 
-    // T38/T39 — the graph's tail: correction drift left p2.pokemonLeft high
-    // and Rhydon's isActive false, the search threw on both turns, and the
-    // graph ended at T37 (user report). Both evaluate now, decisively for
-    // the winner mopping up.
+    // Turns 38 and 39: correction drift left p2.pokemonLeft high and Rhydon's isActive false, so the search threw on both turns and
+    // the graph ended at turn 37. Both must evaluate, decisively for the winner mopping up.
     await analyze(38);
     await analyze(39);
     expect(scoreByTurn.get(38)!).toBeGreaterThan(0);
     expect(scoreByTurn.get(39)!).toBeGreaterThan(0);
 
-    // T14: Cobalion was KO'd before it ever acted — the side prices through
-    // the charitable stay-in phantom instead of reading "unclear (a choice
-    // never surfaced)" (same shape as T36).
+    // Turn 14: Cobalion was KO'd before it ever acted; the side prices through the stay-in phantom instead of reading "unclear
+    // (a choice never surfaced)".
     const t14 = await analyze(14);
     expect(t14.p2.neverActed).toBe(true);
     expect(t14.p2.played?.label).toContain('stayed in');
 
-    // T35: the WINNER feeds a healthy Salazzle into Knock Off while the
-    // engine calls the game decisively won on both sides of the sack
-    // (probe: 83% before, 71% after; with the body deleted outright p1
-    // still sits at 72% — the value was surplus headroom). Simplification
-    // framing, never a mistake-tier misplay. Round 47: the bench reads the
-    // protocol, so Rhydon stands at its true 100 % (the log's turn-36 switch
-    // line) instead of the sim's 88 %, and the score after the sack reads
-    // 0.38, just under the healthy-sack floor: the stamp stands exactly
-    // when both scores hold the floor, and the turn never reads as a mistake.
-    // Round 70 (batch gate): the stamp demotes a tier, so it needs one that
-    // the decided-position leniency leaves standing. Under the round-70
-    // static the turn reads 0.82 before and 0.64 after the sack, regret
-    // 0.171 (0.204 before): the decided leniency alone clears the
-    // inaccuracy and no stamp renders; the turn still never reads as a mistake.
+    // Turn 35: the winner feeds a healthy Salazzle into Knock Off while the engine calls the game decisively won on both sides of
+    // the sack; that is simplification, never a mistake-tier misplay. Rhydon stands at its true 100 % (the log's turn-36
+    // switch line), not the sim's 88 %. The sacrifice stamp renders exactly when both scores hold the healthy-sack floor and
+    // the regret keeps a tier after the decided-position leniency (the turn reads 0.82 before and 0.64 after the sack, regret
+    // 0.171: the leniency alone clears the inaccuracy and no stamp renders).
     await analyze(36);
     const t35 = await analyze(35, scoreByTurn.get(36) ?? null);
     const floorHolds = scoreByTurn.get(35)! >= HEALTHY_SACK_FLOOR && scoreByTurn.get(36)! >= HEALTHY_SACK_FLOOR;
@@ -117,9 +94,7 @@ describe('GPL replay end-to-end verdicts', () => {
     if (t35.p1.sacrifice) expect(t35.p1.sacrifice.healthy).toBe(true);
     expect(t35.p1.tier === undefined || t35.p1.tier === 'inaccuracy').toBe(true);
 
-    // T25 (pivot pairs): the ranked lists enumerate "U-turn → X" as
-    // first-class choices on the real reconstruction — the finding was that
-    // the engine could not say WHICH incoming mon makes the pivot safe.
+    // Turn 25: the ranked lists enumerate "U-turn → X" pivot pairs as first-class choices.
     const t25runtime = await reconstructBranchRuntime({
       format: getBranchSimulatorFormat(replay),
       p1Team, p2Team,
@@ -135,7 +110,6 @@ describe('GPL replay end-to-end verdicts', () => {
       .filter(row => row.choice.includes(' > switch '));
     expect(pairRows.length).toBeGreaterThan(0);
     for (const row of pairRows) expect(row.label).toContain(' → ');
-    // The pair rows are real ranked entries with their own values.
     for (const row of pairRows) expect(Number.isFinite(row.ev)).toBe(true);
   });
 });

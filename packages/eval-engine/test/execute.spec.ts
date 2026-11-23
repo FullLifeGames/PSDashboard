@@ -521,7 +521,7 @@ describe('followup-fixes', () => {
         value: 'Heavy-Duty Boots',
         source: 'guessed',
       }));
-      // Garchomp took the rocks damage — no boots inference.
+      // Garchomp took the rocks damage, so no boots inference.
       expect(garchomp?.item.value).not.toBe('Heavy-Duty Boots');
     });
   });
@@ -572,10 +572,8 @@ describe('followup-fixes', () => {
       const battle = runtime.battleStream.battle!;
       expect(battle.turn).toBe(1);
 
-      // Simulates a double click racing two identical writes into the sim: the
-      // second pair of commands lands on the NEXT request and silently commits
-      // an extra, unintended turn — this documents why the UI needs the
-      // in-flight guard (the hook now blocks the second call entirely).
+      // A double click races two identical writes into the sim: the second pair lands on the next request and silently
+      // commits an extra turn, which is why the UI needs its in-flight guard.
       const commands = [
         { side: 'p1' as const, command: 'move 1' },
         { side: 'p2' as const, command: 'move 1' },
@@ -586,8 +584,7 @@ describe('followup-fixes', () => {
       ]);
 
       expect(first.ok || second.ok).toBe(true);
-      // Without a guard the battle can advance past turn 2 — the guarded hook
-      // must never let this happen. Documenting the raw engine behaviour:
+      // Without a guard the battle advances past turn 2.
       expect(battle.turn).toBeGreaterThanOrEqual(2);
     });
   });

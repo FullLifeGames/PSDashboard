@@ -6,15 +6,7 @@ import { evalFeatures, evaluatePosition } from '../src/eval-function';
 import { readFileSync } from 'node:fs';
 import { buildTeamsFromReplay, type SmogonUsageStats } from '@fulllifegames/replay-core';
 
-/**
- * Mechanics the expert-feedback round put on trial (2026-08-15, 655336
- * t23/t24 anomalies): Intimidate drops, Dragon Dance boosts, Regenerator,
- * Rocky Helmet, and hazard re-entry. All five behave — the verdict
- * anomalies were VALUATION gaps (active-side re-entry blindness, inert
- * sweep weight; ledger + agenda item ④), not broken mechanics. These pins
- * keep the acquittal honest: each mechanic through the search's own
- * advance/round-trip path, plus the static-eval reactions that exist.
- */
+/** Intimidate drops, Dragon Dance boosts, Regenerator, Rocky Helmet and hazard re-entry through the search's own advance path (655336 t23/t24). */
 
 function makeSet(name: string, species: string, moves: string[], extra?: Partial<PokemonSet>): PokemonSet {
   return {
@@ -63,10 +55,8 @@ describe('searched mechanics stay honest', () => {
     const ddBattle = positionBattle(afterDD);
     expect(ddBattle.sides[0].active[0]!.boosts.atk).toBe(1);
     expect(ddBattle.sides[0].active[0]!.boosts.spe).toBe(1);
-    // Isolated 1v1: the flat stage term paid ~+0.29 when pinned. Directional
-    // guard on the boosts column, so weight tuning cannot break the pin: the
-    // singles table prices boostsBiting since round 69 (T49), and a Dragonite
-    // with no attack in its set has no move that reads the stage.
+    // Directional guard on the boosts column, so weight tuning cannot break it: a Dragonite with no attack in its set has no
+    // move that reads the stage, and the singles table prices boostsBiting.
     const afterNoop = advancePosition(mkRoot(), 'move splash', 'move protect', '1,2,3,4');
     expect(evalFeatures(positionBattle(afterDD)).boosts).toBeGreaterThan(evalFeatures(positionBattle(afterNoop)).boosts);
   });
@@ -100,9 +90,8 @@ describe('searched mechanics stay honest', () => {
   });
 
   test('a benched mon below hazard-entry HP stops counting (effHp 0)', () => {
-    // SR+Spikes set up for real; the benched Lopunny at 10% sits below its
-    // entry damage — the wincon-vs-hazards rule prices it as disabled
-    // (pinned at ~0.44 toward p1; directional guard only).
+    // SR+Spikes set up for real; the benched Lopunny at 10% sits below its entry damage, so the wincon-vs-hazards rule prices
+    // it as disabled (about 0.44 toward p1; directional guard only).
     const build = () => {
       const battle = makeBattle(
         [makeSet('Skarmory', 'Skarmory', ['Stealth Rock', 'Spikes'])],

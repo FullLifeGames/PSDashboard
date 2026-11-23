@@ -8,16 +8,15 @@ import { dexOfRules, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 83 (T307, GitHub issue #3): a screen of a Light Clay holder keeps its eight turns in a variation. The simulator sets a
- * condition with the duration its own rule gives (Light Clay: eight turns for Reflect, Light Screen and Aurora Veil). At every
- * turn boundary the reconstruction synced the field with the client's snapshot and wrote the client's minimum, which counts
- * five turns because the log never shows the item. The main line synced again every turn, so nothing ended early there; a
- * variation stops syncing, and the screen ended after five (gen9terapreviewdraft-2182991758: Latias with Light Clay, Light
- * Screen on turn 34 and Reflect on turn 35, the variation from turn 38).
+ * A screen of a Light Clay holder keeps its eight turns in a variation. The simulator sets a condition with the duration its own
+ * rule gives (Light Clay: eight turns for Reflect, Light Screen and Aurora Veil); the turn boundary syncs the field with the
+ * client's snapshot, which counts five turns because the log never shows the item. The main line syncs every turn, but a
+ * variation stops syncing (gen9terapreviewdraft-2182991758: Latias with Light Clay, Light Screen on turn 34 and Reflect on turn 35,
+ * the variation from turn 38).
  *
  * The sweep: every move that sets a side condition or a pseudo weather, in every rule set and game type the corpus plays, by a
- * holder of no item and by a holder of every item and every ability that changes the condition's duration (asked of the
- * condition's own duration rule); after one turn the turn boundary keeps the simulator's duration.
+ * holder of no item and by a holder of every item and every ability that changes the condition's duration; after one turn the
+ * turn boundary keeps the simulator's duration.
  */
 await loadSimMods('gen9championsou');
 
@@ -114,10 +113,9 @@ function playRow(rules: Rules, mode: Mode, row: Row): { simulator: number | unde
 }
 
 /**
- * The second cause the sweep found (a TODO proposal of round 83, at the batch's gate): the sync deletes a condition the client's
- * snapshot does not hold. The client shows Fairy Lock only as `-fieldactivate` (Gens 6 on), and the client of Gens 8 and 9 does
- * not know the Past moves Lucky Chant, Mud Sport and Water Sport; the simulator keeps them, the turn boundary takes them away.
- * These rows fail until that fix, and turn red when it lands.
+ * The sync deletes a condition the client's snapshot does not hold. The client shows Fairy Lock only as `-fieldactivate` (Gens 6
+ * on), and the client of Gens 8 and 9 does not know the Past moves Lucky Chant, Mud Sport and Water Sport; the simulator keeps
+ * them, the turn boundary takes them away. These rows are `test.fails` and turn red once the sync keeps them.
  */
 const clientBlind = (rules: Rules, move: string): boolean =>
   (move === 'fairylock' && rules.generation >= 6)

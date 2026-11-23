@@ -12,10 +12,10 @@ import {
 import { chancesCalled, liveState, turnOf, type Called } from './flip-turn-support';
 
 /**
- * Round 89 (A6-1, ruling 24, #145): the dice-level part of the sweep behind the plain path's flip. On a copy of one turn the
- * recorder lists every chance die the simulator drew (the roll facts aside) and `flipTurn` plays one of them the other way with
- * the others held. In every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and doubles, for the dice of the
- * stalling moves, the status checks, the accuracies, the secondaries and a first-mover item, each row holds:
+ * The dice-level sweep behind the plain path's flip. On a copy of one turn the recorder lists every chance die the simulator
+ * drew (the roll facts aside) and `flipTurn` plays one of them the other way with the others held. In every rule set the corpus
+ * plays (Gens 1 to 9, the Champions mod), singles and doubles, for the dice of the stalling moves, the status checks, the
+ * accuracies, the secondaries and a first-mover item, each row holds:
  * - the chance of the die equals what the simulator passes to `randomChance` (a spy over the stream of a plain turn; for a
  *   secondary's percent, the Dex entry);
  * - the flip reaches the other branch: the protocol of the flipped turn shows the other answer, the recorded turn shows its own;
@@ -46,7 +46,7 @@ function play(board: Battle, clicks: Clicks): Played {
   const flips = recorded.dice.map(die => ({ die, flipped: flipTurn(turn, recorded, die) }));
   const called = chancesCalled(board, clicks);
   expect(liveState(board), 'the live board').toBe(before);
-  // Round 89 (A6-3a): a die the turn drew more than once is listed apart and never flipped
+  // a die the turn drew more than once is listed apart and never flipped
   for (const die of recorded.repeated) expect(recorded.dice.some(entry => entry.key === die.key), `${die.key} is listed once`).toBe(false);
   for (const { die, flipped } of flips) {
     expect(flipped.took, `${die.key} took`).toBe(true);

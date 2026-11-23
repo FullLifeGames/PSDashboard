@@ -8,14 +8,11 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 69 (T42 part 2, decision 15): the field pair as two features, at weight
- * 0 until a fit prices them. pairFocus: a foe on the field that neither of the
- * side's two actives KOs alone but both KO together, valued by the second
- * attacker's marginal share of the foe's HP, over the foes on the field.
- * pairRedirect: a living Follow Me or Rage Powder user next to a partner with
- * damage, valued by the partner's best share of a foe's HP it covers, at the
- * redirector's HP. Both are p1-positive differences and 0 in singles. The
- * premises (who KOs, who is hit) are played in the simulator.
+ * The field pair as two features at weight 0. pairFocus: a foe on the field that neither of the side's two actives KOs alone but
+ * both KO together, valued by the second attacker's marginal share of the foe's HP, over the foes on the field. pairRedirect: a
+ * living Follow Me or Rage Powder user next to a partner with damage, valued by the partner's best share of a foe's HP it
+ * covers, at the redirector's HP. Both are p1-positive differences and 0 in singles. The premises (who KOs, who is hit) are
+ * played in the simulator.
  */
 
 const FORMAT = 'gen9doublescustomgame';
@@ -179,8 +176,7 @@ describe('singles and the inert weights (round 69, T42)', () => {
   test.each([false, true])('the tables carry the cells at weight 0 (doubles %s)', doubles => {
     for (const ruleset of RULESETS) {
       const weights = featureWeights(doubles, ruleset);
-      // Round 69: the S7 fit priced pairFocus in vgc-doubles only (-188); the user gate of 13.10. (6b) set it back to 0
-      // until T199 replaces the 0/1 gate by a ramp, because the VGC score fell as a foe took damage.
+      // A 0/1 gate on pairFocus made the VGC score fall as a foe took damage, so both weights stay 0.
       expect(weights.pairFocus).toBe(0);
       expect(weights.pairRedirect).toBe(0);
     }
@@ -201,7 +197,7 @@ describe('singles and the inert weights (round 69, T42)', () => {
     const cache = createMatchupCache(ruleset);
     const features = evalFeatures(battle, cache);
     const weights = featureWeights(doubles, ruleset);
-    // The sum is the table's: the singles phase form (round 69, S9) is off here and pinned in phase-form.spec.ts.
+    // The sum is the table's: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     let diff = 0;
     for (const key of OLD_KEYS) diff += weights[key] * (features as EvalFeatures)[key];

@@ -11,9 +11,8 @@ import { configureSimFast, resetSimFastForTests } from '../src/forward/sim-fast/
 
 type DeserializeFn = typeof State.deserializeBattle;
 
-// These tests count forks as State.deserializeBattle calls, which only the
-// standard path makes; lever clone copies a template instead. They pin the
-// standard path whatever EVAL_SIM_FAST or the default says.
+// Forks are counted as State.deserializeBattle calls, which only the standard path makes (lever clone copies a template), so
+// these rows pin the standard path whatever EVAL_SIM_FAST says.
 beforeEach(() => configureSimFast([]));
 afterEach(() => resetSimFastForTests());
 
@@ -34,8 +33,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
     p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
     p2: { name: 'Beta', team: Teams.pack(p2Sets) },
   });
-  // Custom Game opens at team preview — commit the default order so the
-  // leads are actually on the field.
+  // Custom Game opens at team preview: commit the default order so the leads are on the field.
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
@@ -53,7 +51,7 @@ describe('fork counts on the standard path', () => {
       forks += 1;
       return original.call(State, serialized);
     }) as DeserializeFn;
-    // Round 35: a zero prover budget keeps this count about the matrix sampler.
+    // A zero prover budget keeps this count about the matrix sampler.
     const proverStates = PROVER_BUDGET.states; PROVER_BUDGET.states = 0;
     try {
       // 2x2 all-quiet matrix (Protect/Substitute): every cell needs one sim.
@@ -65,10 +63,8 @@ describe('fork counts on the standard path', () => {
       searchPosition(quiet, { depth: 1, samples: 3, tera: false });
       expect(forks).toBe(1 + 4); // root + 4 cells x 1 draw
 
-      // Toss KOs Pikachu (bench Eevee continues the game): those cells are
-      // roll-sensitive and take the full spread; quiet cells still take one.
-      // Round 70: the trend tiebreak probes a cell from each of its draws, so
-      // its forks grow with the draws too; the count is the matrix stage's.
+      // Toss KOs Pikachu (bench Eevee continues the game): those cells are roll-sensitive and take the full spread; quiet
+      // cells still take one. The trend tiebreak probes a cell from each of its draws, so its forks grow with the draws too.
       const violent = createRootPosition(serialize(makeBattle(
         [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
         [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
@@ -123,8 +119,7 @@ describe('fork counts on the standard path', () => {
       return original.call(State, serialized);
     }) as DeserializeFn;
     try {
-      // A sleeping Sleep Talker: which move comes out is pure seed — the
-      // cell must not be judged off a single called move.
+      // A sleeping Sleep Talker: which move comes out is pure seed, so the cell must not be judged off a single called move.
       const sleeper = () => {
         const battle = makeBattle(
           [makeSet('S', 'Snorlax', ['Sleep Talk', 'Protect'], 100)],

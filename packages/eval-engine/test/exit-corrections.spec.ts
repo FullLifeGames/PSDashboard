@@ -9,17 +9,15 @@ import { mon, RULES, RULES_WITH_DOUBLES, type Mode, type Rules } from './dice-fi
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#138): the game's switch-out ends a body's volatiles. Two corrections of the rebuild differed from the simulator's own switch.
+ * The game's switch-out ends a body's volatiles; the rebuild's corrections must leave the same volatiles as the simulator's own switch.
  *
- * 1. A body the simulator switched out and the game dragged back into the OTHER slot (Doubles OU 2553498001 turn 5: Sableye, taunted,
- *    leaves p2b for Rillaboom; Roar on p2a drags it into p2a) got the volatiles of its exit back. The check for a switch-out in the block
- *    asked about the slot the body entered, not the slot it left.
- * 2. The body a correction displaces from a slot kept its volatiles on the bench (Champions VGC 2685328963: Sableye kept its Taunt and
- *    entered turn 7 with it). The simulator's switch calls `clearVolatile` on the old active.
+ * 1. A body switched out and dragged back into the other slot (Doubles OU 2553498001 turn 5: Sableye, taunted, leaves p2b for
+ *    Rillaboom; Roar on p2a drags it into p2a) must not get the volatiles of its exit back.
+ * 2. The body a correction displaces from a slot loses its volatiles on the bench (Champions VGC 2685328963: Sableye entered
+ *    turn 7 with its Taunt). The simulator's switch calls `clearVolatile` on the old active.
  *
- * Rows: the scenes on the simulator in doubles (1) and in singles and doubles (2), both correction paths (the protocol's lines and the
- * snapshot); then a sweep over every rule set the corpus plays (Gens 1 to 9 and Champions, singles and doubles): every condition of the
- * Dex put on a body as a volatile, the simulator's own switch on one board and the correction on its twin, the same volatiles after.
+ * The sweep covers every rule set the corpus plays (Gens 1 to 9 and Champions, singles and doubles): every Dex condition put on a
+ * body as a volatile, the simulator's own switch on one board and the correction on its twin.
  */
 await loadSimMods('gen9championsou');
 
@@ -45,7 +43,7 @@ async function toTurn(session: Awaited<ReturnType<typeof open>>['session'], turn
 describe('a body the game dragged into the other slot after its switch-out (doubles)', () => {
   const p1 = [set('Pikachu', 'Static', ['Taunt', 'Splash']), set('Snorlax', 'Immunity', ['Splash'])];
   const p2 = [set('Ogerpon', 'Defiant', ['Tackle', 'Splash']), set('Sableye', 'Prankster', ['Tackle', 'Splash']), set('Rillaboom', 'Overgrow', ['Splash']), set('Pidgey', 'Keen Eye', ['Splash'])];
-  // Turn 1: Taunt lands on Sableye (p2b). Turn 2: it switches out for Rillaboom in the simulator.
+  // Taunt lands on Sableye (p2b) on turn 1; on turn 2 it switches out for Rillaboom in the simulator.
   const turn1 = '>p1 move 1 2, move 1\n>p2 move 1 1, move 1 1';
   const turn2 = '>p1 move 2, move 1\n>p2 move 1 1, switch 3';
   // The game: Rillaboom takes p2b, then Roar drags Sableye into p2a.

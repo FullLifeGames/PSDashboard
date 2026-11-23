@@ -18,13 +18,9 @@ import { rollSet as set, rootOf } from './calc-roll-oracle';
 import { killing, simDamages, strengthSeeds, type SimDamages } from './sim-rolls';
 
 /**
- * Round 69, lane D (T154): Fickle Beam doubles in power on 30 % of its uses
- * (the Dex move's onBasePower asks randomChance(3, 10) and chains a factor of
- * 2), which the calculator does not know. The chance and the factor are read
- * from the Dex handler; the engine prices the move as the mix of its two
- * strengths, each with its 16 rolls and its crits. The oracle is the
- * simulator's own damage, drawn on a seed where the stronger strength came
- * out and one where it did not (sim-rolls.ts).
+ * Fickle Beam doubles in power on 30 % of its uses (the Dex move's onBasePower asks randomChance(3, 10) and chains a factor of
+ * 2), which the calculator does not know. The oracle is the simulator's own damage, drawn on a seed where the stronger strength
+ * came out and one where it did not (sim-rolls.ts).
  */
 
 const MARKER = 'move: Fickle Beam';
@@ -53,7 +49,6 @@ describe('the strength mix is read from the Dex handler', () => {
       if (hit?.kind === 'roll') damages.add(hit.snapshot.defender.hp - positionBattle(drawn.child).sides[1].active[0]!.hp);
     }
     expect(Math.abs(strong - 200 * mix.chance)).toBeLessThan(3 * Math.sqrt(200 * mix.chance * (1 - mix.chance)));
-    // Two damages only: the weak one and the doubled one.
     expect(damages.size).toBe(2);
   });
 });
