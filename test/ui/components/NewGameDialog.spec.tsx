@@ -5,11 +5,7 @@ import { Dex } from '@pkmn/sim';
 import { NewGameDialog } from '../../../src/components/NewGameDialog';
 import { savedRecord } from '../fixtures/saved-game';
 
-/**
- * Round 89 (lane H, #105), stage H4: the New game dialog (user ruling 13.11.2026: a modal, the simulator's problems under the team
- * with Start possible, the simulator's whole format list searchable and grouped, a fresh dice seed per game that the user can read
- * and set). The real simulator runs under it: the format list, the team check and Start are the engine's.
- */
+/** The real simulator runs under the dialog: the format list, the team check and Start are the engine's. */
 
 const GOOD = `Garchomp @ Rocky Helmet
 Ability: Rough Skin
@@ -55,7 +51,6 @@ describe('the dialog', () => {
     rerender(<NewGameDialog {...props()} />);
     expect(screen.getByRole('dialog', { name: 'New game' })).toHaveAttribute('aria-modal', 'true');
     expect(start()).toBeDisabled();
-    // each empty box says what it lacks, under itself
     expect(within(team(1)).getByText('Paste a team for Player 1 to start.')).toBeInTheDocument();
     expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
     paste(1, GOOD);
@@ -127,7 +122,7 @@ describe('the format list', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   }, 60_000);
 
-  // Round 89 (#105, H7, tester finding 10): the dialog reads the format's rules from the Dex, never a list of generations.
+  // The dialog reads the format's rules from the Dex, never a list of generations.
   test('the intro says Team Preview only for a format that has one; Gen 4 OU and Gen 9 OU read from the Dex', async () => {
     render(<NewGameDialog {...props()} />);
     expect(screen.getByText(/Start opens the game at Team Preview/)).toBeInTheDocument();
@@ -251,7 +246,6 @@ describe('the dice seed', () => {
     const field = screen.getByRole('textbox', { name: 'Seed' });
     const first = (field as HTMLInputElement).value;
     expect(first).toMatch(/^\d+,\d+,\d+,\d+$/);
-    // the row stands under the Format row, in the mock's words
     const format = document.querySelector('.ps-newgame-format') as HTMLElement;
     expect(format.nextElementSibling).toBe(document.querySelector('.ps-newgame-seed'));
     expect(screen.getByText('The same seed, teams and choices roll the same dice.')).toBeInTheDocument();
@@ -360,8 +354,8 @@ describe('the saved games', () => {
 });
 
 /**
- * Round 89 (lane H, #105), H16a: Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is
- * modal), keeps the pasted teams, and Cancel starts nothing. Singles and doubles start through the same line.
+ * Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is modal), keeps the pasted teams, and
+ * Cancel starts nothing. Singles and doubles start through the same line.
  */
 describe('Start with an unsaved variation open (H16a)', () => {
   for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
@@ -413,9 +407,8 @@ describe('Start with an unsaved variation open (H16a)', () => {
 });
 
 /**
- * Round 89 (lane H, #105), H18a and H20a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
- * so. A pasted set without an ability starts with the species' first ability, written into the saved team; the team check names it
- * before Start. Singles and doubles run both.
+ * An empty seed field means a fresh seed, and the placeholder says so. A pasted set without an ability starts with the species' first
+ * ability, written into the saved team; the team check names it before Start. Singles and doubles run both.
  */
 describe('an empty seed field (H18a)', () => {
   test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
@@ -443,12 +436,11 @@ describe('a pasted set without an ability (H20a)', () => {
       await pickFormat(search, name);
       paste(1, NO_ABILITY);
       paste(2, GOOD);
-      // slot 0 of Garchomp, Sand Veil, is banned by Evasion Abilities Clause in both formats: the fill takes its next slot (X2a)
+      // slot 0 of Garchomp, Sand Veil, is banned by Evasion Abilities Clause in both formats: the fill takes its next slot
       const abilityOf = (species: string) => (species === 'Garchomp' ? 'Rough Skin' : Dex.forGen(9).species.get(species).abilities['0']);
       expect(id).toBeTruthy();
       expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();
       expect(screen.getByText(`Garchomp has no ability: plays ${abilityOf('Garchomp')}.`)).toBeInTheDocument();
-      // the other side pasted its abilities: no note under it
       expect(screen.queryByText(/Gliscor has no ability/)).toBeNull();
       await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
       await userEvent.click(screen.getByRole('button', { name: 'Start' }));

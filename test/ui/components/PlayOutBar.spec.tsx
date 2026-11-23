@@ -24,14 +24,14 @@ describe('PlayOutBar', () => {
     expect(screen.getByRole('button', { name: /Let it play out/ })).toBeDisabled();
   });
 
-  // Round 77 (C2): at turn 0 the hint names the start the run really takes.
+  // at turn 0 the hint names the start the run really takes
   test('in the turn 0 view the hint names turn 0 and the picked leads, not the turn the pointer left behind', () => {
     render(<PlayOutBar {...props({ viewTurn: 3, atTurnZero: true })} />);
     expect(screen.getByText('engine plays the game from turn 0 with the leads picked above')).toBeInTheDocument();
     expect(screen.queryByText(/from turn 3/)).toBeNull();
   });
 
-  // Round 77 (swarm A-6): at an ended position the engine has nothing to play.
+  // at an ended position the engine has nothing to play
   test('at an ended position no play-out is offered', () => {
     render(<PlayOutBar {...props({ ended: true })} />);
     expect(screen.queryByRole('button', { name: /Let it play out/ })).toBeNull();
@@ -48,7 +48,7 @@ describe('PlayOutBar', () => {
     expect(wired.onStopPlayOut).toHaveBeenCalledTimes(1);
   });
 
-  // Round 88 (T347, #83): Stop with a turn in flight keeps the run active until that turn lands; the bar says so.
+  // Stop with a turn in flight keeps the run active until that turn lands; the bar says so.
   test('after Stop with a turn in flight the bar says the engine ends the run after that turn and offers no second Stop', () => {
     const wired = props({ playOut: { active: true, stopping: { text: 'Play-out stopped', navigated: false } }, fastPlayOut: true });
     render(<PlayOutBar {...wired} />);
@@ -87,7 +87,7 @@ describe('PlayOutBar', () => {
     expect(screen.getByText(/Engine play-out running/)).not.toHaveTextContent('fast');
   });
 
-  // Round 67 (T111 point 7): the fast option says where Auto runs the tree, per game type, from the search budget.
+  // the fast option says where Auto runs the tree, per game type, from the search budget
   test('the fast option names where it saves time, per game type', () => {
     const { rerender } = render(<PlayOutBar {...props()} />);
     const title = () => screen.getByRole('checkbox', { name: /Fast play-out/ }).closest('label')?.getAttribute('title');

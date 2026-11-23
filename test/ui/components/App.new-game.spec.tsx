@@ -42,19 +42,13 @@ async function startOnLanding(names: [string, string] = ['Alice', 'Bob']) {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Start' }));
 }
 
-/**
- * Round 89 (lane H, #105), stage H4: the dialog inside the app. The start page offers New game beside the loader; Start opens the
- * game at Team Preview with its title row, its lead picker and its save; a replay loaded afterwards is a replay again.
- */
 describe('a new game in the app', () => {
   test('Start on the start page opens the game: the title row names it, the lead picker offers both teams, the game is saved', async () => {
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
-    // Start saved the record at once (D-E1): no lead is played yet
     expect(listGames()).toHaveLength(1);
     expect(listGames()[0].players).toEqual(['Alice', 'Bob']);
-    // the address names the game (H12a), so a reload brings it back
     await waitFor(() => expect(window.location.search).toBe(`?game=${listGames()[0].id}`));
     expect(screen.queryByRole('dialog', { name: 'New game' })).toBeNull();
     const bar = document.querySelector('.ps-topbar') as HTMLElement;
@@ -62,7 +56,6 @@ describe('a new game in the app', () => {
     expect(within(bar).getByText('[Gen 9] OU')).toBeInTheDocument();
     expect(within(bar).getByText('Alice')).toBeInTheDocument();
     expect(within(bar).getByText('Bob')).toBeInTheDocument();
-    // the lead picker of turn 0 offers both teams' six bodies
     await waitFor(() => expect(screen.getAllByText('Garchomp').length).toBeGreaterThanOrEqual(2), { timeout: 30_000 });
     expect(screen.getByText(/Pick 1 per side|Play from turn 0/)).toBeInTheDocument();
   }, 90_000);
@@ -78,7 +71,6 @@ describe('a new game in the app', () => {
     expect(document.querySelector('.ps-loader-panel')).toHaveTextContent('open now');
     await userEvent.click(screen.getByRole('button', { name: 'New game' }));
     const dialog = await screen.findByRole('dialog', { name: 'New game' });
-    // the Game panel folded away behind the dialog
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
     expect(within(dialog).queryByText('Saved games')).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -153,7 +145,6 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  // Round 89 (#105, H7, finding 1): the Game menu copies the link of a game wherever it stands, with no variation open.
   async function copiedLink() {
     await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     await userEvent.click(within(document.querySelector('.ps-loader-panel') as HTMLElement).getByRole('button', { name: 'Copy Share Link' }));
@@ -216,7 +207,6 @@ describe('a new game in the app', () => {
     expect(document.querySelector('.ps-topbar')).toBeNull();
   });
 
-  // Round 89 (#105, H5, ruling 31 H6a): a game's share link opens the game as a copy; the address names the copy.
   test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
     const played = await playedRecord(1);
     window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
@@ -234,7 +224,6 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  // Round 89 (#105, H7, finding 4): a second open of the same link finds the game it made before.
   test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either (H7)', async () => {
     const played = await playedRecord(1);
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
@@ -321,9 +310,6 @@ describe('a new game in the app', () => {
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
   });
 
-  // Round 90 (E5): the browser rows "a version 1 link of a replay branch opens its read-only view as before; one of a game offers no
-  // Load Original Replay" and "a link of a newer version names its version; a damaged game link says so" of new-game-share.spec
-  // (the newer version is the row above).
   test('a version 1 link of a replay branch opens its read-only view with Load Original Replay; one that names a game offers New Replay only', async () => {
     const branch = {
       version: 1 as const, replayId: 'gen9ou-test-123', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Alice', 'Bob'] as [string, string], branchTurn: 2,
@@ -377,10 +363,6 @@ describe('a new game in the app', () => {
 /** The panel's own submit button is named "Load" as well, so the toggle is found by its class. */
 const toggle = () => document.querySelector('.ps-loader-toggle') as HTMLElement;
 
-/**
- * Round 84 (turn dock, user answer Q20 a, 02.11.2026): the start page keeps the loader in the column; once a replay is loaded the
- * column holds none, the Load button in the top bar opens it, a load from there replaces the replay, and the panel closes.
- */
 describe('the replay loader in the app', () => {
   test('the start page shows the loader in the column; a loaded replay moves it to the Load button, and a load from there works', async () => {
     const first = replayData('singles');
@@ -388,7 +370,6 @@ describe('the replay loader in the app', () => {
     stubReplayFetch([first, second]);
     render(<App />);
 
-    // The start page: the loader panel with its title, the workflow guide, no Load button in a top bar.
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
     expect(screen.getByLabelText('Unified timeline workflow')).toBeInTheDocument();
     expect(document.querySelector('.ps-topbar')).toBeNull();
@@ -397,7 +378,6 @@ describe('the replay loader in the app', () => {
     await userEvent.type(input, `${first.id}{Enter}`);
 
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
-    // The workspace: no loader in the column, the button opens it with the loaded link.
     expect(screen.queryByText('Load Replay')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
     const load = screen.getByRole('button', { name: 'Game' });
@@ -416,10 +396,7 @@ describe('the replay loader in the app', () => {
   });
 });
 
-/**
- * Round 90 (E5, #222, #191 item 3): the start page and the Load panel, as the browser rows of `loader` and `support` read them. The
- * checks are text and state of the app's own markup; they need no replay iframe, so they run here.
- */
+/** Text and state of the app's own markup: no replay iframe, so they run here. */
 describe('the start page and the Load panel', () => {
   test('the start page: one header with Beta, Report issue and the creator link; the featured draft link and a Load button; the three guide steps; the team paste', async () => {
     render(<App />);

@@ -40,10 +40,7 @@ async function importWithoutProtect(): Promise<string> {
   return typed;
 }
 
-/**
- * Round 89 (lane H, #105), H14a (user ruling 13.11.2026): a team change that makes played turns invalid asks before it cuts. The hook
- * specs (`useGameTeamEdit.spec.tsx`, `useNewGame.spec.tsx`) hold the question for singles and doubles; these rows run it through the app.
- */
+/** The hook specs (`useGameTeamEdit.spec.tsx`, `useNewGame.spec.tsx`) hold the question for singles and doubles; these rows run it through the app. */
 describe('a team edit that cuts played turns asks first (H14a)', () => {
   test('Cancel leaves the game and its saved record as they were; Apply edit cuts it and says where the line ends', async () => {
     const record = await openGame(3);
@@ -52,16 +49,13 @@ describe('a team edit that cuts played turns asks first (H14a)', () => {
     const question = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
     expect(question).toHaveTextContent(/This edit makes \d+ played turns? invalid\./);
     expect(question).toHaveTextContent('the game keeps its first turn');
-    // the panel waits under the question, out of sight
     expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
-    // nothing is cut before the answer
     expect(loadGame(record.id)!.turns).toBe(3);
     await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(loadGame(record.id)!.turns).toBe(3);
     expect(listGames()[0].turns).toBe(3);
     expect(loadGame(record.id)!.teams).toEqual(record.teams);
-    // Cancel returns to the open panel with the text as typed (user, 13.11.2026), and Import asks again
     const back = screen.getByRole('dialog', { name: 'Import / Export Sets' });
     expect((back.querySelector('textarea') as HTMLTextAreaElement).value).toBe(typed);
     await userEvent.click(within(back).getByRole('button', { name: 'Import' }));

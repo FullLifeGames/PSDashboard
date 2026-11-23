@@ -12,7 +12,7 @@ import { replayFixture, singlesReplay } from '../fixtures/replay';
 const replayData = singlesReplay();
 const { snapshots } = replayFixture('singles');
 
-/** Round 84 (A7i, ruling 20a): the workspace wires the hook into the history panel; the spec does the same. */
+/** The workspace wires the hook into the history panel; the spec does the same. */
 function Panel({ branchHistory = history, finalLog = '|turn|3', data = replayData, game }: {
   branchHistory?: BranchHistoryEntry[]; finalLog?: string; data?: typeof replayData; game?: Parameters<typeof useBranchSaveShare>[0]['game'];
 }) {
@@ -79,7 +79,6 @@ describe('the save and share buttons of the history panel', () => {
     expect(decodeBranchShare(link.split('#branch=')[1])).toMatchObject({ choices: [{ p1Choice: 'move stealthrock', p2Choice: 'move shadowball' }] });
     expect(screen.queryByText('Copied to clipboard.')).toBeNull();
 
-    // a fresh copy puts the new link on the clipboard and says so again
     await userEvent.click(screen.getByRole('button', { name: 'Copy Share Link' }));
     await waitFor(() => expect(screen.getByText('Copied to clipboard.')).toBeVisible());
     const copied = (screen.getByLabelText('Branch share link') as HTMLInputElement).value;
@@ -143,7 +142,6 @@ describe('the save and share buttons of the history panel', () => {
   });
 });
 
-/** Round 89 (#105, H5): a game shares its own link (version 2), saves its branch as a row of that link, and has no replay to load. */
 describe('a new game in the history panel', () => {
   const choice = (name: string) => [{ kind: 'move' as const, moveId: name.toLowerCase().replace(/\W/g, ''), moveName: name }];
   const turn: BranchHistoryEntry = { ...history[0], kind: 'turn', p1SlotChoices: choice('Earthquake'), p2SlotChoices: choice('Protect') };

@@ -47,10 +47,6 @@ async function mountLoaded(kind: ReplayKind, link?: (id: string) => string) {
   return { app: () => latest.current!, replay };
 }
 
-/**
- * Round 89 (ruling 49): Depth and Samples live in the Setup menu of the workspace and write the stored preferences; another engine than
- * the built-in search hides them. Singles and doubles read the same menu.
- */
 describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
   test.each([['singles'], ['doubles']] as const)('%s: Depth 2 brings Samples and updates the preferences; Auto takes the matrix depth back', async kind => {
     const { app } = await mountLoaded(kind);

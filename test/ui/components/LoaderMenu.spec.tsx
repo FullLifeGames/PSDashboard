@@ -15,10 +15,9 @@ const dropOnPage = (dropped: File) =>
   fireEvent.drop(document.body, { dataTransfer: { files: [dropped], types: ['Files'] } });
 
 /**
- * Round 84 (turn dock, user answer Q20 a, 02.11.2026): with a replay loaded the loader leaves the replay column and folds into a
- * "Load" button beside "Setup" in the top bar. The panel holds what the loader offers on the start page, minus the title and the
- * workflow guide; it closes on Escape, on a click beside it and after a load that succeeded. A failed load keeps it open with the
- * error. An exported .html dropped anywhere on the page loads while the replay is loaded.
+ * The panel holds what the loader offers on the start page, minus the title and the workflow guide; it closes on Escape, on a click beside
+ * it and after a load that succeeded. A failed load keeps it open with the error. An exported .html dropped anywhere on the page loads
+ * while the replay is loaded.
  */
 describe('LoaderMenu', () => {
   test('a closed menu shows only the button; a click opens the URL form, the file picker and the team paste', async () => {
@@ -34,7 +33,6 @@ describe('LoaderMenu', () => {
     expect(screen.getByLabelText('Load exported replay file')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Browse file' })).toBeInTheDocument();
     expect(screen.getByText(/Paste your team/)).toBeInTheDocument();
-    // The panel has no title of its own and no workflow guide.
     expect(screen.queryByText('Load Replay')).toBeNull();
     expect(screen.queryByLabelText('Unified timeline workflow')).toBeNull();
   });
@@ -122,10 +120,7 @@ describe('LoaderMenu', () => {
   });
 });
 
-/**
- * Round 89 (lane H, #105), H16a (user ruling 13.11.2026): loading a replay, dropping a file and opening a saved game ask first when an
- * unsaved variation is open: the question stands in the menu's panel, Discard variation goes on, Cancel leaves everything.
- */
+/** Loading a replay, dropping a file and opening a saved game ask first when an unsaved variation is open: the question stands in the menu's panel, Discard variation goes on, Cancel leaves everything. */
 describe('LoaderMenu with an unsaved variation open (H16a)', () => {
   test('the URL form asks before it loads; Cancel loads nothing, Discard variation loads once', async () => {
     const wired = props({ unsavedVariation: () => true });

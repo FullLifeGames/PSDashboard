@@ -7,9 +7,9 @@ import { evalGraph, evalResult, rankedChoice } from '../fixtures/eval-result';
 import { turnAnalysis } from '../fixtures/analysis';
 
 /**
- * Round 79 (T290): the replacement note on the card of the turn after a knockout. One sentence per replacing side: what the
- * player sent in with the win chance, then the engine's pick, "matches the engine", or "only X was left". Doubles name each slot;
- * nothing is graded, so no tier, mark or colour of a verdict appears.
+ * The replacement note on the card of the turn after a knockout: one sentence per replacing side (what the player sent in with the win
+ * chance, then the engine's pick, "matches the engine", or "only X was left"). Doubles name each slot; nothing is graded, so no tier, mark
+ * or colour of a verdict appears.
  */
 
 const names: [string, string] = ['LordEnz', 'SOULWIND'];

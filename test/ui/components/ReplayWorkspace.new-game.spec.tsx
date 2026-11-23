@@ -17,11 +17,6 @@ vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['
 const { useAppController } = await import('../../../src/hooks/useAppController');
 const { ReplayWorkspace } = await import('../../../src/components/ReplayWorkspace');
 
-/**
- * Round 89 (lane H, #105), H16a (user ruling 13.11.2026): loading a replay from the Game menu asks first when an unsaved variation of
- * the open game is open; Cancel keeps the variation, Save Branch makes the question go away. Singles and doubles run the same rows.
- */
-
 function Workspace({ latestRef }: { latestRef: { current: AppController | null } }) {
   const app = useAppController();
   useEffect(() => { latestRef.current = app; });
@@ -71,7 +66,7 @@ async function playKnockoutTurn(app: () => AppController, leads: { p1: string[];
 }
 
 
-/** A game with one finished turn, then a different first turn from turn 1: a variation of the game (as the H7 row builds it). */
+/** A game with one finished turn, then a different first turn from turn 1: a variation of the game. */
 async function openVariation(format: string, leads: { p1: string[]; p2: string[] }) {
   const { app } = await mountGame(format);
   await playKnockoutTurn(app, leads);
@@ -105,14 +100,12 @@ describe('loading a replay while an unsaved variation is open (H16a)', () => {
     await typeReplayId('gen9ou-777');
     const question = await screen.findByRole('alertdialog');
     expect(question).toHaveTextContent('The open variation is not saved. Loading a replay closes it.');
-    // nothing was loaded: the game and its variation stand
     expect(app().ctx.replay.error).toBeNull();
     expect(app().ctx.branch.history.length).toBeGreaterThan(0);
     await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();
     expect(screen.getByRole('button', { name: 'Discard variation' })).toBeInTheDocument();
     expect(app().ctx.branch.history.length).toBeGreaterThan(0);
-    // saved: the same variation no longer asks
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('button', { name: 'Save Branch' }));
     await typeReplayId('gen9ou-777');
@@ -122,10 +115,6 @@ describe('loading a replay while an unsaved variation is open (H16a)', () => {
   }, 300_000);
 });
 
-/**
- * Round 89 (user ruling 40, FB4a): Discard variation asks first once the variation has a played turn (the same banner as the leave
- * question); with no played turn it goes at once. Singles and doubles run the same rows.
- */
 describe('Discard variation (FB4a)', () => {
   test.each(CASES)('$name: with a played turn the question comes first; Cancel keeps the variation, Discard variation drops it', async ({ format, leads }) => {
     const app = await openVariation(format, leads);
@@ -195,14 +184,12 @@ describe('a game tip whose knockout turn waits for its replacement is no variati
     expect(state.p2ForceSwitch).toBe(true);
     expect(app().ctx.newGame.record!.turns).toBe(0);
     expectNoVariationChrome();
-    // a link copied now holds the game's main line and no turn of the pending one
     const pending = await copiedGameLink();
     expect(pending.variation).toBeUndefined();
     expect(pending.entries).toHaveLength(app().ctx.newGame.record!.entries.length);
     expect(pending.gameId).toBe(record.id);
     expect(pending.view).toEqual({ turn: 1, line: 'main' });
 
-    // the replacement joins the turn to the main line
     await act(async () => {
       picks(app().ctx.branch.simState!, 'p2').forEach((choice, slot) => { if (choice) app().ctx.branch.setChoice('p2', choice, slot); });
     });
@@ -224,7 +211,6 @@ describe('a game tip whose knockout turn waits for its replacement is no variati
     });
     await act(async () => { await app().ctx.branch.executeTurn(); });
     await waitFor(() => expect(app().ctx.newGame.record!.turns).toBe(1), { timeout: 30_000 });
-    // back to the position before turn 1 and a different first turn: a variation of the game
     act(() => app().board.timeline.navigateTo({ turn: 1, line: 'main' }));
     act(() => app().board.deviation.requestDeviation(null));
     await waitFor(() => expect(app().analysis.showBranch).toBe(true), { timeout: 60_000 });
@@ -258,14 +244,12 @@ describe('a reload while a replacement is pending keeps the played turn (finding
     render(<Workspace latestRef={latest} />);
     await act(async () => { await latest.current!.ctx.newGame.openRecord(saved); });
     await waitFor(() => expect(latest.current!.ctx.replay.replayData?.id).toBe(saved.id), { timeout: 30_000 });
-    // the turn stands played: its entry is back on the live branch, the opponent's replacement is asked for
     await waitFor(() => expect(latest.current!.ctx.branch.history.length).toBe(entriesBefore), { timeout: 60_000 });
     await waitFor(() => expect(latest.current!.ctx.branch.executing).toBe(false));
     await waitFor(() => expect(latest.current!.ctx.branch.simState?.p2ForceSwitch).toBe(true), { timeout: 30_000 });
     expect(latest.current!.ctx.newGame.record!.turns).toBe(0);
     expect(latest.current!.board.timeline.viewTurn).toBe(viewBefore);
     expectNoVariationChrome();
-    // picking the replacement joins the turn to the main line, as before the reload
     await act(async () => {
       picks(latest.current!.ctx.branch.simState!, 'p2').forEach((choice, slot) => { if (choice) latest.current!.ctx.branch.setChoice('p2', choice, slot); });
     });

@@ -10,9 +10,8 @@ import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 /**
- * Round 89 (#104), step G4b: the question "replace the existing variation?" after ▶ Play stands under the line the user clicked,
- * in the turn card's Lines section and in the Game review, singles and doubles (the tester saw it 800 px above the screen, and
- * under the dock bar).
+ * The question "replace the existing variation?" after ▶ Play stands under the line the user clicked, in the turn card's Lines section and
+ * in the Game review, singles and doubles (it showed 800 px above the screen, and under the dock bar).
  */
 const MESSAGE = 'Play this line from turn 20: replace the existing variation from turn 12 (3 turns)?';
 const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({ ...evalResult(kind), lines });
@@ -71,9 +70,8 @@ describe('the replace question of ▶ Play', () => {
 });
 
 /**
- * Round 89 (#104), step G4d: in the 354 px right column the message took the width and the two buttons broke into letters
- * ("Rep/lace", "Ca/nc/el"; the tester saw it at every width). The buttons keep their words whole and the question wraps instead.
- * jsdom has no layout, so the row reads the styles that decide it.
+ * In the 354 px right column the message took the width and the two buttons broke into letters ("Rep/lace", "Ca/nc/el"). The buttons keep
+ * their words whole and the question wraps instead. jsdom has no layout, so the row reads the styles that decide it.
  */
 describe('the replace question in a narrow column', () => {
   test.each(['singles', 'doubles'] as const)('%s: the row wraps and both buttons keep their words whole', kind => {

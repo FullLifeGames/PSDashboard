@@ -22,7 +22,6 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
-  // Round 89 (#153, HM-2): the setting reaches the engine-move buttons of every card shape: tracked rows (singles), untracked rows (doubles) and the open tip.
   test.each([['a tracked card', {}, false], ['an untracked card (doubles)', { playedTracking: false }, false], ['an open tip', {}, true]] as const)(
     '%s names the reply in its engine-move titles, off and on', (_name, extra, open) => {
       const analysis = turnAnalysis(4, { ...extra, p1: sideAnalysis(open ? { played: null, regret: null } : {}), p2: sideAnalysis(open ? { played: null, regret: null } : {}) });
@@ -42,10 +41,8 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText('open position: nothing played yet')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/never surfaced/);
     expect(screen.queryByRole('button', { name: /Explanation/ })).toBeNull();
-    // both sides show the engine's line to play
     expect(screen.getAllByText(/engine:/)).toHaveLength(2);
     expect(document.body.textContent).not.toMatch(/played (?!yet)/);
-    // the same analysis of a replay keeps its wording
     const replay = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} />);
     expect(replay.container.textContent).toMatch(/choice never surfaced/);
   });
@@ -58,7 +55,6 @@ describe('EvalTurnAnalysis', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveAttribute('aria-controls', summary.id);
     expect(summary).not.toBeVisible();
-    // The header, the split line and the side rows show while it is closed.
     expect(screen.getByText('Alice misplayed')).toBeVisible();
     expect(screen.getByText(/expected from the choices/)).toBeVisible();
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeVisible();
@@ -106,7 +102,7 @@ describe('EvalTurnAnalysis', () => {
     const rows = screen.getAllByRole('button', { name: '✓ the engine\'s move ↗' });
     expect(rows).toHaveLength(2);
     await userEvent.click(rows[0]);
-    // round 89 (#153): the click also hands the result the card reads (none here), for Hard mode
+    // the click also hands the result the card reads (none here), for Hard mode
     expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best, undefined);
     await userEvent.click(rows[1]);
     expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best, undefined);
@@ -164,7 +160,7 @@ describe('EvalLeadAnalysis', () => {
   });
 
   test('doubles: a lead pair keeps the engine\'s pick as a neutral line, without a verdict', () => {
-    // Round 63 (T116): the doubles lead reading sits close to a coin flip, so no mistake or inaccuracy is named.
+    // the doubles lead reading sits close to a coin flip, so no mistake or inaccuracy is named.
     const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
     const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
     const { rerender } = render(<EvalLeadAnalysis leads={leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } })} playerNames={names} />);
@@ -176,7 +172,7 @@ describe('EvalLeadAnalysis', () => {
   });
 
   test('doubles: a led pair that matches the engine\'s pick gets no tick either, only the neutral engine line (T123 point 5)', () => {
-    // Round 63 lead census, gen9doublesou-2660802611 p1: led Landorus + Incineroar, the engine's pick too.
+    // gen9doublesou-2660802611 p1: led Landorus + Incineroar, the engine's pick too.
     const pair = rankedChoice('team 12', 'Lead Landorus + Incineroar', 0.1);
     render(<EvalLeadAnalysis leads={leadAnalysis({ p1: { played: pair, best: pair, regret: 0 } })} playerNames={names} />);
     expect(screen.queryByText('✓ the engine\'s leads')).toBeNull();
@@ -213,7 +209,6 @@ describe('EvalTurnAnalysis, the endgame entry (round 89, #130)', () => {
   });
 });
 
-/** The user's note on X1 (ruling 39): the Lines section and the win-path view start closed, like the Explanation. */
 describe.each([
   ['singles', false, { ...evalResult('singles'), lines: [playedLine] }],
   ['doubles', true, { ...evalResult('doubles'), lines: [{ ...doublesLine, for: ['played' as const] }] }],
@@ -307,7 +302,7 @@ describe.each([
   });
 });
 
-// Round 89 (LN-4): the card hands its result to the rows, so the ranked row's "then ..." and the Lines section show one line per row.
+// The card hands its result to the rows, so the ranked row's "then ..." and the Lines section show one line per row.
 describe.each([
   ['singles', 'Earthquake', evalResult('singles'), true],
   ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', evalResult('doubles'), false],

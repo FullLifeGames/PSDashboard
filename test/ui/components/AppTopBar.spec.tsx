@@ -34,8 +34,6 @@ describe('AppTopBar', () => {
   });
 
   test('names the match; the Setup menu holds the edit and sets buttons and closes after a pick', async () => {
-    // Round 77 (user request 28.10.2026): one row; the animate toggle, Edit Player, Edit Opp and Import/Export Sets
-    // moved into one menu.
     const wired = props();
     render(<AppTopBar {...wired} />);
     expect(screen.getByText('[Gen 9] OU')).toBeInTheDocument();
@@ -59,7 +57,6 @@ describe('AppTopBar', () => {
     expect(screen.queryByText(/Smogon/)).toBeNull();
   });
 
-  // Round 84 (A7f, ruling 19a): a long format name shortens first; the full names ride in the titles.
   test('the format tag and both player names carry their full text in a title', () => {
     render(<AppTopBar {...props({ replayData: { format: '[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)', players: ['SpiringOcean', 'sigueinventando'] } })} />);
     expect(screen.getByText('[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)')).toHaveAttribute('title', '[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)');
@@ -79,7 +76,6 @@ describe('AppTopBar', () => {
   });
 
   test('the Load button stands beside Setup once the workspace passes a loader, and a bar without one has none (the embedded view)', async () => {
-    // Round 84 (turn dock, Q20 a): the loader folds into the top bar when a replay is loaded.
     const loader = { onLoad: vi.fn(), onLoadFile: vi.fn(), onTeamLoad: vi.fn(), loading: false, error: null };
     const { rerender } = render(<AppTopBar {...props()} />);
     expect(screen.queryByRole('button', { name: 'Game' })).toBeNull();
@@ -94,7 +90,6 @@ describe('AppTopBar', () => {
   });
 
   test('the Game menu holds three parts: Load replay, New game and the saved games; it closes when New game opens the dialog or a saved game opens; the embedded view has none', async () => {
-    // Round 89 (lane H, #105, user ruling 13.11.2026): the menu is "Game", no third button in the bar, at every width.
     const onNewGame = vi.fn();
     const onOpenGame = vi.fn().mockResolvedValue(undefined);
     const record = await savedRecord();
@@ -150,7 +145,7 @@ describe('AppTopBar', () => {
     expect(wired.onCancelPreparation).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (user ruling 40, FB7a): the status names the live simulator's tip, which is not the turn on the slider after a play-out.
+  // The status names the live simulator's tip, which is not the turn on the slider after a play-out.
   test.each(['singles', 'doubles'] as const)('%s: the live branch status reads "Variation tip: Turn N", and a preparing branch keeps its progress words', kind => {
     const { rerender } = render(<AppTopBar {...props({ showBranch: true, simState: simState(kind, { turnNumber: 33 }) })} />);
     expect(screen.getByText('Variation tip: Turn 33')).toBeInTheDocument();
@@ -166,7 +161,6 @@ describe('AppTopBar', () => {
     const wired = props({ showBranch: true, simState: simState('singles', { turnNumber: 7, ended: true, winner: 'Alice' }), branchDivergence: 'The simulated replay diverged' });
     render(<AppTopBar {...wired} />);
     expect(screen.getByText('Variation tip: Turn 7')).toBeInTheDocument();
-    // The winner shows in the branch panel, where the pickers were (round 77).
     expect(screen.queryByText(/Alice wins/)).toBeNull();
     expect(screen.getByTitle('The simulated replay diverged')).toHaveTextContent('⚠ The simulated replay diverged');
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
@@ -174,7 +168,6 @@ describe('AppTopBar', () => {
     expect(toggle).toBeChecked();
     await userEvent.click(toggle);
     expect(wired.onAnimateChange).toHaveBeenCalledWith(false);
-    // A toggle keeps the menu open: the user sees the new state.
     expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
   });
 });

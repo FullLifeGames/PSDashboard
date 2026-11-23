@@ -62,7 +62,7 @@ describe('BattleStatsPanel', () => {
     expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
   });
 
-  // Round 89 (lane B, #117): whether a format generates its team comes from the Dex entry, never from a name.
+  // A format generates its team by its Dex entry, never by its name.
   test('the Dex decides: Hackmons Cup generates its team, a name with "random" in it does not', () => {
     const mon = revealedPokemon('Garchomp', { evs: evs('unknown'), moves: [move('Earthquake', 'revealed')] });
     const hackmons = render(<BattleStatsPanel replayData={{ ...singlesReplay(), formatid: 'gen9hackmonscup' }} p1Info={{ pokemon: [mon] }} p2Info={null} />);
@@ -74,8 +74,7 @@ describe('BattleStatsPanel', () => {
     expect(screen.queryByText('Not yet revealed')).not.toBeInTheDocument();
   });
 
-  // Round 89 (lane B, #117): a Random Battle that showed 4 of 6 lists six bodies; the guesses wear the random-set mark and the
-  // "never showed" notice is gone. Singles (Gen 3) and doubles (Gen 9 Random Doubles) read the same panel.
+  // A Random Battle that showed 4 of 6 lists six bodies; the guesses wear the random-set mark. Singles (Gen 3) and doubles (Gen 9 Random Doubles).
   describe.each([
     { label: 'singles', id: 'gen3randombattle-1', missing: 3 },
     { label: 'doubles', id: 'gen9randomdoublesbattle-11', missing: 2 },
@@ -103,7 +102,7 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 69 (T69). Singles and doubles replays share the panel, so both run each case.
+  // Singles and doubles replays share the panel, so both run each case.
   describe.each(['singles', 'doubles'] as const)('provenance of a solved spread (%s)', kind => {
     const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
     const spread = { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 };
@@ -119,7 +118,6 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 87 (release 1.1.0), T317: an unknown spread says "EVs not yet known" and drops the doubled source word, singles and doubles alike.
   describe.each(['singles', 'doubles'] as const)('an unknown spread (%s)', kind => {
     const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
 
@@ -147,7 +145,6 @@ describe('BattleStatsPanel', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // Round 84 (A7b, ruling 9a): the panel is the closed panel at the right column's foot, and its list carries the fade mark.
   test('is the closed stats panel, and its list is the one that scrolls and fades', () => {
     const replayData = { ...singlesReplay(), players: ['Alice', 'Bob'] };
     const { container } = render(<BattleStatsPanel replayData={replayData} p1Info={teamInfo('singles', 'p1')} p2Info={null} />);
@@ -156,7 +153,7 @@ describe('BattleStatsPanel', () => {
     expect(panel.querySelector(':scope > .ps-stats-grid')).not.toBeNull();
   });
 
-  // Round 88 (F, #101): a game without team preview where a side showed fewer bodies than its |teamsize|. Singles and doubles both.
+  // A game without team preview where a side showed fewer bodies than its |teamsize|. Singles and doubles both.
   describe.each([['singles', 'gen4ou', '[Gen 4] OU'], ['doubles', 'gen4doublesou', '[Gen 4] Doubles OU']] as const)('the bodies a side never showed (%s)', (_kind, formatid, tier) => {
     const NL = String.fromCharCode(10);
     const log = (teamsize: number, preview = false) => [
@@ -191,7 +188,7 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 89 (T9c): the panel names the nature with its source. A set without one (Generations 1 and 2) shows no tag.
+  // A set without a nature (Generations 1 and 2) shows no tag.
   describe.each(['singles', 'doubles'] as const)('the nature tag (%s)', kind => {
     const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
 

@@ -35,8 +35,8 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(5, 'main');
   });
 
-  // Round 89 (#105, H7, tester finding 15): React logged `Received NaN for the y2 attribute` while a game's graph filled (Champions VGC).
-  // A score the sweep has not written yet reads undefined, and only `null` meant "no point" in the line from the lead and in the edge's highlight.
+  // React logged `Received NaN for the y2 attribute` while a game's graph filled (Champions VGC): a score the sweep has not written yet reads
+  // undefined, and only `null` meant "no point" in the line from the lead and in the edge's highlight.
   test('a lead score before any turn score, and a turn whose next score is not there yet, draw no line with a NaN end', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const unfilled = (turns: number, filled: Record<number, number>) => {
@@ -101,9 +101,9 @@ describe('EvalGraph', () => {
     expect(svg.querySelector('circle[r="4.5"]')).toBeNull();
   });
 
-  // Round 77 (C8): on a turn where both lines have a point, the two hit areas share the whole column and split it at
-  // the middle between the two points, so the nearer point wins at any width. Before, the gold area took the middle half
-  // of a column about 5 px wide and the blue point under it could not be hit.
+  // On a turn where both lines have a point, the two hit areas share the whole column and split it at the middle between the two points, so
+  // the nearer point wins at any width (the gold area took the middle half of a column about 5 px wide, and the blue point under it could
+  // not be hit).
   describe('a turn where the variation and the main line both have a point', () => {
     const rect = (turn: number, line?: 'variation') => {
       const element = hit(turn, line);
@@ -125,7 +125,6 @@ describe('EvalGraph', () => {
       expect(top.y).toBe(0);
       expect(top.y + top.height).toBeCloseTo(bottom.y, 5);
       expect(bottom.y + bottom.height).toBeCloseTo(GRAPH_HEIGHT, 5);
-      // Each point lies inside its own area.
       const graphY = (score: number) => GRAPH_HEIGHT / 2 - score * (GRAPH_HEIGHT / 2 - 7);
       expect(graphY(Math.max(main, gold))).toBeLessThan(top.y + top.height);
       expect(graphY(Math.min(main, gold))).toBeGreaterThan(top.y + top.height);
@@ -180,7 +179,6 @@ describe('EvalGraph review marks', () => {
     expect(square.getAttribute('stroke')).toBe('#c8a');
     expect(circle.getAttribute('fill')).toBe('none');
     expect(svg.querySelectorAll('[data-review-mark]')).toHaveLength(2);
-    // each mark is centred on the point of its turn
     const points = [...svg.querySelectorAll('circle')].filter(node => !node.hasAttribute('data-review-mark'));
     expect(circle.getAttribute('cx')).toBe(points[2].getAttribute('cx'));
     expect(circle.getAttribute('cy')).toBe(points[2].getAttribute('cy'));

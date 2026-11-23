@@ -7,10 +7,10 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 
 /**
- * Round 73 (T202, design gate 3a): the picker's preview prices a forced spread on a lone foe behind a screen on a copy of the
- * branch's live battle. The workspace hands that battle to the picker at the live tip. Round 82 (step A7b): a stored exact position
- * brings its own revived battle, which the workspace hands over with the replay's log (the dice chips read the log's dice from its
- * lines); an approximated position has no battle. The dock (round 84, the turn dock) is a spy here, so the test reads the props the workspace gives it.
+ * The picker's preview prices a forced spread on a lone foe behind a screen on a copy of the branch's live battle. The workspace hands that
+ * battle to the picker at the live tip; a stored exact position brings its own revived battle, which the workspace hands over with the
+ * replay's log (the dice chips read the log's dice from its lines); an approximated position has no battle. The dock is a spy here, so the
+ * test reads the props the workspace gives it.
  */
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 const panel = vi.hoisted(() => ({ props: [] as Array<{ source?: string; getBattle?: () => unknown; replayLog?: string }> }));

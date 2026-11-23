@@ -85,7 +85,6 @@ describe('ComboBox', () => {
     const boxes = screen.getAllByRole('combobox');
     expect(boxes[1]).toBeDisabled();
   });
-  // Round 89 (T9c): Escape with the list open closes the list only; a dialog around the box keeps its edits.
   test('Escape closes an open list and stops there; with the list closed the key reaches the host', async () => {
     const onHostKey = vi.fn();
     render(
