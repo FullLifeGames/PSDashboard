@@ -28,13 +28,16 @@ export const isCss = fileName => fileName.endsWith('.css');
 /** What a comment of the repository's own marker looks like: `// oracle: <spec path>`; the specs read the block above a list. */
 const ORACLE_LINE = /^\s*(\/\/|\/\*+|\*)?\s*oracle:/;
 
-/** Patterns that make a whole comment code-read, tested on the comment's text without its delimiters. */
+/**
+ * Patterns that make a whole comment code-read, tested on the comment's text without its delimiters and leading asterisks. The
+ * pragmas stand at the start of a line of the comment: a sentence that names one is prose.
+ */
 const DIRECTIVES = [
   ['eslint', /^eslint-(disable|enable|env)\b/],
   ['eslint', /^eslint\s+[@\w./-]+\s*:/],
-  ['typescript', /@ts-(expect-error|ignore|nocheck|check)\b/],
-  ['vitest', /@vitest-environment/],
-  ['coverage', /\b(istanbul|v8|c8)\s+ignore\b/],
+  ['typescript', /^@ts-(expect-error|ignore|nocheck|check)\b/m],
+  ['vitest', /^@vitest-environment/m],
+  ['coverage', /^(istanbul|v8|c8)\s+ignore\b/m],
   ['jsx', /@jsx\w*\b/],
   ['bundler', /[@#]__(PURE|NO_SIDE_EFFECTS)__|@vite-ignore|webpackIgnore/],
   ['sourcemap', /[#@]\s*sourceMappingURL=/],
@@ -44,7 +47,7 @@ const DIRECTIVES = [
 /** The text of a comment without its delimiters, its leading asterisks and its outer whitespace. */
 function body(raw) {
   if (raw.startsWith('//')) return raw.slice(2).trim();
-  if (raw.startsWith('/*')) return raw.slice(2, raw.endsWith('*/') ? -2 : undefined).replace(/^\s*\*+/gm, '').trim();
+  if (raw.startsWith('/*')) return raw.slice(2, raw.endsWith('*/') ? -2 : undefined).split(/\r?\n/).map(line => line.replace(/^\s*\*+/, '').trim()).join('\n').trim();
   return raw.trim();
 }
 

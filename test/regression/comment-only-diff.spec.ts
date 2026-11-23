@@ -129,6 +129,8 @@ describe('the comments that code reads stay byte for byte', () => {
     expect(readByCode('// eslint-disable-line no-console')).toEqual({ all: 'eslint' });
     expect(readByCode('/* eslint-disable react/foo -- why */')).toEqual({ all: 'eslint' });
     expect(readByCode('// the eslint ratchet shrinks')).toBeNull();
+    expect(readByCode('// a spec may carry the @vitest-environment tag or @ts-ignore, v8 ignore too')).toBeNull();
+    expect(readByCode('/**\n * The page.\n * @vitest-environment jsdom\n */')).toEqual({ all: 'vitest' });
     expect(readByCode('// oracle: a.spec.ts')).toEqual({ lines: [0] });
     expect(readByCode('/**\n * words\n * oracle: a.spec.ts\n */')).toEqual({ lines: [2] });
   });
