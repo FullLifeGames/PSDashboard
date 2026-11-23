@@ -2,13 +2,7 @@ import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, test } from 'vitest';
 
-/**
- * Round 69 (T184): the rule set is a required field of the settings the app
- * hands the pool and of the two sweep param types. The specs are not part of
- * `tsc -b`, so this test compiles probe snippets against the app's own
- * tsconfig and reads the diagnostics: a caller without a rule set must stop
- * compiling, a caller with one must compile.
- */
+/** The rule set is a required field of the settings the app hands the pool and of the two sweep param types. Specs are not part of `tsc -b`, so this test compiles probe snippets against the app's own tsconfig: a caller without a rule set must stop compiling, one with it must compile. */
 const root = path.resolve(__dirname, '../../..');
 const virtual = path.join(root, 'src/__ruleset_probe__.ts');
 

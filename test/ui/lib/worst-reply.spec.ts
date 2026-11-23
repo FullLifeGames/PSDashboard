@@ -3,11 +3,7 @@ import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from 
 import { winPctText } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup, worstReply } from '../../../src/lib/worst-reply';
 
-/**
- * Round 89 (#153, Hard mode): the rule of the reply that hurts a move most, as the app reads it. The cell choice is the engine's
- * `worstAnswer` (its own spec holds the matrices); here the app's part: the reply as the ranked row the pickers map, the fallbacks
- * (the row's floor, then the opponent's best row) and the choice of the lines. Singles and doubles boards.
- */
+/** The reply that hurts a move most, as the app reads it. The cell choice is the engine's `worstAnswer` (its own spec holds the matrices); here the app's part: the reply as the ranked row the pickers map, the fallbacks (the row's floor, then the opponent's best row) and the choice of the lines. Singles and doubles boards. */
 
 const ranked = (choice: string, label: string, punishedBy: string | null = null): RankedChoice => ({ choice, label, worstCase: 0, expected: 0, ev: 0, punishedBy });
 const solid: MatrixCell = { visits: 20, verified: false };
@@ -101,11 +97,7 @@ describe('worstLookup', () => {
   });
 });
 
-/**
- * Round 89 (G16, wave-tester pass 4, finding 1): the card's rows of a pivot are pairs ("U-turn → Keldeo"), and the lines of a tree name
- * the move alone ("U-turn": the follow-up is a step of its own). The lookup finds the row of a bare move among its pairs (the best
- * ranked pair, the one the line's follow-up resembles), and a reply that is a pair stands for its bare move.
- */
+/** The card's rows of a pivot are pairs ("U-turn → Keldeo"), and the lines of a tree name the move alone ("U-turn": the follow-up is a step of its own). The lookup finds the row of a bare move among its pairs (the best ranked pair, the one the line's follow-up resembles), and a reply that is a pair stands for its bare move. */
 describe('worstLookup with a pivot\'s pair rows (singles)', () => {
   const pairs = result(['Pursuit', 'Knock Off'], ['U-turn → Tyranitar', 'U-turn → Keldeo', '→ Excadrill'], [[0.1, -0.3, 0.2], [0.3, 0.2, 0.1]], [[solid, solid, solid], [solid, solid, solid]]);
   const lookup = worstLookup(pairs);

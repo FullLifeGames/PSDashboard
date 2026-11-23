@@ -1,10 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { stoppedEmptyHere } from '../../../src/lib/stopped-line';
 
-/**
- * Round 89 (SB-9): the panel's line for a stop before a first result belongs to the stopped position only. The rule reads no game
- * type: singles and doubles tags are the same strings ("main:3", "variation:2").
- */
+/** The panel's line for a stop before a first result belongs to the stopped position only. The rule reads no game type: singles and doubles tags are the same strings ("main:3", "variation:2"). */
 describe('stoppedEmptyHere', () => {
   const shown = { live: true, status: 'idle' as const, key: 'variation:2' };
   test.each(['variation:2', 'main:7'])('the mark of %s shows only on its own position, idle, live', tag => {

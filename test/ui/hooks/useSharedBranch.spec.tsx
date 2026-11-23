@@ -58,7 +58,6 @@ describe('useSharedBranch', () => {
     expect(window.location.hash).toBe('');
   });
 
-  // Round 89 (#105, H5): a game's link (version 2) is no read-only view; the app opens the game and clears the hash then.
   test('a version 2 link reads as a game and leaves the replay branch empty; the hash stays until the game opens', () => {
     window.location.hash = `#branch=${encodeBranchShare(game)}`;
     const { result } = renderHook(() => useSharedBranch());

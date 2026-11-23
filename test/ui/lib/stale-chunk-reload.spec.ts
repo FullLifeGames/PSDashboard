@@ -2,10 +2,9 @@ import { describe, expect, test, vi } from 'vitest';
 import { installStaleChunkReload, STALE_CHUNK_RELOAD_KEY } from '../../../src/lib/stale-chunk-reload';
 
 /**
- * Round 81 (T298): after a deploy a page built before it asks for chunks that are gone (production, 31.10.2026: "Error
- * loading .../assets/opponent-inferrer-DmwVZADz.js" until a hard reload). Vite's preload helper raises
- * `vite:preloadError` for a failed lazy import; the page reloads once to fetch the new index.html, and a second failure
- * within the guard shows the error instead of reloading in a loop.
+ * After a deploy a page built before it asks for chunks that are gone ("Error loading .../assets/opponent-inferrer-DmwVZADz.js" until a hard reload). Vite's preload
+ * helper raises `vite:preloadError` for a failed lazy import; the page reloads once to fetch the new index.html, and a second failure within the guard shows the
+ * error instead of reloading in a loop.
  */
 
 function memoryStorage(): Storage {

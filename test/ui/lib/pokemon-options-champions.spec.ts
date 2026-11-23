@@ -5,12 +5,7 @@ import {
   getAbilityPool, getEveryAbilityPool, getEveryMovePool, getEvLimit, getItemPool, getMovePool, getTeraTypePool,
 } from '../../../src/lib/pokemon-options';
 
-/**
- * Round 69 (T162): the editor's pools for a Pokémon Champions game come from
- * the Champions mod (the base Dex lacks Mega Stones and the mod's learnsets),
- * on the singles and the VGC format alike. Scarlet/Violet pools stay as they
- * were. Everything is compared with the mod's own dex.
- */
+/** The editor's pools for a Pokémon Champions game come from the Champions mod (the base Dex lacks Mega Stones and the mod's learnsets), on the singles and the VGC format alike; everything is compared with the mod's own dex. */
 const CHAMPIONS_FORMATS = ['gen9championsou', 'gen9championsvgc2026regmcbo3'];
 
 beforeAll(async () => {
@@ -73,7 +68,7 @@ describe('Champions pools', () => {
  * it gets the total the simulator's rule table gives a listed Champions format.
  */
 describe('a Champions format the mod does not list', () => {
-  // Round 78: since @pkmn/mods 0.10.12 the mod lists Regulation M-C only, so an M-B replay's format is one of these too.
+  // The mod (@pkmn/mods 0.10.12) lists Regulation M-C only, so an M-B replay's format is one of these too.
   const UNLISTED = ['gen9championsubers', 'gen9championsvgc2026regmabo3', 'gen9championsvgc2026regmbbo3', 'gen9championsdoublesou'];
 
   for (const format of UNLISTED) {

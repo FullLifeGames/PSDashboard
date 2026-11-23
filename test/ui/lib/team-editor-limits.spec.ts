@@ -5,12 +5,7 @@ import { EV_STATS, clampEv, evLimitsFor, canonicalMove, withEditedStandIns } fro
 import { getEvLimit } from '../../../src/lib/pokemon-options';
 import { field, revealedPokemon } from '../fixtures/team-info';
 
-/**
- * Round 69 (T162): the editor clamps the EVs of a set by the format's limits.
- * Pokémon Champions replaces EVs by Stat Points (32 per stat, 66 in total),
- * Scarlet/Violet caps the total at 510. The table is checked against the
- * simulator's own team validator, so it cannot drift from the format.
- */
+/** The editor clamps the EVs of a set by the format's limits: Pokémon Champions replaces EVs by Stat Points (32 per stat, 66 in total), Scarlet/Violet caps the total at 510. The table is checked against the simulator's own team validator. */
 
 describe('team-editor-limits', () => {
   const SINGLES_CHAMPIONS = 'gen9championsou';
@@ -50,7 +45,7 @@ describe('team-editor-limits', () => {
         expect(clampEv('252', limits, 252)).toBe(252);
         expect(clampEv('252', limits, 300)).toBe(210);
         expect(clampEv('252', limits, 510)).toBe(0);
-        // Round 76 (12a): the editor opens on the solved spread (252 Atk / 252 Spe / 4 SpD is 508 of 510), so a typed 252 HP keeps 2.
+        // the editor opens on the solved spread (252 Atk / 252 Spe / 4 SpD is 508 of 510), so a typed 252 HP keeps 2.
         expect(clampEv('252', limits, 508)).toBe(2);
       });
     }

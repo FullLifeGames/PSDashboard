@@ -3,11 +3,7 @@ import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
 import { variationBoardShares } from '../../../src/lib/variation-shares';
 import { pokemon, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * Round 70 (T216): the fainted share of the board a variation point stands on. The share counts fainted bodies over all
- * bodies of both sides, the measure the engine routes by (battleFaintedFraction), so the branch board and its search
- * read one phase. Expected values are counted by hand from the rosters below.
- */
+/** The fainted share of the board a variation point stands on: fainted bodies over all bodies of both sides, the measure the engine routes by (battleFaintedFraction), so the branch board and its search read one phase. Expected values are counted by hand from the rosters below. */
 const BODIES: Record<FormatKind, number> = { singles: 6, doubles: 4 };
 
 /** One side's roster: `down` of its bodies fainted (hp 0, flag set), the rest healthy. */

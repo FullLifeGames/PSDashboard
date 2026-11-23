@@ -6,10 +6,8 @@ import { infoOfTeam } from '../../../src/hooks/useNewGame';
 import { SIX, startedRecord } from '../fixtures/new-game';
 
 /**
- * Round 89 (lane H, #105), stage H4: Edit Player and Edit Opp on a new game. The editor's team info becomes the side's sets, the
- * other side stays as the record holds it, the live branch stops and the editor closes before the record plays again; a line that
- * ends early says where. Round 89, H14a: an edit that makes played turns invalid asks first: the question names how many turns fall away
- * and that the open variation goes; Cancel changes nothing (no stop, no edit) and returns to the editor, which stayed open (hidden) with the text as typed.
+ * Edit Player and Edit Opp on a new game. An edit that makes played turns invalid asks first (how many turns fall away, the open variation
+ * goes); Cancel changes nothing and returns to the editor, which stayed open (hidden) with the text as typed.
  */
 describe('useGameTeamEdit', () => {
   type Inputs = Parameters<typeof useGameTeamEdit>[0];

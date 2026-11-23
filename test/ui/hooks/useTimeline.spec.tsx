@@ -76,7 +76,7 @@ describe('useTimeline', () => {
   });
 
   test('the pointer knows whether it followed an executed turn or the user moved it', () => {
-    // Round 77 (user report 28.10.2026): the branch frame plays a turn in only when the pointer followed that turn.
+    // The branch frame plays a turn in only when the pointer followed that turn.
     const { result, rerender, base } = setup();
     act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
     expect(result.current.followedPlay).toBe(false);
@@ -120,7 +120,7 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
   });
 
-  // Round 77 (C5): Stop hands the view back; the turn still in flight lands after it and must not drag the pointer to the tip.
+  // Stop hands the view back; the turn still in flight lands after it and must not drag the pointer to the tip.
   describe('a turn that lands after the view was handed back', () => {
     const running = (history: BranchHistoryEntry[], executing: boolean, base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 2, history, executing });
@@ -161,14 +161,14 @@ describe('useTimeline', () => {
     });
   });
 
-  // Round 77 (C9): T0 is a side trip. The arrow forward returns to the line the user came from.
+  // T0 is a side trip. The arrow forward returns to the line the user came from.
   describe('turn 0 as a side trip', () => {
     const leadVariation = (base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0), entry(1), entry(2)] });
 
     test('a new game from T0 with the same span follows its tip once the start asks for it; a rebuild of the span stays on T0 (round 80)', () => {
-      // The user's report of 30.10.2026 (Champions VGC 2646618972): back on T0, the same picks played again kept the
-      // key "0:1", so the pointer stayed on the lead picker while the new game stood at turn 1.
+      // Champions VGC 2646618972: back on T0, the same picks played again kept the key "0:1", so the pointer stayed on the lead picker while
+      // the new game stood at turn 1.
       const { result, rerender, base } = setup();
       const leadGame = (): TimelineInputs => ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0)] });
       rerender(leadGame());
@@ -268,7 +268,7 @@ describe('useTimeline', () => {
     expect(result.current.viewTurn).toBe(3);
   });
 
-  // Round 77 (swarm A-4): inside a variation the frame's own Last turn / Next turn move the pointer as on the main line.
+  // Inside a variation the frame's own Last turn / Next turn move the pointer as on the main line.
   describe('the branch frame\'s own navigation', () => {
     const variation = (length: number, base: TimelineInputs) => ({
       ...base, branching: true, variationStartTurn: 2, history: Array.from({ length }, (_, index) => entry(2 + index)),
@@ -295,9 +295,9 @@ describe('useTimeline', () => {
     });
 
     test('the frame landing on the tip spends the play, so a rebuild after it plays nothing in again (round 77)', () => {
-      // The acceptance e2e: a set edit at the tip rebuilt the variation, the new frame document opened at the turn before
-      // the tip to play it in again (followedPlay still held from the executed turn), and its landing there moved the
-      // pointer off the tip onto the main line. The play is spent once the frame lands on the tip it followed.
+      // A set edit at the tip rebuilt the variation, the new frame document opened at the turn before the tip to play it in again (followedPlay
+      // still held from the executed turn), and its landing there moved the pointer off the tip onto the main line. The play is spent once the
+      // frame lands on the tip it followed.
       const { result, rerender, base } = setup();
       rerender(variation(3, base));
       expect(result.current).toMatchObject({ viewTurn: 5, followedPlay: true });
@@ -314,8 +314,8 @@ describe('useTimeline', () => {
       act(() => result.current.handleReplayTurn(5));
       expect(result.current.viewTurn).toBe(3);
       act(() => result.current.handleReplayTurn(3));
-      // Round 88 (T347, #83): the branch frame's turn 2 is the variation's start turn (it shows the variation's own moves, the
-      // main replay's turn 2 does not): the pointer stays on the variation at its first covered turn.
+      // The branch frame's turn 2 is the variation's start turn (it shows the variation's own moves, the main replay's turn 2 does not): the
+      // pointer stays on the variation at its first covered turn.
       act(() => result.current.handleReplayTurn(2));
       expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', viewingVariation: true });
       // A turn before the start still leaves for the main line.
@@ -335,7 +335,7 @@ describe('useTimeline', () => {
     });
   });
 
-  // Round 77 (swarm A-6): the variation's ended tip is an end position like the main line's.
+  // The variation's ended tip is an end position like the main line's.
   describe('an ended variation', () => {
     afterEach(() => { vi.useRealTimers(); });
 
@@ -345,20 +345,19 @@ describe('useTimeline', () => {
       rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
       expect(result.current).toMatchObject({ viewTurn: 4, viewingVariation: true, atVariationEnd: true });
 
-      // The echo guard of the executed turn lapsed (20 s since round 77); the frame stays on the last played turn.
+      // The echo guard of the executed turn lapsed (20 s); the frame stays on the last played turn.
       vi.setSystemTime(Date.now() + 30_000);
       act(() => result.current.handleReplayTurn(3));
       expect(result.current.viewTurn).toBe(4);
 
-      // Going back with the frame's own button is the user's: the frame's turn 2 is the start turn, and the pointer takes the first covered turn (round 88, T347).
+      // Going back with the frame's own button is the user's: the frame's turn 2 is the start turn, and the pointer takes the first covered turn.
       act(() => result.current.handleReplayTurn(2));
       expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, atVariationEnd: false });
     });
 
     test('the frame landing on the last played turn ends the guard: Last turn right after the end moves the pointer', () => {
-      // Round 77 (lane L2's open point, made worse by the 20-second play-in guard): an ended tip never reports its own
-      // turn, so the guard waiting for the tip held every report until it lapsed, and the user's first Last turn after
-      // the game ended did nothing. At an ended variation the frame lands on the last played turn: that ends the guard.
+      // An ended tip never reports its own turn, so the guard waiting for the tip held every report until it lapsed, and the user's first Last
+      // turn after the game ended did nothing. At an ended variation the frame lands on the last played turn: that ends the guard.
       const { result, rerender, base } = setup();
       rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
       expect(result.current).toMatchObject({ viewTurn: 4, atVariationEnd: true });
@@ -407,10 +406,7 @@ describe('useTimeline', () => {
   });
 });
 
-/**
- * Round 88 (T348, #84): the timeline reads a history with replacements on both sides by the one rule. The span, the tip and
- * the recorded position of every pointer turn count real turns, so the dock's position is the one the frame shows.
- */
+/** The timeline reads a history with replacements on both sides by one rule: the span, the tip and the recorded position of every pointer turn count real turns. */
 describe.each(INTERLUDE_CASES)('useTimeline over a history with interludes, $name', ({ history, startTurn, settledAt, turns }) => {
   const tip = startTurn + turns;
 
@@ -457,8 +453,8 @@ describe('useTimeline.frame', () => {
     return { ...hook, base };
   }
 
-  // Round 88 (T347, #83): the finish of a play-out leaves the frame where it stands, and the pointer takes its turn. The
-  // tip-follow's guard drops the frame's reports during the run; the timeline remembers the last one.
+  // The finish of a play-out leaves the frame where it stands, and the pointer takes its turn. The tip-follow's guard drops the frame's
+  // reports during the run; the timeline remembers the last one.
   describe("the pointer takes the frame's turn without a seek", () => {
     const variation = (length: number, base: TimelineInputs, extra: Partial<TimelineInputs> = {}) => ({
       ...base, branching: true, variationStartTurn: 2, history: Array.from({ length }, (_, index) => entry(2 + index)), ...extra,

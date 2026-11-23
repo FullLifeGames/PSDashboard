@@ -4,9 +4,8 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings } from '@fulllifegames/eval-engine';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 
-// Round 77 (C1): a single evaluation started while a sweep runs used to bump the shared run counter without clearing the
-// sweep's running flag, so "analyzing… turn 0/2" and Cancel stayed on screen for good. The sweep is the same code for
-// singles and doubles (the game type only picks the engine), so the specs run on the sweep's own surface.
+// A single evaluation started while a sweep runs must clear the sweep's running flag, or "analyzing… turn 0/2" and Cancel stay on screen.
+// The sweep is the same code for singles and doubles (the game type only picks the engine), so the specs run on its own surface.
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
 }));

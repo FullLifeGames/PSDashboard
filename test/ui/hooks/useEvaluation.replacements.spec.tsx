@@ -4,11 +4,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings, ReplacementPoint, ReplacementRound } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/**
- * Round 79 (T290): the sweep's replacement stage over a scripted worker pool. The stage runs after the turn passes, prices each
- * request round of the protocol at the position the capture hook handed out, with the engine the following turn ran, and keeps
- * the result under its own cache key. A round the capture did not reach stays a silent gap.
- */
+/** The sweep's replacement stage over a scripted worker pool; a round the capture did not reach stays a silent gap. */
 
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
@@ -89,7 +85,6 @@ describe('the sweep\'s replacement stage', () => {
       turn: 1, ordinal: 0, forced: { p1: [0], p2: [] }, played: { p1: ['Toxapex'], p2: [] }, result: expect.objectContaining({ score: 0.5 }),
     }]);
     expect(graph.replacements?.[2]).toBeNull();
-    // The turn scores stay what the turn passes made them.
     expect(graph.scores).toEqual([0, 0, 0]);
     const call = script.calls.find(entry => entry.serialized === REPLACEMENT_AT)!;
     expect(call.settings).toMatchObject({ depth: 1, samples: 1, mode: 'matrix', prove: false });

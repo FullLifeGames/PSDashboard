@@ -2,11 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { notationDice, type DiceReport, type DieReport, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
 import { diceMarksOf, markText, sideMarkTexts, turnDiceMarks } from '../../../src/lib/branch-dice-marks';
 
-/**
- * Round 82 (forced dice), step A7c, decision 6a: what the history rows and the share links say about a turn's forced dice. The
- * labels come from `notationDice` (the chips' and the frame lines' words), each die sorted to the side that holds it, and a die
- * that took no effect says so. A turn that paused for a switch has two entries; the row reads the joined report once.
- */
+/** What the history rows and the share links say about a turn's forced dice: labels from `notationDice`, each die on the side that holds it, a die without effect says so. A turn that paused for a switch has two entries; the row reads the joined report once. */
 
 const words: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
 const die = (slot: string, kind: 'accuracy' | 'secondary', happens: boolean): ForcedDie =>

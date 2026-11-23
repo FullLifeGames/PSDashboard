@@ -3,10 +3,7 @@ import { calcSingleDamageRange, type DamageResult } from '@fulllifegames/eval-en
 import { fullMoveTitle, hitSharesText, koShort, koVerdict, ppTextFor, shortRange } from '../../../src/lib/move-damage-text';
 import { moveOption, pokemon } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the texts of a move tile and its tooltip, with the cases the old MoveBtn spec held (round 67,
- * T136 point 1: the hit distribution of Bullet Seed; round 83: the short KO verdict).
- */
+/** The texts of a move tile and its tooltip, with the cases the old MoveBtn spec held (the hit distribution of Bullet Seed, the short KO verdict). */
 const damage = (min: number, max: number, koChance = ''): DamageResult =>
   ({ moveName: 'Earthquake', minPercent: min, maxPercent: max, range: `${min}% - ${max}%`, koChance });
 
@@ -17,8 +14,8 @@ describe('move damage text', () => {
     expect(koVerdict('')).toBe('');
   });
 
-  // Round 84 (turn dock), A4: the bar row of a tile is about 12 characters wide; "guaranteed 2..." was cut. The tile shows the
-  // verdict's core, the target row and the tooltip keep the longer text.
+  // The bar row of a tile is about 12 characters wide; "guaranteed 2..." was cut. The tile shows the verdict's core, the target row and the
+  // tooltip keep the longer text.
   test('the short KO verdict is the hit count, with the chance in front when the calc gives one', () => {
     expect(koShort('guaranteed OHKO')).toBe('OHKO');
     expect(koShort('guaranteed 2HKO after Leftovers recovery')).toBe('2HKO');

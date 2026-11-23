@@ -3,10 +3,7 @@ import type { PokemonSnapshot, TurnSnapshot } from '@fulllifegames/replay-core';
 import { ENDGAME_MAX_BODIES } from '@fulllifegames/eval-engine';
 import { endgameTurns, livingBodies, loserOf } from '../../../src/lib/endgame-scope';
 
-/**
- * Round 89 (#130, G8b): which turns of a game are its endgame and who lost. The count is the turn card's own (the bodies each side
- * brought, the fallen ones of the turn's start snapshot), the scope the engine's constant.
- */
+/** Which turns of a game are its endgame and who lost. The count is the turn card's own (the bodies each side brought, the fallen ones of the turn's start snapshot), the scope the engine's constant. */
 const mon = (fainted: boolean): PokemonSnapshot => ({ name: 'x', speciesForme: 'x', hp: fainted ? 0 : 100, maxhp: 100, hpPercent: fainted ? 0 : 100, status: '', fainted, isActive: false, boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 50, gender: '' });
 const side = (id: 'p1' | 'p2', fallen: number, size: number) => ({ name: id, id, pokemon: Array.from({ length: size }, (_, index) => mon(index < fallen)), sideConditions: {} });
 const snapshot = (turn: number, fallen1: number, fallen2: number, size1 = 6, size2 = 6, log: string[] = []): TurnSnapshot =>

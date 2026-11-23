@@ -2,11 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { useScrollFade } from '../../../src/hooks/useScrollFade';
 
-/**
- * Round 84 (turn dock), A7b, ruling 9a: a list that scrolls inside its panel fades out at its foot while more follows. The hook
- * writes `data-more="true"` on the list from its scroll position and its size, never through React state: the fade is gone at the
- * list's end and when everything fits.
- */
+/** A scrolling list fades at its foot while more follows: the hook writes `data-more="true"` from the scroll position and size, never through React state. */
 type Geometry = { scrollTop: number; clientHeight: number; scrollHeight: number };
 const geometry: Geometry = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
 

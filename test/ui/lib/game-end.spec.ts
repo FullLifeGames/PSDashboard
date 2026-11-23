@@ -22,7 +22,6 @@ describe('the end of a game\'s main line (H4h)', () => {
     expect(gameEnd({ ...base, atEndPosition: true })).toEqual({ winner: 'Alice' });
     expect(gameEnd({ ...base, atEndPosition: true, log: '|turn|3\n' })).toEqual({ winner: null });
     expect(gameEnd({ ...base, atEndPosition: false })).toBeUndefined();
-    // a replay's end is the battle's (H19a)
     expect(gameEnd({ ...base, atEndPosition: true, isGame: false })).toEqual({ winner: 'Alice', battle: true });
     expect(gameEnd({ ...base, atEndPosition: true, viewingVariation: true })).toBeUndefined();
     expect(logWinner(log)).toBe('Alice');

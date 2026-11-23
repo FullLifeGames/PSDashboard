@@ -3,11 +3,7 @@ import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, typ
 import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, replacementWords, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/**
- * Round 89 (#104), step G3: the data under the Lines section. Ruling 33: per player the engine's line and the played line (one
- * line for a player who played the engine's move); chips only for dice that could have gone the other way (question 3a); the
- * tooltip of ▶ Play lists every forced die.
- */
+/** The data under the Lines section: per player the engine's line and the played line (one line for a player who played the engine's move); chips only for dice that could have gone the other way; the tooltip of ▶ Play lists every forced die. */
 const singles: LineViewContext = { turn: 20, playerNames: SINGLES_NAMES, doubles: false, rules: { gen: 9, mod: undefined } };
 const doubles: LineViewContext = {
   turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined },
@@ -26,13 +22,12 @@ describe('lineBlocks', () => {
     ]);
   });
 
-  // Round 89 (X1a part 1): the played line of a body that never acted is the line of its stand-in; the head does not say it was played.
+  // The played line of a body that never acted is the line of its stand-in; the head does not say it was played.
   test('the head of a line of a body knocked out before it moved says staying in, never that it was played', () => {
     const asNever = { ...singles, neverActed: { p2: true } };
     expect(lineBlocks([playedLine], asNever)[0].role).toBe('staying in: Hyper Voice');
     expect(lineBlocks([{ ...playedLine, for: ['engine', 'played'] }], asNever)[0].role).toBe('engine: Hyper Voice');
     expect(lineBlocks([singlesLine], asNever)[0].role).toBe('engine: Hydro Pump');
-    // the other side of the same turn keeps its words
     expect(lineBlocks([bothRolesLine], asNever)[0].role).toBe('played the engine\'s move: Draining Kiss');
   });
 
@@ -100,7 +95,6 @@ describe('lineBlocks', () => {
   });
 });
 
-/** Round 89 (#104), step G4b: the smaller faults of the first tester pass. */
 describe('lineBlocks: the tester\'s smaller items', () => {
   const hitDie = (slot: string, moveId: string, targetSlot: string): ForcedDie => ({ name: { slot, moveId, targetSlot, kind: 'accuracy' }, result: { happens: true } });
   const shown = (die: ForcedDie, chance: number): LineDie => ({ die, chance, shown: true });
@@ -116,12 +110,11 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     const [block] = lineBlocks([lineOf([stepWith(dice)])], doubles);
     expect(block.rows[0].sides[0].chips).toEqual(['Rock Slide → Urshifu: hits (90%)', 'Rock Slide → Rillaboom: hits (90%)']);
     expect(block.tooltip.split('\n').slice(1)).toEqual(['T4: Rock Slide → Urshifu: hits (90%)', 'T4: Rock Slide → Rillaboom: hits (90%)']);
-    // a move with one target keeps its plain subject
     const single = lineBlocks([lineOf([stepWith([dice[0]])])], doubles)[0];
     expect(single.rows[0].sides[0].chips).toEqual(['Rock Slide: hits (90%)']);
   });
 
-  // Round 89 (X1a part 3, 2630685175 T7): a Protect that fails at 67 percent decided the turn; its chip shows, in singles and in doubles.
+  // A Protect that fails at 67 percent decided the turn (2630685175 T7); its chip shows, in singles and in doubles.
   const stallOn = (line: EvalLine, side: 'p1' | 'p2', at: number, slot: string): EvalLine => {
     const die: ForcedDie = { name: { slot, moveId: 'protect', kind: 'stalling', effectId: 'protect' }, result: { happens: false } };
     const [first, ...later] = line.steps;
@@ -154,8 +147,8 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     expect(block.tooltip.split('\n')[1]).toBe('T4: Weather Ball: damage roll 9 (KO in 9 of 16 rolls)');
   });
 
-  // Round 89 (#104), G13b (tester, third pass): a forced roll on the side that does not knock out read "KO (1 of 16 rolls)". The chip
-  // says what the forced roll does, read against the boundary the simulator found (`ko`): rolls from `of - rolls` up knock out.
+  // A forced roll on the side that does not knock out read "KO (1 of 16 rolls)". The chip says what the forced roll does, read against the
+  // boundary the simulator found (`ko`): rolls from `of - rolls` up knock out.
   test.each([
     ['roll 9 of a move that knocks out in 1 of 16 rolls', 8, 1, 'Vacuum Wave: no KO (15 of 16 rolls)', 'T4: Vacuum Wave: damage roll 9 (no KO in 15 of 16 rolls)'],
     ['the highest roll of that move', 15, 1, 'Vacuum Wave: KO (1 of 16 rolls)', 'T4: Vacuum Wave: damage roll 16 (KO in 1 of 16 rolls)'],
@@ -213,7 +206,7 @@ describe('why a line ends', () => {
   });
 });
 
-/** Round 89 (#104), step G10 (ruling G5a): a line that has a row value shows both numbers; the sentence comes only when they differ. */
+/** A line that has a row value shows both numbers; the sentence comes only when they differ. */
 describe('both numbers on a line', () => {
   const endOf = (line: EvalLine) => winPctText(line.end, line.endFainted);
 
@@ -263,9 +256,8 @@ describe('both numbers on a line', () => {
 });
 
 /**
- * Round 89 (G13b, tester question 10): "row 100%, this line ends at 81%" sat under a sentence about averages. A row at 100% (or 0%) is
- * one where every answer and die ends the game (`winPercent` shows exactly 100 only for an ended evaluation); the line stops before
- * the game ends, so its end is the estimate of the position it stops at. The sentence is added only where such a row stands.
+ * A row at 100% (or 0%) is one where every answer and die ends the game (`winPercent` shows exactly 100 only for an ended evaluation); the line stops
+ * before the game ends, so its end is the estimate of the position it stops at. The sentence is added only where such a row stands.
  */
 describe('the sentences under a section of lines', () => {
   const block = (row: string | null, endPct: string) => lineBlocks([singlesLine], { ...singles, ...(row ? { rowValues: { p2: { engine: row } } } : {}) })
@@ -290,7 +282,7 @@ describe('the sentences under a section of lines', () => {
   });
 });
 
-/** Round 89 (#104), step G11 (ruling G8a): a line names the rank of the answer it meets in the search's merged ranking. */
+/** A line names the rank of the answer it meets in the search's merged ranking. */
 describe('the answer a line meets', () => {
   const ranked = (...p1: string[]) => ({ p1, p2: ['Hydro Pump', 'Hyper Voice'] });
 
@@ -347,9 +339,8 @@ describe('the answer a line meets', () => {
 });
 
 /**
- * Round 89 (G16, pass 4, findings 1 and 4): in Hard mode the bracket names the reply that hurts the line's choice most by those words
- * (not by the choice's own label, which the line printed a few words before: a switch read as "hurts → Clefable", a joint choice ran
- * to fifty characters), and a reply that is a pivot's pair ("Draining Kiss → Mew") is the bare move the line meets.
+ * In Hard mode the bracket names the reply that hurts the line's choice most by those words (not by the choice's own label: a switch read as "hurts → Clefable",
+ * a joint choice ran to fifty characters), and a reply that is a pivot's pair ("Draining Kiss → Mew") is the bare move the line meets.
  */
 describe('the reply the search rates lowest, in the bracket', () => {
   const ranks = { p1: ['Draining Kiss', 'Surf'], p2: ['Hydro Pump', 'Hyper Voice'] };
@@ -385,7 +376,7 @@ describe('the reply the search rates lowest, in the bracket', () => {
   });
 });
 
-/** Round 89 (G16, pass 4, finding 13): a doubles replacement whose other slot needs no body carries "pass" in the engine's label; the words of a line leave it out. */
+/** A doubles replacement whose other slot needs no body carries "pass" in the engine's label; the words of a line leave it out. */
 describe('a replacement names the bodies that come in, not the slot that passes', () => {
   const withPass: typeof doublesLine = {
     ...doublesLine,

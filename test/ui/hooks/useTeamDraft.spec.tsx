@@ -44,7 +44,7 @@ describe('useTeamDraft', () => {
     expect(result.current.pokemon[0].moves[2].source).toBe('manual');
     expect(result.current.moveError[0]).toBeNull();
 
-    // Round 83 (T308, GitHub issue #2): Spore is in the generation's Dex, not in Garchomp's learnset, and still joins.
+    // Spore is in the generation's Dex, not in Garchomp's learnset, and still joins.
     act(() => { added = result.current.addMove(0, ' power whip'); });
     expect(added).toBe(true);
     expect(result.current.pokemon[0].moves.map(move => move.name)).toEqual(['Protect', 'Earthquake', 'Fire Fang', 'Power Whip']);
@@ -93,7 +93,7 @@ describe('useEditorPools', () => {
     expect(Object.keys(loaded.movesBySpecies).sort()).toEqual(['Amoonguss', 'Flutter Mane', 'Incineroar', 'Urshifu']);
     expect(loaded.movesBySpecies.Amoonguss).toContain('Spore');
     expect(loaded.abilitiesBySpecies.Incineroar).toContain('Intimidate');
-    // The whole lists of the generation come with the species' own pools (T308).
+    // The whole lists of the generation come with the species' own pools.
     expect(loaded.allMoves).toEqual(expect.arrayContaining(['Spore', 'Power Whip']));
     expect(loaded.allAbilities).toEqual(expect.arrayContaining(['Intimidate', 'Rough Skin']));
     expect(loaded.items).toContain('Leftovers');

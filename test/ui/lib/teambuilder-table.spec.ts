@@ -6,10 +6,9 @@ import {
 } from '../../../src/lib/teambuilder-table';
 
 /**
- * Round 85 (T318): every replay frame ran Showdown's `data/teambuilder-tables.js` (15.8 MB, 185 ms at load and again at every
- * variation start), of which the replay client reads the generation tables `gen1` to `gen8` and the mods it names
- * (`battledata.js` ModdedDex; `battle.js` Dex.mod). A worker cuts that part once per session; the frame's script hook swaps
- * the table's source for the part's script. The e2e sweep (`test/e2e/teambuilder-table.spec.ts`) holds the part to the client.
+ * Every replay frame runs Showdown's `data/teambuilder-tables.js` (15.8 MB, 185 ms at load and again at every variation start), of which the replay client reads the
+ * generation tables `gen1` to `gen8` and the mods it names (`battledata.js` ModdedDex; `battle.js` Dex.mod). A worker cuts that part once per session; the frame's script
+ * hook swaps the table's source for the part's script. The e2e sweep (`test/e2e/teambuilder-table.spec.ts`) holds the part to the client.
  */
 const table = {
   tiers: ['header'], learnsets: { pikachu: {} }, overrideTier: {}, metagameBans: {}, natdexchampions: { x: 1 }, gen9dlc1: { y: 2 },

@@ -4,8 +4,6 @@ import { logRules } from '@fulllifegames/replay-core';
 import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-// The evaluation surface over a scripted worker pool client: the hook's
-// contract is what it asks the client for and how it installs the answers.
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings, handlers?: { onProgress?(p: SearchProgress): void; onPartial?(r: EvalResult): void }) => Promise<EvalResult>),
   calls: [] as { serialized: string; settings: EvalSettings }[],
@@ -101,10 +99,8 @@ describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
 });
 
 /**
- * Round 89 (ruling 49): with the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), a `hardMode: true` that an earlier
- * nightly stored is ignored: the hook hands every reader (the dock fill, the engine walk, the lines, the cards) the preference as
- * unset, no search request carries it, and the stored value stays as it was. The preference does not depend on the game type, so one
- * row covers singles and doubles; the position of the search row is a doubles one on purpose.
+ * With VITE_FEATURE_OPPONENT_READS off, a stored `hardMode: true` is read as unset by every reader and no search request carries it.
+ * One row covers both game types; the search row's position is a doubles one on purpose.
  */
 describe('useEvaluation preferences: Opponent reads my move behind its flag (round 89, ruling 49)', () => {
   beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
@@ -166,14 +162,12 @@ describe('useEvaluation single position', () => {
     expect(result.current.progress).toBeNull();
     expect(script.calls[0].settings).toEqual({ depth: 1, samples: 1, mode: 'matrix', tera: false, sleepClause: true });
 
-    // The same position with the same engine is a cache hit: no acquisition, no search.
     act(() => result.current.evaluate({ cacheKey: 'replay:3:fp', tera: false, acquire, tag: 'main:3' }));
     expect(result.current.status).toBe('done');
     expect(acquire).toHaveBeenCalledTimes(1);
     expect(script.calls).toHaveLength(1);
   });
 
-  // Round 63 (final review): the single evaluation of a replay turn searches with the played action, like the sweep it shares the cache key with.
   test('a single evaluation hands its played action to the search as keepPlayed', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
@@ -183,7 +177,6 @@ describe('useEvaluation single position', () => {
     expect(script.calls[0].settings.keepPlayed).toEqual(played);
   });
 
-  // Round 65: the rule set (Pokémon Champions or standard) rides with the search settings to the pool.
   test('a single evaluation hands the rule set to the search', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
@@ -193,7 +186,7 @@ describe('useEvaluation single position', () => {
   });
 
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
-    // The threshold before round 61; the default now runs the tree from the first turn (next test).
+    // tree-from is set explicitly: the default runs the tree from the first turn (next test).
     configureSearchBudget(parseSearchBudget(`tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));
     onTestFinished(() => configureSearchBudget(null));
     const { result } = renderHook(() => useEvaluation());
@@ -315,7 +308,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(script.calls).toHaveLength(3);
   });
 
-  // Round 63 (T78, lane C's merge patch): the verify step joins the played row and column, so a singles turn hands its played action on too.
   test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());

@@ -3,14 +3,10 @@ import { FRAME_HEIGHT_PROPERTY, followContentHeight } from '../../../src/lib/rep
 import { PHONE_CLASS } from '../../../src/lib/replay-phone';
 
 /**
- * Round 84 (T315, A7c, ruling 10a): in phone mode the frame's height follows its content (the scene, the controls and the log
- * stand in one column) instead of REPLAY_FRAME_HEIGHT; in the desktop layout the property stays unset and the frame keeps its height.
- *
- * A7d: the A7c run raised "ResizeObserver loop completed with undelivered notifications" in 15 of its 19 tests. The follower was
- * the only new observer on the desktop path: the page's observer watched the frame document's body, and its callback wrote the
- * frame's height, which the page's other observers then saw in the same delivery. The follower now observes with the frame
- * document's own `ResizeObserver` (its loop stays in the frame), measures the body's box and not the root (`scrollHeight` of the
- * root never falls below the viewport, the box the follower sizes), and writes only when the height changed.
+ * In phone mode the frame's height follows its content (the scene, the controls and the log stand in one column) instead of REPLAY_FRAME_HEIGHT; in the desktop
+ * layout the property stays unset. The follower observes with the frame document's own `ResizeObserver` (the page's observer watching the frame's body raised
+ * "ResizeObserver loop completed with undelivered notifications"), measures the body's box and not the root (`scrollHeight` of the root never falls below the
+ * viewport), and writes only when the height changed.
  */
 let frameCallback: (() => void) | null = null;
 let pageObservers = 0;

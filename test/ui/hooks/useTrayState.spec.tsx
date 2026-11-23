@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useTrayState } from '../../../src/hooks/useTrayState';
 
-/** Round 84 (turn dock): when the dock's tray opens and closes. */
+/** When the dock's tray opens and closes. */
 function Probe({ positionKey }: { positionKey: string }) {
   // Destructured: the lint rule reads `ref={tray.attachRoot}` as a ref and then every other `tray.` read as a ref read.
   const { open, attachRoot, onKeyDown, toggleChip, toggleMore } = useTrayState(positionKey);

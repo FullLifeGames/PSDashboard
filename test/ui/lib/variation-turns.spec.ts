@@ -12,11 +12,7 @@ import {
 } from '../../../src/lib/variation-turns';
 import { INTERLUDE_CASES } from '../fixtures/variation-interludes';
 
-/**
- * Round 88 (T348, #84): a replacement on both sides is stored as an entry of kind `turn` with the `turnNumber` of the entry
- * before it. Every reader of a variation's history names the same turn for every entry, on the data of 1.1.0 and before
- * (no version bump: the rule reads the old entries by their turnNumber). The expectations are counted by hand in the fixture.
- */
+/** A replacement on both sides is stored as an entry of kind `turn` with the `turnNumber` of the entry before it. Every reader of a variation's history names the same turn for every entry, old stored entries included (the rule reads them by their turnNumber). The expectations are counted by hand in the fixture. */
 describe.each(INTERLUDE_CASES)('every reader of a history with interludes on both sides, $name', ({
   history, startTurn, settledAt, playedAt, interludes, turns,
 }) => {

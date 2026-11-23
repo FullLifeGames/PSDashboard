@@ -3,11 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { generateReplayHtml } from '../../../src/lib/replay-html';
 import { APP_CONTROLS_STYLES, sideTrackerScript } from '../../../src/lib/replay-controls';
 
-/**
- * Round 88 (T316, #56): the workspace's replay frames hide the buttons the timeline covers (Last turn, Next turn, Go to turn...)
- * and the two choosers that do nothing in the app's frame (Color scheme, Music), and they report the side the frame shows near so
- * the dock can put that side's row on top. The embed rewrites row 1 on every battle update, so the hiding is CSS on `data-action`.
- */
+/** The workspace's replay frames hide the two choosers that do nothing in the app's frame (Color scheme, Music) and report the side the frame shows near. The embed rewrites row 1 on every battle update, so the hiding is CSS on `data-action`. */
 const log = '|player|p1|A|1\n|player|p2|B|2\n|turn|1';
 
 const scriptBodies = (html: string) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
@@ -28,7 +24,7 @@ function runTracker(viewpoint: 'p1' | 'p2', replays?: unknown) {
 const near = (sideid: string) => ({ battle: { nearSide: { sideid } } });
 
 describe('the frame document that hides the two choosers', () => {
-  // Round 88 (gate of 08.11.2026): Last turn, Next turn and Go to turn... are back in the frame; Color scheme and Music stay hidden
+  // Last turn, Next turn and Go to turn... stay in the frame; only Color scheme and Music are hidden
   test('hideChoosers adds the style that hides the two choosers, and none of the buttons the app keeps', () => {
     const html = generateReplayHtml({ log, hideChoosers: true });
     expect(html).toContain(APP_CONTROLS_STYLES);

@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { gameReviewEnabled, opponentReadsEnabled } from '../../../src/lib/feature-flags';
 
-/**
- * Round 89 (ruling 49): both flags are off unless a build sets its env variable to 1 or true. The vitest config of the ui project
- * switches both on for the specs of the two features, so each row stubs the variable it reads.
- */
+/** Both flags are off unless a build sets its env variable to 1 or true; the ui project's vitest config switches both on for the specs of the two features, so each row stubs the variable it reads. */
 afterEach(() => vi.unstubAllEnvs());
 
 const flags = [

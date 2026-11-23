@@ -10,11 +10,9 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult } from '../fixtures/eval-result';
 import { replayFixture } from '../fixtures/replay';
 
-// Round 89 (#112): a play-out without Fast play-out waited forever when the replay frame reported a turn other than the
-// tip after the timeline's play-in guard had ended. The real timeline (pointer, tip-follow, guard), the real loop and the
-// real transients run in one hook; the evaluation, the simulator and the frame are stubs. The spec reads what the user
-// sees (the next turn arrives, the pointer, the run), so it holds for each way to fix it: the loop stops reading the
-// pointer, the pointer walks back to the tip, or the guard covers the whole run.
+// A play-out without Fast play-out must not wait forever when the replay frame reports a turn other than the tip after the play-in guard
+// ended. The real timeline, loop and transients run in one hook; the evaluation, the simulator and the frame are stubs, and the spec reads
+// only what the user sees (the next turn arrives, the pointer, the run), so it holds for every way to fix it.
 
 type Evaluation = ReturnType<typeof useEvaluation>;
 const GUARD_MS = 20_000; // PLAY_IN_GUARD_MS, src/hooks/useTimeline.ts

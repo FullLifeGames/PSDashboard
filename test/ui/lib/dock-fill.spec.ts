@@ -4,10 +4,7 @@ import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillPar
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), lane A, step A5: what the engine fills into the untouched slots of the dock. The best ranked joint choice
- * whose parts agree with every slot the user touched supplies the rest; no agreeing choice leaves the slots empty.
- */
+/** The best ranked joint choice whose parts agree with every slot the user touched fills the rest; no agreeing choice leaves the slots empty. */
 
 const fakeOut: BranchSlotChoice = { kind: 'move', moveId: 'fakeout', moveName: 'Fake Out', targetLoc: 2 };
 const flareBlitz: BranchSlotChoice = { kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 2 };
@@ -268,7 +265,7 @@ describe('overlayFill (a replay turn: the fill under the draft and over nothing)
 });
 
 describe('engineHoldsForcedBeside', () => {
-  // Round 84 (A7c, ruling 16a): a bench click sends a replacement at once only when no other forced slot of the turn holds just the engine's pick.
+  // a bench click sends a replacement at once only when no other forced slot of the turn holds just the engine's pick.
   const marks = (p1: boolean[], p2: boolean[] = [false]) => ({ p1, p2 });
 
   test("doubles, both slots of P1 forced: an engine pick beside holds the click back, the user's own pick does not", () => {
@@ -299,11 +296,7 @@ describe('engineHoldsForcedBeside', () => {
   });
 });
 
-/**
- * Round 89 (#153, Hard mode): the ranked row the picks of a side stand for, which the worst reply is read for. The picks as they stand
- * (the user's slots and the slots the fill wrote) when one row has them all; else the row the fill itself would take beside the user's
- * slots alone, so a pick that broke the joint choice still has a row; null when no row agrees.
- */
+/** The ranked row the picks of a side stand for: the picks as they stand when one row has them all, else the row the fill itself would take beside the user's slots alone; null when no row agrees. */
 describe('rowOfChoices', () => {
   const doubles = simState('doubles');
   const slot = (choices: (BranchSlotChoice | null)[]) => choices;
@@ -330,7 +323,6 @@ describe('rowOfChoices', () => {
   });
 });
 
-/** Round 89 (#153, HM3b): the test of "Back to the engine's pick": a pick that is the engine's own needs no button. */
 describe('sameChoice', () => {
   test('the same move, target and gimmick are one pick, however the object was built', () => {
     expect(sameChoice(fakeOut, { targetLoc: 2, moveName: 'Fake Out', moveId: 'fakeout', kind: 'move' })).toBe(true);

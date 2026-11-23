@@ -3,9 +3,6 @@ import type { EvalLine, WinStep } from '@fulllifegames/eval-engine';
 import { chanceText, rankWords, sequenceNote, winStepViews, type WinPathsViewContext } from '../../../src/lib/win-paths-view';
 import { doublesLine, DOUBLES_NAMES, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/**
- * Round 89 (#130, G8b): the words of the win-path panel, as the user ruled them (14.11.2026, W1a to W5a), singles and doubles.
- */
 const ctx = (extra: Partial<WinPathsViewContext> = {}): WinPathsViewContext =>
   ({ turn: 23, playerNames: SINGLES_NAMES, doubles: false, host: { rules: { gen: 9, mod: undefined } }, side: 'p2', playedLabel: null, ...extra });
 const spent = { cells: 3, turns: 5 };
@@ -44,8 +41,8 @@ describe('the win-path words', () => {
     expect(pair.block?.rows.length).toBeGreaterThan(3);
   });
 
-  // Round 89 (#130), G13b (tester, third pass): "Played stayed in (KO’d before acting): 4 %." printed the card's description as a choice
-  // and a number nobody could relate to a move. The panel names the played choice in Showdown's words and says what the number is.
+  // "Played stayed in (KO’d before acting): 4 %." printed the card's description as a choice and a number nobody could relate to a move. The panel
+  // names the played choice in Showdown's words and says what the number is.
   test('step 1 on a body that was knocked out before it moved says so instead of naming a choice', () => {
     const host = { rules: { gen: 9, mod: undefined }, snapshot: { p1: { pokemon: [{ name: 'Tentacruel', isActive: true }] }, p2: { pokemon: [{ name: 'Rotom-Wash', isActive: true }] } } } as unknown as WinPathsViewContext['host'];
     const [view] = winStepViews([step('stronger', 'found', { chance: 0.106, played: 0.04, line: line() })], ctx({ host, playedLabel: 'stayed in (KO’d before acting)', playedNeverActed: true }));
@@ -75,7 +72,7 @@ describe('the win-path words', () => {
     expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24, Pepitopalotin wins: this sequence has 84 %.');
   });
 
-  // Round 89 (X1a part 4, 649664 T23): "If BKC had played Icy Wind (its third choice) on turn 23. This sequence: 86 %." opened with a fragment.
+  // 649664 turn 23: "If BKC had played Icy Wind (its third choice) on turn 23. This sequence: 86 %." opened with a fragment.
   test('step 3 is one sentence in singles and in doubles, with or without a chance', () => {
     const deviation = { turn: 23, label: 'Icy Wind', rank: 3 };
     const [singles] = winStepViews([step('mistake', 'found', { chance: 0.86, deviation, line: line() })], ctx());
@@ -89,8 +86,8 @@ describe('the win-path words', () => {
     expect(noSlip.headline).toBe('This sequence: 50 %.');
   });
 
-  // Round 89 (G13b, tester questions 8 and 9): a sequence's number multiplies the dice whose other result would change who faints, and
-  // it prices one sequence; a chip also shows a die that changes nothing, and the stronger play's share adds every winning sequence.
+  // A sequence's number multiplies the dice whose other result would change who faints, and it prices one sequence; a chip also shows a die that
+  // changes nothing, and the stronger play's share adds every winning sequence.
   test('a luck or mistake step that found a path carries the note on what its number counts; the other steps do not', () => {
     const found = (kind: WinStep['kind']) => winStepViews([step(kind, 'found', { chance: 0.5, line: line() })], ctx());
     expect(sequenceNote(found('luck'))).toBe('A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.');
@@ -103,7 +100,7 @@ describe('the win-path words', () => {
 
   test('chances and ordinals', () => {
     expect([0.0005, 0.004, 0.108, 0.19, 0.2, 0.5175, 1].map(chanceText)).toEqual(['0.1 %', '0.4 %', '10.8 %', '19 %', '20 %', '52 %', '100 %']);
-    // the rank reads as the line heads of the Lines section read it (G13b, G16): "second choice", "third choice", then "fourth choice", "11th choice"
+    // the rank reads as the line heads of the Lines section read it: "second choice", "third choice", then "fourth choice", "11th choice"
     expect([2, 3, 4, 5, 10, 11, 12, 21, 22, 23].map(rankWords)).toEqual(['second choice', 'third choice', 'fourth choice', 'fifth choice', 'tenth choice', '11th choice', '12th choice', '21st choice', '22nd choice', '23rd choice']);
   });
 

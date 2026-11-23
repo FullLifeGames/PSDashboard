@@ -76,7 +76,7 @@ describe('useTeamKnowledge', () => {
     expect(result.current.setsFingerprint).not.toBe(JSON.stringify([null, null, '']));
   });
 
-  // Round 76 (T234): a panel that opens before the first solve would show and export the usage guesses.
+  // A panel that opens before the first solve would show and export the usage guesses.
   test.each(['editor', 'sets panel'] as const)('the %s opens when the first spread solve has settled, and closes at once', async kind => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>(resolve => { release = resolve; });
@@ -156,7 +156,7 @@ describe('useTeamKnowledge', () => {
     expect(outcome).toBe('Load a replay first.');
   });
 
-  // Round 77 (D5): the import names what the game cannot use and applies nothing until the text is fixed.
+  // The import names what the game cannot use and applies nothing until the text is fixed.
   describe.each(['singles', 'doubles'] as const)('a sets import with values the game does not have (%s)', kind => {
     test('is refused with every value named, and nothing is applied or stored', async () => {
       const fixture = replayFixture(kind);
@@ -219,12 +219,7 @@ describe('useTeamKnowledge', () => {
   });
 });
 
-/**
- * Round 88 (F, #101): a game without team preview where a side showed fewer bodies than its |teamsize|. The panel's infos carry the
- * stand-ins the format's teammate statistics name, flagged; a pasted team fills the open slots first, and the paste's own sets overlay
- * them as manual knowledge; an edit of a stand-in takes the flag off. Gen 4 OU stands for singles, a simulator-made Gen 4 Doubles OU log
- * for doubles (neither has a preview).
- */
+/** A game without team preview where a side showed fewer bodies than its |teamsize|: Gen 4 OU stands for singles, a simulator-made Gen 4 Doubles OU log for doubles. */
 describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () => {
   const fixture = (name: string) => JSON.parse(readFileSync(`test/regression/fixtures/${name}.json`, 'utf-8'));
   const sceneLog: string = fixture('smogtours-gen4ou-544639').log;
@@ -294,9 +289,8 @@ describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () =>
 });
 
 /**
- * Round 89 (lane B, #117): a game whose format generates its team fills the bodies a side never showed from the format's random-set
- * file, which the set fetch carries (`setAssumptions.assumptions.randomSets`). Gen 3 Random Battle for singles, Gen 9 Random Doubles
- * for doubles: logs the simulator played (packages/replay-core/test/fixtures/random-*.json).
+ * A game whose format generates its team fills the bodies a side never showed from the format's random-set file (`setAssumptions.assumptions.randomSets`):
+ * Gen 3 Random Battle for singles, Gen 9 Random Doubles for doubles, logs the simulator played (`packages/replay-core/test/fixtures/random-*.json`).
  */
 describe.each([
   { label: 'Gen 3 Random Battle', id: 'gen3randombattle-1', missing: 3 },

@@ -59,7 +59,6 @@ describe('useEvalView', () => {
     expect(empty.result.current.evalAvailable).toBe(false);
   });
 
-  // Round 65: a Pokémon Champions replay (OU or VGC) is its own rule set, named from the replay's format.
   test('resolves the rule set from the replay format and hands it to Evaluate and the sweep', () => {
     const { evaluation, spies } = evaluationOf();
     const standard = renderHook(() => useEvalView(inputs(evaluation)));
@@ -71,7 +70,7 @@ describe('useEvalView', () => {
     expect(spies.evaluate.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
     act(() => view.result.current.handleAnalyzeGame());
     expect(spies.runGraphSweep.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
-    // Round 65 gate (2b): VGC outside Champions is its own rule set too.
+    // VGC outside Champions is its own rule set too.
     const vgc = { ...replayData, id: 'gen9vgc2026regi-2630181744', formatid: 'gen9vgc2026regi' };
     expect(renderHook(() => useEvalView(inputs(evaluation, { replayData: vgc }))).result.current.effectiveRuleset).toBe('vgc');
   });
@@ -144,8 +143,7 @@ describe('useEvalView', () => {
     expect(spies.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({ cacheKey: `${replayData.id}:3:fp1`, tag: 'main:3', acquire: main.acquire.acquireReplayPosition }));
   });
 
-  // Round 84 (turn dock): the engine fill hands a result callback to Evaluate; it reaches the run at every position and never
-  // turns the "Auto" preference on. A click event (the Evaluate button) carries no callback.
+  // A click event (the Evaluate button) carries no callback.
   test('Evaluate passes a result callback on to the run at every position and never sets Auto', () => {
     const { evaluation, spies } = evaluationOf();
     const onResult = vi.fn();
@@ -167,8 +165,6 @@ describe('useEvalView', () => {
     expect((spies.evaluate.mock.calls.at(-1)![0] as { onResult?: unknown }).onResult).toBeUndefined();
   });
 
-  // Round 63 (final review): Evaluate and Analyze game store a replay turn under one cache key, so both hand the
-  // search the same played action (the verify step joins its row and column, T78); live and variation positions have none.
   test('Evaluate on a replay turn hands the search the played action the sweep would; live and variation evaluations none', () => {
     const { evaluation, spies } = evaluationOf();
     const expected = parsePlayedActions(snapshots[3]?.log ?? [], logRules(''));
@@ -202,11 +198,11 @@ describe('useEvalView', () => {
     expect(sweep.turns).toBe(6);
     expect(sweep.from).toBeUndefined();
     expect(sweep.cacheKeyFor(3)).toBe(`${replayData.id}:3:fp1`);
-    // Round 79 (T290): the full sweep carries the protocol's replacement rounds and their own cache keys; a single turn's analysis does not.
+    // The full sweep carries the protocol's replacement rounds and their own cache keys; a single turn's analysis does not.
     const withRounds = sweep as typeof sweep & { replacementRounds: unknown; replacementKeyFor: (turn: number, ordinal: number) => string };
     expect(withRounds.replacementRounds).toEqual(replacementRounds(replayData.log));
     expect(withRounds.replacementKeyFor(3, 1)).toBe(`${replayData.id}:3r1:fp1`);
-    // Round 86 (T304): and the last stage that plays the game's biggest roll the other way, with its own cache key beside the turn keys.
+    // The rolled-copy stage has its own cache key beside the turn keys.
     const withStage = sweep as typeof sweep & { rolledCopy: { keyFor: (turn: number) => string; namedRoll: unknown; playCopy: unknown } };
     expect(withStage.rolledCopy.keyFor(3)).toBe(`${replayData.id}:3x:fp1`);
     expect(withStage.rolledCopy).toEqual({ keyFor: expect.any(Function), namedRoll: expect.any(Function), playCopy: expect.any(Function) });
@@ -219,7 +215,6 @@ describe('useEvalView', () => {
     expect(spies.runGraphSweep.mock.calls[2][0]).toMatchObject({ from: 6, to: 6 });
   });
 
-  // Round 67 (T109, gate answer 5b): the deeper stage left with "Think deeper"; a gap turn keeps its analysis.
   test('a gap turn offers its analysis at the current settings, an analyzed turn offers nothing', () => {
     const graph = evalGraph('singles', {
       settings: [
@@ -236,7 +231,6 @@ describe('useEvalView', () => {
     expect(targetAt(2)).toBeNull();
     expect(targetAt(3)).toBeNull();
     expect(targetAt(4)).toBeNull();
-    // A gap turn: the configured settings.
     expect(targetAt(5)).toEqual({ depth: 2, samples: 3, mode: 'matrix' });
     expect(targetAt(null)).toBeNull();
     expect(targetAt(5, { liveEvalView: true })).toBeNull();
@@ -281,7 +275,6 @@ describe('useEvalView', () => {
     // The gap turn at a tenth fainted: singles configure the early matrix there, doubles the tree.
     expect(singles.result.current.analyzeTarget).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
     expect(doubles.result.current.analyzeTarget).toEqual(tree);
-    // The stored tree turn offers nothing in either game type.
     expect(renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1 }))).result.current.analyzeTarget).toBeNull();
   });
 
@@ -305,11 +298,10 @@ describe('useEvalView', () => {
     const counts = () => ({ stale: spies.markStale.mock.calls.length, reset: spies.reset.mock.calls.length, clear: spies.clearGraph.mock.calls.length });
     const before = counts();
 
-    // Round 77 (C6): moving the pointer alone does not age the result; its position tag decides whether it fits the screen.
+    // Moving the pointer alone does not age the result; its position tag decides whether it fits the screen.
     rerender(inputs(evaluation, { viewTurn: 4 }));
     rerender(inputs(evaluation, { viewTurn: 4, viewLine: 'variation' }));
     expect(counts().stale).toBe(before.stale);
-    // The position itself changing (a turn executed, a set edited) does.
     rerender(inputs(evaluation, { viewTurn: 4, historyLength: 1 }));
     expect(counts().stale).toBe(before.stale + 1);
     rerender(inputs(evaluation, { viewTurn: 4, historyLength: 1, editedP1Info: { name: 'edited' } as never }));
@@ -336,8 +328,8 @@ describe('useEvalView', () => {
     expect(pending.spies.runGraphSweep).not.toHaveBeenCalled();
   });
 
-  // Round 89 (SB-7): Cancel is the user's answer for that position; Auto and "always on" start no new run over it. Another position
-  // (another tag) is theirs again. The same for singles and doubles: the view does not read the game type here.
+  // Cancel is the user's answer for that position; another position (another tag) is theirs again. The view does not read the game type
+  // here, so one row serves singles and doubles.
   test.each([['Auto', { auto: true }], ['Always on', { autoAnalyze: true }]] as const)('%s leaves a position the user stopped alone, and takes the next one', (_name, prefs) => {
     const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'stale' as const, evalViewKey: 'variation:3' };
     const stopped = evaluationOf({ prefs, status: 'stale', result: evalResult(), resultTag: 'variation:3', stopped: { tag: 'variation:3' } });
@@ -347,8 +339,8 @@ describe('useEvalView', () => {
     expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (SB-9): a stop before any result (a tree before its interim result) is the user's answer too; "Always on" does not start the run
-  // again. Round 89 (SB-10): the game analysis it starts stands: no single evaluation supersedes it in the same commit ("Analysis stopped").
+  // A stop before any result (a tree before its interim result) is the user's answer too: "Always on" does not start the run again, and the
+  // game analysis it starts stands (no single evaluation supersedes it in the same commit: "Analysis stopped").
   test.each([['kept nothing', { tag: 'variation:3', empty: true as const }], ['kept a result', { tag: 'variation:3' }]] as const)(
     'Always on leaves a position whose stop %s alone and starts the game analysis, not a search', (_name, mark) => {
       const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
@@ -360,8 +352,8 @@ describe('useEvalView', () => {
       expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
     });
 
-  // Round 89 (#112): a frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip.
-  // The run's evaluation (the user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.
+  // A frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip. The run's evaluation (the
+  // user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.
   describe.each(['singles', 'doubles'] as const)('a run with the pointer behind the tip, %s', kind => {
     const fixture = replayFixture(kind);
     const behind = (evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {}) => inputs(evaluation, {

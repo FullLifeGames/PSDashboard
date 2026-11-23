@@ -5,11 +5,7 @@ import {
   PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_SCALE_PROPERTY, PHONE_STYLES,
 } from '../../../src/lib/replay-phone';
 
-/**
- * Round 84 (T315, A7c, ruling 10a): on a phone the replay's battle scene shrinks to the frame's width, and the controls and the
- * log stand under it at their own size. The document decides by its own width: below the battle's 642 px it takes the class
- * `ps-phone` and the scale `--ps-k`; the stylesheet turns the embed's absolute layout into one column.
- */
+/** On a phone the replay's battle scene shrinks to the frame's width, and the controls and the log stand under it at their own size. Below the battle's 642 px the document takes the class `ps-phone` and the scale `--ps-k`; the stylesheet turns the embed's absolute layout into one column. */
 const log = '|player|p1|A|1\n|player|p2|B|2\n|turn|1';
 
 /** The fit script in a minimal document: a root element with a class list, a style map and a width. */

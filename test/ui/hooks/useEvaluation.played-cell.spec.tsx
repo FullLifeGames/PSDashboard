@@ -5,9 +5,8 @@ import type { EvalResult, EvalSettings, MatrixCell, PlayedAction, PlayedTurn } f
 import { evalResult } from '../fixtures/eval-result';
 
 /**
- * Round 79 (T287): in tree mode the played pair is priced with the root's own cell of the merged matrix, the number the
- * roots around it are made of. The depth-1 sub-search (evalPair) stays only where the pair is no priced cell: a matrix
- * turn (its pair search is the cell's own machinery), a cell no tree visited, a result that carries no cells.
+ * In tree mode the played pair is priced with the root's own cell of the merged matrix. The depth-1 `evalPair` sub-search stays only for
+ * a matrix turn, a cell no tree visited and a result without cells.
  */
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),

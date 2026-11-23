@@ -19,12 +19,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * Round 70 (T215): the quick picker labels a move with the type it lands with before any Tera click, as the
- * simulator reads it for the body (the move's own rule, then the ability: Weather Ball under the weather that
- * stands, Terrain Pulse under the terrain, the -ate family, Liquid Voice, Normalize). The snapshot knows the
- * field and the guessed set names the ability, so the picker asks the simulator on a one-Pokémon twin instead of
- * keeping the catalog type. The checker is the simulator: the same position as a live battle, read through
- * createBranchStateFromBattle. Every scene runs on a singles and a doubles format.
+ * The quick picker labels a move with the type it lands with before any Tera click, as the simulator reads it for the body (the move's own rule, then
+ * the ability: Weather Ball under the weather that stands, Terrain Pulse under the terrain, the -ate family, Liquid Voice, Normalize). The snapshot knows
+ * the field and the guessed set names the ability, so the picker asks the simulator on a one-Pokémon twin. The checker is the simulator: the same position
+ * as a live battle, read through createBranchStateFromBattle.
  */
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -234,9 +232,8 @@ describe('snapshot picker, doubles slots', () => {
   }, 120_000);
 
   /**
-   * Round 84 (final gate, answer 2a): the scene of T271. In Doubles OU 2663093831 the snapshot picker listed P2's actives in
-   * party order while the exact position loaded: P2A and P2B swapped at turns 5 and 12. At turn 15 slot A of both sides fainted
-   * with nobody left to come in; the picker keeps two slots a side and leaves slot A empty.
+   * Doubles OU 2663093831: the snapshot picker listed P2's actives in party order while the exact position loaded: P2A and P2B swapped at turns 5 and 12.
+   * At turn 15 slot A of both sides fainted with nobody left to come in; the picker keeps two slots a side and leaves slot A empty.
    */
   test('Doubles OU 2663093831: the slots of turns 5, 12 and 15 as the protocol has them', async () => {
     const replay = JSON.parse(readFileSync('test/e2e-feedback/fixtures/gen9doublesou-2663093831.json', 'utf-8')) as { log: string };
@@ -256,7 +253,7 @@ describe('snapshot picker, doubles slots', () => {
 
 describe('picker-state-hp', () => {
   const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { log: string };
-  // Round 75 (T160): every body here is built from a Champions log (on a Scarlet/Violet format as well), and its inference reads the mod.
+  // Every body here is built from a Champions log (on a Scarlet/Violet format as well), and its inference reads the mod.
   beforeAll(async () => { await loadSimMods('gen9championsou'); });
   const FORMATS = [
     { label: 'singles', format: 'gen9ou' },

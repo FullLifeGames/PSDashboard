@@ -38,7 +38,6 @@ describe('useLeadSelection', () => {
     expect(result.current.p2Leads).toEqual(['Rillaboom', 'Tornadus', 'Ogerpon']);
     act(() => result.current.toggleP1('Urshifu'));
     expect(result.current.p1Leads).toEqual(['Incineroar', 'Amoonguss', 'Flutter Mane', 'Urshifu']);
-    // Deselecting a lead and picking it again moves it to the end of the order.
     act(() => result.current.toggleP2('Kingambit'));
     act(() => result.current.toggleP2('Rillaboom'));
     expect(result.current.p2Leads).toEqual(['Tornadus', 'Ogerpon', 'Kingambit']);

@@ -27,8 +27,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// The stats fetcher caches per format for the life of the module, so every
-// test below reads a different format.
+// The stats fetcher caches per format for the life of the module, so every test reads a different format.
 describe('useSmogonUsageStats', () => {
   test('without a format nothing loads', () => {
     const fetchMock = stubStats({});
@@ -90,7 +89,7 @@ describe('useSmogonUsageStats', () => {
   });
 
   test('a load cut short by a format change is not remembered: back on the format, the stats load', async () => {
-    // T68 scene: replay in format X, a replay in Y before X's stats arrive, then X again (VGC: doubles sets hang on it).
+    // Scene: replay in format X, a replay in Y before X's stats arrive, then X again (VGC: doubles sets hang on it).
     let firstAsk = true;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

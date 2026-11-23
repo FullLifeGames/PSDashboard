@@ -36,7 +36,6 @@ async function land(serialized: string, state: BranchSimState, battle?: unknown)
 }
 
 describe('usePositionPicker', () => {
-  // Round 88 (T314, #55): a stored position is read through the bench of the bring-limited game.
   test('a stored position is read through the game\'s bench', async () => {
     const bench = { lists: { p1: [], p2: ['Kyurem'] }, rules: { gen: 9 } };
     benches.length = 0;
@@ -46,9 +45,9 @@ describe('usePositionPicker', () => {
   });
 
   test('while the viewed position resolves, the panel keeps what it showed last, as stale', async () => {
-    // Round 77 (user report 28.10.2026): one turn back from the tip of a turn-0 variation showed another position's picker
-    // (Mienshao's moves) for about 40 ms until turn 3 (Kyurem) resolved, and a click there would choose a move of a Pokémon
-    // that was not on the field. Without a stand-in the history below jumped by the panel's height (585 px) for two frames.
+    // Scene: one turn back from the tip of a turn-0 variation showed another position's picker (Mienshao's moves) for about 40 ms until
+    // turn 3 (Kyurem) resolved; a click there would choose a move of a Pokémon not on the field, and without a stand-in the history below
+    // jumped by the panel's height (585 px) for two frames.
     const shown = (current: { pickerSimState: BranchSimState | null }) => current.pickerSimState?.p1Active?.name;
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), {
       initialProps: args({ viewingVariation: false, viewTurn: 1 }),
@@ -70,7 +69,6 @@ describe('usePositionPicker', () => {
     await waitFor(() => expect(shown(result.current)).toBe('Kyurem at turn 3'));
     expect(result.current.pickerStale).toBe(false);
 
-    // Between two recorded positions the last one stands in.
     rerender(args({ viewTurn: 2, serializedAtView: 'turn-2 again' }));
     expect(shown(result.current)).toBe('Kyurem at turn 3');
     expect(result.current.pickerStale).toBe(true);
@@ -117,8 +115,7 @@ describe('usePositionPicker', () => {
   });
 
   test('a viewed position that cannot be shown ends the stand-in: the panel goes empty, not stale for good', async () => {
-    // Review of round 77: a variation position without a capture resolves to no picker, and the stand-in stayed on screen,
-    // inert, for as long as the pointer stood there.
+    // A variation position without a capture resolves to no picker: the stand-in must not stay on screen, inert, while the pointer stands there.
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true }) });
     rerender(args({ viewTurn: 3, serializedAtView: null }));
     await waitFor(() => expect(result.current.pickerStale).toBe(false));
@@ -149,7 +146,6 @@ describe('usePositionPicker', () => {
       rerender(args({ serializedAtView: 'seeded', played, draftChoices: { p1: [mine], p2: [] } }));
       expect(names(result.current.pickerSimState?.p1Choices)).toEqual(['Protect', null]);
       expect(names(result.current.pickerSimState?.p2Choices)).toEqual(['Wood Hammer', null]);
-      // Navigation clears the draft: the seed stands again.
       rerender(args({ serializedAtView: 'seeded', played }));
       expect(names(result.current.pickerSimState?.p1Choices)).toEqual(['Flare Blitz', null]);
     });

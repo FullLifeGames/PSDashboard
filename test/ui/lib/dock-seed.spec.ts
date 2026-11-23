@@ -7,11 +7,7 @@ import { mergeChoices, seedChoices } from '../../../src/lib/dock-seed';
 import type { PlayedAtPosition, PlayedPick } from '../../../src/lib/played-pick';
 import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), lane A, step A2: the seed of the dock. Each slot starts with the choice the viewed line played, but only
- * a choice the picker offers: a move that is listed and enabled, a bench Pokémon that is alive, a target the move lists and a
- * gimmick the slot has. What the picker lacks leaves the slot empty with the played pick kept for the chip's note.
- */
+/** Each slot starts with the choice the viewed line played, but only one the picker offers (a listed, enabled move, a living bench Pokémon, a target the move lists, a gimmick the slot has); what the picker lacks leaves the slot empty with the played pick kept for the chip's note. */
 
 const move = (name: string, extra: Partial<PlayedPick> = {}): PlayedPick => ({ kind: 'move', name, ...extra });
 const doublesAt = (p1: (PlayedPick | null)[], p2: (PlayedPick | null)[] = [null, null]): PlayedAtPosition => (
@@ -135,10 +131,7 @@ describe('mergeChoices', () => {
   });
 });
 
-/**
- * C3 against the simulator: a spread move takes no target. The log names the first foe for Rock Slide, and a choice that carried
- * it would show a target the move does not take; the seed drops it, so the command the dock sends is one the simulator takes.
- */
+/** A spread move takes no target: the log names the first foe for Rock Slide, and the seed drops it, so the command the dock sends is one the simulator takes. */
 describe('a spread move run through resolveSideChoices and the simulator', () => {
   const STATS = { hp: 0, atk: 252, def: 0, spa: 252, spd: 0, spe: 0 };
   const set = (species: string, moves: string[]): PokemonSet => ({

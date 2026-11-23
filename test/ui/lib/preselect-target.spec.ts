@@ -2,11 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { moveOption, targetOption } from '../fixtures/sim-state';
 import { preselectTarget } from '../../../src/lib/preselect-target';
 
-/**
- * Round 84 (turn dock), lane A: a move that needs a target in doubles opens with one target chosen, so a pick takes one click.
- * The rule: the played target for the played move, else the foe the move hurts most (the highest damage roll), else the first
- * target the move lists.
- */
+/** A move that needs a target in doubles opens with one target chosen, so a pick takes one click: the played target for the played move, else the foe the move hurts most (the highest damage roll), else the first target the move lists. */
 const move = moveOption('Flare Blitz', {
   requiresTarget: true,
   targetOptions: [targetOption('p2', 0, 'Rillaboom', 1), targetOption('p2', 1, 'Tornadus', 2), targetOption('p1', 1, 'Amoonguss', -2)],

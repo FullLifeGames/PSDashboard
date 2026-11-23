@@ -84,14 +84,12 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOutRef.current).toEqual(expect.objectContaining({ active: true }));
   });
 
-  // Round 77 (C4): the run arms after the deviation started (after the replace confirm's yes), not before.
   test('starting off the live tip goes through the deviation flow first and arms only when it starts; the end sentinel only asks', () => {
     const { evaluation, setPrefs } = evaluationOf({});
     const wired = wiring({ liveTip: false, viewingVariation: false });
     const { result } = setup(evaluation, wired);
     act(() => result.current.playOut.startPlayOut());
     expect(wired.requestDeviation).toHaveBeenCalledWith(null, { onStart: expect.any(Function) });
-    // Waiting on the confirm: nothing runs, nothing is changed.
     expect(result.current.transients.playOut).toBeNull();
     expect(setPrefs).not.toHaveBeenCalled();
     expect(wired.handleEvaluate).not.toHaveBeenCalled();
@@ -121,16 +119,14 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 1 });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
     // Two calls at the start (the arm, and the kick of this mock whose status stays idle); none after the executed turn
-    // (usePlayOut.evaluations.spec counts the real chain).
+    // (the harness rows at the end of this file count the real chain).
     await act(async () => {});
     expect(wired.handleEvaluate).toHaveBeenCalledTimes(2);
 
-    // The same result again is not played twice.
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: done, resultTag: 'variation:3' }).evaluation, wiring: wired });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
   });
 
-  // The loop no longer re-evaluates after a turn by itself; a turn the simulator refuses must end the run, not stall it.
   test('a refused turn ends the run with the refusal instead of waiting for an evaluation that never comes', async () => {
     const { evaluation } = evaluationOf({ auto: true });
     const wired = wiring({ executeTurn: vi.fn(async () => 'Earthquake is disabled for Garchomp right now.') });
@@ -163,7 +159,7 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  // Round 88 (T348, #84): a replacement on both sides is played as a pair, but the battle's turn does not move: no turn is counted.
+  // A replacement on both sides is played as a pair, but the battle's turn does not move: no turn is counted.
   test.each([
     ['singles', [true], [true]],
     ['doubles', [true, false], [false, true]],
@@ -180,7 +176,7 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  // Round 88 (T347, #83): the finish leaves the frame where the user watches it; the pointer takes the frame's turn.
+  // The finish leaves the frame where the user watches it; the pointer takes the frame's turn.
   test('an ended battle finishes the run, restores the auto setting, and leaves the frame where it stands after played turns', async () => {
     const { evaluation, setPrefs } = evaluationOf({});
     const { result, rerender, wired } = setup(evaluation);
@@ -214,7 +210,6 @@ describe('usePlayOut', () => {
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: wired });
     expect(result.current.transients.playOutNotice?.text).toBe("Play-out stopped after 0 turns: the engine's choice was not playable at this position.");
 
-    // A run armed while the evaluation has already failed ends at once with the failure.
     rerender({ evaluation: evaluationOf({ auto: true, status: 'error', error: 'worker crashed' }).evaluation, wiring: wired });
     act(() => result.current.playOut.startPlayOut());
     expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped after 0 turns: the evaluation failed here (worker crashed).');
@@ -230,7 +225,7 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 0 turns played (they stay in the variation).');
 
-    // The pointer takes the variation position of the turn the frame is about to show, never the tip (T347).
+    // The pointer takes the variation position of the turn the frame is about to show, never the tip.
     act(() => result.current.playOut.watchFrom(2));
     expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 2, line: 'variation' }, { seek: false, internal: true, toFrame: 2 });
     expect(wired.setNavSeek).not.toHaveBeenCalled();
@@ -239,7 +234,7 @@ describe('usePlayOut', () => {
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
   });
 
-  // Round 88 (T343 builds on it): the lead variation's Watch from turn 0 reads T1 while the frame plays the leads in.
+  // The lead variation's Watch from turn 0 reads T1 while the frame plays the leads in.
   test('watchFrom turn 0 asks for the frame position of turn 0 and seeks turn 0', () => {
     vi.useFakeTimers();
     const { evaluation } = evaluationOf({ auto: true });
@@ -251,7 +246,6 @@ describe('usePlayOut', () => {
     expect(updater(null)).toEqual({ turn: 0, seq: 1, play: true });
   });
 
-  // Round 77 (C5): a turn in flight lands after the stop; the timeline must not follow it to the tip.
   test('stopping hands the view back and holds the tip-follow of the timeline for the turn in flight, user stop and navigation alike', () => {
     const { evaluation } = evaluationOf({ auto: true });
     const { result, wired } = setup(evaluation);
@@ -265,8 +259,8 @@ describe('usePlayOut', () => {
     expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
   });
 
-  // Round 88 (T347, #83): a turn in flight lands after the stop in the append mode of the run ('hold': no seek, no play,
-  // no follow-end), so the frame stays where the user watches it. The run stays active until that turn landed.
+  // A turn in flight lands after the stop in the append mode of the run ('hold': no seek, no play, no follow-end), so the frame stays where
+  // the user watches it. The run stays active until that turn landed.
   describe('a stop with a turn in flight', () => {
     const inFlight = () => {
       const { evaluation } = evaluationOf({ auto: true });
@@ -363,7 +357,7 @@ describe('usePlayOut', () => {
     expect(setEngineOverride.mock.calls.every(([override]) => override === null)).toBe(true);
   });
 
-  // Round 77 (C2): the T0 run plays from the leads the picker shows, through the same road as "Play from turn 0".
+  // The turn-0 run plays from the leads the picker shows, through the same road as "Play from turn 0".
   describe('from turn 0', () => {
     const singlesPicks = { p1: ['Talonflame'], p2: ['Weavile'] };
     const vgcPicks = { p1: ['Incineroar', 'Amoonguss', 'Urshifu', 'Rillaboom'], p2: ['Tornadus', 'Kingambit', 'Chi-Yu', 'Pelipper'], bring: true };
@@ -383,12 +377,12 @@ describe('usePlayOut', () => {
       expect(result.current.transients.playOut).toBeNull();
       const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
       act(() => onStart());
-      // Round 88 (T343, #79): the run arms with turn 0, so the progress line and the notice name the turn the game starts at.
+      // The run arms with turn 0, so the progress line and the notice name the turn the game starts at.
       expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 0 });
     });
 
-    // Round 88 (T343, #79): the notice offers Watch from turn 0, and Watch plays the frame from its team preview while
-    // the pointer reads T1 (the variation line has no turn 0). A run from a later turn keeps its turn (the rows above).
+    // The notice offers Watch from turn 0, and Watch plays the frame from its team preview while the pointer reads T1 (the variation line has
+    // no turn 0). A run from a later turn keeps its turn (the rows above).
     test.each([
       ['singles', singlesPicks],
       ['doubles with a bring of four', vgcPicks],
@@ -422,8 +416,8 @@ describe('usePlayOut', () => {
 });
 
 describe('usePlayOut, a step that fails', () => {
-  // Round 88 (#103, A7): the forced replacement settles with an execute error (the resolver refused the body, or the
-  // simulator refused the command). The position never changes, so no new evaluation comes: the run ends with the reason.
+  // The forced replacement settles with an execute error (the resolver or the simulator refused the command). The position never changes, so
+  // no new evaluation comes: the run ends with the reason.
   const REFUSED = 'Ogerpon (Ogerpon-Teal-Tera) is no longer available to switch in.';
   test.each(['singles', 'doubles'] as const)('%s: a forced replacement that fails ends the run with its reason instead of waiting', kind => {
     const { evaluation, setPrefs } = evaluationOf({});
@@ -499,7 +493,7 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   const counts = useRef({ evaluate: 0, tags: [] as (string | null)[], acquires: [] as unknown[], pendingTag: null as string | null });
   const [pointerBehind, setPointerBehind] = useState(false);
   const tipTurn = START_TURN + turns;
-  // Round 89 (#112): `pointerBehind` parks the pointer one turn before the tip, as a frame report does; the run plays on at the tip.
+  // `pointerBehind` parks the pointer one turn before the tip, as a frame report does; the run plays on at the tip.
   const viewTurn = pointerBehind ? tipTurn - 1 : tipTurn;
   const liveTip = !pointerBehind;
   const evalViewKey = `variation:${viewTurn}`;
@@ -608,7 +602,7 @@ describe('a play-out evaluates every position once', () => {
     expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:4', 'variation:5', 'variation:6']);
   });
 
-  // Round 89 (#112): the frame's report parks the pointer one turn behind the tip, right after the run armed. The run asks for the tip's position (the live
+  // The frame's report parks the pointer one turn behind the tip right after the run armed. The run asks for the tip's position (the live
   // sim, tagged with the tip's key) and plays it, never the evaluation of the turn the pointer shows.
   test.each(['singles', 'doubles'] as const)('%s: a pointer behind the tip does not stop the run or send an evaluation of the clicked turn', async kind => {
     const done = await runToEnd(kind, [], 3, true);

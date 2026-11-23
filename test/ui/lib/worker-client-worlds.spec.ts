@@ -4,11 +4,9 @@ import { installFakeWorker, FakeWorker } from '../fixtures/worker';
 import { clearWorldPositions, registerWorldPositions, worldPositionsOf } from '../../../src/lib/eval/world-positions';
 
 /**
- * Round 89 (#124): the worker client is the one place every evaluation passes, so it is where a short-side game's worlds blend. A
- * position the registry knows runs once per world, one after the other, and comes back blended by usage; a position it does not know
- * runs once, as before. The orchestrator is a stand-in that asks the pool one question about the position it was handed, so the
- * spec reads which positions reached the pool, in which order and under which cancel rules. Singles and doubles take the same path:
- * the registry holds opaque position strings, and the choice ids below are the one string every world shares.
+ * The worker client is the one place every evaluation passes, so it is where a short-side game's worlds blend. A position the registry knows runs once per world,
+ * one after the other, and comes back blended by usage; a position it does not know runs once. The orchestrator is a stand-in that asks the pool one question about
+ * the position it was handed. Singles and doubles take the same path: the registry holds opaque position strings, and the choice ids below are the one string every world shares.
  */
 const engine = vi.hoisted(() => ({ afterWorld: null as null | ((position: string) => void) }));
 vi.mock('@fulllifegames/eval-engine', async importOriginal => {

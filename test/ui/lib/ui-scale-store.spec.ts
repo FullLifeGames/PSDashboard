@@ -4,11 +4,7 @@ import {
 } from '../../../src/lib/ui-scale-store';
 import { UI_SCALE_STORAGE_KEY } from '../../../src/lib/ui-scale-setting';
 
-/**
- * Round 84 (T315, A7d): the scale lives in one store, started once at the app's root. It reads the setting and the window, writes
- * `--ps-scale` onto the root element (base.css gives `html` its `zoom` from it and divides the vh rules by it), and follows the
- * window's resize with a listener, no React state and no effect. The window is the real one in CSS pixels, never the zoomed tree.
- */
+/** The scale lives in one store, started once at the app's root: it reads the setting and the window, writes `--ps-scale` onto the root element (base.css gives `html` its `zoom` from it and divides the vh rules by it), and follows the window's resize with a listener, no React state and no effect. The window is the real one in CSS pixels, never the zoomed tree. */
 function resizeTo(width: number, height: number) {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: height });

@@ -2,11 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { NewGameRecord } from '../../../src/lib/new-game/record';
 import { MAX_SAVED_GAMES, gameKey, listGames, loadGame, onGameEvicted, saveGame, type SavedGameRow } from '../../../src/lib/new-game/store';
 
-/**
- * Round 89 (lane H, #105), H15a (user ruling 13.11.2026): the 21st saved game first pushes out the games without a played turn, then
- * the oldest one, and says which game went. The store does not read the record's contents beyond the index row, so a stand-in record
- * with the row's fields is enough; a singles and a doubles format both play through the same store.
- */
+/** The 21st saved game first pushes out the games without a played turn, then the oldest one, and says which game went. The store reads only the index row of a record, so a stand-in record is enough; both game types play through the same store. */
 const stand = (n: number, turns: number, format = '[Gen 9] OU'): NewGameRecord => ({
   recordVersion: 1, id: `newgame-${n}`, format: format === '[Gen 9] OU' ? 'gen9ou' : 'gen9doublesou', formatName: format,
   players: [`P${n}`, `Q${n}`], turns, seed: '1,2,3,4', updatedAt: new Date(Date.UTC(2026, 10, 1, 0, n)).toISOString(),

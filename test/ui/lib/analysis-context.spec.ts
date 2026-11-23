@@ -43,7 +43,6 @@ describe('analysis-context', () => {
   const nearAt = (turn: number, graph: AnalysisGraphData, context: TurnAnalysisContext) =>
     analyzeTurnAt({ turn, graph, context, includeSacks: false })?.p1.nearDecided;
 
-  /** Round 63 (T18): the walk and the card hand the turn's fainted share to analyzeTurn. */
   describe('analyzeTurnAt passes the phase of the turn', () => {
     test('the sweep\'s recorded share decides: none fallen keeps the near sentence quiet, a quarter lets it speak', () => {
       const graph = graphWith(snapshots.map((_, index) => (index === 1 ? 0.25 : 0)));
@@ -64,10 +63,8 @@ describe('analysis-context', () => {
   });
 
   /**
-   * Round 64 (T123 point 7): without a recorded share the fallback counted the
-   * six bodies team preview lists per side, where a VGC side brings four
-   * (2629703929 t9: the sweep's 0.5 against the snapshot's 0.333). The
-   * protocol's own |teamsize| line names how many each side brought.
+   * Without a recorded share the fallback counted the six bodies team preview lists per side, where a VGC side brings four (2629703929 t9: the
+   * sweep's 0.5 against the snapshot's 0.333). The protocol's own |teamsize| line names how many each side brought.
    */
   describe('the fallback share counts the bodies each side brought', () => {
     const vgc = replayOf('vgc');
@@ -97,11 +94,7 @@ describe('analysis-context', () => {
     });
   });
 
-  /**
-   * Round 63 fix: the report walk marks the forced-win sentence spoken
-   * whenever it speaks — since T19 that includes a proof under 0.9 whose open
-   * event holds the bar down (649664 t24) — so the walk says it once.
-   */
+  /** The walk marks the forced-win sentence spoken whenever it speaks, including a proof under 0.9 whose open event holds the bar down (649664 t24). */
   describe('the report walk speaks the forced-win sentence once', () => {
     test('a proof under 0.9 that speaks on the first turn stays quiet on the next', () => {
       const forcedWin = {
@@ -121,11 +114,7 @@ describe('analysis-context', () => {
     });
   });
 
-  /**
-   * Round 67 (T22): the walk and the card hand the turn's rolls to analyzeTurn
-   * (dice markers and move hits read from the turn's protocol against the
-   * pre-turn snapshot), so the luck sentences can tell a roll from a re-read.
-   */
+  /** The dice markers and move hits are read from the turn's protocol against the pre-turn snapshot, so the luck sentences can tell a roll from a re-read. */
   describe('analyzeTurnAt passes the rolls of the turn', () => {
     test('singles: a crit on turn 1 is a roll for p1, a turn without dice rolled for nobody', () => {
       const critLog = replayData.log.replace('|-damage|p2a: Kingambit|55/100', () => '|-crit|p2a: Kingambit\n|-damage|p2a: Kingambit|55/100');
@@ -196,8 +185,8 @@ describe('the walk speaks a side\'s decided sentence again after the board left 
     expect(walk[5]?.p1.forcedWin?.announce).toBe(true);
   });
 
-  // Review fix: a proof spoken under the line (mass 0.75, open branch at -0.4, bar 0.65 by applyForcedWin)
-  // left no decided zone behind; releasing it on the next turn made it speak on every turn.
+  // A proof spoken under the line (mass 0.75, open branch at -0.4, bar 0.65 by applyForcedWin) left no decided zone behind; releasing it on the
+  // next turn made it speak on every turn.
   for (const kind of ['singles', 'vgc'] as const) {
     test(`${kind}: a proof spoken while the bar sits under 0.7 speaks once, not on every turn`, () => {
       const walk = walkOver(kind, [0.65, 0.65, 0.65, 0.65], new Set(), new Set([1, 2, 3, 4]), 0.75);

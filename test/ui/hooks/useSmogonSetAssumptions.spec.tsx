@@ -27,8 +27,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// The sets fetcher caches per format and species list for the life of the
-// module, so every test below reads a different format.
+// The sets fetcher caches per format and species list for the life of the module, so every test reads a different format.
 describe('useSmogonSetAssumptions', () => {
   test('without a format or without species nothing loads', () => {
     const fetchMock = stubSets({});

@@ -2,10 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { hitBarSegments, hpBarClass } from '../../../src/lib/hit-bar';
 
 /**
- * Round 84 (turn dock), lane A: the bar under a target shows what a hit does to its HP. `rest` is what surely stays (after the
- * highest damage roll, grey), `roll` what the roll decides (striped), `sure` what the lowest roll surely takes, lost what the
- * target has lost already. The four parts add up to the bar's 100 %. Variant F (A7b): `tone` is the colour of the hit's parts,
- * the share of the target's present HP that the lowest roll takes: over 50 green, over 20 yellow, else red.
+ * `rest` is what surely stays (after the highest damage roll, grey), `roll` what the roll decides (striped), `sure` what the lowest roll surely takes, `lost` what the
+ * target has lost already; the four add up to the bar's 100 %. `tone` colours the hit by the share of the target's present HP that the lowest roll takes: over 50 green, over 20 yellow, else red.
  */
 const total = (bar: ReturnType<typeof hitBarSegments>) => bar.rest + bar.roll + bar.sure + bar.lost;
 

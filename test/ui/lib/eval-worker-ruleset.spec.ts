@@ -3,13 +3,7 @@ import { Battle, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { serializeLiveBattle, type EvalWorkerRequest, type EvalWorkerResponse } from '@fulllifegames/eval-engine';
 
-/**
- * Round 67 (T139, app part): the worker never prices a position under a
- * rule set nobody named. A search message without one answers an error
- * instead of the standard weights, so a path that forgets to pass the
- * replay's rule set fails loudly. One test per message type; the worker
- * module runs on this thread over a stand-in for its global scope.
- */
+/** A search message without a rule set answers an error instead of the standard weights, so a path that forgets the replay's rule set fails loudly. One test per message type; the worker module runs on this thread over a stand-in for its global scope. */
 const posted: EvalWorkerResponse[] = [];
 const scope = {
   onmessage: null as ((event: MessageEvent<EvalWorkerRequest>) => Promise<void>) | null,

@@ -3,10 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { EvalResult } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/**
- * Round 84 (turn dock), step A5: `onResult` of `EvaluateParams`. The dock's engine fill acts where a result lands: after a
- * search, on a stored hit and on a memory hit. A run that was superseded, cancelled or failed calls nothing.
- */
+/** `onResult` of `EvaluateParams` fires after a search, a stored hit and a memory hit; a superseded, cancelled or failed run calls nothing. */
 
 const script = vi.hoisted(() => ({
   evaluate: null as null | (() => Promise<EvalResult>),

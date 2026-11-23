@@ -7,10 +7,9 @@ import { diceMarksOf } from '../../../src/lib/branch-dice-marks';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
 /**
- * Round 82 (forced dice), step A7b, decision 6a: the frame shows a display line before the event a forced die decided ("Forced: Air
- * Slash flinch, 60 %": the chance the simulator used, decision 14a) and, for a forced die without effect, a line at the end of its
- * action ("Forced burn had no effect"). The lines sit in the display of the branch log at the report's log index; the battle's own
- * log never holds them. The report's index counts the battle's log, which writes a `|split|` line and both versions of a line the
+ * The frame shows a display line before the event a forced die decided ("Forced: Air Slash flinch, 60 %": the chance the simulator used) and, for a
+ * forced die without effect, a line at the end of its action. The lines sit in the display of the branch log at the report's log index; the
+ * battle's own log never holds them. The report's index counts the battle's log, which writes a `|split|` line and both versions of a line the
  * players see differently; the shown log has one line there.
  */
 const words = wordsOf(diceBattle({ p1: [setOf('Noivern', ['airslash', 'splash'])], p2: [setOf('Snorlax', ['splash'])] }));
@@ -49,8 +48,8 @@ describe('the text of a forced die', () => {
     expect(dieText(report('secondary', { happens: true }, { chance: 0.6 }, { effectId: 'flinch' }), words)).toBe('Forced: Air Slash flinch, 60 %');
   });
 
-  // LN-4 (tester pass on the built state): the report holds the chance of the event, the line names the chance of the result the click forced.
-  // A two-outcome die forced each way; the Lines read the chance of the result they take ("fails (67%)", "no crit (96%)").
+  // A two-outcome die forced each way: the report holds the chance of the event, the line names the chance of the result the click forced
+  // ("fails (67%)", "no crit (96%)").
   test.each([
     ['accuracy', 'hits', 'misses', 0.95, '95 %', '5 %', {}],
     ['crit', 'crit', 'no crit', 1 / 24, '4.2 %', '95.8 %', {}],
@@ -119,7 +118,7 @@ describe('the dice part of a history entry', () => {
   const never = report('secondary', { happens: true }, { took: 'no-draw', reason: 'Air Slash drew no secondary this turn' }, { effectId: 'brn' });
   const start = { battleStart: 2, shownStart: 2, words };
   const battle = { log: BATTLE_LOG } as never;
-  // Round 82, step A7c: the entry carries the marks of its report (the history row and the share link read them)
+  // the entry carries the marks of its report (the history row and the share link read them)
   const marksOf = (report: DiceReport) => diceMarksOf(report, words);
 
   test('a turn with no forced die leaves the entry as it was', () => {
@@ -170,8 +169,8 @@ describe('the shown log with the lines in it', () => {
     expect(withDieLines(['|a', '|b'], [{ at: 2, text: 'Forced x' }])).toEqual(['|a', '|b', `${DIE_LINE}Forced x`]);
   });
 
-  // Round 89 (F5, the wave-tester's finding 1): the replay client splits a protocol line at every pipe and prints its first field, so
-  // a reason that quotes a protocol line ("the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris"") broke off at the quote.
+  // The replay client splits a protocol line at every pipe and prints its first field, so a reason that quotes a protocol line
+  // ("the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris"") broke off at the quote.
   test('a reason that quotes protocol lines reaches the frame whole: its pipes leave the line one field after the message type', () => {
     const reason = 'Triple Axel drew no accuracy: the protocol shows "|-activate|p1a: Glimmora|ability: Toxic Debris" and "|-miss|p2a: Weavile|p1a: Glimmora"';
     const shown = withDieLines(['|a'], [{ at: 1, text: `Forced 3 hits had no effect: ${reason}` }])[1];

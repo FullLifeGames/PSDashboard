@@ -3,12 +3,10 @@ import { followFrameZoom } from '../../../src/lib/replay-frame-zoom';
 import { UI_SCALE_EVENT } from '../../../src/lib/ui-scale-store';
 
 /**
- * Round 84 (T315, A7d): the replay frame under the root's zoom, per engine (the zoom probe of A7c). Chromium zooms the frame's
- * content with the page: inside the frame the layout width is the frame's CSS width (400 of 400 at 150 %) and the pixel ratio is
- * 1.5, so nothing is left to do. WebKit 27.2 gives the frame the physical width as its layout width (600 of 400) and renders the
- * content at 100 %, so the frame shows the replay small inside a larger frame. The follower measures the frame's layout width
- * against the frame's CSS width and zooms the frame document by the ratio, so the content fills the frame in both engines, drawn
- * at the zoomed size (no scaled bitmap) and never scaled twice (no ratio, no zoom).
+ * The replay frame under the root's zoom, per engine. Chromium zooms the frame's content with the page: inside the frame the layout width is the frame's CSS width
+ * (400 of 400 at 150 %) and the pixel ratio is 1.5, so nothing is left to do. WebKit 27.2 gives the frame the physical width as its layout width (600 of 400) and
+ * renders the content at 100 %. The follower measures the frame's layout width against the frame's CSS width and zooms the frame document by the ratio, so the
+ * content fills the frame in both engines, drawn at the zoomed size (no scaled bitmap) and never scaled twice (no ratio, no zoom).
  */
 afterEach(() => { document.body.innerHTML = ''; });
 

@@ -58,7 +58,7 @@ function postFromFrame(source: unknown, data: unknown) {
   act(() => { window.dispatchEvent(event); });
 }
 
-// Round 88 (T316, #56): the side the frame shows near reaches the app through `ps-side`, from its own window only.
+// The side the frame shows near reaches the app through `ps-side`, from its own window only.
 describe('useSideReports', () => {
   test('forwards the side its own frame reports and nothing else', () => {
     const { iframeRef } = frame();
@@ -170,7 +170,7 @@ describe('useSeekTurn', () => {
   });
 
   test('a live frame that reports ready stops its retries: a late retry would cut short a turn its appends play', () => {
-    // Round 77 (user report 28.10.2026): a new variation's first turn plays in from an append right after ready.
+    // A new variation's first turn plays in from an append right after ready.
     vi.useFakeTimers();
     const { iframeRef, postMessage } = frame();
     const lastReportedTurnRef = { current: null as number | null };
@@ -193,7 +193,7 @@ describe('useSeekRequests', () => {
 
     const bump: SeekRequest = { turn: 7, seq: 2, play: true };
     rerender(bump);
-    // Round 88 (T347, #83): the request's seq rides every retry as its id; the bridge runs a play seek once per id.
+    // The request's seq rides every retry as its id; the bridge runs a play seek once per id.
     expect(postMessage).toHaveBeenCalledWith({ type: 'ps-seek-turn', turn: 7, autoPlay: true, id: 2 }, '*');
     act(() => vi.advanceTimersByTime(400));
     expect(postMessage).toHaveBeenCalledTimes(3);
@@ -220,8 +220,8 @@ describe('useLiveAppend', () => {
   };
 
   test('lines appended before the frame reports ready wait for it and then go out as one append', () => {
-    // Round 77 (user report 28.10.2026): after one turn back and a new choice the frame reloaded for the rebuilt line, and the
-    // new turn's lines went out while the embed script still loaded. Nothing listened yet, so the frame never showed the turn.
+    // After one turn back and a new choice the frame reloaded for the rebuilt line, and the new turn's lines went out while the embed script
+    // still loaded: nothing listened yet, so the frame never showed the turn.
     const { iframeRef, postMessage } = frame();
     const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
     rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp`, liveAppendMode: 'play', liveAppendTurn: 2 });

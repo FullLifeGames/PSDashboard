@@ -4,10 +4,7 @@ import { isInterlude, turnEntryCount } from '../../../src/lib/variation-turns';
 import { bothRolesLine, doublesLine, singlesLine } from '../fixtures/lines';
 import type { EvalLine } from '@fulllifegames/eval-engine';
 
-/**
- * Round 89 (#104), step G3: a line as the history of a variation. The rebuild reads the slot choices (by identity) and the dice
- * that ride on them, the kind and the forced side of an interlude, and the turn numbers.
- */
+/** A line as the history of a variation: the rebuild reads the slot choices (by identity) and the dice that ride on them, the kind and forced side of an interlude, and the turn numbers. */
 describe('lineHistory', () => {
   test('a singles line becomes one turn entry per step, numbered from the start turn, the slot choices and their dice untouched', () => {
     const history = lineHistory(singlesLine, 20);

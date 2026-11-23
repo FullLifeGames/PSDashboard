@@ -6,11 +6,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../../src/lib/eval/worker-client';
 
-/**
- * Round 89 (#130, G8a): the on-demand job and its client. The job runs on a worker of its own: it never queues behind a sweep's search,
- * a cancel of the sweep leaves it, and its cancel leaves the sweep. Steps arrive one by one, the answer of a finished job is kept for the
- * next open, and the job's message is generic (`job`, `jobStep`, `jobResult`), so a later "search this row on request" shares it.
- */
+/** The on-demand job runs on a worker of its own: it never queues behind a sweep's search, a cancel of the sweep leaves it, and its cancel leaves the sweep. Steps arrive one by one, the answer of a finished job is kept for the next open, and the job's message is generic (`job`, `jobStep`, `jobResult`). */
 
 const workers: FakeWorker[] = [];
 

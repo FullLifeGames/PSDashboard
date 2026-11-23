@@ -3,10 +3,7 @@ import { formatLine, type EvalLine, type LineChoice, type LineStep } from '@full
 import { rowLineTail } from '../../../src/lib/row-line';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 
-/**
- * Round 89 (LN-4, F1 of LN-3): one card shows one line per row. The ranked row's "then ..." reads the later steps of the line the Lines
- * section shows for the row, not the engine's principal variation, which is read from another tree by another rule.
- */
+/** One card shows one line per row: the ranked row's "then ..." reads the later steps of the line the Lines section shows, not the engine's principal variation. */
 const pick = (label: string, slots = 1): LineChoice => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
 const waiting = (slots = 1): LineChoice => ({ choice: 'wait', label: '(waiting)', slots: Array.from({ length: slots }, () => null) });
 const step = (p1: string, p2: string, extra: Partial<LineStep> = {}): LineStep => ({ p1: pick(p1), p2: pick(p2), dice: [], ...extra });

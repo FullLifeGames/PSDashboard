@@ -7,18 +7,16 @@ import { diceMarksOf, sideMarkTexts } from '../../../src/lib/branch-dice-marks';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
 /**
- * Round 89 (#114, F3; the user's ruling 31 on 13.11.2026): a move whose later hits roll accuracy (Dex `multiaccuracy`: Triple Axel,
- * Triple Kick, Population Bomb) shows one "Hits" row with the counts 1 to N under its "Hit" row, like the hit count of Bullet Seed. A
- * count k stands for the engine's per-hit dice as `chainResults` writes them (hits 2 to k land, hit k + 1 misses, count N is all
- * landing) and always sets the first hit. The history and the share link say "2 hits". The counts come from the Dex: no move name
- * stands in our code.
+ * A move whose later hits roll accuracy (Dex `multiaccuracy`: Triple Axel, Triple Kick, Population Bomb) shows one "Hits" row with the counts 1 to N under
+ * its "Hit" row. A count k stands for the engine's per-hit dice as `chainResults` writes them (hits 2 to k land, hit k + 1 misses, count N is all
+ * landing) and always sets the first hit. The counts come from the Dex: no move name stands in our code.
  */
 const battle = diceBattle({ p1: [setOf('Snorlax', ['splash'], { name: 'Nova' })], p2: [setOf('Vaporeon', ['splash'], { name: 'Wave' })] });
 const words = wordsOf(battle as never);
 
 const nameOf = (moveId: string, kind: DieName['kind'], extra: Partial<DieName> = {}): DieName => ({ slot: 'p1a', moveId, targetSlot: 'p2a', kind, ...extra });
 const YES_NO = [{ happens: true }, { happens: false }];
-/** The offers of one target as the engine names them (F1): the plain accuracy die, hits 2 to N, then the crit. */
+/** The offers of one target as the engine names them: the plain accuracy die, hits 2 to N, then the crit. */
 const offersOf = (moveId: string, hits: number, extra: Partial<DieName> = {}): DieOffer[] => [
   { name: nameOf(moveId, 'accuracy', extra), results: YES_NO },
   ...Array.from({ length: hits - 1 }, (_, index): DieOffer => ({ name: nameOf(moveId, 'accuracy', { ...extra, hit: index + 2 }), results: YES_NO })),
@@ -66,9 +64,8 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     }
   });
 
-  // Round 89 (F5, the wave-tester's finding 3): Tail Slap, Bullet Seed and the other moves of a random count (`multihit` as a range)
-  // offer the engine's own hit count, which the engine lists last; it belongs under the move's "Hit" row, where the folded Hits row of
-  // Triple Axel stands, so a user finds the counts in one place.
+  // Tail Slap, Bullet Seed and the other moves of a random count (`multihit` as a range) offer the engine's own hit count, which the engine lists
+  // last; it belongs under the move's "Hit" row, where the folded Hits row of Triple Axel stands.
   test.each([['singles: slot p1a', 'p1a'], ['doubles: slot p1b of a four-slot dock', 'p1b']])('%s: the hit count of a random-count move stands right under the Hit row', (_label, slot) => {
     const realCount: DieOffer = { name: { slot, moveId: 'tailslap', kind: 'hit-count' }, results: [2, 3, 4, 5].map(hits => ({ hits })) };
     const offers = [...offersOf('tailslap', 1, { slot }), { name: nameOf('tailslap', 'damage-roll', { slot }), results: [{ roll: 0 }] } as unknown as DieOffer, realCount];
@@ -196,7 +193,7 @@ describe('the history and the share link read one entry per chain', () => {
 
   test('hit dice of one move and target fold into "Triple Axel: 2 hits" beside the first hit\'s mark', () => {
     const marks = diceMarksOf(report(entry(plain('tripleaxel')), entry(later('tripleaxel', 2, true)), entry(later('tripleaxel', 3, false))), words)!;
-    // round 89 (F5): a count already says the first hit lands, so the plain "Triple Axel: hits" mark does not stand beside it
+    // a count already says the first hit lands, so the plain "Triple Axel: hits" mark does not stand beside it
     expect(sideMarkTexts(marks, 'p1')).toEqual(['Triple Axel: 2 hits']);
   });
 
@@ -236,7 +233,7 @@ describe('the history and the share link read one entry per chain', () => {
   test('a count that played in part (the target fainted on hit 3 of a forced 4) says so with the report\'s reason', () => {
     const stopped = { took: 'no-draw' as const, reason: 'Triple Axel ended after 3 hits', landed: 3 };
     const forced = report(entry(later('populationbomb', 2, true), { logIndex: 4 }), entry(later('populationbomb', 3, true), { logIndex: 5 }), entry(later('populationbomb', 4, true), stopped), entry(later('populationbomb', 5, false), stopped));
-    // round 89 (F5): the hits that landed are named; "(no effect)" is false for a chain that played three hits
+    // the hits that landed are named; "(no effect)" is false for a chain that played three hits
     expect(diceMarksOf(forced, words)!.p1).toEqual([{ label: 'Population Bomb: 4 hits', noEffect: 'Triple Axel ended after 3 hits', played: 3 }]);
     expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Population Bomb: 4 hits (3 landed)']);
     const lines = dieLines(forced, WINDOW, words);
@@ -255,8 +252,8 @@ describe('the history and the share link read one entry per chain', () => {
     expect(dieLines(unplayed, WINDOW, words).map(line => line.text)).toEqual(['Forced 2 hits had no effect: p1a did not use Triple Axel this turn']);
   });
 
-  // Round 89 (F5, the wave-tester's finding 5): a count the game cut short stands with its hit count ("The Pokémon was hit 1 time!"),
-  // not behind the end-of-turn lines (the weather's upkeep line) that the turn's end puts after the last action.
+  // A count the game cut short stands with its hit count ("The Pokémon was hit 1 time!"), not behind the end-of-turn lines (the weather's
+  // upkeep line) that the turn's end puts after the last action.
   test('the line of a count the target\'s faint cut short stands right after the hit count, before the weather line', () => {
     const log = ['|old', '|move|p1a: Nova|Triple Axel|p2a: Wave', '|-damage|p2a: Wave|0 fnt', '|-hitcount|p2: Wave|1', '|faint|p2a: Wave', '|-weather|Snowscape|[upkeep]', '|upkeep', '|turn|2'];
     const window: TurnWindow = { battleLog: log, battleStart: 1, shownLog: log, shownStart: 1, complete: true };

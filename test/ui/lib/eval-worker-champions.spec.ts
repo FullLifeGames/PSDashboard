@@ -4,11 +4,8 @@ import { join } from 'node:path';
 import type { EvalWorkerRequest, EvalWorkerResponse } from '@fulllifegames/eval-engine';
 
 /**
- * Round 67 (T145, merge): the evaluation worker revives a Champions position on
- * the Champions mod. Nothing in the worker's own module graph loads the mod
- * before the first message, so the worker loads it from the position itself
- * before any search; without that, a Champions position fails as a battle
- * without its mod. The positions are lane F's two turn-3 fixtures; the worker
+ * The evaluation worker revives a Champions position on the Champions mod: nothing in the worker's own module graph loads the mod before the first
+ * message, so the worker loads it from the position itself before any search, else the position fails as a battle without its mod. The worker
  * module runs on this thread over a stand-in for its global scope.
  */
 const posted: EvalWorkerResponse[] = [];

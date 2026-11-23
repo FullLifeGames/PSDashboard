@@ -8,11 +8,9 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import type { AppController } from '../../../src/hooks/useAppController';
 
-// Round 89 (#112): a play-out without Fast play-out stopped for good when the replay frame reported a turn before the tip
-// (the user stepped the frame back and paused). The run below plays over the real controller (timeline, evaluation view,
-// walk, loop) and a scripted search: the frame's report parks the pointer behind the tip right after the run armed, and the
-// run must still play its turns on the live sim. Singles only here: the unit rows (usePlayOut.frame, usePlayOut.evaluations,
-// useEvalView) cover doubles, and the loop and the controllers do not branch on the game type.
+// A play-out without Fast play-out must survive the replay frame reporting a turn before the tip (the user stepped back and paused). The run
+// plays over the real controller and a scripted search. Singles only: usePlayOut.frame, usePlayOut.spec (its harness rows) and useEvalView cover
+// doubles, and the loop and the controllers do not branch on the game type.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 

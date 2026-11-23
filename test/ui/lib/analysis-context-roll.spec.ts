@@ -3,11 +3,7 @@ import { allTurnEvents, type BiggestRoll, type TurnAnalysis } from '@fulllifegam
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 import { replayFixture } from '../fixtures/replay';
 
-/**
- * Round 86 (T304): the report's walk and the sweep's last stage read one set of analyses. The walk hands the graph's `rollFlip` (the
- * engine's score of the next root with the biggest roll's die turned over) to the report; the stage asks the same walk for the roll to
- * play (`namedRollOf`), with the replay's winner and the dice turns the report reads.
- */
+/** The report's walk and the sweep's last stage read one set of analyses: the walk hands the graph's `rollFlip` to the report, and the stage asks the same walk for the roll to play (`namedRollOf`). */
 
 const seen = vi.hoisted(() => ({
   report: [] as unknown[][],

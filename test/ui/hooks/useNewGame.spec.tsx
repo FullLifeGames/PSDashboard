@@ -9,12 +9,7 @@ import { gameAdoptSnapshot } from '../../../src/hooks/branch/game-rebuild';
 import { gameReplayData } from '../../../src/lib/new-game/record';
 import { picks, SIX, startedRecord } from '../fixtures/new-game';
 
-/**
- * Round 89 (lane H, #105), stage H3: the game in the hooks. The real branch simulator over the real @pkmn/sim, composed with the
- * game hook as the app composes them (the replay state and the exact store are fakes that record what the game gives them): a turn
- * played at the tip joins the main line, a turn played from another turn stays a variation, a replacement settles its turn, and
- * the position source never asks for a replay job.
- */
+/** The real branch simulator over the real @pkmn/sim, composed with the game hook as the app composes them; the replay state and the exact store are fakes that record what they receive. */
 
 const set = <T,>(cell: { current: T }, value: T) => { cell.current = value; };
 const newProbe = () => ({
@@ -157,7 +152,7 @@ describe('useNewGame', () => {
         // the knockout turn has run, its replacement waits: the main line has not moved
         expect(turnsOf(rendered)).toBe(before);
         expect(rendered.result.current.branch.history.length).toBeGreaterThan(0);
-        // ... but the record keeps the turn for a reload (H8, finding 8): its entries as the branch holds them, the main line as it was
+        // ... but the record keeps the turn for a reload: its entries as the branch holds them, the main line as it was
         const kept = rendered.result.current.state.record!;
         expect(kept.pending).toHaveLength(rendered.result.current.branch.history.length);
         expect(kept.pending!.every(row => row.serializedPosition === undefined)).toBe(true);
@@ -243,7 +238,6 @@ describe('useNewGame', () => {
     expect(rendered.result.current.state.record).toBe(before);
     expect(rendered.result.current.saved.current).toBe(saves);
     expect(rendered.result.current.openCalls.current).toBe(opens);
-    // an edit nothing touches keeps every turn
     await act(async () => { plan = await rendered.result.current.game.planTeams({ p1: SIX, p2: SIX }); });
     expect(plan!.error).toBeNull();
     expect(plan!.kept).toBe(before.turns);
@@ -256,8 +250,8 @@ describe('useNewGame', () => {
     const reopened = renderHook(() => useGame(newProbe()));
     expect(reopened.result.current.game.takeLanding(saved.id)).toBeNull();
     await act(async () => { await reopened.result.current.game.openRecord(saved); });
-    // The landing belongs to the game's id (round 89, H4g): the reset runs of the board before the document arrives (no id, or the
-    // id of another replay) leave it, and the run for the game's own id takes it, once.
+    // The landing belongs to the game's id: the board's reset runs before the document arrives (no id, or the id of another replay) leave
+    // it, and the run for the game's own id takes it, once.
     expect(reopened.result.current.game.takeLanding(undefined)).toBeNull();
     expect(reopened.result.current.game.takeLanding('someothergame')).toBeNull();
     expect(reopened.result.current.game.takeLanding(saved.id)).toBe(saved.turns + 1);

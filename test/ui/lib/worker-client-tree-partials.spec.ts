@@ -5,11 +5,9 @@ import { configureSearchBudget, parseSearchBudget, serializeLiveBattle, type Eva
 import { EvalWorkerClient } from '../../../src/lib/eval/worker-client';
 
 /**
- * Round 89 (SB-9, gate finding BROKEN 1): a tree search streamed no result until a whole tree had ended, so a Cancel in the first
- * seconds of a doubles or VGC replacement kept nothing. The pool now asks tree 0 (and only tree 0) for its interim result, and only
- * when the caller listens: the game analysis and the play-out pass no `onPartial` and get no extra work. Rows run the real worker
- * module on this thread behind a stand-in pool, for a doubles battle and a singles battle (singles from a quarter fainted runs
- * the tree too).
+ * A tree search streams no result until a whole tree has ended, so a Cancel in the first seconds of a doubles or VGC replacement would keep nothing. The pool
+ * asks tree 0 (and only tree 0) for its interim result, and only when the caller listens: the game analysis and the play-out pass no `onPartial` and get no extra
+ * work. Rows run the real worker module on this thread behind a stand-in pool, for a doubles and a singles battle (singles from a quarter fainted runs the tree too).
  */
 
 const posted: EvalWorkerRequest[] = [];

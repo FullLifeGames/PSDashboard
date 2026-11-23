@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { divergenceNoticeFor } from '../../../src/lib/branch-build';
 
-/**
- * Round 89 (FT-1, ruling 43 FT2a): the divergence notice is for a replay whose rebuild ended before the branch turn. A variation
- * that carried the game to its end itself (VGC 2630685175 t7, Hard mode, the engine line wins) is no divergence. Singles and
- * doubles share the rule: it reads the battle's end and the variation's turns, not the game type.
- */
+/** The divergence notice is for a replay whose rebuild ended before the branch turn; a variation that carried the game to its end itself (VGC 2630685175 t7, Hard mode) is none. The rule reads the battle's end, not the game type. */
 describe('divergenceNoticeFor', () => {
   const ended = { ended: true, winner: 'Alice', turn: 9 };
 

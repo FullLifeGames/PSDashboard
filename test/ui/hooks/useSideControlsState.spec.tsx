@@ -57,11 +57,9 @@ describe('useGimmickToggles', () => {
     expect(p1A().modifier).toBe('terastallize');
     rerender({ p1: [NO_MODIFIERS], p2: [] });
     expect(p1A()).toMatchObject({ modifier: null, modifierAvailable: false });
-    // A new Tera-capable Pokémon in the slot starts unarmed.
     rerender({ p1: [withTera], p2: [] });
     expect(p1A().modifier).toBeNull();
 
-    // Picking a gimmick the active cannot use never arms it.
     act(() => p1A().toggle('mega'));
     expect(p1A().modifierAvailable).toBe(false);
   });
@@ -152,10 +150,7 @@ describe('useGimmickToggles', () => {
   });
 });
 
-/**
- * Round 84 (turn dock), C4: with a pick standing on a slot (the seed or the user's), the gimmick toggle edits that pick instead of
- * arming the next click: "chip, Tera, Execute" is three clicks. A slot without a move pick keeps the armed toggle.
- */
+/** With a pick standing on a slot (the seed or the user's), the gimmick toggle edits that pick instead of arming the next click; a slot without a move pick keeps the armed toggle. */
 describe('useGimmickToggles on a slot with a move pick (round 84, C4)', () => {
   const flare = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
   const spore = { kind: 'move' as const, moveId: 'spore', moveName: 'Spore' };
@@ -261,11 +256,7 @@ describe('useMovePool', () => {
   });
 });
 
-/**
- * Round 89 (T8a): the pool follows the game's format. A Champions game reads the mod's learnsets (the Generation 9 pool offers
- * moves the mod does not teach); a National Dex draft gets its Past species' pool; a format change reloads the pool. The
- * oracles are the mod's own Dex and the team editor's reader, `getMovePool`, never a move name.
- */
+/** The pool follows the game's format. The oracles are the mod's own Dex and the team editor's reader `getMovePool`, never a move name. */
 describe('useMovePool follows the format', () => {
   beforeAll(async () => {
     await loadSimMods('gen9championsou');
@@ -294,7 +285,6 @@ describe('useMovePool follows the format', () => {
       const { result, rerender } = renderHook((id: string) => useMovePool('Dracovish', 9, id), { initialProps: format });
       await waitFor(() => expect(result.current).toContain('Fishious Rend'), { timeout: 20_000 });
       expect(result.current).toEqual(await getMovePool('Dracovish', 9, format));
-      // A format change drops the pool at once and loads the next one.
       rerender('gen9ou');
       expect(result.current).toEqual([]);
       await waitFor(() => expect(result.current.length).toBeGreaterThan(0), { timeout: 20_000 });

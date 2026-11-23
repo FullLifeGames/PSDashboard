@@ -4,13 +4,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { BiggestRoll, EvalResult, EvalSettings } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/**
- * Round 86 (T304): the sweep's last stage plays the game's biggest roll the other way. The report names the roll (a missed sure kill of
- * the winner), the replay worker plays the turn again with the die turned over, and the engine evaluates the copy's next root at the
- * engine the actual next root ran: one evaluation per replay with a named roll, none without. The result rides in the graph, so the
- * report is complete when `graph.running` turns false. A copy the log cannot give, an evaluation that fails and a cached evaluation
- * are all silent: the sentence then speaks without the number, or the stage reads the cache and plays nothing.
- */
+/** The sweep's last stage replays the biggest roll the other way; a missing copy, a failed evaluation and a cached one are silent. */
 
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
@@ -100,8 +94,8 @@ describe('the sweep\'s biggest-roll stage', () => {
   });
 
   test('the pool gives its workers back before the copy\'s worker spawns: the stage never runs a worker beside a full pool (573756 died of it)', async () => {
-    // Round 86 (B8): 573756 holds twelve pool workers and the replay worker at the end of its sweep, about 6.2 GB in the renderer;
-    // the copy's own worker was the one more that took the page down, and the feedback test hung for 40 minutes.
+    // 573756 holds twelve pool workers and the replay worker at the end of its sweep, about 6.2 GB in the renderer: a worker of the copy's own
+    // took the page down.
     const { params } = sweepOf(roll, { serialized: COPY_AT, stage: 'request', terminal: null });
     await runSweeps(params);
     const playing = script.events.indexOf('copy plays');
@@ -171,7 +165,7 @@ describe('the sweep\'s biggest-roll stage', () => {
   });
 
   test('a second sweep of a game that ends in the copy reads the end from the cache: no new copy (one code path for singles, doubles and VGC)', async () => {
-    // Round 88 (T326, #62): the terminal score used to return before the cache write, so every sweep of 2629703929 (turn 10) played the copy again.
+    // The terminal score is cached too: a second sweep of 2629703929 (turn 10) plays no copy.
     const { params, playCopy } = sweepOf(roll, { serialized: COPY_AT, stage: 'ended', terminal: -1 });
     const result = await runSweeps(params, 2);
     expect(playCopy).toHaveBeenCalledTimes(1);

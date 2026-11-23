@@ -7,11 +7,10 @@ import { loadSimMods } from '@fulllifegames/eval-engine';
 import { pickerStateFromSnapshot } from '../../../src/lib/picker-state';
 
 /**
- * Round 68 (T186, decision 3 with D8): the snapshot picker builds every species the Champions mod allows. The calculator's
- * Champions generation 0 lacks 35 of them (Aegislash, the Vivillon patterns, Minior-Meteor, the Ogerpon Tera formes, ...),
- * and a name it lacks used to throw into the picker's catch, which fell back to the snapshot's percent-scale HP (maxhp 100
- * or 0). The picker now builds through replay-core's shared builder, so a body's absolute HP is the simulator's for every
- * legal species, on the singles format and on the doubles (VGC) format alike.
+ * The snapshot picker builds every species the Champions mod allows. The calculator's Champions generation 0 lacks 35 of them (Aegislash, the Vivillon
+ * patterns, Minior-Meteor, the Ogerpon Tera formes, ...), and a name it lacks threw into the picker's catch, which fell back to the snapshot's percent-scale
+ * HP (maxhp 100 or 0). The picker builds through replay-core's shared builder, so a body's absolute HP is the simulator's for every legal species, on the
+ * singles format and on the doubles (VGC) format alike.
  */
 const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { formatid: string; log: string };
 const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;

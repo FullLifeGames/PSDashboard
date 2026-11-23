@@ -119,7 +119,7 @@ describe('usePositionSource', () => {
     expect(onDiagnostic).toHaveBeenCalledWith(expect.stringMatching(/ended at turn 2 although the real game continued/));
   }, 30_000);
 
-  // Round 79 (T290): only a sweep that asks gets the replacement requests, and they reach its callback with the point intact.
+  // Only a sweep that asks gets the replacement requests, and they reach its callback with the point intact.
   test('acquireAll asks the worker for the replacement requests only when it has a consumer, and hands them on', async () => {
     const point = { turn: 1, ordinal: 0, forced: { p1: [0], p2: [] }, played: { p1: ['Toxapex'], p2: [] } };
     const { client, requests } = fakeReplayWorkerClient((request): ReplayJobResponse[] => (request.type === 'reconstruct'
@@ -163,9 +163,8 @@ describe('usePositionSource', () => {
 });
 
 /**
- * Round 89 (#124): a short-side game plays every world of its unknown bodies. The position source reconstructs each world's main line,
- * hands out the heaviest world's positions, and registers the siblings of each one (the worker client reads them) before it hands
- * the position out. A sibling's position never enters the exact store. A game with one world or none reconstructs once and registers nothing.
+ * A short-side game plays every world of its unknown bodies: the source reconstructs each world's main line, hands out the heaviest world's
+ * positions and registers the siblings of each one (the worker client reads them) before it hands the position out; a sibling never enters the exact store.
  */
 describe('usePositionSource with the worlds of a short side', () => {
   const world = (guess: string, weight: number): BringWorld =>
@@ -235,7 +234,6 @@ describe('usePositionSource with the worlds of a short side', () => {
     await expect(result.current.acquireExact(2, vi.fn())).resolves.toBe('pos-2-K');
     expect(requests.map(guessOf)).toEqual(['N', 'R']);
     expect(registered('pos-2-K')).toEqual([['pos-2-K', 0.6], ['pos-2-N', 0.3], ['pos-2-R', 0.1]]);
-    // A second acquire finds them registered and asks for nothing.
     requests.length = 0;
     await result.current.acquireExact(2, vi.fn());
     expect(requests).toHaveLength(0);

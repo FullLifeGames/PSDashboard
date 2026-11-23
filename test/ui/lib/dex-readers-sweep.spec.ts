@@ -9,12 +9,9 @@ import { spriteUrl } from '../../../src/lib/sprite-url';
 import { getAbilityPool, getItemPool } from '../../../src/lib/pokemon-options';
 
 /**
- * Round 75 (T160, decision D1), the sweep of the app's half: the pickers, the sprite names and the option pools read the Dex of
- * the replay's generation and mod, entry by entry. The picker used the Scarlet/Violet Dex for a Champions game (Snap Trap and
- * Growth differ in the mod) and the newest Dex for an older one. The changed entries are found by comparing the mod's Dex with
- * Scarlet/Violet, not by our code; the older generations are compared with each generation's own Dex.
- * Singles and doubles use one reader here (the picker takes a side's bodies; the format name carries the game type), so each
- * reader runs on a singles format and a doubles format of Champions and of Scarlet/Violet.
+ * The sweep of the app's half: the pickers, the sprite names and the option pools read the Dex of the replay's generation and mod, entry by entry
+ * (Snap Trap and Growth differ in the Champions mod). The changed entries come from comparing the mod's Dex with Scarlet/Violet, not from our code;
+ * older generations are compared with each generation's own Dex. Each reader runs on a singles and a doubles format of Champions and of Scarlet/Violet.
  */
 await loadSimMods('gen9championsou');
 
