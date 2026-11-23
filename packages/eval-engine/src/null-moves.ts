@@ -1,23 +1,7 @@
-// Round 75 (T160): the Dex is the game's own, by generation and mod, from replay-core's resolver.
 import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-core';
 import { moveAtUse } from './move-use.ts';
 
-/**
- * Mechanical-null detection for recommended moves (653785 t19: Will-O-Wisp
- * proposed into Charizard-X — Fire-types cannot be burned). The narrative
- * layer uses this to never render a provably useless recommendation
- * uncommented. CONSERVATIVE by design: only definite type-chart nulls fire.
- * Ability-granted immunities (Levitate, Flash Fire) stay out of scope, and
- * attacker abilities that BREAK an immunity (Scrappy, Corrosion) suppress
- * the verdict. It judges one comma-free move choice against one defender:
- * singles, and a doubles endgame with one living active per side (the single
- * target is then the single foe); a side with two acting slots carries a
- * comma and returns null. A terastallized defender is read by its Tera type
- * and named with it, so the sentence stays true of the body on the field.
- * Round 57: the type is the move's at use (move-use.ts): a move whose type
- * depends on a fact the sentence lacks, or on an ability the attacker may or
- * may not have, is no definite null.
- */
+// Mechanical-null detection: names a recommended move that provably does nothing (Will-O-Wisp into Charizard-X: Fire-types cannot be burned).
 
 const STATUS_TEXT: Record<string, string> = {
   brn: 'burned',
@@ -32,16 +16,15 @@ type GenDex = RulesDex;
 type DexMove = ReturnType<GenDex['moves']['get']>;
 
 /**
- * Types immune to a major status, by generation. The @pkmn/dex type chart
- * only carries type-vs-type entries (no status keys), so this table is the
- * status half of the immunity check — curated to the unconditional rules.
+ * Types immune to a major status, by generation: the @pkmn/dex type chart has only type-vs-type entries, so this is the status half,
+ * curated to the unconditional rules.
  */
 function statusImmuneTypes(status: string, gen: number): string[] {
   switch (status) {
     case 'brn': return ['Fire'];
-    // Electric-types became paralysis-immune in gen 6.
+    // Electric-types are paralysis-immune from gen 6.
     case 'par': return gen >= 6 ? ['Electric'] : [];
-    // Steel gained its poison immunity with its introduction in gen 2.
+    // Steel is poison-immune from gen 2, its first generation.
     case 'psn':
     case 'tox': return gen >= 2 ? ['Steel', 'Poison'] : ['Poison'];
     case 'frz': return ['Ice'];
@@ -70,10 +53,8 @@ function candidateAbilities(dex: GenDex, attackerSpecies: string | null, mega: b
 }
 
 /**
- * The type the move lands with, from what the sentence knows (round 57):
- * the species, its possible abilities, the generation and the attacker's
- * Tera. An unknown item, weather, terrain or hidden type, or abilities that
- * disagree, leave it undecided (null) and the sentence silent.
+ * The type the move lands with, from what the sentence knows: the species, its possible abilities, the generation and the attacker's
+ * Tera. An unknown item, weather, terrain or hidden type, or abilities that disagree, leave it undecided (null) and the sentence silent.
  */
 function typeAtUse(
   move: DexMove,
@@ -142,7 +123,7 @@ function statusNullReason(
   if (move.flags.powder && gen >= 6 && types.includes('Grass')) {
     return `powder moves do not affect Grass-types like ${named}`;
   }
-  // The sim implements this one as onTryImmunity — no data field carries it.
+  // The sim implements this one as onTryImmunity: no data field carries it.
   if (move.id === 'leechseed' && types.includes('Grass')) {
     return `Leech Seed cannot affect Grass-types like ${named}`;
   }
@@ -166,12 +147,11 @@ function attackerAtUse(
 }
 
 /**
- * Why a single-slot move choice provably does nothing against the given
- * defender — or null when it might do something (which includes every case
- * where the data is incomplete: unknown move, unknown species, non-move or
- * doubles choice). `attackerSpecies` exists to SUPPRESS verdicts: when any
- * of the attacker's possible abilities breaks the immunity, the null is not
- * definite and the guard stays silent.
+ * Why a single-slot move choice provably does nothing against the defender, or null when it might (unknown move or species, a
+ * non-move choice, a comma choice with two acting slots: it judges singles and a doubles endgame with one living active per side). Only
+ * definite type-chart and status nulls fire; ability-granted immunities (Levitate, Flash Fire) are out of scope. When any of the
+ * attacker's possible abilities breaks the immunity (Scrappy, Corrosion), or the move's type depends on a fact the sentence lacks,
+ * the null is not definite and the guard stays silent. A terastallized defender is read by its Tera type and named with it.
  */
 export function nullMoveReason(params: {
   choice: string;

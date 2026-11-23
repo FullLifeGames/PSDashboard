@@ -1,17 +1,13 @@
 import { CHANCE_CANT } from '../dice-events.ts';
 
-/**
- * Round 56: the doubles pair plan reads a draw's own lines. A hit's window
- * runs from its roll to the next |move| line; the owner's HP lines carry
- * the exact HP (denominator = max HP), the public ones a percentage.
- */
+// The doubles pair plan reads a draw's own lines: a hit's window runs from its roll to the next |move| line, and the owner's HP lines
+// carry the exact HP (denominator = max HP), the public ones a percentage.
 
 /**
- * The `|cant|` reasons whose cause the simulator draws this turn (round 70, N1). It writes each reason by the name of its
- * condition, so the infatuation reads "Attract" and never "attract". test/pair-cant-reasons.spec.ts scans every reason the
- * simulator can write, plays each over 40 seeds in every doubles generation and the Champions mod, and holds this set to
- * the dice ones. Round 76 (T233): the report's dice markers (CHANCE_CANT) are the same set plus sleep, whose length the
- * simulator draws when the status starts, so the plan prices no roll in a sleeping turn.
+ * The `|cant|` reasons whose cause the simulator draws this turn. It writes each reason by the name of its condition, so the
+ * infatuation reads "Attract" and never "attract". test/pair-cant-reasons.spec.ts holds this set to the dice ones. The report's dice
+ * markers (CHANCE_CANT) are the same set plus sleep, whose length the simulator draws when the status starts, so the plan prices
+ * no roll in a sleeping turn.
  */
 const RANDOM_CANT: ReadonlySet<string> = new Set([...CHANCE_CANT].filter(reason => reason !== 'slp'));
 
@@ -38,7 +34,7 @@ export function hpAfterHit(log: readonly string[], from: number, targetSlot: str
 
 /**
  * A random outcome the plan does not price: a |cant| from flinch, paralysis, freeze or attraction, a confusion check, a random drag-in.
- * Round 86 (T305): a |cant| that a recorded secondary die explains (`<slot>|<effect id>`: the flinch the hit's die came true with) is
+ * A `|cant|` that a recorded secondary die explains (`<slot>|<effect id>`: the flinch the hit's die came true with) is
  * priced as a token of the hit's class, not a deviation.
  */
 export function randomDeviation(log: readonly string[], explained: ReadonlySet<string> = new Set()): string | null {

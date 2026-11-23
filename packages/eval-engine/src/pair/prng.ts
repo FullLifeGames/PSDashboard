@@ -9,39 +9,28 @@ import type { PricedHit } from './kill-table.ts';
 import { captureHit, type HitSnapshot } from './snapshot.ts';
 
 /**
- * Round 56: the doubles pair plan's dice. A recording PRNG writes down, per
- * hit instance (one move object and one target), the accuracy roll with the
- * threshold the sim used, the crit roll with its denominator, and the damage
- * roll with the crit flag and a snapshot of both bodies — hitStepAccuracy and
- * getSpreadDamage set battle.activeTarget per target, so a spread move is
- * one instance per target. A speed tie among move actions is written down
- * too. Scripts answer one instance's rolls on demand, keyed
- * `${attackerSlot}:${moveId}>${targetSlot}`; an answered roll still draws
- * its number, so everything before it replays exactly as without the
- * script. Without scripts the draws are the plain PRNG's, number for number.
- * The singles solver keeps ScriptedPRNG; nothing here reaches it.
+ * The doubles pair plan's dice. A recording PRNG writes down, per hit instance (one move object and one target), the accuracy roll with
+ * the threshold the sim used, the crit roll with its denominator, and the damage roll with the crit flag and a snapshot of both bodies;
+ * hitStepAccuracy and getSpreadDamage set battle.activeTarget per target, so a spread move is one instance per target. A speed tie among
+ * move actions is written down too. Scripts answer one instance's rolls on demand, keyed `${attackerSlot}:${moveId}>${targetSlot}`; an
+ * answered roll still draws its number, so everything before it replays exactly as without the script. Without scripts the draws are the
+ * plain PRNG's, number for number. The singles solver keeps ScriptedPRNG; nothing here reaches it.
  *
- * Round 69 (T154): a move that doubles its strength on a chance (Fickle Beam's
- * randomChance(3, 10) in the BasePower event, read from the Dex handler by
- * calc/fickle.ts) draws that chance before the damage roll; the draw is kept
- * on the hit's instance and the roll's snapshot carries the factor it drew, so
- * the table at the roll is the table of the strength the log shows. A script
- * answers it with `doubled`.
+ * A move that doubles its strength on a chance (Fickle Beam's randomChance(3, 10) in the BasePower event, read from the Dex handler by
+ * calc/fickle.ts) draws that chance before the damage roll; it is kept on the hit's instance and the roll's snapshot carries the factor
+ * it drew, so the table at the roll is the table of the strength the log shows. A script answers it with `doubled`.
  *
- * Round 86 (T299): the recorder no longer tells a draw by its numbers. A `DrawNamer`
- * (dice/namer.ts, the module's naming by the simulator's hook, docs/adr/0002) names
- * each call, and only the move's own accuracy, crit and damage roll are booked: an
- * attacker's status check (the confusion check has an accuracy shape, the others a
- * crit shape) and the confusion self-hit's random(16) leave no record. The draws
- * stay the plain PRNG's number for number, as before.
+ * A `DrawNamer` (dice/namer.ts, docs/adr/0002) names each call, and only the move's own accuracy, crit and damage roll are booked: an
+ * attacker's status check (the confusion check has an accuracy shape, the others a crit shape) and the confusion self-hit's random(16)
+ * leave no record.
  *
- * Round 86 (T305): a secondary die (an entry of the move's `secondaries`, one `random(100)` per entry the target's rules leave)
- * is booked per hit instance with its effect id, its chance and the result it had. A script answers it by effect id
- * (`secondary`); as with the other rolls the natural value is drawn first, so the stream stays where it would have been.
+ * A secondary die (an entry of the move's `secondaries`, one `random(100)` per entry the target's rules leave) is booked per hit
+ * instance with its effect id, its chance and the result it had. A script answers it by effect id (`secondary`); as with the other
+ * rolls the natural value is drawn first, so the stream stays where it would have been.
  *
- * Round 89 (#59, T322 block 1): a tree's root draw may carry `DieQuantiles` (`search/root-quantile.ts`). The natural value is drawn
- * first, then replaced for every NAMED die the quantiles answer (they read the raw name, also a status check the records skip), and
- * the records carry the replaced value, so `readPattern` names the class the battle shows. A script outranks a quantile.
+ * A tree's root draw may carry `DieQuantiles` (`search/root-quantile.ts`). The natural value is drawn first, then replaced for every
+ * NAMED die the quantiles answer (they read the raw name, also a status check the records skip), and the records carry the replaced
+ * value, so `readPattern` names the class the battle shows. A script outranks a quantile.
  */
 
 export interface PairScript {

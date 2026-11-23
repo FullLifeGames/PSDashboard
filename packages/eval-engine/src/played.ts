@@ -1,7 +1,4 @@
-/**
- * Parses what each side actually chose in one turn's protocol block. Pure —
- * no @pkmn/sim imports of its own (the Dex comes from replay-core's resolver), main-bundle safe.
- */
+// Parses what each side actually chose in one turn's protocol block; pure (the Dex comes from replay-core's resolver) and main-bundle safe.
 
 import { dexOf, toId, type GameRules, type RulesDex, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { normalizeLineEndings, normalizeLines } from './line-endings.ts';
@@ -10,14 +7,12 @@ import { detectSacks as detectSacksOfLf, type SackInfo } from './turn-analysis/s
 
 export type { SackInfo } from './turn-analysis/sacks.ts';
 
-/**
- * Round 63: the sack shapes live in turn-analysis/sacks.ts; the protocol API keeps its old address. Round 70 (T206): the address
- * is also the reader's door for line endings, because the faint pattern matches to the line end and a '\r' there hid every sack.
- */
+/** The sack each side made this turn (shapes in turn-analysis/sacks.ts); this address also passes the line-ending door, since a '\r' hid every faint pattern. */
 export function detectSacks(events: string[], snapshotBefore: TurnSnapshot | null, rules: GameRules): { p1?: SackInfo; p2?: SackInfo } {
   return detectSacksOfLf(normalizeLines(events), snapshotBefore, rules);
 }
 
+/** One side's chosen action of a turn: a move or a switch with its gimmick flags, doubles target and pivot follow-up. */
 export interface PlayedAction {
   kind: 'move' | 'switch';
   /** Move name, or the incoming Pokémon's nickname for switches. */
@@ -34,10 +29,7 @@ export interface PlayedAction {
    * own side), null when the line names no slot target (spread/self).
    */
   targetLoc?: number | null;
-  /**
-   * Pivot moves (U-turn family): the species that came in on the follow-up
-   * switch — the other half of the pair the player actually chose.
-   */
+  /** Pivot moves (U-turn family): the species that came in on the follow-up switch, the other half of the pair the player chose. */
   pivotTarget?: string;
 }
 
@@ -45,9 +37,9 @@ export interface PlayedAction {
 export interface LoggedMove { slot: string; move: string }
 
 /**
- * Round 89 (#108): a body that fell before it acted, with what the order bound reads (`branch/action-bound.ts`): the move actions the log
- * shows before the fall (other bodies), whether a line before it can have moved a speed (then only a priority bracket proves an order), and
- * the turn's `|-activate|` lines (the dice of Quick Claw, Custap Berry, Quick Draw and the like). Plain data, so it travels with a cache entry.
+ * A body that fell before it acted, with what the order bound reads (`branch/action-bound.ts`): the move actions the log shows before
+ * the fall (other bodies), whether a line before it can have moved a speed (then only a priority bracket proves an order), and the
+ * turn's `|-activate|` lines (the dice of Quick Claw, Custap Berry, Quick Draw and the like). Plain data, so it travels with a cache entry.
  */
 export interface FellMark {
   before: LoggedMove[];
@@ -56,8 +48,8 @@ export interface FellMark {
 }
 
 /**
- * Round 89 (#108): what the order rules rule out for a body that fell before it acted: the move ids it cannot have chosen, and whether a
- * chosen switch is out too. Plain data (the grading reads it, the cache carries it).
+ * What the order rules rule out for a body that fell before it acted: the move ids it cannot have chosen, and whether a chosen switch
+ * is out too. Plain data (the grading reads it, the cache carries it).
  */
 export interface SlotBound {
   moves: string[];
@@ -67,6 +59,7 @@ export interface SlotBound {
 /** The bound per side and slot, as the parse's `fell` marks it (null: no bound for the slot). */
 export interface PlayedBounds { p1?: (SlotBound | null)[]; p2?: (SlotBound | null)[] }
 
+/** What each side chose in one turn: one action per side, or per slot in doubles. */
 export interface PlayedTurn {
   p1: PlayedAction | null;
   p2: PlayedAction | null;
@@ -74,14 +67,13 @@ export interface PlayedTurn {
   p1Slots?: (PlayedAction | null)[];
   p2Slots?: (PlayedAction | null)[];
   /**
-   * Why a side's choice never surfaced, when the protocol says: the `|cant|`
-   * reason ('slp', 'flinch', 'move: Taunt', …) or 'faint'. The player DID
-   * choose — the report should say what swallowed it, not "could not act".
+   * Why a side's choice never surfaced, when the protocol says: the `|cant|` reason ('slp', 'flinch', 'move: Taunt', …) or 'faint'.
+   * The player DID choose: the report should say what swallowed it, not "could not act".
    */
   prevented?: { p1?: string; p2?: string };
   /**
-   * Round 89 (#108): per side and slot, the mark of a body that fell before it acted (null: the slot did not). Singles carry one slot.
-   * Absent when no body fell before acting.
+   * Per side and slot, the mark of a body that fell before it acted (null: the slot did not). Singles carry one slot. Absent when no
+   * body fell before acting.
    */
   fell?: { p1?: (FellMark | null)[]; p2?: (FellMark | null)[] };
 }
@@ -148,7 +140,7 @@ const activationLines = (lines: string[]): string[] => lines.filter(line => line
 
 /** The singles scan: per side the settled action, the gimmick flags, and why a choice never surfaced. */
 interface PlayedScan {
-  /** Round 75 (T160): the game's own Dex (generation and mod), for the pivot moves. */
+  /** The game's own Dex (generation and mod), for the pivot moves. */
   dex: RulesDex;
   actions: { p1: PlayedAction | null; p2: PlayedAction | null };
   settled: Record<SideId, boolean>;
@@ -167,9 +159,8 @@ function noteGimmick(scan: PlayedScan, tag: string, side: SideId): void {
 }
 
 /**
- * The side's queued choice was cancelled (or never shown) — whatever
- * follows for it (replacements) is not the chosen action. Record WHY
- * when no action had surfaced yet, so the report can say so.
+ * The side's queued choice was cancelled (or never shown): whatever follows for it (replacements) is not the chosen action.
+ * Record WHY when no action had surfaced yet, so the report can say so.
  */
 function notePrevented(scan: PlayedScan, tag: string, side: SideId, reason: string | undefined): void {
   if (!scan.settled[side] && scan.actions[side] === null && scan.prevented[side] === undefined) {
@@ -190,12 +181,9 @@ function noteMove(scan: PlayedScan, side: SideId, name: string): void {
 
 function noteSwitch(scan: PlayedScan, side: SideId, ref: string, species: string): void {
   if (scan.settled[side]) {
-    // A switch after the side's own PIVOT move is the pair's other half —
-    // record which Pokémon the player brought in (grading distinguishes
-    // "U-turn → the wall" from "U-turn → the wincon"). Round 70 (N1): the pivots
-    // are the Dex's selfSwitch moves (pivot-moves.ts), and a body that fainted
-    // after its move was replaced, not pivoted: a Teleport that failed before
-    // Gen 8 records no target. The scan reads the game's own Dex (round 75, T160).
+    // A switch after the side's own PIVOT move is the pair's other half: record which Pokémon the player brought in (grading
+    // distinguishes "U-turn → the wall" from "U-turn → the wincon"). The pivots are the Dex's selfSwitch moves (pivot-moves.ts), and a
+    // body that fainted after its move is a replacement, not a pivot; a Teleport that failed before Gen 8 records no target.
     const action = scan.actions[side];
     if (action && action.kind === 'move' && !scan.fainted[side] && isPivotMove(scan.dex, toId(action.name)) &&
       action.pivotTarget === undefined) {
@@ -220,14 +208,8 @@ function notePlayedLine(scan: PlayedScan, tag: string, side: SideId, parts: stri
   }
 }
 
-/**
- * Per side, the chosen action is its first `|move|` or `|switch|` line —
- * with the protocol's traps excluded: switches after the side already moved
- * are pivots (U-turn), switches after the side's own faint are replacements,
- * `|drag|`/`|replace|` are never choices, and `|cant|` means the choice
- * never surfaced (the side stays unknown rather than guessed). Round 70 (T206): the lines pass the door for line endings first, so
- * the reason of a `|cant|` line, its last field, reads "flinch" and never "flinch\r".
- */
+// The lines pass the line-ending door first, so a `|cant|` reason (its last field) reads "flinch", never "flinch\r".
+/** Per side, the chosen action: its first |move| or |switch| line, except pivot follow-ups, replacements after a faint, |drag|, |replace| and |cant| (side unknown). */
 export function parsePlayedActions(lines: string[], rules: GameRules): PlayedTurn {
   const scan: PlayedScan = {
     dex: dexOf(rules),
@@ -262,11 +244,7 @@ export function parsePlayedActions(lines: string[], rules: GameRules): PlayedTur
   };
 }
 
-/**
- * The leads each side actually sent out: the `|switch|` lines between
- * `|start` and the first `|turn|` — the turn-0 decision as the replay shows
- * it. Species names, in slot order.
- */
+/** The leads each side sent out: the species of the `|switch|` lines between `|start` and the first `|turn|`, in slot order. */
 export function parseLeadSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const leads = { p1: [] as string[], p2: [] as string[] };
   let started = false;
@@ -339,10 +317,7 @@ function noteDoublesLine(scan: DoublesScan, tag: string, ref: SlotRef, parts: st
   }
 }
 
-/**
- * Doubles variant: the same settle rules applied per SLOT (a/b), plus move
- * target locations so combined engine choices can be matched exactly.
- */
+/** Doubles variant of parsePlayedActions: the same settle rules per SLOT (a/b), plus move target locations so combined engine choices match exactly. */
 export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   const scan: DoublesScan = {
     slots: { p1: [null, null], p2: [null, null] },
@@ -376,9 +351,8 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
 }
 
 /**
- * The protocol lines strictly between `|turn|N` and `|turn|N+1` (or the log
- * end). NOT the same as a TurnSnapshot's `log` chunk, which groups lines by
- * snapshot association rather than turn boundaries.
+ * The protocol lines strictly between `|turn|N` and `|turn|N+1` (or the log end); a TurnSnapshot's `log` chunk groups lines by
+ * snapshot association instead.
  */
 export function turnEvents(rawLog: string, turn: number): string[] {
   const lines = normalizeLineEndings(rawLog).split('\n');
@@ -392,11 +366,7 @@ export function turnEvents(rawLog: string, turn: number): string[] {
   return events;
 }
 
-/**
- * One-pass turn index: `result[turn]` holds that turn's events (same slicing
- * as turnEvents). Callers iterating every turn use this instead of calling
- * turnEvents per turn, which re-splits the whole log each time.
- */
+/** One-pass turn index: `result[turn]` holds that turn's events (as turnEvents), without re-splitting the whole log for each turn. */
 export function allTurnEvents(rawLog: string): string[][] {
   const byTurn: string[][] = [];
   let current: string[] | null = null;

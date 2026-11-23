@@ -6,30 +6,17 @@ import { strongerPower, type StrengthMix } from '../calc/fickle.ts';
 import { stellarFirstUse } from '../calc/stellar.ts';
 import type { BodySnapshot, HitSnapshot } from './snapshot.ts';
 
-/**
- * Round 56: the 16 damage values of one hit, normal and crit, from
- * @smogon/calc fed with the snapshot the dice took at the roll — a doubles
- * field with the partner effects the calc knows (ruin, Helping Hand,
- * Battery, Power Spot, Steely Spirit, Friend Guard, doubles screens). Three
- * call details keep the calc on the sim's number (docs/perf/probes/
- * 2026-09-23-r56/damage-check-anchor-v2.vt.ts: all 8450 anchor rolls, the
- * 6535 non-lethal ones to the HP; damage-check-v2.vt.ts: 96.8 % of the
- * non-lethal rolls on 83 bank positions):
- * `calculate` clones the move, so a spread move against one target goes in
- * through `overrides`; the bodies come from the engine's one builder, which
- * counts an entry boost once (calc/body.ts, round 67); Meteor Beam and
- * Electro Shot lose the charge boost the calc adds itself.
- *
- * Round 69 (T152): the calc also forces the spread target for Tera Starstorm
- * of Terapagos-Stellar and Expanding Force on Psychic Terrain (gen789.js), and
- * its Doubles field then takes the 0.75 spread factor off a hit that the
- * simulator did not spread because only one foe stood. That hit is priced with
- * the Singles game type, which enters the calc in the spread factor and the
- * screen factor only. Round 73 (T202): a defender behind a screen is the one hit neither field prices (a screen is 2732/4096 in
- * Doubles and 2048/4096 in Singles), so its table is null and the pair plan samples the simulator's own draws.
- */
+// The 16 damage values of one hit, normal and crit, from @smogon/calc fed with the snapshot the dice took at the roll: a doubles field
+// with the partner effects the calc knows (ruin, Helping Hand, Battery, Power Spot, Steely Spirit, Friend Guard, doubles screens).
+// Three call details keep the calc on the sim's number: `calculate` clones the move, so a spread move against one target goes in
+// through `overrides`; the bodies come from the engine's one builder, which counts an entry boost once (calc/body.ts); Meteor Beam
+// and Electro Shot lose the charge boost the calc adds itself. The calc also forces the spread target for Tera Starstorm of
+// Terapagos-Stellar and Expanding Force on Psychic Terrain (gen789.js), and its Doubles field then takes the 0.75 spread factor off a
+// hit the simulator did not spread because only one foe stood: that hit is priced with the Singles game type, which enters the calc
+// in the spread factor and the screen factor only. A defender behind a screen is the one hit neither field prices (a screen is
+// 2732/4096 in Doubles and 2048/4096 in Singles), so its table is null and the pair plan samples the simulator's own draws.
 
-/** A hit's snapshot with the strength factor the move drew (Fickle Beam's 2, T154); absent for the move's own power. */
+/** A hit's snapshot with the strength factor the move drew (Fickle Beam's 2); absent for the move's own power. */
 export type PricedHit = HitSnapshot & { strength?: number };
 
 export interface KillTable {
@@ -115,7 +102,7 @@ export function killTable(snap: PricedHit): KillTable | null {
     const gen = calcGenerationFor(snap.gen, snap.attacker.mod);
     const attacker = calcBody(gen, attackerAtUse(dexOfCalc(gen), snap.attacker, snap.moveName), chargeOffset(snap));
     const defender = calcBody(gen, snap.defender, 0);
-    // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
+    // A Stellar body's first use of a type hits harder; the type at use is the calc's own.
     const first = stellarFirstUse(snap.attacker, () => calculate(gen, attacker, defender, hitMove(gen, snap, false), calcField(snap)).move.type);
     const normal = hitRolls(gen, snap, attacker, defender, false, first);
     const crit = hitRolls(gen, snap, attacker, defender, true, first);
@@ -140,7 +127,7 @@ export function killShare(table: KillTable, hp: number, crit: number): number {
 }
 
 /**
- * The kill share of a hit: its table's, or for a move that doubles on a chance (Fickle Beam, T154) the mix of the tables
+ * The kill share of a hit: its table's, or for a move that doubles on a chance (Fickle Beam) the mix of the tables
  * at the weaker and the stronger strength. Null when a table cannot be priced.
  */
 export function mixedKillShare(snap: HitSnapshot, hp: number, crit: number, mix: StrengthMix | null): number | null {

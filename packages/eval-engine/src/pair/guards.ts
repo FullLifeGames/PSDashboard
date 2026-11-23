@@ -2,15 +2,9 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { rollsStall } from '../dex-facts/protect.ts';
 import { randomCallMoves } from '../ko-odds.ts';
 
-/**
- * Round 56: a doubles pair choice as slot actions, and the rules that send
- * a cell to the fallback before anything is drawn (spec rule F1): a status
- * that may cancel the action, random priority, a Protect whose success is
- * rolled, a move whose hits or target are random, a move that calls a
- * random move.
- */
+// A doubles pair choice as slot actions, and the rules that send a cell to the fallback before anything is drawn.
 
-/** `tera`: the move part clicks Tera (its terastallize token), set only then (round 67, T84). */
+/** `tera`: the move part clicks Tera (its terastallize token), set only then. */
 export type PairAction =
   | { kind: 'move'; slot: number; moveId: string; loc: number | null; tera?: true }
   | { kind: 'switch'; slot: number; to: number }
@@ -44,8 +38,8 @@ function moverFallback(battle: Battle, mon: Pokemon, moveId: string, foes: numbe
   if (mon.status === 'par' || mon.status === 'frz') return `prevented:${mon.status}`;
   if (mon.volatiles['confusion'] || mon.volatiles['attract']) return 'prevented:volatile';
   if (mon.item === 'quickclaw' || mon.ability === 'quickdraw') return 'quick';
-  // Round 70: a move whose success the simulator rolls against the stall counter: the Protect family, Endure included (Wide Guard,
-  // Quick Guard and Mat Block set a side condition and roll nothing; test/pair-stall-guard.spec.ts plays every one).
+  // A move whose success the simulator rolls against the stall counter: the Protect family, Endure included (Wide Guard, Quick Guard and
+  // Mat Block set a side condition and roll nothing; test/pair-stall-guard.spec.ts plays every one).
   if (rollsStall(battle.dex, move) && mon.volatiles['stall']) return 'stall';
   if (move.multihit || mon.ability === 'parentalbond') return 'multi-hit';
   if (randomCallMoves(battle.dex).has(move.id)) return 'random-call';

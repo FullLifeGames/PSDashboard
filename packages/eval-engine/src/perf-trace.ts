@@ -1,17 +1,5 @@
-/**
- * Wall-clock stage collector for the graph sweep (main thread only). The
- * sweep always collects — one Map update per stage call is nanoseconds
- * against multi-second stages, so measurement can never change what the
- * sweep computes — and only REPORTS when the opt-in flag is set:
- *
- *   localStorage.setItem('ps-replay-interceptor:perf', '1')
- *
- * With the flag set, the sweep's end prints a stage table to the console
- * and mirrors it on window.__EVAL_PERF__ for harnesses. Stages may overlap
- * in wall time (acquisition streams positions while searches run), so the
- * stage sum can exceed the sweep total — the total is the truth, the
- * stages say where the waiting happened.
- */
+// Wall-clock stage collector for the graph sweep (main thread only): it always collects and reports only when localStorage
+// 'ps-replay-interceptor:perf' is '1'.
 
 const FLAG_KEY = 'ps-replay-interceptor:perf';
 
@@ -23,6 +11,7 @@ interface PerfStage {
 export interface PerfSummary {
   label: string;
   totalMs: number;
+  /** Stages may overlap in wall time (acquisition streams positions while searches run), so their sum can exceed totalMs; the total is the truth. */
   stages: Record<string, PerfStage>;
   counters: Record<string, number>;
 }
@@ -48,6 +37,7 @@ export function perfReset(): void {
   startedAt = now();
 }
 
+/** Adds one timed run of a stage, in milliseconds. */
 export function perfAdd(stage: string, ms: number): void {
   const entry = stages.get(stage);
   if (entry) {
@@ -58,6 +48,7 @@ export function perfAdd(stage: string, ms: number): void {
   }
 }
 
+/** Adds to a named counter. */
 export function perfCount(name: string, by = 1): void {
   counters.set(name, (counters.get(name) ?? 0) + by);
 }
@@ -72,8 +63,7 @@ export async function perfSpan<T>(stage: string, run: () => Promise<T>): Promise
   }
 }
 
-/** Times one synchronous block — for main-thread compute sites, where the
- * span IS blocked main-thread time (async spans only measure waiting). */
+/** Times one synchronous block, for main-thread compute sites where the span is blocked main-thread time (async spans measure waiting). */
 export function perfSync<T>(stage: string, run: () => T): T {
   const start = now();
   try {
@@ -92,7 +82,7 @@ export function perfSummary(label: string): PerfSummary {
   };
 }
 
-/** Prints (and mirrors on window) the collected stages — flag-gated. */
+/** Prints the collected stages to the console and mirrors them on window.__EVAL_PERF__; flag-gated. */
 export function perfReport(label: string): void {
   if (!perfEnabled()) return;
   const summary = perfSummary(label);

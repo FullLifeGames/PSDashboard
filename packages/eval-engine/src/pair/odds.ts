@@ -9,14 +9,9 @@ import { parsePairChoice, type PairAction } from './guards.ts';
 import { mixedKillShare } from './kill-table.ts';
 import { snapshotPair } from './snapshot.ts';
 
-/**
- * Round 56: kill odds for doubles options, the narrative payload the singles
- * rows carry since round 6. Per option, every own slot's damaging move is
- * priced against the living foes it names on the root with the doubles
- * calc (partner abilities, ruin, the spread modifier by target count); the
- * option shows the slot event with the best kill chance among the uncertain
- * ones (0 < kill, hit × kill < 1), labeled with its move and target.
- */
+// Kill odds for doubles options, the narrative payload the singles rows carry: every own slot's damaging move is priced against the
+// living foes it names on the root with the doubles calc, and the option shows its slot event with the best uncertain kill chance
+// (0 < kill, hit × kill < 1).
 
 type Odds = Required<KoOddsInfo> & { pKill: number };
 type MoveAction = Extract<PairAction, { kind: 'move' }>;
@@ -30,7 +25,7 @@ const targetsAsked = new WeakMap<Pokemon, Map<string, string>>();
 type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: unknown) => void;
 
 /**
- * The move's target as the simulator's ModifyMove leaves it for this user (round 69, T152): the move's own handler from the
+ * The move's target as the simulator's ModifyMove leaves it for this user: the move's own handler from the
  * Dex runs on a stand-in for the attacker (the species its Tera click makes, the body otherwise) and for the battle (its
  * field, cleared when the click clears it), so Tera Starstorm of Terapagos-Stellar and Expanding Force of a grounded user
  * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target. The stand-ins are
@@ -87,8 +82,8 @@ function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: 
 }
 
 /**
- * One slot's event; a slot that clicks Tera is priced on the body the click makes (round 67, T84). `cleared`: a click of
- * the option clears the weather and the terrain (Teraform Zero, T152) before any of its slots moves, so every slot meets
+ * One slot's event; a slot that clicks Tera is priced on the body the click makes. `cleared`: a click of
+ * the option clears the weather and the terrain (Teraform Zero) before any of its slots moves, so every slot meets
  * the cleared field, the clicking one and its partner alike.
  */
 function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: MoveAction, spread: boolean, cleared: boolean): Odds | null {

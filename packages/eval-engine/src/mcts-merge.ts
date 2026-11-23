@@ -4,47 +4,30 @@ import type { CellBlendClass, EvalCellValue, EvalMatrix, EvalResult, KoOddsMisma
 import { cellContribution, keyedCell, type TreeCell } from './search/merge-pool.ts';
 import { VERIFY_DISAGREEMENT, VERIFY_MIN_TREES, VERIFY_MIN_VISITS, weightedDisagreement } from './verify-select.ts';
 
-// Round 63: the verify cell selection lives in verify-select.ts; its names stay importable from here.
 export {
   rowCompletedCells, starvedSupportCells, VERIFY_DISAGREEMENT, VERIFY_SAMPLES, weightedDisagreement,
 } from './verify-select.ts';
 
-/**
- * Root parallelization for the MCTS mode: N independent trees (each with a
- * rotated seed offset) run on separate workers and merge here by POOLED
- * root-cell statistics, ranked by the same equilibrium solve the matrix
- * mode runs (visit counts allocate search effort; they are not the
- * verdict). Verification re-prices the suspect cells the solve leans on
- * and keeps the pool's depth where the pool has played a cell out
- * (verifiedValue). Pure —
- * rank.ts and the sim-free payload helpers only, no sim imports,
- * main-thread safe.
- */
+// Root parallelization of the MCTS mode: merges N independent trees by pooled root-cell statistics and ranks them with the matrix
+// mode's equilibrium solve. Sim-free (rank.ts and the payload helpers only), so it runs on the main thread.
 
 /**
- * A pool whose continuation has reached this magnitude has played the cell
- * out to a (near-)terminal verdict; only there does the tree's depth
- * outrank the sampler's one-ply static (573756 t138: −0.94 to −0.99 over
- * 490 to 760 visits against statics near zero). Below it a rich pool is a
- * middlegame mean over exploration, not a verdict, and the round-7 sampler
- * stands (655336 t24: 528 visits agreed at +0.52 while the static read
- * +0.08, and the tree's number regraded a fine Dragon Dance as a blunder).
+ * A pool at this magnitude has played the cell out to a near-terminal verdict; only there does the tree's depth outrank the sampler's
+ * one-ply static. Below it a rich pool is a middlegame mean over exploration: 528 visits agreed at +0.52 while the static read +0.08,
+ * and the pool's number regraded a fine Dragon Dance as a blunder.
  */
 const VERIFY_DEPTH_FLOOR = 0.9;
 
 /**
- * Round 77 (T267): with at most this many living Pokémon on each side the trees play the game to its end, so a rich,
- * agreeing pool is a verdict at any magnitude: damage rolls, critical hits and misses keep the mean of a played-out
- * endgame off ±1. Draft 2058494320, variation turn 63: the pools of Kyurem's switch into Dragapult's attacks read 11 to
- * 17 % for P1 over 400 to 650 visits, the one-ply sampler 84 to 93 %, and the floor gave the sampler the cells, so the
- * ranking advised U-turn beside a score that saw the other side winning. The middlegame keeps the floor (655336 t24).
+ * With at most this many living Pokémon per side the trees play the game to its end, so a rich, agreeing pool is a verdict at any
+ * magnitude: damage rolls, crits and misses keep the mean of a played-out endgame off ±1. Scene: pools of Kyurem's switch into
+ * Dragapult's attacks read 11 to 17 % for P1 over 400 to 650 visits, the sampler 84 to 93 %, and the ranking advised U-turn.
  */
 const VERIFY_ENDGAME_LIVING = 2;
 
 /**
- * A value short of a decided game needs a pool that played the cell out, more than the VERIFY_MIN_VISITS a decided
- * pool needs. Champions VGC 2628166702 turn 7 (the last pair) pooled 24 visits of Dark Pulse into Protect at about
- * 0.1, while the sampler one ply deeper read the win the prover proves in two turns (T63's pools held 400 to 650).
+ * A value short of a decided game needs more visits than VERIFY_MIN_VISITS: 24 visits of Dark Pulse into Protect pooled at about
+ * 0.1 while the sampler, one ply deeper, read the win the prover proves in two turns.
  */
 const VERIFY_ENDGAME_MIN_VISITS = 100;
 
@@ -58,14 +41,10 @@ interface PooledCell {
   total: number;
   value: number;
   ended: boolean;
-  /** Round 43: the per-tree cells, for the per-class pool of chance cells. */
   cells: TreeCell[];
 }
 
-/**
- * Pool per-cell reward totals across trees; ONE static prior per cell (the
- * per-tree results already carry it, the pool re-applies it once).
- */
+/** Pools per-cell reward totals across trees with ONE static prior per cell: the per-tree results carry it, the pool applies it once. */
 function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
   const pooled = new Map<number, PooledCell>();
   for (const tree of trees) {
@@ -84,13 +63,9 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
 }
 
 /**
- * The pool's continuation for one root cell: the trees whose drawn child
- * did not end the game, pooled with each tree's own prior, plus the visit
- * count, the number of such trees, and the visit-weighted disagreement
- * of their per-tree means. With `classKey` only the trees that drew that
- * outcome class count (round 33); `acceptUnkeyed` lets trees without a
- * recorded class join (the one-open-class shape, where every open draw
- * must belong to that class).
+ * The pool's continuation for one root cell: the trees whose drawn child did not end the game, pooled with each tree's own prior, plus
+ * the visit count, the number of such trees and the visit-weighted disagreement of their means. `classKey` limits it to the trees that
+ * drew that outcome class; `acceptUnkeyed` lets trees without a recorded class join (the one-open-class shape).
  */
 function poolContinuation(
   trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
@@ -113,40 +88,28 @@ function poolContinuation(
 /** A class pool rich enough to carry depth: VERIFY_MIN_VISITS visits over at least two trees (four trees split across classes). */
 const VERIFY_MIN_CLASS_TREES = 2;
 
-/** A pool that has played its cell out and agrees: its depth outranks the one-ply sampler (in an endgame below the floor too, given the visits). */
 function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean): boolean {
   if (pool.visits < VERIFY_MIN_VISITS || pool.trees < minTrees || pool.disagreement > VERIFY_DISAGREEMENT) return false;
   return Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR || (endgame && pool.visits >= VERIFY_ENDGAME_MIN_VISITS);
 }
 
 /**
- * The value a verified cell contributes (rounds 32 and 33). The sampler's
- * job is the ROOT chance split; the trees' job is depth, and depth counts
- * only where the pool has played the cell out (VERIFY_DEPTH_FLOOR) and
- * agrees. Without a blend a rich, agreeing, played-out pool stands and
- * everything else takes the sampler's value (round 7). With a blend every
- * class is priced on its own (round 33): an ended class contributes its
- * exact leaves; an open class takes the pool of the trees that DREW that
- * class (cells[].classKey) when that pool is deep, and the sampler's class
- * mean otherwise (573756 t137: three trees played the hit out to −0.96
- * while the one miss tree sat at +0.2 — the hit class keeps its depth,
- * the miss class keeps the sampler). Trees without a recorded class join
- * a pool only in the one-open-class shape, where every open draw must
- * belong to that class (round 32's rule as the special case). Round 63
- * (T16): the verify step takes every open class one ply deeper
- * (cls.deepened) and a plain cell's outcome groups mixed by share
- * (cell.deepened), so no verified cell mixes depths.
+ * The value a verified cell contributes. The sampler prices the ROOT chance split; a tree's depth counts only where the pool has
+ * played the cell out (VERIFY_DEPTH_FLOOR) and agrees, else the sampler's value stands. With a blend every class is priced on its
+ * own: an ended class by its exact leaves, an open class by the pool of the trees that DREW it when that pool is deep, else by the
+ * sampler's class mean (three trees played a hit out to -0.96 while the one miss tree sat at +0.2: the hit class keeps its depth,
+ * the miss class the sampler). Trees without a recorded class join a pool only when exactly one class is open. The verify step takes
+ * every open class one ply deeper (cls.deepened) and a plain cell's outcome groups mixed by share (cell.deepened), so no verified
+ * cell mixes depths.
  */
 function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue, pooledValue: number): number {
   const endgame = endgameOf(trees);
   if (!cell.blend) {
     const pool = poolContinuation(trees, key);
-    // The sampler's value, one ply deeper where the verify step deepened it (round 33).
     return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length), endgame) ? pooledValue : cell.deepened ?? cell.value;
   }
   const { blend } = cell;
-  // A class one ply deeper (round 63); otherwise a deepened first-seed child
-  // re-blends inside its class only (reblendValue's rule, values from before).
+  // A class one ply deeper; otherwise a deepened first-seed child re-blends inside its class only (reblendValue's rule).
   const classMean = (cls: CellBlendClass) => {
     if (cls.deepened !== undefined) return cls.deepened;
     return cell.deepened !== undefined && cls.hasFirst
@@ -167,10 +130,8 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
 }
 
 /**
- * The pooled root matrix. `verified` (cellKey → sampled cell) re-prices the
- * suspect cells before the solve: a starved cell takes the multi-seed
- * matrix-grade mean (it outranks the 1-2 chance outcomes the tree happened
- * to draw there), a played-out pool keeps its depth (verifiedValue).
+ * The pooled root matrix; `verified` (cellKey → sampled cell) re-prices the suspect cells before the solve and a played-out pool
+ * keeps its depth.
  */
 function pooledMatrix(
   base: MctsTreeStats,
@@ -181,7 +142,7 @@ function pooledMatrix(
   const values = base.p1Options.map((_, i) => base.p2Options.map((_, j) => {
     const entry = pooled.get(cellKey(i, j));
     if (!entry) return base.rootValue;
-    // Round 89 (T322, #59): a keyed cell weighs its drawn classes by the Dex, then the visit pool.
+    // A keyed cell takes the Dex-weighted value of its drawn classes.
     return keyedCell(entry.cells)?.value ?? (entry.total + entry.value) / (entry.visits + 1);
   }));
   const ended = base.p1Options.map((_, i) =>
@@ -198,14 +159,10 @@ function pooledMatrix(
 }
 
 /**
- * Round 69 (T64): what stands behind each matrix cell, index-aligned with
- * `values`: the visits `visitsOf` knows for the cell's key (0 for a cell no
- * tree expanded) and whether the verify step re-priced it. Round 69 (T178):
- * with the offset-0 tree's `plannedCells` each cell also says what the
- * planner answered (a cell missing from the list failed) and carries the
- * outcome classes of a rolled cell; without the list (a doubles search without
- * the played turn, a matrix-mode result) neither is set. Round 70 (T217): a
- * doubles list covers the played row and column only; the other cells read fail.
+ * What stands behind each matrix cell, index-aligned with `values`: the visits `visitsOf` knows for the cell's key (0 for a cell no
+ * tree expanded) and whether the verify step re-priced it. With the offset-0 tree's `plannedCells` each cell also says what the
+ * planner answered (a cell missing from the list failed) and carries the outcome classes of a rolled cell; a doubles list covers the
+ * played row and column only, the other cells read fail. Without the list neither is set.
  */
 export function matrixCells(
   rows: number, columns: number, visitsOf: (key: number) => number, verified?: Map<number, EvalCellValue>,
@@ -223,12 +180,7 @@ export function matrixCells(
   }));
 }
 
-/**
- * Round 7: the verify sampler's mismatch diagnostics survive the merge —
- * sorted (i, j) because the pooled executor returns chunks in completion
- * order. Blend payloads feed verifiedValue (round 32); MCTS has no
- * deepening, so reblendValue has no call site here.
- */
+/** The verify sampler's mismatch diagnostics, sorted by (i, j) because the pooled executor returns chunks in completion order. */
 function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): KoOddsMismatch[] {
   return verified
     ? [...verified.values()]
@@ -238,11 +190,7 @@ function verifiedDiagnostics(verified: Map<number, EvalCellValue> | undefined): 
     : [];
 }
 
-/**
- * HYBRID SEMANTICS (see mcts.ts toResult): the score keeps the summed
- * visit-mean formulation — bit-comparable with the standing records —
- * while the rankings carry the pooled equilibrium.
- */
+/** The score stays the summed visit mean (hybrid semantics, see mcts.ts toResult) while the rankings carry the pooled equilibrium. */
 function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats, pooled: Map<number, PooledCell>): { score: number; interval: number } {
   const sum = (key: 'p1N' | 'p1W' | 'p2N' | 'p2W'): number[] =>
     base[key].map((_, index) => trees.reduce((total, tree) => total + (tree[key][index] ?? 0), 0));
@@ -252,9 +200,8 @@ function visitMeanScore(trees: MctsTreeStats[], base: MctsTreeStats, pooled: Map
   const p2W = sum('p2W');
   const i = topVisitedIndex(p1N);
   const j = topVisitedIndex(p2N);
-  // Round 89 (T322, #59): the top row and column swap the totals of a keyed cell's trees for their visits at the Dex-weighted
-  // value (`N m - T`; a row's visits and totals are the sums of its cells, pair-tree-key.spec.ts (g)). A row without such a cell
-  // takes no term.
+  // The top row and column swap the totals of a keyed cell's trees for their visits at the Dex-weighted value (`N m - T`; a row's
+  // visits and totals are the sums of its cells). A row without such a cell takes no term.
   let fix1 = 0;
   let fix2 = 0;
   for (const [key, entry] of pooled) {
@@ -278,11 +225,9 @@ const treeScoreEnv = (): string | undefined =>
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.EVAL_TREE_SCORE;
 
 /**
- * Round 67 (T114): the score's form on tree turns, a measurement switch
- * until the user's gate decides: EVAL_TREE_SCORE under Node, 'visits'
- * otherwise; a typo throws. 'visits' is the visit mean (hybrid semantics),
- * 'game' the matrix mode's score (the solved game value clamped into the
- * maximin interval), 'mix' their midpoint. The rankings never move with it.
+ * The score's form on tree turns, a measurement switch: EVAL_TREE_SCORE under Node, 'visits' otherwise; a typo throws. 'visits' is
+ * the visit mean (hybrid semantics), 'game' the matrix mode's score (the solved game value clamped into the maximin interval),
+ * 'mix' their midpoint. The rankings never move with it.
  */
 export function treeScoreForm(): TreeScoreForm {
   const raw = treeScoreEnv();
@@ -297,7 +242,7 @@ export function treeScore(visitMean: number, matrixScore: number): number {
   return form === 'game' ? matrixScore : form === 'mix' ? (visitMean + matrixScore) / 2 : visitMean;
 }
 
-/** Most-visited index (ties keep the lower index — the old rank order). */
+/** Most-visited index; ties keep the lower index. */
 export function topVisitedIndex(n: number[]): number {
   let best = -1;
   let bestN = 0;
@@ -311,9 +256,8 @@ export function topVisitedIndex(n: number[]): number {
 }
 
 /**
- * The follow-up line comes from a tree that agrees on the top choice. Round 89 (T322, #59): where the principal cell (p1's top
- * row against p2's top column) is keyed, from the first such tree that drew the cell's heaviest drawn class, so the line shows the
- * dice the plan weighs most; else the first that agrees.
+ * The follow-up line comes from a tree that agrees on the top choice; where the principal cell (p1's top row against p2's top
+ * column) is keyed, from the first such tree that drew the cell's heaviest class, so the line shows the dice the plan weighs most.
  */
 function attachDonorLine(trees: MctsTreeStats[], result: EvalResult, base: MctsTreeStats): void {
   if (result.perSide.p1.length > 0) {
@@ -332,13 +276,7 @@ function attachDonorLine(trees: MctsTreeStats[], result: EvalResult, base: MctsT
   }
 }
 
-/**
- * Merges parallel trees into one result. Order of `trees` must be fixed.
- * `verified` (cellKey → sampled cell) re-prices the suspect cells before
- * the solve: a starved cell takes the multi-seed matrix-grade mean, a
- * played-out pool keeps its depth (verifiedValue). The score is untouched by design —
- * it stays the summed-marginal visit mean (hybrid semantics).
- */
+/** Merges parallel trees (in a fixed order) into one result; `verified` re-prices the suspect cells before the solve; the score stays the visit mean. */
 export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, EvalCellValue>): EvalResult {
   const base = trees[0];
   if (trees.length === 1 && !verified) return base.result;
@@ -356,19 +294,18 @@ export function mergeMctsTrees(trees: MctsTreeStats[], verified?: Map<number, Ev
   if (result.matrix) {
     result.matrix.cells = matrixCells(base.p1Options.length, base.p2Options.length, key => pooled.get(key)?.visits ?? 0, verified, base.plannedCells);
   }
-  // Round 13: the root unanswered profile is tree-invariant — take trees[0]'s.
+  // The root unanswered profile is tree-invariant: take trees[0]'s.
   if (base.result.unanswered) result.unanswered = base.result.unanswered;
-  // Round 89 (#108): so is the order bound of the played turn's fallen bodies (the root battle's, read once per tree).
+  // So is the order bound of the played turn's fallen bodies (the root battle's, read once per tree).
   if (base.result.playedBounds) result.playedBounds = base.result.playedBounds;
 
   const { score, interval } = visitMeanScore(trees, base, pooled);
-  // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).
+  // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise.
   result.score = treeScore(score, result.score);
   result.interval = interval;
   attachDonorLine(trees, result, base);
 
-  // Round 7: analytic per-option kill odds, shipped by the trees (this
-  // module stays sim-free — the shared payload helpers are sim-free too).
+  // Analytic per-option kill odds, shipped by the trees (this module stays sim-free).
   if (base.koOdds) attachKoOdds(result, koOddsMapsFor(base.p1Options, base.p2Options, base.koOdds));
   return result;
 }

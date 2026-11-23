@@ -1,9 +1,8 @@
 import type { MoveField, MoveLike, MoveUser } from './move-use.ts';
 
 /**
- * The move's own rule at use (round 57): what the simulator's onModifyType,
- * onModifyMove and basePowerCallback of that move decide. A partial answer
- * overrides the catalog; null means a needed fact is unknown.
+ * The move's own rule at use: what the simulator's onModifyType, onModifyMove and basePowerCallback of that move decide.
+ * A partial answer overrides the catalog; null means a needed fact is unknown.
  */
 export type Own = { type?: string; category?: string; basePower?: number } | null;
 type Rule = (move: MoveLike, user: MoveUser, field: MoveField) => Own;

@@ -6,22 +6,9 @@ import type { AccuracyRecord, CritRecord, PairRecord, PairScript, RollRecord, Se
 import type { HitSnapshot } from './snapshot.ts';
 import { hitClasses, truncates, type EventSecondary } from '../search/secondary-classes.ts';
 
-/**
- * Round 56: one draw read as a class of the doubles pair plan. Every hit
- * instance the dice wrote down gets its outcome (miss, hit, hit-kill,
- * hit-nokill) and that outcome's probability: the hit threshold the sim
- * used, the crit chance it rolled with, and the share of the 16 damage
- * rolls that kill — from the calc, trusted only where it reproduces the
- * drawn roll's damage to the HP. An instance whose outcome is not certain
- * is an event; the class key is the sequence of events, its weight the
- * product of their probabilities. Order, truncation, retargeting and
- * redirection are whatever the sim did in the draw. What the plan does not
- * price makes the read a fallback (spec rules F2 to F6).
- *
- * Round 86 (T305): the secondary dice of a hit are part of its class. The recorded dice (the effect, its chance, the result) name
- * the effects that came true, the class key appends them (`p1a:rockslide>p2a=hit-nokill+flinch`), and the other results of the
- * dice are alternatives with the script that asks for them. A flinch is priced only where the target has not moved yet.
- */
+// One draw read as a class of the doubles pair plan: each hit instance the dice wrote down gets its outcome (miss, hit, hit-kill,
+// hit-nokill) and probability; an uncertain outcome is an event, the class key is the sequence of events (`p1a:rockslide>p2a=hit-nokill+flinch`,
+// the effects that came true appended), its weight the product of their probabilities, and what the plan does not price makes the read a fallback.
 
 export type PairOutcome = 'miss' | 'hit' | 'hit-kill' | 'hit-nokill';
 
@@ -55,7 +42,7 @@ type Dex = Battle['dex'];
 type Read = PairEvent | null | { fallback: string };
 
 interface Hit { key: string; accuracy?: AccuracyRecord; crit?: CritRecord; rolls: RollRecord[]; dice: SecondaryRecord[] }
-/** A hit's tables: its one table, or for a move that doubles on a chance (Fickle Beam, T154) the table at each strength. */
+/** A hit's tables: its one table, or for a move that doubles on a chance (Fickle Beam) the table at each strength. */
 interface Priced { weak: KillTable; strong: KillTable | null; mix: StrengthMix | null }
 interface KillOdds { pKill: number; killed: boolean; priced: Priced | null }
 
@@ -127,10 +114,8 @@ function critIgnoresModifiers({ attacker, defender, screens }: HitSnapshot): boo
 }
 
 /**
- * No roll, not even the top roll as a crit, could reach the HP: scaled up
- * from the drawn damage, with 3 % and 2 HP of margin. A drawn normal roll
- * under a modifier a crit ignores bounds nothing (final review of round
- * 56: the crit of an Intimidated attacker does 2.25 times the hit or more).
+ * No roll, not even the top roll as a crit, could reach the HP: scaled up from the drawn damage, with 3 % and 2 HP of margin. A drawn
+ * normal roll under a modifier a crit ignores bounds nothing (the crit of an Intimidated attacker does 2.25 times the hit or more).
  */
 function surelyNonLethal(damage: number, roll: RollRecord): boolean {
   if (!roll.crit && critIgnoresModifiers(roll.snapshot)) return false;
@@ -159,7 +144,7 @@ const pricedShare = (priced: Priced, hp: number, crit: number): number =>
     ? (1 - priced.mix.chance) * killShare(priced.weak, hp, crit) + priced.mix.chance * killShare(priced.strong, hp, crit)
     : killShare(priced.weak, hp, crit);
 
-/** The kill odds of a landed roll, the calc checked against the damage the log shows (spec rules C, D, F6). */
+/** The kill odds of a landed roll, the calc checked against the damage the log shows. */
 function killOdds(hit: Hit, roll: RollRecord, log: readonly string[], dex: Dex, tableFor: TableFor): KillOdds | { fallback: string } {
   const before = roll.snapshot.defender.hp;
   const after = hpAfterHit(log, roll.logIndex, targetOf(hit.key), roll.snapshot.defender.maxhp);

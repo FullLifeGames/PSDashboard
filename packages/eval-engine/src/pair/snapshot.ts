@@ -3,14 +3,9 @@ import { bodyOf, type SimBody } from '../calc/body.ts';
 import { bodyAsClicked } from '../calc/tera-click.ts';
 import { standingScreens } from '@fulllifegames/replay-core';
 
-/**
- * Round 56: the state of one hit, frozen as plain data at the moment the
- * sim rolls it — the doubles pair plan's calc input (kill-table.ts) and the
- * flags its guards read. Taken from the live bodies and the live field, so
- * everything the turn changed before the hit (Intimidate, a weather set by
- * the partner, chip damage, a Tera click) is already in it. Since round 67
- * the bodies are read by the engine's one builder (calc/body.ts).
- */
+// The state of one hit, frozen as plain data at the moment the sim rolls it: the pair plan's calc input (kill-table.ts) and the flags its
+// guards read. It comes from the live bodies and field, so everything the turn changed before the hit (Intimidate, a weather set by the
+// partner, chip damage, a Tera click) is already in it; the bodies are read by the engine's one builder (calc/body.ts).
 
 export type BodySnapshot = SimBody;
 
@@ -58,7 +53,7 @@ function shieldOf(defender: Pokemon): string | null {
   return null;
 }
 
-/** The hit as it stands now; `tera`: the attacker clicks Tera with the move and is read as the click makes it (round 67, T84). */
+/** The hit as it stands now; `tera`: the attacker clicks Tera with the move and is read as the click makes it. */
 export function snapshotPair(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, spreadHit: boolean, tera = false): HitSnapshot {
   const onField = battle.sides.flatMap(side => side.active).filter(mon => mon && !mon.fainted);
   return {
