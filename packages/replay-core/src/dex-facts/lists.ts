@@ -23,10 +23,7 @@ const scanCalling = (dex: FactsDex) => plainMoves(dex).filter(move => !!move.cal
 /** The items that lock their holder into one move (`isChoice`: Choice Band, Specs and Scarf). */
 export const choiceItems = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'choiceItems', scanChoice);
 
-/**
- * The side conditions of the entry hazards: a foe-side move sets a side condition that acts on a switch-in (`onSwitchIn`,
- * or `onEntryHazard` for the ones the simulator runs through the hazard hook). Layers and caps stay with the readers.
- */
+/** The side conditions of the entry hazards: a foe-side move whose condition acts on a switch-in (`onSwitchIn`, or `onEntryHazard`); layers and caps stay with the readers. */
 export const hazardConditions = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'hazardConditions', scanHazards);
 
 /** The terrain conditions: the terrain a move sets. */
@@ -35,9 +32,5 @@ export const terrainConditions = (dex: FactsDex): ReadonlySet<string> => idsOf(d
 /** The weathers the Utility Umbrella takes away: the weather conditions that change the damage of a type. */
 export const umbrellaWeathers = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'umbrellaWeathers', scanUmbrella);
 
-/**
- * The moves that call another move (`callsMove`: Metronome, Sleep Talk, Assist, Copycat, Mirror Move, Me First, Nature Power). The move
- * that runs is chosen elsewhere in the turn, so a one-turn model cannot price them. Read it over a Dex that carries the Past moves
- * (`Dex` itself holds all seven; Generation 9 marks Assist, Mirror Move, Me First and Nature Power Past, which stay real moves).
- */
+/** The moves that call another move (`callsMove`: Metronome, Sleep Talk, Assist, Copycat, Mirror Move, Me First, Nature Power), which a one-turn model cannot price; read over a Dex that carries the Past moves (Generation 9 marks Assist, Mirror Move, Me First and Nature Power Past). */
 export const callingMoves = (dex: FactsDex): ReadonlySet<string> => idsOf(dex, 'callingMoves', scanCalling);

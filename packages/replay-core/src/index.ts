@@ -1,11 +1,4 @@
-/**
- * Public surface of @fulllifegames/replay-core. Curated: the names the app, the worker, the
- * sibling package, the worked example, and the root suite reach, plus every
- * type their signatures mention. Widen it by adding a line here and refreshing
- * test/regression/fixtures/api/replay-core.txt (UPDATE_API_SNAPSHOT=1). The
- * package's own tests import the sources directly; the root suite imports by
- * name, so it consumes this list like any other user.
- */
+/** Public surface of @fulllifegames/replay-core: curated, widened by a line here and a refreshed test/regression/fixtures/api/replay-core.txt (`UPDATE_API_SNAPSHOT=1`). */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
 export { isChampionsFormat } from './champions-format.ts';

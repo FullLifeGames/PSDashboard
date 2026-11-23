@@ -7,24 +7,7 @@ import type { InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line.ts';
 import { judge, type Interval } from './screen-evidence.ts';
 
-/**
- * Round 88 (T329, GitHub issue #65): the item that held a weather or a terrain, from its turns in the log, the sibling of
- * screen-evidence.ts. Sunny Day lasts five turns, eight with Heat Rock; Rain Dance with Damp Rock, Sandstorm with Smooth Rock,
- * Hail and Snowscape with Icy Rock, the four terrains with Terrain Extender (`conditionTurns` reads every pair from the Dex's
- * condition). The log shows the field's start and its end but never the item. The lifetime counts the residual phases the
- * field stood: a start in the action phase counts the turn it started on, a start before the first turn (a lead's ability) or
- * after the turn's `|upkeep` (a replacement's ability) counts from the next turn. The same verdict as a screen's follows
- * (`judge`): the plain five turns rule the items out, the turns of one item prove it.
- *
- * The setter is the user of the move line before the start when the Dex move sets that condition, or the `[of]` body of a
- * `[from] ability:` start; an ability's start counts only where it does not leave the field standing for good (`startsForGood`:
- * before Generation 6 an ability's field never ends). Nothing is read when the turns prove
- * nothing: an end outside the residual phase is a removal; a second weather or terrain replaces the first outside the residual
- * phase (a replaced terrain prints only the new start, never an end of its own); a field still standing at the log's end; a
- * start in the residual phase; a start that carries `[from]` of a move (Metronome, Copycat) or names no setter. The doubts of
- * the screen reader hold here too (an item the log showed or changed, Klutz, Embargo, Magic Room, an Illusion team). The sweep
- * `field-evidence-sweep.spec.ts` plays every setter and every move of every rule set against the reader.
- */
+/** The item that held a weather or a terrain, from its turns in the log (the sibling of screen-evidence.ts); the rules are in EVALUATION.md, "Rule-outs". */
 
 type Kind = 'weather' | 'terrain';
 
@@ -40,7 +23,6 @@ export interface FieldWatch {
 
 const newWatch = (): FieldWatch => ({ turn: 0, bars: 0, upkept: false, open: new Map() });
 
-/** Whether the move sets this weather or terrain, by the move's own Dex entry. */
 function setsField(state: InferrerState, moveName: string, id: string): boolean {
   const move = dexOf(state).moves.get(moveName);
   const field = move.exists ? move.weather ?? move.terrain : undefined;
@@ -60,7 +42,7 @@ function setterOf(state: InferrerState, id: string, line: LogLine): string | nul
   return hasKw(line, 'from') || !move || move.from || !setsField(state, move.name, id) ? null : move.ident;
 }
 
-/** The interval of a start the reader can judge: a table with items, the first residual turn, the setter. */
+/** The interval of a start the reader can judge; a start before the first turn (a lead's ability) or after the turn's `|upkeep` (a replacement's ability) counts from the next turn. */
 function intervalOf(state: InferrerState, watch: FieldWatch, id: string, line: LogLine): Interval | null {
   const table = conditionTurns(dexOf(state), id);
   if (!table || table.byItem.size === 0 || inResidual(watch) || hasKw(line, 'silent')) return null;
@@ -75,7 +57,7 @@ function intervalOf(state: InferrerState, watch: FieldWatch, id: string, line: L
   };
 }
 
-/** A start replaces the field of its kind; the same one again (an ability that fails on its own weather) keeps the count. */
+/** A start replaces the field of its kind (a replaced terrain prints only the new start, never an end); the same one again (an ability that fails on its own weather) keeps the count. */
 function onStart(state: InferrerState, watch: FieldWatch, kind: Kind, id: string, line: LogLine) {
   if (watch.open.get(kind)?.id === id) return;
   watch.open.delete(kind);
@@ -92,10 +74,7 @@ function onEnd(state: InferrerState, watch: FieldWatch, kind: Kind, id: string |
   if (inResidual(watch)) judge(state, open.interval, watch.turn - open.interval.turn + 1);
 }
 
-/**
- * The line handler, called after `watchScreenEvidence` (it has updated the latest move line this reads) and after
- * `watchItemEvidence`: the turn and the phase, the start and the end of a weather and of a terrain.
- */
+/** The line handler: call it after `watchScreenEvidence` (it updates the latest move line this reads) and `watchItemEvidence`. */
 export function watchFieldEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.fieldWatch ??= newWatch());
   if (line.cmd === 'turn') {

@@ -3,12 +3,7 @@ import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 import { arg, detailsOf, identOf, type LogLine } from './log-line.ts';
 
-/**
- * The formes a battle-only forme comes from, as the Dex names them: one for
- * a Mega, Mimikyu-Busted or Ogerpon-Teal-Tera, two for Zygarde-Complete and
- * Necrozma-Ultra (the team decides); a Gigantamax forme changes from its
- * base. Empty for every other species.
- */
+/** The formes a battle-only forme comes from, as the Dex names them: one for a Mega, Mimikyu-Busted or Ogerpon-Teal-Tera, two for Zygarde-Complete and Necrozma-Ultra (the team decides); a Gigantamax forme changes from its base; empty for every other species. */
 function battleOrigins(dex: RulesDex, species: string): string[] {
   const entry = dex.species.get(species);
   if (entry.battleOnly) return ([] as string[]).concat(entry.battleOnly);
@@ -16,13 +11,8 @@ function battleOrigins(dex: RulesDex, species: string): string[] {
 }
 
 /**
- * The team entry a seen species belongs to (round 63, T101): its own name
- * when the team holds it (a preview may name Zacian-Crowned itself); else
- * the held origin of a battle-only forme (Zygarde-Complete → Zygarde-10%,
- * Necrozma-Ultra → Necrozma-Dusk-Mane), or the held entry of the same Dex
- * number (Greninja-Ash came from Greninja-Bond, the preview shows Greninja);
- * else the forme's first origin, as a Mega first seen evolved always was
- * (B16: battle-only formes never make a seventh card).
+ * The team entry a seen species belongs to: its own name when the team holds it (a preview may name Zacian-Crowned itself); else the held origin of a battle-only forme (Zygarde-Complete to Zygarde-10%),
+ * or the held entry of the same Dex number (Greninja-Ash came from Greninja-Bond, the preview shows Greninja); else the forme's first origin, so battle-only formes never make a seventh card.
  */
 export function teamSpecies(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string {
   // A "-*" preview marker learns the forme as the switch shows it (Zamazenta-Crowned).
@@ -35,11 +25,7 @@ export function teamSpecies(dex: RulesDex, pokemonMap: Map<string, RevealedPokem
     origins[0];
 }
 
-/**
- * Team preview hides some formes behind a "-*" marker (Urshifu-*,
- * Zamazenta-*, Greninja-*, Arceus-*): the marker entry a revealed species
- * belongs to, matched on the base species — null when the team holds none.
- */
+/** Team preview hides some formes behind a "-*" marker (Urshifu-*, Zamazenta-*, Greninja-*, Arceus-*): the marker entry a revealed species belongs to, matched on the base species; null when the team holds none. */
 export function unknownFormeMarkerFor(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>, species: string): string | null {
   const dexSpecies = dex.species.get(species);
   const base = toId(dexSpecies.exists ? dexSpecies.baseSpecies : species.split('-')[0]);
@@ -49,10 +35,7 @@ export function unknownFormeMarkerFor(dex: RulesDex, pokemonMap: Map<string, Rev
   return null;
 }
 
-/**
- * The battle revealed the forme behind a marker: the entry keeps its
- * preview position and everything booked on it; only its identity changes.
- */
+/** The battle revealed the forme behind a marker: the entry keeps its preview position and everything booked on it; only its identity changes. */
 export function revealMarkerForme(
   pokemonMap: Map<string, RevealedPokemonInfo>,
   marker: string,

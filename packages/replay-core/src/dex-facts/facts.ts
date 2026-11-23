@@ -1,21 +1,14 @@
 import type { Dex } from '@pkmn/sim';
 
-/**
- * Round 72 (T235): what the engine and the inference know about a Dex, found once. One table per Dex object, in the shape of
- * eval-engine's score/contact-filter.ts `factsOf`: a WeakMap keyed by the Dex (the battle's `dex`, `Dex.forGen(n)` or the
- * Champions mod), filled on the first question, so a hot path pays one map read. The table holds no species, move, item or
- * ability name: every id comes from a scan of the Dex, and test/dex-facts-lists.spec.ts holds each scan to the hand list it
- * replaced in every generation and the Champions mod.
- */
+/** The Dex the rule facts are read over: one table per Dex object, filled by scans of the Dex on the first question and holding no species, move, item or ability name. */
 export type FactsDex = typeof Dex;
 
+/** The Protect family of a move: `shield` (Protect, the King's Shield kin, Max Guard), `stall` (Endure) or `side` (Wide Guard, Quick Guard, Crafty Shield, Mat Block). */
 // eslint-disable-next-line names/no-new-dex-name -- 'stall' is a ProtectKind (the simulator's stall counter), not the ability Stall
 export type ProtectKind = 'shield' | 'stall' | 'side';
 
 export interface DexRuleFacts {
-  /** The Protect family per move id (null: not a member). */
   protect: Map<string, ProtectKind | null>;
-  /** Id sets found by a scan of the Dex, per fact. */
   sets: Map<string, ReadonlySet<string>>;
 }
 

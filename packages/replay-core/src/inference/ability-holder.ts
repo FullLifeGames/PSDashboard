@@ -2,15 +2,7 @@ import { dexOf } from '../rules-dex.ts';
 import { speciesAbilityFor } from '../team/dex-legal.ts';
 import { type InferrerState } from './inferrer-state.ts';
 
-/**
- * Who owns an ability a protocol line names (round 60, T104). The sim
- * writes [of] differently per line: Rough Skin's -damage names the victim and
- * [of] the holder (battle.js:1944); an ability heal names the holder and [of]
- * the attacker (battle.js:2103); Pickpocket's -enditem names only the
- * attacker (abilities.js:3390). Outside formats with free abilities the dex decides: a
- * Pokémon whose species cannot have the ability never gets it; of two that
- * can, [of] wins as before; an unknown species can.
- */
+/** Who owns an ability a protocol line names: the simulator writes [of] per line (Rough Skin's -damage names the victim and [of] the holder, an ability heal the holder and [of] the attacker, Pickpocket's -enditem only the attacker), so outside free-ability formats the Dex decides. */
 
 /** Whether the Pokémon behind an ident may hold the ability as its own. */
 export function mayHold(state: InferrerState, ident: string, ability: string): boolean {

@@ -1,20 +1,11 @@
 import { toId } from './ids.ts';
 
-/**
- * Round 75 (T160): the one place that decides whether a format is Pokémon Champions. Four modules decided on their own
- * before (calcModOf, replayRuleset, the spreads' isChampionsFormat, eval-engine's isChampionsSimFormat), with four regexes, and
- * a tier name with its capitals ('[Gen 9 Champions] OU') read as no Champions format in two of them.
- *
- * The input is anything a host holds for a format: the Dex's id ('gen9championsou'), a replay id ('smogtours-gen9championsou-12'),
- * a branch format with custom rules ('gen9championsou@@@+sleepclausemod') or the tier name a log prints ('[Gen 9 Champions] OU',
- * '[Gen 9] Champions VGC 2026 Reg M-A (Bo3)', or a bare 'championsvgc2026' as a spec writes it). No format of the base Dex
- * carries the word, and every format of the mod does (champions-format.spec.ts checks the rule against both Dexes).
- */
+/** The one rule that decides whether a format is Pokémon Champions: no format of the base Dex carries the word `champions` and every format of the mod does. */
 const CHAMPIONS_FORMAT = /champions/;
 const MEMO_LIMIT = 512;
 const memo = new Map<string, boolean>();
 
-/** Whether `format` (an id, a replay id, a branch format or a tier name) names a Pokémon Champions format (memoized: the forks of a search ask per node). */
+/** Whether `format` (a Dex id, a replay id, a branch format with custom rules or a tier name as a log prints it) names a Pokémon Champions format; memoized because a search asks per node. */
 export function isChampionsFormat(format: string): boolean {
   let champions = memo.get(format);
   if (champions === undefined) {

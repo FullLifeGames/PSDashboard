@@ -1,12 +1,6 @@
 import { Protocol } from '@pkmn/protocol';
 
-/**
- * One log line as @pkmn/protocol reads it (round 67, T108 step 1, spec
- * decision 19). The inference parses every line once and hands the result
- * to each handler: the protocol's split into arguments and keyword arguments
- * ([from], [of], [spread], ...), with its upgrade of older line forms,
- * replaces the splits and regular expressions the handlers kept each.
- */
+/** One log line as @pkmn/protocol reads it: the inference parses every line once, with the protocol's split into arguments and keyword arguments ([from], [of], [spread], ...) and its upgrade of older line forms. */
 export interface LogLine {
   /** The line as the log has it. */
   raw: string;

@@ -1,15 +1,12 @@
 import type { Field } from '@smogon/calc';
 
-/**
- * Sim condition ids mapped onto @smogon/calc's field labels. The damage
- * previews, the kill-odds pricing, and the spread fit all read these, so
- * the tables live in the replay core rather than in the engine.
- */
+/** Sim condition ids mapped onto @smogon/calc's field labels, shared by the damage previews, the kill-odds pricing and the spread fit. */
 
 type CalcFieldOptions = ConstructorParameters<typeof Field>[0];
 type CalcWeather = NonNullable<CalcFieldOptions>['weather'];
 type CalcTerrain = NonNullable<CalcFieldOptions>['terrain'];
 
+/** The calculator's weather label by the simulator's condition id. */
 export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
   raindance: 'Rain',
   primordialsea: 'Heavy Rain',
@@ -23,10 +20,8 @@ export const WEATHER_BY_ID: Record<string, NonNullable<CalcWeather>> = {
 };
 
 /**
- * What the calculator reads off the field and its two sides, not off the two Pokémon (round 69, T86), by the Dex id of the
- * ability or condition that makes it true. A Ruin or Aura ability on any active Pokémon, and a field condition, set a field flag;
- * the volatiles of the attacker and the abilities of its ally set an attacker-side flag; the abilities of the defender's ally set a
- * defender-side flag. The calculator's own check leaves out the holder itself.
+ * Calculator flags by the Dex id of the ability or condition that sets them: a Ruin or Aura ability on any active Pokémon and a field condition set a field flag;
+ * the attacker's volatiles and its ally's abilities set an attacker-side flag; the defender's ally's abilities a defender-side flag. The calculator's own check leaves out the holder itself.
  */
 export const FIELD_FLAG_BY_ID: Record<string, string> = {
   beadsofruin: 'isBeadsOfRuin', swordofruin: 'isSwordOfRuin', tabletsofruin: 'isTabletsOfRuin', vesselofruin: 'isVesselOfRuin',
@@ -39,10 +34,7 @@ export const ATTACKER_SIDE_FLAG_BY_ID: Record<string, string> = {
 };
 export const DEFENDER_SIDE_FLAG_BY_ID: Record<string, string> = { friendguard: 'isFriendGuard', defenderflowergift: 'isFlowerGift' };
 
-/**
- * The fact an ally's ability books for one side of a hit, or null when the calculator reads nothing of it (round 73, T203). Flower
- * Gift weighs on both sides (the attacker's Attack, the defender's Special Defense), so the defender side books it under its own id.
- */
+/** The fact an ally's ability books for one side of a hit, or null when the calculator reads nothing of it; Flower Gift weighs on both sides, so the defender side books it as `defenderflowergift`. */
 export function allyFactOf(role: 'attacker' | 'defender', ability: string): string | null {
   if (role === 'attacker') return ability in ATTACKER_SIDE_FLAG_BY_ID ? ability : null;
   // eslint-disable-next-line names/no-new-dex-name -- the one ability both sides read; field-ability-census.spec.ts holds it to the Dex
@@ -50,6 +42,7 @@ export function allyFactOf(role: 'attacker' | 'defender', ability: string): stri
   return fact in DEFENDER_SIDE_FLAG_BY_ID ? fact : null;
 }
 
+/** The calculator's terrain label by the simulator's condition id. */
 export const TERRAIN_BY_ID: Record<string, NonNullable<CalcTerrain>> = {
   electricterrain: 'Electric',
   grassyterrain: 'Grassy',

@@ -5,14 +5,9 @@ import type { HiddenPowerEvidence } from './types.ts';
 import { toId } from './ids.ts';
 import { rulesDex, type GameRules, type RulesDex } from './rules-dex.ts';
 
-/**
- * Typeless "Hidden Power" resolution (round 2, agenda item ⑤): the replay
- * only ever shows the generic name, and the sim then runs the IV-default
- * type (31s = Dark) — the 648453 t13 mon really carried HP Ice. Evidence
- * from effectiveness markers filters the candidates, usage ranks the
- * survivors, explicit knowledge (hpType / custom IVs / typed names) wins.
- */
+/** Resolves a typeless Hidden Power (the replay shows only the generic name and the simulator then runs the IV-default type): effectiveness markers filter the candidate types and usage ranks the survivors. */
 
+/** The sixteen types a Hidden Power can have. */
 export const HP_TYPES = [
   'Bug', 'Dark', 'Dragon', 'Electric', 'Fighting', 'Fire', 'Flying', 'Ghost',
   'Grass', 'Ground', 'Ice', 'Poison', 'Psychic', 'Rock', 'Steel', 'Water',
@@ -29,6 +24,7 @@ function markerFor(dex: RulesDex, type: string, defenderSpecies: string): Marker
   return effectiveness > 0 ? 'super' : effectiveness < 0 ? 'resisted' : 'neutral';
 }
 
+/** The typed Hidden Power display name that fits the evidence, ranked by usage; null when usage lists no typed variant. */
 export function resolveHiddenPowerType(
   evidence: HiddenPowerEvidence[],
   usageStats: SmogonUsageStats | null | undefined,
@@ -40,8 +36,7 @@ export function resolveHiddenPowerType(
   const variants = (stats?.moves ?? [])
     .filter(move => toId(move.value).startsWith('hiddenpower') && toId(move.value) !== 'hiddenpower')
     .map(move => {
-      // Usage payloads carry raw ids ("hiddenpowerice") — display through
-      // the dex so the substituted slot reads like a real move name.
+      // Usage payloads carry raw ids ("hiddenpowerice"); the Dex name reads like a real move.
       const dexMove = dex.moves.get(toId(move.value));
       return {
         display: dexMove.exists ? dexMove.name : move.value,
@@ -57,17 +52,11 @@ export function resolveHiddenPowerType(
   const fits = (type: string) =>
     mine.every(entry => markerFor(dex, type, entry.defenderSpecies) === entry.marker);
   const surviving = variants.filter(variant => fits(variant.type));
-  // Empty intersection: ability-faked markers (Levitate family) can poison
-  // the filter — fall back to usage alone rather than to nothing.
+  // An empty intersection (ability-faked markers, the Levitate family) falls back to usage alone.
   return (surviving[0] ?? variants[0]).display;
 }
 
-/**
- * The typed Hidden Power variant a built set carries ('hiddenpowerice'), or
- * null. Damage fitters need it: the protocol only ever records the generic
- * 'hiddenpower', and calculating that id runs the IV-default type — fitting
- * spreads under ×1 for a hit the sim then plays at ×4 (653785 Dragonite).
- */
+/** The typed Hidden Power id a set carries ('hiddenpowerice'), or null: the protocol records only the generic id, and calculating that runs the IV-default type. */
 export function typedHiddenPowerId(moves: string[]): string | null {
   for (const move of moves) {
     const id = toId(move);
@@ -76,8 +65,7 @@ export function typedHiddenPowerId(moves: string[]): string | null {
   return null;
 }
 
-/** Builder post-pass: substitute ONLY the exactly-typeless slot; explicit
- * knowledge (hpType, deliberate IVs, typed names) is never overridden. */
+/** Substitutes only the exactly-typeless Hidden Power slot; hpType, deliberate IVs and typed names are never overridden. */
 export function withHiddenPowerType(
   set: PokemonSet,
   evidence: HiddenPowerEvidence[],
