@@ -1,6 +1,8 @@
-import { describe, expect, test } from 'vitest';
-import { Battle, PRNG } from '@pkmn/sim';
-import { readGameSeed } from '../src/index';
+import { describe, expect, test, beforeAll } from 'vitest';
+import { Battle, PRNG, Dex } from '@pkmn/sim';
+import { readGameSeed, checkGameTeams, loadSimMods, startGameLog } from '../src/index';
+import type { PokemonSet } from '@pkmn/sim';
+import { legalTeams } from './new-game-teams';
 
 /**
  * Round 89 (lane H, #105, stage H4b; user ruling 13.11.2026): the seed a new game starts on is set by hand in the dialog, so the
@@ -50,5 +52,29 @@ describe('readGameSeed', () => {
     expect(read).toHaveProperty('problem');
     expect((read as { problem: string }).problem).toMatch(/four whole numbers/);
     expect((read as { problem: string }).problem).toMatch(/sodium/);
+  });
+});
+
+describe('new-game-refused', () => {
+  const FORMATS = ['gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9championsou', 'gen9championsvgc2026regmc'];
+  const UNKNOWN = 'Zzqxvwk';
+
+  beforeAll(async () => {
+    await loadSimMods('gen9championsou');
+  }, 60_000);
+
+  describe('the refusal of an unknown species, per side', () => {
+    for (const id of FORMATS) {
+      test(`${id}: the check names what Start refuses, and a known side has none`, async () => {
+        const base = legalTeams(id);
+        if ('problems' in base) throw new Error(`${id} has no legal team`);
+        const bad: PokemonSet[] = [{ ...base.p2[0], species: UNKNOWN, name: UNKNOWN }, ...base.p2.slice(1)];
+        const checked = await checkGameTeams(id, { p1: base.p1, p2: bad });
+        expect(checked.refused).toEqual({ p1: null, p2: `${UNKNOWN} is no Pokémon of ${Dex.formats.get(id).name}. Fix the set to start.` });
+        const started = await startGameLog({ format: id, p1Team: base.p1, p2Team: bad }).then(() => 'started', (error: Error) => error.message);
+        expect(started).toBe(checked.refused.p2);
+        expect((await checkGameTeams(id, base)).refused).toEqual({ p1: null, p2: null });
+      }, 60_000);
+    }
   });
 });
