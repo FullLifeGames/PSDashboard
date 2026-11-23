@@ -2,13 +2,7 @@ import { type TurnSnapshot, toId } from '@fulllifegames/replay-core';
 import type { SimBattle } from './types.ts';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
 
-/**
- * Field and side conditions from the turn snapshot (moved out of
- * corrections.ts in round 60, T92). The snapshot comes from @pkmn/client:
- * side conditions carry `level` (a repeated setter) and the remaining
- * minimum and maximum turns; weather and terrain carry theirs in
- * weatherState and terrainState (absent before round 60).
- */
+/** Field and side conditions from the turn snapshot: @pkmn/client gives side conditions a `level` (a repeated setter) and the remaining minimum and maximum turns, weather and terrain theirs in weatherState and terrainState. */
 
 type EffectEntry = { id?: string; duration?: number; effectOrder?: number; layers?: number };
 
@@ -38,22 +32,14 @@ function snapshotConditionRange(value: unknown): { min: number; max: number } | 
   return { min, max: max || min };
 }
 
-/**
- * The remaining turns a synced condition keeps. The simulator's own count stands where the snapshot allows it: the simulator
- * knows the setter's item, and the client, which never sees it, counts a screen of a Light Clay holder from five turns, not
- * eight (round 83, T307, GitHub issue #3). Otherwise the snapshot's count, as before.
- */
+/** The remaining turns a synced condition keeps: the simulator's own count where the snapshot allows it (it knows the setter's item; the client never sees it and counts a Light Clay screen from five turns, not eight), else the snapshot's. */
 function syncedDuration(held: number | undefined, value: unknown): number | undefined {
   const range = snapshotConditionRange(value);
   if (held !== undefined && range && held >= range.min && held <= range.max) return held;
   return snapshotConditionDuration(value);
 }
 
-/**
- * Whether the sim stacks this condition: its dex condition restarts
- * (onSideRestart, in 0.10.11 exactly Spikes and Toxic Spikes, which count
- * layers there). The client counts the same setter as `level`.
- */
+/** Whether the sim stacks this condition: its dex condition has `onSideRestart` (exactly Spikes and Toxic Spikes in 0.10.11, which count layers); the client counts the same setter as `level`. */
 function stacks(battle: SimBattle, id: string): boolean {
   // Side handlers are not on the dex's Condition type; the data object carries them.
   const condition = battle.dex.conditions.get(id);
@@ -106,6 +92,7 @@ function syncTerrain(battle: SimBattle, snapshot: TurnSnapshot) {
   if (duration) battle.field.terrainState.duration = duration;
 }
 
+/** Syncs weather, terrain, pseudo-weather and both sides' conditions of the battle to the turn snapshot. */
 export function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   battle.turn = snapshot.turn;
   syncWeather(battle, snapshot);

@@ -5,9 +5,10 @@ import { dieLabel, type DieWords } from './dice/die-label.ts';
 import { isCommanding } from './forward/request-moves.ts';
 import type { ForcedDie } from './dice/types.ts';
 
+/** The facts of one active body that decide whether its slot is asked for a choice. */
 export interface BranchChoiceActive {
   fainted: boolean;
-  /** Round 85 (T320): a Tatsugiri inside its Dondozo; the simulator passes its slot, so it is asked nothing. */
+  /** A Tatsugiri inside its Dondozo; the simulator passes its slot, so it is asked nothing. */
   commanding?: boolean;
 }
 
@@ -16,19 +17,10 @@ export function branchChoiceActive(pokemon: { fainted: boolean; volatiles: Recor
   return pokemon ? { fainted: pokemon.fainted, commanding: isCommanding(pokemon) } : null;
 }
 
+/** The Tera, Mega, Z-Move and Ultra Burst intents of a move choice. */
 export type BranchMoveModifier = 'terastallize' | 'mega' | 'zmove' | 'ultra';
 
-/**
- * Identity-based slot choice (B1): moves are stored by move id and switches by
- * species + nickname, never by grid/bench position. Position indices are only
- * produced at the sim boundary, resolved against the live request
- * (`resolveSideChoices` in branch-engine.ts). `modifier` carries
- * Tera/Mega/Z-Move/Ultra Burst intents (G7).
- *
- * Round 82 (forced dice, ADR 0001): `dice` carries the dice the user forces in the turn this choice belongs to, each named by
- * the body that holds it (`name.slot`). The field is optional and JSON-clean, so every hand-off that copies the choice (draft,
- * prefill, history, support state) carries it, and a choice without it reads as before.
- */
+/** One slot's choice by identity (a move by id, a switch by species and nickname), never by position; `dice` are the dice forced in this choice's turn, each named by its body (`name.slot`), optional and JSON-clean. */
 export type BranchSlotChoice =
   | { kind: 'move'; moveId: string; moveName: string; targetLoc?: number; modifier?: BranchMoveModifier; dice?: ForcedDie[] }
   | { kind: 'switch'; speciesId: string; pokemonName: string; dice?: ForcedDie[] };
@@ -52,11 +44,7 @@ export function describeSlotChoice(choice: BranchSlotChoice | null | undefined):
   return `move ${choice.moveName}${target}${modifier}`;
 }
 
-/**
- * Notation form of a slot choice: the move NAME the user clicked, or
- * "→ Pokémon" for a switch — never the raw sim command ("move 1",
- * "switch 2") the history stores for replaying.
- */
+/** The notation of a slot choice: the move name clicked, or "→ Pokémon" for a switch, never the raw sim command the history stores. */
 export function notationSlotChoice(choice: BranchSlotChoice | null | undefined): string {
   if (!choice) return '';
   if (choice.kind === 'switch') return `→ ${choice.pokemonName}`;
@@ -65,11 +53,7 @@ export function notationSlotChoice(choice: BranchSlotChoice | null | undefined):
   return `${choice.moveName}${target}${modifier}`;
 }
 
-/**
- * Round 82 (forced dice), step A7c: the labels of forced dice, one text per die from `dieLabel`, so the history rows, the
- * share links and the frame lines say the same thing. `words` is the reader of names of the game's rule set (`wordsOf`
- * in the app); without it the ids stand in.
- */
+/** The labels of forced dice, one text per die; `words` reads the names of the game's rule set, without it the ids stand in. */
 export function notationDice(dice: readonly ForcedDie[] | undefined, words?: DieWords): string[] {
   return (dice ?? []).map(die => dieLabel(die, words));
 }
@@ -88,21 +72,20 @@ export function notationSideLabel(
   return parts.length > 0 ? parts.join(' + ') : rawCommand;
 }
 
+/** The identity key of a switch choice (species id and nickname id), null for a move or a pass. */
 export function switchChoiceKey(choice: BranchSlotChoice | null | undefined): string | null {
   if (!choice || choice.kind !== 'switch') return null;
   return `${choice.speciesId}|${toId(choice.pokemonName)}`;
 }
 
+/** The identity key of a switch option, in the form `switchChoiceKey` gives. */
 export function switchOptionKey(option: Pick<BranchSwitchOption, 'species' | 'name'>): string {
   return `${toId(option.species)}|${toId(option.name)}`;
 }
 
 /**
- * The forced slots a bench can fill (round 77, B1). The simulator asks every slot with a switch flag for
- * a replacement, even when fewer Pokémon wait in the back: it then takes one switch per Pokémon and a
- * pass for the rest (side.js `forcedPasses = canSwitchOut - min(canSwitchOut, canSwitchIn)`). The first
- * slots take the replacements, the later ones pass. `switchIns` is the count of living Pokémon in the
- * back; undefined, or zero (the simulator asks nothing then), leaves the request as it is.
+ * The forced slots a bench can fill: the simulator asks every flagged slot even when fewer Pokémon wait in the back, then takes one switch per Pokémon and a pass for the rest,
+ * the first slots first (side.js `forcedPasses = canSwitchOut - min(canSwitchOut, canSwitchIn)`). `switchIns` undefined or zero leaves the request as it is.
  */
 export function fillableForcedSlots(forced: boolean[], switchIns?: number): boolean[] {
   if (switchIns === undefined || switchIns <= 0) return forced;
@@ -110,6 +93,7 @@ export function fillableForcedSlots(forced: boolean[], switchIns?: number): bool
   return forced.map(slot => (slot && left > 0 ? (left--, true) : false));
 }
 
+/** Which slots the request asks for a choice: the fillable forced slots, else every living, non-commanding active. */
 export function requiredChoicesForActiveSlots(
   activeSlots: (BranchChoiceActive | null)[],
   forceSwitches: boolean[],
@@ -141,6 +125,7 @@ export function conflictingSwitchTargets(
   return [...conflicts].sort();
 }
 
+/** True when every required slot has a choice and no two slots switch to the same Pokémon. */
 export function branchSideChoicesReady(
   choices: (BranchSlotChoice | null)[],
   requiredChoices: boolean[],
@@ -226,26 +211,6 @@ function resolveCustomSwitch(
 
 const EVAL_MODIFIERS = ['terastallize', 'mega', 'ultra'] as const;
 
-/**
- * Maps an engine choice string (possibly a doubles combined choice like
- * "move bugbite 1 mega, switch 3") onto per-slot branch choices, validated
- * against each slot's live options. Null when any part fails to resolve —
- * a partial prefill would silently misrepresent the engine's line. A null
- * entry inside the array is a "pass" slot (nothing to choose there).
- *
- * Switch parts resolve by the label's species ("→ Muk-Alola") when the
- * label is provided — the engine's slot numbers index ITS battle's bench,
- * which is not guaranteed to share the branch reconstruction's order.
- *
- * `actionableSlots` aligns parts with slots: the engine emits one part per
- * slot WITH choices and skips slots the sim auto-passes, so a doubles
- * forced replacement arrives as a single part that belongs to the FORCED
- * slot, not slot 0 (the VGC play-out wedge: the pick landed on the wrong
- * slot, reserved the species there, and locked the only legal button).
- * With the mask, parts map onto the slots that expect a choice; a
- * full-width string (explicit `pass` per slot) still maps positionally,
- * and any other count mismatch refuses rather than guessing a slot.
- */
 /** Maps choice parts onto slots: by the actionable mask, positionally, or not at all. */
 function partSlotMapping(
   partCount: number, actionableSlots: boolean[] | undefined,
@@ -279,6 +244,7 @@ function resolvePartChoice(
   return { ok: true, choice: modifier ? { ...resolved.choice, modifier } : resolved.choice };
 }
 
+/** Maps an engine choice string (a doubles pair like "move bugbite 1 mega, switch 3") onto per-slot choices checked against each slot's live options; null when any part fails, a null entry is a pass slot. */
 export function evalChoiceToSlotChoices(
   evalChoice: string,
   movesBySlot: BranchMoveOption[][],
@@ -286,8 +252,10 @@ export function evalChoiceToSlotChoices(
   label?: string,
   actionableSlots?: boolean[],
 ): (BranchSlotChoice | null)[] | null {
-  // Pivot pairs ("move uturn > switch 4"): the branch UI prefills the MOVE;
-  // the sim raises the follow-up switch as its own prompt afterwards.
+  // Pivot pairs ("move uturn > switch 4"): the prefill is the move; the sim raises the follow-up switch as its own prompt.
+  // A switch resolves by the label's species when given: the engine's slot numbers index its own bench, whose order may differ from the reconstruction's.
+  // `actionableSlots` aligns parts with slots: the engine emits one part per slot with choices, so a doubles forced replacement is one part that belongs
+  // to the forced slot, not slot 0 (the pick landed on the wrong slot, reserved the species there and locked the only legal button).
   const parts = evalChoice.split(' > ')[0].split(',').map(part => part.trim());
   const labelParts = label ? splitCombinedLabel(label) : [];
   const mapping = partSlotMapping(parts.length, actionableSlots);
@@ -303,10 +271,7 @@ export function evalChoiceToSlotChoices(
   return choices;
 }
 
-/**
- * Validates a free-text choice against the current request before it is ever
- * stored, so invalid input can never reach the simulator (B8).
- */
+/** Validates a free-text choice against the current request before it is stored, so invalid input never reaches the simulator. */
 export function resolveCustomChoice(
   input: string,
   moves: BranchMoveOption[],

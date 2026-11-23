@@ -2,20 +2,13 @@ import { fillableForcedSlots } from '../branch-choices.ts';
 import { isReviving } from '../forward/request-reviving.ts';
 import type { SimBattle, SimSide } from './types.ts';
 
-/**
- * The Pokémon a side can still send in: the living ones behind the actives, as the simulator counts them
- * (`canSwitchIn` in side.js). Null while a Revival Blessing prompt is open (its request marks the body
- * `reviving`): the target of that switch is a fainted one.
- */
+/** The living Pokémon behind the actives, as the simulator counts them (`canSwitchIn` in side.js); null while a Revival Blessing prompt is open (the target is a fainted body). */
 export function switchInsOf(side: SimSide): number | null {
   if (isReviving(side)) return null;
   return side.pokemon.slice(side.active.length).filter(pokemon => pokemon && !pokemon.fainted).length;
 }
 
-/**
- * The slots whose replacement the user chooses: the request's forced slots, capped by the bench (round 77,
- * B1). A forced slot the bench cannot fill passes, so it reads like a fainted active without a request.
- */
+/** The slots whose replacement the user chooses: the request's forced slots, capped by the bench; a slot the bench cannot fill passes. */
 export function forceSwitches(battle: SimBattle, sideIdx: number): boolean[] {
   const side = battle.sides[sideIdx];
   const requests = side.activeRequest?.forceSwitch;

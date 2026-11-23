@@ -21,11 +21,7 @@ import { forceSwitches, hasForceSwitch } from './forced-slots.ts';
 
 export { forceSwitches, hasForceSwitch, buildForcedSwitchChoice };
 
-/**
- * Round 89 (#138): the repoints of one block pass through bodies the block's later lines put back (a slot whose first entrant fell on
- * arrival, the body that entered after it was the one the simulator already held). `returning` holds the bodies a later entry line of the
- * block puts back; `passed` the ones this pass has taken off and not yet put back.
- */
+/** The repoints of one block pass through bodies the block's later lines put back (a slot whose first entrant fell on arrival): `returning` holds the bodies a later entry line puts back, `passed` those this pass took off and has not put back. */
 interface Passing { returning: ReadonlySet<SimPokemon>; passed: Set<SimPokemon> }
 
 function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon, passing?: Passing): boolean {
@@ -42,10 +38,7 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
   }
   if (previous && !swapped) leaveTheField(previous, passing);
 
-  // Mirror BattleActions#switchIn's array swap: the sim keeps
-  // side.pokemon[i] === side.active[i], and its next real switch swaps via
-  // the position fields. Repointing active without reordering side.pokemon
-  // makes that swap duplicate one team member and erase another.
+  // Mirrors BattleActions#switchIn's array swap: the sim keeps side.pokemon[i] === side.active[i] and swaps via the position fields, so repointing active without reordering side.pokemon would duplicate one team member and erase another.
   const targetIndex = side.pokemon.indexOf(target);
   if (targetIndex >= 0 && targetIndex !== activeSlot) {
     const occupant = side.pokemon[activeSlot];
@@ -64,34 +57,29 @@ function repointActiveSlot(side: SimSide, activeSlot: number, target: SimPokemon
 }
 
 /**
- * Round 89 (#138): the simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body a repoint
- * takes off the field leaves the same way, or it carries them back in (Taunt on a Sableye of Champions VGC 2685328963). A body the block's
- * later lines put back was never off the field for the game: the simulator played both entries itself and holds what the log shows
- * (Ditto's Imposter Transform, Gen 6 Ubers 902024 turn 23).
+ * The simulator's switch ends the old active's volatiles (`oldActive.clearVolatile()`, battle-actions.js); a body a repoint takes off the field leaves the same way, or it carries them back in
+ * (Taunt on a Sableye in Champions VGC). A body the block's later lines put back was never off the field for the game: the simulator played both entries itself and holds what the log shows (Ditto's Imposter Transform).
  */
 function leaveTheField(previous: SimPokemon, passing?: Passing) {
   if (passing?.returning.has(previous)) passing.passed.add(previous);
   else previous.clearVolatile();
 }
 
-/**
- * The REAL game brought this Pokémon in fresh; the sim history being corrected may never have switched it out at all — a diverged GPL
- * reconstruction kept Vileplume on the field locked into its tricked scarf's Sludge Bomb, and the stale lock followed it into the corrected
- * position (T38: "Grass Knot not among the options"). Mirror the parts of a real entry that gate move choice.
- */
+/** The real game brought this Pokémon in fresh, but the sim being corrected may never have switched it out: a diverged reconstruction kept Vileplume locked into its tricked scarf's Sludge Bomb, and the stale lock followed it into the corrected position. Mirrors the parts of a real entry that gate move choice. */
 function enterFresh(target: SimPokemon) {
   delete target.volatiles['choicelock'];
   target.lastMove = null;
   for (const slot of target.moveSlots) slot.disabled = false;
 }
 
+/** Repoints the battle's actives to the entries of the block's `|switch|` and `|drag|` lines, restores items, starts and locks the protocol shows, and refreshes the requests. */
 export function correctActivesFromProtocol(
   battle: SimBattle,
   rawEvents: string[],
   locks?: { context: ChoiceLockContext; turn: number },
   residualAt?: number,
 ) {
-  // The door for lines (round 73, T230 on T206): a block cut from a CRLF log ends its lines in a carriage return; the readers below see LF only.
+  // A block cut from a CRLF log ends its lines in a carriage return; the readers below see LF only.
   const events = normalizeLines(rawEvents);
   const before = battle.sides.map(side => [...side.active]);
   let repointed = false;
@@ -111,25 +99,22 @@ export function correctActivesFromProtocol(
       restoreAfterProtocolEntry(battle, target, `${match[2]}${match[3]}: ${match[4]}`, events);
     }
   }
-  // A body the repoints put on the field plays its switch-in with the item it
-  // held, before the held items take the protocol's state (round 67, T133).
+  // A body the repoints put on the field plays its switch-in with the item it held, before the held items take the protocol's state.
   if (repointed) playProtocolEntries(battle, before, events);
-  // A start the block shows and the board lacks (round 73, T212); residualAt: where the block's residual round came.
+  // A start the block shows and the board lacks; residualAt: where the block's residual round came.
   const started = playProtocolStarts(battle, events, residualAt);
   // After the repoints, so a lock lands on the body the protocol has active.
   const handedOver = locks ? applyProtocolHeldItems(battle, locks.context, locks.turn, events) : false;
-  // The cached requests were built from the PRE-correction actives — refresh
-  // the disable flags and the request view from the corrected board.
+  // The cached requests were built from the pre-correction actives: refresh the disable flags and the request view from the corrected board.
   if (repointed || handedOver || started) {
     restoreSideInvariants(battle);
-    // Protocol-proven locks go back on BEFORE the request refresh, so the
-    // disable pass bakes them into the corrected request (spec ③ 1b).
+    // Protocol-proven locks go back on before the request refresh, so the disable pass bakes them into the corrected request.
     if (locks) restampProtocolLocks(battle, locks.context, locks.turn);
     refreshRequestsFromLiveState(battle);
   }
 }
 
-/** Spec 1b's stamp: protocol trail + eligibility + set sanity, never sim history. */
+/** Stamps the choice lock from the protocol trail, the eligibility and set sanity, never from sim history. */
 function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, turn: number) {
   for (const sideId of ['p1', 'p2'] as const) {
     const lock = protocolChoiceLock(context.trails, sideId, turn, battle.dex);
@@ -153,12 +138,8 @@ function restampProtocolLocks(battle: SimBattle, context: ChoiceLockContext, tur
 }
 
 /**
- * Status residuals read their state from `statusState` (Toxic damage is
- * `stage * maxhp/16`, sleep counts down `time`) — a bare `status` assignment
- * leaves that state empty, so corrected Toxic dealt NaN (= no) damage for the
- * rest of the branch. Mirror Pokemon#setStatus instead, and only when the
- * snapshot disagrees, so a matching reconstruction keeps its own toxic stage
- * and sleep counter. A sleeper takes the count the protocol allows (T187).
+ * Status residuals read their state from `statusState` (Toxic damage is `stage * maxhp/16`, sleep counts down `time`): a bare `status` assignment leaves it empty, so corrected Toxic dealt NaN damage.
+ * Mirrors Pokemon#setStatus, and only when the snapshot disagrees, so a matching reconstruction keeps its toxic stage and sleep counter. A sleeper takes the count the protocol allows.
  */
 function correctStatusFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]) {
   const status = (snapshotPokemon.status || '') as SimPokemon['status'];
@@ -210,18 +191,10 @@ function simBodyOf(side: SimSide, snapshotPokemon: SnapshotPokemon): SimPokemon 
 }
 
 /**
- * One body against its snapshot entry. The protocol reports only the
- * actives. A benched body's snapshot HP is its last sighting, taken as it
- * left the field: the bench reads that sighting, plus the third Regenerator
- * restores on the way out (round 40, 573756 Toxapex 70 % → 100 %). The sim's
- * own bench HP is no witness: a body that is hit and leaves within one turn
- * never meets a boundary correction (round 47, 913994 t5: Rillaboom left at
- * 22 % and read 100 %). Status and boosts of the bench stay with the sim (a
- * silent Natural Cure lives only there); only a faint-state disagreement is
- * resolved from the snapshot. A faint written or taken back moves the side's
- * fainted count, as the sim's own faint does (round 67, T133: Supreme
- * Overlord and Last Respects read it; 752324's Kingambit counted no fallen
- * ally after the correction fainted Amoonguss).
+ * One body against its snapshot entry. The protocol reports only the actives. A benched body's snapshot HP is its last sighting, taken as it left the field: the bench reads that sighting,
+ * plus the third Regenerator restores on the way out (Toxapex 70 % to 100 %). The sim's own bench HP is no witness: a body that is hit and leaves within one turn never meets a boundary correction
+ * (Rillaboom left at 22 % and read 100 %). Status and boosts of the bench stay with the sim (a silent Natural Cure lives only there); only a faint-state disagreement is resolved from the snapshot.
+ * A faint written or taken back moves the side's fainted count, as the sim's own faint does (Supreme Overlord and Last Respects read it).
  */
 function correctBodyFromSnapshot(battlePokemon: SimPokemon, snapshotPokemon: SnapshotPokemon, log: readonly string[]): boolean {
   if (!snapshotPokemon.isActive && battlePokemon.fainted === snapshotPokemon.fainted) {
@@ -247,7 +220,7 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot): Set<S
 
     for (const snapshotPokemon of snapshotSide.pokemon) {
       const battlePokemon = simBodyOf(battleSide, snapshotPokemon);
-      // Round 76 (T265): the hits taken are the log's count, as the side's fallen are, for the bench too.
+      // The hits taken are the log's count, as the side's fallen are, for the bench too.
       if (battlePokemon && snapshotPokemon.maxhp > 0) {
         battlePokemon.timesAttacked = snapshotPokemon.timesAttacked ?? 0;
         if (correctBodyFromSnapshot(battlePokemon, snapshotPokemon, snapshot.log ?? [])) tookOut.add(battlePokemon);
@@ -258,20 +231,17 @@ function correctHpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot): Set<S
   return tookOut;
 }
 
-/**
- * The protocol-line correction only fires when the real battle logged a
- * switch. When the SIM invents a switch the real game never saw — a guessed
- * spread lets a damage roll faint the active, and a bench mon replaces it —
- * no later block carries a line to undo it: the GPL replay's Uxie stayed
- * benched-dead while the protocol had it casting Future Sight two turns
- * later. The snapshot knows who really stood on the field; put them back.
- */
-/** Whether the body on the field is the snapshot's entry: the same species by the Dex (one body in another forme counts, round 88, #103) or the same name. */
+/** Whether the body on the field is the snapshot's entry: the same species by the Dex (one body in another forme counts) or the same name. */
 export function sameMon(pokemon: SimPokemon | null | undefined, want: PokemonSnapshot): boolean {
   if (!pokemon) return false;
   return sameBodyForme(pokemon.battle.dex, pokemon.species?.name, want.speciesForme) || sameBodyName(pokemon.name, want.name);
 }
 
+/**
+ * The protocol-line correction only fires when the real battle logged a switch. When the sim invents a switch the real game never saw (a guessed spread lets a damage roll faint the active
+ * and a bench mon replaces it), no later block carries a line to undo it: Uxie stayed benched-dead while the protocol had it casting Future Sight two turns later.
+ * The snapshot knows who really stood on the field; this puts them back.
+ */
 function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   let moved = false;
   for (let sideIdx = 0; sideIdx < 2; sideIdx++) {
@@ -292,21 +262,14 @@ function correctActivesFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
     }
     if (placeOnSlots(side, desired, sameMon)) moved = true;
   }
-  // The request was built from the pre-correction slots (913990 turn 4: Overheat
-  // was offered for Chi-Yu only on p2b, where the game had it and the board had not).
+  // The request was built from the pre-correction slots (Overheat was offered for Chi-Yu only on p2b, where the game had it and the board had not).
   if (moved) {
     restoreSideInvariants(battle);
     refreshRequestsFromLiveState(battle);
   }
 }
 
-/**
- * Round 69, T151: a doubles pair stands on the slots the game has it on. The
- * correction above only fills a slot with nobody from the snapshot, so a pair
- * the simulator holds swapped (a revival put one body back on the other's
- * slot) stayed swapped. The snapshot's slot says where each active belongs;
- * a snapshot written before round 69 carries none and moves nothing.
- */
+/** A doubles pair stands on the slots the game has it on: the snapshot's slot says where each active belongs (a snapshot without one moves nothing), so a pair the simulator holds swapped (a revival put one body back on the other's slot) is swapped back. */
 function placeOnSlots(
   side: SimSide,
   desired: PokemonSnapshot[],
@@ -325,13 +288,14 @@ function placeOnSlots(
   return moved;
 }
 
+/** Corrects the battle to the turn snapshot: HP, status, boosts, actives, faints, volatiles, field, Tera and PP. */
 export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   const offTheField = bodiesOffTheField(battle);
   const tookOut = correctHpFromSnapshot(battle, snapshot);
   endLocksTheGameEnded(battle, snapshot, simBodyOf);
   restoreTeraFromSnapshot(battle, snapshot);
   correctActivesFromSnapshot(battle, snapshot);
-  // Round 88 (T327, #63): a body the log never shows on a slot the log leaves empty leaves the field before the bench behind it retires.
+  // A body the log never shows on a slot the log leaves empty leaves the field before the bench behind it retires.
   const strangers = retireUnshownActives(battle, snapshot);
   retireBenchAfterFaints(battle, snapshot, new Set([...tookOut, ...strangers]));
   if (strangers.size > 0) {
@@ -343,12 +307,7 @@ export function correctBattleFromSnapshot(battle: SimBattle, snapshot: TurnSnaps
   if (restorePpFromSnapshot(battle, snapshot, simBodyOf) && strangers.size === 0) refreshRequestsFromLiveState(battle);
 }
 
-/**
- * After snapshot/active corrections the emitted request can go stale: it still
- * demands a forced switch although no active Pokémon carries a switchFlag
- * anymore (B7 — the gen3 "phantom forced switch" deadlock). The battle itself
- * is consistent, so regenerating the request from the live state repairs it.
- */
+/** After the corrections the emitted request can go stale: it still demands a forced switch although no active carries a switchFlag (the gen 3 phantom forced switch deadlock); regenerating the request repairs it. */
 export function hasStaleForcedSwitchRequest(battle: SimBattle): boolean {
   if (battle.ended) return false;
   return battle.sides.some(side =>
@@ -365,14 +324,7 @@ export function repairStaleForcedSwitchRequest(battle: SimBattle) {
   }
 }
 
-/**
- * Mirror of Battle#endTurn's move-disable recomputation: reset every active's
- * flags, run the DisableMove events, reapply cantusetwice. The sim ran this
- * BEFORE the correction layers mutated the board, so corrected actives can
- * carry flags in either stale direction — set for a state that no longer
- * holds, or cleared for one that does (a repointed mon beside a standing
- * Imprison would otherwise play through the block).
- */
+/** Mirrors Battle#endTurn's move-disable recomputation (reset every active's flags, run the DisableMove events, reapply cantusetwice): the sim ran it before the corrections changed the board, so flags can be stale either way (a repointed mon beside a standing Imprison would play through the block). */
 function runDisablePass(battle: SimBattle) {
   for (const side of battle.sides) {
     for (const pokemon of side.active) {
@@ -396,13 +348,8 @@ function runDisablePass(battle: SimBattle) {
 }
 
 /**
- * Requests are a VIEW of battle state, built by the sim BEFORE the correction
- * layers (active repoints, snapshot HP/status/volatile sync) mutate it. A
- * stale view offers the wrong mon's moves and misses recomputed disable
- * states (Imprison; gen9doublesou-2660802611 turn 2 offered Incineroar's
- * Imprison-disabled Knock Off and turn 4 offered benched Grimmsnarl's
- * screens). Recompute the disable flags, then rebuild the view — both are
- * identities on healthy battles and fixes on corrected ones.
+ * Requests are a view of battle state, built by the sim before the corrections change it: a stale view offers the wrong mon's moves and misses recomputed disable states
+ * (Incineroar's Imprison-disabled Knock Off, benched Grimmsnarl's screens). Recomputes the disable flags, then rebuilds the view; both are identities on healthy battles.
  */
 export function refreshRequestsFromLiveState(battle: SimBattle) {
   if (battle.ended) return;

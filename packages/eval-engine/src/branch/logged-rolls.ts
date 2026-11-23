@@ -9,18 +9,11 @@ import { buildForcedSwitchChoice, hasForceSwitch } from './corrections.ts';
 import type { ProtocolBench } from './team-order.ts';
 
 /**
- * Round 73 (T232): the logged dice of every action in a branch's first turn. The arrival plays its turn under the seed whose
- * rolls reproduce the log (arrival-dice.ts), but the actions draw from ONE stream in order: when the user changes the faster
- * action's move, the number of draws before the slower action changes, and the slower action rolls other numbers than the log
- * has. A recorder plays the logged choices once on a copy and writes down, per action (side, slot and move in flight), the
- * numbers the sim drew for it; the branch's own PRNG answers an action that is still in the log with those numbers.
- *
- * Every draw is a call of PRNG#random: randomChance (accuracy, crit, secondary effects, paralysis, thaw), sample, shuffle and
- * the damage roll all reach it, so one mechanism covers the damage roll and the secondary effect. A changed action (another
- * move, another slot) has no record and draws from the seed. Draws outside any action (speed ties, residual rolls) are never
- * replaced. The underlying stream advances on every call, answered or not, so a turn whose actions all stay as logged draws
- * exactly the numbers the plain seed gives (nothing moves for the search or the replay), and a replaced answer moves no later
- * draw of the stream.
+ * The logged dice of every action in a branch's first turn. The actions draw from ONE stream in order, so when the user changes the faster action's move the number of draws before
+ * the slower action changes and it rolls other numbers than the log has. A recorder plays the logged choices once on a copy and writes down, per action (side, slot, move in flight), the numbers
+ * the sim drew; the branch's PRNG answers an action still in the log with those. Every draw is a call of PRNG#random (randomChance, sample, shuffle, the damage roll), so one mechanism covers all of them.
+ * A changed action has no record and draws from the seed; draws outside any action (speed ties, residual rolls) are never replaced. The underlying stream advances on every call, answered or not,
+ * so a turn whose actions all stay as logged draws exactly the plain seed's numbers, and a replaced answer moves no later draw.
  */
 
 interface Draw { from: number | undefined; to: number | undefined; value: number }
@@ -39,7 +32,7 @@ export function actionKey(battle: Pick<Battle, 'activeMove' | 'activePokemon'> |
 class RollRecorder extends PRNG {
   readonly rolls = new Map<string, Draw[]>();
   private battle: Battle | null = null;
-  /** Round 86 (T306): while a forced part plays, its own observer writes the answers down and this stream stays silent. */
+  /** While a forced part plays, its own observer writes the answers down and this stream stays silent. */
   muted = false;
 
   attach(battle: Battle): void {
@@ -61,28 +54,21 @@ class RollRecorder extends PRNG {
   }
 }
 
-/**
- * Round 82 (forced dice): the logged turn a branch opens on, as the first turn of the branch has to read it: the block's lines
- * (the log's own results) and the commands the log's players sent. The dice module joins the log's results to the dice the user
- * forces (gate answer 19a) and finds the actions the user changed by comparing the commands.
- */
+/** The logged turn a branch opens on: the block's lines (the log's own results) and the commands the log's players sent; the dice module joins the results to the user's forced dice and finds the changed actions by comparing the commands. */
 export interface LoggedTurn {
   turn: number;
   lines: readonly string[];
   choices: { p1: string; p2: string };
 }
 
-/**
- * The branch's dice for its first turn: the plain seed stream, except that an action the log has plays its logged draws.
- * `turn` is the turn the position stands at; from the next turn on this is the plain PRNG again.
- */
+/** The branch's dice for its first turn: the plain seed stream, except that an action the log has plays its logged draws. `turn` is the turn the position stands at; from the next turn on this is the plain PRNG. */
 export class LoggedRollPRNG extends PRNG {
   private battle: Battle | null = null;
   private readonly logged: LoggedRolls;
   private readonly turn: number;
   private readonly cursors = new Map<string, number>();
 
-  /** The logged turn the position stands at (round 82); null for a stream built without it. */
+  /** The logged turn the position stands at; null for a stream built without it. */
   readonly loggedTurn: LoggedTurn | null;
 
   constructor(seed: PRNGSeed, logged: LoggedRolls, turn: number, loggedTurn?: Omit<LoggedTurn, 'turn'>) {
@@ -96,11 +82,7 @@ export class LoggedRollPRNG extends PRNG {
     this.battle = battle;
   }
 
-  /**
-   * Round 82 (forced dice): a second stream at this one's place, with the same logged dice and the cursors where they stand.
-   * The copy of a battle plays the natural turn on it while the original stays where it is. It is not attached: the caller
-   * attaches it to the battle it plays on.
-   */
+  /** A second stream at this one's place, with the same logged dice and the cursors where they stand, for a copy that plays the natural turn. It is not attached: the caller attaches it to the battle it plays on. */
   fork(): LoggedRollPRNG {
     const copy = new LoggedRollPRNG(this.getSeed(), this.logged, this.turn, this.loggedTurn ?? undefined);
     for (const [key, cursor] of this.cursors) copy.cursors.set(key, cursor);
@@ -124,10 +106,7 @@ export class LoggedRollPRNG extends PRNG {
   }
 }
 
-/**
- * The draws of the logged turn: the block's choices (and its forced replacements, answered from the log) played under the
- * aligned seed on a copy of the position. Null when the copy cannot play them; the caller keeps the plain seed then.
- */
+/** The draws of the logged turn: the block's choices (and its forced replacements, answered from the log) played under the aligned seed on a copy of the position; null when the copy cannot play them (the caller keeps the plain seed). */
 export function recordLoggedRolls(
   battle: Battle, seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },
 ): LoggedRolls | null {
@@ -153,11 +132,9 @@ export function recordLoggedRolls(
 }
 
 /**
- * Round 86 (the log's dice, T306): the draws of the logged turn as the reconstruction plays it now: the block's choices under the hidden
- * dice of `seed` with the log's dice forced (`dice`), part by part (the choices, then every forced replacement the log answers), so an action
- * the user leaves as logged rolls what the rebuilt position rolled, damage roll included. The draws the forced parts take are the answers
- * the module gave, not the stream's values: the same die forced again reads the same. Null when the copy cannot play the turn; the caller
- * falls back to the seed search then.
+ * The draws of the logged turn as the reconstruction plays it: the block's choices under the hidden dice of `seed` with the log's dice forced (`dice`), part by part (the choices, then every forced
+ * replacement the log answers), so an action the user leaves as logged rolls what the rebuilt position rolled, damage roll included. The forced parts' draws are the answers the dice module gave,
+ * not the stream's values: the same die forced again reads the same. Null when the copy cannot play the turn (the caller falls back to the seed search).
  */
 export function recordForcedRolls(
   battle: Battle, dice: readonly ForcedDie[], seed: PRNGSeed, p1Choice: string, p2Choice: string, forced: { p1: string[]; p2: string[] },

@@ -1,6 +1,2 @@
-/**
- * The dice seed every reconstruction and every new game starts on unless the caller names another. It lives in a module of its
- * own: the app's start page reads it (the saved game's record), and a module that imports the battle runtime would put that
- * runtime into the start load (round 89, CI run 43380926565; `test/regression/start-load-graph.spec.ts`).
- */
+/** The dice seed every reconstruction and new game starts on unless the caller names another. It lives alone because the app's start page reads it: a module that imports the battle runtime would pull that runtime into the start load. */
 export const DEFAULT_GAME_SEED = '1,2,3,4';
