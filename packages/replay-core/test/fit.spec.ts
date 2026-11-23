@@ -33,7 +33,7 @@ import {
  *   E  Rock Slide with one foe left on the field    no spreadHit: no cut, whatever the move's target says (the other foe set off
  *                                                   Explosion the turn before and has no replacement; VGC picks four, so its bench would come in: not run there)
  * Singles has no spread targets and no partner: the Field of a singles hit is the one of before (last test), and the singles solver
- * scenes are logged-entry-stage.spec.ts and the rest of the suite.
+ * scenes are team-info.boots-guess.spec.ts and the rest of the suite.
  */
 describe('doubles-damage-fit', () => {
   interface Cfg { name: string; id: string; level: number; points: boolean }

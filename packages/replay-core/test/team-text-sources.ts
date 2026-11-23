@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type { PokemonSet } from '@pkmn/sim';
 import { ExhaustiveRunner } from '@pkmn/sim/tools';
 
-/** Team texts for team-text.spec.ts and sheet-text.spec.ts (round 72, T241): the fixtures' own, and the simulator's generated teams. */
+/** Team texts for team-info.boots-guess.spec.ts and sheet-text.spec.ts (round 72, T241): the fixtures' own, and the simulator's generated teams. */
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURE_DIRS = [
