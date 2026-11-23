@@ -1,12 +1,25 @@
 import { describe, expect, test } from 'vitest';
 import {
-  dumpSamples, familyOf, familyReports, liftHolds, parseKTable, parseModelForms, parseWeightSet, phaseKReports, rootScaleReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  dumpSamples,
+  familyOf,
+  familyReports,
+  liftHolds,
+  parseKTable,
+  parseModelForms,
+  parseWeightSet,
+  phaseKReports,
+  rootScaleReports,
+  rulesetOfId,
+  withModelForms,
+  withoutHoldout,
+  withoutUnratedLadder,
   type FamilySample,
 } from './fit-families';
 import { mulberry32 } from './fit-helpers';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 /**
  * Round 65: the refit per family (rule set × game type), on samples read from
@@ -439,5 +452,27 @@ describe('root scale of search values', () => {
     // Singles rows do not care for the doubles table of the stamp.
     const singles = searched('gen9ou', 'singles', 1, 0, 200, 59);
     expect(() => rootScaleReports(singles, kOf, other, 10)).not.toThrow();
+  });
+});
+
+describe('scripts/k-stamp.mjs writes the K table the leaf resolves', () => {
+  const run = () => spawnSync(process.execPath, ['scripts/k-stamp.mjs'], { cwd: process.cwd(), encoding: 'utf8' });
+
+  test('parseKTable reads the stamp for every rule set and game type', () => {
+    const result = run();
+    expect(result.status, result.stderr).toBe(0);
+    const stamp = parseKTable(result.stdout);
+    for (const ruleset of ['standard', 'vgc', 'champions'] as const) {
+      for (const gameType of ['singles', 'doubles'] as const) expect(stamp(ruleset)[gameType], `${ruleset} ${gameType}`).toEqual(JSON.parse(result.stdout)[ruleset][gameType]);
+    }
+  });
+
+  test('the stamp holds today\'s five family values', () => {
+    const stamp = JSON.parse(run().stdout);
+    expect(stamp).toEqual({
+      standard: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
+      vgc: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
+      champions: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 1.86, k1: 4.17 } },
+    });
   });
 });

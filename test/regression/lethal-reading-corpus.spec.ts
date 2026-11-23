@@ -23,7 +23,7 @@ import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
  *    of the player's own side prints exact HP). The old pair's best roll is 216 and the old reading's 2 % slack hid that; no rung reaches 219 with
  *    the Fake Out line of turn 2 beside it, but the refutation now pulls the defender one rung down (Defense 252 to 244). Round 89's gate rows
  *    (`lanes/D/d7-gate-rows.md`) carry the rebuild fingerprint this moves.
- * Doubles and VGC are the rows above; singles also have the unit rows of `packages/replay-core/test/lethal-reading.spec.ts`; the corpus rows are the doubles and VGC scenes.
+ * Doubles and VGC are the rows above; singles also have the unit rows of `packages/replay-core/test/fit.lethal-reading.spec.ts`; the corpus rows are the doubles and VGC scenes.
  */
 interface Row { /** A feedback fixture (tracked, built with its pinned Smogon data) instead of a replay of the local corpus. */ fixture?: true; id: string; family: string; move: string; defender: string; shown: { hp: number; maxhp: number }; attacker: string; check: (attacker: Record<string, number>, defender: Record<string, number>) => void }
 
@@ -85,7 +85,7 @@ describe('a knockout the game refutes opens the attacker\'s offense; one it allo
  * Ogerpon from a shown 100/100 in turn 15 (a Moonblast that must do the whole 301 HP of a body without HP EVs) and hits Moltres from 100 to 74 in turn 8, a hit
  * whose window of 100 to 103 HP sits low. On the project's calc, with the bodies of the build, a Special Attack of 28 EVs and more reaches the knockout, and the hit
  * on Moltres stays inside its slack up to 60 EVs (64 overshoots it by 1.6e-6, 100 by 8e-5, 180 by 9e-4). The top-up measured its tolerance from the winning rung's
- * refuted knockout and ran the stat to 180 (round 89, D7); the rule it now holds (`lethal-reading.spec.ts`, "never ends on an offense the lines fit worse than the
+ * refuted knockout and ran the stat to 180 (round 89, D7); the rule it now holds (`fit.lethal-reading.spec.ts`, "never ends on an offense the lines fit worse than the
  * cheapest spread that reaches every knockout") puts it on the reach: the built spread reaches the knockout and sits where the clean line still fits.
  */
 describe('the offense of a mon with a knockout and a clean line sits where both fit (D9)', () => {

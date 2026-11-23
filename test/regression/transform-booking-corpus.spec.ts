@@ -11,7 +11,7 @@ import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
  * lacked the move, the rebuilt copy could not play it, and the simulator refused the click. Each row reads a corpus game (local: the
  * rows skip without `.fit-corpus`): the built target holds the move, the copy's request at the start of the turn offers it (the copy
  * plays its logged move, the click needs no stand-in), and the turn adds no refusal. The unit rows are in
- * `packages/replay-core/test/transform-booking.spec.ts`, the sweep over every Dex entry that transforms a body in
+ * `packages/replay-core/test/opponent-inferrer.spec.ts`, the sweep over every Dex entry that transforms a body in
  * `packages/replay-core/test/transform-booking-sweep.spec.ts`.
  *
  * Singles, Doubles OU, VGC SV and Champions each have a row (the log scan of 7,032 games: 357 move lines of copies in singles, 22 in

@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import {
-  INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, inferOpponentTeam, withStandIns,
+  INFERRED_SPREAD_DETAIL,
+  MEASURED_HP_SPREAD_DETAIL,
+  ORDER_SPREAD_DETAIL,
+  inferOpponentTeam,
+  withStandIns,
+  KNOCKOUT_BOOST_ITEM_DETAIL,
+  NO_BOOST_ITEM_DETAIL,
 } from '@fulllifegames/replay-core';
 import { RANDOM_SET_MARK, RANDOM_SET_TITLE } from '../../../src/lib/stand-in-mark';
 import { BattleStatsPanel } from '../../../src/components/BattleStatsPanel';
@@ -198,5 +204,42 @@ describe('BattleStatsPanel', () => {
       expect(tag).toHaveTextContent('guessed 40%');
       expect(screen.getByRole('img', { name: 'Heatran' }).parentElement!).not.toHaveTextContent(/Jolly|Timid|Bold|nature/i);
     });
+  });
+});
+
+describe.each(['singles', 'doubles'] as const)('the reason of a boost item a knockout needs (%s)', kind => {
+  const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+
+  test('the item tag carries the reason as its hover text and stays a guess', () => {
+    const mon = revealedPokemon('Gengar', { item: { value: 'Choice Specs', source: 'guessed', sourceDetail: KNOCKOUT_BOOST_ITEM_DETAIL } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    const tag = screen.getByTitle(KNOCKOUT_BOOST_ITEM_DETAIL);
+    expect(tag).toHaveTextContent('Choice Specs');
+    expect(tag).toHaveTextContent('guessed');
+  });
+
+  test('the reason reads in plain words and differs from the dropped boost item\'s', () => {
+    expect(KNOCKOUT_BOOST_ITEM_DETAIL).toBe('only a boost item reaches the knockout');
+    expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toBe(NO_BOOST_ITEM_DETAIL);
+    expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toMatch(/[—–]/);
+  });
+});
+
+describe.each(['singles', 'doubles'] as const)('IVs in the stats panel (%s)', kind => {
+  const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+
+  test('a Trick Room body shows the IVs below 31 beside its EVs', () => {
+    const ivs = { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 };
+    const mon = revealedPokemon('Sinistcha', { ivs: { value: ivs, source: 'guessed', sourceDetail: 'Smogon sets gen9ou' } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    const card = screen.getByRole('img', { name: 'Sinistcha' }).parentElement!;
+    expect(card).toHaveTextContent('0 Atk / 0 Spe IVs');
+  });
+
+  test('a body with every IV at 31 shows no IV line', () => {
+    const all31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+    const mon = revealedPokemon('Garchomp', { ivs: { value: all31, source: 'guessed' } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    expect(screen.getByRole('img', { name: 'Garchomp' }).parentElement!).not.toHaveTextContent('IVs');
   });
 });

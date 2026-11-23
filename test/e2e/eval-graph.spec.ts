@@ -200,7 +200,7 @@ test.describe('PS Dashboard', () => {
   });
   // Round 69 (T184, gate answer 8a of round 67): the configured engine decides what a sweep replaces. A matrix
   // result of depth 2 no longer outranks the tree, so Re-analyze under an MCTS target (or Auto on a tree turn)
-  // replaces it. The truth table lives in test/regression/supersedes-stored-t184.spec.ts; these two drive the buttons.
+  // replaces it. The truth table lives in test/regression/prefs.spec.ts; these two drive the buttons.
   const STAGE_BADGE = 'What produced the numbers shown for this turn.';
 
   /** Sweeps the loaded game at matrix depth 2, switches Depth (Setup menu) to `mode` and re-analyzes; turn 1 must read the new engine. */
