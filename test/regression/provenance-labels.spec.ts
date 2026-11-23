@@ -1,11 +1,21 @@
 import { test, expect, describe } from 'vitest';
 import {
-  buildTeamsFromReplay, solveReplaySpreads, inferOpponentTeam, parseReplayLogWithObservations, applyInferredSpreads,
-  INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL,
+  buildTeamsFromReplay,
+  solveReplaySpreads,
+  inferOpponentTeam,
+  parseReplayLogWithObservations,
+  applyInferredSpreads,
+  INFERRED_ITEM_DETAIL,
+  RULED_OUT_ITEM_DETAIL,
+  INFERRED_SPREAD_DETAIL,
+  MEASURED_HP_SPREAD_DETAIL,
+  ORDER_SPREAD_DETAIL,
+  logRules,
 } from '@fulllifegames/replay-core';
 import type { SmogonUsageStats, OpponentTeamInfo, RevealedPokemonInfo } from '@fulllifegames/replay-core';
 import { sourceLabel } from '../../src/lib/provenance-labels';
 import { buildSensitivityTargets } from '../../src/lib/team-knowledge';
+import { spriteUrl } from '../../src/lib/sprite-url';
 
 /**
  * Round 37: the Choice Scarf the solver infers from a move order (or drops
@@ -128,5 +138,33 @@ describe('Choice Scarf inference reaches the build and the panel', () => {
       mon('Garchomp', 'Leftovers', RULED_OUT_ITEM_DETAIL),
     ] };
     expect(buildSensitivityTargets(info, usage)).toEqual([{ species: 'Garchomp', items: ['Rocky Helmet'] }]);
+  });
+});
+
+describe('stats panel display helpers', () => {
+  test('sprite URLs drop base-name hyphens but keep forme hyphens (Ting-Lu)', () => {
+    expect(spriteUrl('Ting-Lu', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/tinglu.png');
+    expect(spriteUrl('Chien-Pao', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/chienpao.png');
+    expect(spriteUrl('Kommo-o', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/kommoo.png');
+    expect(spriteUrl('Rotom-Wash', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/rotom-wash.png');
+    expect(spriteUrl('Ninetales-Alola', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/ninetales-alola.png');
+    expect(spriteUrl('Greninja-*', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/greninja.png');
+    expect(spriteUrl('Mr. Mime', logRules(''))).toBe('https://play.pokemonshowdown.com/sprites/gen5/mrmime.png');
+  });
+});
+
+describe('provenance labels', () => {
+  test('a damage-fitted spread reads fitted, a usage guess reads guessed with its share', () => {
+    expect(sourceLabel('guessed', undefined, INFERRED_SPREAD_DETAIL)).toBe('fitted');
+    expect(sourceLabel('guessed', 0.318)).toBe('guessed 31.8%');
+    expect(sourceLabel('guessed')).toBe('guessed');
+    expect(sourceLabel('revealed', undefined, INFERRED_SPREAD_DETAIL)).toBe('revealed');
+  });
+  // Round 69 (T69): the label names who checked the spread; fitted stays for damage lines only.
+  test('a spread the move order or the HP of the log checked says so, and fitted stays with damage', () => {
+    expect(sourceLabel('guessed', undefined, ORDER_SPREAD_DETAIL)).toBe('from move order');
+    expect(sourceLabel('guessed', undefined, MEASURED_HP_SPREAD_DETAIL)).toBe('HP from log');
+    expect(sourceLabel('guessed', undefined, INFERRED_SPREAD_DETAIL)).toBe('fitted');
+    expect(sourceLabel('manual', undefined, ORDER_SPREAD_DETAIL)).toBe('manual');
   });
 });
