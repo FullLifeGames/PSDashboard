@@ -1,6 +1,6 @@
 import { Move as CalcMove, Pokemon as CalcPokemon, Field, calculate } from '@smogon/calc';
 import { toID, type Battle, type Pokemon } from '@pkmn/sim';
-import { buildCalcPokemon, calcGenerationFor, calcSpecies as sharedCalcSpecies, dexOfCalc, rulesDex, speciesOverrides as sharedSpeciesOverrides, type CalcGeneration, type RulesDex } from '@fulllifegames/replay-core';
+import { buildCalcPokemon, calcGenerationFor, calcSpecies as sharedCalcSpecies, dexOfCalc, rulesDex, type CalcGeneration, type RulesDex } from '@fulllifegames/replay-core';
 import type { SimPokemonInfo } from '../branch/types.ts';
 import { itemAtUse } from './typeless.ts';
 
@@ -322,11 +322,6 @@ function entersWithStage(gen: CalcGen, body: CalcBody, ability: string | undefin
   if (body.onField || body.entryStage === false) return false;
   const effective = ability ?? gen.species.get(toID(species))?.abilities?.[0];
   return !!effective && calcOwnEntryStage((gen.num as number), effective);
-}
-
-/** The species as overrides, read from the simulator's Dex (replay-core calc-build.ts, decision 3). */
-export function speciesOverrides(gen: CalcGen, name: string): ReturnType<typeof sharedSpeciesOverrides> {
-  return sharedSpeciesOverrides(gen, name, dexOfCalc(gen));
 }
 
 /** The one place the engine builds a calc Pokémon (the species through replay-core's shared builder). */
