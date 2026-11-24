@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
-/**
- * Which slot's tray is open, and when it closes. At most one tray is open. The state belongs to the viewed position (a new
- * `positionKey` closes it in the same render, the way `useArmedAt` drops the armed gimmicks). A click beside the dock closes it; the
- * replay is an iframe, whose clicks never reach this document, so the window losing focus to an iframe closes it too. Escape closes
- * it and returns the focus to the chip, except while the What-if box has its list open. `onLeave` reports the slot a tray leaves
- * (closed, or replaced by another chip's), from the event that does it, so the engine's deferred pick for that slot lands then. A
- * new `positionKey` reports nothing: the pick belonged to the old position.
- */
+// `onLeave` reports the slot a tray leaves, from the event that does it, so the engine's deferred pick lands then;
+// a new `positionKey` closes the tray in the same render and reports nothing: the pick belonged to the old position.
 
 type Side = 'p1' | 'p2';
 
@@ -25,7 +19,6 @@ export function useTrayState(positionKey: string | undefined, onLeave?: (left: T
   if (moved) setState({ key: positionKey, open: null });
   const open = moved ? null : state.open;
   const root = useRef<HTMLElement | null>(null);
-  // A callback ref: the hook hands out no ref object, so a component can read the hook's other values while it renders.
   const attachRoot = useCallback((element: HTMLElement | null) => { root.current = element; }, []);
 
   const close = useCallback((returnFocus = false) => {

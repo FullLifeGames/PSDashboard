@@ -41,11 +41,7 @@ export interface AppTeams {
   inferredSpreads: Map<string, SpreadCandidate>;
 }
 
-/**
- * The app's team build as one function: enriched infos with the hidden-power resolver and the damage judge, the two-stage spread
- * solve, then the build with the solved spreads and the HP evidence. It models the settled state the sweep waits for (the lazy
- * resolver has landed and the Smogon data is in) of a replay nobody edited: no pasted team, no edited or stored sets.
- */
+/** The app's team build as one function: enriched infos, the two-stage spread solve, then the build. */
 export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
   usageStats: SmogonUsageStats | null;
   setAssumptions: SmogonSetAssumptions | null;
@@ -53,8 +49,6 @@ export function buildAppTeams(log: string, seed: AppTeamSeed, knowledge: {
   const { usageStats, setAssumptions } = knowledge;
   const hpResolver = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
     seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(log));
-  // The sides of a game without team preview that showed fewer bodies than their `|teamsize|`, filled as the panel's are; a
-  // generated-team format fills them from its random-set file, which the set fetch carries.
   const infos = enrichTeamInfos(withStandIns(seed.rawInfos, log, usageStats, undefined, setAssumptions?.randomSets), usageStats, setAssumptions, { p1: hpResolver('p1'), p2: hpResolver('p2') }, judgeItemsByDamage);
   const shared = { p1Info: infos.p1, p2Info: infos.p2, usageStats, setAssumptions };
   const inferredSpreads = solveReplaySpreads(log, seed.observations,

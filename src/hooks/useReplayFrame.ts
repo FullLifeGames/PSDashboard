@@ -7,7 +7,7 @@ type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
 export type FrameSide = 'p1' | 'p2';
 
-/** `id` names one request across its retries: the bridge runs a play seek with an id once. */
+// `id` names one request across its retries: the bridge runs a play seek with an id once.
 const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean, id?: number) =>
   iframeRef.current?.contentWindow?.postMessage(id === undefined ? { type: 'ps-seek-turn', turn, autoPlay } : { type: 'ps-seek-turn', turn, autoPlay, id }, '*');
 
@@ -26,8 +26,7 @@ export function useReplayBlobUrl(args: {
   viewpoint?: 'p1' | 'p2';
 }): string | null {
   const { documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint } = args;
-  // A frame opened right after the app starts waits for the teambuilder table's part (at most until TABLE_PART_WAIT_MS); the flag
-  // turns false once and stays false, so no frame that stands is rebuilt by it.
+  // Turns false once and stays false, so a standing frame is never rebuilt when the table part arrives.
   const tableWait = useSyncExternalStore(subscribeTablePart, tablePartPending, () => false);
   const blobUrl = useMemo(() => {
     if (!documentLog.trim() || tableWait) {
@@ -85,7 +84,7 @@ export function useTurnReports(onTurnChange: ((turn: number) => void) | undefine
   return lastReportedTurnRef;
 }
 
-/** Forwards the side the frame's own document shows near; a report of a document that is going away never reaches the app. */
+/** Forwards the side the frame's document shows near; a report of a document going away never reaches the app. */
 export function useSideReports(iframeRef: FrameRef, onSideChange: ((side: FrameSide) => void) | undefined) {
   useEffect(() => {
     if (!onSideChange) return;
@@ -112,8 +111,7 @@ export function useSeekTurn(args: {
   useEffect(() => {
     if (seekTurn == null) return;
     if (liveUpdates && didInitialLiveSeekRef.current) return;
-    // The seekTurn change may be only the echo of a turn the iframe itself reported (Play/Next inside the embed); re-seeking would
-    // pause playback after every turn.
+    // seekTurn may only echo a turn the iframe reported (Play/Next inside the embed); re-seeking would pause playback.
     if (!liveUpdates && lastReportedTurnRef.current === seekTurn) return;
     const sendSeek = () => postSeek(iframeRef, seekTurn, !!autoPlay);
     didInitialLiveSeekRef.current = true;
@@ -142,10 +140,7 @@ export interface SeekRequest {
   play?: boolean;
 }
 
-/**
- * Explicit navigation/watch seeks (seekRequest): requests issued before this frame instance mounted are stale (the initial
- * seekTurn positioned it), so only seq bumps after mount are sent. Short retry window: a bump can land while the embed boots.
- */
+/** Seeks on navigation or watch requests; only seq bumps after mount count, the initial seekTurn already placed it. */
 export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | null) {
   const seenSeekSeqRef = useRef<number | null>(seekRequest?.seq ?? null);
   useEffect(() => {
@@ -175,7 +170,7 @@ interface LiveAppendArgs {
   liveUpdates: boolean;
   reloadKey: string;
   blobUrl: string | null;
-  /** The log the document opened with, when it opened on less than `log`: the lines after it reach the frame as appends. */
+  /** The log the document opened with, when that is less than `log`: the lines after it arrive as appends. */
   documentLog?: string;
   log: string;
   seekTurn: number | undefined;
@@ -185,11 +180,7 @@ interface LiveAppendArgs {
 
 type SentLog = { key: string; blobUrl: string; lines: string[] };
 
-/**
- * Streams appended log lines into a live frame instead of rebuilding it. The frame's bridge listens only once its document has
- * loaded, and the embed script comes from the network: lines posted before that were lost, and the frame never showed the new turn
- * after one turn back and a new choice. New lines wait for the frame's ready message and then go out as one append.
- */
+/** Streams appended log lines into a live frame, after its ready message: the bridge listens only once loaded. */
 export function useLiveAppend(args: LiveAppendArgs) {
   const { iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
   const sentLogRef = useRef<SentLog | null>(null);

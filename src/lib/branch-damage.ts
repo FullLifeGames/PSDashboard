@@ -26,20 +26,11 @@ export interface DamagePreviewInputs {
   p2MovesBySlot: BranchMoveOption[][];
   fieldState: BranchSimState['field'] | null;
   gen: number;
-  /**
-   * The Tera type each slot's armed toggle would take, null when off. The preview reads it as the calc reads a Pokémon after the
-   * click: attacking and defending in its Tera type. Mega, Ultra Burst and Z stay out.
-   */
+  /** The Tera type each slot's armed toggle would take, null when off; Mega, Ultra Burst and Z stay out. */
   teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] };
-  /**
-   * Both sides' picks so far (live tip or draft). The preview reads what the defender's partner chose: a Protect there turns the
-   * second Dragon Dart back onto the defender.
-   */
+  /** Both sides' picks so far; a Protect by the defender's partner turns Dragon Darts back onto the defender. */
   choices?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
-  /**
-   * The live battle of the branch when the viewed position is its tip: a hit the calc cannot price (a lone foe behind a screen under
-   * a forced spread) is played on a copy of it. Left out, that hit shows no range.
-   */
+  /** The live battle at the tip: a hit the calc cannot price is played on a copy; left out, that hit shows no range. */
   battle?: LiveHit['battle'] | null;
 }
 
@@ -53,12 +44,7 @@ const NO_TERA = { p1: [], p2: [] };
 const isLiving = (info: SimPokemonInfo | null | undefined): info is SimPokemonInfo =>
   !!info && !info.fainted && info.hp > 0;
 
-/**
- * Doubles: who else stands next to the defender and the attacker, so the
- * calc lands the move as the simulator does (one target, no spread factor;
- * Dragon Darts split over two foes, unless the partner's pick shields it).
- * The partner is never the attacker.
- */
+// Doubles: Dragon Darts split over two foes unless the partner's pick shields it; the partner is never the attacker.
 function fieldFacts(slots: SlotsBySide, choices: ChoicesBySide, attacker: SimPokemonInfo, defenderSide: 'p1' | 'p2', defenderSlot: number) {
   const attackerSide = slots.p1.includes(attacker) ? 'p1' : 'p2';
   const partnerSlot = slots[defenderSide].findIndex((info, slot) => slot !== defenderSlot && info !== attacker && isLiving(info));
@@ -70,10 +56,6 @@ function fieldFacts(slots: SlotsBySide, choices: ChoicesBySide, attacker: SimPok
   };
 }
 
-/**
- * What the slot's chosen move adds to the calc's context: a crit forced on this target prices it as a crit, a forced hit count prices a
- * multi-hit move for that count. Other moves keep the plain preview.
- */
 function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | null, move: BranchMoveOption, target: string): Partial<NonNullable<DamageContext>> {
   if (!chosen || chosen.moveId !== toId(move.name)) return {};
   const dice = chosen.dice ?? [];
@@ -82,11 +64,7 @@ function forcedContext(chosen: Extract<BranchSlotChoice, { kind: 'move' }> | nul
   return { rolls: true, ...(crit ? { isCrit: true } : {}), ...(count ? { hits: count.hits } : {}) };
 }
 
-/**
- * A move whose Dex target is `allAdjacent` (Earthquake, Surf) hits every body next to its user, the user's partner among them, and
- * the preview lists the partner's row after the foes'. `test/regression/damage-preview-partner.spec.ts` holds this reading to the
- * simulator's targets for every damaging move of the Dex.
- */
+/** A Dex target `allAdjacent` hits the user's partner too; damage-preview-partner.spec.ts holds it to the simulator. */
 export const hitsPartner = (move: Pick<BranchMoveOption, 'targetType'>): boolean => move.targetType === 'allAdjacent';
 
 interface SlotDamageArgs {

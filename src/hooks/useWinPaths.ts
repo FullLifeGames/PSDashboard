@@ -8,7 +8,6 @@ import type { WinPathsFrom, WinPathsHost, WinPathsRun } from '../lib/win-paths-h
 
 interface Held { replayId: string; call: number; run: WinPathsRun }
 
-/** The side that lost and the turns of its endgame (null when the game has no loser or never reached an endgame). */
 function useEndgame(app: AppController, replayData: ReplayData): WinPathsHost['endgame'] {
   const { snapshots } = app.ctx.replay;
   const { analyzableTurns } = app.board.timeline;
@@ -19,13 +18,7 @@ function useEndgame(app: AppController, replayData: ReplayData): WinPathsHost['e
   }, [loser, snapshots, analyzableTurns]);
 }
 
-/**
- * The win-path job of the Game review and the turn card. One search is open at a time. The position of the turn is the healed
- * main-line position the evaluation acquires (`makeReplayAcquire`: stored or rebuilt in a worker); the job runs on a worker of its
- * own (`EvalWorkerClient.winPaths`), so a sweep in progress never waits for it and the sweep's cancel never ends it. The client
- * keeps the newest answers (its memo), so opening a turn again shows its steps at once. Closing the panel, asking for another turn,
- * another replay or leaving the page stops the worker. This hook is the only caller of the job: the sweep never starts one.
- */
+/** The win-path job of the Game review and the turn card: one search at a time, on its own worker. */
 export function useWinPaths(app: AppController, replayData: ReplayData): WinPathsHost {
   const endgame = useEndgame(app, replayData);
   const { graph } = app.ctx.evaluation;
@@ -40,7 +33,6 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
   const [held, setHeld] = useState<Held | null>(null);
   const replayId = replayData.id;
 
-  // the worker and the client end with the page or the replay
   useEffect(() => () => {
     abortRef.current?.abort();
     abortRef.current = null;

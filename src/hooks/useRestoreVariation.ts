@@ -13,11 +13,7 @@ export interface SavedVariation {
   pinnedTeams: PinnedTeams | null;
 }
 
-/**
- * A saved variation rebuilds from its start turn with its history and pending choices, through the rebuild every deviation takes
- * (a turn-0 variation re-seeds its leads from its lead entry). The pinned teams ride along explicitly: a pin set just before has
- * not reached this render's team sources yet.
- */
+/** A saved variation rebuilds from its start turn like any deviation; the pinned teams ride along explicitly. */
 export function useRestoreVariation(inputs: Omit<RebuildContext, 'bringOnly' | 'landPointer' | 'replayData'> & {
   replayData: RebuildContext['replayData'] | null;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;

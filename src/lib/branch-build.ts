@@ -10,8 +10,7 @@ export interface BranchInputs {
   choiceLocks: Awaited<ReturnType<typeof import('./lazy/choice-lock')['buildChoiceLockContext']>>;
 }
 
-/** Team build plus choice locks for a branch start: the shared prelude of the deviation rebuild and the team-edit refresh. Null when
- *  the teams could not be built (the caller skips silently). */
+/** Team build plus choice locks for a branch start; null when the teams could not be built (the caller skips). */
 export async function prepareBranchInputs(
   replayData: ReplayData,
   sources: TeamBuildSources,
@@ -28,11 +27,7 @@ export async function prepareBranchInputs(
   };
 }
 
-/**
- * The honest divergence notice after a branch arrival (or null). An ended battle is a divergence only when the rebuild itself ended
- * it: with turns of a variation replayed on top (`replayedTurns`), the variation carried the game to its end, which is no fault of
- * the guessed sets (a VGC game whose engine line wins on turn 7).
- */
+/** The divergence notice after a branch arrival, or null; an ended battle counts only if the rebuild ended it. */
 export function divergenceNoticeFor(
   battle: { ended?: boolean; winner?: string | null; turn: number } | null | undefined,
   startTurn: number,
@@ -52,8 +47,7 @@ export function divergenceNoticeFor(
   return null;
 }
 
-/** Kept entries for a truncating rebuild: interludes (a replacement on one side or on both) ride along with the turn they resolve;
- *  keep them until the next turn entry past the cut (one rule in `variation-turns.ts`, mirrored by alignHistoryRows). */
+/** Kept entries for a rebuild that truncates: interludes ride along with their turn, as in `variation-turns.ts`. */
 export function keptHistorySlice(history: BranchHistoryEntry[], keepTurns: number): BranchHistoryEntry[] {
   return entriesOfTurns(history, keepTurns);
 }

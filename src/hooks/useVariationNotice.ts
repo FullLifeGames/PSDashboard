@@ -3,11 +3,7 @@ import type { Timeline } from './useTimeline';
 
 type NoticeTimeline = Pick<Timeline, 'viewTurn' | 'viewLine' | 'setVariationScores' | 'setViewLine' | 'setViewTurn'>;
 
-/**
- * A notice about the variation that went away or came back: a refused execute that restored the old variation or left none behind,
- * or a rebuild that kept no turn. It belongs to the position where it appeared and leaves once the pointer moves on or a turn is
- * played. A render-phase reconciliation reads the position on the first render after the notice, no effect.
- */
+/** A notice about a variation that went away or came back; it leaves once the pointer moves on or a turn is played. */
 export function useVariationNotice(timeline: NoticeTimeline, historyLength: number, snapshotCount: number) {
   const [notice, setNotice] = useState<{ text: string; key: string | null } | null>(null);
   const positionKey = `${timeline.viewTurn}:${timeline.viewLine}:${historyLength}`;

@@ -14,19 +14,16 @@ export interface BranchHistoryEntry {
   /** Identity-based choices that replay this entry after a team edit. */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
-  /**
-   * What the simulator did with the dice forced in this turn. A turn that paused for a switch holds its dice in two entries: the forced
-   * replacement that finishes the turn carries the report that joins both parts.
-   */
+  /** What the simulator did with this turn's forced dice; the replacement that finishes a paused turn joins both. */
   diceReport?: DiceReport;
   /** The display lines of that report, placed in the shown log by index; the battle's own log never holds them. */
   dieLines?: DieLine[];
-  /** The labels of the report's dice by side, named with the battle's words when the turn played (the entry has no battle later). */
+  /** The labels of the report's dice by side, named when the turn played (the entry has no battle later). */
   diceMarks?: DiceMarks;
   /** The resolved commands sent to the sim (display and share only). */
   p1Choice: string;
   p2Choice: string;
-  /** Serialized position after this entry executed; null when the capture failed (navigation still works via the sim log). */
+  /** Serialized position after this entry executed; null when the capture failed (navigation uses the sim log). */
   serializedPosition?: string | null;
   p1Active: SimPokemonInfo | null;
   p1ActiveSlots: (SimPokemonInfo | null)[];
@@ -76,11 +73,7 @@ export interface HistoryRowAlignment {
   settled: BranchHistoryEntry;
 }
 
-/**
- * Forced-switch interludes are their own entries and do not shift the alignment with the original replay (`isInterlude` decides which
- * entries make a turn). `variationTurn` is the position after the row's move, including the forced replacements that follow the turn,
- * so the row's cell reads the board from `settled`.
- */
+/** Interludes are own entries, no turn; `variationTurn` is the position after the row's move and its replacements. */
 export function alignHistoryRows(history: BranchHistoryEntry[], branchStartTurn: number): HistoryRowAlignment[] {
   let turnIndex = 0;
   return history.map((entry, index) => {

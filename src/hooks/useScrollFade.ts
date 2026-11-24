@@ -1,10 +1,6 @@
 import { useCallback, useRef } from 'react';
 
-/**
- * A list that scrolls inside its panel fades out over its last 36 px while more follows (stats-panel.css reads `data-more="true"`).
- * The mark goes onto the element from its scroll position, a ResizeObserver and a MutationObserver; no React state, so a scroll
- * repaints nothing but the mask. The list at its end, or one that fits, carries no mark. Returns a callback ref.
- */
+/** A scrolling list fades over its last 36 px while more follows (`data-more="true"`, read by stats-panel.css). */
 export function useScrollFade(): (element: HTMLElement | null) => void {
   const release = useRef<(() => void) | null>(null);
   return useCallback((element: HTMLElement | null) => {

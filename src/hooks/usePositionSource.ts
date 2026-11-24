@@ -13,13 +13,9 @@ import { useGamePositions, type GamePositions } from './useGamePositions';
 type Report = (turn: number, target: number) => void;
 type Teams = { p1Team: PokemonSet[]; p2Team: PokemonSet[] };
 
-/** A streamed sweep pass stores one position per message; the pickers repaint at most this often. */
 const VERSION_REPAINT_MS = 100;
 
-/**
- * The exact store's API. Render-stable on purpose: an identity that churned per render restarted the effects built on it (the dwell
- * timer, the team-edit refresh), a refresh restarting itself forever through its own progress.
- */
+// Render-stable: an identity that changes per render restarts the effects built on it (dwell timer, team-edit refresh).
 interface ExactStore {
   exactKeyFor(turn: number): string | null;
   storeExactPosition(turn: number, serialized: string): void;
@@ -29,14 +25,11 @@ interface ExactStore {
   markFailed(key: string): void;
 }
 
-/** Exact main-line positions the app has already reconstructed, keyed like the eval cache (replay:turn:sets). */
 function useExactPositions(replayData: ReplayData | null, setsFingerprint: string, smogonPending: boolean, worldsKey: string) {
-  // New replay or new set knowledge makes the old reconstructions stale: the store swaps itself lazily when its identity key
-  // changes. Accessed only from callbacks and effects, never during render. The main line is the heaviest world's, so other
-  // worlds (the statistics moved the heaviest guess) are other positions.
+  // Swaps lazily when its identity key changes; accessed only from callbacks and effects, never during render.
   const storeIdentity = `${replayData?.id}:${setsFingerprint}:${worldsKey}`;
   const storeRef = useRef({ identity: storeIdentity, positions: new Map<string, string>(), failed: new Set<string>() });
-  // A position built while the Smogon sets still load was built on other teams than the settled ones: it may be used once, never kept.
+  // A position built while the Smogon sets still load was built on other teams: it may be used once, never kept.
   const smogonPendingRef = useRef(smogonPending);
   useEffect(() => {
     smogonPendingRef.current = smogonPending;
@@ -153,11 +146,7 @@ interface SiblingPasses {
   worlds: BringWorld[];
 }
 
-/**
- * The main-line positions the user plays are the heaviest world's. This registers the positions of every other world beside each
- * one (`world-positions.ts`), so the worker client searches them all and blends by usage. The lighter worlds' passes run one after
- * the other; a world whose pass fails drops out and the rest keep their weights.
- */
+// A world whose pass fails drops out; the rest keep their weights.
 function useWorldPasses(args: { reconstruct: Reconstruct; bringWorlds: BringWorld[] | null }) {
   const { reconstruct, bringWorlds } = args;
   const worlds = bringWorlds && bringWorlds.length > 1 ? bringWorlds : null;
@@ -214,7 +203,6 @@ function useAcquireExact(args: MainLineArgs) {
     const stored = exact.getExact(turn);
     const teams = stored && (!hasWorlds || worldPositionsOf(stored)) ? null : await buildTeams();
     if (stored) {
-      // A position the branch start stored has no siblings yet: the lighter worlds' passes to this turn complete it.
       if (teams) register(stored, await runSiblings({ targetTurn: turn, teams, report, signal, replacements: false }), 'positions', String(turn));
       return stored;
     }
@@ -225,8 +213,7 @@ function useAcquireExact(args: MainLineArgs) {
     });
     if (outcome.invalid) throw new Error(outcome.invalid);
     if (!outcome.serialized) throw new Error('Reconstruction produced no battle.');
-    // Backstop for replays healing cannot save: an ended (or short) arrival is a divergence artifact, and evaluating it would
-    // report a decided ±1.00.
+    // Backstop: an ended or short arrival is a divergence artifact; evaluating it would report a decided ±1.00.
     if (!outcome.reached) {
       throw new Error(`The reconstruction diverged before turn ${turn}: the guessed sets could not reproduce this position. Correcting items/moves via Edit Player/Opp is the common fix.`);
     }
@@ -248,7 +235,6 @@ function useAcquireAll(args: MainLineArgs & { setSweepAlignment: (records: TurnA
     setSweepAlignment(null);
     const teams = await buildTeams();
     const positions: (string | null)[] = new Array(turns).fill(null);
-    // The lighter worlds first, so every position the sweep receives already knows its siblings.
     const siblings = await runSiblings({ targetTurn: turns, teams, report, replacements: onReplacement !== undefined });
     const outcome = await reconstruct({
       targetTurn: turns, mode: 'replay', teams, bringOnly: bringOnlyLists, onProgress: report,
@@ -285,23 +271,18 @@ function useMainLineAcquire(args: Omit<MainLineArgs, 'worlds'> & { bringWorlds: 
   return { sweepAlignment, acquireExact, acquireAll };
 }
 
-/**
- * The branch start's runtime: a stored position adopts at once; anything else reconstructs in the worker (a lead game for turn 0)
- * and adopts the arrival. Only a sim that could not even start falls back to the main-thread reconstruction.
- */
 function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactStore; reconstruct: Reconstruct; game: GamePositions | null }) {
   const { replayData, exact, reconstruct, game } = args;
   return useCallback(async (params: ReconstructParams, plan: { isT0: boolean }): Promise<BranchRuntime> => {
     const branchEngine = await import('../lib/lazy/branch-engine');
     if (!replayData) return branchEngine.reconstructBranchRuntime(params);
-    // A Champions position revives on the Champions mod, loaded in this realm first.
     await branchEngine.loadSimMods(params.format);
     const adopt = (serialized: string, outcome?: ReconstructOutcome) => branchEngine.adoptSerializedRuntime({
       serialized, replayLog: params.replayLog, targetTurn: params.targetTurn,
       snapshot: plan.isT0 ? null : game ? game.adoptSnapshot() : params.snapshot ?? null,
       ...(outcome ? { log: outcome.log, haxAlignment: outcome.haxAlignment, timedOut: outcome.timedOut } : {}),
     });
-    // A game's positions are the record's: stored, else rebuilt from its entries; a miss never starts a 'replay' job.
+    // A game's positions come from its record; a miss never starts a 'replay' job.
     if (!plan.isT0 && game) return adopt(await game.acquireExact(params.targetTurn));
     if (!plan.isT0) {
       const stored = exact.getExact(params.targetTurn);
@@ -334,7 +315,6 @@ export function usePositionSource(inputs: {
   const { gameRecord = null, replayData, snapshots, observations, sources, setsFingerprint, bringOnlyLists, bringWorlds = null, smogonPending, replayWorker } = inputs;
   const worldsKey = useMemo(() => (bringWorlds ? JSON.stringify(bringWorlds) : ''), [bringWorlds]);
   const { exact, exactPositionsVersion } = useExactPositions(replayData, setsFingerprint, smogonPending && !gameRecord, worldsKey);
-  // The worker's bundle parses while the replay is still loading.
   useEffect(() => {
     if (replayData) replayWorker.warm();
   }, [replayData, replayWorker]);

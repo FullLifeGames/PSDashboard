@@ -5,11 +5,7 @@ import { historyOfShare, sameGameAsShare, shareEntry, type GameSharePayload } fr
 import type { ViewLine } from '../lib/timeline';
 import type { SavedVariation } from './useRestoreVariation';
 
-/**
- * A game's share link (`#branch=` version 2) opens the main line and the open branch at the sharer's turn: the reader starts the
- * shared game as a copy with a new id and saves it, and the address then names it (`?game=<id>`). A link of the game that is open,
- * whose main line it holds from its start, opens its branch in that game and makes no copy. The hash leaves the address first.
- */
+/** Opens a shared game as a saved copy with a new id, or its branch in the held game when the link names it. */
 
 export interface SharedGameApp {
   ctx: {
@@ -63,7 +59,6 @@ async function restoreView(latest: React.RefObject<SharedGameApp>, payload: Game
 async function openShared(latest: React.RefObject<SharedGameApp>, payload: GameSharePayload): Promise<string | null> {
   const { ctx } = latest.current;
   let game = holdsMainLine(payload, ctx.newGame.record) ? ctx.newGame.record : null;
-  // a link that equals a game this browser holds (the copy an earlier open made, the sharer's own game) opens that game: no new copy
   const held = game ? null : findGame(record => sameGameAsShare(record, payload), payload.seed);
   if (held) {
     ctx.shared.clearSharedBranch();

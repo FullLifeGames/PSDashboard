@@ -14,20 +14,16 @@ export interface AnalysisGraphData {
   verified: Parameters<typeof analyzeTurn>[0]['verified'][];
   sensitivity: Parameters<typeof analyzeTurn>[0]['sensitivity'][];
   faintedFractions?: (number | null)[];
-  /** The engine's score of the next root with the game's biggest roll's die turned over; the report's sentence reads it. */
+  /** Score of the next root with the biggest roll's die turned over; the report's sentence reads it. */
   rollFlip?: RollFlip | null;
 }
 
-/**
- * How many bodies each side brought, as the protocol's `|teamsize|` line before turn 1 states it (VGC: 4 of the 6 team preview
- * lists); null for a side the log does not size.
- */
+// From the protocol's `|teamsize|` line (VGC: 4 of the 6 team preview lists); null for a side the log does not size.
 function broughtCounts(snapshots: TurnSnapshot[]): { p1: number | null; p2: number | null } {
   return teamSizes(snapshots[0]?.log ?? []);
 }
 
-/** The turn's phase for the near sentence: the sweep's own measure, else the fallen share of the pre-turn snapshot over the bodies a side
- *  brought (not the six its team preview lists); null without either. */
+/** The turn's phase for the near sentence: the sweep's measure, else the fallen share of the bodies brought. */
 export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSnapshot[], turn: number): number | null {
   const recorded = graph.faintedFractions?.[turn - 1];
   if (recorded !== undefined && recorded !== null) return recorded;
@@ -39,10 +35,7 @@ export function turnFaintedFraction(graph: AnalysisGraphData, snapshots: TurnSna
   return total > 0 ? fallen / total : null;
 }
 
-/**
- * The share of every swept turn, as the turn card takes it. Only the auto engine records its phase in the graph, so a Matrix or MCTS
- * sweep leaves `faintedFractions` empty; the graph tooltips read this list instead, so every engine mode prints the same map.
- */
+/** The share of every swept turn as the turn card takes it (only the auto engine records its phase in the graph). */
 export function graphFaintedFractions(graph: AnalysisGraphData, snapshots: TurnSnapshot[]): (number | null)[] {
   return graph.scores.map((_, index) => turnFaintedFraction(graph, snapshots, index + 1));
 }
@@ -60,7 +53,6 @@ export type ReplayTendencies = NonNullable<Parameters<typeof analyzeTurn>[0]['te
 function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks: boolean) {
   const events = context.turnEventsIndex[turn];
   const before = context.snapshots[turn - 1] ?? null;
-  // The turn's generation and mod read the Dex (hazards, accuracies, secondaries); no board, no snapshot, no sacks.
   const actives = context.activesForTurn(turn);
   const rules = actives ? { gen: actives.gen, mod: actives.mod } : undefined;
   return {
@@ -69,7 +61,7 @@ function protocolInputs(turn: number, context: TurnAnalysisContext, includeSacks
   };
 }
 
-/** The replay's generation and mod, from the first turn that has a board; undefined keeps the dice markers as the protocol shows them. */
+// undefined keeps the dice markers as the protocol shows them.
 function replayRulesOf(context: TurnAnalysisContext): { gen?: number; mod?: RulesMod } {
   for (let turn = 1; turn < context.snapshots.length; turn++) {
     const actives = context.activesForTurn(turn);
@@ -117,8 +109,7 @@ export function analyzeTurnAt(args: {
   });
 }
 
-/** Streak-detector history: per side per turn, who attacked whom with what, from the replay's snapshots and protocol lines. Gaps push
- *  null (breaks streaks; the detector fails closed). */
+// Gaps push null (breaks streaks; the detector fails closed).
 function historyEntryFor(
   side: 'p1' | 'p2',
   playedTurn: PlayedTurn | null,
@@ -160,8 +151,7 @@ export function buildPlayedHistory(
   return sides;
 }
 
-/** Exploitative Read lens: best response to the opponent model over the
- *  already-solved matrix — advisory only, verdicts stay equilibrium-graded. */
+/** Exploitative Read lens: best response to the opponent model over the solved matrix; advisory only. */
 export function computeTurnReads(
   turn: number,
   graph: AnalysisGraphData,
@@ -195,8 +185,7 @@ export function buildAnalysisContext(args: {
   return {
     snapshots,
     turnEventsIndex,
-    // Null-move guard board context: the pre-turn active species per side; anything but exactly one live active per side passes null
-    // and keeps the guard off (fail closed).
+    // Anything but exactly one live active per side passes null and keeps the null-move guard off (fail closed).
     activesForTurn: (turn: number) => {
       const snapshot = snapshots[turn - 1] ?? null;
       if (!snapshot) return null;
@@ -222,10 +211,8 @@ interface ReportWalkArgs {
 }
 
 function analysesOf(args: ReportWalkArgs): (TurnAnalysis | null)[] {
-  // The report walk speaks each entry sentence once: keys of already-spoken unanswered stages accumulate, so a mon's tenth entry stays
-  // quiet here while the per-turn card keeps its sentence.
+  // Each entry sentence is spoken once in the report walk; the per-turn card keeps its own.
   const unansweredSeen = new Set<string>();
-  // The decided/near announcements share the walk regime: the state stays on every decided turn, the sentence speaks once.
   const decidedSeen = new Set<string>();
   return args.graph.results.map((_, index) => {
     const bar = args.graph.scores[index];
@@ -259,10 +246,7 @@ function diceTurnsOf(context: TurnAnalysisContext): ReadonlySet<number> {
   return diceEventTurns(context.turnEventsIndex, replayRules.gen, replayRules.mod);
 }
 
-/**
- * The roll the report would name, for the sweep's last stage to play the other way, so the stage and the sentence name one roll. Null
- * without a winner or with fewer than three analyzed turns, where the report speaks of none.
- */
+/** The roll the report names, for the sweep's last stage to play the other way; null without a winner or 3 turns. */
 export function namedRollOf(args: ReportWalkArgs): BiggestRoll | null {
   const winner = replayWinnerOf(args.replayData);
   if (!winner) return null;

@@ -4,11 +4,7 @@ import { notationSideLabel } from '@fulllifegames/eval-engine';
 import { sideMarkTexts, turnDiceMarks } from './branch-dice-marks';
 import { isGameSharePayload, type GameSharePayload } from './new-game/share';
 
-/**
- * One executed entry of the branch: `p1Choice` and `p2Choice` are the simulator commands, the labels the names the history panel shows
- * (a link without labels lists the commands; the fields are optional, so format version 1 stays). `p1DiceLabels` and `p2DiceLabels`
- * hold one text per forced die as the history row writes it, a die that took no effect marked; a side without a forced die has no key.
- */
+// The fields after the commands are optional, so format version 1 stays (a link without labels lists the commands).
 interface BranchShareChoice {
   turnNumber: number;
   p1Choice: string;
@@ -33,14 +29,14 @@ export interface BranchSharePayload {
   finalLog: string;
 }
 
-/** A saved row: a replay's branch (version 1) or a game's (version 2, `GameSharePayload`). The rows of one replay or game share one store key. */
+/** A saved row: a replay's branch (version 1) or a game's (version 2); a replay or game has one store key. */
 export type SavedBranch = BranchSharePayload | GameSharePayload;
 
 export function savedBranchOwner(row: SavedBranch): string {
   return row.version === 2 ? row.gameId : row.replayId;
 }
 
-/** How many choices a saved row holds: a replay's branch, or the open variation of a game (none: the game's own line). */
+/** How many choices a saved row holds: a replay's branch, or a game's open variation (none: its own line). */
 export function savedBranchChoices(row: SavedBranch): number {
   return row.version === 2 ? (row.variation?.entries.length ?? 0) : row.choices.length;
 }
@@ -113,10 +109,7 @@ export function decodeBranchShare(encoded: string): BranchSharePayload {
   return decodeShareJson(encoded) as BranchSharePayload;
 }
 
-/**
- * What a `#branch=` link holds: version 1 is a replay's branch (its id and the log it ends on: the read-only view), version 2 a game
- * (the reader plays it). A version above 2 comes from a newer app; anything else, a version 1 link without its log, is damaged and throws.
- */
+/** What a `#branch=` link holds: version 1 a replay's branch, 2 a game; above 2 a newer app's; else damaged, throws. */
 export type ReadShare =
   | { kind: 'branch'; payload: BranchSharePayload }
   | { kind: 'game'; payload: GameSharePayload }
@@ -153,10 +146,7 @@ function uniqueSaveTime(existing: SavedBranch[]): string {
   return new Date(time).toISOString();
 }
 
-/**
- * Stores the branch as a new row. A row's key is its `createdAt` and `branchTurn` and the save stamps the time, so saving one branch
- * twice makes two rows with two keys.
- */
+/** Stores the branch as a new row: the key is `createdAt` and `branchTurn`, so saving twice makes two rows. */
 export function saveBranchPayload(payload: SavedBranch): SavedBranch[] {
   const existing = loadSavedBranches(savedBranchOwner(payload));
   const next = [{ ...payload, createdAt: uniqueSaveTime(existing) }, ...existing].slice(0, 20);

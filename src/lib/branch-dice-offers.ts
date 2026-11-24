@@ -1,10 +1,6 @@
 import type { BranchSlotChoice, DieOffer, ForcedDie, LiveHit, ResolvedSideCommand } from '@fulllifegames/eval-engine';
 
-/**
- * What the panel asks the engine about the position it shows. The engine's offers read the live battle on copies and never write it
- * (`offeredDice` for one slot's chosen move, `offeredOrderDice` and `offeredEndDice` for the turn once both sides have chosen). The
- * engine arrives through the lazy chunk, so the caller hands it in.
- */
+// The engine's offers read the live battle on copies and never write it.
 
 type Battle = LiveHit['battle'];
 type Choices = readonly (BranchSlotChoice | null)[];
@@ -23,10 +19,7 @@ export interface DiceAsk {
   choices: { p1: Choices; p2: Choices };
   required: { p1: boolean[]; p2: boolean[] };
   turnReady: boolean;
-  /**
-   * The replay's log, for a stored position the user views before a branch starts there: the log's dice come from its lines.
-   * Without it the battle's own first-turn PRNG names them (a branch's live battle).
-   */
+  /** The replay's log for a stored position viewed before a branch starts; else the first-turn PRNG names the dice. */
   replayLog?: string;
 }
 
@@ -65,10 +58,7 @@ function turnPlay(engine: Engine, ask: DiceAsk): ((battle: Battle) => void) | nu
   };
 }
 
-/**
- * The dice the panel offers for the position. A failure of the engine to read a move leaves that part empty: the panel
- * shows what it can, and Execute stays as it was.
- */
+/** The dice the panel offers for the position; a move the engine cannot read leaves its part empty. */
 export function askDice(engine: Engine, ask: DiceAsk): DiceOffers {
   let bySlot: Record<string, DieOffer[]> = {};
   let turn: DieOffer[] = [];

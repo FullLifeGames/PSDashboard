@@ -17,7 +17,7 @@ export interface ReplayState {
   hpEvidence: HiddenPowerEvidence[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
-  /** The damage judge, loaded with the inference: the enrichment reads the infos' logged hits with it, so both arrive in one render. */
+  /** Loaded with the inference, so the enrichment reads the logged hits with it in the same render. */
   itemJudge: ItemDamageJudge | null;
   /** The replay came by link or id, so the address can name it (`?replay=`); a file or a game has no such address. */
   byLink: boolean;
@@ -47,7 +47,6 @@ export function useReplay() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
-      // The Champions mod registers before the inference reads the Champions Dex.
       await loadReplayMods(data);
       const [{ parseReplayLogWithObservations }, { inferOpponentTeam, judgeItemsByDamage }] = await Promise.all([
         import('../lib/lazy/protocol-parser'),

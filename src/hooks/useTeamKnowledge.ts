@@ -36,8 +36,6 @@ function useTeamEdits(replayId: string | undefined, p1Info: OpponentTeamInfo | n
   const [editedP2Info, setEditedP2Info] = useState<OpponentTeamInfo | null>(null);
   const [editorSide, setEditorSide] = useState<'p1' | 'p2' | null>(null);
   const [setsPanelOpen, setSetsPanelOpen] = useState(false);
-  // A freshly loaded replay starts clean: no team edits carried over from the previous one (host pages can inject replays
-  // repeatedly). A render-phase adjustment, not an effect.
   const [editsReplayId, setEditsReplayId] = useState(replayId);
   if (editsReplayId !== replayId) {
     setEditsReplayId(replayId);
@@ -102,11 +100,7 @@ function useSetsIO(args: {
     }
   }, [replayData, effectiveP1Info, effectiveP2Info, replayGenNumber]);
 
-  /**
-   * Applies a sets-import text to both sides, or to none while a value is invalid; returns the error message or null. A routed import
-   * (the sets of a new game belong to its record) hands the checked infos to `route` and applies nothing itself; a side the text
-   * leaves out is null there.
-   */
+  // Applies the text to both sides or neither; with `route` the checked infos go there and nothing applies here.
   const applySetsText = useCallback((text: string, route?: (next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }) => void): string | null => {
     if (!replayData || !effectiveP1Info || !effectiveP2Info) return 'Load a replay first.';
     const pools = poolsRef.current?.replayId === replayData.id ? poolsRef.current.pools : null;
@@ -137,11 +131,7 @@ function useSetsIO(args: {
   return { applySetsText, loadPools };
 }
 
-/**
- * The team editor and the sets panel start from the infos the stats panel shows, and those carry the solved spreads only once a solve
- * has run; a panel that opens earlier would show the usage guesses and the import would take them as the user's own input. The open
- * waits for the solve (a settled one answers at once; with no solve possible, it opens at once).
- */
+// Panels open after the solve: before it the infos carry usage guesses, which an import would take as the user's input.
 function useOpenAfterSolve(getInferredSpreads: ReturnType<typeof useSpreadSolve>['getInferredSpreads']) {
   return useCallback((open: () => void) => {
     void getInferredSpreads().then(() => undefined, () => undefined).then(open);
@@ -161,8 +151,6 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   const enriched = useMemo(() => {
     const empty = { pokemon: [] };
     const inferred = { p1: p1Info ?? empty, p2: opponentInfo ?? empty };
-    // A side of a game without team preview that showed fewer bodies than its `|teamsize|` gets the pasted bodies it lacks, then stand-ins
-    // from the format's teammate statistics (a generated-team format: from its random-set file), as buildAppTeams does.
     const randomSets = setAssumptions.assumptions?.randomSets;
     const sized = replayData ? withStandIns(inferred, replayData.log, usageStats.stats, { p1: paste.pastedSets ?? [] }, randomSets) : inferred;
     const both = enrichTeamInfos(sized, usageStats.stats, setAssumptions.assumptions,
@@ -218,10 +206,7 @@ export function useTeamKnowledge(inputs: TeamKnowledgeInputs) {
   };
 }
 
-/**
- * A solved item can replace the guessed one, and the coherence vetoes read the item (a Choice item drops a guessed status move), so the
- * moves of such a Pokémon are settled again under the solved item, as the build settles them.
- */
+// Coherence vetoes read the item (a Choice item drops a guessed status move): settle the moves under the solved item.
 function settleMovesUnderSolvedItem(
   shown: OpponentTeamInfo, before: OpponentTeamInfo,
   enrich: (pokemon: OpponentTeamInfo['pokemon'][number]) => OpponentTeamInfo['pokemon'][number],
@@ -277,8 +262,6 @@ function useTeamStatus(args: { paste: ReturnType<typeof useTeamPaste>; p1Info: O
   return { teamPasteStatus, teamPasteError: paste.teamPasteParseError || teamPasteMismatch };
 }
 
-/** Save from the team editor: the record holds every edited side, an import's included, so it replaces the stored import text
- *  and a reload restores it alone. */
 function useSaveTeam(args: {
   replayId: string | undefined;
   effectiveP1Info: OpponentTeamInfo | null;

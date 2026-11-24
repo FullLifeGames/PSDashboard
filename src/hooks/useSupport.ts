@@ -27,7 +27,6 @@ function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInpu
     app: { version: APP_VERSION, commit: APP_COMMIT, url: window.location.href, embed: replay.embed },
     browser: { userAgent: navigator.userAgent, width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio },
     replay: replay.replayData,
-    // A game's file carries its record (no key for a replay).
     game: app.ctx.newGame.record,
     knowledge: { teamText: knowledge.teamText, editedP1Info: knowledge.editedP1Info, editedP2Info: knowledge.editedP2Info },
     variation: { startTurn: branch.variationStartTurn, branching: branch.branching, history: branch.history },
@@ -74,7 +73,6 @@ function downloadJson(value: unknown, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** One macrotask: the state set before it has rendered, and the latest controller holds it. */
 const settle = () => new Promise(resolve => window.setTimeout(resolve, 0));
 
 async function openStateGame(latest: React.RefObject<SupportApp>, state: SupportState): Promise<void> {
@@ -117,7 +115,7 @@ async function restoreState(latest: React.RefObject<SupportApp>, file: unknown):
 
 type StateHandle = { capture: () => Promise<SupportState>; restore: (state: unknown) => Promise<void> };
 
-/** The support side of the app: "Report issue" offers the state file and the filled issue form; `window.__psState` serves test/e2e/repro-state.spec.ts. */
+/** "Report issue": the state file and the filled issue form; `window.__psState` serves test/e2e/repro-state.spec.ts. */
 export function useSupport(app: SupportApp) {
   const latest = useRef(app);
   useEffect(() => {

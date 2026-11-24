@@ -14,10 +14,7 @@ const EMPTY_STATE: SmogonUsageStatsState = {
   error: null,
 };
 
-/**
- * A new replay of the same format keeps `formatid`, so the load would never run again. After a failed load the next replay key
- * (any value that changes per loaded replay) asks once more; after a load that worked, or one still running, it changes nothing.
- */
+// A new replay of the same format keeps `formatid`: after a failed load the next replay key asks once more.
 function useRetryAttempt(formatid: string | undefined, replayKey: unknown, state: SmogonUsageStatsState): number {
   const [attempt, setAttempt] = useState({ replayKey, count: 0 });
   if (attempt.replayKey !== replayKey) {
@@ -41,7 +38,7 @@ export function useSmogonUsageStats(formatid: string | undefined, replayKey?: un
       .then(({ fetchSmogonUsageStats }) => fetchSmogonUsageStats(formatid, { signal: controller.signal }))
       .then(stats => {
         if (!active) return;
-        // A null result means every stats source failed: surface it so the "Smogon stats unavailable" badge can appear.
+        // null: every stats source failed.
         setState({
           formatid,
           stats,

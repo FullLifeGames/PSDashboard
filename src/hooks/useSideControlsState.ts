@@ -5,7 +5,6 @@ import { gimmickApplies } from '../lib/dock-seed';
 
 export function useMovePool(activeSpecies: string, gen: number, format: string): string[] {
   const key = `${activeSpecies}:${gen}:${format}`;
-  // A species change drops the previous pool in the same render; the async load fills the new key.
   const [loaded, setLoaded] = useState<{ key: string; pool: string[] }>({ key, pool: [] });
   useEffect(() => {
     let alive = true;
@@ -48,12 +47,8 @@ type PendingChoices = Record<Side, (BranchSlotChoice | null)[]>;
 
 const NO_PENDING: PendingChoices = { p1: [], p2: [] };
 
-/**
- * The gimmicks the other slots of a side hold this turn: what a slot's pending choice carries once it has one, else its armed
- * toggle. The simulator takes each gimmick once per side choice (Side.chooseMove: "You can only Terastallize once per battle", the
- * same for Mega Evolution, Ultra Burst and Z-Moves) while the request offers it to every slot, so the panel holds the kind for the
- * other slots, as Showdown's own client does (test/ui/hooks/useSideControlsState.spec.tsx checks it against the simulator).
- */
+// Side.chooseMove takes each gimmick once per side choice while the request offers it to every slot, so the panel holds
+// the kind for the other slots, as Showdown's client does (test/ui/hooks/useSideControlsState.spec.tsx checks it).
 function heldByPartners(side: Side, slot: number, armed: ArmedGimmicks, pending: PendingChoices): HeldGimmicks {
   const held: HeldGimmicks = {};
   const slots = Math.max(armed[side].length, pending[side].length);
@@ -99,7 +94,6 @@ function editedPick(
   return { ...pick, modifier: kind };
 }
 
-/** The armed gimmicks of one position; a new position key starts every slot unarmed, so an armed Tera never rides to another turn. */
 function useArmedAt(positionKey: string | undefined) {
   const [state, setState] = useState<{ key: string | undefined; armed: ArmedGimmicks }>({ key: positionKey, armed: NONE_ARMED });
   const moved = state.key !== positionKey;
@@ -109,8 +103,7 @@ function useArmedAt(positionKey: string | undefined) {
   return { armed: moved ? NONE_ARMED : state.armed, setArmed };
 }
 
-/** The battle gimmick toggles of every active slot, held by the panel so the damage preview reads them; `pending` keeps a gimmick one
- *  slot holds out of reach of the side's other slots. */
+/** The gimmick toggles of every active slot; `pending` keeps a gimmick one slot holds out of its side's other slots. */
 export function useGimmickToggles(
   p1Modifiers: BranchSlotModifiers[],
   p2Modifiers: BranchSlotModifiers[],
@@ -119,8 +112,7 @@ export function useGimmickToggles(
   edit?: PendingEdit,
 ) {
   const { armed, setArmed } = useArmedAt(positionKey);
-  // Once a gimmick is spent (or the active Pokémon changed and can't use it), it must not silently stick to future move choices
-  // ("Thundurus can't Terastallize" after an earlier Tera).
+  // A spent gimmick, or one the active Pokémon cannot use, must not stick to later move choices.
   const kept = { p1: keepApplying(armed.p1, p1Modifiers), p2: keepApplying(armed.p2, p2Modifiers) };
   const spent = (side: Side) => kept[side].some((kind, slot) => kind !== (armed[side][slot] ?? null));
   if (spent('p1') || spent('p2')) setArmed(() => kept);

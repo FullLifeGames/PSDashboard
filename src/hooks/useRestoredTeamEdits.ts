@@ -2,11 +2,7 @@ import { useState } from 'react';
 import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { loadTeamEdits } from '../lib/team-edits-store';
 
-/**
- * Puts the replay's saved editor edit back once the fresh inference exists, before any stored import text applies on top. A
- * render-phase reconcile, never an effect; it runs only while nothing was edited in this session, so a later edit or import is
- * never overwritten. A record that fits no inferred team is ignored.
- */
+/** Puts the replay's saved editor edit back once the fresh inference exists, while nothing was edited this session. */
 export function useRestoredTeamEdits(args: {
   replayId: string | undefined;
   p1Info: OpponentTeamInfo | null;

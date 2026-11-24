@@ -5,11 +5,7 @@ import { gameTipTurn } from './useNewGame';
 import type { SavedVariation } from './useRestoreVariation';
 import { waitForGame, type SharedGameApp } from './useOpenSharedGame';
 
-/**
- * The record of a game whose tip turn was played and waits for its replacement carries that turn (`pending`). When such a game
- * opens and its live branch is empty, the turn plays again on the branch from the tip, which asks for the replacement again. One
- * restore per record object: a failed one does not repeat on every render.
- */
+/** A record whose tip turn waits for its replacement plays that turn again on the branch, once per record object. */
 
 export interface PendingTurnApp extends SharedGameApp {
   ctx: SharedGameApp['ctx'] & { branch: { history: BranchHistoryEntry[] } };

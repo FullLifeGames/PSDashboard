@@ -3,11 +3,10 @@ import {
   type BranchSlotChoice, type DieName, type DieOffer, type DieReport, type DieWords, type ForcedDie, type HitResult, type LiveHit,
 } from '@fulllifegames/eval-engine';
 
-/** The words of the dice chips in the branch panel and the edits a click makes to a slot's forced dice; names come from the battle's Dex. */
 
 type Battle = LiveHit['battle'];
 
-/** The six status conditions by their Dex id in the words a user reads; a spec holds the table to the Dex's status conditions. */
+/** The six status conditions by Dex id in the words a user reads; a spec holds the table to the Dex. */
 export const STATUS_WORDS: Record<string, string> = {
   brn: 'Burn', par: 'Paralysis', slp: 'Sleep', frz: 'Freeze', psn: 'Poison', tox: 'Toxic',
 };
@@ -43,7 +42,6 @@ function effectWord(battle: Battle, id: string): string {
   return dexName(battle, id);
 }
 
-/** A status or a volatile as a common noun ("burn", "flinch"); a stat change and the names of abilities and items keep their capitals. */
 function plainWord(battle: Battle, id: string): string {
   const word = effectWord(battle, id);
   const dex = battle.dex as unknown as Record<'abilities' | 'items' | 'moves' | 'conditions', Namer>;
@@ -53,7 +51,6 @@ function plainWord(battle: Battle, id: string): string {
 
 const bodyAt = (battle: Battle, slot: string) => battle.sides[slot[1] === '1' ? 0 : 1]?.active[slot[2] === 'a' ? 0 : 1];
 
-/** The reader of names for `dieLabel` and the chips. */
 export function wordsOf(battle: Battle): DieWords {
   return {
     move: id => dexName(battle, id),
@@ -63,7 +60,7 @@ export function wordsOf(battle: Battle): DieWords {
   };
 }
 
-/** The words of one chip without the subject; the subject may hold a colon (a body named "Type: Null"), the result never does. */
+/** The words of one chip without the subject; the subject may hold a colon ("Type: Null"), the result not. */
 export function resultWord(die: ForcedDie, words: DieWords): string {
   if ('option' in die.result) return upperFirst(words.effect(die.result.option));
   const label = dieLabel(die, words);
@@ -116,11 +113,7 @@ export interface DiceTableModel { heads: string[]; rows: DiceRow[]; shared: DieO
 
 const keyWithoutTarget = (name: DieName): string => dieKey({ ...name, targetSlot: undefined });
 
-/**
- * The accuracy die of a later hit (`hit` 2 and up) of a move whose every hit rolls its own accuracy. The panel folds the hits of one
- * move and target into one "Hits" row of counts 1 to N (a `hit-count` die that names its target; the engine's real hit count names
- * none); `applyDie` turns a count `{ hits: k }` into the per-hit dice.
- */
+// The panel folds later hits into one "Hits" row of counts 1 to N (a `hit-count` die); `applyDie` unfolds it.
 const isLaterHit = (name: DieName): boolean => name.kind === 'accuracy' && name.hit !== undefined;
 
 const plainName = (name: DieName): DieName => {
@@ -135,7 +128,6 @@ const sameTarget = (a: DieName, b: DieName): boolean => sameMove(a, b) && a.targ
 
 const hitResult = (die: ForcedDie): HitResult => ({ hit: die.name.hit!, happens: 'happens' in die.result && die.result.happens });
 
-/** The count of landed hits that the set later-hit dice of one move and target give, or undefined when none is set. */
 export function heldHits(dice: readonly ForcedDie[], name: DieName): number | undefined {
   const held = dice.filter(die => isLaterHit(die.name) && sameTarget(die.name, name));
   return held.length === 0 ? undefined : chainCount(held.map(hitResult));
@@ -153,10 +145,7 @@ function countOffers(later: readonly DieOffer[]): DieOffer[] {
   }));
 }
 
-/**
- * A move with several targets (a spread move in doubles) gets a column per target and a row per kind of die; dice that name no target
- * stand in `shared`. The later hits of a multi-accuracy move are one "Hits" row of counts under the move's "Hit" row.
- */
+/** A spread move gets a column per target and a row per kind of die; dice that name no target stand in `shared`. */
 export function diceTable(offers: readonly DieOffer[]): DiceTableModel {
   const table = plainTable(offers.filter(offer => !isLaterHit(offer.name)));
   const counts = countOffers(offers.filter(offer => isLaterHit(offer.name)));
@@ -175,10 +164,7 @@ export function diceTable(offers: readonly DieOffer[]): DiceTableModel {
   return { ...table, rows: countsUnderHit(rows) };
 }
 
-/**
- * The engine's own hit count (Tail Slap, Bullet Seed) names no target and comes last in the offers; its row moves under the move's
- * "Hit" row. A row without a "Hit" row of its move stays where it is.
- */
+// The engine's own hit count (Tail Slap, Bullet Seed) names no target and comes last; its row moves under "Hit".
 function countsUnderHit(rows: readonly DiceRow[]): DiceRow[] {
   const isHitCount = (row: DiceRow) => row.cells.length === 1 && row.cells[0]?.name.kind === 'hit-count' && row.cells[0].name.targetSlot === undefined;
   const out = rows.filter(row => !isHitCount(row));
@@ -202,14 +188,9 @@ function plainTable(offers: readonly DieOffer[]): DiceTableModel {
   return { heads, rows, shared: offers.filter(offer => offer.name.targetSlot === undefined) };
 }
 
-/**
- * Dice drawn only when the move hits: the crit and the damage roll, then a secondary effect, the hit count, the self effect and the
- * target's procs.
- */
 const NEEDS_HIT: ReadonlySet<DieName['kind']> = new Set(['crit', 'damage-roll', 'secondary', 'hit-count', 'self-effect', 'ability-proc', 'item-proc']);
 
 const sameMove = (a: DieName, b: DieName): boolean => a.slot === b.slot && a.moveId === b.moveId;
-/** A die that names a target needs the hit on that target; one that names none needs the hit on every target. */
 const needsHitOn = (die: DieName, accuracy: DieName): boolean => NEEDS_HIT.has(die.kind) && sameMove(die, accuracy) && (die.targetSlot === undefined || die.targetSlot === accuracy.targetSlot);
 
 const isSet = (dice: readonly ForcedDie[], die: ForcedDie): boolean => dice.some(entry => dieKey(entry.name) === dieKey(die.name) && sameResult(entry, die));
@@ -221,10 +202,7 @@ function setAll(dice: readonly ForcedDie[], pulled: readonly ForcedDie[]): Force
   }, [...dice]);
 }
 
-/**
- * The dice of the move's own offers that its forced die needs: the hit on its target (the first hit's die covers every hit; a later hit
- * has a die of its own only when the user sets a count) and the attacker's status checks (it has to act).
- */
+// The first hit's die covers every hit; a later hit has a die of its own only when the user sets a count.
 function pulledFor(die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] {
   return offers
     .filter(offer => sameMove(offer.name, die.name)
@@ -232,17 +210,10 @@ function pulledFor(die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] {
     .map(offer => ({ name: offer.name, result: { happens: true } }));
 }
 
-/**
- * A miss of the first hit or a body that cannot act: the dice that need the hit have nothing to decide. A later hit that misses ends
- * a chain only.
- */
 const stopsTheMove = (die: ForcedDie): boolean =>
   ((die.name.kind === 'accuracy' && !isLaterHit(die.name)) || die.name.kind === 'status-check') && 'happens' in die.result && !die.result.happens;
 
-/**
- * A click on a chip of the Hits row: the first hit lands and the later hits are `chainResults` of the count (hits 2 to k land, hit k + 1
- * misses; the last count is all landing). The count already set gives its hit dice back and leaves the first hit.
- */
+// Count k: the first hit lands, hits 2 to k land, hit k + 1 misses (the last count is all landing).
 function applyCount(dice: readonly ForcedDie[], die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] | undefined {
   if (!isCountDie(die.name) || !('hits' in die.result)) return undefined;
   const later = offers.filter(offer => isLaterHit(offer.name) && sameTarget(offer.name, die.name));
@@ -253,11 +224,7 @@ function applyCount(dice: readonly ForcedDie[], die: ForcedDie, offers: readonly
   return [...setAll(rest, pulledFor(die, offers)), ...chain];
 }
 
-/**
- * A click on a chip of a slot's move: it toggles the die, then settles the dice around it. A die that needs the hit sets the hit on its
- * target and passes the attacker's status checks (a result that contradicts them gives way); a miss or a stopped body takes back the
- * dice that need the hit.
- */
+/** A click on a chip of a slot's move: toggles the die, then settles the dice that need it (the hit, status checks). */
 export function applyDie(dice: readonly ForcedDie[], die: ForcedDie, offers: readonly DieOffer[]): ForcedDie[] {
   const counted = applyCount(dice, die, offers);
   if (counted) return counted;
@@ -281,7 +248,6 @@ function needOf(die: ForcedDie, words: DieWords): string {
   }
 }
 
-/** One sentence per set die of the move that another die needs: the chips show the dice as set, the sentences say why. */
 export function pullNotes(dice: readonly ForcedDie[], offers: readonly DieOffer[], words: DieWords): string[] {
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
   const notes: string[] = [];
@@ -300,12 +266,7 @@ export function pullNotes(dice: readonly ForcedDie[], offers: readonly DieOffer[
   return notes;
 }
 
-/**
- * The report of the dice the user forced, with the later hits of one move and target as one count die ("Triple Axel: 2 hits"). The entry
- * takes the place and the log index of the first hit die. Its report is that of the first die that did not apply, except for a miss
- * that ended the chain in advance and was never drawn. A count that played in part (the target fainted on hit 5 of a forced 10)
- * reads `blocked`: the line of the forced count stands and the reason follows it.
- */
+/** Folds later hits of a move and target into one count die ("Triple Axel: 2 hits"); a cut-short count: `blocked`. */
 export function foldHitReports(forced: readonly DieReport[]): DieReport[] {
   const keyOf = (name: DieName) => `${name.slot}:${name.moveId}:${name.targetSlot ?? ''}`;
   const groups = new Map<string, DieReport[]>();

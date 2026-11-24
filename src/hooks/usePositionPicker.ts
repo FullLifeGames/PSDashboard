@@ -10,7 +10,7 @@ import type { PlayedAtPosition, PlayedPick } from '../lib/played-pick';
 import { mergeChoices, seedChoices } from '../lib/dock-seed';
 import { turnEntryAt } from '../lib/variation-turns';
 
-/** Picker state for the viewed position when the live sim is elsewhere: exact from the recorded position, else approximate from snapshot + guessed teams. */
+/** Picker state for the viewed position when the live sim is elsewhere: exact if recorded, else from the snapshot. */
 export function usePositionPicker(args: {
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
@@ -35,8 +35,6 @@ export function usePositionPicker(args: {
     draftChoices, liveSimState, played,
   } = args;
   const [resolution, setResolution] = useState<{ viewKey: string; picker: ResolvedPicker | null } | null>(null);
-  // Live-tip positions render the sim's own state, and a picker resolved for another position never stands for the viewed one;
-  // both come by derivation (a synchronous clear would be a setState in an effect).
   const viewKey = `${viewingVariation ? 'variation' : 'main'}:${viewTurn}`;
   const landed = !liveTip && resolution?.viewKey === viewKey;
   const positionPicker = landed ? resolution!.picker : null;
@@ -66,17 +64,11 @@ export function usePositionPicker(args: {
 
   const pickerBattle = positionPicker?.battle ?? null;
   const getPickerBattle = useCallback(() => pickerBattle, [pickerBattle]);
-  // The main line shows the replay's own turn at a stored position: the log's dice come from the replay's lines. A variation's
-  // position is no turn of the replay.
   const pickerReplayLog = pickerBattle && !viewingVariation ? replayData?.log : undefined;
   return { positionPicker, pickerSimState, pickerSeed, pickerStale: standIn !== null, getPickerBattle: pickerBattle ? getPickerBattle : undefined, pickerReplayLog };
 }
 
-/**
- * The seed is derived, never stored: a slot without a draft entry shows the choice the viewed line played; the draft wins slot by
- * slot, and navigation clearing it brings the seed back. The seed reads the resolved picker only (a stand-in belongs to another
- * position).
- */
+// The seed reads the resolved picker only: a stand-in belongs to another position.
 function useEffectivePicker(
   shownState: BranchSimState | null, positionPicker: ResolvedPicker | null, played: PlayedAtPosition | null | undefined,
   draftChoices: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] },
@@ -101,11 +93,7 @@ function useEffectivePicker(
 
 type ResolvedPicker = { simState: BranchSimState; source: PickerSource; battle?: PickerBattle };
 
-/**
- * While the viewed position resolves, the panel keeps what it showed last (the live tip or the last resolved position) so it keeps
- * its height. The stand-in is stale and the panel takes no input: a click on the last resolved picker would choose a move of a
- * Pokémon that is not on the field. Once the viewed position lands, with a picker or without one, the stand-in ends.
- */
+// The stand-in takes no input: a click on the last resolved picker would choose a move of a Pokémon not on the field.
 function useStandIn(
   liveTip: boolean, landed: boolean, lastPicker: ResolvedPicker | null, liveSimState: BranchSimState | null,
 ): BranchSimState | null {
@@ -142,20 +130,18 @@ async function resolvePickerState(args: {
   const index = Math.min(viewTurn - 1, snapshots.length - 1);
   const snapshot = snapshots[index] ?? null;
   if (!snapshot || !replayData) return null;
-  // The approximation uses solved spreads when a solve exists and never starts one (the solve ran three times per load).
+  // Solved spreads when a solve exists; never starts a solve.
   const [{ pickerStateFromSnapshot, teraUsedSides }, teams] = await Promise.all([
     import('../lib/picker-state'),
     buildReplayTeams(replayData, sources, undefined, { cachedOnly: true }),
   ]);
-  // The fast picker offers Tera where the simulator will: the branch format allows it and the side has not terastallized so far.
   const rules = { format: getBranchSimulatorFormat(replayData), teraUsed: teraUsedSides(snapshots.slice(0, index + 1)) };
-  // A Champions format exists in the simulator only once its mod is loaded.
   const { loadSimMods } = await import('../lib/lazy/branch-engine');
   await loadSimMods(rules.format);
   return { simState: pickerStateFromSnapshot(snapshot, teams.p1Team, teams.p2Team, replayGenNumber, bench?.lists ?? null, rules), source: 'snapshot' };
 }
 
-/** What the viewed line played at this position: main line from the replay protocol, variation from the recorded entry. */
+/** What the viewed line played here: the replay protocol on the main line, the recorded entry in a variation. */
 export function usePlayedAtView(args: {
   viewingVariation: boolean;
   variationSpan: VariationSpan | null;
@@ -227,7 +213,6 @@ function fromChoice(choice: BranchSlotChoice | null): PlayedPick | null {
 }
 
 export function playedFromHistory(history: BranchHistoryEntry[], index: number): PlayedAtPosition | null {
-  // The entry that plays the turn, whatever the interludes before it (a replacement on both sides is one).
   const entry = turnEntryAt(history, index);
   if (!entry) return null;
   const p1Slots = (entry.p1SlotChoices ?? []).map(fromChoice);

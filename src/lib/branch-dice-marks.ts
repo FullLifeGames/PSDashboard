@@ -2,12 +2,7 @@ import { notationDice, type DiceReport, type DieReport, type DieWords } from '@f
 import { foldHitReports } from './branch-dice';
 import { isInterlude } from './variation-turns';
 
-/**
- * What the history rows and the share links say about the dice the user forced in a turn. A mark is the label of one die
- * (`notationDice`, the words of the chips and the frame lines) and, for a die that took no effect, the report's reason. Marks are
- * sorted to the side that holds the die, and they live on the history entry, computed when the turn plays (the entry has no battle
- * to name the moves with later).
- */
+/** What a history row and a share link say about a forced die: its label and, if it had no effect, the reason. */
 
 export interface DieMark {
   label: string;
@@ -39,11 +34,7 @@ export const markText = (mark: DieMark): string =>
 
 export const sideMarkTexts = (marks: DiceMarks | undefined, side: Side): string[] => (marks?.[side] ?? []).map(markText);
 
-/**
- * The marks a turn's row shows. A turn that paused for a switch has the turn entry (a partial report: the dice it never reached
- * read as not drawn) and the forced entries that finish it (the last one holds the joined report), so the row reads the last
- * entry of the turn that has marks. An interlude (a replacement on one side or on both) has no row of its own for dice.
- */
+/** The marks a turn's row shows; a turn paused for a switch has several entries, the row reads the last with marks. */
 export function turnDiceMarks(history: readonly { kind?: 'turn' | 'forced'; turnNumber?: number; diceMarks?: DiceMarks }[], index: number): DiceMarks | undefined {
   if (isInterlude(history, index)) return undefined;
   let marks = history[index]?.diceMarks;

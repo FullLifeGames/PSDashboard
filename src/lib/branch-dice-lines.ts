@@ -2,23 +2,13 @@ import { dieLabel, type DiceReport, type DieName, type DieReport, type DieWords,
 import { foldHitReports, resultWord, wordsOf } from './branch-dice';
 import { diceMarksOf, type DiceMarks } from './branch-dice-marks';
 
-/**
- * The lines the frame shows for the dice the user forced: one before the event a forced die decided ("Forced: Air Slash flinch,
- * 60 %", the chance of the result the click forced) and, for a die that took no effect, one at the end of its action ("Forced burn
- * had no effect", with the report's reason). They live in the display of the branch log, never in the battle's log (`branchFrameLog`
- * puts them in). The replay client prints a `|-message|` line as it is, and the frozen `/v1.0.2/` viewer plays the same client, so a
- * shared branch shows the marks as well.
- */
+/** Forced-die display lines are `|-message|` lines: the replay client and the `/v1.0.2/` viewer print them as is. */
 
 export const DIE_LINE = '|-message|';
 
 export interface DieLine { at: number; text: string }
 
-/**
- * Where a turn's lines stand. The report's `logIndex` counts the battle's own log, which writes a `|split|` line and both versions
- * of a line the players see differently; the shown log (what the stream gave the app) has one line there. `battleStart` and
- * `shownStart` are the two lengths before the turn's real play; `complete` is false while the turn waits for a switch.
- */
+/** Where a turn's lines stand: `logIndex` counts the battle's log (`|split|` doubles lines), the shown log has one. */
 export interface TurnWindow {
   battleLog: readonly string[];
   battleStart: number;
@@ -31,15 +21,11 @@ const lowerFirst = (text: string): string => text.charAt(0).toLowerCase() + text
 
 const percent = (chance: number): string => `${Math.round(chance * 1000) / 10} %`;
 
-/**
- * The chance of the result the click forced. The report holds the simulator's chance of the event, the die's "happens" (a 95 % move
- * hits at 0.95), whichever way the click forced it; a die forced not to happen has the complement. A line of the Lines section reads
- * the same number (`LineDie.chance` is the chance of the result the line takes: "no crit (96%)").
- */
+// The simulator's chance is the die's "happens" (a 95 % move hits at 0.95); a forced non-event has the complement.
 const resultChance = (report: DieReport): number | undefined =>
   report.chance !== undefined && 'happens' in report.die.result && !report.die.result.happens ? 1 - report.chance : report.chance;
 
-/** "Forced: Air Slash flinch, 60 %": the subject and the result of the die's label, then the chance of that result when the die has one. */
+/** "Forced: Air Slash flinch, 60 %": subject and result of the die's label, then the chance when the die has one. */
 export function dieText(report: DieReport, words: DieWords): string {
   const label = dieLabel(report.die, words);
   const cut = label.lastIndexOf(': ');
@@ -58,7 +44,6 @@ function noun(report: DieReport, words: DieWords): string {
   return lowerFirst(resultWord(report.die, words));
 }
 
-/** "Forced 10 hits had no effect: ...", or "Forced 10 hits, 5 landed: ..." for a count the game cut short after hits that landed. */
 const noEffectText = (report: DieReport, words: DieWords): string =>
   `Forced ${noun(report, words)}${report.landed === undefined ? ' had no effect' : `, ${report.landed} landed`}${report.reason ? `: ${report.reason}` : ''}`;
 
@@ -84,11 +69,7 @@ function firstFrom(log: readonly string[], from: number, match: (line: string) =
   return found < 0 ? log.length : found;
 }
 
-/**
- * The place after the `|-hitcount|` line of the move a count of hits belongs to, in the shown log of the turn. A count the game cut
- * short is read there, next to "The Pokémon was hit 1 time!", and not behind the end-of-turn lines. Nothing when the move shows no
- * hit count (it never ran, or it was blocked).
- */
+// A count the game cut short is read next to "The Pokémon was hit 1 time!", not behind the end-of-turn lines.
 function afterHitCount(window: TurnWindow, name: DieName): number | undefined {
   if (name.kind !== 'hit-count') return undefined;
   const { shownLog, shownStart } = window;
@@ -104,11 +85,7 @@ function afterHitCount(window: TurnWindow, name: DieName): number | undefined {
   return undefined;
 }
 
-/**
- * The display lines of one executed turn, from the report of the user's dice. A die drawn before this part of the turn (a turn that
- * paused for a switch reports every die in its last part) has its lines from the part that drew it; a die the simulator never
- * drew gets its line only once the turn is complete, since the rest of the turn may still draw it.
- */
+/** The display lines of one executed turn; a die the simulator never drew gets its line once the turn completes. */
 export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords): DieLine[] {
   const lines: DieLine[] = [];
   for (const entry of foldHitReports(report.forced)) {
@@ -124,11 +101,7 @@ export function dieLines(report: DiceReport, window: TurnWindow, words: DieWords
   return lines;
 }
 
-/**
- * The text of a display line as one protocol field: the client splits a line at every pipe and prints its first field, so a reason
- * that quotes a protocol line ("the protocol shows "|-miss|p2a: ..."") would break off at the quote. A broken bar (U+00A6) stands in
- * for the pipe and keeps the quoted line readable.
- */
+// The client splits a line at every pipe and prints the first field: a broken bar (U+00A6) stands in for a quoted pipe.
 const asField = (text: string): string => text.replaceAll('|', '\u00a6');
 
 export function withDieLines(log: readonly string[], lines: readonly DieLine[]): readonly string[] {
@@ -151,13 +124,7 @@ export interface TurnStart { battleStart: number; shownStart: number; words: Die
 export const turnStart = (battle: Battle, shown: readonly string[]): TurnStart =>
   ({ battleStart: battle.log.length, shownStart: shown.length, words: wordsOf(battle) });
 
-/**
- * The part of a history entry that holds the dice of the turn just played: the report, its display lines and its marks for the
- * history row and the share link; empty for a turn without a forced die. `waiting` is true while a forced replacement is pending;
- * the turn is still complete when its actions are over (the `|upkeep` line shows it): a body that fainted at the end of the turn
- * asks for a replacement after the last action drew its dice. A switch in the middle of the turn (a pivot move) leaves the rest of
- * the actions to play.
- */
+/** The report, display lines and marks of the turn just played; the turn is complete once `|upkeep` shows. */
 export function entryDice(
   report: DiceReport | undefined, start: TurnStart, battle: Battle, shown: readonly string[], waiting: boolean,
 ): { diceReport?: DiceReport; dieLines?: DieLine[]; diceMarks?: DiceMarks } {

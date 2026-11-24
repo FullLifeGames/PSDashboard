@@ -62,7 +62,7 @@ export function useHpResolver(
     if (!replayData) return;
     void import('../lib/lazy/team-builder');
     void import('../lib/lazy/branch-engine');
-    // The display-side HP-type resolver pulls @pkmn/sim's Dex: keep it out of the main chunk, hand the loaded module to the enrich memos.
+    // The HP-type resolver pulls @pkmn/sim's Dex: keep it out of the main chunk.
     void import('../lib/lazy/hidden-power').then(module => setHpModule(module));
   }, [replayData]);
 
@@ -85,12 +85,7 @@ interface SpreadSolveEntry {
   value: Promise<Map<string, SpreadCandidate>>;
 }
 
-/**
- * The damage-consistent spread solve: deterministic per replay but thousands of calc calls, so it runs in the replay worker and is
- * cached across the build call sites. Inputs count by identity where they are big and stable (replay, evidence, Smogon payloads)
- * and by content where they are small and re-created per render (the team infos, the paste): an identity churn alone never
- * re-solves. Concurrent callers share the running promise.
- */
+/** The damage-consistent spread solve in the replay worker, cached across call sites; callers share the promise. */
 export function useSpreadSolve(inputs: {
   replayData: ReplayData | null;
   observations: DamageObservation[];
@@ -125,8 +120,6 @@ export function useSpreadSolve(inputs: {
     if (cached && cached.content === content && cached.refs.every((entry, index) => entry === refs[index])) {
       return cached.value;
     }
-    // Only the settled Smogon knowledge is worth a solve (the dwell, the sweep and the play-out wait for it anyway), and a caller
-    // that only wants the cached state never starts one.
     if (opts?.cachedOnly || usageStats.loading || setAssumptions.loading) return undefined;
     const value = replayWorker.solveSpreads({
       log: replayData.log,
@@ -156,7 +149,7 @@ export function useSpreadSolve(inputs: {
   return { solvedSpreads, getInferredSpreads };
 }
 
-/** Posted open team sheets, surfaced in the stats panel as 'sheet' knowledge (the extraction needs the sim's Teams parser, lazily). */
+/** Posted open team sheets, surfaced in the stats panel as 'sheet' knowledge. */
 export function useSheetTeams(replayData: ReplayData | null) {
   const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
   useEffect(() => {

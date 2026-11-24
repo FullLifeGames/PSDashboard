@@ -1,11 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { parseReplayUrl } from '../lib/replay-fetcher';
 
-/**
- * `?replay=<id>&turn=<n>` opens a replay on a turn. The address is read once, at start (`useEmbedHost`), and the turn is landed once,
- * when the named replay has opened, through `landOnTurn` (the selection the evaluation column's graph makes). The address is not
- * rewritten when the user moves on. A turn outside the replay clamps to its range; the lead view (turn 0) is not a turn of the address.
- */
+/** `?replay=<id>&turn=<n>` is read once at start and lands once; a turn outside the replay clamps to its range. */
 
 /** A whole number as written in the address; anything else (empty, `7.5`, `7x`) names no turn. */
 export function parseRequestedTurn(value: string | null): number | null {
@@ -23,7 +19,7 @@ export interface RequestedTurnInputs {
   landOnTurn: (turn: number) => void;
 }
 
-/** Lands on the requested turn once: the first replay that opens ends the request, so a file, host message or later load never moves it. */
+/** Lands on the requested turn once: the first replay that opens ends the request, so later loads never move it. */
 export function useRequestedTurn({ requestedReplay, requestedTurn, replayId, maxTurn, landOnTurn }: RequestedTurnInputs): void {
   const spentRef = useRef(false);
   useEffect(() => {
