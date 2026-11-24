@@ -114,14 +114,16 @@ describe('the rule in the repository config', () => {
   });
 });
 
+let universeOfTree: ReturnType<typeof loadUniverse> | undefined;
+let censusOfTree: Record<string, string[]> | undefined;
+const universe = () => (universeOfTree ??= loadUniverse());
+const census = () => (censusOfTree ??= censusOf(ROOT, universe()) as Record<string, string[]>);
+
 describe('the baseline against the tree', () => {
   const baseline = JSON.parse(readFileSync(fileURLToPath(new URL('../../scripts/name-baseline.json', import.meta.url)), 'utf8')) as { files: Record<string, string[]> };
-  const universe = loadUniverse();
-  const census = censusOf(ROOT, universe) as Record<string, string[]>;
-
   test('no file of packages/*/src holds a Dex name the baseline lacks', () => {
     const fresh: string[] = [];
-    for (const [file, ids] of Object.entries(census)) {
+    for (const [file, ids] of Object.entries(census())) {
       for (const id of ids) if (!baseline.files[file]?.includes(id)) fresh.push(`${file}: ${id}`);
     }
     expect(fresh).toEqual([]);
@@ -144,14 +146,14 @@ describe('the baseline against the tree', () => {
       "export const B = 'sketch'; // eslint-disable-line names/no-new-dex-name -- reviewed",
       "export const C = 'mimic';",
     ].join('\n');
-    expect(filePairs(text, 'x.ts', universe).map((pair: { id: string }) => pair.id)).toEqual(['mimic']);
+    expect(filePairs(text, 'x.ts', universe()).map((pair: { id: string }) => pair.id)).toEqual(['mimic']);
   });
 
   test('the universe holds the four kinds and leaves out types, natures and stats', () => {
-    expect(universe.kindOf('Rocky Helmet')?.kind).toBe('item');
-    expect(universe.kindOf('Psychic')).toBeNull();
-    expect(universe.kindOf('Adamant')).toBeNull();
-    expect(universe.kindOf('speed')).toBeNull();
+    expect(universe().kindOf('Rocky Helmet')?.kind).toBe('item');
+    expect(universe().kindOf('Psychic')).toBeNull();
+    expect(universe().kindOf('Adamant')).toBeNull();
+    expect(universe().kindOf('speed')).toBeNull();
   });
 });
 
@@ -167,7 +169,7 @@ describe('scripts/update-name-baseline.mjs', () => {
   test('the shipped baseline is what the script would write from the tree', async () => {
     const { diffNames } = await import('../../scripts/update-name-baseline.mjs');
     const shipped = JSON.parse(readFileSync(fileURLToPath(new URL('../../scripts/name-baseline.json', import.meta.url)), 'utf8')) as { files: Record<string, string[]> };
-    const diff = diffNames(shipped.files, censusOf(ROOT, loadUniverse()));
+    const diff = diffNames(shipped.files, census());
     expect(diff.added).toEqual([]);
   });
 });
