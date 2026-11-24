@@ -1,7 +1,7 @@
 // The one reader of comments for the comment tools: scripts/comment-only-diff.mjs (proof that an edit moved no code),
 // scripts/comment-counts.mjs (the comment ratchet) and eslint.comments.mjs (the rule comments/no-history).
 //
-// A comment that code reads is never history and never changes in a comment-only edit: `// oracle:` markers (the specs read them),
+// A comment that code reads is never history and never changes in a comment-only edit: `// oracle:` markers (they name the spec that holds the list; one spec still reads its own),
 // eslint directives, TypeScript and test-runner pragmas, triple-slash references, shebangs and legal headers. `readByCode` is the
 // one list of them; the checker compares them byte for byte, the rule and the counter leave them out.
 import ts from 'typescript';
@@ -25,7 +25,7 @@ export function scriptKindOf(fileName) {
 
 export const isCss = fileName => fileName.endsWith('.css');
 
-/** What a comment of the repository's own marker looks like: `// oracle: <spec path>`; the specs read the block above a list. */
+/** What a comment of the repository's own marker looks like: `// oracle: <spec path>`; it names the spec that holds the list below it, and one spec still reads its own. */
 const ORACLE_LINE = /^\s*(\/\/|\/\*+|\*)?\s*oracle:/;
 
 /**

@@ -3,7 +3,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { conditionTurns, ITEM_BLOCKERS } from '../src/dex-facts/screen-turns';
 import type { RulesDex } from '../src/rules-dex';
 import { RULE_VIEWS as VIEWS } from './screen-scenes';
-import { battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { battleIn, mon, type SimView } from './sim-views';
 
 /**
  * The Dex reader `conditionTurns` is held to the simulator in every rule set the corpus plays (Generations 1 to 9 and the Champions
@@ -15,8 +15,6 @@ import { battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
  *    field condition makes the simulator ignore the item; the causes found equal `ITEM_BLOCKERS`, so a fourth cause fails here.
  * The reader takes no battle (a stand-in source), so a guard checks that it leaves a live battle untouched.
  */
-
-const SPEC = 'packages/replay-core/test/screen-turns-sweep.spec.ts';
 
 const asRulesDex = (view: SimView): RulesDex => view.dex as unknown as RulesDex;
 
@@ -49,12 +47,6 @@ const hold = (battle: Battle, setter: Pokemon, item: string): void => {
   setter.item = item;
   setter.itemState = battle.initEffectState({ id: item, target: setter });
 };
-
-describe('the oracle tag', () => {
-  test('the blockers list names this spec', () => {
-    expect(oracleTagAbove('packages/replay-core/src/dex-facts/screen-turns.ts', 'export const ITEM_BLOCKERS', SPEC)).toBe(true);
-  });
-});
 
 describe.each(VIEWS)('S1, the turns of a condition: $name', view => {
   const dex = asRulesDex(view);

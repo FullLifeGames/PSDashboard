@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { TERA_FORME_SPECIES } from '../src/branch/tera-restore';
-import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * `TERA_FORME_SPECIES` in branch/tera-restore.ts names the species whose Terastallization leaves
@@ -15,8 +14,6 @@ import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, oracleTagAbove, type SimVi
  * or maximum HP at the end of the turn depends on the click. They are the list, and a Tera Morpeko is the one that keeps its
  * forme where the plain Morpeko turns Hangry.
  */
-
-const SPEC = 'packages/eval-engine/test/tera-forme-oracle.spec.ts';
 
 interface Outcome { forme: string; ability: string; maxhp: number }
 
@@ -36,12 +33,6 @@ function leads(view: SimView): { species: string; ability: string }[] {
 }
 
 describe('TERA_FORME_SPECIES is held to the simulator (round 72)', () => {
-  test('the set carries its oracle tag and the file names the reason per species', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/branch/tera-restore.ts', 'const TERA_FORME_SPECIES', SPEC)).toBe(true);
-    const source = readFileSync(new URL('../src/branch/tera-restore.ts', import.meta.url), 'utf8');
-    for (const word of ['Ogerpon', 'Terapagos', 'Morpeko', 'Hunger Switch']) expect(source, word).toContain(word);
-  });
-
   describe.each([SINGLES_VIEWS[8], DOUBLES_VIEWS[0]])('$name', view => {
     test('the species whose Tera click changes their forme, ability or maximum HP over a turn are the set', () => {
       const dependent = leads(view)

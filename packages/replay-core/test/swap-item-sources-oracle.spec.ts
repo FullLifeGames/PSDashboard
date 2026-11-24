@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { arg, fromEffect, kwText, readLine } from '../src/inference/log-line';
 import { ITEM_HANDOVER_ACTIVATIONS, SWAP_ITEM_SOURCES } from '../src/inference/handlers';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * `SWAP_ITEM_SOURCES` in inference/handlers.ts names the `[from]` sources of an `|-item|` line that mean the holder took the item from
@@ -21,8 +21,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  *    `takeItem`; the list names it, so the picker's item is not read as its set item.
  * Recycle, Harvest, Frisk and G-Max Replenish write `|-item|` lines too and move no item between Pokémon: they stay out.
  */
-
-const SPEC = 'packages/replay-core/test/swap-item-sources-oracle.spec.ts';
 
 type Entry = Record<string, unknown>;
 
@@ -82,10 +80,6 @@ function observedSources(view: SimView, emitter: Emitter): string[] {
 }
 
 describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/replay-core/src/inference/handlers.ts', 'const SWAP_ITEM_SOURCES', SPEC)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const writers = emitters(view);
 

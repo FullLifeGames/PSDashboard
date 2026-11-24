@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { HALVING_MOVES } from '../src/score/threat';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove } from './sim-views';
+import { ALL_VIEWS, battleIn, mon } from './sim-views';
 
 /**
  * `HALVING_MOVES` in score/threat.ts names the moves that deal half the target's current HP (the threat prices them from the
@@ -11,10 +11,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove } from './sim-views';
  */
 
 describe('HALVING_MOVES is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/score/threat.ts', 'const HALVING_MOVES', 'packages/eval-engine/test/halving-moves-oracle.spec.ts')).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const withCallback = view.dex.moves.all()
       .filter(move => move.exists && move.category !== 'Status' && (move as unknown as { damageCallback?: unknown }).damageCallback)

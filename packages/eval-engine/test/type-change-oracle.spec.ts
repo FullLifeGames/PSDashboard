@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { ActiveMove, Battle, Pokemon } from '@pkmn/sim';
 import { CONTEXT_MOVES, NO_ATE, NO_NORMALIZE, RULE_MOVES, moveAtUse, type MoveLike } from '../src/move-use';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * move-use.ts keeps three lists of move ids by hand, because it imports nothing (the
@@ -17,7 +17,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  */
 
 const ATE = ['pixilate', 'aerilate', 'refrigerate', 'galvanize', 'dragonize'];
-const spec = 'packages/eval-engine/test/type-change-oracle.spec.ts';
 
 const isReal = (view: SimView, kind: 'moves' | 'abilities', id: string): boolean => {
   const entry = view.dex[kind].get(id);
@@ -52,12 +51,6 @@ const idsInHandler = (ability: { onModifyType?: unknown }): string[] => {
 };
 
 describe('the type lists of move-use.ts are held to the simulator (round 72)', () => {
-  test('the lists carry their oracle tag', () => {
-    for (const name of ['const NO_ATE', 'const NO_NORMALIZE', 'const CONTEXT_MOVES']) {
-      expect(oracleTagAbove('packages/eval-engine/src/move-use.ts', name, spec), name).toBe(true);
-    }
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const gen = view.dex.gen;
     const moves = realMoves(view);

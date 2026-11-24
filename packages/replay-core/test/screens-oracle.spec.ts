@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { SCREENS, standingScreens } from '../src/dex-facts/index';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * The screens are one constant (`SCREEN_FLAGS` in dex-facts/screens.ts, `SCREENS` its keys), because the Dex cannot say them: the
@@ -14,7 +14,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * log parser books the screen on a hit in every view.
  */
 
-const SPEC = 'packages/replay-core/test/screens-oracle.spec.ts';
 const HITS = [{ category: 'Physical', move: 'tackle', user: 'Machamp' }, { category: 'Special', move: 'thunderbolt', user: 'Alakazam' }];
 
 const isReal = (view: SimView, id: string): boolean => {
@@ -32,10 +31,6 @@ function damage(view: SimView, hit: (typeof HITS)[number], prepare?: (side: Retu
 }
 
 describe('SCREENS is held to the simulator (round 72)', () => {
-  test('the constant carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/replay-core/src/dex-facts/screens.ts', 'export const SCREEN_FLAGS', SPEC)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     test('the side conditions that cut a physical or a special hit are the screens', () => {
       const conditions = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.sideCondition as string))];

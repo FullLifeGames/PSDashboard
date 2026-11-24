@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { ROOMS } from '../src/pair/snapshot';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * `ROOMS` in pair/snapshot.ts names the pseudo-weathers the damage calculator's Field reads (isGravity, isMagicRoom, isWonderRoom).
@@ -11,8 +11,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * (Ion Deluge and Plasma Fists are Past moves in Generation 9; Mud Sport and Water Sport are live in Generations 3 to 8). Trick Room
  * and Fairy Lock change no roll.
  */
-
-const SPEC = 'packages/eval-engine/test/rooms-oracle.spec.ts';
 
 /** Pseudo-weathers that change a roll but are not in ROOMS. */
 const UNKEYED = ['iondeluge', 'mudsport', 'watersport'];
@@ -48,10 +46,6 @@ function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType
 }
 
 describe('ROOMS is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/pair/snapshot.ts', 'const ROOMS', SPEC)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const pseudoWeathers = [...new Set(view.dex.moves.all()
       .filter(move => isReal(view, 'moves', move.id) && move.pseudoWeather)

@@ -50,5 +50,3 @@ export function battleIn(view: SimView, p1: PokemonSet[], p2: PokemonSet[], seed
   }
   return battle;
 }
-
-export { oracleTagAbove } from './oracle-tag';

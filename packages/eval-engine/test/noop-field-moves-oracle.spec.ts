@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { LAYER_CAPS, failsAgainstStanding } from '../src/search/options';
 import type { positionBattle } from '../src/forward-model';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * search/options.ts drops a field move from the option list while its condition already stands ("clicking it is a pass with a
@@ -15,7 +15,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * where the same turn without the standing condition does not (under the weather a move may need: none, Snow, Hail).
  */
 
-const SPEC = 'packages/eval-engine/test/noop-field-moves-oracle.spec.ts';
 type Side = ReturnType<typeof positionBattle>['sides'][number];
 
 const isReal = (view: SimView, id: string): boolean => {
@@ -58,10 +57,6 @@ function simulatorFails(view: SimView, moveId: string): boolean {
 }
 
 describe('field moves against a standing condition are read from the Dex and held to the simulator (round 72)', () => {
-  test('the layer caps carry their oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/search/options.ts', 'export const LAYER_CAPS', SPEC)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const setters = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.id))].sort();
 

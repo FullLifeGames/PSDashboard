@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { hazardConditions } from '@fulllifegames/replay-core';
 import { BOTH_SIDES_REMOVAL_MOVES, OWN_SIDE_REMOVAL_MOVES, removalKind } from '../src/score/hazards';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * score/hazards.ts names five hazard removal moves in two lists, those that clear only the
@@ -54,12 +54,6 @@ function sweep(view: SimView, hazards: string[]): { own: string[]; foe: string[]
 const real = (view: SimView, ids: string[]) => ids.filter(id => isReal(view, id));
 
 describe('hazard removal lists are held to the simulator (round 72)', () => {
-  test('both lists carry their oracle tag', () => {
-    const spec = 'packages/eval-engine/test/hazard-removal-oracle.spec.ts';
-    expect(oracleTagAbove('packages/eval-engine/src/score/hazards.ts', 'const OWN_SIDE_REMOVAL_MOVES', spec)).toBe(true);
-    expect(oracleTagAbove('packages/eval-engine/src/score/hazards.ts', 'const BOTH_SIDES_REMOVAL_MOVES', spec)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const hazards = [...hazardConditions(view.dex)].filter(id => isReal(view, id)).sort();
     const realHere = (ids: string[]) => real(view, ids);

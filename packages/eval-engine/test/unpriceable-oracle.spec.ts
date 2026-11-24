@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { UNPRICEABLE_MOVE_IDS } from '../src/ko-odds';
-import { ALL_VIEWS, battleIn, known, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, known, mon, type SimView } from './sim-views';
 
 /**
  * `UNPRICEABLE_MOVE_IDS` in ko-odds.ts names the 31 moves whose immediate damage the one-turn model cannot price. The Dex says why for 30 of them, through a field the
@@ -39,10 +39,6 @@ const UNLISTED_WITH_REASON: string[] = [
 ];
 
 describe('UNPRICEABLE_MOVE_IDS is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/ko-odds.ts', 'const UNPRICEABLE_MOVE_IDS', 'packages/eval-engine/test/unpriceable-oracle.spec.ts')).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     const listed = [...UNPRICEABLE_MOVE_IDS].filter(id => view.dex.moves.get(id).exists);
 

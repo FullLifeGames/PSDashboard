@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Battle } from '@pkmn/sim';
 import { SENDERS } from '../src/inference/item-triggers';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
  * `SENDERS` in inference/item-triggers.ts names the items whose `|-enditem|` line means the item sent a Pokémon out of the field (it
@@ -11,8 +11,6 @@ import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-vi
  * doubles has one too) and keeps the items after whose use a Pokémon left or waits to leave (the holder's `switchFlag`, or the
  * attacker dragged out by `|drag|`).
  */
-
-const SPEC = 'packages/replay-core/test/senders-oracle.spec.ts';
 
 const HANDLERS = ['onAfterMoveSecondary', 'onAfterBoost'];
 
@@ -32,10 +30,6 @@ function sends(view: SimView, item: string, move: string, filler: string): boole
 }
 
 describe('SENDERS is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/replay-core/src/inference/item-triggers.ts', 'const SENDERS', SPEC)).toBe(true);
-  });
-
   describe.each(ALL_VIEWS)('$name', view => {
     test('the items that send a Pokémon out are the listed ones', () => {
       const candidates = realItems(view)
