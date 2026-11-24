@@ -1,45 +1,28 @@
 import { rulesDex, toId, type RulesDex, type RulesMod, type SideId, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { normalizeLines } from './line-endings.ts';
 
-/**
- * Protocol-visible dice events per turn, the anchor for the report's luck claims: the chance ledger (chanceDelta) is a residual (rolls,
- * crits, reveals and model error all land in it), so these turns, which carry an event the protocol itself shows to be rolled, ground or
- * contradict a claim. Coarse on purpose: damage rolls emit no marker, and a bare |-status| can come from a deterministic source.
- */
+// Coarse on purpose: damage rolls emit no marker, and a bare |-status| can come from a deterministic source.
 
-/**
- * |cant| reasons that are dice: full paralysis, flinch, freeze, sleep (Rest sleep is fixed-length: a documented over-inclusion), and the
- * infatuation, which the simulator writes by the name of its condition, "Attract" (test/pair-cant-reasons.spec.ts holds the set to the
- * simulator's dice reasons, plus sleep).
- */
+// Rest sleep is fixed-length (a documented over-inclusion); the simulator writes the infatuation as "Attract".
 // eslint-disable-next-line names/no-new-dex-name -- the simulator's |cant| reason (the infatuation's condition name), held by pair-cant-reasons.spec.ts
 export const CHANCE_CANT: ReadonlySet<string> = new Set(['slp', 'par', 'frz', 'flinch', 'Attract']);
 
 type GenDex = RulesDex;
 
-/** The Dex of a replay's generation and mod (the Champions mod changes accuracies and secondaries); absent without a generation. */
 const dexOfGeneration = (generation: number | undefined, mod: RulesMod): GenDex | undefined =>
   generation === undefined ? undefined : rulesDex(generation, mod);
 
-/** The Dex and the move whose action is running at a line; null keeps the markers as the protocol alone shows them. */
 type DiceContext = { dex: GenDex; running: string | null } | null;
 
-/**
- * Whether a move's own dice can decide a status it lands: an accuracy under 100 (Hypnosis, Toxic, Thunder Wave from Gen 7 on) or a
- * status chance under 100 (Scald's burn; Tri Attack's, which a handler picks). Thunder Wave in Gen 6 (accuracy 100), Toxic Spikes and
- * Rest (accuracy true) roll nothing.
- */
 function moveRollsStatus(dex: GenDex, id: string): boolean {
   const move = dex.moves.get(id);
   if (typeof move.accuracy === 'number' && move.accuracy < 100) return true;
   const effects = move.secondaries ?? (move.secondary ? [move.secondary] : []);
-  // A secondary that names only its chance picks its effect in a handler (Tri Attack, Dire Claw): its status is rolled too.
-  // The simulator's Dex keeps the handler on the secondary (onHit): a function is no field.
+  // A secondary that names only its chance picks its effect in a handler (Tri Attack, Dire Claw): its status is rolled.
   return effects.some(effect => (effect.chance ?? 100) < 100
     && (effect.status !== undefined || Object.entries(effect).every(([key, value]) => key === 'chance' || typeof value === 'function')));
 }
 
-/** A bare or `[from] move:` status is a roll when its source's dice can decide it; with no running move (a hazard on a switch-in, a residual) it is none. */
 function statusRolls(from: string | undefined, context: NonNullable<DiceContext>): boolean {
   if (from === undefined) return context.running !== null && moveRollsStatus(context.dex, context.running);
   if (from.startsWith('[from] ability:')) return true;
@@ -52,15 +35,14 @@ function diceLine(line: string, context: DiceContext): boolean {
   if (line.startsWith('|move|') && line.includes('|[miss]')) return true;
   if (line.startsWith('|cant|')) return CHANCE_CANT.has(line.split('|')[3] ?? '');
   if (line.startsWith('|-status|')) {
-    // Without a generation: a named non-ability source (move: Rest, item: Flame Orb, hazards) is deterministic; a bare status (move
-    // secondary, direct status move) and an ability source (Flame Body, Static) are rolled. With one: the source's own Dex entry decides.
+    // Without a generation: a named non-ability source (Rest, Flame Orb, hazards) is deterministic; a bare status or an
+    // ability source (Flame Body, Static) rolls. With one, the source's own Dex entry decides.
     const from = line.split('|').find(part => part.startsWith('[from]'));
     return context ? statusRolls(from, context) : from === undefined || from.startsWith('[from] ability:');
   }
   return false;
 }
 
-/** The tags that close a move's action: the next action, the residual phase (the empty line), the turn's end. */
 const ACTION_END: ReadonlySet<string> = new Set(['move', 'switch', 'drag', 'cant', 'upkeep', 'turn', '']);
 
 function diceMarks(lines: readonly string[], generation: number | undefined, mod: RulesMod): boolean[] {
@@ -74,7 +56,7 @@ function diceMarks(lines: readonly string[], generation: number | undefined, mod
   });
 }
 
-/** Turns whose protocol carries a visible dice event, indexed by turn (entry 0 stays empty); with the generation a sure crit and a status no dice decided are no event. */
+/** Entry 0 stays empty; with the generation a sure crit and a status no dice decided are no event. */
 export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], generation?: number, mod?: RulesMod): Set<number> {
   const turns = new Set<number>();
   turnEventsIndex.forEach((lines, turn) => {
@@ -83,24 +65,18 @@ export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], 
   return turns;
 }
 
-/** One hit of a move on an opposing body, as the protocol shows it. */
 export interface RolledHit {
   side: SideId;
-  /** The move's id, as the |move| line names it. */
   move: string;
-  /** The body's species: its switch line this turn, else the pre-turn snapshot. */
   target: string;
-  /** The attacker's slot ("p1a", "p2b"), so a doubles hit names who used the move. */
   slot: string;
-  /** The attacker's species, read like the target's; absent when no line names it. */
   attacker?: string;
   /** The hit took the body's last HP (a |-damage| to 0 without [from]). */
   ko: boolean;
 }
 
-/** What one turn's protocol shows of its rolls: the side each dice marker favored and every hit on an opposing body. */
 export interface TurnRolls {
-  /** The side opposing the body each dice marker went against (the crit's target, the missing attacker, a dice |cant| holder, a rolled status's body). */
+  /** The side opposing the body each dice marker went against (crit target, missing attacker, |cant| holder). */
   favored: { p1: boolean; p2: boolean };
   hits: RolledHit[];
 }
@@ -110,7 +86,6 @@ const sideOfIdent = (ident: string | undefined): SideId | null =>
 
 type Entered = Map<string, { name: string; species: string }>;
 
-/** The species behind an ident: the slot's switch line this turn, else the pre-turn snapshot (nickname, then species). */
 function speciesOf(ident: string, entered: Entered, snapshotBefore: TurnSnapshot | null): string | null {
   const match = ident.match(/^(p[12])([a-d]): (.+)$/);
   if (!match) return null;
@@ -124,13 +99,11 @@ function speciesOf(ident: string, entered: Entered, snapshotBefore: TurnSnapshot
 
 interface RunningAction {
   side: SideId;
-  /** The attacker's ident ("p1a: Name"). */
   ident: string;
   move: string;
   hits: Map<string, RolledHit>;
 }
 
-/** One direct |-damage| line on an opposing body extends the running action's hits (a multi-hit move stays one hit). */
 function noteHit(action: RunningAction, parts: string[], scan: { entered: Entered; snapshotBefore: TurnSnapshot | null; hits: RolledHit[] }): void {
   if (parts.some(part => part.startsWith('[from]'))) return;
   const ident = parts[2] ?? '';
@@ -161,13 +134,11 @@ function nextAction(action: RunningAction | null, tag: string, parts: string[]):
   return ACTION_END.has(tag) ? null : action;
 }
 
-/** A switch or drag line names the slot's new body ("p1a: Name", "Species, L50, F"). */
 function noteEntry(entered: Entered, parts: string[]): void {
   const ident = parts[2] ?? '';
   entered.set(ident.slice(0, 3), { name: ident.slice(5), species: (parts[3] ?? '').split(',')[0].trim() });
 }
 
-/** The sides a turn's dice markers favored and the hits its moves put on opposing bodies; with the replay generation a sure crit and a status no dice decided are no roll. */
 export function detectRolls(rawLines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number, mod?: RulesMod): TurnRolls {
   const lines = normalizeLines(rawLines);
   const favored = { p1: false, p2: false };

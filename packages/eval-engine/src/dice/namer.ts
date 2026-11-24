@@ -3,11 +3,7 @@ import { recognize } from './recognize.ts';
 import type { DieName, Draw } from './types.ts';
 import { watchBattle, type BattleWatch } from './watch.ts';
 
-/**
- * Names the draws of a scripted PRNG (the tree's `forward/scripted-prng.ts`, `pair/prng.ts`) by the simulator's own hook (ADR 0002), the way
- * `dice/prng.ts` does. The PRNG asks once per simulator call, also for a draw it answers itself (a skipped draw leaves the watch's queue of
- * secondary entries behind the stream), and before it draws: the name reads the battle's state, never the value. After `release()` a draw has no name.
- */
+/** Names a scripted PRNG's draws by the simulator's own hook (ADR 0002); the name reads the state, never the value. */
 export class DrawNamer {
   private watch: BattleWatch | null;
 
@@ -15,7 +11,7 @@ export class DrawNamer {
     this.watch = watchBattle(battle);
   }
 
-  /** The die of this draw, or null when nothing names it (or the namer was released). */
+  /** null when nothing names the draw, or after `release()`. */
   name(draw: Draw): DieName | null {
     const watch = this.watch;
     if (!watch) return null;

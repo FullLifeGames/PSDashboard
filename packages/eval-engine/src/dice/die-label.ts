@@ -1,32 +1,25 @@
 import type { DieKind, DieName, DieResult, ForcedDie } from './types.ts';
 
-/** One text per forced die (history rows, shares, frame lines, chips), with the names the caller's `DieWords` give it; free of simulator imports. */
+/** The reader of names for dieLabel; this module imports nothing from the simulator. */
 
-/** The reader of names: the game's own Dex for moves and effects, the battle's names for the bodies. */
 export interface DieWords {
   move(id: string): string;
-  /** A status, a volatile, an ability or an item by its id (a secondary's `boosts:spd` and `self:atk` pass through as given). */
+  /** A status, volatile, ability or item by id; a secondary's `boosts:spd` and `self:atk` pass through as given. */
   effect(id: string): string;
-  /**
-   * The same effect as a common noun inside a result ("no burn", like "no crit"): a status or a volatile in lower case, a stat change
-   * and the names of abilities and items as `effect` writes them. Absent: `effect`.
-   */
+  /** The effect as a common noun inside a result ("no burn", like "no crit"); absent: `effect`. */
   plain?(id: string): string;
   slot(slot: string): string;
 }
 
 const IDS: DieWords = { move: id => id, effect: id => id, slot: slot => slot };
 
-/** Kinds whose subject is the effect that holds the die, not a move. */
 const EFFECT_SUBJECT = new Set<DieKind>(['ability-proc', 'item-proc', 'end-of-turn', 'move-first']);
 
-/** The effect id without the suffix the module gives a die with several results (`effectspore:option`). */
 const idOf = (name: DieName): string => (name.effectId ?? '').split(':option')[0];
 
 function subjectOf(name: DieName, words: DieWords): string {
   if (name.kind === 'speed-tie') return 'Speed tie';
   if (EFFECT_SUBJECT.has(name.kind) && name.effectId) return words.effect(idOf(name));
-  // the accuracy die of a later hit of a multi-hit move names its hit; the first hit's die keeps the plain subject
   return name.moveId ? `${words.move(name.moveId)}${name.hit ? ` hit ${name.hit}` : ''}` : words.slot(name.slot);
 }
 
@@ -56,7 +49,6 @@ function resultText(name: DieName, result: DieResult, words: DieWords): string {
   return chanceText(name, words)[result.happens ? 0 : 1];
 }
 
-/** The label of a forced die: its subject, a colon and the result in words. */
 export function dieLabel(die: ForcedDie, words: DieWords = IDS): string {
   return `${subjectOf(die.name, words)}: ${resultText(die.name, die.result, words)}`;
 }

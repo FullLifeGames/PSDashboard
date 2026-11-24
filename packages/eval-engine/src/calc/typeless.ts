@@ -1,13 +1,9 @@
 import type { RulesDex } from '@fulllifegames/replay-core';
 
-/**
- * Struggle in Gens 2 to 4 is typeless in the simulator (its onModifyMove sets the type to '???'), so a Normal type-boost item (Silk Scarf,
- * Pink Bow) adds nothing, while @smogon/calc 0.12 hands it over by name. Both facts come from the simulator's handlers on stand-ins.
- */
+// Struggle in Gens 2 to 4 is typeless in the simulator (onModifyMove sets '???'): a Normal type-boost item adds none.
 
 type Handler = (this: unknown, ...args: unknown[]) => unknown;
 
-/** Whether the simulator's move, once it has run its own onModifyMove, is a typeless damaging move ('???'). */
 function typelessAtUse(dex: RulesDex, moveName: string): boolean {
   const move = dex.getActiveMove(moveName);
   const modify = (move as { onModifyMove?: unknown }).onModifyMove;
@@ -20,7 +16,7 @@ function typelessAtUse(dex: RulesDex, moveName: string): boolean {
   return (move.type as string) === '???';
 }
 
-/** The item handlers that scale a hit by the move: all four take (value, user, target, move); Gen 3's Silk Scarf reads onModifyAtk. */
+// Item handlers that scale a hit take (value, user, target, move); Gen 3's Silk Scarf reads onModifyAtk.
 const HIT_HANDLER = /^on(BasePower|ModifyAtk|ModifySpA|ModifyDamage)$/;
 
 function boostsType(dex: RulesDex, itemName: string, moveName: string, type: string): boolean {
@@ -35,7 +31,7 @@ function boostsType(dex: RulesDex, itemName: string, moveName: string, type: str
   });
 }
 
-/** The item the calc sees on the attacker: '' for a Normal-type boost item on a move the simulator plays typeless, else the item. */
+/** The item the calc sees: '' for a Normal-type boost item on a move the simulator plays typeless. */
 export function itemAtUse(dex: RulesDex, item: string, moveName: string): string {
   if (!item) return item;
   return typelessAtUse(dex, moveName) && boostsType(dex, item, moveName, 'Normal') && !boostsType(dex, item, moveName, '???') ? '' : item;

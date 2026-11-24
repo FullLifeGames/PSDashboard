@@ -1,10 +1,7 @@
 import type { Battle } from '@pkmn/sim';
 import { idsOfStrings, lex, readsOfCode } from './handler-source.ts';
 
-/**
- * Which fields of the board a Dex entry reads when its handlers run, scanned from the handler sources at run time (the memo keys of
- * score/contact.ts, score/residuals.ts).
- */
+/** The consumer whose memo key the reads feed: score/contact.ts (hit) and score/residuals.ts (residual). */
 
 export type Consumer = 'hit' | 'residual';
 
@@ -12,18 +9,13 @@ export type ReadSet = ReadonlySet<string>;
 
 type BattleDex = Battle['dex'];
 
-/**
- * The events a played hit never fires (a move use on the copy of a board, score/contact-play.ts): the choice of the next turn (the
- * disabled moves, the trapped bodies, the lock of a move). The end of the turn does fire (Residual, BeforeMove). An event the list does
- * not know is read, so a new simulator event costs hits, never an answer; test/board-key-census.spec.ts plays every damaging move and
- * requires that none of these fired.
- */
+/** Events a played hit never fires; an unknown event counts as read, so a new one costs hits, never an answer. */
+// test/board-key-census.spec.ts plays every damaging move and requires that none of these fired.
 export const HIT_EVENTS_NEVER: ReadonlySet<string> = new Set([
   'DisableMove', 'StallMove', 'TrapPokemon', 'MaybeTrapPokemon', 'BeforeTurn', 'LockMove', 'LockMoveAbility',
   'FoeMaybeTrapPokemon', 'AllyMaybeTrapPokemon', 'FlinchChance',
 ]);
 
-/** The events the played end of the turn fires (`fieldEvent('Residual')` and what a residual handler's damage and heal set off). */
 export const RESIDUAL_EVENTS: ReadonlySet<string> = new Set([
   'Residual', 'FieldResidual', 'SideResidual', 'Weather', 'Damage', 'Heal', 'TryHeal', 'Type', 'Update', 'ModifySpecies',
   // eslint-disable-next-line names/no-new-dex-name -- 'Immunity' is the simulator's event of that name (held by board-key-effects.spec.ts), not the ability
@@ -31,7 +23,6 @@ export const RESIDUAL_EVENTS: ReadonlySet<string> = new Set([
   'BeforeFaint', 'Faint', 'AfterFaint', 'End',
 ]);
 
-/** `onResidual`, `onFoeBasePower`, `onSourceModifyDamage`: the event of a handler's key, with and without the prefix that says whose it is. */
 const HANDLER = /^on(Ally|Foe|Source|Any|Field|Side|Slot|Self)?([A-Z]\w*)$/;
 
 const SUB_EFFECTS = ['condition', 'self', 'secondary', 'secondaries'] as const;
@@ -39,15 +30,11 @@ const CREATES = ['volatileStatus', 'sideCondition', 'slotCondition', 'status', '
 
 export interface EntryReads { fields: ReadSet; names: ReadonlySet<string> }
 
-/** The reads of the simulator's own methods on a body, a side and the field: a handler that calls one of them reads what it reads. */
 export type Methods = ReadonlyMap<string, ReadSet>;
 
 export const tokensOf = (source: string): Set<string> => readsOfCode(lex(source).code);
 
-/**
- * Whether the consumer fires the event of this handler key (a key that is no handler is a callback the move path calls: the hit reads it,
- * the end of the turn does not).
- */
+// A key that is no handler is a callback the move path calls: the hit reads it, the end of the turn does not.
 function fires(key: string, consumer: Consumer): boolean {
   const match = HANDLER.exec(key);
   if (!match) return consumer === 'hit';
@@ -77,7 +64,6 @@ function collect(entry: Record<string, unknown>, consumer: Consumer, depth: numb
 
 const scans = { hit: new WeakMap<object, EntryReads>(), residual: new WeakMap<object, EntryReads>() };
 
-/** The properties the handlers of one Dex entry read for a consumer, and the ids it names; the entry is a move, an ability, an item or a condition. */
 export function entryReads(entry: object, consumer: Consumer, methods: Methods): EntryReads {
   let found = scans[consumer].get(entry);
   if (found) return found;
@@ -86,9 +72,8 @@ export function entryReads(entry: object, consumer: Consumer, methods: Methods):
   const fields = readsOfCode(out.code);
   const names = new Set(out.names);
   for (const id of out.ids) names.add(id);
-  // A build writes `volatiles['substitute']` as `volatiles.substitute`: a property name that is the id of a condition is a name too.
+  // A build writes `volatiles['substitute']` as `volatiles.substitute`: a property that is a condition id counts too.
   for (const field of fields) names.add(field);
-  // A call of a method of the body, the side or the field reads what the method reads (transitively: the methods are in the table closed already).
   for (const token of [...fields]) for (const read of methods.get(token) ?? []) fields.add(read);
   found = { fields, names };
   scans[consumer].set(entry, found);
@@ -117,20 +102,11 @@ function closeOver(direct: ReadonlyMap<string, ReadonlySet<string>>): { reads: M
   return { reads, reach };
 }
 
-/**
- * The method of the battle that finds the handlers of an event in the Dex entries on the board: what reaches it runs those handlers, which
- * the scan reads on their own.
- */
+// A Battle method that reaches getCallback runs handlers the scan reads on their own, so its reads stay out.
 const DISPATCH = 'getCallback';
 
-/**
- * The reads of the methods of the simulator's `Pokemon`, `Side` and `Field`, and of the `Battle` methods that never reach its event
- * dispatch, closed over their calls of each other: found from the prototypes of instances of the battle (a clone of the speed layer
- * carries the same sources). A handler that calls `this.getOverflowedTurnCount()` (a Future Sight, a Wish) reads the battle's `turn`.
- * A `Battle` method that reaches the dispatch (`runEvent`, `damage`, `heal`) runs the handlers of the entries on the board, whose reads
- * the scan already holds, and reads bookkeeping of the dispatch (`event`, `effect`, `activeMove`): its reads stay out, because with
- * them every board would read the whole battle (the hit memo would play five times as often).
- */
+/** The reads of Pokemon, Side and Field methods and of the Battle methods that never reach the dispatch. */
+// With the dispatching ones (runEvent, damage, heal) every board would read the whole battle.
 export function methodsOf(battle: Battle): Methods {
   const side = battle.sides[0];
   const body = side.pokemon[0] ?? side.active[0];
@@ -149,7 +125,6 @@ export function methodsOf(battle: Battle): Methods {
     return names;
   };
   for (const proto of prototypes) add(proto, true);
-  // The battle's own methods join under their own names (a name the body, the side or the field has keeps its reads), minus the ones that reach the dispatch.
   const ofBattle = add(Object.getPrototypeOf(battle) as object, false);
   const dispatching = closeOver(direct).reach;
   for (const name of ofBattle) {
@@ -160,10 +135,6 @@ export function methodsOf(battle: Battle): Methods {
   return closed;
 }
 
-/**
- * Everything the handlers of some entries read for a consumer, with the conditions they can create (the ids their data and their
- * sources name, resolved by the Dex's own resolver) and what those read in turn.
- */
 export function readsOfEntries(dex: BattleDex, entries: Iterable<object | null | undefined>, consumer: Consumer, methods: Methods): Set<string> {
   const reads = new Set<string>();
   const seen = new Set<object>();

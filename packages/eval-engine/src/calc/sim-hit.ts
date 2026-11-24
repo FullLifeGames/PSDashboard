@@ -1,29 +1,22 @@
 import type { ActiveMove, Battle, Pokemon } from '@pkmn/sim';
 import { FixedDice, playOnCopy } from '../sim-ask/index.ts';
 
-/**
- * The simulator's own price of one hit, played on a copy of the live battle, for hits the calc cannot price: it forces the spread target
- * for Expanding Force in Psychic Terrain and Tera Starstorm of Terapagos-Stellar, and against a lone foe behind a screen it holds no
- * screen factor in either game type.
- */
+/** Hits the calc cannot price: spread-target Expanding Force and Tera Starstorm, a lone foe behind a screen. */
 
-/** A body of the live battle: the side's index (0 is p1) and its active slot. */
 export interface BattleSlot {
   side: 0 | 1;
   slot: number;
 }
 
-/** A hit to price: the live battle (read, never written), its two bodies and the Terastallization the picker has armed. */
+/** A hit to price: the live battle is read, never written. */
 export interface LiveHit {
-  /** The live battle of the branch (`getBattle()` in the app). */
   battle: Battle;
   attacker: BattleSlot;
   defender: BattleSlot;
-  /** The Terastallization the picker has armed for this turn, played as the click makes it before the hit. */
   armed?: { attacker?: boolean; defender?: boolean };
 }
 
-/** The damage in HP of the highest and the lowest roll, no crit, with the defender's HP at the hit. */
+/** The damage in HP of the highest and the lowest roll, no crit, against the defender's HP at the hit. */
 export interface SimHitRange {
   min: number;
   max: number;
@@ -31,7 +24,7 @@ export interface SimHitRange {
   maxhp: number;
 }
 
-/** random(16) answers 0 for the highest roll (100 percent) and 15 for the lowest (85 percent). */
+// random(16) answers 0 for the highest roll and 15 for the lowest.
 const HIGHEST_ROLL = 0;
 const LOWEST_ROLL = 0.999;
 
@@ -40,9 +33,7 @@ function clickTera(copy: Battle, body: Pokemon): void {
   if (!body.terastallized && typeof actions.terastallize === 'function') actions.terastallize(body);
 }
 
-/** One played use: the damage the simulator's damage step returned for the defender, or null when the move never reached it. */
 function damageAt(hit: LiveHit, moveId: string, quantile: number): { damage: number; hp: number; maxhp: number } | null {
-  // No crit and no miss: a crit is a chance draw and the preview shows the roll range of the plain hit.
   return playOnCopy(hit.battle, new FixedDice({ quantile, chance: false }), copy => {
     const attacker = copy.sides[hit.attacker.side].active[hit.attacker.slot];
     const defender = copy.sides[hit.defender.side].active[hit.defender.slot];
@@ -65,7 +56,7 @@ function damageAt(hit: LiveHit, moveId: string, quantile: number): { damage: num
   });
 }
 
-/** The simulator's damage range of a single-hit move on a copy of the live battle, or null when it never reaches the defender or the battle cannot be copied. */
+/** The damage range of a single-hit move on a copy; null when it never reaches the defender or no copy exists. */
 export function simHitRange(hit: LiveHit, moveName: string): SimHitRange | null {
   try {
     const id = moveName.toLowerCase().replace(/[^a-z0-9]/g, '');

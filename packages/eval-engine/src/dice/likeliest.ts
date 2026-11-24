@@ -7,14 +7,13 @@ import { readsStartRoll } from './start-roll.ts';
 import { probeCheck } from './status-probe.ts';
 import { dieKey, plainKey, tieName, type DieName, type Draw, type ForcedDie } from './types.ts';
 
-/** The likeliest result of each die, and a turn played with every die at it, so the click that plays an engine line forces the dice the line assumes. */
+/** A die at its likeliest result; `chance` is that result's chance, 0 to 1, absent when the draw names none. */
 
-export interface LikeliestDie { die: ForcedDie; /** The chance of the result the die takes, 0 to 1; absent when the draw names none. */ chance?: number }
+export interface LikeliestDie { die: ForcedDie; chance?: number }
 
-/** Kinds that are one chance, forced to happen or not to; a status check has its own polarity. */
 const CHANCE_KINDS = new Set(['accuracy', 'crit', 'secondary', 'self-effect', 'stalling', 'power', 'move-first', 'ability-proc', 'item-proc', 'end-of-turn']);
 
-/** The mode of a list (first appearance order); a tie takes the lower middle one. */
+// First appearance order; a tie takes the lower middle one.
 function modeOf<T>(items: readonly T[]): { value: T; share: number } {
   const counts = new Map<T, number>();
   for (const item of items) counts.set(item, (counts.get(item) ?? 0) + 1);
@@ -31,7 +30,7 @@ function chanceLikeliest(name: DieName, draw: Draw): LikeliestDie {
   return chance >= 0.5 ? { die: { name, result: { happens: true } }, chance } : { die: { name, result: { happens: false } }, chance: 1 - chance };
 }
 
-/** A status check: the body acts when that is one half or more likely; the polarity comes from the condition's own handler. */
+// The body acts when that is one half or more likely; the polarity comes from the condition's own handler.
 function checkLikeliest(name: DieName, draw: Draw, battle: Battle): LikeliestDie | null {
   const chance = chanceOfDraw(draw);
   if (chance === undefined) return null;
@@ -40,7 +39,7 @@ function checkLikeliest(name: DieName, draw: Draw, battle: Battle): LikeliestDie
   return goesOn >= 0.5 ? { die: { name, result: { happens: true } }, chance: goesOn } : { die: { name, result: { happens: false } }, chance: 1 - goesOn };
 }
 
-/** A hit count: the draw's mode, or the middle of its range; a draw with no range (Loaded Dice, Population Bomb) names none. */
+// A draw with no range (Loaded Dice, Population Bomb) names none.
 function hitsLikeliest(name: DieName, draw: Draw): LikeliestDie | null {
   if (draw.call === 'sample' && draw.items && draw.items.length > 0) {
     const { value, share } = modeOf(draw.items);
@@ -54,11 +53,7 @@ function hitsLikeliest(name: DieName, draw: Draw): LikeliestDie | null {
   return null;
 }
 
-/**
- * The likeliest result of one die at its draw, with the chance of that result, or null when the draw names no result to force.
- * A chance die happens at one half or more; the damage roll takes its middle step; a count or pick takes the mode of the draw's items;
- * a draw with no chance (the Gen 2 crit compares `random(256)` with a threshold the draw does not show) answers "does not happen".
- */
+/** A chance die happens at one half or more, the damage roll takes its middle step; null when no result is named. */
 export function likeliestOf(name: DieName, draw: Draw, battle: Battle, gen: number): LikeliestDie | null {
   if (name.kind === 'status-check') return checkLikeliest(name, draw, battle);
   if (name.kind === 'damage-roll') return { die: { name, result: { step: Math.floor(genShape(gen).roll.steps / 2) } } };
@@ -72,7 +67,7 @@ export function likeliestOf(name: DieName, draw: Draw, battle: Battle, gen: numb
 
 const covered = (forced: ReadonlyMap<string, LikeliestDie>, name: DieName): boolean => forced.has(dieKey(name)) || forced.has(plainKey(name));
 
-/** Forced dice for speed ties (the slot that sorts first wins) and for the start-of-turn die of Gens 2 and 3 (does not come true). */
+// Speed ties force the slot that sorts first; the start-of-turn die of Gens 2 and 3 does not come true.
 function orderDice(live: Battle, play: (battle: Battle) => void): LikeliestDie[] {
   const natural = naturalTurn(live, play);
   const dice: LikeliestDie[] = [];
@@ -97,37 +92,31 @@ function orderDice(live: Battle, play: (battle: Battle) => void): LikeliestDie[]
   return dice;
 }
 
-/** Rounds a turn is replayed to close its dice: a forced hit after a natural miss draws a crit and a roll the natural turn did not. */
+// A forced hit after a natural miss draws a crit and a roll the natural turn did not: the turn replays to close them.
 const MAX_ROUNDS = 6;
 
 export interface LikeliestTurn {
-  /** A copy of the battle after the turn; the input battle is never written. */
+  /** A copy of the battle after the turn; the input is never written. */
   battle: Battle;
-  /** The dice the turn drew, each at its likeliest result. */
   dice: LikeliestDie[];
-  /** The kinds of dice the draw could not name: the seed decides them. */
   unforced: string[];
-  /** Draws of the played turn that no die names and no forced tie covers: the seed decides them. */
+  /** Draws of the played turn that no die names and no forced tie covers. */
   unnamed: number;
 }
 
-/** A turn played with some dice pinned: `draws` holds the draw each die was read from, `drawOrder` the order the turn asked for them (die keys). */
+/** `draws` holds the draw each die was read from, `drawOrder` the order the turn asked for them (die keys). */
 export interface PinnedTurn extends LikeliestTurn {
   draws: ReadonlyMap<string, Draw>;
   drawOrder: readonly string[];
 }
 
-/** Plays `play` on a copy of `live` with every die at its likeliest result; `play` writes both sides' choices and runs several times, on copies. */
+/** `play` writes both sides' choices and runs several times, on copies. */
 export function playLikeliestTurn(live: Battle, play: (battle: Battle) => void): LikeliestTurn {
   const { battle, dice, unforced, unnamed } = playTurnWith(live, play, []);
   return { battle, dice, unforced, unnamed };
 }
 
-/**
- * The likeliest turn with the dice in `pinned` held at the result the caller names, wherever the turn draws them; every other die takes
- * its likeliest result, so a die a pin makes appear (a forced hit adds a crit and a roll) is read from its own draw. `dice` lists the
- * dice the played turn drew, pinned ones included; `draws` is the input of `otherResults`.
- */
+/** Pinned dice hold wherever drawn; a die a pin makes appear (a forced hit adds a crit) is read from its own draw. */
 export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinned: readonly LikeliestDie[]): PinnedTurn {
   const forced = new Map<string, LikeliestDie>();
   const skipped = new Map<string, DieName>();
@@ -160,7 +149,6 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
         battle: trial,
         dice: [...forced.values()].filter(entry => drawn.has(dieKey(entry.die.name))),
         drawOrder: [...seen.keys()],
-        // a random target whose sample cannot change the turn is no die the seed decides
         unforced: [...new Set([...skipped].filter(([key, name]) => name.kind !== 'random-target' || sampleDecides(trial.dex.moves.get(name.moveId).target, draws.get(key))).map(([, name]) => name.kind))],
         unnamed: report.unnamed ?? 0,
         draws,
@@ -169,16 +157,12 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
   }
 }
 
-/** The outcome of a turn as a key: the bodies that fell, by side and name, and whether the game ended. */
 export function fallen(battle: Battle): string {
   const names = battle.sides.slice(0, 2).flatMap(side => side.pokemon.filter(mon => mon.fainted).map(mon => `${side.id}:${mon.name}`));
   return `${names.sort().join(',')}${battle.ended ? '|ended' : ''}`;
 }
 
-/**
- * The share of rolls that give the chosen result of a damage roll, or null when the roll decides no knock-out (the same bodies fall at
- * the lowest and the highest roll).
- */
+/** The share of rolls that give the chosen result; null when the same bodies fall at the lowest and highest roll. */
 export function rollDecides(
   live: Battle, play: (battle: Battle) => void, dice: readonly ForcedDie[], index: number,
 ): { rolls: number; of: number; chance: number } | null {
@@ -191,10 +175,7 @@ export function rollDecides(
   return { rolls, of: steps, chance: (die.result.step >= lo ? rolls : steps - rolls) / steps };
 }
 
-/**
- * The lowest step that gives the highest roll's outcome (the bodies that fall) and the number of steps; null when the lowest and the
- * highest roll give the same outcome. `plays` counts the turns played on copies.
- */
+/** The lowest step giving the highest roll's outcome, or null when both ends agree; `plays` counts played turns. */
 export function rollBoundary(
   live: Battle, play: (battle: Battle) => void, dice: readonly ForcedDie[], index: number,
 ): { lo: number; steps: number; plays: number } | null {
@@ -222,11 +203,7 @@ export function rollBoundary(
   return { lo, steps, plays };
 }
 
-/**
- * The other results of one die and the simulator's own chance of each, from the draw `playTurnWith` keeps in `draws`: the one other
- * answer of a chance die, status check or speed tie; every other item of a count or pick. Never a damage roll (`rollBoundary`), a die
- * whose draw names no chance, or a result that is sure.
- */
+/** Never a damage roll (`rollBoundary`), a die whose draw names no chance, or a result that is sure. */
 export function otherResults(entry: LikeliestDie, draw: Draw | undefined): LikeliestDie[] {
   const { name, result } = entry.die;
   if (name.kind === 'speed-tie') {
@@ -258,7 +235,6 @@ function otherItems(entry: LikeliestDie, draw: Draw): LikeliestDie[] {
   return [];
 }
 
-/** The damage roll's other group across its knock-out boundary: its middle step and the share of rolls in it. */
 export function otherRollGroup(entry: LikeliestDie, boundary: { lo: number; steps: number }): LikeliestDie | null {
   const { result } = entry.die;
   if (entry.die.name.kind !== 'damage-roll' || !('step' in result)) return null;
@@ -267,17 +243,12 @@ export function otherRollGroup(entry: LikeliestDie, boundary: { lo: number; step
   return { die: { name: entry.die.name, result: { step: from + Math.floor((to - from) / 2) } }, chance: (to - from + 1) / steps };
 }
 
-/**
- * Whether the user sees a chip for the die: only a die that could have gone the other way and did not read as the default. An event
- * that happens, a status check, a speed tie, a pick, a hit count and a stalling move that fails or works again show; the miss of a likely
- * hit, a crit that does not come, an effect that does not land and a roll that decides no knock-out do not.
- */
+/** Only a die that could have gone the other way and did not read as the default shows a chip. */
 export function chipShown(die: ForcedDie, chance: number | undefined, decides: boolean): boolean {
   const { kind } = die.name;
   if (kind === 'speed-tie' || kind === 'hit-count') return true;
   if (kind === 'damage-roll') return decides;
   if (kind === 'status-check' || kind === 'accuracy') return chance !== undefined && chance < 1;
-  // a stalling move's failure decided the turn and could have gone the other way: it shows as well as its success
   if (kind === 'stalling' && 'happens' in die.result && chance !== undefined) return chance < 1;
   if ('happens' in die.result) return die.result.happens && (chance === undefined || chance < 1);
   return 'option' in die.result;

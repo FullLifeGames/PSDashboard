@@ -12,23 +12,17 @@ import { probeCheck } from './status-probe.ts';
 import { dieKey, tieName, type DieName, type DieResult, type SecondaryEntry } from './types.ts';
 import { watchBattle } from './watch.ts';
 
-/** Which dice the panel offers for a slot's move choice, read on copies; `dice-offer.spec.ts` holds every offer to a draw of the simulator. */
+/** The dice the panel offers for a move choice, read on copies; `dice-offer.spec.ts` holds each to a simulator draw. */
 
-/** One die the panel offers for a move choice, with the results a user can force. */
 export interface DieOffer {
   name: DieName;
-  /** The results the user can force; a damage roll lists every step, a hit count every count of the move's range. */
   results: DieResult[];
-  /** The chance of a die that is one chance (a secondary entry, a chance of power). */
   chance?: number;
-  /**
-   * The name of the ability or item that fixes the hit count of a variable multi-hit move (Skill Link, Loaded Dice): the offer is no draw but a
-   * `hit-count` die with the one count the simulator plays, shown as a row without a choice and never forced.
-   */
+  /** Ability or item that fixes a variable multi-hit move's count (Skill Link, Loaded Dice): a `hit-count` row. */
   fixedBy?: string;
 }
 
-/** `move.target` values a foe can be among; the others (the user, a side, the field, an ally) draw no accuracy or crit against a foe. */
+// Targets a foe can be among; the others (the user, a side, the field, an ally) draw no accuracy or crit against a foe.
 const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent', 'randomNormal', 'scripted']);
 const HITS_ALLY = 'allAdjacent';
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent', 'randomNormal', 'scripted']);
@@ -52,24 +46,19 @@ const slotOf = (body: Pokemon | undefined | null): string | undefined => (body &
 function targetsOf(user: Pokemon, move: ActiveMove, choice: MoveChoice): Pokemon[] {
   const foes = user.foes();
   if (SPREAD.has(move.target)) return move.target === HITS_ALLY ? [...foes, ...user.allies()] : foes;
-  // a move that throws one hit at each foe (Dex flag `smartTarget`) draws for both, aimed or not
   if (move.smartTarget) return foes;
   const aimed = choice.targetLoc === undefined ? foes[0] : user.getAtLoc(choice.targetLoc);
   return aimed ? [aimed] : [];
 }
 
-/**
- * The move as the simulator rewrites it for this user and target: abilities and items rewrite it (an item adds a flinch, an ability fixes the
- * hit count or strips the secondaries), so it is read on a copy through the move's own `ModifyMove` handler, then the event over the user's rules.
- */
+// Abilities and items rewrite the move (a flinch, a fixed hit count): read via ModifyMove on a copy.
 function activeMoveOn(copy: Battle, user: Pokemon, target: Pokemon | undefined, moveId: string): ActiveMove {
   const active = copy.dex.getActiveMove(moveId) as unknown as ActiveMove;
   const events = copy as unknown as {
     singleEvent(...args: unknown[]): unknown; runEvent(...args: unknown[]): unknown;
     setActiveMove(move: unknown, pokemon: Pokemon, target?: Pokemon): void; clearActiveMove(failed?: boolean): void;
   };
-  // `runMove` sets the move in flight before `ModifyMove` and handlers read it (a Choice item's `choicelock` throws "Battle.activeMove is null"
-  // without it): the copy gets the same context for the two events and loses it after them
+  // runMove sets the move in flight before ModifyMove, and handlers read it (choicelock throws without it).
   events.setActiveMove(active, user, target);
   try {
     events.singleEvent('ModifyMove', active, null, user, target, active, active);
@@ -83,11 +72,8 @@ function activeMoveOn(copy: Battle, user: Pokemon, target: Pokemon | undefined, 
 const holdsCharge = (user: Pokemon, move: ActiveMove): boolean =>
   Object.values(user.volatiles).some(volatile => (volatile as { move?: string }).move === move.id);
 
-/**
- * Whether a charge move spends this turn charging: the simulator decides it (the move's weather, Power Herb and Mega Sol skip the charge;
- * Utility Umbrella, Cloud Nine, Air Lock, Klutz, Embargo and Magic Room block such a skip). The move runs on a second copy, because Electro
- * Shot boosts on its charge turn and Power Herb is used up, and the user holds the volatile of the charge afterwards when it charged.
- */
+// The move's weather, Power Herb and Mega Sol skip the charge; Utility Umbrella, Cloud Nine, Air Lock, Klutz, Embargo,
+// Magic Room block the skip. It runs on a second copy: Electro Shot boosts on its charge turn, Power Herb is used up.
 function chargesThisTurn(battle: Battle, slot: string, choice: MoveChoice, move: ActiveMove): boolean {
   if (!move.flags.charge) return false;
   const copy = copyOf(battle);
@@ -100,18 +86,13 @@ function chargesThisTurn(battle: Battle, slot: string, choice: MoveChoice, move:
   return holdsCharge(user, move);
 }
 
-/** The condition on the user that makes a stalling move draw (the one with an `onStallMove` handler), or undefined. */
 function stallCondition(user: Pokemon, battle: Battle): string | undefined {
   return Object.keys(user.volatiles).find(id => typeof (battle.dex.conditions.get(id) as unknown as { onStallMove?: unknown }).onStallMove === 'function');
 }
 
 const fixedDamage = (move: ActiveMove): boolean => !!move.damage || !!move.ohko || !!move.damageCallback;
 
-/**
- * The accuracy die of a later hit of a move whose every hit rolls its own accuracy (the Dex's `multiaccuracy` with a fixed `multihit`, read
- * after `ModifyMove`: Skill Link and Loaded Dice have cleared the flag by then and the simulator draws one die only). The die of hit N is
- * named as `recognize.ts` names the draw (`hit` N, 2 and up).
- */
+// Read after ModifyMove: Skill Link and Loaded Dice have cleared multiaccuracy by then and the simulator draws one die.
 function laterHitsOf(move: ActiveMove): number[] {
   const { multiaccuracy, multihit } = move as ActiveMove & { multiaccuracy?: boolean };
   return multiaccuracy && typeof multihit === 'number' ? Array.from({ length: Math.max(0, Math.floor(multihit) - 1) }, (_, index) => index + 2) : [];
@@ -133,13 +114,12 @@ function damageOffers(battle: Battle, move: ActiveMove, base: Base, targets: str
   if (move.category === 'Status' || fixedDamage(move) || (!move.basePower && !move.basePowerCallback && typeof move.onModifyMove !== 'function')) return [];
   const steps = Array.from({ length: genShape(battle.gen).roll.steps }, (_, step): DieResult => ({ step }));
   return targets.flatMap((targetSlot): DieOffer[] => [
-    // `willCrit` is set to true (always) or to false (never) by the Dex; only a move that leaves it open draws the crit
     ...(move.willCrit === undefined ? [{ name: { ...base, targetSlot, kind: 'crit' as const }, results: YES_NO }] : []),
     ...(move.noDamageVariance ? [] : [{ name: { ...base, targetSlot, kind: 'damage-roll' as const }, results: steps }]),
   ]);
 }
 
-/** The entries `ModifySecondaries` leaves for one target: the target's own rules may remove them (Gens 1 and 2 have no hook). */
+// The target's own rules may remove entries (Gens 1 and 2 have no hook).
 function entriesOn(copy: Battle, user: Pokemon, move: ActiveMove, target: Pokemon): SecondaryEntry[] {
   if (!move.secondaries?.length) return [];
   const runner = copy as unknown as { runEvent(...args: unknown[]): SecondaryEntry[] | undefined };
@@ -156,10 +136,6 @@ function secondaryOffers(copy: Battle, user: Pokemon, move: ActiveMove, base: Ba
   })));
 }
 
-/**
- * The secondary dice a move of `userSlot` draws against `targetSlot`, with their chances in the draw's order, read on a copy;
- * `dice/secondaries.ts` caches it.
- */
 export function secondaryDiceOf(battle: Battle, userSlot: string, moveId: string, targetSlot: string): { effectId: string; chance: number }[] {
   const copy = copyOf(battle);
   copy.prng ??= battle.prng.clone();
@@ -183,7 +159,6 @@ function moveOffers(copy: Battle, user: Pokemon, move: ActiveMove, targets: Poke
   return offers;
 }
 
-/** The events of a hit that holders' abilities and items answer (the target was hit, then it took damage), run on a copy. */
 function hitEvents(copy: Battle, userSlot: string, targetSlot: string, moveId: string): void {
   const user = bodyAt(copy, userSlot);
   const target = bodyAt(copy, targetSlot);
@@ -202,11 +177,7 @@ function hitEvents(copy: Battle, userSlot: string, targetSlot: string, moveId: s
   }
 }
 
-/**
- * The procs of a hit: the hit's events run on a copy under the module's own recognition, and the proc dice it names are listed with the chance
- * the draw carried; a die that picks (Effect Spore's status) lists its results: the items of a `sample`, or the statuses a `random(100)` can
- * reach, read from the protocol on copies (`learn.ts`). No ability or item is named: a holder whose handler draws nothing offers nothing.
- */
+// No ability or item is named: a holder whose handler draws nothing offers nothing.
 function procOffers(battle: Battle, user: Pokemon, move: ActiveMove, targets: Pokemon[]): DieOffer[] {
   if (move.category === 'Status') return [];
   const offers: DieOffer[] = [];
@@ -240,10 +211,7 @@ function procOffers(battle: Battle, user: Pokemon, move: ActiveMove, targets: Po
   return offers;
 }
 
-/**
- * The status checks the body carries: a condition whose own `BeforeMove` handler draws a chance for this move; the chance offered is that
- * of "the body goes on".
- */
+// A condition whose BeforeMove handler draws a chance for this move; the chance offered is that of "the body goes on".
 function checkOffers(battle: Battle, slot: string, moveId: string): DieOffer[] {
   const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
   if (!body || body.fainted) return [];
@@ -255,7 +223,7 @@ function checkOffers(battle: Battle, slot: string, moveId: string): DieOffer[] {
   });
 }
 
-/** The dice the panel offers for a choice of the body in `slot`: none for a switch; a charging or future move offers only its status checks. */
+/** None for a switch; a charging or future move offers only its status checks. */
 export function offeredDice(battle: Battle, slot: string, choice: BranchSlotChoice): DieOffer[] {
   if (choice.kind !== 'move') return [];
   const copy = copyOf(battle);
@@ -285,12 +253,11 @@ function userOffers(copy: Battle, user: Pokemon, move: ActiveMove): DieOffer[] {
   return offers;
 }
 
-/** The dice of the turn's order the panel offers (speed ties and first movers), read from the natural turn on a copy; the live battle is never written. */
+/** Read from the natural turn on a copy; the live battle is never written. */
 export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void): DieOffer[] {
   const natural = naturalTurn(battle, play);
   const offers: DieOffer[] = [];
   const seen = new Set<string>();
-  // a speed tie for every pair of bodies whose move actions the simulator shuffled together (the name is the sorted pair, the results the two orders)
   for (const slots of natural.ties) {
     for (const [index, a] of slots.entries()) {
       for (const b of slots.slice(index + 1)) {
@@ -301,14 +268,12 @@ export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void)
       }
     }
   }
-  // a first mover for every holder whose die the simulator drew, with the chance of the draw (Quick Claw for any move, since its handler tests the
-  // relayed priority of 0 and not the move's; Quick Draw only for a damaging move)
+  // Quick Claw's handler tests a relayed priority of 0 and not the move's; Quick Draw only for a damaging move.
   for (const [key, name] of natural.names) {
     const chance = natural.chances.get(key);
     if (name.kind === 'move-first') offers.push({ name, results: YES_NO, ...(chance === undefined ? {} : { chance }) });
   }
-  // Gens 2 and 3 draw that die at the start of the turn and keep it on the battle: offered for every body that acted this turn and whose action
-  // speed moves with the roll (no chance: no draw of the turn carries one)
+  // Gens 2 and 3 draw that die at the start of the turn and keep it: offered for every body that acted this turn.
   if (rollsAtTurnStart(battle.gen)) {
     for (const slot of natural.acted.filter(acted => readsStartRoll(battle, acted))) {
       const body = battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
@@ -318,13 +283,11 @@ export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void)
   return offers;
 }
 
-/** The dice of the end of the turn the panel offers, read from the natural turn on a copy; the live battle is never written. */
 export function offeredEndDice(battle: Battle, play: (battle: Battle) => void): DieOffer[] {
   const natural = naturalTurn(battle, play);
   const offers: DieOffer[] = [];
   const steps = Array.from({ length: genShape(battle.gen).roll.steps }, (_, step): DieResult => ({ step }));
-  // the Residual event of every body (Shed Skin, Harvest, Healer, the Gen 2 thaw), and a future move that lands this turn as far as the natural
-  // landing drew its dice (a landing that misses draws no crit and no roll)
+  // The Residual event of every body (Shed Skin, Harvest, Healer, the Gen 2 thaw) and a future move landing this turn.
   for (const [key, name] of natural.names) {
     const chance = natural.chances.get(key);
     const withChance = chance === undefined ? {} : { chance };
