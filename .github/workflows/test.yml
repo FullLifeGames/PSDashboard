@@ -103,7 +103,7 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 36 other spec files read the same switch. The three
+  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 37 other spec files read the same switch. The three
   # parts below run them with DICE_SWEEPS=full. Their size comes from the run of 17.11.2026 (CI-1, the first run of the job): parts 1 and 2 hold
   # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
   # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest

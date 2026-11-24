@@ -3,7 +3,7 @@
 // scripts/comment-lib.mjs (HISTORY_PATTERNS). Comments that code reads are never history: an eslint directive, a `// oracle:` marker
 // line, a TypeScript or test-runner pragma, a reference, a shebang, a legal header.
 //
-// The tree holds history comments today, so the rule counts per file against comment-ratchet.json, which only falls
+// The rule counts per file against comment-ratchet.json, which only falls
 // (scripts/update-lint-ratchet.mjs rewrites it): a file with more history lines than its baseline reports every one of them, a file at
 // or below it reports none. The rule's rows are in test/regression/lint-rules.spec.ts.
 import path from 'node:path';

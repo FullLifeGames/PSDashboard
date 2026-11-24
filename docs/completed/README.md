@@ -1,6 +1,6 @@
 # Erledigte Runden (Archiv nach Gebiet)
 
-Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält nur Offenes, `docs/backlog.md` die Einzelheiten offener TODOs, diese Dateien nur Erledigtes. Seit dem 13.10.2026 liegt das Archiv im Repository; Mess-Ausgaben, Sonden und Specs bleiben lokal unter `docs/`. Maschinen-Quellen sind der Ledger in `test/regression/eval-calibration.spec.ts` und die Pins in `test/e2e-feedback/corpus.ts`; die Arbeitsregeln stehen in `AGENTS.md`.
+Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. Offenes steht in den GitHub-Issues, diese Dateien halten nur Erledigtes. Seit dem 13.10.2026 liegt das Archiv im Repository; Mess-Ausgaben, Sonden und Specs bleiben lokal unter `docs/`. Maschinen-Quellen sind der Ledger in `test/regression/eval-calibration.spec.ts` und die Pins in `test/e2e-feedback/corpus.ts`; die Arbeitsregeln stehen in `AGENTS.md`.
 
 | Datei | Gebiet | Enthält |
 | --- | --- | --- |
