@@ -11,6 +11,7 @@ Hier steht jede abgeschlossene Runde, sortiert nach Gebiet. `NextSteps.md` hält
 | `test-infrastructure.md` | Test-Infrastruktur | Runde 39 (Vitest, App-Testsuite unter jsdom, e2e in Themen-Dateien, Test-Workflow in CI), Runde 71 (Bank in GitHub Actions), Runde 89 (CI-Jobs für volle Sweeps, geteilte Sweep-Specs) |
 | `triage.md` | Triage | stillgelegte TODOs mit Urteil, Beleg und altem Text (Runde 62, Nachträge der Runden 67 und 69, die Triage vor dem Release vom 21.10.2026) |
 | `qa-campaign-2026-07.md` | QA-Kampagne 07/2026 | der Fix-Plan der 45 Befunde und die Nachtest-Runden (vor der Rundenzählung) |
+| `source-comment-history.md` | Quellkommentare | Verlaufsblöcke, die bis Runde 90 in Quellkommentaren standen (Cache-Versionslog v7 bis v80, Fit-Verläufe von Gewichten und K, Messungen der Verify-Runde), wörtlich je Quelldatei |
 
 Ein neues Gebiet bekommt eine eigene Datei mit demselben Kopf und eine Zeile in dieser Tabelle.
 

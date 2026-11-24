@@ -11,7 +11,7 @@ import { leafValue } from './leaf.ts';
  * open class and keeps the plan weights; a cell without a plan draws VERIFY_PLAIN_DRAWS natural seeds, groups them by outcome (who
  * fell, who missed, who could not act) and goes one ply deeper per group, mixed by draw share. An outcome goes deeper through one
  * child per state its draws leave, since one child cannot stand for what the log does not split (a Sleep Powder hit whose sleep
- * counter reads 3 while a third of its draws wake next turn). The design is in EVALUATION.md.
+ * counter reads 3 while a third of its draws wake next turn). The design is in EVALUATION.md, "The verify round and the answer round".
  */
 
 /** Natural draws of a plain verify cell wherever the sampler wants more than one. */
