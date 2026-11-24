@@ -1,4 +1,4 @@
-// .feedback-run.json of a feedback/<name> branch (round 89, feedback runs in GitHub Actions).
+// .feedback-run.json of a feedback/<name> branch.
 //
 // The feedback workflow (.github/workflows/feedback.yml) treats the file as untrusted input, as bank.yml does with
 // .bank-run.json: this script validates it against an allowlist, and the workflow passes only the run index of its

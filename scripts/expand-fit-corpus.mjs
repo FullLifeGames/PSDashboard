@@ -1,11 +1,11 @@
-// Round 65: grows the weight-fitting corpus by one ladder format from the public replay search, highest
+// Grows the weight-fitting corpus by one ladder format from the public replay search, highest
 // rated first, without touching the tranches scripts/build-fit-corpus.mjs scrapes. The search endpoint
 // returns 51 replays a page, newest first; this pages back with `before`, keeps the highest-rated games
 // at or above --min-rating, downloads each into .fit-corpus/ and keeps it only when the log has a winner
 // and at least --min-turns turns. New entries append to test/regression/fixtures/fit-corpus-manifest.json
 // (append-only, like the builder's --expand): existing entries stay pinned.
 //
-// Round 66: --sort rating pages the search by rating instead (`sort=rating&page=N`), so a format that
+// --sort rating pages the search by rating instead (`sort=rating&page=N`), so a format that
 // left the ladder still yields its rated ladder games; newest first only finds the unrated challenges
 // played after. Replays of the calibration bank and the feedback corpus never enter (the corpus and the
 // bank share no replay), and every new entry carries its rating. On a Bo3 ladder only the deciding game of a set

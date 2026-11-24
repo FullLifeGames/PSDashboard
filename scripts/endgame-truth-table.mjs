@@ -1,4 +1,4 @@
-// The endgame truth table (round 34): per estimator, Brier and mean
+// The endgame truth table: per estimator, Brier and mean
 // absolute error against the solver's exact value on the exactly solved
 // positions, sign agreement, the coverage line (solved / capped / unpriced
 // / loop / out of scope), and the decided reference (how many decided
@@ -13,7 +13,7 @@ if (paths.length === 0) {
 }
 const rows = paths.flatMap(path => readFileSync(path, 'utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l)));
 const prob = v => (v + 1) / 2;
-// Round 35: `prover` is the sweep's auto mode with the forced-win bar (mass column alongside).
+// `prover` is the sweep's auto mode with the forced-win bar (mass column alongside).
 const ESTIMATORS = ['static', 'staticB', 'd1', 'd2', 'd3', 'mcts', 'prover'];
 const DECIDED_WP = 0.8;
 

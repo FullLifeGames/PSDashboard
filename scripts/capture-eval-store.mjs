@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 
 /**
- * Round 90 (#222): captures the saved engine results the browser specs seed (test/e2e/eval-store.ts, test/e2e-capture/). It runs the
+ * Captures the saved engine results the browser specs seed (test/e2e/eval-store.ts, test/e2e-capture/). It runs the
  * analysis of every capture once in the browser on a dev server (feature flags on, as in the e2e suite) and writes the IndexedDB records
  * to test/e2e/fixtures/eval-store/. Run it when a spec says "fixture stale", then commit the files.
  *

@@ -1,15 +1,9 @@
-// Shared aggregation over calibration dumps (EVAL_CALIBRATION_DUMP JSONL,
-// one sample per line: id, turn, tranche, phase, gameType, score,
-// faintedFraction, p1Won, since round 32 decided: the root's decided-sweep
-// side or null, and since round 50 decidedHeld: that side where the finished
-// score holds the sweep). Three consumers: the harness itself prints the
-// same aggregate lines, scripts/run-calibration.mjs merges slice dumps and
-// summarizes them, scripts/paired-calibration.mjs joins two dumps. The math
-// replicates test/regression/fit-helpers.ts exactly (pooled constant-K logistic
-// fit via 500-iteration gradient descent from 1.5, Brier under that K), and
-// compareSamples is the summation order the harness sorts into before it
-// aggregates, so a merged summary matches the single-process printout
-// character for character.
+// Shared aggregation over calibration dumps (EVAL_CALIBRATION_DUMP JSONL, one sample per line: id, turn, tranche, phase, gameType, score,
+// faintedFraction, p1Won, decided: the root's decided-sweep side or null, decidedHeld: that side where the finished score holds the sweep).
+// Three consumers: the harness prints the same aggregate lines, scripts/run-calibration.mjs merges slice dumps and summarizes them,
+// scripts/paired-calibration.mjs joins two dumps. The math replicates test/regression/fit-helpers.ts exactly (pooled constant-K logistic
+// fit via 500-iteration gradient descent from 1.5, Brier under that K), and compareSamples is the summation order the harness sorts into
+// before it aggregates, so a merged summary matches the single-process printout character for character.
 import { readFileSync } from 'node:fs';
 
 const sigmoid = z => 1 / (1 + Math.exp(-z));
@@ -30,17 +24,15 @@ export const brier = (samples, k) =>
   samples.reduce((sum, s) => sum + (probOf(s, k) - (s.won ? 1 : 0)) ** 2, 0) / samples.length;
 
 /**
- * Reads one JSONL dump, or several joined by commas in order (round 65, D26:
- * the doubles verdict reads the bank's dump together with the holdout's);
+ * Reads one JSONL dump, or several joined by commas in order (the doubles verdict reads the bank's dump together with the holdout's);
  * blank lines are skipped.
  */
 export const load = path => path.split(',').flatMap(one =>
   readFileSync(one, 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line)));
 
 /**
- * Round 67 (T114): `--a-field <name>` and `--b-field <name>` read another number of a
- * side's dump as its score (the root's solved `gameValue`), so one bank run pairs its
- * game value against its score; the flags leave the rest of argv in order.
+ * `--a-field <name>` and `--b-field <name>` read another number of a side's dump as its score (the root's solved `gameValue`), so one
+ * bank run pairs its game value against its score; the flags leave the rest of argv in order.
  */
 export function takeFieldArgs(argv) {
   let rest = argv;
@@ -134,7 +126,7 @@ export function summarize(samples) {
     return inPhase.length === 0 ? '-' : brier(inPhase, pooledK).toFixed(4);
   }).join('/');
   const pct = subset => (100 * subset.filter(right).length / subset.length).toFixed(0);
-  // Round 34: the hq tranche and the luck-adjusted view, same K as the full bank.
+  // The hq tranche and the luck-adjusted view, same K as the full bank.
   const hq = samples.filter(s => s.quality === 'hq');
   if (hq.length > 0) lines.push(`hq: n=${hq.length} sign-accuracy=${pct(hq)}% brier early/mid/late=${briers(hq)}`);
   const clean = samples.filter(s => !s.luckAgainstFavored);
@@ -149,8 +141,7 @@ export function summarize(samples) {
       `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
     );
   }
-  // Round 50: the decided sweep's named side, over every sweep and over the
-  // sweeps the bar holds (heldDecided); older dumps carry no held field.
+  // The decided sweep's named side, over every sweep and over the sweeps the bar holds (heldDecided); older dumps carry no held field.
   const namedShare = key => {
     const named = samples.filter(sample => sample[key]);
     const won = named.filter(sample => (sample[key] === 'p1') === sample.p1Won).length;
@@ -355,10 +346,9 @@ function ownKs(pairs) {
 }
 
 /**
- * The verdict table with error bars (round 48): paired Brier deltas B minus A
- * under ONE fixed K (the A side's pooled fit), per view, game type and phase,
- * each with a band from a paired bootstrap over replays. Every row seeds its
- * own generator, so a row's numbers do not depend on which other rows exist.
+ * The verdict table with error bars: paired Brier deltas B minus A under ONE fixed K (the A side's pooled fit), per view, game type
+ * and phase, each with a band from a paired bootstrap over replays. Every row seeds its own generator, so a row's numbers do not
+ * depend on which other rows exist.
  */
 export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
   const key = s => `${s.id}#${s.turn}`;
@@ -386,12 +376,9 @@ function bandRows(pairs, rowOf) {
 }
 
 /**
- * The second verdict table (round 63, T52 step 1, rule D25): the same rows,
- * but each side scores under its own K per game type and phase, fitted on
- * the row's own positions and refit in every bootstrap draw. Under one fixed
- * K the bank pays for scale (round 62: rescaling doubles per phase alone
- * reads −35 bp); here a pure rescale reads nought, and only a better order
- * of the positions within a cell reads as a gain.
+ * The second verdict table: the same rows, but each side scores under its own K per game type and phase, fitted on the row's own
+ * positions and refit in every bootstrap draw. Under one fixed K the bank pays for scale (rescaling doubles per phase alone reads
+ * -35 bp); here a pure rescale reads nought, and only a better order of the positions within a cell reads as a gain.
  */
 export function ownKBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
   const key = s => `${s.id}#${s.turn}`;
@@ -402,7 +389,7 @@ export function ownKBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } =
   return { ownK: true, k: ownKs(pairs), joined: pairs.length, draws, level, rows };
 }
 
-/** A shift this small is no harm even where its band clears zero: few moved positions resolve a single basis point (round 49, user gate). */
+/** A shift this small is no harm even where its band clears zero: few moved positions resolve a single basis point. */
 export const HARM_MIN_BP = 5;
 
 /** What the table says as a verdict: pooled rows decide, phase cells only warn, and harm needs size. */
@@ -452,7 +439,7 @@ export function bandLines(result) {
   return lines;
 }
 
-/** Samples of one quality tranche ('hq' or 'std'); dumps from before round 34 carry no quality and pass through untouched. */
+/** Samples of one quality tranche ('hq' or 'std'); dumps without a quality pass through untouched. */
 export const filterQuality = (samples, quality) => quality ? samples.filter(s => s.quality === quality) : samples;
 
 /** Pulls `--quality <hq|std>` out of an argv list. */

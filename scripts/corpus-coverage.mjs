@@ -1,4 +1,4 @@
-// Round 72 (T237): which rule-bearing populations do the replays of the project contain, and how many replays carry each? A
+// Which rule-bearing populations do the replays of the project contain, and how many replays carry each? A
 // population with few or no replays is one in which a rule error is invisible to every measurement.
 //
 //   node scripts/corpus-coverage.mjs [--bank <run folder>] [--columns fixtures,fit,bank] [--json] [--root <dir>]

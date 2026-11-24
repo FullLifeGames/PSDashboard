@@ -1,9 +1,9 @@
 // Builds the manifest-pinned fitting corpus for the eval weight fit
 // (test/regression/eval-fit.spec.ts). Two tranches:
 //  - tournament: Smogon tournament replays via the ReplayScouter static data
-//    (fulllifegames.com/Tools/TournamentTeams) — cleanest outcome labels.
+//    (fulllifegames.com/Tools/TournamentTeams): cleanest outcome labels.
 //  - ladder: top-rated replays from the replay search API.
-// Writes test/regression/fixtures/fit-corpus-manifest.json (COMMITTED — pins the
+// Writes test/regression/fixtures/fit-corpus-manifest.json (COMMITTED, pins the
 // corpus so fits are reproducible; run-to-run corpus drift poisons
 // comparisons) and caches replay JSONs in .fit-corpus/ (gitignored).
 //
@@ -34,10 +34,8 @@ const SMOGON_DOUBLES_THREADS = [
   3778554, // Official Smogon Doubles Tournament - Replays and Usage Stats
   3781999, // OSDT VI Play-In (replays required)
 ];
-// Gen9 SINGLES tournament threads (2026-08-09 expansion): the fit's
-// gen9-singles tranche was under-powered (~105 games vs 405 oldgen) while
-// the app targets gen9 — and the instrumented fit showed the matchup term
-// carrying 4x more outcome signal in gen9 than in old gens.
+// Gen9 SINGLES tournament threads: the fit's gen9-singles tranche was under-powered (~105 games vs 405 oldgen) while the app targets
+// gen9, and the matchup term carries 4x more outcome signal in gen9 than in old gens.
 const SMOGON_SINGLES_THREADS = [
   3718664, // SV OU Official Tournament Replays (SPL/OST/WCoP archive)
   3779021, // UWC Replay Thread (Ubers World Cup, gen9ubers-heavy)
@@ -47,9 +45,9 @@ const FORMAT_FILTER = /^gen\d(ou|uu|ru|nu|ubers|doublesou|vgc|champions)/;
 const DOUBLES_FORMAT = /doubles|vgc|champions/;
 const GEN9_SINGLES_FORMAT = /^gen9(ou|uu|ru|nu|ubers)/;
 const PER_FORMAT_CAP = 30;
-// The doubles tranche is the corpus's scarce resource — cap far higher.
+// The doubles tranche is the corpus's scarce resource: cap far higher.
 const DOUBLES_PER_FORMAT_CAP = 150;
-// Gen9 singles: the app's home turf — power the tranche properly.
+// Gen9 singles: the app's home turf, so power the tranche properly.
 const GEN9_SINGLES_PER_FORMAT_CAP = 300;
 const LADDER_PER_FORMAT = 25;
 const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
@@ -117,7 +115,7 @@ async function smogonThreadTranche() {
       let found = 0;
       for (const html of pages) {
         // Official tournament replays carry a room prefix (smogtours-gen9ou-…)
-        // — the id is one or more dash-joined segments before the number.
+        // (the id is one or more dash-joined segments before the number).
         for (const match of html.matchAll(/replay\.pokemonshowdown\.com\/((?:[a-z0-9]+-)+\d+[a-z0-9-]*)/g)) {
           const id = match[1];
           const format = id.replace(/^smogtours-/, '').split(/-\d{4,}/)[0];

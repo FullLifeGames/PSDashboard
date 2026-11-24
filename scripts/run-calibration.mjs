@@ -4,49 +4,32 @@
 //                                    [--env KEY=VALUE ...] [--tranche NAME]
 //                                    [--reuse] [--dry-run]
 //
-// Each slice is one Playwright process over test/regression/eval-calibration.spec.ts
-// with EVAL_CALIBRATION=1, EVAL_CALIBRATION_SLICE=i/N, and its own dump
-// (<out>/slice-i.jsonl; console in <out>/slice-i.log). The measurement line
-// is EVAL_CALIBRATION_MODE=auto EVAL_CALIBRATION_SMOGON=1; --env overrides or
-// adds variables, --tranche restricts the corpus to one stratum. Afterwards
-// the dumps merge into <out>/merged.jsonl (sorted by replay id, then turn,
-// the order the harness sums in), the harness's aggregate lines print and
-// land in <out>/summary.txt, and <out>/run.json keeps the configuration,
-// exit codes, and wall times. A red slice still merges; the exit code stays
-// non-zero then. Slices are independent (one replay belongs to exactly one
-// slice), so the merged aggregate equals a single-process run.
+// Each slice is one Playwright process over test/regression/eval-calibration.spec.ts with EVAL_CALIBRATION=1, EVAL_CALIBRATION_SLICE=i/N,
+// and its own dump (<out>/slice-i.jsonl; console in <out>/slice-i.log). The measurement line is EVAL_CALIBRATION_MODE=auto
+// EVAL_CALIBRATION_SMOGON=1; --env overrides or adds variables, --tranche restricts the corpus to one stratum. Afterwards the dumps merge
+// into <out>/merged.jsonl (sorted by replay id, then turn, the order the harness sums in), the harness's aggregate lines print and land in
+// <out>/summary.txt, and <out>/run.json keeps the configuration, exit codes, and wall times. A red slice still merges; the exit code stays
+// non-zero then. Slices are independent (one replay belongs to exactly one slice), so the merged aggregate equals a single-process run.
 //
-// Base reuse (round 70). run.json also keeps the run's fingerprint, its
-// fraction (quick tier, below), the sha256 of merged.jsonl, the count of
-// replays lost to HTTP errors and a `complete` flag. The fingerprint covers the
-// git tree ids of the tracked inputs at HEAD (packages, src, test/regression,
-// scripts, package-lock.json and the config files), a content hash of
-// .smogon-cache and .fit-corpus, the lever env (the run's own and the ambient
-// EVAL_* variables) and the Node version; scripts/calibration-fingerprint.mjs
-// holds the recipe. Two runs with the same fingerprint give the same rows, so
-// --reuse looks under .calibration/ for a finished run that carries the current
-// one. When it finds one, it prints that folder as its last line, starts
-// nothing, creates no --out folder and exits 0. A tree with an uncommitted
-// change under the inputs never reuses, and its run never serves as a base
-// (run.json marks it dirty). Without a match --reuse runs as usual and names the
-// input groups that differ from the closest finished run. Runs from before this
-// change carry no fingerprint and never match. --dry-run prints the fingerprint
-// and the decision and starts nothing: with --reuse it exits 0 when a base
-// exists and 3 when a run would start; without --reuse it exits 0.
+// Base reuse. run.json also keeps the run's fingerprint, its fraction (quick tier, below), the sha256 of merged.jsonl, the count of
+// replays lost to HTTP errors and a `complete` flag. The fingerprint covers the git tree ids of the tracked inputs at HEAD (packages, src,
+// test/regression, scripts, package-lock.json and the config files), a content hash of .smogon-cache and .fit-corpus, the lever env (the
+// run's own and the ambient EVAL_* variables) and the Node version; scripts/calibration-fingerprint.mjs holds the recipe. Two runs with
+// the same fingerprint give the same rows, so --reuse looks under .calibration/ for a finished run that carries the current one. When it
+// finds one, it prints that folder as its last line, starts nothing, creates no --out folder and exits 0. A tree with an uncommitted
+// change under the inputs never reuses, and its run never serves as a base (run.json marks it dirty). Without a match --reuse runs as
+// usual and names the input groups that differ from the closest finished run. A run without a fingerprint never matches. --dry-run prints
+// the fingerprint and the decision and starts nothing: with --reuse it exits 0 when a base exists and 3 when a run would start; without
+// --reuse it exits 0.
 //
-// Quick tier (round 70). --env EVAL_CALIBRATION_FRACTION=0.25 keeps a quarter
-// of the universe (test/regression/bank-universe.ts: the same replays every time,
-// each tranche and family in proportion). run.json records the fraction, the
-// fingerprint covers it, and scripts/paired-calibration.mjs pairs a quick run
-// against a full base on the rows both hold.
+// Quick tier. --env EVAL_CALIBRATION_FRACTION=0.25 keeps a quarter of the universe (test/regression/bank-universe.ts: the same replays
+// every time, each tranche and family in proportion). run.json records the fraction, the fingerprint covers it, and
+// scripts/paired-calibration.mjs pairs a quick run against a full base on the rows both hold.
 //
-// CI jobs (round 71). --slice-range a..b runs only slices a to b of --slices N
-// into --out and writes job.json there instead of merged.jsonl and run.json, so
-// --reuse never takes a job for a run. --merge <dir> (once per job folder) checks
-// that the jobs make one run (same slice count, env, fraction, commit and
-// fingerprint, every slice once), copies their slice files into --out and writes
-// merged.jsonl, summary.txt and run.json as a local run of all slices would
-// (scripts/calibration-jobs.mjs).
+// CI jobs. --slice-range a..b runs only slices a to b of --slices N into --out and writes job.json there instead of merged.jsonl and
+// run.json, so --reuse never takes a job for a run. --merge <dir> (once per job folder) checks that the jobs make one run (same slice
+// count, env, fraction, commit and fingerprint, every slice once), copies their slice files into --out and writes merged.jsonl,
+// summary.txt and run.json as a local run of all slices would (scripts/calibration-jobs.mjs).
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';

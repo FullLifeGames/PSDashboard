@@ -1,16 +1,15 @@
-// Round 65: the holdout of the weight-fitting corpus. One third of the corpus's SETS (the games two players
+// The holdout of the weight-fitting corpus. One third of the corpus's SETS (the games two players
 // play against each other in one format family, so a Bo3 never splits) in every family the calibration bank
 // cannot judge on its own (Doubles OU, Scarlet/Violet VGC, Champions VGC, Champions OU) leaves the fit for
 // good and becomes a test bank: the calibration harness reads it with EVAL_CALIBRATION_SOURCE=holdout and the
 // fit (test/regression/eval-fit.spec.ts) drops every holdout id. The bank's own doubles tranche holds 36 Doubles OU
-// and 10 VGC games and no Champions game; round 65 showed that its 15 games with Screens or Trick Room decide
-// every doubles verdict on those weights and run against the 308-game corpus (docs/perf/probes/2026-10-09-r65).
+// and 10 VGC games and no Champions game; its 15 games with Screens or Trick Room decide every doubles verdict.
 //
 // The selection is a pure function of the committed corpus manifest and the cached replays' player names:
 // FNV-1a of "<family>|<sorted player ids>", modulo 3, equal to 0. Writes
 // test/regression/fixtures/fit-holdout-manifest.json (COMMITTED, like the corpus manifest).
 //
-// Round 86: a family that scripts/fresh-holdout.mjs drew (vgc2) is not a function of the corpus and never comes back
+// A family that scripts/fresh-holdout.mjs drew (vgc2) is not a function of the corpus and never comes back
 // from it, so a rebuild keeps the sets of every family it does not draw, in their order after the rebuilt sets, and
 // the manifest's `drawn` notes with them.
 //

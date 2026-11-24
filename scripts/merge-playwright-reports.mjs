@@ -1,4 +1,4 @@
-// Round 90 (step E6, #222): the JSON reports of the three "Browser flows" parts, merged and read.
+// The JSON reports of the three "Browser flows" parts, merged and read.
 //
 //   node scripts/merge-playwright-reports.mjs [--out <merged.json>] <report.json>...
 //

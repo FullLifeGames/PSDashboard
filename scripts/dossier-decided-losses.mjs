@@ -1,8 +1,6 @@
-// Round 15 sighting (round 33): every calibration position whose decided
-// side LOST, classified from the rest of the protocol:
-//   node scripts/dossier-decided-losses.mjs .calibration/r33-block1/merged.jsonl > docs/perf/2026-09-04-decided-losses.md
-// --held (round 50) lists the losses among the sweeps the bar holds (the
-// dump's decidedHeld field) instead of every sweep.
+// Every calibration position whose decided side LOST, classified from the rest of the protocol:
+//   node scripts/dossier-decided-losses.mjs .calibration/<run>/merged.jsonl > <report>.md
+// --held lists the losses among the sweeps the bar holds (the dump's decidedHeld field) instead of every sweep.
 // Replays come from the fit-corpus cache or the replay server (cached
 // under .calibration/replays/). Classes: roll (crit / miss / full-para /
 // freeze / flinch against the sweeper before it fainted), pair (the

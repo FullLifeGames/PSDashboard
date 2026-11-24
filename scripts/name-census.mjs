@@ -1,4 +1,4 @@
-// Round 72 (T236): the one reader of Dex name literals in the sources. The name ratchet (eslint.names.mjs), the twin detector
+// The one reader of Dex name literals in the sources. The name ratchet (eslint.names.mjs), the twin detector
 // (scripts/twin-lists.mjs), scripts/update-name-baseline.mjs and their specs import it; the CLI prints the census.
 //
 //   node scripts/name-census.mjs [--json]
@@ -114,7 +114,7 @@ const REVIEWED = /eslint-disable-(next-)?line\b.*\bnames\/no-new-dex-name\b/;
 /**
  * The lines a reviewed exception covers: the line after an `eslint-disable-next-line names/no-new-dex-name` comment and
  * the line of an `eslint-disable-line` one. The census counts what the rule would report, so the baseline never holds a
- * pair whose line already carries its reason (round 72 merge: nine reviewed pairs of lane A).
+ * pair whose line already carries its reason.
  */
 export function reviewedLines(ast) {
   const lines = new Set();

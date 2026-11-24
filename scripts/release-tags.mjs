@@ -1,8 +1,7 @@
 /**
  * Release versions and tags: the version helpers of scripts/publish-packages.mjs and the check that the local tags hold
- * every release tag below the version being released (round 77, release gate 29.10.2026, "6a"). Without the tags fetched,
- * the plan compared against an older release (v0.7.1 was missing locally on 28.10.) and would have published a package
- * that had not moved.
+ * every release tag below the version being released. Without the tags fetched, the plan compares against an older release
+ * and would publish a package that had not moved.
  */
 
 /** [major, minor, patch] of `1.2.3` or `v1.2.3`, else null. */

@@ -1,4 +1,4 @@
-// .bank-run.json of a bank/<name> branch (round 71, bank in GitHub Actions).
+// .bank-run.json of a bank/<name> branch.
 //
 // The bank workflow (.github/workflows/bank.yml) treats the file as untrusted input. This script validates it against
 // an allowlist and starts scripts/run-calibration.mjs itself, without a shell, so no value of the file reaches a shell
@@ -10,7 +10,7 @@
 //   node scripts/bank-run-config.mjs merge <dir>    merge the job folders <dir>/job-* into .calibration/<name>
 //
 // The file: { "name": "r71-bank-1", "jobs": 16, "slicesPerJob": 4, "env": { "EVAL_CALIBRATION_SOURCE": "holdout",
-// "EVAL_CALIBRATION_TRANCHE": "holdout-vgc" } }. jobs and slicesPerJob default to 16 and 4 (user gate 13.10., 2a);
+// "EVAL_CALIBRATION_TRANCHE": "holdout-vgc" } }. jobs and slicesPerJob default to 16 and 4;
 // job k runs slices k*slicesPerJob to k*slicesPerJob + slicesPerJob - 1 of jobs*slicesPerJob.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';

@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 /**
- * Round 90 (#222): captures the saved engine results that browser specs seed (test/e2e/eval-store.ts). Run through
+ * Captures the saved engine results that browser specs seed (test/e2e/eval-store.ts). Run through
  * `node scripts/capture-eval-store.mjs`, which starts the dev server with the feature flags on; one worker, as a sweep fills the pool.
  */
 export default defineConfig({

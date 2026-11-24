@@ -1,4 +1,4 @@
-// The bank's data as one gzipped tar (round 71, bank in GitHub Actions).
+// The bank's data as one gzipped tar.
 //
 // A CI job has no .fit-corpus and no .smogon-cache; the bank reads both. packData writes their files (the names the
 // fingerprint hashes, calibration-fingerprint.mjs dataFileNames) into a POSIX ustar archive in code unit order, with
@@ -137,8 +137,8 @@ export function unpackData(gz, root, dirs = CACHE_DIRS) {
 }
 
 /**
- * The bytes at `url`, fetched again after a network error, a server error or a rate limit; a client error such as a 404
- * fails at once (round 72: a CI job met HTTP 504 on the data release, and the run's merge lost its slices).
+ * The bytes at `url`, fetched again after a network error, a server error or a rate limit (an HTTP 504 on the data release made a
+ * CI job's merge lose its slices); a client error such as a 404 fails at once.
  */
 export async function downloadWithRetry(url, { fetcher = fetch, attempts = 4, pauses = [5000, 15000, 30000] } = {}) {
   let last = '';

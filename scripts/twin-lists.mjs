@@ -1,4 +1,4 @@
-// Round 72 (T236): the twin detector. AGENTS.md, Rules for the code: one rule lives in one module and every other place imports
+// The twin detector. AGENTS.md, Rules for the code: one rule lives in one module and every other place imports
 // it; a deliberate copy gets a spec that compares the two. A twin is a list of 3 or more string literals that stands in two or
 // more files with the same names (the stat names in four files, Reflect / Light Screen / Aurora Veil in five).
 //
@@ -27,7 +27,7 @@ const toID = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
 // A file without an opening bracket followed by three strings and two commas cannot hold a list of 3 strings: the cheap
 // test keeps the parser (the cost of the check) off most files. A string is read whole, so one that holds a bracket
-// passes (round 72 merge: '[object Map]' in sim-ask/isolated.ts slipped the old pattern); comments between elements pass.
+// passes ('[object Map]' in sim-ask/isolated.ts slipped an older pattern); comments between elements pass.
 const STR = String.raw`(?:'[^'\n]*'|"[^"\n]*"|` + '`[^`]*`)';
 const GAP = String.raw`(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*`;
 const MAY_HOLD_LIST = new RegExp(String.raw`\[${GAP}${STR}${GAP},${GAP}${STR}${GAP},${GAP}${STR}`);

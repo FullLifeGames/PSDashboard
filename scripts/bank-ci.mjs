@@ -1,4 +1,4 @@
-// Runs a bank measurement in GitHub Actions (round 71, bank in GitHub Actions).
+// Runs a bank measurement in GitHub Actions.
 //
 //   node scripts/bank-ci.mjs --name <name> [--commit <ref>] [--jobs 16] [--slices-per-job 4] [--env KEY=VALUE ...]
 //                            [--tranche NAME] [--reuse] [--dry-run]
@@ -9,17 +9,16 @@
 // it as the one branch bank/<name> with an explicit refspec (never a tag, never --force, refused when the branch
 // exists), waits for the workflow .github/workflows/bank.yml, downloads the merged run into .calibration/<name>/ and
 // deletes the branch with --force-with-lease, so a branch that moved is never deleted. Before the push it reads the
-// diff of the measured commit against origin/master and refuses files and lines that look like secrets. The user's
-// standing okay of 13.10. ("6a") covers these pushes and deletes of bank/<name> branches and nothing else.
+// diff of the measured commit against origin/master and refuses files and lines that look like secrets.
 //
 // --resume takes up a run whose watcher ended (the session closed, the machine slept): it finds the run by its name or run
 // id, waits for it by the same rule, downloads it into .calibration/<name>/, records it and deletes its branch. A run whose
 // jobs have all completed and whose merged artifact exists counts as over after a grace period, also while GitHub still
-// calls it in_progress (round 76, T266).
+// calls it in_progress.
 //
 // --reuse prints the folder of a downloaded CI run of the same measured commit and the same run settings and starts
 // nothing. --dry-run builds and checks the run commit and stops before the push. CI measures only commits that carry
-// this tooling (user 17.10., 1a). Data uploads are a separate command (scripts/bank-data-pack.mjs --upload).
+// this tooling. Data uploads are a separate command (scripts/bank-data-pack.mjs --upload).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -68,8 +67,8 @@ export const deleteArgs = (sha, name) => ['push', `--force-with-lease=refs/heads
 export const runSettings = config => ({ jobs: config.jobs, slicesPerJob: config.slicesPerJob, env: config.env });
 
 /**
- * A git command's output. The secret check reads the whole diff against master, which outgrew Node's default output
- * limit of 1 MB in round 77 ("spawnSync git ENOBUFS"), so the limit is 256 MB.
+ * A git command's output. The secret check reads the whole diff against master, which can outgrow Node's default output
+ * limit of 1 MB ("spawnSync git ENOBUFS"), so the limit is 256 MB.
  */
 export const gitText = (root, args, options = {}) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, ...options,
@@ -160,7 +159,7 @@ export const GRACE_MS = 5 * 60 * 1000;
 const WATCH_MS = 3 * 60 * 1000;
 
 /**
- * Round 76 (T266): whether the run's own jobs say it is over, whatever GitHub's status of the run says: every job of the run
+ * Whether the run's own jobs say it is over, whatever GitHub's status of the run says: every job of the run
  * (the config job, the slice jobs, the merge job) has completed and the merged artifact exists.
  */
 export function runFinished(state, artifactNames, { expectedJobs, artifactName, mergeJob = MERGE_JOB }) {
@@ -176,13 +175,13 @@ const jobsConclusion = jobs => (jobs.every(job => ['success', 'skipped', 'neutra
 
 /**
  * The conclusion of a CI run once GitHub calls it completed. `gh run watch` ends with an error on a failed run and on an
- * API error alike (HTTP 504 on 19.10.2026: the script read run 39262005491 as over while it ran, found no artifact and
- * deleted its branch), so the run's own status decides, asked again until the run is completed.
+ * API error alike (an HTTP 504 made the script read a run as over while it ran, find no artifact and delete its branch), so the
+ * run's own status decides, asked again until the run is completed.
  *
- * Round 76 (T266): GitHub also kept the run of r74-k open for about an hour after its 16 jobs and its merge had completed. With
- * `artifacts` (the names of the run's artifacts) a run whose jobs are all completed and whose merged artifact is there counts
- * as over once that has held for `graceMs`; a job that runs again starts the period anew, and the run's own conclusion wins
- * when GitHub gives it first. The conclusion then is the jobs': success only when none failed.
+ * GitHub can keep a run open for about an hour after its jobs and its merge have completed. With `artifacts` (the names of the
+ * run's artifacts) a run whose jobs are all completed and whose merged artifact is there counts as over once that has held for
+ * `graceMs`; a job that runs again starts the period anew, and the run's own conclusion wins when GitHub gives it first. The
+ * conclusion then is the jobs': success only when none failed.
  */
 export async function waitForRun(id, {
   watch, view, artifacts, wait = pause, now = Date.now, attempts = 240, graceMs = GRACE_MS, expectedJobs = 0, artifactName = '',
@@ -206,7 +205,7 @@ export async function waitForRun(id, {
       try {
         names = artifacts(id);
       } catch {
-        // The artifact list could not be read: the period keeps running as it was.
+        // The artifact list could not be read: the period keeps running.
       }
       if (names) {
         if (!runFinished(state, names, { expectedJobs, artifactName })) finishedSince = null;
@@ -222,7 +221,7 @@ export async function waitForRun(id, {
 }
 
 /**
- * Round 76 (T266): the Bank run a name or a run id stands for, through `gh` (`ghText(args)` returns its output). A name is the
+ * The Bank run a name or a run id stands for, through `gh` (`ghText(args)` returns its output). A name is the
  * run's `bank/<name>` branch (the newest Bank run on it), a number is the run itself; its branch gives the name back.
  */
 export function findRunByTarget(target, ghText) {
@@ -287,7 +286,7 @@ function recordRun(run, config, measured, sha, conclusion) {
 }
 
 /**
- * Round 76 (T266): takes up a run whose watcher ended. The run commit still exists on origin as bank/<name> (the watcher
+ * Takes up a run whose watcher ended. The run commit still exists on origin as bank/<name> (the watcher
  * deletes the branch last), and its .bank-run.json gives the run's settings back; a branch that is gone leaves the run
  * commit to fetch by its sha, and a commit that cannot be fetched stops the resume with the reason.
  */

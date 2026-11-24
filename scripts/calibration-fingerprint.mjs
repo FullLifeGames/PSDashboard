@@ -1,9 +1,7 @@
 // Fingerprints of calibration runs, the reuse of a finished base, and the quick-tier header of the paired script.
 //
-// A bank run costs 15 to 50 minutes of machine time, and two runs on the same inputs give the same rows (the
-// bases of 12.10. and 13.10. were byte-identical). The fingerprint names everything that decides the rows.
-// scripts/run-calibration.mjs writes it into run.json; with --reuse it prints the folder of a finished run that
-// carries the same one and starts nothing. computeFingerprint hashes these inputs:
+// Two runs on the same inputs give the same rows. scripts/run-calibration.mjs writes the fingerprint into run.json; with --reuse it prints
+// the folder of a finished run that carries the same one and starts nothing. computeFingerprint hashes these inputs:
 //
 //   format     the version of this recipe, so a changed recipe never matches an older run
 //   node       process.version, platform and arch
@@ -13,15 +11,14 @@
 //   env        the run's env plus the ambient EVAL_*, CALIB_*, NODE_OPTIONS and NODE_ENV variables, without the two
 //              keys the runner sets per slice (RUNNER_OWNED)
 //
-// The caches are hashed by content. Reading about 96 MB in 5,700 files takes 0.7 s against a run of 15 to 50
-// minutes, and a payload edited in place keeps its name and often its size, which a hash of names and sizes misses.
+// The caches are hashed by content: a payload edited in place keeps its name and often its size, which a hash of names and sizes misses.
 // The slice count is no input: each replay belongs to one slice, so the merged rows come out the same.
 //
 // A tree with an uncommitted change under the inputs gets a value that names HEAD, not the files on disk. The
 // runner marks its run dirty, such a run never serves as a base, and a dirty tree never reuses (decideReuse).
-// A run that adds entries to .smogon-cache records the cache it leaves behind, because the entries it fetched
-// produced its rows. A change of any other input during the run marks it unstable. A run that lost replays to
-// HTTP errors is incomplete. Runs from before this recipe carry no fingerprint and never match.
+// A run that adds entries to .smogon-cache records the cache it leaves behind, because the entries it fetched produced its rows. A change
+// of any other input during the run marks it unstable. A run that lost replays to HTTP errors is incomplete. A run without a fingerprint
+// never matches.
 //
 // Everything under test/regression/ is an input, so a ledger block booked into test/regression/eval-calibration.spec.ts
 // changes the value although it changes no behavior. Commits that touch only docs or AGENTS.md keep it.
@@ -185,9 +182,8 @@ const nodeInfo = () => ({ version: process.version, platform: process.platform, 
 /**
  * The fingerprint of the inputs as they stand: { value, dirty, dirtyPaths, commit, inputs, problem }.
  * `env` is the run's own env (the DEFAULT_ENV merged with --env and --tranche, plus EVAL_CALIBRATION=1),
- * `ambient` the environment the slices inherit, `slices` the run's slice count (no pair of runs has shown that the
- * rows ignore it, so a base serves only runs with its own count). Without a readable HEAD, value is null and the
- * tree counts as dirty.
+ * `ambient` the environment the slices inherit, `slices` the run's slice count (a base serves only runs with its own count). Without a
+ * readable HEAD, value is null and the tree counts as dirty.
  */
 export function computeFingerprint({
   root, env, ambient = process.env, node = nodeInfo(), paths = FINGERPRINT_PATHS, cacheDirs = CACHE_DIRS, slices = null,
@@ -363,7 +359,7 @@ function sideFractions(path) {
 /**
  * The header lines scripts/paired-calibration.mjs adds when a side ran the quick tier (its run.json records a
  * fraction below 1): the fraction of each side, the pairing count and its share of A, and what the fixed K comes from.
- * Two full runs, or dumps without run.json, give no lines, so the output of an ordinary pair stays as it was.
+ * Two full runs, or dumps without run.json, give no lines.
  */
 export function quickTierLines({ aPath, bPath, aRows, pairs, replays }) {
   const a = sideFractions(aPath);

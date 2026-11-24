@@ -1,4 +1,4 @@
-// CI jobs of a calibration run (round 71, bank in GitHub Actions).
+// CI jobs of a calibration run.
 //
 // A run of N slices splits into jobs: each job runs a range of the slices (run-calibration.mjs --slice-range a..b
 // --slices N) and leaves its slice dumps with a job.json (no run.json, so --reuse never mistakes a job for a run).

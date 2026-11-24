@@ -6,10 +6,9 @@
  * into a browsable page. Kept as a script rather than a heredoc in the workflow
  * so the markup can be rendered and eyeballed locally:
  *
- *   node scripts/build-versions-index.mjs site .versions-tmp/manifest.tsv owner/repo abc1234 2026-08-17
+ *   node scripts/build-versions-index.mjs site .versions-tmp/manifest.tsv owner/repo abc1234 <date>
  *
- * Manifest format is one release per line, newest first — the first line is the
- * one mirrored at /latest/:
+ * Manifest format is one release per line, newest first (the first line is the one mirrored at /latest/):
  *   <tag>\t<publishedAt ISO>
  *
  * Set PS_PRODUCTION_URL to also surface the hosted production deployment. It is
@@ -28,7 +27,7 @@ if (!siteDir || !manifestPath || !repoSlug) {
   process.exit(1);
 }
 
-/** Tags and dates come from the GitHub API, but they land in markup — escape. */
+/** Tags and dates come from the GitHub API, but they land in markup: escape. */
 const esc = (value) =>
   String(value)
     .replace(/&/g, '&amp;')
@@ -40,8 +39,7 @@ let manifest = '';
 try {
   manifest = readFileSync(manifestPath, 'utf8');
 } catch {
-  // No manifest means no release carried a build asset. Render the empty state
-  // rather than failing the deploy — the nightly itself is still fine.
+  // No manifest means no release carried a build asset. Render the empty state rather than failing the deploy.
 }
 
 const releases = manifest

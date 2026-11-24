@@ -1,4 +1,4 @@
-// Runs the feedback corpus in GitHub Actions (round 89, feedback runs in GitHub Actions; the user approved the route on 20.11.2026).
+// Runs the feedback corpus in GitHub Actions.
 //
 //   node scripts/feedback-ci.mjs --name <name> [--runs 3] [--commit <ref>] [--reuse] [--dry-run]
 //
@@ -8,8 +8,7 @@
 // .github/workflows/feedback.yml, downloads the artifact of every run into .calibration/feedback-<name>/run<i>/, prints the
 // verdict of the compare job, compares the downloaded dumps again with the module the job uses, and deletes the branch with
 // --force-with-lease, so a branch that moved is never deleted. It refuses a dirty tree and reads the diff of the measured commit
-// against origin/master for secrets before the push. The user's standing okay covers pushes and deletes of feedback/<name>
-// branches as it covers bank/<name> (user 20.11.2026) and nothing else.
+// against origin/master for secrets before the push.
 //
 // --reuse prints the folder of a downloaded run of the same measured commit and the same run count and starts nothing.
 // --dry-run builds and checks the run commit and stops before the push.

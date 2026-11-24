@@ -1,4 +1,4 @@
-// Packs, uploads and fetches the bank's data for CI (round 71, bank in GitHub Actions).
+// Packs, uploads and fetches the bank's data for CI.
 //
 //   node scripts/bank-data-pack.mjs                 pack .fit-corpus and .smogon-cache into
 //                                                   .calibration/bank-data/<asset> and write
@@ -11,7 +11,7 @@
 //                                                   check that both folders hash as the fixture says
 //
 // The tarball holds what a CI run reads from disk: every file of .smogon-cache and, of .fit-corpus, every replay the
-// fit source reads (round 74, T163: CI captures the fit corpus with search): the manifest's replays
+// fit source reads (CI captures the fit corpus with search): the manifest's replays
 // (test/regression/fixtures/fit-corpus-manifest.json, FIT_MANIFEST in test/regression/bank-universe.ts) and the holdout sets'
 // replays (test/regression/fixtures/fit-holdout-manifest.json, read by the holdout source there). The sample caches of
 // the weight fits (samples-cache*.json) stay here, and so does what no manifest names; the bank fetches its own
@@ -64,7 +64,7 @@ const megabytes = bytes => `${(bytes / 1e6).toFixed(1)} MB`;
 /**
  * The files to pack: all of .smogon-cache, and of .fit-corpus every replay the fit source reads, the manifest's and
  * the holdout's. A holdout replay must be there; a manifest replay the cache lacks is skipped by a run on the fit
- * source too (round 74: five of 5,627 on the build machine), so the pack reports them and goes on.
+ * source too (five of 5,627 on the build machine), so the pack reports them and goes on.
  */
 function selection() {
   const holdout = [...new Set(JSON.parse(readFileSync(join(ROOT, HOLDOUT_MANIFEST), 'utf8')).sets.flatMap(set => set.ids))];
@@ -111,7 +111,7 @@ function upload() {
   if (exists) fail(`the release ${fixture.release} exists already; nothing uploaded`);
   // A pre-release that is never "Latest": the site's Pages build lists releases and serves the newest one with a build
   // zip; this one carries none, and the repository's latest release stays the app's. Its tag points at master: a release
-  // event runs pages.yml from the tagged commit, and that pages.yml skips bank data releases (round 71).
+  // event runs pages.yml from the tagged commit, and that pages.yml skips bank data releases.
   execFileSync('gh', [
     'release', 'create', fixture.release, assetPath, '--prerelease', '--latest=false', '--target', 'master',
     '--title', `Bank data ${fixture.release.slice('bank-data-'.length)}`,

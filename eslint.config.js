@@ -41,7 +41,7 @@ export default defineConfig([
     plugins: { names: namesPlugin },
     rules: { 'names/no-new-dex-name': 'error' },
   },
-  // Round 75 (T160): replay-core, eval-engine and the app read rules through the resolver of generation and mod, never the global Dex (see eslint.dex.mjs).
+  // Dex reads: replay-core, eval-engine and the app read rules through the resolver of generation and mod, never the global Dex (see eslint.dex.mjs).
   {
     files: ['packages/replay-core/src/**/*.ts', 'packages/eval-engine/src/**/*.ts', 'src/**/*.{ts,tsx}'],
     ignores: ['packages/replay-core/src/rules-dex.ts'],

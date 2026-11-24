@@ -50,7 +50,7 @@ export default defineConfig({
       project('ui', 'test/ui/**/*.spec.{ts,tsx}', {
         environment: 'jsdom',
         setupFiles: [fileURLToPath(new URL('./test/ui/setup.ts', import.meta.url))],
-        // Round 89 (ruling 49): the two features behind a flag (src/lib/feature-flags.ts) are off in every build; their specs run with both on,
+        // The two features behind a flag (src/lib/feature-flags.ts) are off in every build; their specs run with both on,
         // and the specs of the off state switch one off with `vi.stubEnv`.
         env: { VITE_FEATURE_GAME_REVIEW: '1', VITE_FEATURE_OPPONENT_READS: '1' },
       }),

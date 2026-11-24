@@ -8,7 +8,7 @@ import { currentTag, openReplayAnalysis, readEvalStore } from '../e2e/eval-store
 import { installReplayEmbedCache } from '../e2e/helpers';
 
 /**
- * Round 90 (#222): one live analysis per capture of `EVAL_STORE_CAPTURES` (the game's sweep, or the capture's turns one by one with
+ * One live analysis per capture of `EVAL_STORE_CAPTURES` (the game's sweep, or the capture's turns one by one with
  * "Analyze this position", as the spec does), then the records of the app's IndexedDB store go to
  * `test/e2e/fixtures/eval-store/<replay>--<mode>-d<depth>s<samples>[-t<turns>].json`. `EVAL_STORE_ONLY=<replay id or file name>` captures one replay or one file.
  */

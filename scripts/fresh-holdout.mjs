@@ -1,9 +1,8 @@
-// Round 86 (the fresh VGC holdout of the final gate's 1c): draws a holdout family of rated ladder games that no
-// measurement has read. The old VGC holdout (scripts/build-fit-holdout.mjs) has judged every VGC choice since round
-// 65; this draw takes games from the same formats and seasons that no tracked file, no local note and no
-// .fit-corpus file names, so a reading on them is the third sample next to the bank and the old holdout.
+// Draws a holdout family of rated ladder games that no measurement has read. The old VGC holdout (scripts/build-fit-holdout.mjs) is the
+// reference; this draw takes games from the same formats and seasons that no tracked file, no local note and no .fit-corpus file names,
+// so a reading on them is a third sample next to the bank and the old holdout.
 //
-// The draw rule, written before any measurement:
+// The draw rule:
 //   - the public replay search, sort=rating, pages 1 to 20 of each format (50 rows a page);
 //   - rows of the main server only (id "<format>-<digits>"; dawn-, smogtours-, china- never enter), with a numeric
 //     rating at or above --min-rating (1500), whose id no known set holds;
@@ -16,7 +15,7 @@
 // corpus's manifest. The pure core is exported for test/regression/fresh-holdout.spec.ts.
 //
 // Run: node scripts/fresh-holdout.mjs --family vgc2 --fetch-listing
-//      node scripts/fresh-holdout.mjs --family vgc2 --listing .calibration/fresh-holdout/listing-2026-11-06.json [--dry-run]
+//      node scripts/fresh-holdout.mjs --family vgc2 --listing .calibration/fresh-holdout/listing-<date>.json [--dry-run]
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -33,8 +32,8 @@ const MIN_TURNS = 6;
 const HQ_RATING = 1700;
 
 /**
- * The formats in the draw's order with their quotas: the old holdout's seven formats at three times its games
- * (user gate 06.11.2026, 2a), then gen9vgc2025regj, a format the old holdout never held, kept apart (1c).
+ * The formats in the draw's order with their quotas: the old holdout's seven formats at three times its games, then gen9vgc2025regj, a
+ * format the old holdout never held, kept apart.
  */
 export const FRESH_FORMATS = [
   { format: 'gen9vgc2026regi', quota: 264 },

@@ -45,7 +45,7 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** The packages vite.config.ts pre-bundles (optimizeDeps.include) — the ones the app reaches through lazy imports. */
+/** The packages vite.config.ts pre-bundles (optimizeDeps.include): the ones the app reaches through lazy imports. */
 const PREBUNDLED_DEPS = ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'];
 const METADATA_PATH = './node_modules/.vite/deps/_metadata.json';
 
@@ -118,9 +118,9 @@ async function assertPortFree() {
 }
 
 /**
- * Round 89 (ruling 49): the two features behind a flag (src/lib/feature-flags.ts) are off in every build. The e2e specs of both run on a
- * dev server with the flags on; the feedback run (`-c playwright.feedback.config.ts`) reads neither and keeps the default build, which
- * is what ships. A flag the caller already set in the environment wins, so `VITE_FEATURE_GAME_REVIEW=0` runs the suite with one off.
+ * The two features behind a flag (src/lib/feature-flags.ts) are off in every build. The e2e specs of both run on a dev server with the
+ * flags on; the feedback run (`-c playwright.feedback.config.ts`) reads neither and keeps the default build, which is what ships. A flag
+ * the caller already set in the environment wins, so `VITE_FEATURE_GAME_REVIEW=0` runs the suite with one off.
  */
 const FEATURE_FLAGS = ['VITE_FEATURE_GAME_REVIEW', 'VITE_FEATURE_OPPONENT_READS'];
 function serverEnv() {
@@ -188,11 +188,9 @@ async function stopServer() {
 }
 
 /**
- * An interrupted run (Ctrl+C, a closed console, a polite kill) takes the
- * browser run and the dev server down with it; before this, such a run left
- * Vite listening and the next run died on the port. A forced kill of the
- * runner itself runs no handler: the port check above then names the orphan.
- * A second signal ends the runner the hard way.
+ * An interrupted run (Ctrl+C, a closed console, a polite kill) takes the browser run and the dev server down with it, so the next run
+ * finds the port free. A forced kill of the runner itself runs no handler: the port check above then names the orphan. A second signal
+ * ends the runner the hard way.
  */
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.once(signal, () => {

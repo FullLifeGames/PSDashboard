@@ -1,4 +1,4 @@
-// Moves the @pkmn release train to one version in every workspace manifest (round 70, T43).
+// Moves the @pkmn release train to one version in every workspace manifest.
 //
 //   node scripts/upgrade-pkmn.mjs [version] [--dry-run]      (npm run upgrade:pkmn -- [version])
 //

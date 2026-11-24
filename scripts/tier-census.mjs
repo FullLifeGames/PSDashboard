@@ -1,12 +1,12 @@
-// The tier census of feedback dump folders (standing rule D21).
+// The tier census of feedback dump folders.
 //   node scripts/tier-census.mjs <folder> [<folder>...]        counts per replay, per game type and in total
 //   node scripts/tier-census.mjs --moved <base> <next>         the turns whose verdict moved between two folders
 // A folder holds the feedback-full-<id>.json dumps of one feedback run
 // (FEEDBACK_DUMP=1 npm run test:feedback). The bank grades the bar, not the
 // move verdicts: every weight or K change reads this census next to the
-// paired bank. The count alone is not the verdict (round 48: the total held
-// at 38/2/0 -> 32/2/1 while the expert golden gained a blunder), so --moved
-// names every turn behind a changed number.
+// move verdicts: every weight or K change reads this census next to the
+// paired bank. The count alone is not the verdict (a total held at 38/2/0 -> 32/2/1 while the expert golden gained a blunder), so
+// --moved names every turn behind a changed number.
 //
 // Reading rules the numbers carry with them:
 // - A side-turn without a matched played action ("unmatched") can never get a

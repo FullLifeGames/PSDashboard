@@ -1,4 +1,4 @@
-// Round 72 (T236): the name ratchet, the rule names/no-new-dex-name.
+// The name ratchet, the rule names/no-new-dex-name.
 //
 // AGENTS.md, Rules for the code: game rules come from the simulator and the Dex; our code never reads species or move names.
 // The rule counts the Dex name literals per file in packages/*/src against scripts/name-baseline.json, which only shrinks

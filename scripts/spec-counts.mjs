@@ -1,4 +1,4 @@
-// The spec-count ratchet (round 90, AGENTS.md "What earns a test", rule 5): the number of spec files per test project only falls,
+// The spec-count ratchet (AGENTS.md "What earns a test", rule 5): the number of spec files per test project only falls,
 // or grows with a named new module.
 //
 //   node scripts/spec-counts.mjs          check: exit 1 when a project holds more spec files than spec-count-ratchet.json

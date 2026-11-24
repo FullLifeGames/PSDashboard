@@ -2,7 +2,7 @@
  * Publishes the workspace packages (packages/*) as part of the release flow.
  *
  * One global version: every package manifest carries the root package.json
- * version (release 1.0.1, test/regression/package-api.spec.ts), and this
+ * version (test/regression/package-api.spec.ts), and this
  * script writes it again while it runs. Changed-only: a package is selected
  * when its files changed since the previous release tag (the newest v* tag
  * below the current version), when no earlier tag exists, or when the
@@ -65,7 +65,7 @@ const git = (...gitArgs) => {
 
 /**
  * The newest v* tag whose version is below the one being released, or null. A plan that selects by change needs every
- * release tag of origin: it stops when the local tags lack one (round 77, "6a"); --all selects without a tag.
+ * release tag of origin: it stops when the local tags lack one; --all selects without a tag.
  */
 function previousReleaseTag(version) {
   const current = parseVersion(version);

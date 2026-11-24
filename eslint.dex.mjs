@@ -1,11 +1,11 @@
-// Round 75 (T160): the rule dex/no-global-dex-read.
+// The rule dex/no-global-dex-read.
 //
 // AGENTS.md, Rules for the code: game rules come from the simulator and the Dex, and the Dex of a game is the Dex of its generation
 // and mod. The global `Dex` of @pkmn/sim (and the one of @pkmn/dex) is Generation 9 on Scarlet/Violet: it knows neither the type
 // chart of Gen 1 to 5, a species' older stats and abilities, nor the Pokémon Champions mod. A package reads rules only through
 // replay-core's resolver (`rulesDex(gen, mod)` in packages/replay-core/src/rules-dex.ts) or a battle's own `battle.dex`.
 // The rule reports every value reference to an imported `Dex`; the type `typeof Dex` is no read. The resolver's own file is
-// exempt in eslint.config.js. It replaces the census spec of round 67 (no exceptions, user 23.10.2026).
+// exempt in eslint.config.js.
 const SOURCES = new Set(['@pkmn/sim', '@pkmn/dex']);
 
 /** Whether a node sits inside a `typeof X` type query, which names the type of the Dex and reads nothing. */
