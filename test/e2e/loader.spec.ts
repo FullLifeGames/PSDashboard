@@ -23,9 +23,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('displayed set guesses pass the coherence vetoes (GPL Cobalion)', async ({ page }) => {
-    // Deterministic usage payload: Body Press tops the marginals while the
-    // replay reveals Swords Dance — the panel must show the vetoed assembly
-    // the simulator builds, never a second raw-usage guess (the GPL split).
+    // Body Press tops the marginals while the replay reveals Swords Dance: the panel must show the vetoed assembly.
     const cobalionUsage = (route: Route) => {
       if (route.request().url().includes('/stats/')) {
         route.fulfill({
@@ -62,8 +60,6 @@ test.describe('PS Dashboard', () => {
 
     await fromSetup(page, 'Import/Export Sets');
     const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
-    // The panel opens after the spread solve and the editor's pools: under the full suite the
-    // unbundled dev server needs more than the default five seconds for both.
     await expect(dialog).toBeVisible({ timeout: 30_000 });
 
     const textarea = dialog.locator('textarea');
@@ -99,7 +95,6 @@ test.describe('PS Dashboard', () => {
     const editor = page.getByRole('dialog', { name: 'Edit Player Team' });
     const garchompCard = editor.locator('.ps-panel').filter({ hasText: 'Garchomp' }).first();
 
-    // Ability is a select: the species' real abilities first, then every other ability of the generation.
     const abilitySelect = garchompCard.getByLabel('Garchomp ability');
     await expect(abilitySelect.locator('option', { hasText: 'Rough Skin' })).toHaveCount(1, { timeout: 10000 });
     await expect(abilitySelect.locator('option', { hasText: 'Sand Veil' })).toHaveCount(1);
@@ -109,11 +104,8 @@ test.describe('PS Dashboard', () => {
     await abilitySelect.selectOption('Rough Skin');
     await expect(garchompCard.getByText(/is not an ability of Garchomp/)).toHaveCount(0);
 
-    // Nature select carries the 25 natures.
     await garchompCard.getByLabel('Garchomp nature').selectOption('Adamant');
 
-    // A name the Dex does not know is rejected; a move the species cannot learn joins with a note; a legal one is picked by
-    // CLICKING the combobox option, no Enter required.
     const moveInput = garchompCard.getByPlaceholder('Add move...');
     await garchompCard.getByLabel(/Remove .* from Garchomp/).first().click();
     await moveInput.fill('Moon Landing');
@@ -155,7 +147,6 @@ test.describe('PS Dashboard', () => {
 
     await expect(page.getByText('Alpha', { exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Beta', { exact: true }).first()).toBeVisible();
-    // The panel closed after the load.
     await expect(page.locator('.ps-loader-panel')).toHaveCount(0);
   });
 });

@@ -3,18 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { fixtureReplay, installReplayEmbedCache, routeOfflineFixtures, startVariationAt } from './helpers';
 import { lightEngine, loadDockReplay, openVariationHistory, pinUiScale } from './dock-helpers';
 
-/**
- * An opt-in measurement, never part of a run until `PS_SWEET_SPOT=1` is set.
- * At 100 % it finds, per scene, the smallest window at which the left column fits without scrolling and the evaluation column shows
- * its head: the smallest height at five widths and the smallest width at a tall window, in steps of 10 px. The scenes are a replay
- * turn and a variation, in singles and in doubles; the variation is measured with the history panel closed (it starts so) and open. The numbers go to `test-results/sweet-spot.json`
- * (merged scene by scene), and decide whether Auto's room of 1400 x 820 px stands.
- *
- *   PS_SWEET_SPOT=1 PS_DEV_PORT=<port> npx playwright test test/e2e/sweet-spot.spec.ts --project=chromium
- *
- * "Fits" reads: the left column's content is no taller than its box (no scroll), the page has no sideways scroll, and the first
- * element of the right column lies inside the window. The scan assumes that a window which fits keeps fitting when it grows.
- */
+// PS_SWEET_SPOT=1 PS_DEV_PORT=<port> npx playwright test test/e2e/sweet-spot.spec.ts --project=chromium
+// The scan assumes that a window which fits keeps fitting when it grows.
 test.skip(process.env.PS_SWEET_SPOT !== '1', 'an opt-in measurement: set PS_SWEET_SPOT=1');
 
 const DOUBLES = 'gen9doublesou-2693620934';
@@ -56,7 +46,6 @@ async function fits(page: Page, width: number, height: number): Promise<boolean>
   });
 }
 
-/** The smallest value in [low, high], in steps, for which `ok` holds; null when not even `high` does. */
 async function smallest(low: number, high: number, ok: (value: number) => Promise<boolean>): Promise<number | null> {
   if (!(await ok(high))) return null;
   let lo = Math.ceil(low / STEP);

@@ -2,13 +2,6 @@ import { test, expect, type Frame, type Page } from '@playwright/test';
 import { generateReplayHtml } from '../../src/lib/replay-html';
 import { TABLE_PART_MODS, TEAMBUILDER_TABLE_URL, cutTablePart, tablePartScript } from '../../src/lib/teambuilder-table';
 
-/**
- * The sweep behind the part of the teambuilder table. Two replay frames, built by the app's own builder: one
- * loads Showdown's whole `teambuilder-tables.js`, the other the part's script through the swap hook. In each, the replay
- * client's Dex reads every species, move, item, ability and type its data lists, for every generation (`Dex.mod('gen1')` to
- * `Dex.mod('gen8')` and the Generation 9 `Dex`) and every mod the client names (`TABLE_PART_MODS`). The part holds when both
- * frames read the same for every entry; a read of a key the part lacks throws and fails its row.
- */
 test.setTimeout(180_000);
 
 const LOG = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|player|p1|A|1\n|player|p2|B|2\n|turn|1';
@@ -22,10 +15,9 @@ async function wholeTable(): Promise<Record<string, unknown>> {
   return exports.BattleTeambuilderTable!;
 }
 
-/** Mounts two frames side by side: `whole` with Showdown's table, `part` with the part's script through the swap hook. */
 async function mountFrames(page: Page, partScript: string): Promise<{ whole: Frame; part: Frame }> {
   await page.goto('/');
-  // Blob URLs belong to the page's origin, so the page makes the part's URL; the app's builder then writes both documents.
+  // Blob URLs belong to the page's origin, so the page makes the part's URL.
   const partUrl = await page.evaluate(script => URL.createObjectURL(new Blob([script], { type: 'text/javascript' })), partScript);
   const docs = {
     whole: generateReplayHtml({ log: LOG, format: 'gen9ou' }),
@@ -53,7 +45,6 @@ async function mountFrames(page: Page, partScript: string): Promise<{ whole: Fra
   return { whole: frameOf('whole')!, part: frameOf('part')! };
 }
 
-/** Every entry the client's data lists, read through one Dex, as one string per kind (a throw reads as its message). */
 function readDex(dexId: string): Record<string, string[]> {
   type Getter = { get: (id: string) => unknown };
   type ClientDex = { species: Getter; moves: Getter; items: Getter; abilities: Getter; types: Getter; mod: (id: string) => ClientDex };
@@ -83,7 +74,6 @@ test('the part of the teambuilder table reads like the whole table, for every ge
   const table = await wholeTable();
   const { whole, part } = await mountFrames(page, tablePartScript(table));
 
-  // The part's frame never asked Showdown for the table, and holds exactly the part's keys.
   const fetchedTable = (frame: Frame) => frame.evaluate(table => performance.getEntriesByType('resource').some(entry => entry.name.split('?')[0] === table), TEAMBUILDER_TABLE_URL);
   expect(await fetchedTable(whole), 'the whole frame loads Showdown\'s table').toBe(true);
   expect(await fetchedTable(part), 'the part frame loads the part instead').toBe(false);

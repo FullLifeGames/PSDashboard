@@ -2,12 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { Clicks, DOUBLES_SLOTS, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
-/**
- * The app on a phone (390 x 844, touch). The replay's battle scene shrinks to
- * the frame's width with the log under it, the page never scrolls sideways, the dock shows one chip a row (doubles: four rows at the
- * dock's 46 px) with the whole choice, the top bar takes two lines, and the task of picking a move instead of the played one
- * takes the same three clicks as at 1366 x 768.
- */
 const DOUBLES = 'gen9doublesou-2693620934';
 const TURN = 5;
 
@@ -34,8 +28,7 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   await expect(frameOf(page).locator('html')).toHaveClass(/ps-phone/);
   const battleBox = (await battle.boundingBox())!;
   const logBox = (await frameOf(page).locator('.battle-log').boundingBox())!;
-  // The scale is the frame's width over the battle's border box (642), so the scene's right edge is the frame's width
-  // (Showdown's inline scale(width / 640) overshoots by 1.1 px unless the document's rule takes !important). The numbers sit in the message.
+  // Showdown's inline scale(width / 640) overshoots by 1.1 px unless the document's rule takes !important.
   const inside = await frameOf(page).locator('html').evaluate(root => ({
     width: root.clientWidth,
     battleRight: root.querySelector('.battle')!.getBoundingClientRect().right,
@@ -48,15 +41,12 @@ test('the battle scene stands inside the frame with the log under it, and the pa
   expect(logBox.y, 'the log stands under the scene').toBeGreaterThanOrEqual(battleBox.y + battleBox.height - 1);
   expect(logBox.x + logBox.width).toBeLessThanOrEqual(frameBox.x + frameBox.width + 1);
   await expect(frameOf(page).locator('.battle-log')).toBeVisible();
-  // The frame is as tall as its content: its height is above the desktop's 456 px, and the frame has no scroll of its own.
   expect(frameBox.height).toBeGreaterThan(456);
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(sideways, 'horizontal scroll of the page').toBeLessThanOrEqual(0);
 });
 
-// The frame hides Color scheme and Music (Music was cut on the 362 px frame). Last turn, Next turn and Go to turn... stay, so row 1 holds
-// six buttons and takes two lines on a phone. The speed chooser fits its row, and nothing of either row reaches past the document's edge.
-// The widths go to the test's annotations.
+// The frame hides Color scheme and Music; Last turn, Next turn and Go to turn... stay: six buttons, two lines.
 test('the frame\'s controls fit the phone frame: row 1 in at most two lines, the speed chooser whole, nothing past the edge', async ({ page }) => {
   test.setTimeout(120_000);
   const frame = frameOf(page);
@@ -104,18 +94,15 @@ test('the dock: four chip rows of 46 px with the whole choice, Execute under the
     expect(boxes[i].y).toBeGreaterThanOrEqual(boxes[i - 1].y + boxes[i - 1].height);
   }
   for (const box of boxes) expect(Math.round(box.height)).toBe(46);
-  // The whole choice: no pick line is cut by its box.
   for (const slot of DOUBLES_SLOTS) {
     const cut = await dockChip(page, slot).locator('.ps-dock-pick').evaluate(element => element.scrollWidth - element.clientWidth);
     expect(cut, `the pick line of ${slot}`).toBeLessThanOrEqual(1);
   }
   const execute = (await page.locator('.ps-execute-btn').boundingBox())!;
   expect(execute.y).toBeGreaterThanOrEqual(boxes[3].y + boxes[3].height);
-  // The top bar: two lines at most. Its height is below three lines'.
   const bar = (await page.locator('.ps-topbar').boundingBox())!;
   expect(bar.height, 'height of the top bar').toBeLessThan(64);
-  // A row is a run of children whose boxes overlap in height: the children of one row differ in height and sit centred, so their
-  // tops differ by several px (bucketing the tops by tens counted one row twice).
+  // A row is a run of children whose boxes overlap in height; bucketing the tops by tens counted one row twice.
   const rows = await page.locator('.ps-topbar > *').evaluateAll(elements => {
     const boxes = elements.map(element => element.getBoundingClientRect()).sort((a, b) => a.top - b.top);
     const found: { top: number; bottom: number }[] = [];

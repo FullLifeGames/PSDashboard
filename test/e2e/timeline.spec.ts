@@ -40,12 +40,8 @@ test.describe('PS Dashboard', () => {
 
   test('a long forward slider jump lands the scene instead of hanging on "seeking..."', async ({ page }) => {
     test.setTimeout(150_000);
-    // A long, chatty log makes the embed fast-forward in >300ms chunks, the
-    // chained continuation that scene.pause()'s interruptionCount bump could
-    // cancel (a permanent "seeking..." hang).
-    // Every log line is a DOM write while seeking, so line count is the load.
-    // Self-consistent synthetic replay: appending turns to a real fixture
-    // would reference mons its log never introduced and error the parser.
+    // A long log makes the embed seek in >300 ms chunks; scene.pause()'s interruptionCount bump could cancel one.
+    // The log is synthetic and self-consistent: appended turns of a real fixture would name mons it never introduced.
     const seekReplay = {
       id: 'gen9ou-seektest',
       format: '[Gen 9] OU',
@@ -92,11 +88,8 @@ test.describe('PS Dashboard', () => {
       !!(window as ReplayWindow).Replays?.battle
     ), { timeout: 30_000 }).toBe(true);
 
-    // Throttle the CPU so the fast-forward genuinely crosses the 300ms chunk
-    // boundary — on a fast machine the whole seek finishes synchronously and
-    // the regression (a cancelled continuation) could never fire. The hang
-    // shows as a turn counter frozen forever; slow-but-alive seeking still
-    // arrives, so the generous poll separates the two.
+    // Throttled CPU, so the fast-forward crosses the 300 ms chunk boundary: the hang shows as a frozen turn counter,
+    // slow-but-alive seeking still arrives, so the generous poll separates the two.
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     try {
@@ -104,7 +97,6 @@ test.describe('PS Dashboard', () => {
       await expect.poll(async () => frame!.evaluate(() =>
         (window as ReplayWindow).Replays?.battle?.turn ?? -1
       ), { timeout: 90_000 }).toBe(400);
-      // The seek must have ENDED — a stuck battle.seeking is the hang.
       await expect.poll(async () => frame!.evaluate(() =>
         (window as ReplayWindow).Replays?.battle?.seeking ?? null
       ), { timeout: 15_000 }).toBeNull();
@@ -136,7 +128,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 2);
 
-    // The executed turn is entry "Turn 2"; the sim continues one past it.
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
     await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 15000 });
   });
@@ -145,21 +136,17 @@ test.describe('PS Dashboard', () => {
     test('navigate back inside the variation and silently truncate on a new move', async ({ page }) => {
       test.setTimeout(120_000);
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-      // Two turns of variation: Swords Dance keeps turn 1 KO-free.
       await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
       await pickMove(page, 'p1a');
       await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
 
-      // Step back one position: the pointer sits INSIDE the variation, the
-      // pickers come from the recorded position, and the line chip appears.
       await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
       await expect(page.getByText('Choices from the reconstructed position')).toBeVisible();
       await expect(page.locator('.ps-line-chip')).toBeVisible();
 
-      // Deviate here: a DIFFERENT P1 move — NO confirm may appear (chess
-      // rules: truncation inside the variation is silent).
+      // A different P1 move inside the variation raises no confirm: truncation there is silent (chess rules).
       await (await openTray(page, 'p1a')).locator('.ps-movebtn:enabled').nth(1).click();
       await pickMove(page, 'p2a');
       await page.locator('.ps-execute-btn').click();
@@ -168,9 +155,6 @@ test.describe('PS Dashboard', () => {
     });
 
     test('a move past the variation\'s tip plays on the main line there, after the replace confirm', async ({ page }) => {
-      // Scene: a one-turn variation at turn 5, then ▶ to turn 28 and Brave Bird there. The line stayed
-      // "variation" across the uncovered turns, the move extended the variation instead, ran at its tip against Kyurem
-      // ("no longer knows Brave Bird") and pulled the pointer back. Here: a one-turn variation at turn 1, ▶ to turn 3.
       test.setTimeout(120_000);
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
@@ -196,12 +180,10 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await startVariationAt(page, 2);
 
-      // One click back to the main line — view only, nothing destroyed.
       await page.locator('.ps-line-chip button', { hasText: 'Main line' }).click();
       await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
 
-      // Deviating ON the main line asks first; Cancel keeps the variation.
       await page.locator('.ps-branch-bar input[type="range"]').fill('1');
       await pickMove(page, 'p1a');
       await pickMove(page, 'p2a');
@@ -212,7 +194,6 @@ test.describe('PS Dashboard', () => {
       await confirm.locator('button', { hasText: 'Cancel' }).click();
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
 
-      // The variation stays one click away too.
       await page.locator('.ps-branch-bar input[type="range"]').fill('3');
       await page.locator('.ps-line-chip button', { hasText: 'Variation' }).click();
       await expect(page.locator('iframe[title="Branch Simulation"]')).toBeVisible({ timeout: 10000 });
@@ -223,13 +204,9 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
 
-      // Straight from the freshly loaded replay (main line, no variation):
-      // the branch rebuild resets the eval to idle, and the loop's first
-      // evaluation must fire on its own, or the run sits at "0 turns played".
       await page.locator('button', { hasText: 'Let it play out' }).click();
       await expect(page.getByText(/Engine is playing both sides from turn 1/)).toBeVisible({ timeout: 60_000 });
-      // Proof it actually played: a live counter past zero, or (the small
-      // fixture game can finish first) the completion notice with turns.
+      // A live counter past zero, or the completion notice: the small fixture game can finish first.
       await expect.poll(async () => {
         const body = await page.textContent('body');
         return /Engine is playing both sides from turn 1\. [1-9]/.test(body ?? '') ||
@@ -245,16 +222,11 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
 
-      // T0 sits on the timeline whether or not a game graph exists; the view
-      // swaps the turn pickers for the lead picker with the real leads
-      // preselected and badged.
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('team preview: pick each side')).toBeVisible();
       const p1Column = page.locator('.ps-lead-side').first();
       await expect(p1Column.locator('.ps-switchbtn-selected .ps-played-badge')).toBeVisible();
 
-      // A different P1 lead + play: a fresh game opens at turn 1 and the
-      // history records the lead decision as its turn-0 entry.
       await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)').first().click();
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
       await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
@@ -272,19 +244,12 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('team preview: pick each side')).toBeVisible();
 
-      // The run must INCLUDE the lead decision: branching at the shared
-      // turn-1 prefix produced a variation whose moves list started at
-      // turn 1 and whose first turn fell back to the main line.
       await page.locator('button', { hasText: 'Let it play out' }).click();
-      // The run starts at turn 0, the turn the leads come in; the status line says so.
       await expect(page.locator('.ps-playout-progress')).toContainText('from turn 0', { timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0', { timeout: 60_000 });
       await expect(history).toContainText('lead');
 
-      // When the run ends the view stays on a VARIATION position (the line chip stays on gold), not a main-line
-      // fallback, and the notice offers the watch from turn 0 (the pointer takes the frame's
-      // turn instead of returning to turn 1).
       await expect(page.getByText(/Play-out (finished|stopped)/)).toBeVisible({ timeout: 120_000 });
       await expect(page.getByRole('button', { name: /Watch from turn 0/ })).toBeVisible();
       await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
@@ -299,8 +264,6 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick both leads per side')).toBeVisible();
       const p1Column = page.locator('.ps-lead-side').first();
-      // Both real leads come preselected; swapping one lead replaces the
-      // oldest pick instead of demanding a deselect first.
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
       await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)').first().click();
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(2);
@@ -309,9 +272,7 @@ test.describe('PS Dashboard', () => {
       await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0');
-      // Two leads per side, slot-ordered ("lead X + Y").
       await expect(history).toContainText('+');
-      // The doubles branch opens with a chip for each of the four actives.
       await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
     });
 
@@ -321,14 +282,11 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-      // Bring-four preview: six chips per side, the real brought four
-      // preselected (leads first).
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
       const p1Column = page.locator('.ps-lead-side').first();
       await expect(p1Column.locator('.ps-switchbtn')).toHaveCount(6);
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
-      // Swap in a never-brought Pokémon — the oldest pick gives way.
       await p1Column.locator('.ps-switchbtn:not(.ps-switchbtn-selected)', { hasText: 'Flareon' }).click();
       await expect(p1Column.locator('.ps-switchbtn-selected')).toHaveCount(4);
 
@@ -337,8 +295,7 @@ test.describe('PS Dashboard', () => {
       const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
       await expect(history).toContainText('Turn 0');
       await expect(history).toContainText('back');
-      // The live branch fields ONLY the chosen four — every evaluation and
-      // play-out runs on this battle, so each slot's bench holds exactly 2.
+      // The live branch fields only the chosen four: each slot's bench holds exactly 2.
       await expect(page.locator('.ps-dock-chip')).toHaveCount(4);
       await expect((await openTray(page, 'p1a')).locator('.ps-switchbtn')).toHaveCount(2);
     });
@@ -353,8 +310,6 @@ test.describe('PS Dashboard', () => {
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
       await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
 
-      // Scene (Champions VGC 2646618972): back on T0, the same picks started again hung at
-      // "Variation tip"; discarding the variation first worked.
       await page.locator('.ps-branch-bar button[title^="Turn 0"]').click();
       await expect(page.getByText('pick the 4 each side brings')).toBeVisible();
       await page.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();

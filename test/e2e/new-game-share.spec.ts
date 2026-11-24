@@ -2,13 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { installReplayEmbedCache, pickMove, moveTimeline, startVariationAt } from './helpers';
 import { copiedLink, openInFreshContext, prepare, timelineState } from './new-game-helpers';
 
-/**
- * The share link of a game and the state file of a game, in the browser. A player copies the
- * link in the middle of a game (the main line, a variation, a turn he stands on) and a teammate opens it in a fresh browser
- * context: the same main line, the same variation, the same turn, the seed in the saved list. A game's state file restores the
- * game on a fresh page. Singles (Gen 9 OU) and VGC (doubles type). The version 1 link of a replay branch and the
- * newer or damaged links are read in test/ui/components/App.new-game.spec.tsx.
- */
 test.beforeAll(installReplayEmbedCache);
 
 const SIX = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'];
@@ -44,7 +37,6 @@ async function playLeads(page: Page, brings: number | null): Promise<void> {
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
 }
 
-/** One turn at the tip: every slot protects (a turn that cannot end the game), then Execute. */
 async function playProtectTurn(page: Page, slots: ('p1a' | 'p1b' | 'p2a' | 'p2b')[], reaches: number): Promise<void> {
   for (const slot of slots) await pickMove(page, slot, 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
@@ -55,7 +47,6 @@ async function expectOpenedLikeTheSharer(page: Page, sharer: Awaited<ReturnType<
   await expect(page.locator('.ps-topbar').getByText('New game', { exact: true })).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toBeVisible({ timeout: 120_000 });
   await expect.poll(() => timelineState(page), { timeout: 60_000 }).toEqual(sharer);
-  // the hash is gone, the address names the copy, and the game is saved in the new browser with the sharer's seed
   await expect.poll(() => new URL(page.url()).hash).toBe('');
   await expect(page).toHaveURL(/[?&]game=newgame-/);
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.seed)).toBe(seed);
@@ -72,7 +63,6 @@ test('Gen 9 OU: the link of a game in the middle of a variation opens the same m
   await playLeads(page, null);
   await playProtectTurn(page, ['p1a', 'p2a'], 2);
   await playProtectTurn(page, ['p1a', 'p2a'], 3);
-  // a variation from turn 2: another move than the game's own
   await startVariationAt(page, 2, { p1Move: 'Earthquake' });
   await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2');
   const sharer = await timelineState(page);
@@ -101,7 +91,6 @@ test('Scarlet/Violet VGC: the link carries the four brought bodies, the main lin
   const sharer = await timelineState(page);
   const seed = await page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0].seed as string);
   const link = await copiedLink(page);
-  // a doubles link stays short: two teams of six, the leads and the choices
   expect(link.length).toBeLessThan(8000);
 
   const fresh = await openInFreshContext(browser, link);
@@ -131,7 +120,6 @@ test('the state file of a game restores the game on a fresh page; its issue link
   expect(state.version).toBe(1);
   expect(game.turns).toBe(1);
   expect((state.replay as { id: string }).id).toBe(game.id);
-  // the issue link names the game, with no Showdown replay behind it
   await page.locator('.ps-topbar').getByRole('button', { name: 'Report issue' }).click();
   const href = await page.getByRole('link', { name: 'Open the issue on GitHub' }).getAttribute('href');
   expect(new URL(href!).searchParams.get('replay')).toBe(`New game ${game.id}, [Gen 9] OU, seed ${game.seed}, 1 turn played (no Showdown replay)`);

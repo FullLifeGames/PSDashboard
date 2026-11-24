@@ -2,13 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { dockReplays, installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { failOnResizeLoops, lightEngine, loadDockReplay } from './dock-helpers';
 
-/**
- * The top bar stays on one line with a long format name. The game was a Champions VGC replay
- * ("[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)", SpiringOcean against sigueinventando): the support links wrapped to a second line
- * because the match took its whole text as its basis. The match takes what the menus and links leave, the format tag shortens
- * first with an ellipsis and holds its full name in a title, and the player names shorten only after it. The fixture is the Champions
- * VGC corpus game with its `format` and `players` replaced; the rules still come from its `formatid` and log.
- */
 const ID = 'gen9championsvgc2026regma-2625939941';
 const FORMAT = '[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)';
 const PLAYERS = ['SpiringOcean', 'sigueinventando'];
@@ -51,18 +44,11 @@ for (const viewport of [{ width: 2560, height: 1290 }, { width: 1366, height: 76
     });
     const message = JSON.stringify(facts);
     expect(facts.count, message).toBeGreaterThanOrEqual(3);
-    // One line: a horizontal line through the bar crosses every child.
     expect(Math.max(...facts.tops), `the bar's children share one line ${message}`).toBeLessThan(Math.min(...facts.bottoms));
-    // The tag gives way first: while it clips, the names stay whole.
     if (facts.tagClipped) expect(facts.namesClipped, `the names stay whole while the tag clips ${message}`).toEqual([false, false]);
   });
 }
 
-/**
- * The Setup panel opened off the screen on a phone. At 640 px and less the top bar wraps and the Setup button
- * stands at the left of its row, so a panel anchored at the button's right edge ran past the window's left edge. The panel spans
- * the bar like the Load panel; above 640 px it keeps its place under the button, its right edge on the button's.
- */
 async function openSetupPanel(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize(viewport);
   await lightEngine(page);
@@ -73,9 +59,8 @@ async function openSetupPanel(page: Page, viewport: { width: number; height: num
   await button.click();
   const panel = page.locator('.ps-setup-panel');
   await expect(panel).toBeVisible();
-  // `.ps-btn:hover` lifts the button by 1 px over 0.1 s, and the click leaves the pointer on it: a box read during that
-  // transition is up to 1 px off the panel's anchor (0.58 px and 0.93 px were read in CI), and one read after
-  // it is 1 px off for good. The spec means the layout boxes, so the pointer leaves and the lift settles before the read.
+  // `.ps-btn:hover` lifts the button 1 px over 0.1 s, and the click leaves the pointer on it:
+  // the pointer leaves and the lift settles before the layout boxes are read.
   await page.mouse.move(2, viewport.height - 2);
   await expect(button).toHaveCSS('transform', 'none');
   const boxes = await page.evaluate(() => {
@@ -117,12 +102,7 @@ for (const width of [641, 1366]) {
   });
 }
 
-/**
- * On a phone, with a live branch at turn 33 (forum replay gen9natdexdraft-2713067801), "Setup ▾" ran over "Report
- * issue": the actions took no width of their own beside the support links. The status ("Variation tip: Turn 33"), Game, Setup and the
- * links each keep their own box, and the buttons stay on one line. The status text is set to the long form before the read (the
- * fixture's branch reads a short turn); no render follows.
- */
+// The status text is set to the long form before the read (the fixture's branch reads a short turn); no render follows.
 test('390 px: the branch status, Game, Setup and the support links do not overlap', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -130,7 +110,6 @@ test('390 px: the branch status, Game, Setup and the support links do not overla
   await routeOfflineFixtures(page);
   await page.goto('/');
   await loadDockReplay(page, 'gen9doublesou-2693620934', 1);
-  // The branch opens with the first executed turn (the engine's pick stands in every slot).
   await page.locator('.ps-execute-btn').click();
   const status = page.locator('.ps-topbar-actions > span', { hasText: /^Variation tip/ });
   await expect(status).toBeVisible({ timeout: 90_000 });
@@ -154,6 +133,5 @@ test('390 px: the branch status, Game, Setup and the support links do not overla
       expect(across > 1 && down > 1, `"${boxes[a].text}" and "${boxes[b].text}" overlap ${JSON.stringify(boxes)}`).toBe(false);
     }
   }
-  // One line each: a wrapped "Setup ▾" is two lines tall.
   for (const box of boxes) expect(box.bottom - box.top, `"${box.text}" stays on one line ${JSON.stringify(boxes)}`).toBeLessThan(30);
 });

@@ -16,7 +16,6 @@ type Captured = {
 
 const capture = (page: Page) => page.evaluate(() => (window as unknown as { __psState: StateHandle }).__psState.capture()) as Promise<Captured>;
 
-/** The support utilities of a bug report. */
 test.describe('support', () => {
   test.beforeEach(async ({ page }) => {
     await routeOfflineFixtures(page);
@@ -24,7 +23,6 @@ test.describe('support', () => {
   });
 
   test('Report issue opens a dialog that offers the state file and the filled issue form', async ({ page, context }) => {
-    // A dialog with a download button and a link: the click starts neither a tab nor a download by itself.
     await context.route('https://github.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>issue form</p>' }));
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
@@ -70,11 +68,9 @@ test.describe('support', () => {
     await page.locator('.ps-execute-btn').click();
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     await expect(history).toContainText('Turn 2', { timeout: 60_000 });
-    // One turn back and a draft pick there: a non-tip view with a pending choice.
     await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
     await expect(page.getByText('T2/')).toBeVisible();
-    // The tray's second enabled tile. The draft holds the user's pick only: the seed under it is derived
-    // from the recorded turn and never reaches the draft.
+    // The draft holds the user's pick only: the seed under it comes from the recorded turn and never reaches it.
     await (await openTray(page, 'p1a')).locator('.ps-movebtn:enabled').nth(1).click();
     const saved = await capture(page);
     expect(saved.choices.draft.p1.length).toBe(1);

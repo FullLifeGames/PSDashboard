@@ -4,9 +4,7 @@ import { fixturePath, installReplayEmbedCache, routeOfflineFixtures, startVariat
 
 test.beforeAll(installReplayEmbedCache);
 
-// The end of a play-out leaves the replay where the user watches it. Singles and doubles both run
-// (Fast play-out: the singles replay hits the 100-turn cap in about 30 seconds, the doubles replay ends its battle after a
-// dozen turns). The branch frame is read through Replays.battle, the slider through the bar's "T<turn>/<max>" label.
+// The singles replay hits the 100-turn cap, the doubles replay ends its battle after a dozen turns.
 const REPLAYS = [
   ['singles', 'replay.json'],
   ['doubles', 'dock-doublesou-2693620934.json'],
@@ -38,13 +36,11 @@ async function frameState(frame: Frame) {
   });
 }
 
-/** The turn the slider names ("T7/100"). */
 async function sliderTurn(page: Page): Promise<number> {
   const label = await page.locator('.ps-branch-bar').innerText();
   return Number(/T(\d+)\/\d+/.exec(label)?.[1] ?? -1);
 }
 
-/** Press Play in the frame when it stands, then its fastest speed (the engine's line plays to the end during the run). */
 async function playHyperfast(frame: Frame) {
   const paused = await frame.evaluate(() => !!(window as ReplayWindow).Replays?.battle?.paused);
   if (paused) await frame.locator('button').filter({ hasText: /^\s*Play\s*$/ }).first().click({ timeout: 10_000 });
@@ -62,9 +58,6 @@ async function playOutFromVariation(page: Page, file: string) {
 
 test.describe('the end of a play-out', () => {
   for (const [name, file] of REPLAYS) {
-    // One play-out from a variation at turn 2 serves two rows: the frame that plays during the run (Play and Hyperfast
-    // pressed in the frame) and Watch from turn N after the notice. Each keeps its own title as a step, so a red step names its row
-    // (one run per game type, about 110 seconds on the CI runner).
     test(`${name}: one play-out from a variation at turn 2, a frame that plays on and Watch from turn N`, async ({ page }) => {
       test.setTimeout(360_000);
       const frame = await playOutFromVariation(page, file);
@@ -75,7 +68,6 @@ test.describe('the end of a play-out', () => {
       const watchTurn = Number(/Watch from turn (\d+)/.exec(await watch.innerText())?.[1]);
 
       await test.step(`${name}: a frame that plays during the run keeps playing from its turn after the notice`, async () => {
-        // The notice leaves the frame where it stands: its turn never drops, it plays on unless it reached the end of its log.
         const atNotice = await frameState(frame);
         for (let sample = 0; sample < 6; sample++) {
           await page.waitForTimeout(500);
@@ -94,9 +86,7 @@ test.describe('the end of a play-out', () => {
       });
 
       await test.step(`${name}: Watch from turn N plays the variation from N while the frame plays past N`, async () => {
-        // The step before left the frame at Hyperfast; Watch plays from N at the speed the user chose, so that speed returns.
         await frame.locator('.speedchooser button[value="normal"]').click({ timeout: 10_000 });
-        // Let the frame play past the start of the run, then press Watch.
         await frame.evaluate(() => { const battle = (window as ReplayWindow).Replays?.battle as { paused?: boolean; play?: () => void } | undefined; if (battle?.paused) battle.play?.(); });
         await expect.poll(async () => (await frameState(frame)).turn, { timeout: 90_000 }).toBeGreaterThanOrEqual(watchTurn + 2);
         await watch.click();
@@ -121,21 +111,19 @@ test.describe('the end of a play-out', () => {
       const frame = await branchFrame(page);
       await expect(notice(page)).toBeVisible({ timeout: 180_000 });
 
-      // The run keeps the variation: it does not swap the main replay in at the start turn.
       const atNotice = await frameState(frame);
       await page.waitForTimeout(3000);
       await expect(branchIframe(page)).toHaveCount(1);
       await expect(page.locator('.ps-line-chip button.on-vari')).toBeVisible();
       const later = await frameState(frame);
       expect(later.turn, 'the frame stands where the run left it').toBe(atNotice.turn);
-      // The frame's start turn holds the shared prefix: the pointer takes the first covered turn, 3 for a run from turn 2.
+      // The pointer takes the first covered turn: 3 for a run from turn 2.
       expect(await sliderTurn(page)).toBe(Math.max(atNotice.turn, 3));
     });
 
     test(`${name}: a stop with a turn in flight sends the frame no play or follow-end command`, async ({ page }) => {
       test.setTimeout(240_000);
       const frame = await playOutFromVariation(page, file);
-      // Every append the frame receives, with the time of the Stop click (20 ms after the progress line counts the third turn).
       await frame.evaluate(() => {
         const w = window as unknown as { __appends: { t: number; playFromTurn?: number; followEnd?: boolean }[] };
         w.__appends = [];
@@ -165,8 +153,6 @@ test.describe('the end of a play-out', () => {
 
       const appends = await frame.evaluate(() => (window as unknown as { __appends: { t: number; playFromTurn?: number; followEnd?: boolean }[] }).__appends);
       const late = appends.filter(append => append.t >= (stopAt ?? 0));
-      // Only a turn that landed after the stop can break the rule; the unit rows of usePlayOut.spec.tsx carry it for the run
-      // where none landed.
       for (const append of late) {
         expect(append.playFromTurn, JSON.stringify(append)).toBeUndefined();
         expect(append.followEnd, JSON.stringify(append)).not.toBe(true);
@@ -175,9 +161,6 @@ test.describe('the end of a play-out', () => {
   }
 });
 
-// A run from the turn 0 view names turn 0, and Watch from turn 0 plays the branch frame from its team
-// preview while the slider reads T1 (the variation line has no turn 0). Singles and doubles (the doubles replay brings its
-// leads preselected, two per side).
 test.describe('a play-out from turn 0', () => {
   for (const [name, file] of REPLAYS) {
     test(`${name}: the notice offers Watch from turn 0 and the frame plays the leads in while the slider reads T1`, async ({ page }) => {
@@ -195,7 +178,6 @@ test.describe('a play-out from turn 0', () => {
 
       const frame = await branchFrame(page);
       await watch.click();
-      // The frame seeks to its turn 0 (the leads' switch-ins after the team preview) and plays on; the slider names T1.
       await expect.poll(async () => (await frameState(frame)).turn, { timeout: 10_000, intervals: [50] }).toBe(0);
       expect(await sliderTurn(page)).toBe(1);
       const log = await frame.evaluate(() => ((window as ReplayWindow).Replays?.battle as { stepQueue?: string[] } | undefined)?.stepQueue ?? []);

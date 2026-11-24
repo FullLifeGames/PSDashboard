@@ -6,12 +6,6 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { variationPanel } from './dock-helpers';
 
-/**
- * The turn card's "Open matrix" button opens the turn's matrix as a dialog. One test per game type, singles (Gen 6 OU
- * 655336) and Doubles OU (912884), both on turn 8: at 1400 px the dialog fits the window, names the played and the engine choices in
- * words and plays a clicked cell out as a variation; at 390 px it fits the screen and the page itself does not scroll sideways, the
- * wide table scrolls inside the dialog. Escape closes it and hands the focus back to the button.
- */
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
@@ -37,7 +31,7 @@ async function openPage(page: Page, replay: ReplayData): Promise<void> {
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
-/** The panel can land on the game report right after a search; a click on the turn's column of the graph opens the card again. */
+// The panel can land on the game report right after a search; a graph click opens the card again.
 async function settleOnTurn(page: Page, panel: Locator, turn: number): Promise<void> {
   const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
@@ -52,7 +46,6 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number): Promise<v
   throw new Error(`the card of turn ${turn} showed no Open matrix button within 150 s`);
 }
 
-/** The dialog sits inside the window, and the page behind it does not scroll sideways. */
 async function expectFits(page: Page, dialog: Locator): Promise<void> {
   const box = (await dialog.boundingBox())!;
   const view = page.viewportSize()!;
@@ -76,7 +69,6 @@ for (const game of GAMES) {
     await analyze.click();
     await settleOnTurn(page, panel, game.turn);
 
-    // the overview's own toggle stays
     await expect(panel.locator('button.ps-eval-matrix-toggle')).toBeVisible();
 
     const button = panel.locator('.ps-eval-analysis').getByRole('button', { name: 'Open matrix' });
@@ -85,7 +77,6 @@ for (const game of GAMES) {
     await expect(dialog).toBeVisible();
     const table = dialog.locator('table');
     await expect(table.locator('td').first()).toContainText(/\d+%/);
-    // the marks are words; the engine's rows and columns carry one, and every header shows its weight
     await expect(table.getByText('engine', { exact: true }).first()).toBeVisible();
     expect(await table.getByText('played', { exact: true }).count()).toBeGreaterThanOrEqual(1);
     const headers = await table.locator('th').count();
@@ -93,7 +84,6 @@ for (const game of GAMES) {
     expect(await table.locator('th', { hasText: /\d+%/ }).count()).toBe(headers - 1);
     await expectFits(page, dialog);
 
-    // a narrow screen: the dialog fits, the table scrolls inside it
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(dialog).toBeVisible();
     await expectFits(page, dialog);
