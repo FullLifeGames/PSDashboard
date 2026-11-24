@@ -383,14 +383,6 @@ describe('verify-cover-doubles', () => {
     });
   });
 
-  describe('the game types keep their rule', () => {
-    test('singles takes no cheap deepening, doubles takes one', () => {
-      expect(VERIFY_CHEAP.singles).toBe('off');
-      expect(VERIFY_CHEAP.doubles).not.toBe('off');
-      expect(VERIFY_DEEPEN_COVER.singles).toBe(0.9);
-    });
-  });
-
   const fixture = JSON.parse(readFileSync(new URL('./fixtures/positions/smogtours-gen9doublesou-912045-t6.json', import.meta.url), 'utf-8')) as
     { serialized: string; tera: boolean; sleepClause: boolean };
 

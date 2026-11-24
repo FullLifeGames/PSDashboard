@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import {
-  createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures,
+  createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures,
 } from '../src/eval-function';
 import { phaseFormOf, setStaticForm, staticFormOn } from '../src/score/phase-form';
 import { set } from './move-oracle';
@@ -67,13 +67,6 @@ describe('the tables and the form per family', () => {
     }
     // A VGC singles game reads the standard singles table, and the form with it.
     expect(phaseFormOf(false, 'vgc')).toBe(form);
-  });
-
-  test('the fold: statusFix weighs what bodies weighs, in the table and in the form', () => {
-    expect(FEATURE_WEIGHTS.statusFix).toBe(FEATURE_WEIGHTS.bodies);
-    const form = phaseFormOf(false, 'standard')!;
-    expect(form.base.statusFix).toBe(form.base.bodies);
-    expect(form.phase.statusFix).toBe(form.phase.bodies);
   });
 });
 

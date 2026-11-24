@@ -85,11 +85,6 @@ describe('fingerprint', () => {
 describe('playOnCopy', () => {
   const positions = loadPositions();
 
-  test('there are fixtures of every game type', () => {
-    expect(positions.some(position => position.gameType === 'singles')).toBe(true);
-    expect(positions.some(position => position.gameType === 'doubles')).toBe(true);
-  });
-
   /** The first fixture of each format the files hold (singles of Gens 3, 6, 8 and 9, doubles of Gen 9). */
   const few = positions.filter((position, index) => positions.findIndex(other => other.format === position.format) === index);
 

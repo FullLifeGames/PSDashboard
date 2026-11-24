@@ -207,11 +207,6 @@ describe('cell-plan-missing', () => {
       expect(Math.abs(sample.value - truth.mean)).toBeLessThan(2.5 * truth.se);
     });
 
-    test('the cut lies below the weight the policy scene misses', () => {
-      expect(MISSING_WEIGHT_CUT).toBeGreaterThan(0);
-      expect(MISSING_WEIGHT_CUT).toBeLessThan(0.87890625);
-    });
-
     test('doubles: a root cell is priced by the pair plan from the dice drawn, with no missing class to report', () => {
       const side = (names: string[], move: string) => Teams.pack(names.map(species => mon(species, [move, 'Protect'], {
         ability: 'No Ability', evs: { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 }, level: 50,

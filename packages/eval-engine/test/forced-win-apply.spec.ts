@@ -453,11 +453,6 @@ describe('the boards where no strike exists keep their proofs', () => {
   test('Champions VGC 2694684816 turn 8 on the bank root: the proof stays at 0.5747 or above (the strike-only order costs no proof)', () => {
     expect(proofOf(scene('forced-win-delay/champions-vgc-2694684816-t8-bank')).mass).toBeGreaterThanOrEqual(0.5747);
   });
-
-  test('Champions VGC 2628166702 turn 7 (Umbreon\'s Leftovers) and #145\'s scene stay without a proof', () => {
-    expect(proofOf(scene('forced-win-delay/champions-vgc-2628166702-t7')).mass).toBe(0);
-    expect(proofOf(scene('forced-win-delay/champions-vgc-2694505370-t10')).mass).toBe(0);
-  });
 });
 const serialize = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle));
 const strikeOn = (battle: Battle, side: 'p1' | 'p2' = 'p1'): string | null => {

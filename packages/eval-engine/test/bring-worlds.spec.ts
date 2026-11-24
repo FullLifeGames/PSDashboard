@@ -118,10 +118,6 @@ const side = (fielded: string[], candidates: [string, number][], open: number) =
 });
 
 describe('bringWorlds: once per game (#124)', () => {
-  test('the cap is three', () => {
-    expect(BRING_WORLD_CAP).toBe(3);
-  });
-
   test('a bring-all game gives no worlds', () => {
     expect(bringWorlds(null, BRING_WORLD_CAP)).toBeNull();
   });

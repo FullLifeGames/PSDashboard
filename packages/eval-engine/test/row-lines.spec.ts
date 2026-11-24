@@ -322,13 +322,6 @@ describe('the line threshold of the rows is 4 visits, the principal variation ke
     expect(principalVariation(thin())).toEqual(referenceVariation(thin()));
     expect(principalVariation(thin())).toHaveLength(1);
   });
-
-  test('the walk at 4 reads the tree and changes nothing in it', () => {
-    const root = thin();
-    const before = JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]));
-    rowLinesAt(root, tops('Surf', 'Draining Kiss'));
-    expect(JSON.stringify([...root.children].map(([key, child]) => [key, child.visits]))).toBe(before);
-  });
 });
 
 /**

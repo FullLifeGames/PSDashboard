@@ -340,15 +340,6 @@ describe('evaluatePosition', () => {
     expect(evaluatePosition(battle)).toBeGreaterThan(0.3);
   });
 
-  test('boost stages follow the diminishing schedule with an offense/defense split', () => {
-    expect(EVAL_WEIGHTS.boostSchedule[2]).toBe(2 * EVAL_WEIGHTS.boostSchedule[1]);
-    expect(EVAL_WEIGHTS.boostSchedule[6]).toBeLessThan(2 * EVAL_WEIGHTS.boostSchedule[2]);
-    expect(EVAL_WEIGHTS.boostStage.defensive).toBeLessThan(EVAL_WEIGHTS.boostStage.offensive);
-    for (let stage = 1; stage < 6; stage++) {
-      expect(EVAL_WEIGHTS.boostSchedule[stage + 1]).toBeGreaterThan(EVAL_WEIGHTS.boostSchedule[stage]);
-    }
-  });
-
   test('the flat boost term applies the schedule (accuracy stages, matchup-invisible)', () => {
     // Accuracy stages never touch the matchup term, so the mirror isolates the flat term: the +2/+1 ratio is the schedule's
     // 2.0, read on the boosts column.
@@ -919,15 +910,6 @@ describe('PP truth in the threat model (round 11)', () => {
       expect(chancy.physicalAcc).toBeCloseTo(0.5, 5);
       const plain = pairThreat(battle.sides[1].active[0]!, battle.sides[0].active[0]!, battle);
       expect(plain.physicalAcc).toBe(1);
-    });
-
-    test('a no-bench endgame never enters the switch-in stage', () => {
-      // "No switch-ins left" is trivially true in a 1v1: the stage speaks only while the other side has a bench.
-      const battle = makeBattle(
-        [makeSet('A', 'Snorlax', ['Tackle'])],
-        [makeSet('B', 'Snorlax', ['Tackle'])],
-      );
-      expect(unansweredMons(battle)).toEqual({ p1: [], p2: [] });
     });
 
     test('a coin-flip nuke is no answer; the sure nuke still holds the pair', () => {

@@ -13,7 +13,7 @@ export function meanTrend(trends: number[]): number {
 }
 
 /** Extrapolation strength: the observed bleed or build continues λ more plies. */
-export const TREND_LAMBDA = 0.5;
+const TREND_LAMBDA = 0.5;
 /**
  * Shifts below this stay unapplied: single-seed trend probes carry sampling noise on this scale, and decided positions tie
  * structurally with near-zero trends; folding noise into values would churn every endgame ranking the pruned sub-search path must mirror.

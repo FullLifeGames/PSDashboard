@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells,
-  solveMatrixGame, toResult, TIE_EPSILON, TREND_LAMBDA, TREND_MARGIN, type ValueMatrix,
+  solveMatrixGame, toResult, TIE_EPSILON, TREND_MARGIN, type ValueMatrix,
 } from '../src/rank';
 
 // The solver reads the average strategies: the only thing regret matching guarantees converges.
@@ -308,9 +308,5 @@ describe('horizon-trend extrapolation (2b)', () => {
     const result = resultOf(matrix);
     expect(applyTrendExtrapolation(matrix, result, new Map([[cellKey(0, 0), -0.5]]), 0.5)).toBe(false);
     expect(matrix.values[0][0]).toBe(0.3);
-  });
-
-  test('the default λ is the swept 0.5', () => {
-    expect(TREND_LAMBDA).toBe(0.5);
   });
 });

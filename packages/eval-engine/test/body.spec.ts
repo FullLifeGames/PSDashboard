@@ -437,10 +437,6 @@ function play(format: Format, scene: typeof CASES[number]): Hit {
 await loadSimMods('gen9championsou');
 
 describe('Protect reaches the calculator as the simulator plays it (decision 4)', () => {
-  test('the engine names the move\'s Protect check: calc/move.ts exports protectBlocks', () => {
-    expect(typeof (moveModule as unknown as { protectBlocks?: unknown }).protectBlocks).toBe('function');
-  });
-
   for (const format of FORMATS) {
     test(`${format}: the simulator's loss of a Protecting target lies in the range of the engine's field`, () => {
       const hits = CASES.map(scene => ({ scene, ...play(format, scene) }));

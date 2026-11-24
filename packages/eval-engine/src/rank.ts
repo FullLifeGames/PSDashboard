@@ -5,4 +5,4 @@ export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix.ts';
 export { solveMatrixGame } from './ranking/solve.ts';
 export { attachLines, rankFromMatrix, selectExpansionCells, toResult } from './ranking/order.ts';
 export { coreOf, GIMMICK_TOKENS, selectTieProbeCells, TIE_EPSILON, TREND_MARGIN } from './ranking/ties.ts';
-export { applyTrendExtrapolation, applyTrendTiebreak, meanTrend, TREND_LAMBDA } from './ranking/trend.ts';
+export { applyTrendExtrapolation, applyTrendTiebreak, meanTrend } from './ranking/trend.ts';
