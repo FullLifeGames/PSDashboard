@@ -83,7 +83,7 @@ The app posts `ps-embed-ready` once it accepts replays and answers every `ps-loa
 - [packages/eval-engine](./packages/eval-engine/): `@fulllifegames/eval-engine`, position reconstruction, search, grading, and the game report.
 - `test/regression/`: Vitest specs for the app code and the measurement harnesses; `test/ui/`: component and hook specs under jsdom.
 - `test/e2e/`: Playwright browser flows, one file per theme; `test/e2e-capture/`: the capture of the saved engine results the browser flows seed; `test/e2e-build/`: a smoke test of the minified bundle; `test/e2e-feedback/`: the expert-feedback drift suite.
-- `scripts/`: release, pack, lint-ratchet, and calibration tooling; `examples/`: the embed host page; `packages/eval-engine/examples/engine-python/`: a sample engine; `public/`: static assets.
+- `scripts/`: bank, feedback, fit corpus, lint-ratchet, release, and test tooling ([scripts/README.md](./scripts/README.md) says how to call each script); `examples/`: the embed host page; `packages/eval-engine/examples/engine-python/`: a sample engine; `public/`: static assets.
 - [Issues](https://github.com/FullLifeGames/PSDashboard/issues) hold the open work, [milestones](https://github.com/FullLifeGames/PSDashboard/milestones) the releases it belongs to, and [docs/completed/](./docs/completed/) the finished rounds. [AGENTS.md](./AGENTS.md) holds the working rules for agents and contributors.
 
 ## Development
