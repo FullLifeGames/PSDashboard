@@ -11,13 +11,9 @@ import type { EvalLine, LineStep } from '../../types.ts';
 import type { PinnedTurn } from '../../dice/likeliest.ts';
 import { dieKey } from '../../dice/types.ts';
 
-/**
- * The steps of a luck path and the line the app plays from them. A path is a list of steps (a turn, or the replacement a faint or a
- * pivot asks for), each with the choices of both sides, its starting battle and the turn played with its dice (`playTurnWith`). Its exact
- * chance is the product over its dice of `chanceOfDie`.
- */
+/** A step of a luck path: a turn or a replacement with both sides' choices and the turn played with its dice. */
 export interface PathStep {
-  /** The battle at the step's start (read, never written). */
+  /** The battle at the step's start; read, never written. */
   start: Battle;
   p1: ChoiceOption;
   p2: ChoiceOption;
@@ -31,7 +27,6 @@ export const playOf = (p1: ChoiceOption, p2: ChoiceOption) => (battle: Battle): 
   applyChoice(battle, 'p2', p2.choice);
 };
 
-/** Whether the battle stands at a request for a replacement (a faint's, a pivot's) rather than at a turn boundary. */
 export const awaitsReplacement = (battle: Battle): boolean => battle.sides.slice(0, 2).some(side => side.requestState === 'switch');
 
 export const wonBy = (battle: Battle, side: 'p1' | 'p2'): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
@@ -42,13 +37,8 @@ export function inDrawOrder(turn: PinnedTurn): LikeliestDie[] {
   return [...turn.dice].sort((a, b) => rank(a) - rank(b));
 }
 
-/**
- * The chance of one die of a step: the share of its results that leave the same bodies standing as the result the path takes. A die
- * whose other results change who falls counts the chance of the result taken (a miss that spares the foe: 0.2); a die whose every
- * result gives the same outcome counts one (a crit on a body one hit point from falling). A damage roll counts the share of rolls in
- * its group (`rollDecides`); a die the draw names no other result for (a sure chance, a draw with no chance) counts one. `count` is
- * told the turns played on copies to decide it.
- */
+// The chance of one die: the share of its results that leave the same bodies standing as the result the path takes.
+// A damage roll counts its share of rolls in its group (`rollDecides`); a die with no other named result counts one.
 function chanceOfDie(step: PathStep, dice: readonly LikeliestDie[], at: number, count: (plays: number) => void): number {
   const entry = dice[at];
   const { kind } = entry.die.name;
@@ -70,7 +60,7 @@ function chanceOfDie(step: PathStep, dice: readonly LikeliestDie[], at: number, 
   return Math.min(1, share);
 }
 
-/** The exact chance of a path (the product over its steps and their dice); `count` is told the turns played to read the rolls and ties. */
+/** The exact chance of a path; `count` is told the turns played to read the rolls and ties. */
 export function exactChance(path: readonly PathStep[], count: (plays: number) => void): number {
   let chance = 1;
   for (const step of path) {
@@ -80,10 +70,8 @@ export function exactChance(path: readonly PathStep[], count: (plays: number) =>
   return chance;
 }
 
-/** The dice the turn played (the list `rollDecides` and the line index into). */
 const turnDice = (step: PathStep): LikeliestDie[] => step.turn.dice;
 
-/** The line of a winning path, as the app plays it: each step's slot choices with its dice on their holders. */
 export function lineOfPath(side: 'p1' | 'p2', path: readonly PathStep[], ruleset: StaticRuleset): EvalLine | null {
   const steps: LineStep[] = [];
   const unforced = new Set<string>();

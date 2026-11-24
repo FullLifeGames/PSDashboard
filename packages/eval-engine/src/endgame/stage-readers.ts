@@ -5,20 +5,9 @@ import { removalFormat } from '../score/boost-bite.ts';
 import { usableSlots } from '../score/threat.ts';
 import { other, type Side } from './prover-order.ts';
 
-/**
- * Which moves read or move the stat stages a class moved (Foul Play, Punishment, Psych Up, Spectral Thief, Transform, Topsy-Turvy, the
- * Swap moves). The Dex has a field for some and none for the rest, so the simulator answers, played once per twin format and move, as
- * `removesStages` (score/boost-bite.ts) does for Haze and the phazers.
- *
- * The question: the foe (Snorlax, the move first) clicks the move at the target (Vaporeon, a pure Water type: no typing is immune) in
- * five runs, every die answering yes and the damage roll at its middle (`FixedDice`), so the runs differ in the stages only. Baseline:
- * nobody has a stage; then the target gains two stages in Attack and Special Attack, in Defense and Special Defense, in Accuracy and
- * Evasion (the gains a class gives the mover), and the foe loses two stages in all six. Speed is left out (`onlyHelpsMover` never
- * carries a class that moves it). A move reads the stages when, against the baseline, the target loses more HP, a target stage ends
- * lower or a foe stage ends higher. A charge move plays its second turn.
- */
+// The Dex marks some stage readers and not others, so the simulator answers: five runs of a move, stages differ only.
+// Speed is left out (`onlyHelpsMover` never carries a class that moves it); a charge move plays its second turn.
 
-// A body with no ability and no item: nothing but the move answers the stages.
 const body = (species: string, moves: string[]): PokemonSet => ({
 // eslint-disable-next-line names/no-new-dex-name -- stand-in bodies of a played question: the census plays every move against them, held by stage-readers-sweep.spec.ts
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
@@ -32,7 +21,6 @@ const ALL: readonly Stat[] = ['atk', 'def', 'spa', 'spd', 'accuracy', 'evasion']
 
 interface Played { lost: number; target: Record<string, number>; foe: Record<string, number> }
 
-/** One run of the question: the HP the target lost and the stages both bodies ended with, or null when the move cannot be clicked. */
 function played(format: string, moveId: string, gain: readonly Stat[], loss: readonly Stat[]): Played | null {
 // eslint-disable-next-line names/no-new-dex-name -- stand-in bodies of a played question: the census plays every move against them, held by stage-readers-sweep.spec.ts
   const twin = twinBattle(format, { p1: { name: 'Target', team: [body('Vaporeon', ['splash'])] }, p2: { name: 'Foe', team: [body('Snorlax', [moveId, 'splash'])] } });
@@ -50,7 +38,6 @@ function played(format: string, moveId: string, gain: readonly Stat[], loss: rea
   return { lost: hp - target.hp, target: { ...target.boosts }, foe: { ...foe.boosts } };
 }
 
-/** Whether the run is worse for the target than the baseline: more HP lost, a target stage lower, a foe stage higher. */
 function worse(run: Played, base: Played): boolean {
   const stages = Object.keys(base.target);
   return run.lost > base.lost || stages.some(stat => run.target[stat] < base.target[stat] || run.foe[stat] > base.foe[stat]);
@@ -69,10 +56,7 @@ function ask(format: string, moveId: string): boolean {
 
 const answers = new Map<string, boolean>();
 
-/**
- * Whether a move reads or moves the stat stages, as the simulator plays it, once per twin format and move. `format` is the twin's
- * (`removalFormat` of the battle); `test/stage-readers-sweep.spec.ts` plays every move of every rule set against it.
- */
+/** Whether a move reads or moves stat stages, as the simulator plays it (test/stage-readers-sweep.spec.ts holds it). */
 export function readsStages(format: string, moveId: string): boolean {
   const key = `${format}|${moveId}`;
   let reads = answers.get(key);
@@ -83,10 +67,7 @@ export function readsStages(format: string, moveId: string): boolean {
   return reads;
 }
 
-/**
- * Whether a living body of the foe's side (on the field or on the bench: a switch brings it in) can click a move that reads the stages.
- * Reads the battle (the move slots, the generation, the format), writes nothing.
- */
+/** Whether a living foe body, on the field or the bench (a switch brings it in), can click a move that reads stages. */
 export function foeReadsStages(battle: Battle, mover: Side): boolean {
   const format = removalFormat(battle);
   return battle.sides[sideIndex(other(mover))].pokemon.some(mon => !mon.fainted && usableSlots(mon).some(slot => readsStages(format, slot.id)));

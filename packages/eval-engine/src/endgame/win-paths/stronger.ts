@@ -8,18 +8,11 @@ import { awaitsReplacement } from './luck-path.ts';
 import { greedyReplacements } from './replacement.ts';
 import type { WinPathsRequest, WinStep } from './types.ts';
 
-/**
- * A stronger play: the side that lost may pick any own choice at the turn and the opponent answers with its best reply. The prover
- * (`floor: 0`, `plan: true`) proves each own choice in the ranking's order with the turns asked as its depth; the mass (a lower bound
- * under the class model; crits stay outside it and doubles prove over sampled rolls) of the best choice is the step's `chance`, the played
- * choice's `played`. A choice is stronger when its mass beats the played one's and is above 0. The line is a witness: the likeliest dice
- * under which the proof's choices win, searched as the luck step searches (`luck.ts`); a position the dice reach that the proof did not
- * (a roll a little off the proof's own draw) is proved again from there with the turns that are left.
- */
+// The prover (`floor: 0`, `plan: true`) proves each own choice in ranking order; the best mass is the chance.
+// The line is a witness: the likeliest dice under which the proof's choices win; a missed position is re-proved.
 
 const optionsOf = (request: WinPathsRequest) => ({ tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset });
 
-/** The chooser that follows a proof: the root's best plan, then the plan of each position the dice reach (proved with the turns that are left). */
 function planChooser(side: Side, request: WinPathsRequest, rootPlan: ProofPlan, meter: WinMeter, provers: Map<number, ForcedWinProver>, turns: number): (root: SimPosition) => Chooser {
   const proverFor = (left: number): ForcedWinProver => {
     let prover = provers.get(left);
@@ -46,14 +39,12 @@ function planChooser(side: Side, request: WinPathsRequest, rootPlan: ProofPlan, 
   });
 }
 
-/** The candidates of the turn in the ranking's order (the kill odds when the request names none), the played choice last when it is no option. */
 function candidatesOf(root: SimPosition, side: Side, request: WinPathsRequest): ChoiceOption[] {
   const own = searchOptions(root, side, { tera: request.tera, sleepClause: request.sleepClause });
   const order = request.rootOrder ?? [];
   return order.length > 0 ? orderByRanking(own, order) : orderByOdds(positionBattle(root), side, own);
 }
 
-/** The best candidate's mass and plan, the played choice's mass, and whether a cap cut the proof: every candidate in the ranking's order, one proof each. */
 function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: WinPathsRequest): { best: { mass: number; plan: ProofPlan } | null; played?: number } {
   let best: { mass: number; plan: ProofPlan } | null = null;
   let played: number | undefined;

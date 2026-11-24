@@ -1,10 +1,7 @@
 import { State } from '@pkmn/sim';
 import type { Battle } from '@pkmn/sim';
 
-/**
- * The endgame solver's memo key: the serialized state without logs, request bookkeeping, the PRNG, the turn counter and the effect-order
- * counter; the last move stays (Choice lock, Encore and Torment read it). Dropping effectOrder is a small approximation.
- */
+// The last move stays (Choice lock, Encore and Torment read it); dropping effectOrder is a small approximation.
 const STRIPPED_FIELDS = [
   'log', 'inputLog', 'messageLog', 'sentLogPos', 'sentRequests', 'prng', 'prngSeed', 'turn', 'lastMoveLine',
   'hints', 'effectOrder',

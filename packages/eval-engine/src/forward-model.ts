@@ -1,4 +1,3 @@
-// The forward model's facade: the public names of forward/.
 
 export { deserializeBattleExact, restoreSideInvariants, serializeBattleStable } from './forward/serialize.ts';
 export { createRootPosition, positionBattle } from './forward/position.ts';

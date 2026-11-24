@@ -15,46 +15,33 @@ import { cachedStrike, strikeNames } from './prover-strike.ts';
 
 export { dominates } from './prover-order.ts';
 
-/**
- * The forced-win prover: an AND/OR proof search from the root. It reports the proven mass, a lower bound on the win
- * probability under the outcome-class model. Design and caps: EVALUATION.md "The forced-win prover", ADR 0020.
- */
+/** The forced-win prover: an AND/OR proof search; design in EVALUATION.md "The forced-win prover" and ADR 0020. */
 
-/** The caps of one proof: states, matrix cells and turns of depth. */
 export interface ProverBudget {
   states: number;
   /** Matrix cells drawn per position. */
   cells: number;
   depth: number;
 }
-/** The default budget of `proveForcedWin`. */
 export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12 };
-/** Forced draws per class cell, retries included; a class beyond the cap stays open and its share leaves the mass. */
+// Forced draws per class cell, retries included; a class beyond the cap stays open and its share leaves the mass.
 const PROVER_DRAW_BUDGET = 6;
 const PROVER_INNER_DRAW_BUDGET = 3;
-/**
- * Own candidates tried at the root (ranking order) and at inner nodes (odds order); a sure strike (`prover-strike.ts`) goes before them,
- * one more at the root.
- */
 const ROOT_CANDIDATES = 3;
 const INNER_CANDIDATES = 2;
 
-/** What `proveForcedWin` needs besides the position: the side, the root order, the rules and the budget. */
 export interface ProveRequest {
   side: 'p1' | 'p2';
-  /** Root candidates best first (choice ids from the ranking); empty = odds order. */
+  /** Root candidates best first (choice ids from the ranking); empty means odds order. */
   rootOrder: string[];
   tera?: TeraAllowance;
   sleepClause?: boolean;
-  /** The rule set whose weight table the statics read. */
   ruleset?: StaticRuleset;
   budget?: Partial<ProverBudget>;
-  /** States and cells already spent by an earlier attempt on this position. */
   spent?: { states: number; cells: number };
 }
 
 interface Memo extends Proven { remaining: number }
-/** The own choice that proved a position and the reply that gave the minimum mass. */
 export interface ProofPlan { own: ChoiceOption; reply: ChoiceOption }
 interface ReplyProof { proven: Proven; cells: CellProof[]; plan?: ProofPlan; choice?: string }
 /** The defaults are the production path. */
@@ -65,7 +52,6 @@ const NONE: Proven = { mass: 0, turns: 0, caveat: 'none' };
 const CAVEAT_RANK: Record<ForcedWinCaveat, number> = { none: 0, 'barring-crit': 1, 'sampled-rolls': 2 };
 const worse = (a: ForcedWinCaveat, b: ForcedWinCaveat): ForcedWinCaveat => (CAVEAT_RANK[b] > CAVEAT_RANK[a] ? b : a);
 
-/** A move whose damage can crit: base power, not fixed damage or OHKO. */
 function critable(battle: Battle, choice: string): boolean {
   const id = firstMoveId(choice);
   if (!id) return false;
@@ -73,15 +59,12 @@ function critable(battle: Battle, choice: string): boolean {
   return move.exists && move.basePower > 0;
 }
 
-/** Proven over sampled rolls only: every doubles cell (no class plan prices a doubles turn) and a singles plain cell whose draws disagreed. */
 const sampled = (root: Battle, cell: Cell): boolean => cell.plain && (root.gameType !== 'singles' || cell.spread);
 
 export class ForcedWinProver {
   /** Swapped for a fresh map during a lazy pass: a lazy mass must never answer the full pass. */
   private memo = new Map<string, Memo>();
-  /** A lazy pass leaves the turned children aside (mass 0), so its mass is a lower bound of the full proof's. */
   private lazy = false;
-  /** Cells drawn once per (position, pair): a position the proof reaches twice draws its cell once. */
   private readonly cellCache = new Map<string, EndgameChildren>();
   private readonly inProgress = new Set<string>();
   private readonly strikes = new WeakMap<SimPosition, ChoiceOption | null>();
@@ -91,7 +74,6 @@ export class ForcedWinProver {
   private budget: ProverBudget;
   private readonly floor: number;
   private readonly planned: boolean;
-  /** With `plan`: the plan of every proven position, by endgame key. */
   readonly plans = new Map<string, ProofPlan>();
   /** A states or cells cap cut a branch; a depth cut is the turns asked and does not count. */
   capped = false;
@@ -129,7 +111,6 @@ export class ForcedWinProver {
     return proven;
   }
 
-  /** The children of one cell, drawn once per proof run and counted once; root cells may force six draws, inner cells three. */
   private cellsFor(position: SimPosition, p1Choice: string, p2Choice: string, ply: number): EndgameChildren {
     const drawBudget = ply === 0 ? PROVER_DRAW_BUDGET : PROVER_INNER_DRAW_BUDGET;
     const key = `${endgameKey(positionBattle(position))}|${p1Choice}|${p2Choice}|${drawBudget}`;
@@ -149,7 +130,6 @@ export class ForcedWinProver {
     return cachedStrike(this.strikes, position, this.side, own, this.opts.tera);
   }
 
-  /** The sure strike first, then the first `limit` of the order without it: the strike takes none of their places. */
   private candidatesOf(position: SimPosition, own: ChoiceOption[], order: (options: ChoiceOption[]) => ChoiceOption[], limit: number): ChoiceOption[] {
     const strike = this.strikeFor(position, own);
     const today = order(strike ? own.filter(option => option.choice !== strike.choice) : own).slice(0, limit);
@@ -162,11 +142,8 @@ export class ForcedWinProver {
     return this.candidatesOf(root, own, order, ROOT_CANDIDATES).map(candidate => candidate.choice);
   }
 
-  /**
-   * The OR node. Replies are every legal choice of the simulator, never the tree's doubles combo list: that list is a search
-   * budget, not a refutation (VGC 2630685175 turn 7 proved a win against the 12 kept combos, and Zamazenta's Protect escapes it).
-   * A single slot keeps the engine's list, without field moves that fail into a standing condition.
-   */
+  // Replies are every legal choice of the simulator, never the tree's doubles combo list: that list is a search budget,
+  // not a refutation. A single slot keeps the engine's list, without field moves that fail into a standing condition.
   expand(position: SimPosition, ply: number, rootOrder: string[] | null): ReplyProof {
     const battle = positionBattle(position);
     const own = searchOptions(position, this.side, this.opts);
@@ -184,13 +161,12 @@ export class ForcedWinProver {
     return best;
   }
 
-  /** The reply of an AND node's proof that gave the minimum mass (the first, in the node's order, on a tie). */
+  /** The reply of an AND node's proof with the minimum mass (the first in the node's order on a tie). */
   private planOf(own: ChoiceOption, attempt: ReplyProof): ProofPlan | undefined {
     const worst = attempt.cells.reduce<CellProof | null>((low, proof) => (!low || proof.proven.mass < low.proven.mass ? proof : low), null);
     return worst ? { own, reply: worst.cell.reply } : undefined;
   }
 
-  /** One own choice proved by itself at the root's full pass, with its plan; candidates after the first reuse the shared memo. */
   candidateProof(position: SimPosition, own: ChoiceOption): ReplyProof {
     const proof = this.pass(position, own.choice, this.replyChoices(position), 0, false);
     return this.planned ? { ...proof, plan: this.planOf(own, proof) } : proof;
@@ -201,16 +177,12 @@ export class ForcedWinProver {
     return { proven, plan: this.plans.get(endgameKey(positionBattle(position))) ?? null };
   }
 
-  /** The replies the AND node answers: every legal choice of a doubles side, the engine's list for a single slot (see `expand`). */
   private replyChoices(position: SimPosition): ChoiceOption[] {
     const legal = legalChoices(position, other(this.side), { tera: this.opts.tera });
     return isCombined(legal) ? legal : searchOptions(position, other(this.side), this.opts);
   }
 
-  /**
-   * Lazy pass first, full proof only for a candidate that clears MIN_FORCED_MASS; if none clears it, the full proof runs over all with what
-   * is left (ADR 0020).
-   */
+  // Lazy pass first, full proof only for a candidate that clears MIN_FORCED_MASS (ADR 0020).
   private rootLoop(position: SimPosition, ply: number, candidates: ChoiceOption[], replies: ChoiceOption[]): ReplyProof {
     let best: ReplyProof = { proven: NONE, cells: [] };
     let passed = false;
@@ -231,7 +203,7 @@ export class ForcedWinProver {
     return best;
   }
 
-  /** The sure strike runs on cells of its own and gives them back unless it ends the root, so the ranking's candidates meet the full budget. */
+  // The sure strike runs on cells of its own, given back unless it ends the root: the candidates meet the full budget.
   private passes(position: SimPosition, candidate: ChoiceOption, replies: ChoiceOption[], ply: number): { lazy: ReplyProof; attempt: ReplyProof } {
     const strike = this.strikes.get(position)?.choice === candidate.choice;
     const [before, budget] = [this.cells, this.budget];
@@ -246,7 +218,6 @@ export class ForcedWinProver {
     }
   }
 
-  /** One candidate's AND node, lazily (the turned children left aside, a memo of its own) or in full. */
   private pass(position: SimPosition, ownChoice: string, replies: ChoiceOption[], ply: number, lazy: boolean): ReplyProof {
     if (!lazy) return this.replies(position, ownChoice, replies, ply);
     const fullMemo = this.memo;
@@ -260,12 +231,10 @@ export class ForcedWinProver {
     }
   }
 
-  /** Test seam: one root candidate's lazy or full mass (the lazy mass never exceeds the full one). */
   candidateMass(position: SimPosition, ownChoice: string, lazy: boolean): Proven {
     return this.pass(position, ownChoice, this.replyChoices(position), 0, lazy).proven;
   }
 
-  /** The AND node: every reply, worst static first; the running minimum stops at the first escape. */
   private replies(position: SimPosition, ownChoice: string, replies: ChoiceOption[], ply: number): ReplyProof {
     const battle = positionBattle(position);
     if (this.cells + replies.length > this.budget.cells) {
@@ -294,23 +263,17 @@ export class ForcedWinProver {
     return { proven: { mass, turns, caveat, ...(delay ? { delay } : {}) }, cells: proofs };
   }
 
-  /** Share-weighted static of a cell's children from the own side. */
   private ownStatic(cell: Cell): number {
     const sign = this.side === 'p1' ? 1 : -1;
     return sign * cell.children.reduce((sum, child) => sum + child.share * leafValue(positionBattle(child.position), this.cache), 0);
   }
 
   private cell(root: Battle, cell: Cell, ply: number): CellProof {
-    // A repeated stall that leaves the board as it was is a delay (`endgame/delay-rule.ts`): the cell is priced by its other children,
-    // also when the plain path left it unpriced (the hold and the failure end the turn differently).
+    // A repeated stall that leaves the board as it was is a delay (`delay-rule.ts`): priced by the other children.
     const read = readDelay(root, this.side, cell);
-    // A plain cell whose draws disagree on a knock-out has no class to
-    // prove per; a class cell with a class the draws never showed keeps
-    // that class open (its share never enters the mass) unless a drawn
-    // class dominates it, and proves the rest.
+    // A plain cell whose draws disagree on a knock-out has no class to prove per.
     if (cell.unpriced && cell.plain && !read) return { cell, proofs: [], proven: NONE };
     const view: Cell = read?.split ? { ...cell, children: read.children } : cell;
-    // A child where a secondary that only helps this side fired takes the proof of the child where it did not (prover-helping.ts).
     const sources = read?.split ? view.children.map(() => -1) : helpedSources(cell, this.side);
     // A turned child that ended costs no cell and no state, so the lazy pass reads it.
     const proofs: Proven[] = view.children.map((child, index) => (!read?.delays[index] && sources[index] < 0 && !(this.lazy && child.turned && !child.ended) ? this.prove(child.position, ply + 1) : NONE));
@@ -336,13 +299,13 @@ export class ForcedWinProver {
     if (read) {
       mass = delayMass(mass, delayShare);
       if (mass > 0) delay = read.move;
-      // the delay children read as the cell itself (the parent again with a weaker stall), so the open share the bar weighs is 1 - mass
+      // The delay children read as the cell itself (the parent with a weaker stall): the bar's open share is 1 - mass.
       read.delays.forEach((isDelay, index) => { if (isDelay) proofs[index] = { mass, turns, caveat }; });
     }
     return { cell: view, proofs, proven: { mass, turns: turns + 1, caveat, ...(delay ? { delay } : {}) } };
   }
 
-  /** A defender hit by a critable move and still standing in a PROVEN child: the class plan never priced a crit there. */
+  /** A defender hit by a critable move and still standing in a PROVEN child: the class plan never priced the crit. */
   private survivedHit(root: Battle, cell: Cell, proofs: Proven[]): boolean {
     for (const side of ['p1', 'p2'] as const) {
       const choice = side === 'p1' ? cell.p1Choice : cell.p2Choice;
@@ -372,7 +335,6 @@ export function proveForcedWin(rootOrSerialized: string | SimPosition, request: 
   prover.states += 1;
   const { proven, cells, choice } = prover.expand(root, 0, candidates);
   const fields = openFields(battle, request.side, cells, createMatchupCache(request.ruleset));
-  // A proof through a choice the search's list never held names it.
   const outside = choice !== undefined && proven.mass > 0
     && !searchOptions(root, request.side, { tera: request.tera, sleepClause: request.sleepClause }).some(option => option.choice === choice);
   const choiceNames = outside && choice ? strikeNames(root, request.side, choice, request.tera) : undefined;

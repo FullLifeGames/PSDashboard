@@ -3,10 +3,6 @@ import { applied, otherwise, parts, shows, slotOfIdent, type Witness } from './r
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/**
- * The witnesses of the two dice that sample a body. A `random-target` die's witness is the `|move|` line the draw is followed by, which names the
- * target (the draw runs before the move is in flight); a `drag` die's is the `|drag|` line of the slot dragged out.
- */
 
 function lineFrom(log: readonly string[], from: number, type: string, slot: string, matches: (fields: string[]) => boolean): string | undefined {
   return log.slice(from).find(line => {
@@ -34,7 +30,6 @@ export function pickReport(w: Witness, battle: Battle): DieReport {
   return otherwise(w, 'blocked', aimed ? `${shows(line)}, not ${option}` : `the move line names no target (${shows(line)})`);
 }
 
-/** The die was never drawn: the click named a target (or the one foe of singles stands), or the body never moved or never dragged. */
 export function pickNoDraw(input: ReportInput): DieReport | null {
   const { die, battle, start } = input;
   const { kind, slot, moveId } = die.name;

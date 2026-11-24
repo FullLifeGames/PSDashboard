@@ -8,26 +8,19 @@ import { pickNoDraw, pickReport } from './report-picks.ts';
 import { endNoDraw, procReport, SPAN_KINDS } from './report-procs.ts';
 import { moveFirstReport, orderNoDraw, startRollReport, statusNoDraw, statusReport, tieReport } from './report-turn.ts';
 
-/**
- * What became of a forced die: the real turn's PRNG notes whether the simulator drew it and whether the draw could give the answer, and this module
- * reads the protocol's lines after the draw and says `applied` (the protocol shows the answer), `no-draw` (the simulator never drew it, for both
- * answers), `no-chance` (a draw ran and has no way to give the answer) or `blocked` (the draw ran and the answer was given, but the effect did not land).
- */
 
 export interface ReportInput {
   die: ForcedDie;
-  /** What the real turn's PRNG saw of the die; undefined when the simulator never drew it. */
   note: DieNote | undefined;
   battle: Battle;
   /** `battle.log.length` before the real turn. */
   start: number;
-  /** What the watch saw of the moves of the turn (the reasons of a die that was never drawn). */
   saw?: ReadonlyMap<string, MoveSight>;
-  /** The die is the start-of-turn roll of Gens 2 and 3, written on the battle before the turn: no draw of the turn belongs to it. */
+  /** The start-of-turn roll of Gens 2 and 3, written on the battle: no draw of the turn belongs to it. */
   startRoll?: boolean;
 }
 
-/** Lines that open a new action: the next body's move, a switch, the end of the turn. A move another move calls (`[from]`) belongs to the action. */
+// A move another move calls (`[from]`) belongs to the action.
 function startsAction(line: string): boolean {
   const type = line.split('|')[1];
   if (line === '|') return true;
@@ -44,7 +37,6 @@ function windowOf(log: readonly string[], from: number): string[] {
   return lines;
 }
 
-/** Lines that say what a hit was like, not that it did something. */
 const MARKERS = new Set(['-miss', '-crit', '-supereffective', '-resisted', '-hitcount', '-immune', '-fail', '-notarget', '-block', '-anim', '-prepare', '-singleturn', '-hint', '-nothing', 'move']);
 
 function isEffect(line: string): boolean {
@@ -93,11 +85,7 @@ function noDraw(input: ReportInput): DieReport {
   return statusNoDraw(input, move.name, turn) ?? noDrawInAction(input, move, windowOf(turn, moveLine + 1));
 }
 
-/**
- * The line that stopped the move before it did anything. For a later hit's die only a line before the first hit's effect on the target counts:
- * after that effect the chain's own lines say what happened (an ability answering the hit, a miss of a later hit, the faint), and `hitNoDraw`
- * reads the count from `|-hitcount|`.
- */
+// For a later hit's die only a line before the first hit's effect on the target blocks; `hitNoDraw` reads the count.
 function firstBlocker(action: readonly string[], name: DieName): string | undefined {
   const later = name.kind === 'accuracy' && name.hit !== undefined;
   const effect = later ? action.findIndex(line => about(line, name.targetSlot) && isEffect(line)) : -1;
@@ -109,11 +97,10 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   const { targetSlot, kind } = die.name;
   const blocker = firstBlocker(action, input.die.name);
   if (blocker) return { die, took: 'no-draw', reason: `${move.name} drew no ${kind}: ${shows(blocker)}` };
-  // A future move draws in the end-of-turn residual two turns later, when no move is in flight.
   if (move.flags.futuremove) return { die, took: 'no-draw', reason: `${move.name} lands two turns later: its draws fall in the end-of-turn residual` };
   const happened = action.some(line => (about(line, targetSlot) && isEffect(line)) || parts(line)[1] === '-activate');
   if (kind === 'accuracy' && die.name.hit !== undefined && happened) return hitNoDraw(input, move.name, action);
-  // A die the simulator never drew is `no-draw` for both answers; `no-chance` stays for a draw that ran and cannot give the answer.
+  // A die the simulator never drew is `no-draw` for both answers; `no-chance` is a draw that ran and cannot give it.
   if (kind === 'accuracy' && happened) return { die, took: 'no-draw', reason: `${move.name} hit without an accuracy draw: it cannot miss here` };
   if (kind === 'crit' && move.willCrit && action.some(line => about(line, targetSlot) && isEffect(line))) {
     return { die, took: 'no-draw', reason: `${move.name} always crits: the simulator draws no crit` };
@@ -124,16 +111,12 @@ function noDrawInAction(input: ReportInput, move: ReturnType<Battle['dex']['move
   return { die, took: 'no-draw', reason: `the simulator drew no ${kind} for ${move.name} this turn` };
 }
 
-/**
- * A target that fainted in the chain gets the `|-hitcount|` line with its side (`|-hitcount|p2: Garchomp|3`), so the side of the slot reads
- * as the target too.
- */
+// A target that fainted in the chain gets `|-hitcount|p2: Name|3` with its side: the slot's side reads as the target.
 function hitCountIn(action: readonly string[], targetSlot: string | undefined): number | undefined {
   const line = action.find(entry => parts(entry)[1] === '-hitcount' && (about(entry, targetSlot) || slotOfIdent(parts(entry)[2]) === targetSlot?.slice(0, 2)));
   return line === undefined ? undefined : Number(parts(line)[3]);
 }
 
-/** A later hit's die the simulator never drew: the chain ended before that hit, or the move rolls one accuracy for every hit here (Skill Link, Loaded Dice). */
 function hitNoDraw(input: ReportInput, move: string, action: readonly string[]): DieReport {
   const { die } = input;
   const count = hitCountIn(action, die.name.targetSlot);
@@ -144,7 +127,6 @@ function hitNoDraw(input: ReportInput, move: string, action: readonly string[]):
   return { die, took: 'no-draw', reason: `${move} rolls no accuracy for hit ${hit} here: one roll covers every hit` };
 }
 
-/** The accuracy die of a later hit: no needs the chain to end just before it, yes needs the count to reach it. */
 function hitReport(w: Witness, happens: boolean): DieReport {
   const hit = w.die.name.hit!;
   const count = hitCountIn(w.action, w.targetSlot);
@@ -161,8 +143,7 @@ function accuracyReport(w: Witness, happens: boolean): DieReport {
   const missed = w.action.some(line => missFor(line, w.targetSlot));
   if (!happens) return missed ? applied(w) : otherwise(w, 'no-chance', `${w.name} hit although the die gave a miss`);
   if (missed) return otherwise(w, 'blocked', `${w.name} missed although the die gave a hit`);
-  // A line after the hit's first effect on the target is not a block: an ability or item that answers the damage (Emergency Exit,
-  // Eject Button) writes an `-activate` there, after the damage line.
+  // A line after the hit's first effect is no block: an ability or item answering the damage writes `-activate` there.
   const effect = w.action.findIndex(line => about(line, w.targetSlot) && isEffect(line));
   const blocker = w.action.slice(0, effect < 0 ? undefined : effect).find(line => isBlocker(line, w.targetSlot));
   if (blocker) return otherwise(w, 'blocked', `${w.name} hit and did nothing: ${shows(blocker)}`);
@@ -173,7 +154,7 @@ function accuracyReport(w: Witness, happens: boolean): DieReport {
 function critReport(w: Witness, happens: boolean): DieReport {
   const crit = w.target.some(line => parts(line)[1] === '-crit');
   if (crit === happens) return applied(w);
-  // The Gen 2 draw compares a number to a threshold it does not show: 0 and 255 are not a way to a crit or to none.
+  // The Gen 2 draw compares a number to a threshold it does not show: 0 and 255 are no way to a crit or to none.
   if (w.note.chance === undefined) return otherwise(w, 'no-chance', `${w.name}'s crit threshold lets ${happens ? 'no crit' : 'every number'} through`);
   return happens
     ? otherwise(w, 'blocked', 'the crit drew but no crit line followed: a rule of the target or the move stopped it')
@@ -197,7 +178,7 @@ export function reportOf(input: ReportInput): DieReport {
   }
   const { targetSlot, moveId } = die.name;
   const action = windowOf(battle.log, note.logIndex ?? battle.log.length);
-  // a proc or an end-of-turn die owns the lines up to the next draw of any die: two holders' lines share one action
+  // A proc or an end-of-turn die owns the lines up to the next draw of any die: two holders' lines share one action.
   if (SPAN_KINDS.has(die.name.kind) && note.until !== undefined) action.length = Math.min(action.length, note.until - (note.logIndex ?? 0));
   const witness: Witness = {
     die, seen, note, action, targetSlot, target: action.filter(line => about(line, targetSlot)), name: battle.dex.moves.get(moveId).name || moveId,

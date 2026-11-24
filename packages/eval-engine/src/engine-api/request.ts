@@ -14,12 +14,11 @@ export function engineOptions(options: ChoiceOption[]): EngineOption[] {
   });
 }
 
-/** The spectator's lines of the simulator's log: a |split| block keeps its public line (channel 0). */
+// A |split| block keeps its public line (channel 0).
 function spectatorLog(log: string[]): string[] {
   return extractChannelMessages(log.join('\n'), [0])[0];
 }
 
-/** The request one engine answers: the position as the dashboard holds it, with the options it ranks. */
 export function buildEngineRequest(
   serialized: string,
   options: { p1: ChoiceOption[]; p2: ChoiceOption[] },
@@ -27,7 +26,6 @@ export function buildEngineRequest(
   game?: { format?: string },
 ): EngineRequest {
   const battle = deserializeBattleExact(serialized);
-  // The requests are a view of the state: rebuilt from it, as a landed branch position rebuilds them.
   refreshRequestsFromLiveState(battle);
   return {
     protocol: ENGINE_PROTOCOL,
@@ -44,7 +42,7 @@ export function buildEngineRequest(
   };
 }
 
-/** A request with the options the dashboard's own matrix ranks at this position (pivot pairs included), for the conformance tool and engine authors. */
+/** A request with the options the dashboard's own matrix ranks here (pivot pairs too), for engine authors. */
 export function engineRequestFor(serialized: string, budgetMs = 5000, tera: TeraAllowance = true, format?: string): EngineRequest {
   const root = createRootPosition(serialized);
   return buildEngineRequest(serialized, {

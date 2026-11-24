@@ -4,9 +4,8 @@ import type { RollScripts } from './scripted-prng.ts';
 import { answerFollowUps, applyChoice, resolveForcedSwitches } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
-// One-turn advances under a fixed seed: the search's advance (greedy forced switches) and the hax-alignment trial.
 
-/** Advances one full turn under a fixed seed, to a turn boundary or the game end; the input position is never mutated. */
+/** Advances one full turn under a fixed seed, to a turn boundary or the game end; never mutates the input position. */
 export function advancePosition(
   position: SimPosition,
   p1Choice: string,
@@ -17,19 +16,13 @@ export function advancePosition(
 }
 
 export interface AdvanceOptions {
-  /**
-   * Stops at the first forced-switch request no pivot follow-up answers, so the tree can search the replacement as a decision node.
-   * Default: resolve greedily.
-   */
+  /** Stops at the first forced-switch request no pivot follow-up answers, for the tree to search; default: greedy. */
   stopAtForcedSwitch?: boolean;
   /** Dice on demand for the named moves (scripted-prng.ts); the log still decides the outcome class. */
   scripts?: RollScripts;
 }
 
-/**
- * advancePosition plus the battle.log delta of this advance only. With `stopAtForcedSwitch` the child may sit at an open switch
- * request (`pendingSwitch`), and its log ends there.
- */
+/** advancePosition plus this advance's log delta; with `stopAtForcedSwitch` the child may sit at an open switch. */
 export function advancePositionWithLog(
   position: SimPosition,
   p1Choice: string,
@@ -54,13 +47,12 @@ export function advancePositionWithLog(
 }
 
 export interface TrialAdvanceResult {
-  /** The battle.log delta of this advance only. */
   log: string[];
   ended: boolean;
   winner: string | null;
 }
 
-/** The 1-based bench slot of the species or name, or null. */
+// 1-based bench slot of the species or name, or null.
 function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): number | null {
   const wanted = toId(species);
   if (wanted === '') return null;
@@ -75,7 +67,6 @@ function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): n
   return null;
 }
 
-/** Answers one side's forced-switch request from the protocol queue: true when the sim accepted the switch. */
 function answerFromQueue(battle: Battle, side: Side, queues: { p1: string[]; p2: string[] }): boolean {
   const sideId = side.id as 'p1' | 'p2';
   const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
@@ -91,11 +82,7 @@ function answerFromQueue(battle: Battle, side: Side, queues: { p1: string[]; p2:
   return false;
 }
 
-/**
- * Like advancePosition, but returns the emitted log and answers forced-switch requests from the protocol's replacement species
- * (queues per side, in logged order; singles-exact: a multi-slot doubles request or an untranslatable species falls back to the
- * greedy resolution). Throws on a rejected choice.
- */
+/** advancePosition with forced switches answered from the protocol's replacement queues; throws on a reject. */
 export function trialAdvanceLog(
   position: SimPosition,
   p1Choice: string,
@@ -121,8 +108,7 @@ export function trialAdvanceLog(
       if (!answerFromQueue(battle, side, queues)) unresolved = true;
     }
     if (unresolved) {
-      // Doubles multi-forced, empty queue, or a rejected translation:
-      // greedy resolution finishes every pending request (and any cascades).
+      // Doubles multi-forced, empty queue or a rejected translation: the greedy resolution finishes every request.
       resolveForcedSwitches(battle, seed);
       break;
     }

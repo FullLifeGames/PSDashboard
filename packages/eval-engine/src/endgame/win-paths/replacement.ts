@@ -2,11 +2,7 @@ import type { Battle, SideID } from '@pkmn/sim';
 import { copyOf } from '../../sim-ask/copy.ts';
 import { resolveForcedSwitches } from '../../forward/switches.ts';
 
-/**
- * The replacements the simulator's own greedy resolution picks at a position that asks for them (a faint's, a pivot's): the choices the
- * prover makes inside a cell (`resolveForcedSwitches`: each side's entry that evaluates best statically), shown as steps of a line. It runs on
- * a copy with `choose` recorded; a side that asks for nothing is absent.
- */
+/** The replacements the simulator's greedy resolution picks (a faint's, a pivot's), as the prover makes them. */
 export function greedyReplacements(battle: Battle): { p1?: string; p2?: string } {
   const picks: { p1?: string; p2?: string } = {};
   const copy = copyOf(battle);

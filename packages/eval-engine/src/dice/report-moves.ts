@@ -3,12 +3,7 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/**
- * The witnesses of the dice of a move that are not accuracy, crit or roll, and the reasons a secondary was never drawn; each reads the
- * protocol after the draw.
- */
 
-/** Names the ability or the item in a body's Dex entry that carries the handler `handler`, or null. */
 function holderOf(battle: Battle, slot: string | undefined, handler: string): string | null {
   const body = slot ? battle.sides[slot[1] === '1' ? 0 : 1]?.active[slot[2] === 'a' ? 0 : 1] : undefined;
   if (!body) return null;
@@ -18,7 +13,6 @@ function holderOf(battle: Battle, slot: string | undefined, handler: string): st
   return null;
 }
 
-/** The reason a secondary die was never drawn when the hit connected: a hook or the user's ability removed the entries. */
 function secondaryRemoved(input: ReportInput, moveName: string): string | null {
   const { die, battle, saw } = input;
   const sight = saw?.get(die.name.moveId);
@@ -35,7 +29,7 @@ function secondaryRemoved(input: ReportInput, moveName: string): string | null {
   return null;
 }
 
-/** The lines after the draw, to the end of the turn: a flinch shows when its target tries to move, later than the action. */
+// A flinch shows when its target tries to move, later than the action: read to the end of the turn.
 const restOf = (battle: Battle, from: number): string[] => battle.log.slice(from);
 
 function effectLandedLines(w: Witness, rest: string[], battle: Battle): boolean {
@@ -96,7 +90,7 @@ function powerReport(w: Witness, happens: boolean): DieReport {
   return happens ? otherwise(w, 'blocked', `${w.name} drew the stronger power but its handler left no line`) : otherwise(w, 'no-chance', `${w.name} used its stronger power although the die gave none`);
 }
 
-/** Why a die of these kinds was never drawn, beyond the reasons every kind shares; null when none of them applies. */
+/** Why a die of these kinds was never drawn, beyond the shared reasons; null when none applies. */
 export function moveNoDraw(input: ReportInput, moveName: string, action: string[]): DieReport | null {
   const { die } = input;
   if (die.name.kind === 'secondary') {

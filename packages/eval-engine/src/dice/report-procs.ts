@@ -3,15 +3,10 @@ import { applied, otherwise, parts, slotOfIdent, type Witness } from './report-l
 import type { ReportInput } from './report.ts';
 import type { DieReport } from './types.ts';
 
-/**
- * The witnesses of the dice an ability or an item draws (the procs of a hit, the end of the turn); each reads the lines between the die's
- * draw and the next draw of any die.
- */
 
 /** The kinds whose lines end at the next draw, not at the next action. */
 export const SPAN_KINDS: ReadonlySet<string> = new Set(['ability-proc', 'item-proc', 'end-of-turn']);
 
-/** The label the protocol writes for the effect, read from the battle's own Dex: `ability: Static`, `item: Focus Band`, or null for a condition. */
 function labelOf(battle: Battle, id: string): string | null {
   const ability = battle.dex.abilities.get(id);
   if (ability.exists) return `ability: ${ability.name}`;
@@ -19,10 +14,7 @@ function labelOf(battle: Battle, id: string): string | null {
   return item.exists ? `item: ${item.name}` : null;
 }
 
-/**
- * The lines that show the effect: its label in a line, a `-status` line (the sleep of Gens 3 and 4 is written without the ability's
- * label, and the window holds no other die's lines), or, for a condition, the `-curestatus` of the holder.
- */
+// Gens 3 and 4 write the sleep without the ability's label; the window holds no other die's lines.
 function shownBy(w: Witness, battle: Battle): string[] {
   const { slot, effectId = '' } = w.die.name;
   const id = effectId.replace(/:option$/, '');
@@ -30,7 +22,6 @@ function shownBy(w: Witness, battle: Battle): string[] {
   return w.action.filter(line => parts(line)[1] === '-status' || (label ? line.includes(label) : parts(line)[1] === '-curestatus' && slotOfIdent(parts(line)[2]) === slot && parts(line)[3] === id));
 }
 
-/** The status the effect's line names (`|-status|p1a: X|par|[from] ability: Static`), or null. */
 const statusOf = (lines: readonly string[]): string | null => {
   const line = lines.find(candidate => parts(candidate)[1] === '-status');
   return line ? parts(line)[3] : null;
@@ -52,7 +43,6 @@ export function procReport(w: Witness, battle: Battle): DieReport {
   return shown.length === 0 ? applied(w) : otherwise(w, 'no-chance', `${id} showed although the die said no`);
 }
 
-/** Why a die of the end of the turn was never drawn: the holder had nothing for the effect to do this turn. */
 export function endNoDraw(input: ReportInput): DieReport {
   const { die } = input;
   const { slot, effectId = '', targetSlot } = die.name;

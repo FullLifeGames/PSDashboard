@@ -9,20 +9,11 @@ import { firstChoiceChooser, positionOf } from './luck.ts';
 import { awaitsReplacement, exactChance, inDrawOrder, lineOfPath, playOf, wonBy, type PathStep } from './luck-path.ts';
 import type { WinPathsRequest, WinStep } from './types.ts';
 
-/**
- * The smallest slip by the opponent after which the side that lost wins within N turns. Both sides play the engine's first choice with
- * every die at its likeliest result; at each turn of that line the opponent's lower-ranked choices are the candidates, tried mildest
- * first (smallest loss against its first choice, then the earlier turn, then the better rank). The slip is played at its turn, both sides
- * return to their first choices, and the line counts when the game ends in the side's win within N turns; the first candidate that counts
- * is the answer, with the chance of the dice it forces (`exactChance`). The loss is the ranking's own: at the root the request's
- * `foeRanking`, elsewhere the one-turn matrix. One slip per line; a line whose first choices already win answers `none`; a replacement
- * after a faint is never a slip.
- */
+// Candidates are tried mildest first; the first slip after which the side wins within N turns answers; one per line.
 
-/** A candidate slip: the turn it would be played on, its rank in the opponent's ranking (the first choice is rank 1) and its loss. */
+/** A candidate slip: its turn, its rank in the opponent's ranking (the first choice is rank 1) and its loss. */
 export interface Slip { turn: number; rank: number; loss: number }
 
-/** The mildest first: the smallest loss, then the earlier turn, then the better rank. */
 export const byMildest = (a: Slip, b: Slip): number => (a.loss !== b.loss ? a.loss - b.loss : a.turn !== b.turn ? a.turn - b.turn : a.rank - b.rank);
 
 type Side = 'p1' | 'p2';
@@ -33,7 +24,6 @@ interface BaseStep {
   turnsDone: number;
   p1: ChoiceOption;
   p2: ChoiceOption;
-  /** The path before this step. */
   before: readonly PathStep[];
 }
 
@@ -85,7 +75,6 @@ class MistakeSearch {
     return done({ status: 'none' });
   }
 
-  /** Both sides on their first choice, every die at its likeliest result, until the game ends or the turns asked are taken. */
   private firstChoiceLine(from: Battle): (PathStep & { base: BaseStep })[] {
     const steps: (PathStep & { base: BaseStep })[] = [];
     let start = from;
@@ -111,7 +100,6 @@ class MistakeSearch {
     return steps;
   }
 
-  /** The opponent's lower-ranked choices at each turn step of the line, with their loss against its first choice. */
   private candidatesOf(steps: readonly (PathStep & { base: BaseStep })[]): Candidate[] {
     const found: Candidate[] = [];
     for (const { base } of steps) {
@@ -124,7 +112,6 @@ class MistakeSearch {
     return found;
   }
 
-  /** The opponent's ranking at a step: the request's at the root, the one-turn matrix's elsewhere. */
   private rankingAt(base: BaseStep): { option: ChoiceOption; rank: number; loss: number }[] {
     const taken = base[this.foe].choice;
     const given = base.atRoot ? this.request.foeRanking : undefined;
@@ -141,7 +128,6 @@ class MistakeSearch {
     return ranked.map((row, index) => ({ option: row.option, rank: index + 1, loss: Math.max(0, best - row.value) }));
   }
 
-  /** Plays the slip, then both sides on their first choices; the path and its chance when the side wins, null when it does not. */
   private try(candidate: Candidate): { path: PathStep[]; chance: number } | null | 'stopped' {
     const { base, option } = candidate;
     const picked = this.foe === 'p1' ? { p1: option, p2: base.p2 } : { p1: base.p1, p2: option };
@@ -174,7 +160,6 @@ class MistakeSearch {
   }
 }
 
-/** The smallest slip by the opponent after which the side that lost wins within the turns asked; see the module's header. */
 export function mistakeStep(serialized: string, request: WinPathsRequest, meter = new WinMeter(request.budget)): WinStep {
   return new MistakeSearch(serialized, request, meter).run();
 }

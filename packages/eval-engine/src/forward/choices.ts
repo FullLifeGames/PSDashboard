@@ -6,15 +6,11 @@ import { switchInSlots } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 import { isLockedEntry, nextChoosingSlot, requestMoveKey, type RequestMove } from './request-moves.ts';
 
-// The legal choices of one side at a position: every consumer enumerates through legalChoices, so all engines see the same lists.
+// Every consumer enumerates through legalChoices, so all engines see the same lists.
 
-/** Move target types that require picking a foe slot in doubles. */
 const TARGET_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
-/**
- * The played actions of a side's slots. A move the player aimed at the own partner names its location (negative), and the slot
- * lists that target too when the simulator accepts it for the move.
- */
+/** The played actions of a side's slots; a move aimed at the own partner names its location (negative). */
 export type PlayedSlots = readonly ({ kind: string; name: string; targetLoc?: number | null } | null)[];
 
 interface SlotChoice {
@@ -22,7 +18,6 @@ interface SlotChoice {
   label: string;
   /** Uses a once-per-battle gimmick (Tera / Mega / Ultra) this turn. */
   once: boolean;
-  /** Bench slot for switches (duplicate-target exclusion), null for moves. */
   bench: number | null;
 }
 
@@ -34,19 +29,15 @@ interface ActiveRequestSlot {
   canUltraBurst?: unknown;
 }
 
-/** The bench a switch may send in: the living bench, or the fainted after Revival Blessing (switchInSlots). */
 function benchSwitches(sideState: Side): SlotChoice[] {
-  // Species, not nickname — labels feed the analysis text and PVs.
+  // Species, not nickname: labels feed the analysis text and PVs.
   return switchInSlots(sideState).map(slot => ({
     choice: `switch ${slot}`, label: `→ ${sideState.pokemon[slot - 1].species.name}`, once: false, bench: slot,
   }));
 }
 
-/**
- * A request entry the search leaves out: the request's own disabled flag, or a live disable it conceals (Imprison). A locked
- * entry stays whatever its moveSlot says: Disable flags the slot of a locked Outrage, and the simulator plays the locked move
- * before it reads the flag (side.js chooseMove), so dropping it would leave the slot with no choice.
- */
+// A locked entry stays whatever its moveSlot says: Disable flags the slot of a locked Outrage, and the simulator plays
+// the locked move before it reads the flag (side.js chooseMove), so dropping it would leave the slot with no choice.
 function isBarred(move: RequestMove, liveDisabled: ReadonlySet<string>): boolean {
   if ('disabled' in move && move.disabled) return true;
   return !isLockedEntry(move) && liveDisabled.has(requestMoveKey(move));
@@ -60,10 +51,6 @@ function slotGimmicks(entry: ActiveRequestSlot, allowTera: boolean): { canTera: 
   };
 }
 
-/**
- * The played partner target of this move, when the simulator accepts that location for the move's target type
- * (battle.validTargetLoc, the check Side#chooseMove runs).
- */
 function partnerTarget(sideState: Side, move: RequestMove, slot: number, played: PlayedSlots[number] | undefined): { suffix: string; label: string } | null {
   const loc = played?.kind === 'move' && toId(played.name) === requestMoveKey(move) ? played.targetLoc : null;
   const user = sideState.active[slot];
@@ -73,9 +60,8 @@ function partnerTarget(sideState: Side, move: RequestMove, slot: number, played:
 }
 
 function moveTargets(sideState: Side, move: RequestMove, slot: number, played?: PlayedSlots[number]): { suffix: string; label: string }[] {
-  // A locked entry (rampage, charge release, recharge, Bide, Uproar) names no target type: the sim keeps the locked target itself
-  // (side.js:480-492), so the slot offers one bare option and applyChoice submits it by index (even a never-serialized battle
-  // rejects `move outrage`).
+  // A locked entry (rampage, charge, recharge, Bide, Uproar) names no target type: the sim keeps it (side.js:480-492)
+  // so the slot offers one bare option and applyChoice submits it by index (`move outrage` is rejected).
   if (isLockedEntry(move)) return [{ suffix: '', label: move.move }];
   const foeActives = sideState.foe.active;
   const targetType = move.target as string | undefined;
@@ -138,16 +124,14 @@ function slotChoicesFor(
 ): SlotChoice[] {
   if (forced) return benchSwitches(sideState);
   const pokemon = sideState.active[slot];
-  // The sim passes a fainted, an empty and a commanding slot (a Tatsugiri riding a Dondozo): its choice goes to the next slot.
+  // The sim passes a fainted, an empty and a commanding slot (Commander): its choice goes to the next slot.
   if (!entry || !pokemon || nextChoosingSlot(sideState, slot) !== slot) return [];
 
-  // Requests also conceal 'hidden' trapping (an unrevealed Magnet Pull) while the switch validation still rejects: consult the live
-  // field, like liveDisabled below.
+  // Requests conceal 'hidden' trapping (an unrevealed Magnet Pull), yet validation rejects: read the live field.
   const trapped = ('trapped' in entry && !!entry.trapped) || !!pokemon.trapped;
   const gimmicks = slotGimmicks(entry, allowTera);
   const choices: SlotChoice[] = [];
-  // Requests conceal 'hidden' disables (Imprison: the player learns when the click bounces), but the analyzer holds the full state,
-  // and a concealed-disabled candidate is a guaranteed choice reject that kills the whole search.
+  // Requests conceal 'hidden' disables (Imprison): a concealed-disabled candidate is a reject that kills the search.
   const liveDisabled = new Set<string>(pokemon.moveSlots.filter(slot => slot.disabled).map(slot => slot.id));
 
   for (const move of entry.moves) {
@@ -162,7 +146,6 @@ function slotChoicesFor(
   return choices;
 }
 
-/** Per-Pokémon Tera check: draft allowances list the species holding rights. */
 function teraAllowed(tera: TeraAllowance | undefined, side: 'p1' | 'p2', pokemon: Pokemon | null): boolean {
   if (tera === undefined || tera === true) return true;
   if (tera === false || !pokemon) return false;
@@ -172,10 +155,8 @@ function teraAllowed(tera: TeraAllowance | undefined, side: 'p1' | 'p2', pokemon
 
 type ActiveRequest = NonNullable<Side['activeRequest']>;
 
-/**
- * Team preview (turn 0): doubles offers every unordered lead pair, singles every lead; the sim autocompletes the back order.
- * Digit lists stay unambiguous because teams never exceed 6.
- */
+// Team preview: doubles offers every unordered lead pair, singles every lead; the sim autocompletes the back order.
+// Digit lists stay unambiguous because teams never exceed 6.
 function teamPreviewChoices(battle: Battle, sideState: Side): ChoiceOption[] {
   const pool = sideState.pokemon;
   const options: ChoiceOption[] = [];
@@ -201,7 +182,7 @@ function combineSlots(perSlot: SlotChoice[][]): ChoiceOption[] {
   for (const first of perSlot[0]) {
     for (const second of perSlot[1]) {
       if (first.once && second.once) continue; // one Tera/Mega/Ultra per side per turn
-      if (first.bench !== null && first.bench === second.bench) continue; // same bench target
+      if (first.bench !== null && first.bench === second.bench) continue;
       combined.push({ choice: `${first.choice}, ${second.choice}`, label: `${first.label} + ${second.label}` });
     }
   }
@@ -216,10 +197,7 @@ function assignmentLabel(sideState: Side, choice: string): string {
   }).join(' + ');
 }
 
-/**
- * Doubles: per-slot choices, then the combined product. Slots the sim auto-passes (fainted or empty) are skipped: an explicit
- * `pass` trips "more choices than unfainted Pokémon".
- */
+// Slots the sim auto-passes (fainted or empty) are skipped: an explicit `pass` trips "more choices than unfainted"
 function doublesChoices(
   sideState: Side,
   actives: (ActiveRequestSlot | null | undefined)[],
@@ -229,7 +207,7 @@ function doublesChoices(
   tera: TeraAllowance | undefined,
   partner?: PlayedSlots,
 ): ChoiceOption[] {
-  // More forced slots than living replacements: the product over per-slot switches drops every pair with a shared target and
+  // More forced slots than living replacements: the per-slot product drops each shared-target pair and leaves nothing;
   // leaves nothing; the sim wants a pass for each slot no body can fill.
   const forcedCount = forceSwitch.filter(Boolean).length;
   const bench = benchSwitches(sideState).map(entry => entry.bench!);
@@ -276,7 +254,6 @@ function singlesMoveChoices(
   options: ChoiceOption[],
 ): void {
   const activeTera = teraAllowed(tera, side, sideState.active[0] ?? null);
-  // Mirror slotChoicesFor: requests conceal 'hidden' disables (Imprison).
   const liveDisabled = new Set<string>(
     (sideState.active[0]?.moveSlots ?? []).filter(slot => slot.disabled).map(slot => slot.id));
   for (const move of active.moves) {
@@ -297,7 +274,6 @@ function singlesChoices(
   const options: ChoiceOption[] = [];
   const active = 'active' in request ? request.active?.[0] : undefined;
   const forced = 'forceSwitch' in request && !!request.forceSwitch?.[0];
-  // Requests conceal 'hidden' trapping (an unrevealed Magnet Pull); the live field is what the validation checks.
   const trapped = !!active && (('trapped' in active && !!active.trapped) || !!sideState.active[0]?.trapped);
 
   if (active && !forced) singlesMoveChoices(sideState, active, side, tera, options);
@@ -309,7 +285,6 @@ function singlesChoices(
   return options;
 }
 
-/** The legal choices of one side at a position, as choice strings with labels. */
 export function legalChoices(
   position: SimPosition,
   side: 'p1' | 'p2',
@@ -319,8 +294,8 @@ export function legalChoices(
   const sideState = battle.sides[sideIndex(side)];
   const request = sideState.activeRequest;
   if (!request || battle.ended) return [];
-  // Mid-forced-switch positions: the other side resolves its replacement and this side cannot act at all; inventing bench switches
-  // here made the sim reject them with "It's not your turn". The sentinel never reaches the sim (applyChoice skips it).
+  // Mid forced switch: the other side replaces and this side cannot act; invented switches are rejected.
+  // The sentinel never reaches the sim (applyChoice skips it).
   if ('wait' in request && request.wait) {
     return [{ choice: 'wait', label: '(waiting)' }];
   }

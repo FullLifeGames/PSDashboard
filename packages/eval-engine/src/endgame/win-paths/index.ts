@@ -4,11 +4,7 @@ import { mistakeStep } from './mistake.ts';
 import { strongerStep } from './stronger.ts';
 import type { WinPaths, WinPathsRequest, WinStep } from './types.ts';
 
-/**
- * The on-demand job: the steps run in order (a stronger play, luck, a mistake by the opponent), each with a meter of its own so a step
- * that stops at its cap never takes the next one's work, and each is reported the moment it is done. A step that throws is a `failed`
- * step with the message and the others still run.
- */
+/** The on-demand job: each step has its own meter; a step that throws is a `failed` step and the others still run. */
 export interface WinStepRunner {
   kind: WinStep['kind'];
   run(serialized: string, request: WinPathsRequest, meter: WinMeter): WinStep;
@@ -20,7 +16,7 @@ export const WIN_STEPS: readonly WinStepRunner[] = [
   { kind: 'mistake', run: mistakeStep },
 ];
 
-/** Runs the win-path steps for a lost endgame; it runs only when the app asks (never in a sweep) and reads the serialized position without writing into any result. */
+/** Runs the win-path steps for a lost endgame; only when the app asks, never in a sweep, and writes into no result. */
 export function winPaths(
   serialized: string,
   request: WinPathsRequest,

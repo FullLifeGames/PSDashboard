@@ -4,7 +4,6 @@ import { validateEngineResponse } from './validate.ts';
 /** The pages that host the dashboard: an engine must let them call it (CORS). */
 export const DASHBOARD_ORIGINS = ['https://fulllifegames.github.io', 'https://fulllifegames.com'];
 
-/** The result of `checkEngine`: one row per sample position and one per hosting origin's preflight. */
 export interface EngineCheckReport {
   ok: boolean;
   samples: { name: string; ok: boolean; ms: number; errors: string[] }[];
@@ -13,7 +12,6 @@ export interface EngineCheckReport {
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-/** One sample: the request, the timed answer, and the protocol's checks. */
 async function checkSample(url: string, position: { name: string; serialized: string; format?: string }, budgetMs: number, fetcher: Fetch, clock: () => number) {
   const request = engineRequestFor(position.serialized, budgetMs, true, position.format);
   const started = clock();
@@ -39,7 +37,6 @@ async function checkSample(url: string, position: { name: string; serialized: st
   return { name: position.name, ok: errors.length === 0, ms, errors };
 }
 
-/** The browser's preflight for a JSON POST from one hosting page. */
 async function checkCors(url: string, origin: string, fetcher: Fetch) {
   try {
     const response = await fetcher(url, {
@@ -58,7 +55,7 @@ async function checkCors(url: string, origin: string, fetcher: Fetch) {
   }
 }
 
-/** The conformance check of an engine endpoint (`check-engine <url>`): sample positions of each game type, every answer, the budget and both preflights. */
+/** The conformance check of an engine endpoint (`check-engine <url>`): samples per game type, budget, preflights. */
 export async function checkEngine(url: string, options: {
   positions: { name: string; serialized: string; format?: string }[];
   budgetMs?: number;

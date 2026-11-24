@@ -4,7 +4,6 @@ import { evalFeatures, faintedFractionOf } from './score/features.ts';
 import { phaseFormOf, STANDARD_SINGLES_TERMS, staticFormOn } from './score/phase-form.ts';
 import type { MatchupCache } from './score/threat.ts';
 
-/** The static positional evaluation, p1's perspective in [-1, +1]; its stages live in `score/`. */
 
 export {
   CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights,
@@ -37,7 +36,6 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
     diff += weights[key] * features[key];
   }
-  // The phase form of standard singles, switchable (score/phase-form.ts).
   if (staticFormOn() && phaseFormOf(battle.gameType === 'doubles', cache?.ruleset)) {
     const share = faintedFractionOf(battle);
     for (const term of STANDARD_SINGLES_TERMS) diff += (term.shift + term.addend * share) * features[term.key];

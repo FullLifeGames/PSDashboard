@@ -10,30 +10,18 @@ import { LUCK_FLOOR, WinMeter } from './budget.ts';
 import { FirstChoice, positionKey } from './first-choice.ts';
 import { awaitsReplacement, exactChance, inDrawOrder, lineOfPath, playOf, wonBy, type PathStep } from './luck-path.ts';
 
-/**
- * The likeliest sequence of dice under which the side that lost wins within N turns, both sides playing the engine's first choice. A
- * best-first search over the dice: a node is a step to play with some dice pinned (every other die at its likeliest result, `playTurnWith`).
- * A node's priority is an upper bound of its path's chance: the product of the chances of its dice, a damage roll and a speed tie counted
- * as certain until the path wins (`exactChance` reads their share from the simulator on copies). Its successors are the next step and the
- * same step with one more die turned the other way (a chance die, status check, hit count or pick to `otherResults`; a damage roll to the
- * other side of its knock-out boundary, `rollBoundary`; a speed tie to the other order), only dice after the last pinned one, so a set
- * of pins is generated once. Chances only shrink, so the first win popped with its exact chance, once no bound in the queue beats it,
- * is the likeliest. Dice a draw cannot name (a duration, a random target) follow the seed; the line lists them in `unforced`.
- * Caveat: a damage roll counts its share only where it decides who falls, so a roll that leaves a body one hit from a later knock-out
- * is carried at that HP, not priced.
- */
+// Best-first search over the dice: a node's priority bounds its path's chance (rolls and ties count as certain);
+// chances only shrink, so the first win popped once no bound in the queue beats it is the likeliest.
 
 interface Entry {
   /** Upper bound of the path's chance (exact for a `final` entry). */
   bound: number;
   seq: number;
   final: boolean;
-  /** The path so far, and the step to play next (absent on a final entry). */
   path: readonly PathStep[];
   next?: { start: Battle; turnsDone: number; pinned: readonly LikeliestDie[]; before: number; key?: string };
 }
 
-/** A binary max-heap by bound, then insertion order. */
 class Queue {
   private readonly items: Entry[] = [];
   private order = 0;
@@ -80,7 +68,6 @@ class Queue {
 
 const positions = new WeakMap<Battle, SimPosition>();
 
-/** The position of a battle the search holds (read once: a battle is never written). */
 export function positionOf(battle: Battle): SimPosition {
   let position = positions.get(battle);
   if (!position) {
@@ -92,7 +79,7 @@ export function positionOf(battle: Battle): SimPosition {
   return position;
 }
 
-/** The root's options of a side by the request: the ranking's choice when it names one that is legal, else undefined (the matrix's). */
+/** The root's option of a side: the ranking's choice when it is legal, else undefined (the matrix's). */
 export function rootChoice(root: SimPosition, request: WinPathsRequest, side: 'p1' | 'p2'): ChoiceOption | undefined {
   const choice = request.first?.[side];
   if (!choice) return undefined;
@@ -100,15 +87,12 @@ export function rootChoice(root: SimPosition, request: WinPathsRequest, side: 'p
   return found ?? { choice, label: choice };
 }
 
-/** The product of the chances of a step's dice before position `to` (dice with no chance count one). */
 const productBefore = (dice: readonly LikeliestDie[], to: number): number => dice.slice(0, to).reduce((product, entry) => product * (entry.chance ?? 1), 1);
 
-/** What picks both sides' choices at a step of the search: the engine's first choice (luck), or the choices of a proof (a stronger play). */
 export interface Chooser {
   at(position: SimPosition, node: { turnsDone: number; atRoot: boolean; start: Battle }): { p1: ChoiceOption; p2: ChoiceOption } | null;
 }
 
-/** The engine's first choice: the request's ranking at the root, the one-turn matrix everywhere else (see first-choice.ts). */
 export function firstChoiceChooser(root: SimPosition, request: WinPathsRequest, meter: WinMeter, first = new FirstChoice(meter, request)): Chooser {
   return {
     at: (position, node) => {
@@ -129,7 +113,7 @@ class LuckSearch {
   private readonly root: SimPosition;
   private readonly chooser: Chooser;
   private readonly queue = new Queue();
-  /** The best bound a turn boundary was reached with, by turns taken and position: a later arrival with less is dropped. */
+  /** The best bound a turn boundary was reached with, by turns taken and position; a worse arrival is dropped. */
   private readonly arrived = new Map<string, number>();
 
   constructor(serialized: string, request: WinPathsRequest, meter: WinMeter, chooser?: (root: SimPosition) => Chooser) {
@@ -160,14 +144,12 @@ class LuckSearch {
     return done({ status: 'none' });
   }
 
-  /** Both sides' choices for the node's step. */
   private choicesAt(entry: Entry): { p1: ChoiceOption; p2: ChoiceOption } | null {
     const node = entry.next!;
     const atRoot = entry.path.length === 0;
     return this.chooser.at(atRoot ? this.root : positionOf(node.start), { turnsDone: node.turnsDone, atRoot, start: node.start });
   }
 
-  /** Plays the node's step and queues its successors: the outcome's next step, and each die after the last pinned one turned the other way. */
   private expand(entry: Entry, choices: { p1: ChoiceOption; p2: ChoiceOption }): void {
     const node = entry.next!;
     const play = playOf(choices.p1, choices.p2);
@@ -185,7 +167,6 @@ class LuckSearch {
     this.queueTurned(entry, play, turn, dice);
   }
 
-  /** The outcome of a step: a win becomes a final entry at its exact chance, a boundary within the turns asked the next step. */
   private queueOutcome(path: readonly PathStep[], bound: number, turnsDone: number): void {
     const after = path[path.length - 1].turn.battle;
     if (after.ended) {
@@ -201,7 +182,7 @@ class LuckSearch {
     this.queue.push({ bound, final: false, path, next: { start: after, turnsDone, pinned: [], before: bound, key } });
   }
 
-  /** The same step with one more die turned: only dice after the last pinned one (a set of pins is generated once). */
+  /** The same step with one more die turned: only dice after the last pinned one, so each set of pins arises once. */
   private queueTurned(entry: Entry, play: (battle: Battle) => void, turn: PinnedTurn, dice: LikeliestDie[]): void {
     const node = entry.next!;
     const pinnedKeys = new Set(node.pinned.map(item => dieKey(item.die.name)));
@@ -215,7 +196,6 @@ class LuckSearch {
     }
   }
 
-  /** The other results of the die at `index` of the played turn, each with its chance (a roll's through the knock-out boundary). */
   private othersOf(start: Battle, play: (battle: Battle) => void, turn: PinnedTurn, dice: LikeliestDie[], index: number): LikeliestDie[] {
     const entry = dice[index];
     if (entry.die.name.kind !== 'damage-roll') return otherResults(entry, turn.draws.get(dieKey(entry.die.name)));
@@ -226,15 +206,10 @@ class LuckSearch {
   }
 }
 
-/** The likeliest sequence of dice that wins the game for `request.side` within the turns asked; see the module's header. */
 export function luckPath(serialized: string, request: WinPathsRequest, meter = new WinMeter(request.budget)): WinStep {
   return new LuckSearch(serialized, request, meter).run();
 }
 
-/**
- * The same search with the choices of the caller's chooser (a stronger play's proof): the likeliest dice under which those choices win,
- * as a `luck` step; the caller keeps what it needs of it (the line, the chance of the dice).
- */
 export function luckUnder(serialized: string, request: WinPathsRequest, meter: WinMeter, chooser: (root: SimPosition) => Chooser): WinStep {
   return new LuckSearch(serialized, request, meter, chooser).run();
 }

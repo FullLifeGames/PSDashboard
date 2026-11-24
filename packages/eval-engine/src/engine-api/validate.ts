@@ -1,11 +1,9 @@
 import { ENGINE_PROTOCOL, type EngineRequest, type EngineResponse } from './protocol.ts';
 
-/** The outcome of `validateEngineResponse`: the response, or every error found. */
 export type EngineCheck = { ok: true; response: EngineResponse } | { ok: false; errors: string[] };
 
 const inRange = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;
 
-/** The side's values: one per option, nothing else, each on the scale. */
 function valueErrors(side: 'p1' | 'p2', ids: string[], values: unknown): string[] {
   if (!values || typeof values !== 'object') return [`values.${side} must be an object of option id to value`];
   const record = values as Record<string, unknown>;
@@ -17,7 +15,6 @@ function valueErrors(side: 'p1' | 'p2', ids: string[], values: unknown): string[
   ];
 }
 
-/** The optional matrix: every option of each side once, and a full grid of values on the scale. */
 function matrixErrors(request: EngineRequest, matrix: unknown): string[] {
   if (matrix === undefined) return [];
   if (!matrix || typeof matrix !== 'object') return ['matrix must be an object with p1, p2 and values'];
