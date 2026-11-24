@@ -1,16 +1,10 @@
 /**
- * Round 59 (T91): the speed layer for the pinned @pkmn/sim release (named at
- * PINNED_SIM_HASHES in guard.ts). Three levers, each behind the switch in
- * state.ts: rule tables built once per format
- * (rule-table.ts), battles copied instead of deserialized (clone.ts), and a
- * pre-check that answers event dispatches nobody listens to (dispatch.ts).
- * Results never change, only time (spec
- * docs/superpowers/specs/2026-09-24-round-59-design.md).
- *
  * clone.ts and dispatch.ts follow the data layout and the control flow of
  * @pkmn/sim (MIT License, Copyright (c) 2011-2026 Guangcong Luo and other
  * contributors, http://pokemonshowdown.com/).
  */
+
+// The speed layer for the pinned @pkmn/sim: rule tables, battle copies and a dispatch pre-check (ADR 0003).
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { cloneBattle } from './clone.ts';
 import { attachDispatch } from './dispatch.ts';
@@ -75,6 +69,7 @@ function dropEmptied(object: object, created: Keys): void {
 }
 
 /** A battle that becomes a copy source, never written afterwards: drops own keys holding undefined, as JSON does. */
+// Writes the battle it gets: pass a copy or a fresh deserialization, never a reader's battle.
 export function adoptTemplate(battle: Battle): Battle {
   let created: CreatedKeys;
   try {
