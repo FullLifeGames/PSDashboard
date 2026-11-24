@@ -11,6 +11,7 @@
     "test:ui": 1247,
     "test:e2e": 1036,
     "test:e2e-feedback": 139,
-    "test:e2e-build": 30
+    "test:e2e-build": 30,
+    "test:e2e-capture": 13
   }
 }
