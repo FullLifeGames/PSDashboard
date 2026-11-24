@@ -8,22 +8,18 @@ import { SPOKEN_MASS } from './types.ts';
 import { winDeltaText, winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
-// The winner-side story of the report (conversion, dominant edge, tip mechanism, lopsided opening); pure, no sim imports, main-bundle safe.
+// The winner-side story of the report; pure, no sim imports, main-bundle safe.
 
 type Side = 'p1' | 'p2';
 type PlayerNames = [string, string];
 
-/**
- * A turn ranks by its biggest COMPONENT, not its net: the game's biggest roll can net to almost nothing when the decision delta pushes
- * the other way (chance +0.43 on a net of +0.18), and a selection keyed on the net alone never surfaces it.
- */
+/** A turn ranks by its biggest COMPONENT, not its net: the game's biggest roll can net to almost nothing. */
 export const momentScore = (analysis: TurnAnalysis): number =>
   Math.max(Math.abs(analysis.swing ?? 0), Math.abs(analysis.chanceDelta ?? 0));
 
 export const badTier = (side: SideAnalysis): boolean =>
   side.tier === 'mistake' || side.tier === 'blunder';
 
-/** The moment the winner sealed it: the first proven forced win at spoken mass, or the first decided sweep. */
 export interface WinConversion {
   kind: 'forced' | 'decided';
   turn: number;
@@ -33,7 +29,7 @@ export interface WinConversion {
   provenTurns?: number;
 }
 
-/** The dominant edge the summary credits the win to ('close' = the no-single-edge fallback). */
+/** The dominant edge the summary credits the win to ('close' = no single edge). */
 export interface WinPath {
   factor: 'grind' | 'decisions' | 'reads' | 'variance' | 'close';
   /** wp-units behind the claim (0 for 'close'). */
@@ -43,53 +39,37 @@ export interface WinPath {
 export interface WinPathResult {
   winPath: WinPath;
   sentence: string;
-  /** The sentence already tells the luck story — the standalone luck line stays silent. */
+  /** The sentence already tells the luck story: the standalone luck line stays silent. */
   foldLuck: boolean;
 }
 
-/** A win-path factor must reach a mistake-sized edge before it may claim the game. */
 const WIN_PATH_FLOOR = TIER_THRESHOLDS.mistake;
-/** Net chance worth a luck sentence — shared with the report's luck line. */
+/** Net chance worth a luck sentence; shared with the report's luck line. */
 export const LUCK_TOTAL_THRESHOLD = 0.25;
-/** How many turns before the favor boundary the grind detector looks at. */
 const GRIND_WINDOW = 12;
-/** A grind needs at least this many analyzed turns in the window. */
 const GRIND_MIN_TURNS = 8;
-/** Starting score that reads as a lopsided matchup on a wire-to-wire win. */
 const MATCHUP_EDGE = TIER_THRESHOLDS.mistake;
-/** Punished regret below measurement noise renders as "next to nothing". */
 const NEGLIGIBLE_REGRET = 0.02;
 
 const toward = (winner: Side, delta: number): number => (winner === 'p1' ? delta : -delta);
 const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1');
 
-/**
- * The visible dice ACTIVELY contradict the chance ledger's direction: at least an inaccuracy of dice-turn chance runs the other way.
- * Asymmetric on purpose: a weak or empty anchor proves nothing (damage rolls leave no protocol marker), so only a contradiction
- * demotes a luck claim.
- */
+// The visible dice ACTIVELY contradict the ledger: at least an inaccuracy of dice-turn chance runs the other way.
+// Asymmetric on purpose: damage rolls leave no protocol marker, so a weak anchor proves nothing.
 const diceContradict = (chanceTotal: number, diceAnchor: number | null): boolean =>
   diceAnchor !== null && Math.abs(diceAnchor) >= TIER_THRESHOLDS.inaccuracy &&
   chanceTotal !== 0 && Math.sign(diceAnchor) !== Math.sign(chanceTotal);
 
-/** The rolls stand behind the ledger: with the split they carry it, without it the markers do not dispute it. */
 const rollsBehind = (chanceTotal: number, diceAnchor: number | null, split: LuckSplit | null): boolean =>
   split ? rollsCarry(chanceTotal, split) : !diceContradict(chanceTotal, diceAnchor);
 
-/**
- * A ledger the rolls do not carry: the line says only what the rolls gave, to the side they favored; the part no roll explains is an
- * estimate that moved, and no total of it is a probability (a game once read "+117%"). Under 1% the rolls favored neither side.
- */
+// The part no roll explains is an estimate that moved, no probability. Under 1% the rolls favored neither side.
 function rollsOnlyLuckSentence(split: LuckSplit, playerNames: PlayerNames): string {
   if (Math.abs(split.rolled) * 50 < 1) return 'The rolls favored neither side.';
   return `The rolls gave ${playerNames[split.rolled > 0 ? 0 : 1]} ${winDeltaText(Math.abs(split.rolled))}.`;
 }
 
-/**
- * The luck line: named "luck" only while the visible dice don't dispute it. Contradicted, it keeps the number but says what it is, the
- * ledger's residual, and names where the dice went. With the ledger split, "luck" only when the rolls carry it; otherwise the line
- * names only what the rolls gave.
- */
+/** The luck line: "luck" only while the visible dice don't dispute it (with the split: when the rolls carry it). */
 export function luckSentence(
   chanceTotal: number,
   diceAnchor: number | null,
@@ -107,17 +87,12 @@ export function luckSentence(
   return `Luck ran ${chanceTotal > 0 ? 'for' : 'against'} ${playerNames[0]} overall (${winDeltaText(chanceTotal)}).`;
 }
 
-/** Every known turn after this one reads the winner at DECIDED_SCORE or beyond. */
 function barHoldsAfter(known: TurnAnalysis[], index: number, winner: Side): boolean {
   const sign = winner === 'p1' ? 1 : -1;
   return known.slice(index + 1).every(analysis => analysis.scoreBefore * sign >= DECIDED_SCORE);
 }
 
-/**
- * First forced-win (spoken mass) or decided signal on the WINNER's side from which the bar holds for the winner to the last known
- * turn, in turn order; forced wins a same-turn tie. "From turn N" promises the rest of the game: a sweep the bar backed once and
- * dropped again is no conversion yet. The bar carries the turns where no sweep stands.
- */
+/** First forced win or decided sweep of the winner from which the bar holds to the last turn; forced wins a tie. */
 export function conversionFor(
   known: TurnAnalysis[],
   winner: Side,
@@ -145,11 +120,7 @@ export function conversionFor(
   return null;
 }
 
-/**
- * The tip turn's mechanism, when it has one the seeds don't already tell: the winner's read, or a winner-ward roll the protocol shows.
- * A chance entry without a visible dice event stays unnamed: the ledger is a residual, and the engine disagreeing with itself across
- * two evaluations is no roll. Without dice info at all the clause stays ungated, like the luck line.
- */
+/** The tip turn's mechanism: the winner's read, or a winner-ward roll the protocol shows; no dice event, no name. */
 export function tipClause(
   known: TurnAnalysis[],
   winner: Side,
@@ -163,7 +134,6 @@ export function tipClause(
   if (analysis.attribution === `${winner}-read` && played) {
     return `, when ${winnerName}'s read (${phrase(played.label)}) paid off`;
   }
-  // With the turn's rolls known, a roll toward the residual decides; else the marker turn.
   const diceShown = chanceRolled(analysis) ?? (diceTurns === null || diceTurns.has(analysis.turn));
   if (analysis.attribution === 'chance' && diceShown && toward(winner, analysis.chanceDelta ?? 0) > 0) {
     return `, on a roll that went ${winnerName}'s way`;
@@ -171,20 +141,18 @@ export function tipClause(
   return '';
 }
 
-/** On a wire-to-wire win, name the starting matchup when it was lopsided. */
 export function matchupClause(series: (number | undefined)[], winner: Side): string {
   const first = series.find((value): value is number => value !== undefined);
   if (first === undefined || toward(winner, first) < MATCHUP_EDGE) return '';
   return ` from a ${winPercent(winner === 'p1' ? first : -first)}% opening matchup`;
 }
 
-/** Regret that actually cost something: paid-off reads, unpunished risks, and sacks carry no blame. */
+// Paid-off reads, unpunished risks and sacks carry no blame.
 const punishedRegret = (side: SideAnalysis): number =>
   side.riskPaidOff || side.riskUnpunished || side.sacrifice ? 0 : side.regret ?? 0;
 
 interface ReadExample { turn: number; label: string; payoff: number }
 
-/** A side's paid-off reads, biggest payoff first; not on a turn the side lost ground. */
 function paidReads(analyses: TurnAnalysis[], side: Side): ReadExample[] {
   return analyses
     .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side))
@@ -196,10 +164,7 @@ function paidReads(analyses: TurnAnalysis[], side: Side): ReadExample[] {
     .sort((a, b) => b.payoff - a.payoff);
 }
 
-/**
- * "The right play even though it was hard to spot": the position offered real breadth but only one line held (viableCount 1) and the
- * side found it, or the engine needed the depth+1 verification pass to see the played line holds up.
- */
+// Real breadth but only one line held (viableCount 1) and the side found it, or only the depth+1 pass saw it hold.
 const narrowTurn = (side: SideAnalysis): boolean =>
   (side.choiceCount ?? 0) >= BREADTH_MIN_OPTIONS &&
   ((side.viableCount === 1 && (side.regret ?? 1) < TIER_THRESHOLDS.inaccuracy) ||
@@ -210,16 +175,13 @@ interface Grind {
   spanCount: number;
   /** Position change over the span, toward the winner. */
   drift: number;
-  /** The span's decision share toward the winner — the grind's ranking size. */
+  /** The span's decision share toward the winner: the grind's ranking size. */
   size: number;
   narrow: number;
   read: ReadExample | null;
 }
 
-/**
- * The winner improves the position step by step through the window before the favor boundary, with no single big swing, and the drift
- * runs on the choices, not the rolls. A chance-led climb stays a variance story.
- */
+// Step by step through the window before the favor boundary, no single big swing; a chance-led climb is variance.
 function grindFor(
   known: TurnAnalysis[],
   series: (number | undefined)[],
@@ -272,14 +234,12 @@ export interface WinPathArgs {
   chanceTotal: number;
   /** Chance summed over the protocol's dice-event turns (p1 perspective), null without dice info. */
   diceAnchor: number | null;
-  /** The ledger split into the rolled part and the rest (turn-analysis/luck.ts), null without the turns' rolls. */
+  /** The ledger split into the rolled part and the rest (luck.ts); null without the turns' rolls. */
   chanceSplit: LuckSplit | null;
   playedTracking: boolean;
-  /** The seeds sentence already tells the decisions story — don't tell it twice. */
   seedsSpoken: boolean;
 }
 
-/** The ranked factor candidates: each edge that clears its floor, in specificity order (ties keep the earlier). */
 function factorCandidates(
   args: WinPathArgs,
   punished: { p1: number; p2: number },
@@ -295,14 +255,13 @@ function factorCandidates(
     candidates.push({ factor: 'decisions', size: punished[loser] - punished[winner] });
   }
   if (playedTracking && readsSize >= WIN_PATH_FLOOR) candidates.push({ factor: 'reads', size: readsSize });
-  // "The rolls decided it" needs the visible dice on board with the claim.
   if (luck >= LUCK_TOTAL_THRESHOLD && rollsBehind(args.chanceTotal, args.diceAnchor, args.chanceSplit)) {
     candidates.push({ factor: 'variance', size: luck });
   }
   return candidates;
 }
 
-/** The dominant edge behind the win, spoken as one sentence; null when the seeds cover it or nothing clears the floor. */
+/** The dominant edge behind the win as one sentence; null when the seeds cover it or nothing clears the floor. */
 export function winPathFor(args: WinPathArgs): WinPathResult | null {
   const { known, winner, seedsSpoken } = args;
   const loser = other(winner);
@@ -331,7 +290,6 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
     return { winPath: { factor: 'decisions', size: top.size }, sentence, foldLuck: false };
   }
   if (top.factor === 'reads') {
-    // The two biggest payoffs, told in the order they were played.
     const examples = reads.slice(0, 2).sort((a, b) => a.turn - b.turn)
       .map(read => `${phrase(read.label)} on turn ${read.turn} (${winDeltaText(read.payoff)})`);
     return { winPath: { factor: 'reads', size: top.size }, sentence: `${winnerName} won it on reads: ${examples.join(' and ')}.`, foldLuck: false };
@@ -342,18 +300,13 @@ export function winPathFor(args: WinPathArgs): WinPathResult | null {
   return { winPath: { factor: 'variance', size: top.size }, sentence, foldLuck: true };
 }
 
-/** Nothing crossed a floor and nothing else explained the tip — say so instead of saying nothing. */
 export const closeGameFallback = (winnerName: string): WinPathResult => ({
   winPath: { factor: 'close', size: 0 },
   sentence: `No single edge decided it; ${winnerName} converted a close game turn by turn.`,
   foldLuck: false,
 });
 
-/**
- * The loser's two biggest punished misplays up to the turning point. An
- * unpunished risk cost nothing — it cannot have seeded the loss; a
- * deliberate low-cost sack likewise.
- */
+/** The loser's two biggest punished misplays up to the turning point; unpunished risks and sacks cost nothing. */
 export function seedsOfTheLoss(known: TurnAnalysis[], loser: Side, turningPoint: number | null): TurnAnalysis[] {
   return known
     .filter(analysis => (turningPoint === null || analysis.turn <= turningPoint) &&
@@ -364,10 +317,7 @@ export function seedsOfTheLoss(known: TurnAnalysis[], loser: Side, turningPoint:
     .sort((a, b) => a.turn - b.turn);
 }
 
-/**
- * One seed, as "turn N (played, regret; safer was better)"; the played move's analytic odds ground the claim. A regret over 1 reads as
- * the two win chances it spans (regretText).
- */
+/** One seed as "turn N (played, regret; safer was better)"; a regret over 1 reads as the two win chances it spans. */
 export function seedPhrase(analysis: TurnAnalysis, loser: Side): string {
   const side = analysis[loser];
   const setup = playedSetupMove(side) ? '; a setup move the engine may undervalue' : '';

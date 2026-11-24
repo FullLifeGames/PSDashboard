@@ -1,9 +1,7 @@
 import type { Battle } from '@pkmn/sim';
 import { serializeBattleStable } from '../forward/serialize.ts';
 
-// The development check of the module that asks the simulator: it proves the live battle came out of a question as it went in. It costs a
-// whole serialization twice, so it is on in specs (`setAskCheck(true)`) and under `EVAL_ASK_CHECK=1`; read through `globalThis.process`
-// so the browser bundle never touches `process`.
+// Read through `globalThis.process`: the browser bundle never touches `process`.
 
 interface ProcessLike { env?: Record<string, string | undefined> }
 
@@ -19,7 +17,6 @@ export function askCheckOn(): boolean {
   return (globalThis as { process?: ProcessLike }).process?.env?.EVAL_ASK_CHECK === '1';
 }
 
-/** The live battle changed during a question. */
 export class AskLeak extends Error {
   constructor(message = 'a question to the simulator changed the live battle') {
     super(message);
@@ -29,7 +26,7 @@ export class AskLeak extends Error {
 
 const stable = (value: unknown): string => JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'function' ? 'fn' : inner));
 
-/** Everything one question could leave behind: the stable serialization, the event bookkeeping and the JSON of the Dex entries read. */
+/** What one question could leave behind: the stable serialization, event bookkeeping and the Dex entries read. */
 export function fingerprint(battle: Battle, extras: readonly unknown[] = []): string {
   return JSON.stringify({
     state: serializeBattleStable(battle),
@@ -42,7 +39,6 @@ export function fingerprint(battle: Battle, extras: readonly unknown[] = []): st
   });
 }
 
-/** Runs the question; with the check on, throws `AskLeak` when the live battle's fingerprint moved. */
 export function guarded<T>(live: Battle, extras: readonly unknown[], ask: () => T): T {
   if (!askCheckOn()) return ask();
   const before = fingerprint(live, extras);

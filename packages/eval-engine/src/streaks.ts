@@ -1,22 +1,19 @@
 import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-core';
 
-// Narrative only, never a grade: what repetition buys (secondary fishing, crit accumulation), shown at milestones at render time.
+// Narrative only, never a grade: shown at milestones at render time.
 
-/** One turn of a side's played-move history. */
 export interface StreakHistoryEntry {
   attacker: string;
   /** Normalized move id; null = switch/no single move (breaks streaks). */
   moveId: string | null;
   defender: string;
   movedFirst: boolean;
-  /** Ability and item ids, e.g. 'serenegrace'. */
   attackerAbility: string;
   defenderAbility: string;
   defenderItem: string;
   defenderBoosts: { def: number; spd: number };
 }
 
-/** The odds a streak milestone names: per-turn and cumulative chance of the event over `n` repeats. */
 export interface StreakOdds {
   moveLabel: string;
   defenderSpecies: string;
@@ -35,7 +32,6 @@ const SECONDARY_EVENTS: Record<string, StreakOdds['event']> = {
   frz: 'freeze', par: 'paralysis', brn: 'burn', flinch: 'flinch',
 };
 
-/** The same attacker repeating the same move into the same defender, counted back from the current turn. */
 function sameMoveRun(entries: (StreakHistoryEntry | null)[], last: StreakHistoryEntry): number {
   let run = 0;
   for (let index = entries.length - 1; index >= 0; index--) {
@@ -46,10 +42,7 @@ function sameMoveRun(entries: (StreakHistoryEntry | null)[], last: StreakHistory
   return run;
 }
 
-/**
- * The odds when the streak fishes for a narratable, unsuppressed secondary; null when nothing comes of it (a flinch chain that lost the
- * speed race); undefined with no such story.
- */
+// null when a secondary story comes to nothing (a flinch chain that lost the race); undefined with none.
 function secondaryStreak(
   move: DexMove,
   last: StreakHistoryEntry,
@@ -83,7 +76,6 @@ function secondaryStreak(
   return null;
 }
 
-/** Repeated damaging attacks into a defender whose relevant defensive boost is up on every turn: a crit is the roll those boosts cannot answer. */
 function boostedAttackRun(dex: GenDex, last: StreakHistoryEntry, entries: (StreakHistoryEntry | null)[]): number {
   let attackRun = 0;
   for (let index = entries.length - 1; index >= 0; index--) {
@@ -98,10 +90,7 @@ function boostedAttackRun(dex: GenDex, last: StreakHistoryEntry, entries: (Strea
   return attackRun;
 }
 
-/**
- * A narratable streak in a side's played-move history (oldest first, the current turn last; null entries break streaks), or null below gen
- * 3 and off milestones.
- */
+/** A narratable streak in a side's played-move history (oldest first, null entries break streaks); null below gen 3. */
 export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | null)[], mod?: RulesMod): StreakOdds | null {
   if (gen <= 2) return null;
   const last = entries[entries.length - 1];
@@ -113,7 +102,6 @@ export function detectStreakOdds(gen: number, entries: (StreakHistoryEntry | nul
   const secondary = secondaryStreak(move, last, entries, run);
   if (secondary !== undefined) return secondary;
 
-  // Crit accumulation speaks only when no secondary story exists.
   const attackRun = boostedAttackRun(dex, last, entries);
   if (!isMilestone(attackRun)) return null;
   const perTurn = gen >= 7 ? 1 / 24 : 1 / 16;

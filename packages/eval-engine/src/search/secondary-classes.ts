@@ -1,15 +1,6 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { secondaryChances } from '../dice/secondaries.ts';
 
-/**
- * The secondary effects of a root cell as outcome classes. A hit that does not kill splits by the entries of the move's
- * `secondaries` that came true (a 30 percent burn is the class `hit-nokill+brn` beside `hit-nokill`), with the weights the chances
- * give. The chances come from the simulator through `dice/secondaries.ts` (Serene Grace, Sheer Force, Shield Dust, a King's Rock
- * flinch), and a draw says which entries came true by its dice record (`DiceSink` of `forward/scripted-prng.ts`), not by a line of
- * the log. An effect that stops the target's move this turn (the flinch: a volatile whose condition has a `BeforeMove` handler and
- * lasts one turn) cuts the second mover: its event is `none` in that class.
- */
-
 export interface EventSecondary {
   effectId: string;
   chance: number;
@@ -25,16 +16,13 @@ export interface SecondaryDie {
 
 type ConditionLike = { exists?: boolean; duration?: number; onBeforeMove?: unknown };
 
-/** A condition that costs the target its move this turn: it lasts one turn and has a `BeforeMove` handler (the flinch). */
+/** A condition that costs the target its move this turn: lasts one turn, has a `BeforeMove` handler (the flinch). */
 export function truncates(dex: Battle['dex'], effectId: string): boolean {
   const condition = dex.conditions.get(effectId) as unknown as ConditionLike;
   return !!condition.exists && condition.duration === 1 && typeof condition.onBeforeMove === 'function';
 }
 
-/**
- * The entries a damaging move of `userSlot` draws against `defender` (an active body), after the user's and the target's rules, or
- * null when the simulator refuses the question (the caller keeps the cell seed-priced). A status move draws none.
- */
+/** The entries a damaging move draws against `defender`; null when the simulator refuses (cell stays seed-priced). */
 export function eventSecondaries(battle: Battle, userSlot: string, moveId: string, defender: Pokemon): EventSecondary[] | null {
   if (battle.dex.moves.get(moveId).category === 'Status') return [];
   try {
@@ -50,10 +38,7 @@ export interface HitClass {
   cuts: boolean;
 }
 
-/**
- * Every subset of the entries (each entry is one independent die) as a class; two entries of one effect (a move's flinch and a
- * King's Rock's) land in one class when either came true. No entries: the one class without a token.
- */
+/** Every subset of the entries as a class; two entries of one effect (a flinch of move and item) share one. */
 export function hitClasses(secondary: readonly EventSecondary[] | undefined): HitClass[] {
   const entries = secondary ?? [];
   const classes = new Map<string, HitClass>();
@@ -86,24 +71,14 @@ export function dieTokens(dice: readonly SecondaryDie[], side: 'p1' | 'p2', move
   return [...new Set(came)].sort();
 }
 
-/**
- * Whether a cell's events draw a secondary die: its draws record the dice, and a missing class is forced by script, never chased with probe
- * seeds.
- */
 export const hasSecondary = (events: readonly { secondary?: readonly EventSecondary[] }[]): boolean => events.some(event => !!event.secondary?.length);
 
-/**
- * The mass under which a class that carries a secondary effect is left unpriced: a forced draw for it would cost more than it moves (the
- * pair plan's floor).
- */
+/** The mass under which a class with a secondary effect stays unpriced: a forced draw would cost more than it moves. */
 export const MIN_CLASS_MASS = 0.01;
 
 export const isTokened = (classKey: string): boolean => classKey.includes('+');
 
-/**
- * The outcome of a script key (`hit-nokill+brn+flinch`) as its base outcome and the entries' effect ids that came true. An effect id
- * may hold a plus itself (`boosts:atk+def`), so the entries of the cell tell the ids apart, never a split at every plus.
- */
+/** A script key as base outcome and effect ids; an id may hold a plus (`boosts:atk+def`): never split at each plus. */
 export function splitOutcome(outcome: string, secondary: readonly EventSecondary[] = []): { base: string; tokens: string[] } {
   const cut = outcome.indexOf('+');
   if (cut < 0) return { base: outcome, tokens: [] };

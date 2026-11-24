@@ -1,8 +1,7 @@
 import { AskLeak } from './guard.ts';
 import { viewGuarded } from './isolated.ts';
 
-// A Dex handler called with a throwaway `this` (a fresh object that reads through to the facade and swallows the log and debug output).
-// A handler that needs more than the facade offers throws or reads nothing: the answer is then the typed "needs more", never a guess.
+// A handler that needs more than the facade offers yields `{ ok: false }`, never a guess.
 
 export type HandlerResult<T> = { ok: true; value: T } | { ok: false };
 

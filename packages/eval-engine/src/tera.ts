@@ -2,9 +2,8 @@ import type { TeraAllowance } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
 import { normalizeLineEndings } from './line-endings.ts';
 
-// Draft leagues grant Terastallization to specific drafted Pokémon: a global on/off would recommend illegal Teras. Pure, sim-free.
+// Draft leagues grant Terastallization to specific Pokémon: a global on/off would recommend illegal Teras.
 
-/** The panel's Tera setting. */
 export type TeraPreference = 'auto' | 'on' | 'off' | 'revealed';
 
 const PER_POKEMON_TERA_FORMATS = /draft|customgame/;
@@ -32,7 +31,7 @@ function noteTeraLine(parts: string[], species: SpeciesByNick, revealed: Reveale
   if (!revealed[side].includes(name)) revealed[side].push(name);
 }
 
-/** The species that terastallized in the replay, per side: `|-terastallize|` names nicknames, resolved through the switch lines. */
+/** Species that terastallized per side: `|-terastallize|` names nicknames, resolved through the switch lines. */
 export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const species: SpeciesByNick = { p1: new Map(), p2: new Map() };
   const revealed = { p1: [] as string[], p2: [] as string[] };
@@ -48,7 +47,7 @@ export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: st
   return revealed;
 }
 
-/** Resolves the panel preference against the replay ('auto' restricts draft and custom game formats to the revealed species). */
+/** Resolves the panel setting; 'auto' limits draft and custom game formats to the revealed species. */
 export function resolveTeraPreference(
   pref: TeraPreference,
   formatid: string,
@@ -63,7 +62,6 @@ export function resolveTeraPreference(
   return true;
 }
 
-/** A stable, store-key-safe encoding of an allowance. */
 export function teraKey(tera: TeraAllowance | undefined): string {
   if (tera === undefined || tera === true) return '1';
   if (tera === false) return '0';

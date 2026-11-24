@@ -1,11 +1,10 @@
-/** Item-sensitivity probe plumbing: pure JSON surgery on serialized battle positions, with no battle built, so the main thread can prepare probes for the worker. */
+/** Item-sensitivity probes as pure JSON surgery on serialized positions: no battle is built on the main thread. */
 
 import { choiceItems, dexOf, formatRules, sideIndex, toId } from '@fulllifegames/replay-core';
 
-/** A guessed-item mon and the usage-plausible items to probe it with. */
 export interface SensitivityTarget {
   species: string;
-  /** Usage-plausible alternative items (rule-outs already applied), in order. */
+  /** Usage-plausible alternatives, rule-outs already applied. */
   items: string[];
 }
 
@@ -18,14 +17,13 @@ interface SerializedMon {
 }
 
 interface SerializedBattleShape {
-  /** The format the position was serialized under (State.serializeBattle): its generation and mod pick the Dex. */
+  /** The format the position was serialized under: its generation and mod pick the Dex. */
   formatid?: string;
   sides?: { pokemon?: SerializedMon[] }[];
 }
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 
-/** The probe combos for one flagged side: involved opposing guessed-item mons, round-robin over their alternatives, capped at `cap` (two pair-evals each). */
 export function selectProbeCombos(
   serialized: string,
   opposing: 'p1' | 'p2',
@@ -61,7 +59,7 @@ export function selectProbeCombos(
   return combos;
 }
 
-/** The serialized position with `species`' held item swapped to `item` (null when it is not on that side); a removed Choice item drops its choicelock volatile. */
+/** The position with `species`' item swapped to `item` (null when absent); a removed Choice item drops its lock. */
 export function patchSerializedItem(
   serialized: string,
   side: 'p1' | 'p2',

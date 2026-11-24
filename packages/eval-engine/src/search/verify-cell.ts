@@ -6,32 +6,15 @@ import type { EvalCellValue } from '../types.ts';
 import { combinedOptionHints, isCombined } from './hints.ts';
 import { leafValue } from './leaf.ts';
 
-/**
- * The verify step prices a cell at one depth. A blend cell (the singles class plan, the doubles pair plan) goes one ply deeper per
- * open class and keeps the plan weights; a cell without a plan draws VERIFY_PLAIN_DRAWS natural seeds, groups them by outcome (who
- * fell, who missed, who could not act) and goes one ply deeper per group, mixed by draw share. An outcome goes deeper through one
- * child per state its draws leave, since one child cannot stand for what the log does not split (a Sleep Powder hit whose sleep
- * counter reads 3 while a third of its draws wake next turn). The design is in EVALUATION.md, "The verify round and the answer round".
- */
-
 /** Natural draws of a plain verify cell wherever the sampler wants more than one. */
 export const VERIFY_PLAIN_DRAWS = 16;
-/**
- * Outcomes go deeper by descending weight until this share of the cell's open weight is covered; the rarer rest takes its one-ply
- * value shifted by the deepened outcomes' weighted mean step, so no cell mixes depths. A doubles sub-search costs about three
- * singles ones, so doubles goes deeper through the heaviest outcome only; singles keeps 90 %, since the heaviest outcome alone
- * brings back a full-paralysis note that the Monte-Carlo reference of the verify scene pins does not carry.
- */
+/** Share of the open weight that goes deeper (the heaviest outcome always); the rest is shifted by the mean step. */
 export const VERIFY_DEEPEN_COVER = { singles: 0.9, doubles: 0 } as const;
 
-/**
- * How an outcome beyond the cover is priced: 'off' shifts its one-ply leaf by the mean step of the deepened outcomes, 'all' prices every
- * open one through a light sub-search, 'states' only those whose draws leave different states.
- */
+/** Beyond the cover: 'off' shifts the one-ply leaf, 'all' runs a light sub-search, 'states' only if states differ. */
 export type CheapMode = 'off' | 'all' | 'states';
 export const VERIFY_CHEAP: { singles: CheapMode; doubles: CheapMode } = { singles: 'off', doubles: 'all' };
 
-/** The light sub-search: a 5 x 5 matrix (a fifth of a full sub-search's time); outcomes lighter than `minWeight` keep the shift. */
 export const VERIFY_LIGHT = { options: 5, minWeight: 0.05 };
 
 export interface CheapDeepening {
@@ -40,10 +23,6 @@ export interface CheapDeepening {
   minWeight: number;
 }
 
-/**
- * The option list of a light sub-search: a combined (doubles) list cut to its best `VERIFY_LIGHT.options` by the static threat
- * hints, gimmick variants left out unless too few options remain, in list order. A singles list stays as it is.
- */
 export function lightOptions(position: SimPosition, side: 'p1' | 'p2', options: ChoiceOption[], keep = VERIFY_LIGHT.options): ChoiceOption[] {
   if (options.length <= keep || !isCombined(options)) return options;
   const hints = combinedOptionHints(position, side, options);
@@ -56,13 +35,7 @@ export function lightOptions(position: SimPosition, side: 'p1' | 'p2', options: 
     .map(entry => entry.option);
 }
 
-/**
- * How an outcome that goes deeper splits its draws. `split`: 'state' reads every state the simulator keeps on a Pokémon (HP apart),
- * 'counter' only the effects that keep a count (a sleep, confusion, trap, lock, Protect or Encore counter, Toxic's stage). `span`: a
- * state whose one-ply leaves span more than this splits into its lower and upper half (0: never). The states go deeper by
- * descending share until `cover` of the outcome's draws is covered, at most `cap` of them; the rest shift by the deepened states'
- * mean step. `pool`: the natural draws a class or a one-draw cell takes for it.
- */
+/** How an outcome that goes deeper splits its draws: `split` by every state or counters only, `span` 0 never halves. */
 export interface StateRule {
   split: 'state' | 'counter';
   span: number;
@@ -71,7 +44,6 @@ export interface StateRule {
   pool: number;
 }
 
-/** Doubles reads only the counts: the full split costs it about 40 % more sub-searches for the same verdicts. */
 export const VERIFY_STATE_RULE: { readonly singles: StateRule; readonly doubles: StateRule } = {
   singles: { split: 'state', span: 0.05, cover: 0.9, cap: 4, pool: VERIFY_PLAIN_DRAWS },
   doubles: { split: 'counter', span: 0, cover: 0.9, cap: 4, pool: 8 },
@@ -110,10 +82,7 @@ const OUTCOME_LINE = /^\|(faint|-miss|cant)\|/;
 const outcomeKey = (draw: PlainDraw): string =>
   `${draw.log.filter(line => OUTCOME_LINE.test(line)).map(line => line.split('|').slice(1, 4).join('|')).join(';')}${draw.ended ? ';end' : ''}`;
 
-/**
- * Fields of an effect state the state key leaves out: the battle's running effect counter, and amounts of HP and damage (a Substitute's HP,
- * Bide's and Counter's damage), which follow the damage roll.
- */
+// Left out of the state key: the running effect counter and HP and damage amounts, which follow the damage roll.
 const UNREAD = new Set(['effectOrder', 'hp', 'damage', 'totalDamage']);
 
 const counters = (state: Record<string, unknown> | undefined): string => (state
@@ -142,10 +111,7 @@ function sidesKey(child: SimPosition, read: (pokemon: BattlePokemon) => string):
   }).join('|');
 }
 
-/**
- * The state a child leaves on every Pokémon, HP left out: who stands in which slot, fainted, the status and the numbers its state
- * keeps (the sleep counter), every volatile and its numbers (the confusion counter, trap and lock lengths), the stat stages, the item.
- */
+/** The state a child leaves on every Pokémon, HP left out: slots, status, volatiles, stat stages, item. */
 export const stateKey = (child: SimPosition): string => sidesKey(child, pokemonState);
 
 export const counterKey = (child: SimPosition): string => sidesKey(child, pokemonCounts);
@@ -222,11 +188,7 @@ export interface Outcome {
   groups?: readonly StateGroup[];
 }
 
-/**
- * The outcomes one ply deeper: ended ones keep their leaf; open ones go deeper by descending weight (ties keep list order) until
- * `cover` of the open weight is covered (the heaviest always) and at most `cap` of them, and the rest take their leaf shifted by the
- * deepened ones' weighted mean step, or the light search's price with `cheap`. An outcome with states goes deeper through them under `states`.
- */
+/** Open outcomes go deeper by descending weight (ties in list order); the rest shift by the deepened mean step. */
 export function deeperValues(
   outcomes: readonly Outcome[], deepen: (child: SimPosition) => number, cover: number, cap = Number.POSITIVE_INFINITY,
   states: StateRule = VERIFY_STATE_RULE.singles, cheap?: CheapDeepening,

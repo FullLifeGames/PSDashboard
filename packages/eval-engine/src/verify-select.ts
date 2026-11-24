@@ -2,16 +2,10 @@ import { cellKey } from './rank.ts';
 import { matchPlayedSide } from './turn-analysis/played-match.ts';
 import type { EvalCellJob, EvalResult, EvalSettings, MctsTreeStats, RankedChoice } from './types.ts';
 
-// Which root cells the verify step re-prices: a tree fixes ONE chance outcome per cell, so thin, thinly expanded or disagreeing cells are suspect.
-
-/** Pooled visits below which a support cell is chance-suspect. */
 export const VERIFY_MIN_VISITS = 8;
-/** Minimum independent chance samples (trees that expanded the cell). */
+/** Minimum independent chance samples: trees that expanded the cell. */
 export const VERIFY_MIN_TREES = 3;
-/**
- * Per-tree disagreement beyond which a cell's transition is chance-suspect: the visit-weighted mean absolute deviation of the per-tree
- * means from the pool mean. Two equal camps 0.15 apart read 0.075; a thin outlier (54 visits at 25 % beside 600 at 8 %) does not tip a cell.
- */
+/** Disagreement beyond which a cell is chance-suspect: visit-weighted mean absolute deviation of the per-tree means. */
 export const VERIFY_DISAGREEMENT = 0.075;
 
 export function weightedDisagreement(entries: { mean: number; weight: number }[]): number {
@@ -21,19 +15,13 @@ export function weightedDisagreement(entries: { mean: number; weight: number }[]
   return entries.reduce((sum, entry) => sum + Math.abs(entry.mean - mean) * entry.weight, 0) / weight;
 }
 
-/** Fixed seeds per verified cell — matrix-zone grade, deterministic. */
 export const VERIFY_SAMPLES = 3;
-/** Verification budget: at most this many cell jobs per search (doubles boundary cells included). */
+/** At most this many cell jobs per search, doubles boundary cells included. */
 export const VERIFY_CELL_CAP = 12;
-/** Pooled visits from which a cell counts as rich for row completion. */
 const ROW_RICH_VISITS = 50;
-/** Mix weight from which an option counts as equilibrium support. */
 const SUPPORT_MIX = 0.05;
 
-/**
- * What the verify step adds to the trees' own view: the played option per side (it joins the support at the nominal mass of the ranked
- * top three) and the cells the pair plan reported as boundary cells.
- */
+/** What verify adds to the trees' view: the played option per side (nominal mass) and the plan's boundary cells. */
 export interface VerifyFocus {
   played?: { p1?: number; p2?: number };
   boundary?: ReadonlySet<number>;
@@ -62,11 +50,9 @@ function poolStats(trees: MctsTreeStats[]): PoolStats {
   return { perTree, pooledVisits, endedCells };
 }
 
-/** The chance-suspect predicate over the pool: boundary cells, starved cells, thin trees, disagreeing trees (visit-weighted). */
 function suspectFor(trees: MctsTreeStats[], stats: PoolStats, boundary: ReadonlySet<number>): (key: number) => boolean {
   return (key: number): boolean => {
-    // A boundary cell's fixed per-tree outcomes cannot represent its
-    // accuracy×killFraction split — suspect regardless of visit stats.
+    // A boundary cell's fixed per-tree outcomes cannot represent its accuracy×killFraction split: always suspect.
     if (boundary.has(key)) return true;
     if ((stats.pooledVisits.get(key) ?? 0) < VERIFY_MIN_VISITS) return true;
     const entries = stats.perTree.get(key) ?? [];
@@ -75,10 +61,7 @@ function suspectFor(trees: MctsTreeStats[], stats: PoolStats, boundary: Readonly
   };
 }
 
-/**
- * Support per side: equilibrium mass, with the ranked top three and the played option injected at a nominal mass so a starved row the
- * solve DEMOTED on noise still verifies (the demotion may itself be the artifact).
- */
+// The ranked top three and the played option join at a nominal mass: a row the solve DEMOTED on noise still verifies.
 function supportMass(
   mix: number[],
   ranked: EvalResult['perSide']['p1'],
@@ -97,10 +80,8 @@ function supportMass(
   return mass;
 }
 
-/**
- * Punisher cells: each top entry's floor is a single cell, and a starved one makes the floor (and punishedBy) a coin flip too.
- * `key` maps (own index, opponent index) onto the cell key for the entry's side.
- */
+// Each top entry's floor is a single cell: a starved one makes the floor (and punishedBy) a coin flip too.
+// `key` maps (own index, opponent index) onto the cell key for the entry's side.
 function addPunisherCells(
   candidates: Map<number, number>,
   entries: RankedChoice[],
@@ -152,7 +133,7 @@ function cellJob(base: MctsTreeStats, key: number): EvalCellJob {
 const boundaryOf = (trees: MctsTreeStats[], focus?: VerifyFocus): Set<number> =>
   new Set([...(trees[0].boundaryCells ?? []), ...(focus?.boundary ?? [])]);
 
-/** The support cells the pool left starved (unexpanded cells read the bare root static), heaviest first, capped at VERIFY_CELL_CAP, as matrix-grade cell jobs. */
+/** The starved support cells (unexpanded ones read the bare root static), heaviest first, capped at VERIFY_CELL_CAP. */
 export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult, focus?: VerifyFocus): EvalCellJob[] {
   const mixes = merged.matrix?.mixes;
   if (!mixes) return [];
@@ -160,18 +141,15 @@ export function starvedSupportCells(trees: MctsTreeStats[], merged: EvalResult, 
   const boundary = boundaryOf(trees, focus);
   const suspect = suspectFor(trees, stats, boundary);
   return [...supportOf(trees[0], merged, mixes, focus).candidates.entries()]
-    // Boundary cells bypass the ended exclusion: a game-ending kill range is ended in its drawn class precisely because the pool
-    // cannot see the other one. sampleCell's own ended semantics (ALL children ended) replace the pooled flag through the verified merge.
+    // Boundary cells bypass the ended exclusion: a game-ending kill range is ended in its drawn class only,
+    // which the pool cannot see. `sampleCell`'s own ended semantics (ALL children ended) replace the pooled flag.
     .filter(([key]) => suspect(key) && (boundary.has(key) || !stats.endedCells.has(key)))
     .sort((a, b) => b[1] - a[1])
     .slice(0, VERIFY_CELL_CAP)
     .map(([key]) => cellJob(trees[0], key));
 }
 
-/**
- * Doubles: the support and played cells the visit stats leave ineligible, for the pair plan to check (a doubles tree ships no boundary
- * list); empty for singles.
- */
+/** Doubles: the support and played cells the visit stats leave ineligible, for the pair plan; empty for singles. */
 export function boundaryCheckCells(trees: MctsTreeStats[], merged: EvalResult, focus?: VerifyFocus): EvalCellJob[] {
   const mixes = merged.matrix?.mixes;
   if (!mixes || trees[0].boundaryCells !== undefined) return [];
@@ -184,13 +162,12 @@ export function boundaryCheckCells(trees: MctsTreeStats[], merged: EvalResult, f
     .map(([key]) => cellJob(trees[0], key));
 }
 
-/** The jobs plus the other support cells of each row and column that mixes a rich cell with a starved one, so one estimator prices the whole line. */
+/** The jobs plus the other support cells of each row and column that mixes a rich cell with a starved one. */
 export function rowCompletedCells(trees: MctsTreeStats[], merged: EvalResult, jobs: EvalCellJob[], focus?: VerifyFocus): EvalCellJob[] {
   const base = trees[0];
   const mixes = merged.matrix?.mixes;
   if (!mixes || jobs.length === 0) return jobs;
   const stats = poolStats(trees);
-  // A deep cell beside a one-ply sibling (Dragon Claw against Dragon Dance) read the sibling as a blunder; rich cells keep their depth.
   const rich = (i: number, j: number) => (stats.pooledVisits.get(cellKey(i, j)) ?? 0) >= ROW_RICH_VISITS;
   const { p1Mass, p2Mass } = supportOf(base, merged, mixes, focus);
   const taken = new Set(jobs.map(job => cellKey(job.i, job.j)));
@@ -212,7 +189,7 @@ export function rowCompletedCells(trees: MctsTreeStats[], merged: EvalResult, jo
   return [...jobs, ...completions].slice(0, VERIFY_CELL_CAP);
 }
 
-/** The played option per side as an index into the base tree's lists, from keepPlayed; sides without a match are left out. */
+/** The played option per side as an index into the base tree's lists, from keepPlayed; unmatched sides are left out. */
 export function playedIndices(
   trees: MctsTreeStats[], merged: EvalResult, keepPlayed: EvalSettings['keepPlayed'],
 ): { p1?: number; p2?: number } {

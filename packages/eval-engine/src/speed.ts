@@ -1,15 +1,10 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { stageMultiplier } from './stat-stages.ts';
 
-/**
- * Effective speed for move-order decisions: the sim's getStat('spe') rebuilt as a list (asking the sim cost the static 15 to 22 %).
- * It reads the sim's own state where the sim decides (ignoringAbility, ignoringItem, effectiveWeather, the Unburden, Protosynthesis and
- * Quark Drive volatiles). Not modeled: Slow Start, Lagging Tail and Full Incense (move order, not speed), Quick Powder.
- * A benched body is read as if on the field (the sim ignores the item and ability of an inactive Pokémon from gen 5 on); `isActive` is set
- * for this call only.
- */
+/** Effective speed for move order: `getStat('spe')` rebuilt as a list; Slow Start and Quick Powder are not modeled. */
 export function effectiveSpeed(pokemon: Pokemon, battle: Battle): number {
   if (pokemon.isActive) return listSpeed(pokemon, battle);
+  // A benched body is read as if on the field (the sim ignores an inactive Pokémon's item and ability from gen 5 on).
   pokemon.isActive = true;
   try {
     return listSpeed(pokemon, battle);
@@ -29,7 +24,6 @@ function listSpeed(pokemon: Pokemon, battle: Battle): number {
   return speed;
 }
 
-/** The doubling speed abilities, each under the condition its sim handler checks. */
 const DOUBLING = new Map<string, (pokemon: Pokemon, battle: Battle) => boolean>([
   ['swiftswim', pokemon => ['raindance', 'primordialsea'].includes(pokemon.effectiveWeather())],
   ['chlorophyll', pokemon => ['sunnyday', 'desolateland'].includes(pokemon.effectiveWeather())],
@@ -39,7 +33,6 @@ const DOUBLING = new Map<string, (pokemon: Pokemon, battle: Battle) => boolean>(
   ['unburden', pokemon => !!pokemon.volatiles['unburden'] && !pokemon.item],
 ]);
 
-/** The speed abilities; the sim is asked about suppression only for a holder of one (it is the costly call). */
 function abilityFactor(pokemon: Pokemon, battle: Battle): number {
   const ability = pokemon.ability;
   const doubling = DOUBLING.get(ability);
@@ -50,7 +43,6 @@ function abilityFactor(pokemon: Pokemon, battle: Battle): number {
   return factor !== 1 && pokemon.ignoringAbility() ? 1 : factor;
 }
 
-/** Choice Scarf (not while Dynamaxed) and Iron Ball, unless the sim ignores the item. */
 function itemFactor(pokemon: Pokemon): number {
   let factor = 1;
   if (pokemon.item === 'choicescarf') factor = pokemon.volatiles['dynamax'] ? 1 : 1.5;
@@ -58,10 +50,7 @@ function itemFactor(pokemon: Pokemon): number {
   return factor !== 1 && pokemon.ignoringItem() ? 1 : factor;
 }
 
-/**
- * Who acts first in a pairing: a usable priority move outranks speed, then effective speed compares, inverted under Trick Room.
- * An exact tie is never "first" (a speed tie is a coin flip).
- */
+/** Who acts first: priority move, then effective speed (inverted under Trick Room); an exact tie is never first. */
 export function movesFirst(
   a: Pokemon,
   b: Pokemon,

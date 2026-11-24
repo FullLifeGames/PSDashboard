@@ -3,12 +3,9 @@ import { deserializeBattleExact, serializeBattleStable } from '../forward/serial
 import { copyBattle } from '../forward/sim-fast/index.ts';
 import { guarded } from './guard.ts';
 
-// Copy and play: a question that runs the simulator's own code runs on a throw-away copy with dice of the asker's choosing.
-
-/** A throw-away copy: the speed layer's when it is on, else a round trip through the stable serialization. */
 export const copyOf = (battle: Battle): Battle => copyBattle(battle) ?? deserializeBattleExact(serializeBattleStable(battle));
 
-/** A guard against a handler that asks for a fresh draw until it likes the answer: with one answer it never would. */
+// A handler that asks for a fresh draw until it likes the answer would never stop with one answer: this caps it.
 const MAX_DRAWS = 5000;
 
 export interface DiceSpec {
@@ -16,7 +13,7 @@ export interface DiceSpec {
   quantile?: number;
   /** Every `randomChance` answers this; left out, chances draw from the seeded stream as the PRNG does. */
   chance?: boolean;
-  /** Every `randomChance` answers yes when it is at least even (an accuracy of 90 hits, a flinch of 30 does not); wins over `chance`. */
+  /** Every `randomChance` answers yes when it is at least even; wins over `chance`. */
   likely?: boolean;
 }
 
@@ -25,7 +22,7 @@ export class FixedDice extends PRNG {
   private readonly chance: boolean | undefined;
   private readonly likely: boolean;
   private draws = 0;
-  /** The first chance a handler asked since the last `clearChance`, numerator over denominator; null until one is asked. */
+  /** The first chance asked since the last `clearChance`, numerator over denominator. */
   firstChance: number | null = null;
 
   constructor({ quantile = 0.5, chance, likely = false }: DiceSpec) {
@@ -44,7 +41,6 @@ export class FixedDice extends PRNG {
     return Math.floor(this.quantile * (to - from)) + from;
   }
 
-  /** Forgets the chance noted so far (what putting a condition on the copy drew does not count). */
   clearChance(): void {
     this.firstChance = null;
   }
@@ -61,7 +57,7 @@ export class FixedDice extends PRNG {
   }
 }
 
-/** Plays on a copy of the live battle with these dice and returns what `play` returns; the live battle is never written. */
+/** Plays on a copy with these dice and returns what `play` returns; the live battle is never written. */
 export function playOnCopy<T>(live: Battle, dice: PRNG, play: (copy: Battle) => T, extras: readonly unknown[] = []): T {
   return guarded(live, extras, () => {
     const copy = copyOf(live);

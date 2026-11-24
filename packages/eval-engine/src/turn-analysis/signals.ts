@@ -13,23 +13,20 @@ import { hindsightLine } from '../prose/phrases.ts';
 import { cellSolid } from './cell-solid.ts';
 import type { SideGrading } from './grading.ts';
 
-/** The narrative signals, computed where the full result is in scope and rendered in summary.ts and report.ts; they fail closed and never touch the grading. */
+// Narrative signals fail closed and never touch the grading.
 
-/** How many ranked options sit within an inaccuracy of best — the side's real decision breadth. */
 const viableCountFor = (best: RankedChoice | null, options: RankedChoice[]): number | undefined =>
   best === null ? undefined :
     options.filter(option => best.ev - option.ev <= TIER_THRESHOLDS.inaccuracy).length;
 
-/** The side's view of the solved root matrix: own rows and labels, the opponent's labels, the equilibrium mix. */
 interface MatrixView {
   matrix: EvalMatrix | undefined;
   sideChoices: string[] | undefined;
   sideLabels: string[] | undefined;
   oppLabels: string[] | undefined;
   mix: number[] | undefined;
-  /** Own-perspective matrix value of (own index i, opponent index j). */
   ownValue: (grid: EvalMatrix, i: number, j: number) => number;
-  /** Index of the mix's heaviest choice; −1 without a mix. */
+  /** Index of the mix's heaviest choice; -1 without a mix. */
   mixTop: number;
 }
 
@@ -47,7 +44,6 @@ function matrixView(params: AnalyzeTurnParams, key: Side): MatrixView {
   return { matrix, sideChoices, sideLabels, oppLabels, mix, ownValue, mixTop };
 }
 
-/** The opponent replies against which the argmax pick and the mix's leaning pick each earn their keep. */
 function splitReplies(
   matrix: EvalMatrix,
   oppLabels: string[],
@@ -67,10 +63,7 @@ function splitReplies(
   return { bestWhen, mixWhen };
 }
 
-/**
- * The equilibrium leans a different choice than the argmax-EV recommendation (weight at least CONDITIONAL_MIX_MIN): the
- * recommendation renders conditionally, with the opponent replies against which each choice earns its keep. Tiered turns only.
- */
+// The equilibrium leans a different choice than the argmax-EV pick: it renders conditionally. Tiered turns only.
 function conditionalFor(
   tier: VerdictTier | undefined,
   view: MatrixView,
@@ -84,7 +77,6 @@ function conditionalFor(
   return { mixLabel: sideLabels[mixTop], mixWeight: mix[mixTop], bestWhen, mixWhen };
 }
 
-/** A near-pure equilibrium SWITCH (≥ FORCED_MIX_THRESHOLD with more than one option): a forced expectation named in prose. */
 function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['forcedMix'] {
   const { matrix, sideChoices, sideLabels, mix, mixTop } = view;
   if (matrix && sideChoices && sideLabels && mix && options.length > 1 && mixTop >= 0 &&
@@ -94,18 +86,10 @@ function forcedMixFor(view: MatrixView, options: RankedChoice[]): SideAnalysis['
   return undefined;
 }
 
-/**
- * A hindsight read shows on the side row only when its gain lies a band past the equilibrium regret (one inaccuracy, the tiers'
- * step) and the cells of the best and the played row against the click are no guess (`cellSolid`: a read of 0.20 gain once
- * stood on a cell with one to two visits). A result without `cells` (matrix mode, old cache) passes.
- */
+/** A hindsight read shows only when its gain lies a band past the equilibrium regret and its cells are no guess. */
 export const HINDSIGHT_BAND = TIER_THRESHOLDS.inaccuracy;
 
-/**
- * The gate's parts of a hindsight read. The side row's flag and sentence need the solid cells and the band past the regret;
- * the card sentences need the solid cells alone, so a thin cell marks the read. The gain is the best row's cell minus the
- * played row's cell, so both cells are held to the gate.
- */
+// The side row needs the solid cells and the band past the regret; the card sentences need the solid cells alone.
 function hindsightShown(
   read: { response: string; against: string; gain: number },
   cells: (Pick<MatrixCell, 'visits' | 'verified' | 'plan'> | undefined)[],
@@ -115,7 +99,6 @@ function hindsightShown(
   return read.gain >= (regret ?? 0) + HINDSIGHT_BAND ? { shown: true, line: hindsightLine(read) } : {};
 }
 
-/** The own row with the best own-perspective value in the column. */
 function bestRowAgainst(
   view: MatrixView,
   matrix: EvalMatrix,
@@ -131,7 +114,6 @@ function bestRowAgainst(
   return { bestRow, bestValue };
 }
 
-/** The click the model favoured was findable before it came. */
 function likeliestClick(params: AnalyzeTurnParams, key: Side, matrix: EvalMatrix, column: number): { likeliest?: number } {
   const model = opponentModelFor(params, key, matrix);
   return model && favouriteOf(model) === column && model.confidence >= LIKELIEST_CLICK_MIN
@@ -139,11 +121,6 @@ function likeliestClick(params: AnalyzeTurnParams, key: Side, matrix: EvalMatrix
     : {};
 }
 
-/**
- * The read that was on the table: against the opponent's actual click (a known column, unlike the equilibrium the conditional
- * reasons over) the matrix knows the best own row; when it beats the played line in that column by a mistake-sized gain,
- * the shift narrative names that counterfactual.
- */
 function hindsightReadFor(
   params: AnalyzeTurnParams,
   key: Side,
@@ -168,20 +145,14 @@ function hindsightReadFor(
   return undefined;
 }
 
-/** The side's model of the OTHER side's click, sharpened by that player's tendencies; null without tendencies (fail closed). */
 function opponentModelFor(params: AnalyzeTurnParams, key: Side, matrix: EvalMatrix): OpponentModel | null {
   if (!params.tendencies || matrix.p1Labels.length < 2 || matrix.p2Labels.length < 2) return null;
   return modelOpponent(matrix, key, params.tendencies[key === 'p1' ? 'p2' : 'p1']);
 }
 
-/** Index of the model's favourite (first encounter wins ties). */
 const favouriteOf = (model: OpponentModel): number => model.probs.indexOf(model.confidence);
 
-/**
- * The read before the click: the opponent model is sure of its favourite X (PREDICTIVE_READ_CONFIDENCE), and against X an own
- * row beats the displayed recommendation (the null-swapped alternative where one shows) by a mistake-sized gain: "if you expect X,
- * Y is the move". Needs no played actions; fails closed without tendencies or machine choice ids.
- */
+// Needs no played actions; fails closed without tendencies or machine choice ids.
 function predictiveReadFor(
   params: AnalyzeTurnParams,
   key: Side,
@@ -202,11 +173,9 @@ function predictiveReadFor(
   return { expect: oppLabels[column], confidence: model.confidence, response: sideLabels[bestRow], gain, over: sideLabels[shownRow] };
 }
 
-/** "→ X" (a pivot's "U-turn → X" included) names the entry target of a line. */
 const entryTarget = (label: string | undefined): string | null =>
   label?.match(/→ (.+)$/)?.[1] ?? null;
 
-/** The root's unanswered profile for the side: the open list and the switch-in-stage rows. */
 function sideUnanswered(
   params: AnalyzeTurnParams,
   key: Side,
@@ -216,17 +185,13 @@ function sideUnanswered(
   return { ownUnanswered, ownEntry };
 }
 
-/** The open (no live answer) signal for an entry target, else its switch-in-stage row. */
 const entrySignal = (target: string, ownUnanswered: string[] | undefined, ownEntry: EntryUnanswered[] | undefined) =>
   ownUnanswered?.includes(target)
     ? { species: target }
     : ownEntry?.find(row => row.species === target);
 
-/**
- * Entry is profit: the played or recommended line brings in a mon from the root's unanswered profile (no live enemy wins the race pair
- * against it), so a clean entry is value on its own. The switch-in stage rides the same match (bench exhausted, a standing active still
- * holding) and carries the holder's species. A stage the game report has already spoken (unansweredSeen) stays silent.
- */
+// The played or recommended line brings in a mon from the root's unanswered profile (no live enemy wins the race pair):
+// entry is profit. A stage the game report has already spoken (unansweredSeen) stays silent.
 function unansweredFor(
   params: AnalyzeTurnParams,
   key: Side,
@@ -245,10 +210,8 @@ function unansweredFor(
   return undefined;
 }
 
-/**
- * The recommended best is mechanically null against the opposing active (Will-O-Wisp into a Fire-type): a co-optimal option within the
- * rank-tie epsilon replaces it for display; with no such option the caveat stays. Grading untouched; fails closed without board context.
- */
+// A mechanically null best (Will-O-Wisp into a Fire-type) is replaced for display by a co-optimal option within the
+// rank-tie epsilon. Grading untouched; fails closed without board context.
 function bestNullFor(
   params: AnalyzeTurnParams,
   key: Side,
@@ -266,7 +229,6 @@ function bestNullFor(
   });
   const reason = nullFor(best.choice);
   if (!reason) return undefined;
-  // A co-optimal option within the rank-tie scale is a display substitute, never a regrade.
   const alternative = options.find(option => option !== best &&
     best.ev - option.ev <= TIE_EPSILON && nullFor(option.choice) === null) ?? null;
   return {
@@ -277,7 +239,7 @@ function bestNullFor(
   };
 }
 
-/** A streak ending this turn, read from the render-time history (index t−1 = turn t, current included). */
+// The render-time history is indexed t-1 = turn t, the current turn included.
 function streakFor(params: AnalyzeTurnParams, key: Side): SideAnalysis['streakOdds'] {
   if (params.playedHistory && params.actives) {
     return detectStreakOdds(params.actives.gen, params.playedHistory[key].slice(0, params.turn), params.actives.mod) ?? undefined;
@@ -285,7 +247,6 @@ function streakFor(params: AnalyzeTurnParams, key: Side): SideAnalysis['streakOd
   return undefined;
 }
 
-/** The narrative signals of one side. */
 export interface SideSignals {
   viableCount: number | undefined;
   conditional: SideAnalysis['conditional'];
@@ -300,7 +261,6 @@ export interface SideSignals {
   streakOdds: SideAnalysis['streakOdds'];
 }
 
-/** Computes the narrative signals of one side from its grading. */
 export function signalSide(params: AnalyzeTurnParams, key: Side, g: SideGrading): SideSignals {
   const viableCount = viableCountFor(g.best, g.options);
   const view = matrixView(params, key);

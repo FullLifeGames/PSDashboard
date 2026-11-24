@@ -1,4 +1,4 @@
-// The one module that asks the simulator (copy and play, handler calls, action order, protectors, the development check); not in the package barrel.
+// The one module that asks the simulator; not in the package barrel.
 export { askCheckOn, AskLeak, fingerprint, guarded, setAskCheck } from './guard.ts';
 export { copyOf, FixedDice, playOnCopy } from './copy.ts';
 export { queuePlace, actionPriority, actionsTie, activated } from './action-order.ts';

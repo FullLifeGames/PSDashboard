@@ -3,15 +3,13 @@ import { cellSolid } from './cell-solid.ts';
 
 type Side = 'p1' | 'p2';
 
-/** The answer that hurts one row most; `basis` 'cell' is the row's lowest trusted cell, 'punisher' its own floor (`punishedBy`) when no cell is trusted. */
+/** The answer hurting a row most: its lowest trusted cell, else (`basis` 'punisher') its own floor `punishedBy`. */
 export interface WorstAnswer { label: string; choice: string; basis: 'cell' | 'punisher' }
 
-/** The reply that hurts `row` of `side` most, or null (the caller then falls back to the other side's best row); reads the result only. */
+/** The reply that hurts `row` most, or null (the caller falls back to the other side's best row). */
 export function worstAnswer(result: Pick<EvalResult, 'matrix' | 'perSide'>, side: Side, row: Pick<RankedChoice, 'choice' | 'label' | 'punishedBy'>): WorstAnswer | null {
-  // The lowest value of the row from the row's own side (p1's lowest cell, p2's highest cell of the p1-perspective matrix) among the
-  // trusted cells (`cellSolid`: a result without cell statistics, a matrix pass or an old cache, trusts every cell), the first of equals.
-  // Only a reply the other side's ranked list holds counts, and a waiting side is no reply. Without such a cell: the row's own floor,
-  // when the ranked list holds it.
+  // Trusted cells only (`cellSolid`: a result without cell statistics trusts every cell), the first of equals; only a
+  // reply the other side's ranked list holds counts, a waiting side is none. Without one: the row's own floor.
   const other: Side = side === 'p1' ? 'p2' : 'p1';
   const ranked = result.perSide[other];
   const cell = result.matrix ? lowestTrustedCell(result.matrix, side, row, ranked) : null;
@@ -20,10 +18,6 @@ export function worstAnswer(result: Pick<EvalResult, 'matrix' | 'perSide'>, side
   return named ? { label: named.label, choice: named.choice, basis: 'punisher' } : null;
 }
 
-/**
- * One side's view of the matrix: its own and the other side's labels and choices, and the cell and value (this side's view) at a row and
- * a column.
- */
 function viewOf(matrix: EvalMatrix, side: Side) {
   const p1 = side === 'p1';
   return {
@@ -37,10 +31,6 @@ function viewOf(matrix: EvalMatrix, side: Side) {
   };
 }
 
-/**
- * The reply of the lowest trusted cell of the row (the first of equals), among the replies the ranked list holds; null when there is
- * none.
- */
 function lowestTrustedCell(
   matrix: EvalMatrix, side: Side, row: Pick<RankedChoice, 'choice' | 'label'>, ranked: readonly RankedChoice[],
 ): { label: string; choice: string } | null {
@@ -57,7 +47,7 @@ function lowestTrustedCell(
   return lowest ? { label: lowest.label, choice: lowest.choice } : null;
 }
 
-/** Each row's worst answer by label, by side: what `rowLines` keeps the floor lines for (a row without one is left out). */
+/** Each row's worst answer by label per side, what `rowLines` keeps floor lines for; a row without one is left out. */
 export function floorLabels(result: Pick<EvalResult, 'matrix' | 'perSide'>): Record<Side, Record<string, string>> {
   const out: Record<Side, Record<string, string>> = { p1: {}, p2: {} };
   for (const side of ['p1', 'p2'] as const) {
