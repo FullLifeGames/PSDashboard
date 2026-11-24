@@ -206,10 +206,10 @@ describe('BattleStatsPanel', () => {
   });
 });
 
-function reasonReadsInPlainWords() {
-  expect(KNOCKOUT_BOOST_ITEM_DETAIL).toBe('only a boost item reaches the knockout');
-  expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toBe(NO_BOOST_ITEM_DETAIL);
-  expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toMatch(/[—–]/);
+function reasonReadsInPlainWords(reason: string) {
+  expect(reason).toBe('only a boost item reaches the knockout');
+  expect(reason).not.toBe(NO_BOOST_ITEM_DETAIL);
+  expect(reason).not.toMatch(/[—–]/);
 }
 
 describe('the reason of a boost item a knockout needs (singles)', () => {
@@ -223,11 +223,7 @@ describe('the reason of a boost item a knockout needs (singles)', () => {
     expect(tag).toHaveTextContent('guessed');
   });
 
-  test('the reason reads in plain words and differs from the dropped boost item\'s', reasonReadsInPlainWords);
-});
-
-describe('the reason of a boost item a knockout needs (doubles)', () => {
-  test('the reason reads in plain words and differs from the dropped boost item\'s', reasonReadsInPlainWords);
+  test('the reason reads in plain words and differs from the dropped boost item\'s', () => reasonReadsInPlainWords(KNOCKOUT_BOOST_ITEM_DETAIL));
 });
 
 describe('IVs in the stats panel (singles)', () => {
@@ -264,5 +260,22 @@ describe('a doubles game', () => {
       expect(within(card).getByText(item, { exact: false })).toHaveTextContent(`${item}${sourceLabel('sheet')}`);
       expect(within(card).getByText(ability, { exact: false })).toHaveTextContent(`${ability}${sourceLabel('sheet')}`);
     }
+  });
+
+  test('the reason reads in plain words and differs from the dropped boost item\'s', () => {
+    const replay = doublesReplay();
+    const sheets = extractTeamSheets(replay.log);
+    const infoOf = (side: 'p1' | 'p2') => applyTeamSheetToInfo(inferOpponentTeam(replay.log, side), sheets[side]);
+    const withReason = (info: ReturnType<typeof infoOf>) => ({
+      ...info,
+      pokemon: info.pokemon.map(p => (p.species === 'Pikachu'
+        ? { ...p, item: { value: 'Choice Specs', source: 'guessed' as const, sourceDetail: KNOCKOUT_BOOST_ITEM_DETAIL } }
+        : p)),
+    });
+    render(<BattleStatsPanel replayData={replay} p1Info={withReason(infoOf('p1'))} p2Info={withReason(infoOf('p2'))} />);
+    const card = screen.getByRole('img', { name: 'Pikachu' }).parentElement!;
+    const tag = within(card).getByText('Choice Specs', { exact: false });
+    expect(tag).toHaveTextContent('guessed');
+    reasonReadsInPlainWords(tag.getAttribute('title')!);
   });
 });
