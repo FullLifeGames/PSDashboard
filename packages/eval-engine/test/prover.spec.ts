@@ -426,6 +426,7 @@ describe('forced-win-doubles-replies', () => {
 });
 
 describe('plain-dice-scenes', () => {
+  // Saved roots of corpus games (`fixtures/forced-win/plain-dice-*`) and #145's singles scene: a cell whose draws agree on who faints but a die decides is priced by one child per turned die with the simulator's own chance, 33 in 100 for the confusion self-hit and one in three for a second Protect.
   interface Scene {
     id: string;
     turn: number;

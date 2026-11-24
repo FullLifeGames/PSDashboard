@@ -85,7 +85,7 @@ describe('GPL replay end-to-end verdicts', () => {
     // the sack; that is simplification, never a mistake-tier misplay. Rhydon stands at its true 100 % (the log's turn-36
     // switch line), not the sim's 88 %. The sacrifice stamp renders exactly when both scores hold the healthy-sack floor and
     // the regret keeps a tier after the decided-position leniency (the turn reads 0.82 before and 0.64 after the sack, regret
-    // 0.171: the leniency alone clears the inaccuracy and no stamp renders).
+    // 0.171 (0.204 before): the leniency alone clears the inaccuracy and no stamp renders).
     await analyze(36);
     const t35 = await analyze(35, scoreByTurn.get(36) ?? null);
     const floorHolds = scoreByTurn.get(35)! >= HEALTHY_SACK_FLOOR && scoreByTurn.get(36)! >= HEALTHY_SACK_FLOOR;

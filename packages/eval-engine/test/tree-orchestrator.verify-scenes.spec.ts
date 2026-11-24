@@ -358,7 +358,7 @@ describe('verify-spread-scenes', () => {
       // Protect rows take two of p1's twelve rows and Heat Wave + Flare Blitz→Groudon leaves the list, so the cell is priced through the verify step's own job, Koraidon's
       // Flare Blitz aimed back at Groudon (target 1). Reference (24 draws on seed blocks 1001 and 5001, answers off): 0.5847 under the classes' weights on both blocks (plain
       // means 0.585 and 0.595, standard errors 0.078 and 0.079; the hit class reads 0.460 against the engine's 0.333, the miss class 1 on both). The engine reads 0.4871.
-      // Band: 2.5 standard errors (0.079) around the weighted value, 0.39 to 0.78.
+      // Band: 2.5 standard errors (0.079) around the weighted value, 0.39 to 0.78. The reference of the earlier static read 0.5135 on both blocks (plain means 0.516 and 0.526, standard errors 0.092 and 0.094) against the engine's 0.3981.
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const local = createLocalTreeExecutor(position.serialized);
       const rounds: EvalCellJob[][] = [];
@@ -373,7 +373,7 @@ describe('verify-spread-scenes', () => {
 
     // The fresh reference (24 draws, seed blocks 1001 and 5001, answers off) grades p1 a mistake on both blocks (0.255 and 0.298) and p2 a mistake (0.267) and an inaccuracy (0.168),
     // while the engine reads no tier for either side. A pin follows the engine only where the reference carries it, so the test expects the reference and fails until the
-    // distance closes; the day it passes, the marker goes.
+    // distance closes; the day it passes, the marker goes. The engine's regrets are 0.0514 for p1's Heat Wave + Protect and 0.0004 for p2's Protect + Encore→Koraidon; an earlier reference on the same rows read p1 0.326 and 0.299 on 24 draws, 0.280 on 96, and p2 0.016 and 0.010 on 24 draws, 0.147 on 96.
     test.fails("2629703929 t8 (VGC): the tiers the fresh reference grades, p1 a mistake and p2 at least an inaccuracy (T242)", { timeout: 300_000 }, async () => {
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const analysis = flat(position, await search(position));

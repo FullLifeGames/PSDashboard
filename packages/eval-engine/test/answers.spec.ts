@@ -379,6 +379,7 @@ describe('doubles-answers', () => {
       // Four rows lie within 0.003 of each other in value, so which of them comes first follows the verify price of a small outcome
       // and the answers the near rows add; the pin reads the Earth Power row into Zamazenta-Crowned, which the trees rated best at 1.00.
       // A Protect earns the damage it denies in the doubles hints, so p2's tree lists Protect + Protect itself.
+      // Reference: over every legal answer the line holds about 0.75 (column-cut probe), so the bound is 0.8; against the listed answers alone p1's played U-turn + Tera Starstorm took a mistake of regret 1.233.
       const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned'))!;
       expect(best.worstCase).toBeLessThanOrEqual(0.8);
       expect(best.punishedBy).toMatch(/Protect/);
@@ -390,7 +391,7 @@ describe('doubles-answers', () => {
     test('2630685175 t8: a double Protect that only stalls answers nothing, and the played Taunt stays the mistake (user truth pin)', { timeout: 180_000 }, async () => {
       // At one ply p1's Protect + Protect read -0.16 for p2, the board's static after a stalled turn, where the trees read +0.84;
       // one ply deeper it reads +0.87, like the listed answers. An answer counts only when it still refutes the best row one ply deeper.
-      // The best row reads 0.7529 and the Taunt stays the mistake at regret 1.3531.
+      // The best row reads 0.7529 (above 0.8 under the earlier static and without the Protect tempo) and the Taunt stays the mistake at regret 1.3531.
       const position = fixture('gen9vgc2026regi-2630685175-t8');
       const result = await search(position);
       const best = result.perSide.p2[0];
