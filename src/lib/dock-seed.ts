@@ -5,7 +5,6 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { PlayedAtPosition, PlayedPick } from './played-pick';
 
-/** The seed of the dock: each slot starts with the choice the viewed line played, derived and never stored, so Execute without a change plays the logged turn. */
 
 type Side = 'p1' | 'p2';
 
@@ -19,7 +18,6 @@ type OfferedState = Pick<BranchSimState, 'p1MovesBySlot' | 'p2MovesBySlot' | 'p1
 export interface SeedSlot {
   /** The choice the slot starts with; null when nothing was played or the picker does not offer what was. */
   choice: BranchSlotChoice | null;
-  /** What the viewed line played, kept also when the picker lacks it. */
   played: PlayedPick | null;
 }
 
@@ -59,7 +57,7 @@ function seededModifier(
   return wanted;
 }
 
-/** The target a played move keeps: the one the move lists. A spread move lists none, so the log's first name for it never counts. */
+// A spread move lists no target, so the log's first name for it never counts.
 function seededTarget(wanted: number | null | undefined, option: BranchMoveOption): number | undefined {
   return typeof wanted === 'number' && option.targetOptions.some(target => target.targetLoc === wanted) ? wanted : undefined;
 }
@@ -68,7 +66,6 @@ function seedMove(pick: PlayedPick, state: SeedState, side: Side, slot: number):
   const moves = (side === 'p1' ? state.p1MovesBySlot : state.p2MovesBySlot)?.[slot] ?? [];
   const option = moves.find(candidate => toId(candidate.name) === toId(pick.name));
   if (!option || option.disabled) return null;
-  // A recorded choice (behind the tip) is the source for target, gimmick and dice; else the log's pick.
   const source = pick.recorded?.kind === 'move' ? pick.recorded : pick;
   const targetLoc = seededTarget(source.targetLoc, option);
   const modifiers = (side === 'p1' ? state.p1ModifiersBySlot : state.p2ModifiersBySlot)?.[slot];
@@ -103,19 +100,13 @@ function seedSide(played: PlayedAtPosition, state: SeedState, side: Side): SeedS
   return playedSlots(played, side).map((pick, slot) => (forced ? { choice: null, played: pick } : seedSlot(pick, state, side, slot)));
 }
 
-/**
- * Per side and slot the choice the viewed line played, validated against the position's pickers; `played` null (the tip, an
- * unreadable turn) seeds nothing.
- */
+/** The choice the viewed line played per side and slot, validated against the pickers; null `played` seeds nothing. */
 export function seedChoices(played: PlayedAtPosition | null, state: SeedState): SeedChoices {
   if (!played) return { p1: [], p2: [] };
   return { p1: seedSide(played, state, 'p1'), p2: seedSide(played, state, 'p2') };
 }
 
-/**
- * The effective choices: a slot the user touched keeps the draft entry, an untouched slot the seed. Returns the draft itself when
- * the seed holds no choice, so a memo keyed on the draft settles.
- */
+/** Untouched slots take the seed; the draft itself comes back when the seed has no choice, so a memo on it settles. */
 export function mergeChoices(seed: SeedChoices, draft: SideChoices): SideChoices {
   if (![...seed.p1, ...seed.p2].some(slot => slot.choice)) return draft;
   const side = (key: Side): (BranchSlotChoice | null)[] => {

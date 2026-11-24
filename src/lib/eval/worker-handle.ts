@@ -13,7 +13,6 @@ export interface WorkerHandle {
   pending: Map<number, PendingEntry>;
 }
 
-/** Spawns one eval worker; `forget` drops it from whichever list holds it once it has crashed. */
 export function spawnWorker(forget: (handle: WorkerHandle) => void): WorkerHandle {
   perfCount('workerSpawn');
   const worker = new Worker(new URL('../../workers/eval-worker.ts', import.meta.url), { type: 'module' });

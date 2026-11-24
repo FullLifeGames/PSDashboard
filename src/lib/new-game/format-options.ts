@@ -1,6 +1,6 @@
 import { CHAMPIONS_MOD, formatRules, simFormats } from '@fulllifegames/replay-core';
 
-// The formats the new-game panel lists: every format the simulator registers for a user's own team (singles or doubles, no generated team); the list names none itself.
+// Every simulator format that takes a user's own team (singles or doubles, no generated team); no format named here.
 
 export interface FormatOption {
   id: string;
@@ -36,11 +36,9 @@ export function playableFormats(): FormatOption[] {
     .map(optionOf);
 }
 
-/** Within a group: Custom Game first, singles before doubles, then by name. */
 const byRank = (a: FormatOption, b: FormatOption): number =>
   Number(b.custom) - Number(a.custom) || Number(a.gameType === 'doubles') - Number(b.gameType === 'doubles') || a.name.localeCompare(b.name);
 
-/** The groups of the panel's list: `featured` ids first (in the order given, those the registry has), then one group per generation, newest first. */
 export function formatGroups(featured: readonly string[] = []): FormatGroup[] {
   const all = playableFormats();
   const top = featured.map(id => all.find(option => option.id === id)).filter((option): option is FormatOption => option !== undefined);
@@ -55,7 +53,6 @@ export function formatGroups(featured: readonly string[] = []): FormatGroup[] {
   return groups;
 }
 
-/** `formatGroups` after the Champions mod loads in this realm (the Champions formats register with the mod). */
 export async function loadFormatGroups(featured: readonly string[] = []): Promise<FormatGroup[]> {
   const { loadSimMods } = await import('../lazy/branch-engine');
   await loadSimMods('gen9championsou');

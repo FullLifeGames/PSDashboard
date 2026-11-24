@@ -3,7 +3,6 @@ import type { SpreadTargetDamage } from './branch-damage';
 import { koShort, shortRange } from './move-damage-text';
 import { preselectTarget } from './preselect-target';
 
-/** What a move tile shows under its name and the target a click on it takes: both read one target, so the bar is the hit the click plays. */
 
 export interface TileBar {
   /** The body's slot label ("P2A"); empty for the one foe of a singles game. */
@@ -17,14 +16,14 @@ export interface TileBar {
   title: string;
 }
 
-/** The damage of one slot's moves: the best range of each move, its rows per body, and its ranges per target ("moveSlot:loc"). */
+/** Damage of one slot's moves: best range per move, rows per body, ranges per target keyed "moveSlot:loc". */
 export interface TileDamage {
   dmg: DamageResult | undefined;
   spread: SpreadTargetDamage[] | undefined;
   targets: Record<string, DamageResult | undefined>;
 }
 
-/** The target a click on the tile takes: the played target for the played move, else the foe hit hardest, else the first listed. */
+/** The target a click takes: the played one for the played move, else the foe hit hardest, else the first listed. */
 export function tileTarget(
   move: BranchMoveOption, side: 'p1' | 'p2', targets: TileDamage['targets'], playedLoc: number | null | undefined,
 ): number | undefined {
@@ -50,7 +49,6 @@ export function tileBars(args: TileDamage & {
   hpByLabel: Record<string, number>;
   /** The HP of the one living foe, for a move that names no target. */
   foeHp: number | undefined;
-  /** The target the slot's pick holds for this move, when it is the pick. */
   chosenLoc: number | undefined;
   playedLoc: number | null | undefined;
 }): TileBar[] {

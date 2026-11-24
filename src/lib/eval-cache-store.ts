@@ -2,7 +2,7 @@ import {
   type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, searchBudgetTag, teraKey,
 } from '@fulllifegames/eval-engine';
 
-/** IndexedDB persistence for evaluation results, keyed by position and settings; every failure degrades to "no cache". */
+/** IndexedDB persistence of evaluation results, keyed by position and settings; a failure degrades to "no cache". */
 
 export interface StoredEval {
   /** Full cache key (replay:turn:sets-fingerprint + settings suffix). */
@@ -22,10 +22,9 @@ export interface StoredEval {
   savedAt: number;
 }
 
-/** Persisted results of another engine version never resurface as current: bump it when the engine's numbers change meaning. */
+// Bump when the engine's numbers change meaning: persisted results of another version never resurface.
 const EVAL_ENGINE_CACHE_VERSION = 80;
 
-/** A search-budget form stores under its own tag; the default keeps the plain keys. */
 const versionTag = (): string => {
   const tag = searchBudgetTag();
   return tag ? `v${EVAL_ENGINE_CACHE_VERSION}~${tag}` : `v${EVAL_ENGINE_CACHE_VERSION}`;
@@ -41,7 +40,6 @@ export function evalStoreKey(
   return `${versionTag()}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
 }
 
-/** The key prefix shared by every turn, engine, and set fingerprint of one replay. */
 export function evalStorePrefix(replayId: string): string {
   return `${versionTag()}|${replayId}:`;
 }
@@ -110,10 +108,7 @@ export async function loadStoredEval(key: string): Promise<StoredEval | null> {
   });
 }
 
-/**
- * One transaction for every stored eval of a replay, so the graph sweep reads the store once, not once per turn. null: the store is
- * unavailable or the read failed (the caller falls back to single reads).
- */
+/** One transaction for every stored eval of a replay; null when the store is unavailable (callers read singly). */
 export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<string, StoredEval> | null> {
   const db = await openDb();
   if (!db) return null;

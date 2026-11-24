@@ -10,19 +10,14 @@ export interface WinPathsHandlers {
 
 const MEMO_SIZE = 16;
 
-/**
- * The jobs the user asks for, each on a worker of its own outside the evaluation pool: a job never queues behind a sweep's search, a
- * sweep's `cancel` never ends it and ending it never touches a sweep. The worker lives for the job. The message is the worker's generic
- * `job` (`kind` names it), so another on-request search is a new method over `run`, not a new protocol. A finished answer is kept for
- * the same question (position, rule set and request) and replays its steps at once; a failed or cancelled job keeps nothing. No job
- * writes into an `EvalResult`.
- */
+/** The user's on-request jobs, each on a worker of its own outside the pool: a sweep's `cancel` never ends one. */
+// A finished answer is kept per question (position, rule set, request) and replays at once; a failed job keeps nothing.
 export class OnRequestJobs {
   private nextId = 1;
   private running = new Set<WorkerHandle>();
   private memo = new Map<string, WinPaths>();
 
-  /** Win paths: steps arrive through `onStep` as they are done; the promise settles with the whole answer, or rejects with "cancelled". */
+  /** Steps arrive through `onStep`; the promise settles with the whole answer or rejects with "cancelled". */
   async winPaths(serializedBattle: string, request: WinPathsRequest, ruleset: StaticRuleset, handlers: WinPathsHandlers = {}): Promise<WinPaths> {
     const { onStep, signal } = handlers;
     if (signal?.aborted) throw new Error('cancelled');
@@ -80,7 +75,6 @@ export class OnRequestJobs {
     });
   }
 
-  /** Ends every running job (their promises reject with "cancelled"). */
   dispose(): void {
     for (const handle of this.running) {
       handle.worker.terminate();

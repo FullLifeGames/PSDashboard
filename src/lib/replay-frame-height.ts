@@ -1,16 +1,9 @@
 import { PHONE_CLASS } from './replay-phone';
 
-/** The iframe property that holds the frame's height in phone mode; the frame's style falls back to REPLAY_FRAME_HEIGHT. */
 export const FRAME_HEIGHT_PROPERTY = '--ps-frame-h';
 
-/**
- * Follows the content height of a same-origin replay document in phone mode into the iframe's property, and gives it back on the
- * desktop layout. Writes the style directly, no React state. Returns the disposer.
- *
- * Three rules keep it out of a ResizeObserver loop ("loop completed with undelivered notifications"): it observes with the frame
- * document's own `contentWindow.ResizeObserver`; it measures the body's box, not the root's `scrollHeight` (never below the
- * viewport, so it reads back the box it sized); it writes only when the height changed.
- */
+/** Follows the content height of a same-origin replay in phone mode into the iframe's property. */
+// Avoids a ResizeObserver loop: the frame's own observer, the body's box (not scrollHeight), writes on change.
 export function followContentHeight(iframe: HTMLIFrameElement): () => void {
   const doc = iframe.contentDocument;
   const root = doc?.documentElement;

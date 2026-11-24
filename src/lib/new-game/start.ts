@@ -4,7 +4,6 @@ import { parseTeamText } from '@fulllifegames/replay-core';
 import { readGameSeed } from '@fulllifegames/eval-engine';
 import { newGameRecord, newGameSeed, type NewGameRecord } from './record';
 
-// What the New game dialog does with its two text fields: a paste is read by Showdown's own import (`Teams.import`); a block without a move line is no set.
 
 export const TEAM_SIZE = 6;
 
@@ -39,11 +38,7 @@ export interface StartBlocks {
   seed: string | null;
 }
 
-/**
- * The one rule for what blocks Start: a side with no readable set, a side with more than six, a seed the engine refuses, and a
- * species the format's Dex does not know (`refused`, the sentence `checkGameTeams` takes; absent until the team check has read
- * the paste, where Start refuses it itself). The simulator's other team problems never block: a league may allow what the format bans.
- */
+/** What blocks Start: no readable set, more than six, a refused seed, an unknown species; no other team problem. */
 export function startBlocks(params: Pick<StartParams, 'texts' | 'seed'> & { refused?: [string | null, string | null] }): StartBlocks {
   const teams = params.texts.map((text, index) => {
     const { sets } = readTeamPaste(text);
@@ -62,10 +57,7 @@ export function startProblem(params: Pick<StartParams, 'texts' | 'seed'>): strin
   return blocks.teams[0] ?? blocks.teams[1] ?? blocks.seed;
 }
 
-/**
- * Starts the format's battle with the seed and returns the record at Team Preview (no turn played). The record keeps the teams
- * `startGameLog` returns (the level the format gives, the species' first ability for a set that pasted none), never the raw paste.
- */
+/** Starts the battle and returns the record at Team Preview, with the teams `startGameLog` returns, not the paste. */
 export async function startNewGame(params: StartParams): Promise<NewGameRecord> {
   const problem = startProblem(params);
   if (problem) throw new Error(problem);

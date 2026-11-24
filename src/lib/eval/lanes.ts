@@ -1,7 +1,5 @@
-/**
- * Runs `size` indexed jobs through at most `laneCount` lanes in index order; a job that resolves false stops further pickups and the
- * call resolves false (the sweep's "cancelled"). Results must not depend on which lane runs a job or in what order jobs finish.
- */
+/** Runs `size` jobs in index order through `laneCount` lanes; a job returning false stops pickups and the call. */
+// Results must not depend on which lane runs a job or in what order jobs finish.
 export async function runInLanes(
   laneCount: number,
   size: number,

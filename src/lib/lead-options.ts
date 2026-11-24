@@ -1,16 +1,13 @@
 import { type GameRules, type TurnSnapshot, broughtSpeciesFor, speciesBaseId } from '@fulllifegames/replay-core';
 
-/** One team slot offered as a lead: identity plus what the real game did. */
 export interface LeadOption {
   name: string;
   species: string;
-  /** This Pokémon led the real game. */
   wasLead: boolean;
   /** This Pokémon was brought (active at some point) in the real game. */
   wasBrought: boolean;
 }
 
-/** Each side's team with the real leads marked (the pre-turn-1 snapshot's actives) and which Pokemon the real game brought (active in any snapshot). */
 export function buildLeadOptions(snapshots: TurnSnapshot[], rules: GameRules): { p1: LeadOption[]; p2: LeadOption[] } {
   const snapshot = snapshots[0] ?? null;
   if (!snapshot) return { p1: [], p2: [] };
@@ -30,7 +27,7 @@ export function buildLeadOptions(snapshots: TurnSnapshot[], rules: GameRules): {
   };
 }
 
-/** The default selection: the real game's leads, then the rest of its bring; unknown slots fill in option order (an engine run needs a complete selection). */
+/** The real leads, then the rest of the bring; unknown slots fill in option order (an engine run needs all). */
 export function defaultLeadSelectionFor(
   leadOptions: { p1: LeadOption[]; p2: LeadOption[] },
   bringCount: number | null,

@@ -1,13 +1,7 @@
 import type { BranchMoveModifier, BranchSlotChoice } from '@fulllifegames/eval-engine';
 
-/**
- * What the viewed line actually played at this position (the badge on the matching button and the dock's seed): the replay's
- * action on the main line, the variation's recorded choice on variation positions.
- *
- * `targetLoc` is the simulator's location as the log names it (1 and 2 the foe slots, negative the own side), null when the line
- * names none, and absent in singles. A spread move still carries the first name its line shows, so the dock's seed keeps a target
- * only where the move lists it. `recorded` is a variation entry's whole choice (dice included), set only behind the tip.
- */
+/** What the viewed line played here: the replay's action on the main line, else the variation's recorded choice. */
+// `targetLoc` is the log's location (1, 2 foe slots, negative own side), null when none, absent in singles.
 export interface PlayedPick {
   kind: 'move' | 'switch';
   name: string;
@@ -17,7 +11,7 @@ export interface PlayedPick {
   recorded?: BranchSlotChoice;
 }
 
-/** What each side played at a position: doubles carry one pick per slot (`p1Slots`, index 0 = slot A), singles the side's pick alone. */
+/** Doubles carry one pick per slot (`p1Slots`, index 0 = slot A); singles the side's pick alone. */
 export interface PlayedAtPosition {
   p1: PlayedPick | null;
   p2: PlayedPick | null;

@@ -2,7 +2,7 @@ import type { GenerationNum } from '@pkmn/data';
 import { RuleTable, TeamValidator, type PokemonSet, type Species } from '@pkmn/sim';
 import { CHAMPIONS_MOD, evBudget, generationsFor, rulesDex, simFormats, toId } from '@fulllifegames/replay-core';
 
-// Legal option pools for dropdowns; loaded only through import() so the heavy dex and learnset data stay out of the entry chunk.
+// Loaded only through import(): the dex and learnset data stay out of the entry chunk.
 const gens = generationsFor('');
 const movePoolCache = new Map<string, Promise<string[]>>();
 
@@ -12,7 +12,7 @@ export const NATURES: readonly string[] = [
   'Quiet', 'Quirky', 'Rash', 'Relaxed', 'Sassy', 'Serious', 'Timid',
 ];
 
-/** Pokémon Champions plays on a simulator mod whose dex the generation wrapper cannot read (it drops species and every Mega Stone), so its pools come from the mod itself. */
+// The generation wrapper drops the Champions mod's species and Mega Stones, so its pools come from the mod itself.
 const isChampions = (format: string | undefined): boolean => !!format && evBudget(format).statPoints;
 const championsDex = () => rulesDex(9, CHAMPIONS_MOD);
 
@@ -24,7 +24,7 @@ export async function prepareFormat(format: string): Promise<void> {
 
 const CHAMPIONS_REFERENCE_FORMAT = 'gen9championsou';
 
-/** The total EV limit the team validator enforces in a format (`null`: none or an unknown format); a Champions id the mod does not list takes the mod's reference format's limit. */
+/** The validator's total EV limit in a format (`null`: none or unknown); an unlisted Champions id takes the mod's. */
 export function getEvLimit(format: string): number | null {
   const table = (id: string) => {
     const entry = simFormats().get(id);
@@ -40,28 +40,17 @@ const toSimId = (name: string): string => toId(name);
 
 type PoolKind = 'items' | 'moves' | 'abilities';
 
-/** The editor and the sets import differ only for a format id the simulator does not list: the editor lists the standard pool, the import accepts what the generation's Custom Game plays. */
+/** For an unlisted format id the editor lists the standard pool; the import takes the generation's Custom Game pool. */
 export type PoolUse = 'editor' | 'import';
 
-/**
- * The entries a format's simulator lets exist beyond the generation's standard pool. A listed format answers by its own rule
- * table (an entry exists unless a rule such as `-Nonexistent` removes it: a Custom Game has none, so it plays every Past, Future,
- * Unobtainable, CAP, Legends and LGPE entry; Standard pulls `Obtainable` in and refuses them; National Dex lifts what its rule
- * table names). An id the simulator does not list (a draft league's, most Scarlet/Violet VGC regulations) adds nothing to the
- * editor's lists, and the import reads it as the Custom Game of its generation (`PoolUse`). The simulator's own TeamValidator
- * decides, in two steps. First its checks on a copy of the rule table that keeps only the existence rules (bans of single items,
- * moves and abilities and tier rules are no question of existence: the app lists a banned entry). Then, in a format that refuses
- * existence at all, the validator's own verdict on a one-entry set, because a rule of the format can refine the table (National
- * Dex's `NatDex Mod` lifts `+Past` and still refuses a Past item and the Unobtainable moves of the current generation in its
- * `onValidateSet`). A call without a format keeps the standard pools; Champions reads its mod (the callers branch before).
- */
+// A listed format answers by its rule table (an entry exists unless a rule such as `-Nonexistent` removes it).
+// The TeamValidator decides: existence rules alone on a table copy, then a one-entry set (`NatDex Mod` refines it).
 const existenceCache = new Map<string, Record<PoolKind, string[]>>();
 
 type Standing = { exists: boolean; isNonstandard?: string | null; name: string };
 
 const NOT_EXISTING = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder for/;
 
-/** The format itself when the simulator lists it, else (a draft league's id) the Custom Game of its generation or mod, as the rebuild plays it (`getBranchSimulatorFormat`). */
 function battleFormat(gen: GenerationNum, format: string): string {
   const own = simFormats().get(format.split('@@@')[0]);
   if (own.exists) return own.id;
@@ -125,11 +114,7 @@ function existingBeyondStandard(gen: GenerationNum, format: string | undefined, 
 const withExisting = (standard: string[], extra: string[] | undefined): string[] =>
   (extra?.length ? [...standard, ...extra] : standard).sort((a, b) => a.localeCompare(b));
 
-/**
- * A species the standard Dex hides (an `isNonstandard` tag) that the battle's format plays. replay-core's Generations drop it, so
- * its standard pool is empty (Dracovish and Zygarde are Past in Generation 9: no Fishious Rend, no Thousand Arrows, no abilities).
- * The TeamValidator on the format's existence rules, `species.getMovePool(id, natDex)` and the Dex entry answer instead.
- */
+// A species the standard Dex hides (`isNonstandard`) but the format plays has no pool in replay-core's Generations.
 type RulesDex = ReturnType<typeof rulesDex>;
 interface StandingSpecies { dex: RulesDex; entry: Species; format: string; natDex: boolean }
 const speciesJudges = new Map<string, { validator: TeamValidator; judge: TeamValidator; refusesExistence: boolean; gen: GenerationNum }>();
@@ -214,7 +199,7 @@ export function getMovePool(species: string, gen: number, format?: string): Prom
     const names = new Set<string>();
     const genPrefix = String(generation.num);
     const entry = generation.species.get(species);
-    // The library walks prevos and the forme a Pokémon changes from (a forme's own learnset holds only its signature moves: Rotom-Wash, Hydro Pump).
+    // The library walks prevos and the changed-from forme (a forme's own learnset holds only its signature moves).
     const learnsets = entry ? generation.learnsets.all(entry) : [];
     for await (const learnset of learnsets) {
       for (const [moveId, sources] of Object.entries(learnset.learnset ?? {})) {

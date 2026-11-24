@@ -7,10 +7,9 @@ import {
 import { teraBanned } from './picker-tera';
 import { fieldRow } from './field-row';
 
-/** 'live': the branch runtime stands here; 'stored': rebuilt from a recorded serialized position (exact, incl. PP and disables); 'snapshot': approximated from the replay snapshot and guessed teams. */
+/** 'stored' is exact (incl. PP and disables); 'snapshot' is approximated from the replay snapshot and guessed teams. */
 export type PickerSource = 'live' | 'stored' | 'snapshot';
 
-/** The Dex of the game the picker shows: its generation and, for Pokémon Champions, the mod (Snap Trap and Growth differ there). */
 const gameRules = (gen: number, champions: boolean): GameRules => ({ gen: Math.round(gen), mod: champions ? CHAMPIONS_MOD : undefined });
 const dexFor = (gen: number, champions: boolean): RulesDex => dexOf(gameRules(gen, champions));
 
@@ -36,7 +35,7 @@ function moveNamesFor(mon: PokemonSnapshot, set: PokemonSet | undefined): string
   return set?.moves && set.moves.length > 0 ? set.moves : mon.moves;
 }
 
-/** The evs of a Champions game's info hold Stat Points, which the calc's Champions generation (0) reads as they are; the mod names that generation to the engine's bodies. */
+// A Champions game's evs hold Stat Points, which the calc's Champions generation (0) reads as they are.
 const championsMark = (champions: boolean): { mod?: string } => (champions ? { mod: CHAMPIONS_MOD } : {});
 
 function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): { atk?: number; spa?: number } {
@@ -50,7 +49,6 @@ function guessedAttacks(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: 
   }
 }
 
-/** The facts a snapshot holds about a body: the species, the revealed ability, else the guessed set's, else every ability the species may have; a revealed item (empty = unknown). The hidden type stays unknown. */
 function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, champions = false): MoveUser {
   const dex = dexFor(gen, champions);
   const species = dex.species.get(mon.speciesForme);
@@ -67,7 +65,7 @@ function snapshotMoveUser(mon: PokemonSnapshot, set: PokemonSet | undefined, gen
   };
 }
 
-/** The fallback of moveOptionsFor where no simulator twin can be built: no weather, no terrain, so Weather Ball, Terrain Pulse and Hidden Power keep the catalog type, as does a move whose possible abilities disagree. */
+// No simulator twin: no weather or terrain, so Weather Ball, Terrain Pulse and Hidden Power keep the catalog type.
 function snapshotTypeAtUse(name: string, user: MoveUser, gen: number, champions: boolean): string {
   const move = dexFor(gen, champions).moves.get(name);
   if (!move.exists) return '';
@@ -80,7 +78,6 @@ function typesUnderTera(info: SimPokemonInfo, user: MoveUser, teraType: string |
   return name => snapshotTypeAtUse(name, clicked, gen, champions);
 }
 
-/** Move types come from the simulator on a twin of the body in the snapshot's field (snapshotMoveTypes); the move table answers only where the twin cannot (mod not loaded, abilities disagree, unknown move). */
 function moveOptionsFor(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
@@ -122,7 +119,7 @@ function sightedAbsoluteHp(mon: PokemonSnapshot, gen: number, champions: boolean
   return scale === 100 || scale === 48 ? sightedHpAt(gen, champions, { hp: unseen ? 100 : mon.hp, maxhp: scale }, maxhp) : null;
 }
 
-/** Protocol snapshots carry HP on the percent scale (maxhp 100, or 0 for a never-revealed mon); the real max HP is recomputed from the guessed set. */
+// Protocol snapshots carry HP in percent (maxhp 100, 0 if never revealed); the real max HP comes from the guessed set.
 function absoluteHp(
   mon: PokemonSnapshot,
   set: PokemonSet | undefined,
@@ -181,7 +178,7 @@ function pokemonInfoFromSnapshot(
   };
 }
 
-/** Read from the protocol lines: a snapshot clears the Tera type of a body that fainted, and the simulator never gives the side its Tera back. */
+/** A snapshot clears the Tera type of a body that fainted, and the simulator never gives the side its Tera back. */
 export function teraUsedSides(snapshots: readonly TurnSnapshot[]): { p1: boolean; p2: boolean } {
   const used = { p1: false, p2: false };
   for (const snapshot of snapshots) {
@@ -194,14 +191,11 @@ export function teraUsedSides(snapshots: readonly TurnSnapshot[]): { p1: boolean
   return used;
 }
 
-/** A body transformed into one of these keeps no Tera (sim pokemon.js transformInto names them; the Dex carries no flag); test/regression/picker-state.spec.ts holds this mirror against a live battle. */
+// sim pokemon.js transformInto names these (no Dex flag); picker-state.spec.ts holds this mirror against a live battle.
 const NO_TERA_TRANSFORMED_INTO: ReadonlySet<string> = new Set(['Ogerpon', 'Terapagos']);
 
-/**
- * The simulator's canTerastallize on the snapshot's facts: the set's Tera type, else the species' first type (sim pokemon.js); none
- * outside gen 9, once a teammate has terastallized, under Terastal Clause, for a held Z crystal or usable Mega Stone, or after a
- * transformation into Ogerpon or Terapagos.
- */
+// The simulator's canTerastallize (pokemon.js) on the snapshot's facts: none outside gen 9, after a teammate's Tera,
+// under Terastal Clause, with a Z crystal or Mega Stone, or after a transformation into Ogerpon or Terapagos.
 function snapshotTeraType(mon: PokemonSnapshot, set: PokemonSet | undefined, gen: number, sideMayTera: boolean, champions: boolean): string | null {
   if (!sideMayTera || gen !== 9) return null;
   const dex = dexFor(gen, champions);
@@ -225,7 +219,6 @@ function holdsOtherGimmick(dex: GenDex, itemName: string, species: GenSpecies): 
   return !!item.zMove || !!(stone && (stone[species.name] || stone[species.baseSpecies]));
 }
 
-/** Approximate pickers for main-line turns without a recorded position; the sim settles legality at execute time. */
 interface SnapshotSideOptions {
   movesBySlot: BranchMoveOption[][];
   switchesBySlot: BranchSwitchOption[][];
@@ -323,7 +316,7 @@ export function pickerStateFromSnapshot(
   p1Team: PokemonSet[],
   p2Team: PokemonSet[],
   gen = 9,
-  /** Bring-limited replays: bench options list only the brought species (base-species match: actives reveal formes the preview does not). Null (or an empty side) leaves the bench unfiltered. */
+  /** Bring-limited replays: bench options list only the brought species (by base species); null: unfiltered. */
   bringOnly?: { p1: string[]; p2: string[] } | null,
   rules: { format?: string; teraUsed?: { p1: boolean; p2: boolean } } = {},
 ): BranchSimState {

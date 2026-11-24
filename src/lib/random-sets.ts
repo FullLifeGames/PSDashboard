@@ -1,20 +1,13 @@
 import type { withStandIns } from '@fulllifegames/replay-core';
 import type { SmogonFetch } from './smogon/hosts';
 
-/**
- * The published random-set file of a format whose Dex entry generates the team (Random Battle, Hackmons Cup). Its shape is the one
- * `withStandIns` reads (read off the function so the two cannot drift); a game that shows fewer bodies than its `|teamsize|` fills
- * the rest from it. It is not a Smogon analysis file: the hosts differ.
- */
+/** The published random-set file of a format whose Dex generates the team; its shape is read off `withStandIns`. */
 export type RandomSetFile = NonNullable<Parameters<typeof withStandIns>[4]>;
 
-/** data.pkmn.cc/random answers with a redirect to the randbats pages; the second host is the page itself. */
+// data.pkmn.cc/random answers with a redirect to the randbats pages; the second host is the page itself.
 const RANDOM_SET_HOSTS = ['https://data.pkmn.cc/random', 'https://pkmn.github.io/randbats/data'] as const;
 
-/**
- * The format's file: null for a 404 (the format has none), the first host that answers otherwise; every host unreachable throws, so
- * the caller can report a failure and the next load retries. A body that is no object (an error page) reads as no file.
- */
+/** The format's file: null for a 404 or a non-object body; every host unreachable throws, so the next load retries. */
 export async function fetchRandomSets(formatId: string, fetcher: SmogonFetch): Promise<RandomSetFile | null> {
   let failure: unknown = null;
   for (const host of RANDOM_SET_HOSTS) {

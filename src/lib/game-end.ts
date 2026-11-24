@@ -1,8 +1,4 @@
-/**
- * The end of a main line (a new game's or a replay's). The end is the game's, not a variation's: the dock names the winner and
- * offers no turn. Two positions are that end: the live tip whose simulator ended with no turn played from it, and, after a
- * reload or Open, the end position of the main line (no live sim, only the log).
- */
+/** The end of a main line: the live tip whose simulator ended, or after a reload the main line's end (log only). */
 export interface GameEndArgs {
   isGame: boolean;
   viewingVariation: boolean;
@@ -19,10 +15,7 @@ export interface MainLineEnd {
   battle?: true;
 }
 
-/**
- * A replay at its end shows its result in the dock's place: the winner of its log, or a tie. A log cut off before any result shows
- * no end (the picker stays). Only the main line has an end.
- */
+/** A replay at its end shows its result (the log's winner, or a tie); a log cut off before any result has no end. */
 export function gameEnd(args: GameEndArgs): MainLineEnd | undefined {
   const { isGame, viewingVariation, liveTip, simState, atEndPosition, log } = args;
   if (viewingVariation) return undefined;
@@ -42,10 +35,6 @@ export interface IdleTipArgs {
   replacementPending: boolean;
 }
 
-/**
- * Whether the live branch is the game's own next turn and no variation: no turn was played from the tip, or the first one is still
- * waiting for a replacement (it joins the main line once that is chosen). The variation chrome stays hidden then.
- */
 export function idleGameTip(args: IdleTipArgs): boolean {
   const { gameTip, startTurn, history, turnEntries, replacementPending } = args;
   if (gameTip === null || startTurn !== gameTip) return false;

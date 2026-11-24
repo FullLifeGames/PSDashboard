@@ -1,13 +1,9 @@
 import type { BranchMoveOption } from '@fulllifegames/eval-engine';
 
-/**
- * The target a move opens with in doubles, so a pick takes one click: the played target for the played move; else the foe the move
- * hurts most (the highest maximum damage); else the first target the move lists. A move with no target options has nothing to preselect.
- */
+/** The doubles target a move opens with: the played one for the played move, else the foe hurt most, else the first. */
 export interface PreselectInput {
   /** The highest roll against each target, by the target's label ("P2A"). */
   damage?: Record<string, { maxPercent: number } | undefined>;
-  /** The target the viewed line played for this move. */
   playedLoc?: number | null;
 }
 

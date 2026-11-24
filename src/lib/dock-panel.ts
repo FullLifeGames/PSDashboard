@@ -5,13 +5,11 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { PlayedPick } from './played-pick';
 
-/** What a position asks of the two sides, read by the dock. */
 
 export const EMPTY_MOVES: BranchMoveOption[] = [];
 export const EMPTY_SWITCHES: BranchSwitchOption[] = [];
 export const EMPTY_MODIFIERS: BranchSlotModifiers = { teraType: null, canMegaEvo: false, canUltraBurst: false, zMoves: [] };
 
-/** The pick one slot shows: its own entry in a doubles record, else the side's pick on slot A. */
 export function playedOfSlot(slots: (PlayedPick | null)[] | undefined, side: PlayedPick | null | undefined, slot: number): PlayedPick | null {
   if (slots) return slots[slot] ?? null;
   return slot === 0 ? side ?? null : null;
@@ -21,8 +19,7 @@ export function blockedSwitchKeys(choices: (BranchSlotChoice | null)[], required
   const blocked = new Set<string>();
   choices.forEach((choice, index) => {
     if (index === activeSlot) return;
-    // A stale pick on a slot the request does not let act (during the other slot's forced replacement) must not reserve a species:
-    // it locked the forced slot's only legal switch-in.
+    // A stale pick on a slot that cannot act must not reserve a species: it locked the forced slot's only switch-in.
     if (!required[index]) return;
     const target = switchChoiceKey(choice);
     if (target !== null) blocked.add(target);
@@ -49,14 +46,12 @@ export function slotIdentity(side: 'p1' | 'p2', slot: number, activeSlots: (SimP
   };
 }
 
-/** What the position asks of each side: the required slots, whether Execute is ready, and which side waits for the other's replacement. */
 export function panelFlags(simState: BranchSimState, p1ActiveSlots: (SimPokemonInfo | null)[], p2ActiveSlots: (SimPokemonInfo | null)[]) {
   const p1RequiredChoices = requiredChoicesForActiveSlots(p1ActiveSlots, simState.p1ForceSwitches);
   const p2RequiredChoices = requiredChoicesForActiveSlots(p2ActiveSlots, simState.p2ForceSwitches);
-  // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick reaches the next turn.
+  // One side replaces while the other has nothing to choose: its pickers take no input, so no stale pick survives.
   const p1Waits = simState.p2ForceSwitch && !simState.p1ForceSwitch;
   const p2Waits = simState.p1ForceSwitch && !simState.p2ForceSwitch;
-  // A side that waits owes no choice, so Execute at a forced replacement is ready when the replacing side holds its picks.
   const bothChosen = (p1Waits || branchSideChoicesReady(simState.p1Choices, p1RequiredChoices)) &&
     (p2Waits || branchSideChoicesReady(simState.p2Choices, p2RequiredChoices));
   const isMultiActive = p1ActiveSlots.length > 1 || p2ActiveSlots.length > 1;

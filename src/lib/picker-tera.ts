@@ -1,11 +1,8 @@
 import { Battle as SimBattle, type PokemonSet } from '@pkmn/sim';
 import { simFormats } from '@fulllifegames/replay-core';
 
-/**
- * Terastal Clause in the branch format's rule table: the simulator nulls every canTerastallize at battle start; no format, no
- * clause. A mod may switch Tera off in its own actions without the clause (Pokémon Champions), so a format the rule table allows
- * is asked once more, through a throwaway battle. This module loads through import() only (the simulator's dex stays out of the entry chunk).
- */
+/** Terastal Clause nulls canTerastallize; a mod (Champions) can switch Tera off without it. */
+// A format the rule table allows is asked once more through a throwaway battle; this module loads via import() only.
 export function teraBanned(format: string | undefined): boolean {
   if (!format) return false;
   if (/@@@.*terastal ?clause/i.test(format)) return true;
@@ -18,17 +15,13 @@ export function teraBanned(format: string | undefined): boolean {
   }
 }
 
-/** A one-Pokémon team that may terastallize, for the throwaway battle below. */
 const TERA_PROBE_SET = {
   name: 'Garchomp', species: 'Garchomp', item: '', ability: 'Rough Skin', moves: ['Earthquake'], nature: 'Hardy', gender: '', level: 50,
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, teraType: 'Steel',
 } as PokemonSet;
 const teraOffers = new Map<string, boolean>();
 
-/**
- * Whether the simulator offers Tera in a format: a battle of that format reads canTerastallize at creation (null without Tera:
- * Gen 8, Terastal Clause, the Champions mod's actions). Null when no battle can be built (its mod not loaded yet); nothing is remembered then.
- */
+// Null when no battle can be built (its mod not loaded yet); nothing is remembered then.
 function simOffersTera(formatid: string): boolean | null {
   const known = teraOffers.get(formatid);
   if (known !== undefined) return known;

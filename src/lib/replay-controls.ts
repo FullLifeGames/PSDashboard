@@ -1,21 +1,15 @@
-// The workspace's replay frames hide Color scheme and Music (Music does nothing in our frame, which silences every sound; the OS setting picks light or dark). The embed shows its sound chooser with an inline `display`, so the rule needs `!important`.
+// The embed shows its sound chooser with an inline `display`, so hiding it needs `!important`.
 
-/** The style of a frame that hides the two choosers (`hideChoosers`). */
 export const APP_CONTROLS_STYLES = `<style>
 .replay-controls-2 .colorchooser,.replay-controls-2 .soundchooser{display:none !important;}
 </style>`;
 
-/** The style of a frame that hides the two choosers, with its line break; empty for the other frames. */
 export function appControlsStyles(hide: boolean): string {
   return hide ? `${APP_CONTROLS_STYLES}\n` : '';
 }
 
-/**
- * Reports the side the frame shows near (`battle.nearSide`, set by Switch sides and by the `?p2` flag) to the app, which puts that
- * side's dock row on top. It reads state and counts no clicks, so a new document reports its own side. The bridge applies `?p2` a
- * tick after `Replays.battle` exists, so the tracker stays silent until it has seen the document's own side once: a p2 document
- * would otherwise report p1 first and the dock would flip twice. Empty when the frame reports nothing.
- */
+/** Reports the side the frame shows near (`battle.nearSide`) to the dock; empty when not reporting. */
+// `?p2` lands a tick after `Replays.battle` exists: stay silent until the own side was seen, or the dock flips twice.
 export function sideTrackerScript(report: boolean, viewpoint: 'p1' | 'p2'): string {
   if (!report) return '';
   return `

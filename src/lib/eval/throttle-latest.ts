@@ -1,15 +1,10 @@
 export interface LatestThrottle<T> {
-  /** Offer a value: delivered now when the interval has passed, else held as the latest. */
   push(value: T): void;
   flush(): void;
   cancel(): void;
 }
 
-/**
- * Latest-value throttle for streams where only the newest value matters: the first value goes through at once, a burst collapses to
- * one delivery of its last value per interval. The MCTS workers post progress thousands of times per evaluation and every delivery is
- * a React render, so the panel repaints at most every `intervalMs`.
- */
+/** Latest-value throttle: the first value goes through at once, a burst collapses to its last value per interval. */
 export function throttleLatest<T>(deliver: (value: T) => void, intervalMs: number): LatestThrottle<T> {
   let lastAt = -Infinity;
   let pending: { value: T } | null = null;

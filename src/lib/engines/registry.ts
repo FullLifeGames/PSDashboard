@@ -1,4 +1,3 @@
-/** The engines the Evaluation panel offers: the dashboard's own search, contributed engines (ENGINES.md, "Contribute an engine"), the user's own. */
 export interface EngineEntry {
   /** Stable id: results and cache keys carry it. */
   id: string;
@@ -12,10 +11,6 @@ export interface EngineEntry {
 
 export const BUILTIN_ENGINE: EngineEntry = { id: 'ps-dashboard', name: 'PS Dashboard', url: null, source: 'builtin' };
 
-/**
- * Engines contributed to this repository: a hosted endpoint that passes `npx @fulllifegames/eval-engine check-engine <url>`, with author
- * and homepage.
- */
 export const CONTRIBUTED_ENGINES: EngineEntry[] = [];
 
 export const ADDED_ENGINES_KEY = 'ps-replay-interceptor:engines';

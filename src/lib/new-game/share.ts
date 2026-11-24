@@ -4,16 +4,8 @@ import type { BranchMoveModifier, BranchSlotChoice } from '@fulllifegames/eval-e
 import type { BranchHistoryEntry } from '../branch-history';
 import type { NewGameRecord } from './record';
 
-/**
- * The share link of a game, format version 2 (version 1 is a replay's branch). It holds the format, both teams as `Teams.pack`
- * text, the seed, the leads and every choice; the log, the positions and the header stay out, and the reader plays the entries
- * onto the format's battle on the seed (`recordOfShare`), so its game is the sharer's to the byte.
- *
- * A slot choice is one string where it can be: a move is its name, `@<target>` when it has one and `#<modifier>` when it carries
- * one ("Close Combat@1#terastallize"); a switch is `>` and the Pokémon's name ("Rotom-Wash"). A choice that carries forced dice, a
- * move whose name does not spell its id and a switch whose name is a nickname stay as the object the app holds. An entry is a pair
- * of sides' slots (a turn), a side and its slots (a forced replacement) or `L` with the leads (the lead entry of turn 0).
- */
+/** The share link of a game, format version 2 (version 1 is a replay's branch); the reader replays them on the seed. */
+// A slot choice is one string if it can ("Close Combat@1#terastallize", ">Rotom-Wash"); dice or a nickname: object.
 
 export const GAME_SHARE_VERSION = 2;
 
@@ -78,7 +70,6 @@ export function shareEntry(entry: BranchHistoryEntry): ShareEntry {
   return [slotsOf(entry.p1SlotChoices), slotsOf(entry.p2SlotChoices)];
 }
 
-/** The history entries a list of shared entries stands for; `firstTurn` numbers the first turn (the rebuild writes the rest again). */
 export function historyOfShare(entries: ShareEntry[], firstTurn = 1): BranchHistoryEntry[] {
   let turn = firstTurn;
   const bare = (turnNumber: number): BranchHistoryEntry => ({
@@ -124,11 +115,7 @@ export function makeGameSharePayload({ record, variation, view, now = new Date()
   };
 }
 
-/**
- * Whether a saved game is the game a link holds: the same format, seed, players, teams (by their packed text), leads and entries,
- * entry for entry. A link whose main line goes past the game, or differs anywhere, is another game; opening a link twice must not
- * make a copy each time (the cap of saved games would drop real games for them).
- */
+/** Whether a saved game is the game a link holds, entry for entry; opening a link twice must not copy it. */
 export function sameGameAsShare(record: NewGameRecord, payload: GameSharePayload): boolean {
   return record.format === payload.format && record.seed === payload.seed
     && record.players[0] === payload.players[0] && record.players[1] === payload.players[1]
@@ -151,7 +138,7 @@ const isShareVariation = (value: unknown): boolean => {
   return !!variation && typeof variation.startTurn === 'number' && isEntryList(variation.entries);
 };
 
-/** Whether a decoded version 2 value holds every field the reader needs; the entries' inner shape is read when they are played. */
+/** Whether a decoded version 2 value holds every field the reader needs; the entries' inner shape is read on play. */
 export function isGameSharePayload(value: unknown): value is GameSharePayload {
   if (!value || typeof value !== 'object') return false;
   const v = value as Partial<GameSharePayload>;

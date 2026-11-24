@@ -5,7 +5,6 @@ import { DEFAULT_GAME_SEED } from '@fulllifegames/eval-engine';
 import type { BranchHistoryEntry } from '../branch-history';
 import { assembleGameLog } from './game-log';
 
-// A new game is a record; the app shows its log as the game's replay data, so every reader of a replay works on a game unchanged.
 
 export const GAME_RECORD_VERSION = 1;
 
@@ -22,14 +21,10 @@ export interface NewGameRecord {
   bringCount: number | null;
   header: string[];
   body: string[];
-  /** The main line's history entries in play order (the lead entry first); positions are left out, a rebuild restores them. */
+  /** The main line's history entries in play order (lead first); positions are left out, a rebuild restores them. */
   entries: BranchHistoryEntry[];
   turns: number;
-  /**
-   * Optional (an old record has none): the turn the game's tip played whose replacement is not picked yet, as the entries the live
-   * branch holds. It is no part of the main line (no body line, no turn); a reload plays it again on the branch, which asks for
-   * the replacement. The finished turn that joins the main line takes it away.
-   */
+  /** Optional (old records have none): the tip's turn whose replacement is not picked yet; no part of the main line. */
   pending?: BranchHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -46,7 +41,7 @@ export function newGameId(random: RandomBytes = cryptoBytes): string {
   return `newgame-${Array.from(random(ID_LENGTH), byte => (byte % 36).toString(36)).join('')}`;
 }
 
-/** The dice seed of a new game: 'fixed' keeps the seed every rebuild uses, 'fresh' draws four 16-bit numbers. Start calls this once and the record keeps the result. */
+/** The dice seed: 'fixed' keeps the seed every rebuild uses, 'fresh' draws four 16-bit numbers; Start calls it once. */
 export function newGameSeed(mode: 'fixed' | 'fresh' = 'fixed', random: RandomBytes = cryptoBytes): string {
   if (mode === 'fixed') return DEFAULT_GAME_SEED;
   const bytes = random(8);
@@ -89,11 +84,7 @@ export interface FinishedTurn {
   lines: string[];
 }
 
-/**
- * An entry as the record keeps it: what a rebuild replays (the kind, the slot choices with their forced dice, the commands) and
- * nothing the rebuild writes again. The serialized position (tens of kilobytes) and the board snapshots (about 16 kilobytes a
- * doubles turn) are left out, so a 60-turn doubles record stays near 100 kilobytes instead of 960; the rebuild's entry carries them again.
- */
+/** An entry as the record keeps it, without position or board snapshots (60 doubles turns: 100 kB, not 960). */
 export function withoutPosition(entry: BranchHistoryEntry): BranchHistoryEntry {
   return {
     ...entry, serializedPosition: undefined,
@@ -122,7 +113,6 @@ export function withPendingTurn(record: NewGameRecord, entries: readonly BranchH
   return { ...withoutPending(record), ...(entries.length > 0 ? { pending: entries.map(withoutPosition) } : {}), updatedAt: now.toISOString() };
 }
 
-/** The replay data of a game: the explicit `formatid` first, because the id never feeds format inference. */
 export function gameReplayData(record: NewGameRecord): ReplayData {
   return {
     id: record.id,

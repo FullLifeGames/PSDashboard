@@ -2,14 +2,10 @@ import { ENDGAME_MAX_BODIES } from '@fulllifegames/eval-engine';
 import { teamSizes, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { logWinner } from './game-end';
 
-/** Which turns of a game are its endgame (three bodies or fewer standing in total: the engine's `ENDGAME_MAX_BODIES`) and which side lost it. */
 
 type Side = 'p1' | 'p2';
 
-/**
- * The bodies standing at a turn's start, both sides together: those each side brought (`|teamsize|`: VGC brings four of six), else the
- * snapshot's list, less the fallen.
- */
+/** Bodies standing at a turn's start, both sides: those brought (`|teamsize|`, VGC four of six), else the snapshot. */
 export function livingBodies(snapshots: readonly TurnSnapshot[], turn: number): number | null {
   const at = snapshots[Math.min(turn - 1, snapshots.length - 1)];
   if (!at) return null;
@@ -27,7 +23,7 @@ export function endgameTurns(snapshots: readonly TurnSnapshot[], lastTurn: numbe
   return turns;
 }
 
-/** The side that lost the game: the other one than the log's winner; null for a tie, a log without a result or a winner no player bears. */
+/** The side that lost; null for a tie, a log without a result or a winner no player bears. */
 export function loserOf(log: string, players: readonly string[]): Side | null {
   const winner = logWinner(log);
   const at = winner === null ? -1 : players.indexOf(winner);

@@ -1,10 +1,5 @@
-/**
- * The positions of a short-side game's other worlds (`bringWorlds` in the engine). The heaviest world's position is the key; the
- * registry maps it to its siblings with their weights, and the worker client looks every position up here before it searches.
- * A position the registry does not know runs once.
- *
- * Module state on purpose: every evaluation path reaches the client with a serialized position and nothing else.
- */
+/** The other worlds of a short-side game, keyed by the heaviest world's position; an unknown position runs once. */
+// Module state on purpose: every evaluation path reaches the client with a serialized position and nothing else.
 export interface WorldPosition {
   position: string;
   /** The world's share of the game: relative, the client normalizes over the worlds that answer. */
@@ -28,10 +23,7 @@ export function worldPositionsOf(position: string): readonly WorldPosition[] | n
   return registry.get(position) ?? null;
 }
 
-/**
- * Registers `patched` (the heaviest world's edited position) with each other world's position run through `patch`. A world the
- * edit does not fit (`patch` returns null) leaves the blend; nothing registers when `position` has no siblings.
- */
+/** Registers `patched` with every other world run through `patch`; a world that returns null leaves the blend. */
 export function registerPatchedWorlds(position: string, patched: string, patch: (world: string) => string | null): void {
   const worlds = worldPositionsOf(position);
   if (!worlds) return;

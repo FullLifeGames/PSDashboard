@@ -1,13 +1,11 @@
 import { simFormats, toId } from '@fulllifegames/replay-core';
 import { formatGroups, loadFormatGroups, type FormatGroup, type FormatOption } from './format-options';
 
-// The New game dialog's list: the simulator's playable formats grouped by generation, the five measured families (bank and holdouts) on top, Generation 9 Custom Games under "Custom Game".
 
 export const CALIBRATED_FORMATS = ['gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9championsou', 'gen9championsvgc2026regmc'] as const;
 export const CALIBRATED_LABEL = 'Calibrated';
 export const CUSTOM_LABEL = 'Custom Game';
 
-/** The registry's groups as the dialog shows them: Calibrated, Custom Game, then the generations. Reads the registry as it stands. */
 export function panelGroups(): FormatGroup[] {
   const groups = formatGroups(CALIBRATED_FORMATS).map(group => (group.label === 'Featured' ? { ...group, label: CALIBRATED_LABEL } : group));
   const isCustom = (option: FormatOption) => option.custom && option.generation === 9;
@@ -20,13 +18,11 @@ export function panelGroups(): FormatGroup[] {
   return rest;
 }
 
-/** `panelGroups` after the Champions mod loads (the registry gains its Champions formats). */
 export async function loadPanelGroups(): Promise<FormatGroup[]> {
   await loadFormatGroups(CALIBRATED_FORMATS);
   return panelGroups();
 }
 
-/** The groups that hold a format whose name or id contains the query (letters and digits only, any case); an empty query keeps all. */
 export function searchGroups(groups: readonly FormatGroup[], query: string): FormatGroup[] {
   const needle = toId(query);
   if (!needle) return [...groups];
@@ -35,17 +31,15 @@ export function searchGroups(groups: readonly FormatGroup[], query: string): For
     .filter(group => group.options.length > 0);
 }
 
-/** Whether the format has a Team Preview step: the simulator's rule table says so (Gen 1 to 4 formats have none). */
+/** Whether the format has a Team Preview step; the rule table says so (Gen 1 to 4 formats have none). */
 export function formatHasTeamPreview(formatId: string): boolean {
   try {
     return simFormats().getRuleTable(simFormats().get(formatId)).has('teampreview');
   } catch {
-    // a rule table the registry refuses reads as the usual format
     return true;
   }
 }
 
-/** One line about a format, from the simulator's own rule table: its game type, the bring count at Team Preview, a Custom Game's freedom. */
 export function formatNote(option: FormatOption): string {
   const parts: string[] = [option.gameType];
   const format = simFormats().get(option.id);

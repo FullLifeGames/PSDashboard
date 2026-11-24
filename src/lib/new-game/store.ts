@@ -1,7 +1,7 @@
 import type { NewGameRecord } from './record';
 import { GAME_RECORD_VERSION } from './record';
 
-// Where new games live in localStorage: one key per game, an index for the panel. A game's saved variations (`ps-replay-interceptor:branches:<id>`) and set edits (`...:sets:<id>`) go with it on delete.
+// One key per game and an index for the panel; a game's saved variations and set edits go with it on delete.
 
 export const GAMES_INDEX_KEY = 'ps-replay-interceptor:games';
 export const MAX_SAVED_GAMES = 20;
@@ -66,7 +66,7 @@ export function onGameEvicted(listener: (rows: SavedGameRow[]) => void): () => v
   return () => { evictionListeners.delete(listener); };
 }
 
-/** The rows that stay, at most 20: a game over the limit with no played turn goes first (the oldest of them), then the oldest game; the game just saved never goes. */
+// At most 20 rows: a game with no played turn goes first (oldest of them), then the oldest; the new game never goes.
 function keepNewest(rows: SavedGameRow[]): { kept: SavedGameRow[]; evicted: SavedGameRow[] } {
   const kept = [...rows];
   const evicted: SavedGameRow[] = [];
@@ -79,10 +79,7 @@ function keepNewest(rows: SavedGameRow[]): { kept: SavedGameRow[]; evicted: Save
   return { kept, evicted };
 }
 
-/**
- * Saves the record and moves its row to the front of the index; a 21st game pushes one game out with everything it owns and tells
- * the listeners which. Returns false when the browser refuses the write (a full store): the game stays in memory.
- */
+/** Saves the record and moves its row to the front; a 21st game pushes one out. False when the write is refused. */
 export function saveGame(record: NewGameRecord): boolean {
   try {
     localStorage.setItem(gameKey(record.id), JSON.stringify(record));

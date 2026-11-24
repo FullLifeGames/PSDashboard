@@ -4,7 +4,6 @@ import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
 import { sameAnswer, type WorstLookup } from './worst-reply';
 
-// What the "Lines" section of the turn card shows, as plain data: one block per line, one row per step (per player in doubles).
 
 type Side = 'p1' | 'p2';
 type Battle = Parameters<typeof wordsOf>[0];
@@ -19,9 +18,8 @@ export interface LineBlockView {
   role: string;
   end: string;
   endPct: string;
-  /** The percentage the line's own row shows on the card; null when the context holds none (a win-path line has none). */
+  /** The percentage the line's own row shows; null when the context holds none (a win-path line has none). */
   row: string | null;
-  /** Null when the context holds no ranking or the line opens with a replacement. */
   reply: LineReply | null;
   differs: boolean;
   rows: LineRowView[];
@@ -47,14 +45,13 @@ export interface LinesHost {
   onPlay?: (line: EvalLine, turn: number) => void;
   confirm?: LineConfirm | null;
   winPaths?: WinPathsHost;
-  /** The early-lines stage while it runs; absent or null: not running. */
   earlyLines?: { done: number; total: number; stop: () => void } | null;
   hardMode?: boolean;
-  /** What a turn without lines waits for ("stage": the early-lines stage will search it; "sweep": the game analysis still runs). */
+  /** What a turn without lines waits for: "stage" (the early-lines search) or "sweep" (the game analysis runs). */
   lineComing?: (turn: number) => 'stage' | 'sweep' | null;
 }
 
-/** The answer a line meets; `rank` is the words inside the brackets ("Tzon's top choice"), `off` marks an answer that is not the top one. */
+/** `rank` is the words inside the brackets ("Tzon's top choice"); `off` marks an answer that is not the top one. */
 export interface LineReply { label: string; rank: string; off: boolean }
 
 export const REPLY_OFF_TOP_TITLE = "Each of the search's trees follows the answer it explored most, so a line can meet another answer than the top one.";
@@ -67,7 +64,7 @@ export interface RowValues { engine?: string; played?: string }
 
 export const LINE_DIFFERS_SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
 
-// A row at 100% or 0% is one where every answer and die ends the game (`winPercent` shows exactly 100 only for an ended evaluation), so "averages" does not describe it.
+// 100% only shows for an ended evaluation (`winPercent`), so "averages" does not describe such a row.
 export const LINE_PROVEN_SENTENCE = 'A row at 100% (or 0%) is one where every answer and die ends the game; its line stops before the game ends, so its end is the estimate of the position it stops at.';
 
 export function differsSentences(blocks: readonly Pick<LineBlockView, 'differs' | 'row'>[]): string[] {
@@ -79,7 +76,7 @@ export function differsSentences(blocks: readonly Pick<LineBlockView, 'differs' 
 export interface LineViewContext {
   turn: number;
   rowValues?: { p1?: RowValues; p2?: RowValues };
-  /** The sides whose body was knocked out before it moved (`neverActedOf`): their played line is a stand-in, so its head never says played. */
+  /** Sides whose body was knocked out before it moved (`neverActedOf`): their played line is a stand-in. */
   neverActed?: { p1?: boolean; p2?: boolean };
   ranks?: { p1: readonly string[]; p2: readonly string[] };
   playerNames: [string, string];
@@ -117,11 +114,7 @@ export function dieText(entry: LineDie, words: DieWords): string {
   return entry.chance !== undefined && entry.chance < 1 ? `${base} (${Math.round(entry.chance * 100)}%)` : base;
 }
 
-/**
- * What a damage roll the line forces does, read against the boundary the simulator found (`ko`: the rolls from `of - rolls` up knock
- * out); null for a die that carries no boundary. The chip never takes it from the class of the die: a forced roll on the quiet side of
- * the boundary does not knock out (a "KO (1 of 16 rolls)" chip on roll 9).
- */
+// Read against the boundary the simulator found (`ko`), not the die's class: a roll below it does not knock out.
 function rollOutcome(entry: LineDie): { text: string; rolls: number } | null {
   const { die, ko } = entry;
   if (die.name.kind !== 'damage-roll' || !ko || !('step' in die.result)) return null;
@@ -140,7 +133,7 @@ const tooltipText = (entry: LineDie, words: DieWords): string => {
   return outcome ? `${dieLabel(entry.die, words)} (${outcome.text} in ${outcome.rolls} of ${entry.ko!.of} rolls)` : dieText(entry, words);
 };
 
-/** A spread move draws one die per target; dice of a step that differ only in their target get the target in the move's name ("Rock Slide → Urshifu"). */
+// Dice of a spread-move step that differ only in target get the target in the move's name ("Rock Slide → Urshifu").
 function wordsOfDie(entry: LineDie, step: LineStep, words: DieWords): DieWords {
   const { name } = entry.die;
   if (!name.targetSlot || !name.moveId) return words;
@@ -219,7 +212,7 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
       });
       return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: step.replacement ? `replaces: ${replacementWords(choice.label)}` : choice.label, chips };
     });
-    // a replacement inside a turn (a pivot's switch, a faint's) plays on in the turn before it: its dice belong to that turn's number
+    // A replacement inside a turn plays on in the turn before it: its dice belong to that turn's number.
     for (const entry of step.dice) every.push(`${label || `T${turn - 1}`}: ${tooltipText(entry, wordsOfDie(entry, step, words))}`);
     if (ctx.doubles) views.forEach((view, at) => rows.push({ key: `${index}-${view.side}`, turn: at === 0 ? label : '', sides: [view] }));
     else rows.push({ key: String(index), turn: label, sides: views });
@@ -230,7 +223,6 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
 
 const ORDINALS = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
 
-/** A ranking place in the words of the line heads: "top choice" up to "tenth choice", then "11th choice" (a number after "choice" read as a menu entry). */
 export function rankWords(rank: number): string {
   if (rank <= 1) return 'top choice';
   if (rank < ORDINALS.length) return `${ORDINALS[rank]} choice`;
@@ -241,7 +233,7 @@ export function rankWords(rank: number): string {
 
 const RATES_LOWEST = 'the reply the search rates lowest for this choice';
 
-/** The other side's choice in the line's first step, by its place in the ranking; a line that opens with a replacement meets no answer. */
+/** The other side's choice in the line's first step, by ranking place; a line opening with a replacement meets none. */
 export function replyOf(line: EvalLine, ctx: Pick<LineViewContext, 'ranks' | 'playerNames' | 'worst'>): LineReply | null {
   const first = line.steps[0];
   if (!ctx.ranks || !first || first.replacement) return null;
@@ -270,7 +262,7 @@ function tooltipOf(every: string[]): string {
   return every.length === 0 ? `${head}: none to force.` : `${head}:\n${every.join('\n')}`;
 }
 
-/** Player 1's lines first, each player's engine line before the played line; a player who played the engine's move has one line (both roles). */
+/** Player 1's lines first, each player's engine line before the played line; a played engine move has one line. */
 export function lineBlocks(lines: readonly EvalLine[], ctx: LineViewContext): LineBlockView[] {
   const order = (line: EvalLine) => (line.side === 'p1' ? 0 : 2) + (line.for.includes('engine') ? 0 : 1);
   return [...lines].sort((a, b) => order(a) - order(b)).map((line, index) => {

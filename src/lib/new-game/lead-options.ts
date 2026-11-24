@@ -3,10 +3,7 @@ import type { LeadOption } from '../lead-options';
 import { assembleGameLog } from './game-log';
 import type { NewGameRecord } from './record';
 
-/**
- * The lead picker's options of a new game, read from the record (a format without team preview has no `|poke|` line). Once the
- * leads are picked they show as the ones the game started with (the first picks, as many as stand on the field).
- */
+/** Options from the record (no team preview, no `|poke|` line); picked leads show as the first picks. */
 export function gameLeadOptions(record: NewGameRecord): { p1: LeadOption[]; p2: LeadOption[] } {
   const lead = record.entries[0]?.leadChoices;
   const onField = getReplayGameType(assembleGameLog(record.header, [])) === 'doubles' ? 2 : 1;

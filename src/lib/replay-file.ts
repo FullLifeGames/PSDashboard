@@ -3,7 +3,6 @@ import { type ReplayData, getReplayDisplayFormat, inferReplayFormatId } from '@f
 const LOG_DATA_PATTERN = /<script[^>]*class="battle-log-data"[^>]*>([\s\S]*?)<\/script>/i;
 const REPLAY_ID_PATTERN = /<input[^>]*name="replayid"[^>]*value="([a-z0-9-]+)"/i;
 
-/** Tells pasted replay content (an exported HTML document or a raw protocol log) from a replay id or URL that must be fetched. */
 export function looksLikeReplayFileContent(input: string): boolean {
   const content = input.trim();
   if (!content) return false;
@@ -24,7 +23,7 @@ function fileNameId(fileName: string | undefined): string {
     .replace(/^-|-$/g, '');
 }
 
-/** Turns a "Download replay" export (or a raw protocol log file) into the ReplayData the replay API returns; the export wraps the log in a text/plain script with `/` escaped as `\/`. */
+/** Turns a "Download replay" export or raw log into ReplayData (the export escapes `/` as `\/`). */
 export function parseExportedReplay(content: string, fileName?: string): ReplayData {
   const trimmed = content.replace(/^\uFEFF/, '').trim();
 
@@ -48,14 +47,9 @@ export function parseExportedReplay(content: string, fileName?: string): ReplayD
   return replayDataFromLog(log, embeddedId || fileNameId(fileName) || 'imported-replay', embeddedId);
 }
 
-/**
- * Builds ReplayData from a bare protocol log (the file import, and the replay server's `.log` endpoint, which answers with no
- * metadata). `inferenceId` is the id allowed to feed format inference and is not always `id`: a file name is arbitrary text
- * and would corrupt the inferred format, so the import passes null for one.
- */
+/** ReplayData from a bare protocol log; `inferenceId` may feed format inference, a file name never may (null). */
 export function replayDataFromLog(log: string, id: string, inferenceId: string | null = id): ReplayData {
-  // Externally written files come with CRLF; everything downstream splits on '\n', and a surviving \r on a line-final field
-  // (tera type, win line) poisons built teams and crashes the sim's JSON team parsing.
+  // A surviving \r on a line-final field (tera type, win line) poisons built teams and crashes the sim's team parsing.
   const normalized = log.replace(/\r\n?/g, '\n');
 
   const tier = normalized.match(/^\|tier\|([^|\n]+)/m)?.[1]?.trim() ?? '';
