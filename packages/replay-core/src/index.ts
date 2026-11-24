@@ -1,4 +1,4 @@
-/** Public surface of @fulllifegames/replay-core: curated, widened by a line here and a refreshed test/regression/fixtures/api/replay-core.txt (`UPDATE_API_SNAPSHOT=1`). */
+/** Public surface: a new export needs a refreshed test/regression/fixtures/api/replay-core.txt. */
 export { WEATHER_BY_ID, TERRAIN_BY_ID } from './calc-field.ts';
 export { calcGenerationFor, calcModOf, simGenNum, CHAMPIONS_MOD } from './calc-gen.ts';
 export { isChampionsFormat } from './champions-format.ts';

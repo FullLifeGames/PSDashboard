@@ -1,9 +1,9 @@
 import type { Dex } from '@pkmn/sim';
 
-/** The Dex the rule facts are read over: one table per Dex object, filled by scans of the Dex on the first question and holding no species, move, item or ability name. */
+/** The Dex the rule facts are read over: one table per Dex object, filled by scans on the first question. */
 export type FactsDex = typeof Dex;
 
-/** The Protect family of a move: `shield` (Protect, the King's Shield kin, Max Guard), `stall` (Endure) or `side` (Wide Guard, Quick Guard, Crafty Shield, Mat Block). */
+/** The Protect family of a move: `shield` (Protect and kin), `stall` (Endure), `side` (Wide Guard and kin). */
 // eslint-disable-next-line names/no-new-dex-name -- 'stall' is a ProtectKind (the simulator's stall counter), not the ability Stall
 export type ProtectKind = 'shield' | 'stall' | 'side';
 
@@ -13,7 +13,6 @@ export interface DexRuleFacts {
 }
 
 const facts = new WeakMap<object, DexRuleFacts>();
-/** The Dex asked last: a search asks about one Dex thousands of times, so the common ask costs a comparison. */
 let lastDex: FactsDex | null = null;
 let lastFacts: DexRuleFacts | null = null;
 
@@ -29,7 +28,6 @@ export function factsOfDex(dex: FactsDex): DexRuleFacts {
   return known;
 }
 
-/** The ids a scan finds, scanned once per Dex. */
 export function idsOf(dex: FactsDex, fact: string, scan: (dex: FactsDex) => Iterable<string>): ReadonlySet<string> {
   const known = factsOfDex(dex);
   let ids = known.sets.get(fact);
@@ -37,6 +35,5 @@ export function idsOf(dex: FactsDex, fact: string, scan: (dex: FactsDex) => Iter
   return ids;
 }
 
-/** Whether the Dex entry carries a handler for one of the events. */
 export const hasHandler = (effect: unknown, events: readonly string[]): boolean =>
   events.some(event => typeof (effect as Record<string, unknown>)[event] === 'function');

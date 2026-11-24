@@ -1,15 +1,11 @@
 import { Protocol } from '@pkmn/protocol';
 
-/**
- * One log line as @pkmn/protocol reads it: the inference parses every line once, with the protocol's split into arguments and keyword
- * arguments ([from], [of], [spread], ...) and its upgrade of older line forms.
- */
+/** One log line as @pkmn/protocol reads it, with its upgrade of older line forms. */
 export interface LogLine {
-  /** The line as the log has it. */
   raw: string;
-  /** The command after the protocol's upgrade: 'move', '-damage', ...; 'done' for "|", '' for a blank line. */
+  /** The command after the protocol's upgrade; 'done' for "|", '' for a blank line. */
   cmd: string;
-  /** The arguments as the protocol returns them (the client reads them unchanged); `arg` reads one as text. */
+  /** The arguments as the protocol returns them; the client reads them unchanged. */
   args: readonly unknown[];
   kwArgs: Readonly<Record<string, string | true | undefined>>;
 }
@@ -31,7 +27,6 @@ export const kwText = (line: LogLine, key: string): string => {
   return typeof value === 'string' ? value : '';
 };
 
-/** Whether the line carries the keyword argument at all ([from], [spread], [miss], ...). */
 export const hasKw = (line: LogLine, key: string): boolean => line.kwArgs[key] !== undefined;
 
 /** The [from] effect: its name and kind ('item', 'move', 'ability'; '' for a bare effect such as Stealth Rock). */
@@ -40,7 +35,7 @@ export function fromEffect(line: LogLine): { name: string; type: string } {
   return { name: effect.name, type: effect.type ?? '' };
 }
 
-/** Whether any argument or keyword argument names this effect ("Neutralizing Gas", "ability: Neutralizing Gas"). */
+/** Whether any argument names this effect, with or without its kind ("ability: Neutralizing Gas"). */
 export function namesEffect(line: LogLine, name: string): boolean {
   const texts = [...line.args.slice(1), ...Object.values(line.kwArgs)];
   return texts.some(text => typeof text === 'string' && Protocol.parseEffect(text).name === name);
@@ -55,7 +50,7 @@ export function identOf(text: string | undefined): { side: string; slot: string;
   return { side: player, slot: position ?? '', name };
 }
 
-/** The [of] Pokémon's ident ('' entries, as the protocol leaves after some upgrades, count as none). */
+/** The [of] Pokémon's ident; the '' the protocol leaves after some upgrades counts as none. */
 export const ofIdent = (line: LogLine): string | null => (identOf(kwText(line, 'of')) ? kwText(line, 'of') : null);
 
 /** "p2a: Nick" -> "p2: Nick": one Pokémon whatever position it stands in; other text stays as it is. */
@@ -64,7 +59,6 @@ export function keyOf(text: string): string {
   return ident ? `${ident.side}: ${ident.name}`.trim() : text.trim();
 }
 
-/** Species, level and gender of a details argument ("Garchomp, L50, F"); null when there is none. */
 export function detailsOf(text: string | undefined): { species: string; level: number; gender: string } | null {
   if (!text) return null;
   const details = Protocol.parseDetails('', '' as Protocol.PokemonIdent, text as Protocol.PokemonDetails);

@@ -3,9 +3,8 @@ import { calcGenerationFor, type CalcGeneration } from './calc-gen.ts';
 import { rulesDex } from './rules-dex.ts';
 import { toId } from './ids.ts';
 
-/** The one builder of a calculator Pokémon from a species name, shared by the engine, the spread solver, the item judge and the app's picker. */
 
-/** What the builder reads of a Dex: the species rows. The engine hands the simulator's (the Champions mod's where it is loaded). */
+/** The species rows the builder reads of a Dex, the Champions mod's where it is loaded. */
 export interface SpeciesDex {
   currentMod?: string;
   species: { get(name: string): SpeciesRow };
@@ -28,14 +27,13 @@ export type CalcPokemonOptions = NonNullable<ConstructorParameters<typeof CalcPo
 
 const calcGenId = (calc: CalcGeneration): number => calc.num;
 
-/** The Dex of the game generation (the Champions generation reads the registered Champions Dex). */
 function defaultDex(calc: CalcGeneration): SpeciesDex {
   return rulesDex(calc.num as number) as unknown as SpeciesDex;
 }
 
 const speciesMemo = new Map<string, string>();
 
-/** The name the calculator lists for a species: an equal-valued form of the same base species when the calc lacks the name, else the name itself. */
+/** The name the calculator lists for a species: an equal-valued form of the same base species when it lacks it. */
 export function calcSpecies(gen: number, name: string, dex?: SpeciesDex): string {
   const calc = calcGenerationFor(gen);
   const source = dex ?? defaultDex(calc);
@@ -48,8 +46,7 @@ export function calcSpecies(gen: number, name: string, dex?: SpeciesDex): string
   return known;
 }
 
-// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, the Vivillon patterns, the Alcremie flavors,
-// Minior-Meteor, the Ogerpon Tera formes) and refuses a name it does not list.
+// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, Vivillon, Alcremie, Tera forms).
 function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string {
   if (calc.species.get(toId(name) as never)) return name;
   const species = dex.species.get(name);
@@ -63,7 +60,7 @@ function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string 
 
 const overridesMemo = new Map<string, CalcPokemonOptions['overrides'] | null>();
 
-/** The overrides that make the calculator build a species it lacks or lists with other values than the Dex; undefined when none are needed. */
+/** The overrides that make the calculator build a species it lacks or lists with other values; undefined when none. */
 export function speciesOverrides(gen: CalcGeneration, name: string, dex?: SpeciesDex): CalcPokemonOptions['overrides'] | undefined {
   const source = dex ?? defaultDex(gen);
   const key = `${calcGenId(gen)}|${source.currentMod ?? ''}|${name}`;
@@ -79,7 +76,7 @@ function dexOverrides(gen: CalcGeneration, name: string, dex: SpeciesDex): CalcP
   const species = dex.species.get(name);
   if (!species.exists) return undefined;
   const listed = gen.species.get(toId(name) as never);
-  // The Dex wins where the calculator lists other base stats or types (Obliteryx: Special Defense 78 in the Dex, 90 in the calculator).
+  // The Dex wins where the calculator lists other base stats or types (Obliteryx: Special Defense 78 vs 90).
   if (listed) {
     const stats = Object.keys(species.baseStats) as (keyof SpeciesRow['baseStats'])[];
     const same = stats.every(stat => listed.baseStats[stat] === species.baseStats[stat]) && listed.types.join('/') === species.types.join('/');
@@ -103,13 +100,13 @@ export function buildCalcPokemon(gen: CalcGeneration, species: string, options: 
   return new CalcPokemon(gen, known, overrides ? { ...options, overrides: { ...overrides, ...options.overrides } } : options);
 }
 
-/** The species' base stats as the calculator builds them; undefined for a species neither the Dex nor the calculator knows. */
+/** The species' base stats as the calculator builds them; undefined for a species neither knows. */
 export function calcBaseStats(gen: CalcGeneration, species: string, dex?: SpeciesDex): SpeciesRow['baseStats'] | undefined {
   const known = calcSpecies(calcGenId(gen), species, dex);
   return speciesOverrides(gen, known, dex)?.baseStats ?? gen.species.get(toId(known) as never)?.baseStats;
 }
 
-/** Whether the calculator lists the move; an unlisted one (Pound in Champions) builds as a 0-damage Status move, so a judging reader treats it as unreadable. */
+/** Whether the calculator lists the move; an unlisted one (Pound in Champions) builds as a 0-damage Status move. */
 export function calcKnowsMove(gen: CalcGeneration, name: string): boolean {
   return !!gen.moves.get(toId(name) as never);
 }

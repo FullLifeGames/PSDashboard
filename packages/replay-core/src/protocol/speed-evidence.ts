@@ -3,10 +3,6 @@ import type { ClientIdent, ParserState } from './parser-state.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Cleanliness of speed evidence: everything that explains a move order without Speed (foreign actions, rearranged slots, early and late
- * movers, Scarf changes).
- */
 
 const NOT_A_RACE = /\[from\]\s?(?:ability: |move: )?(?:Dancer|Instruct|Magic Bounce|Magic Coat|Snatch)/;
 const AT_THE_SWITCH = /\[from\]\s?Pursuit/;
@@ -23,19 +19,12 @@ export function foreignAction(line: string): boolean {
   return NOT_A_RACE.test(line);
 }
 
-/**
- * A Pursuit on a switching target fires at the switch: no claim to have moved first, but still the mover's action (a U-turn user that
- * moved before it did win the race).
- */
+/** A Pursuit on a switching target fires at the switch: no first-place claim, but still the mover's action. */
 export function switchTriggered(line: string): boolean {
   return AT_THE_SWITCH.test(line);
 }
 
-/**
- * After You and Quash mark their target as rearranged for the turn; a Quick Claw, Quick Draw, or Custap Berry activation marks the holder
- * as having acted early; a Choice Scarf that comes or goes (Knock Off, Trick, a theft) is noted for its holder and its giver, because the
- * solver reads a race against the set's item unless the order names the Scarf held.
- */
+/** Marks order exceptions: After You and Quash (rearranged), Quick Claw and kin (early), a Scarf that comes or goes. */
 export function noteActivation(state: ParserState, line: string): void {
   const parts = line.split('|');
   const ident = parts[2] ?? '';
@@ -52,11 +41,8 @@ export function noteActivation(state: ParserState, line: string): void {
   }
 }
 
-/**
- * The holders whose Scarf this line moves: a removed Scarf (Knock Off, a theft, the giver's side of a swap into nothing), an arriving
- * one with its giver (`[of]`, else the other party of the pending Trick or Switcheroo), and a known Scarf swapped for another item.
- * Frisk only reveals.
- */
+// A removed Scarf (Knock Off, a theft), an arriving one with its giver (`[of]`, else the other party of a Trick),
+// and a known Scarf swapped for another item; Frisk only reveals.
 function scarfChanges(state: ParserState, line: string, ident: string, item: string): [string, boolean][] {
   if (line.startsWith('|-enditem|')) return item === 'Choice Scarf' ? [[ident, false]] : [];
   if (!line.startsWith('|-item|') || !line.includes('[from]') || line.includes('ability: Frisk')) return [];
@@ -74,10 +60,7 @@ function swapPartner(state: ParserState, line: string, ident: string): string | 
   return move.target === ident ? move.attacker : undefined;
 }
 
-/**
- * The races of a mon whose Scarf came or went: dropped in the turn it moved (which item ran that race is open), read with the Scarf the
- * mon held at every other race. Before its first change a mon held the opposite of what that change gave it.
- */
+/** Races of a mon whose Scarf came or went drop in its move turn; before its first change it held the opposite. */
 export function settleScarfMovers(state: ParserState): void {
   if (state.scarfChanges.size === 0) return;
   const held = (side: string, species: string, turn: number): boolean | null | undefined => {
@@ -103,20 +86,14 @@ export function settleScarfMovers(state: ParserState): void {
 
 type Side = 'p1' | 'p2';
 
-/**
- * One Pokémon on the field during a turn: each forme it held from a line of the turn on (the first from the turn's start or its entry),
- * and the line of its own first move. `resorted` marks a change the simulator's megaEvo action makes, which Gen 7 re-sorts the turn on.
- */
+// `resorted` marks a change the simulator's megaEvo action makes, which Gen 7 re-sorts the turn on.
 interface TurnMon {
   side: Side;
   formes: { at: number; species: string; resorted: boolean }[];
   acted?: number;
 }
 
-/**
- * A transformed slot: its own species and the Pokémon it copied. `shared` marks a copy another active slot of its side runs as its own,
- * where the order cannot tell the two movers apart.
- */
+// `shared`: another active slot of its side runs the copy as its own, so the order cannot tell the two movers apart.
 interface Copy {
   side: Side;
   own: string;
@@ -146,7 +123,6 @@ interface SlotLine {
   data: Generation;
 }
 
-/** The protocol the parse has read: the snapshots keep each turn's lines, the last turn is still open. */
 const readLines = (state: ParserState) => [...state.snapshots.flatMap(snapshot => snapshot.log), ...state.currentTurnLines];
 
 const speciesOf = (details: string) => details.split(',')[0].trim();
@@ -166,11 +142,7 @@ function enter({ slots, turn, slot, details, at }: SlotLine): void {
   slots.set(slot, { species, mon });
 }
 
-/**
- * A forme the simulator's megaEvo action changes into (battle-actions.js runMegaEvo: canMegaEvo gives the forme the holder's Mega Stone
- * maps its species to, which the Mega-Z formes of Champions carry no isMega flag for; canUltraBurst the forme a Z-Crystal holder bursts
- * into), read from the Dex.
- */
+/** The forme `runMegaEvo` changes into (`canMegaEvo`: the Mega Stone's forme, no `isMega` needed; `canUltraBurst`). */
 export function megaEvolution(data: Generation, species: string): boolean {
   const forme = data.species.get(species);
   if (!forme) return false;
@@ -195,7 +167,6 @@ function transform({ slots, turn, slot, details }: SlotLine): void {
   if (copy) turn.copies.push(copy);
 }
 
-/** Ally Switch (`|swap|p1b: Meowstic|0|`): the Pokémon leaves its slot for the numbered position and the one there takes its place. */
 function swap({ slots, slot, details }: SlotLine): void {
   const target = `${sideOf(slot)}${'abcd'[Number(details)] ?? ''}`;
   const moved = slots.get(slot);
@@ -205,7 +176,6 @@ function swap({ slots, slot, details }: SlotLine): void {
   if (moved) slots.set(target, moved);
 }
 
-/** The slot's own first move of the turn (a copied action is not its place in the order). */
 function move({ slots, line, slot, at }: SlotLine): void {
   const mon = slots.get(slot)?.mon;
   if (mon && mon.acted === undefined && !foreignAction(line)) mon.acted = at;
@@ -242,26 +212,18 @@ function readTurns(lines: string[], data: Generation): Map<number, TurnRead> {
   return turns;
 }
 
-/** The record of the Pokémon the order names: the one of that side that held this forme during the turn. */
 const recordOf = (turn: TurnRead, side: Side, species: string) =>
   turn.copies.find(copy => copy.side === side && copy.copied.species === species)?.mon ??
   turn.mons.find(mon => mon.side === side && mon.formes.some(forme => forme.species === species));
 
-/**
- * The forme a mover held when the simulator last sorted it against the other one. Gen 6 and below sort a turn once, on the Speeds at its
- * start; Gen 7 also re-sorts a Pokémon its megaEvo action changed (a Mega Evolution, an Ultra Burst); Gen 8 and later re-sort the movers
- * still waiting after every action (@pkmn/sim battle.js runAction), so two movers were ordered just before the first of them acted.
- */
+// Gen 6 and below sort a turn once, on the Speeds at its start; Gen 7 also re-sorts a Pokémon its megaEvo changed;
+// Gen 8 and later re-sort the movers still waiting after every action (@pkmn/sim battle.js runAction).
 function formeAtSort(state: ParserState, mon: TurnMon, firstActed: number | undefined): string | undefined {
   if (state.genNum >= 8) return firstActed === undefined ? undefined : mon.formes.filter(forme => forme.at < firstActed).at(-1)?.species;
   return mon.formes.filter((forme, index) => index === 0 || (state.genNum === 7 && forme.resorted)).at(-1)?.species;
 }
 
-/**
- * The mover that raced: a transformed mover by its own species with the Pokémon it copied (the simulator's Transform copies the target's
- * stats, the item stays its own), else the forme it held at the sort when that runs on another base Speed; null when a copy and its
- * side's own Pokémon of that species stand together.
- */
+// Transform copies the target's stats, the item stays its own; null when a copy and its side's own mon stand together.
 function racedMover(
   state: ParserState, turn: TurnRead, side: Side, species: string, firstActed: number | undefined,
 ): { species: string; copied?: Copy['copied'] } | null {
@@ -273,7 +235,6 @@ function racedMover(
   return { species: raced && dex.get(raced)?.baseStats.spe !== dex.get(species)?.baseStats.spe ? raced : species };
 }
 
-/** Every order names the mover that raced: its forme at the sort, or what it copied. */
 export function settleRacedFormes(state: ParserState): void {
   const turns = readTurns(readLines(state), state.battle.gens.get(state.genNum));
   state.speedOrders = state.speedOrders.flatMap(order => {
@@ -291,11 +252,6 @@ export function settleRacedFormes(state: ParserState): void {
   });
 }
 
-/**
- * The mon can have the ability: the client knows its ability (a revealed
- * one) and it is this one, or nothing is known and the species carries it
- * in a slot of the replay's generation. A revealed other ability relieves.
- */
 function mayHaveAbility(state: ParserState, ident: string, abilityId: string): boolean {
   const mon = state.battle.getPokemon(ident as ClientIdent);
   if (!mon) return false;
@@ -309,7 +265,7 @@ function atFullHp(state: ParserState, ident: string): boolean {
   return !!mon && mon.hp === mon.maxhp;
 }
 
-/** Prankster, Gale Wings, Triage, and Grassy Glide give the move a bracket above Speed. */
+// Prankster, Gale Wings, Triage and Grassy Glide give the move a bracket above Speed.
 function conditionalPriority(state: ParserState, ident: string, moveId: string): boolean {
   const move = state.battle.gens.get(state.genNum).moves.get(moveId);
   if (!move) return false;
@@ -319,7 +275,7 @@ function conditionalPriority(state: ParserState, ident: string, moveId: string):
   return moveId === 'grassyglide' && state.battle.field.terrain === 'Grassy';
 }
 
-/** Weather and terrain speed abilities, and Unburden after a lost item, double the mover's Speed. */
+// Weather and terrain speed abilities, and Unburden after a lost item, double the mover's Speed.
 function fieldSpeed(state: ParserState, ident: string): boolean {
   const { weather, terrain } = state.battle.field;
   for (const [ability, pattern] of Object.entries(WEATHER_ABILITY)) {

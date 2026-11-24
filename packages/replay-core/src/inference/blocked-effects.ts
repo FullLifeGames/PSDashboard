@@ -6,40 +6,28 @@ import { illusionPossible, partyMayHideIllusion, possibleAbilities } from './ite
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, identOf, keyOf, type LogLine } from './log-line.ts';
 
-/**
- * A landed effect or hit rules out the abilities the simulator would have refused it with, asked on a twin battle; the design is in
- * EVALUATION.md, "Rule-outs".
- */
+// Design: EVALUATION.md "Rule-outs".
 
 interface Hit { attacker: string; move: string }
 
 export interface BlockedWatch {
-  /** The moves that hit each body since the turn began (a flinch comes of one of them). */
   hitBy: Map<string, Hit[]>;
-  /** The ability an Intimidate-like line announced since the last action boundary. */
   announced: { ident: string; ability: string } | null;
-  /** Bodies whose ability the log suppressed (`|-endability|`, Gastro Acid), until they leave the field. */
   suppressed: Set<string>;
   /** The weather standing (a Dex condition id, '' for none): the client keeps display names. */
   weather: string;
   /** The terrain and the other field conditions standing (Gravity, Trick Room, ...), as Dex condition ids. */
   terrain: string;
   fields: Set<string>;
-  /** A condition that changes the type of a move stood this turn (Electrify, Ion Deluge): the type of the move in the log is not the Dex move's. */
+  /** Electrify or Ion Deluge stood this turn: the type of a move in the log is not the Dex move's. */
   typeShift: boolean;
 }
 
-/** Events where every legal ability of the body would have refused the effect (nothing is ruled out), counted over the process. */
 let contradictionCount = 0;
 export const blockedContradictions = (): number => contradictionCount;
-/**
- * Landed effects the reader could not judge (a hit by a move whose type the log does not show, an effect on a side whose party may hold an
- * unseen Illusion user), counted over the process.
- */
 let skipCount = 0;
 export const blockedSkips = (): number => skipCount;
 
-/** One way the line's effect may have reached its target. */
 interface Cause { source: string; effect: SceneEffect; route: EffectScene['route']; move?: string; ability?: string }
 
 const BOUNDARIES = new Set(['move', 'switch', 'drag', 'turn', 'upkeep', 'cant', 'faint', 'replace']);
@@ -51,7 +39,6 @@ function watchOf(state: InferrerState): BlockedWatch {
 const SHIFT_LINES = new Set(['-singleturn', '-fieldactivate', '-fieldstart', '-sidestart', '-start', '-activate']);
 const stripKind = (name: string): string => name.replace(/^(move|ability|item): /, '');
 
-/** Whether the Dex condition behind the name carries a `ModifyType` handler (Electrify, Ion Deluge): it changes the type of the moves used under it. */
 function changesMoveType(dex: RulesDex, name: string): boolean {
   const condition = name ? dex.conditions.get(stripKind(name)) : null;
   return !!condition?.exists && Object.keys(condition).some(key => /^on\w*ModifyType/.test(key));
@@ -110,27 +97,19 @@ function effectOf(line: LogLine): SceneEffect | null {
   return null;
 }
 
-/**
- * The cause of a hit: the move resolving now, when it deals damage and its type is the Dex move's; a move that sets its own type (Weather
- * Ball, Tera Blast, Judgment, Hidden Power: an `onModifyType` handler), a Z-move, a Max move and any move under Electrify or Ion Deluge are
- * not asked, because the log does not show the type.
- */
+// Not asked: a move with an `onModifyType` handler, a Z or Max move, any move under Electrify or Ion Deluge.
 function hitCauseOf(state: InferrerState, watch: BlockedWatch, target: string, effect: SceneEffect): { target: string; causes: Cause[]; unsure?: boolean } | null {
   const pending = state.pendingMove;
   const move = pending ? dexOf(state).moves.get(pending.moveName) : null;
   if (!pending || !move?.exists || move.category === 'Status') return null;
-  // A name whose id is another move's (the typed Hidden Powers of the older generations) is the typed alias of a move the twin cannot select by name.
+  // A name whose id is another move's (typed Hidden Powers of older gens) is an alias the twin cannot select by name.
   const open = watch.typeShift || !!move.isZ || !!move.isMax || toId(pending.moveName) !== move.id || Object.keys(move).some(key => /^on\w*ModifyType/.test(key));
   return { target, causes: open ? [] : [{ source: pending.attacker, effect, route: 'primary', move: move.id }], unsure: open };
 }
 
-/**
- * The causes of the effect a line shows: a flinch comes of a move that hit the body this turn, a drop after an Intimidate-like announcement
- * of that ability, the rest of the move resolving now.
- */
 function causesOf(state: InferrerState, watch: BlockedWatch, line: LogLine): { target: string; causes: Cause[]; unsure?: boolean } | null {
   const target = arg(line, 1);
-  // A line the effect of a move names (`[from] move: Spore` on a status) is the move's own; an item's or an ability's is another source.
+  // `[from] move: Spore` on a status line is the move's own effect; an item's or an ability's is another source.
   const from = fromEffect(line);
   const effect = effectOf(line);
   if (!target || !effect || (hasKw(line, 'from') && from.type !== 'move')) return null;
@@ -152,7 +131,7 @@ function sourceAbilities(state: InferrerState, ident: string): string[] | null {
   const mon = clientPokemon(state, ident);
   if (mon?.volatiles.transform) return null;
   if (mon?.ability) return [dexOf(state).abilities.get(mon.ability).name];
-  // The forme the client shows now (a Mega Evolution changes the abilities), else the one the switch line named.
+  // The client's forme now (a Mega Evolution changes the abilities), else the one the switch line named.
   const species = mon?.speciesForme || state.identSpecies.get(ident);
   const entry = species ? dexOf(state).species.get(species) : null;
   if (!entry?.exists) return null;
@@ -164,16 +143,12 @@ type HitState = Pick<SceneBody, 'item' | 'types' | 'volatiles'>;
 
 interface Holder { ident: string; species: string; role: 'self' | 'partner' }
 
-/**
- * What the log shows of the body a hit lands on, which the simulator's hit steps read: its item (Iron Ball grounds a Levitate holder), its
- * types now (Wonder Guard reads them after a Tera or a type change) and its volatiles (Ingrain, Smack Down). The one known hole: a hidden
- * Iron Ball grounds a Levitate holder and the log shows nothing of it.
- */
+// Known hole: a hidden Iron Ball grounds a Levitate holder and the log shows nothing of it.
 function hitStateOf(state: InferrerState, ident: string): HitState {
   const dex = dexOf(state);
   const mon = clientPokemon(state, ident);
   if (!mon) return {};
-  // The types now, read from the client's facts (its own `types` getter needs the species in its Generations, which hide the Past ones).
+  // Client facts: its own `types` getter needs the species in its Generations, which hide the Past ones.
   const own: string[] = [...dex.species.get(mon.speciesForme).types];
   let types = own;
   if (mon.isTerastallized && mon.teraType && mon.teraType !== 'Stellar') types = [mon.teraType];
@@ -186,14 +161,10 @@ function hitStateOf(state: InferrerState, ident: string): HitState {
   };
 }
 
-/**
- * Whether the ability refuses the effect for one cause: the source's abilities are asked one at a time, the candidate first, and it refuses
- * only if every one refuses and the scene with no ability lets the effect land for one (a scene the log contradicts proves nothing). The
- * partner of a body with an open ability stands for its species only, so the scenes of one body's hits share their answers.
- */
+// Refused only if every source ability refuses and the scene with no ability lets the effect land.
 function refusedFor(state: InferrerState, watch: BlockedWatch, holder: Holder, partner: Holder | null, ability: string, cause: Cause, effectTarget: Holder, hitState: HitState | undefined): boolean {
   const dex = dexOf(state);
-  // An ability the log announced (Intimidate) is the source's own at that moment, whatever its species or a Transform or Trace gave it.
+  // An ability the log announced (Intimidate) is the source's own, whatever a Transform or Trace gave it.
   const abilities = cause.route === 'ability' && cause.ability ? [dex.abilities.get(cause.ability).name] : sourceAbilities(state, cause.source);
   const species = clientPokemon(state, cause.source)?.speciesForme || state.identSpecies.get(cause.source);
   if (!abilities || !species) return false;
@@ -220,7 +191,7 @@ function holderOf(state: InferrerState, watch: BlockedWatch, ident: string, role
   const mon = clientPokemon(state, ident);
   const info = nickname ? findPokemon(state, nickname) : undefined;
   if (!nickname || !mon || !info || info.ability.value || mon.fainted) return null;
-  // An ability the client knows and the team entry did not adopt is not the entry's own (a Skill Swap, a Worry Seed): no proof about the entry.
+  // An ability the client knows and the team entry did not adopt is not the entry's own (Skill Swap, Worry Seed).
   if (mon.ability || mon.baseAbility || mon.volatiles.transform || mon.volatiles.gastroacid || watch.suppressed.has(keyOf(ident))) return null;
   if (toId(mon.speciesForme) !== toId(info.species)) return null;
   return { holder: { ident, species: mon.speciesForme, role }, nickname };
@@ -229,14 +200,11 @@ function holderOf(state: InferrerState, watch: BlockedWatch, ident: string, role
 function allyOf(state: InferrerState, ident: string): string | null {
   const mon = clientPokemon(state, ident);
   const ally = mon?.side.active.find(other => other && other !== mon && !other.fainted);
-  // The ident the log writes for the position (the client's own ident is the one without the slot letter).
+  // The log's ident for the position; the client's own ident lacks the slot letter.
   return ally ? `${identOf(ident)?.side}${String.fromCharCode(97 + ally.slot)}: ${ally.name}` : null;
 }
 
-/**
- * Rules out every candidate the simulator refuses the effect with, never the last legal one; a hit asks only the candidates `mayRefuseHit`
- * names, so the others cost nothing.
- */
+// Rules out every candidate the simulator refuses the effect with, never the last legal one.
 function ruleOutRefusers(state: InferrerState, watch: BlockedWatch, effectTarget: Holder, found: { holder: Holder; nickname: string }, partner: Holder | null, causes: Cause[]) {
   const candidates = possibleAbilities(state, found.holder.ident);
   if (!candidates || candidates.size === 0) return;
@@ -269,10 +237,7 @@ function readable(state: InferrerState): boolean {
   return !!walk && !walk.neutralized && dexOf(state).gen >= 3 && !state.freeAbilities;
 }
 
-/**
- * Called once per line after the client read it: a flinch, drop, status, volatile or hit that landed on an opponent Pokémon rules out the
- * abilities of that Pokémon and its ally on the field that the simulator refuses it with.
- */
+/** Call once per line after the client read it: a landed effect rules out the abilities the simulator refuses. */
 export function watchBlockedEffects(state: InferrerState, line: LogLine) {
   const watch = watchOf(state);
   track(state, watch, line);

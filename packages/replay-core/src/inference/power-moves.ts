@@ -6,26 +6,21 @@ import { poweredMove } from '../spreads/powered-move.ts';
 import { findPokemon, type InferrerState } from './inferrer-state.ts';
 import { arg, identOf, kwText, type LogLine } from './log-line.ts';
 
-/**
- * Reads a Z-move or Max move line: the log shows the powered move and never its base move, so the Dex gives the base move or its type.
- * Max Guard, the Max move of status category, stands for every status move.
- */
+// The log shows the powered move, never its base move; Max Guard, the status Max move, stands for every status move.
 
 type PowerMove =
-  /** The base move, named: it is a move of the set. */
   | { base: string; gigantamax?: undefined }
-  /** The base move, hidden: the set keeps a slot open for it; a G-Max move shows the Gigantamax too. */
   | { open: OpenMove; gigantamax?: boolean };
 
 type GenDex = ReturnType<typeof Dex.forGen>;
 
-/** A species' own Z-move: its base move, from the crystal. Any other damaging Z-move: the type the crystal enables (`zMoveType`). */
+// A species' own Z-move names its base move (the crystal); any other damaging Z-move the type the crystal enables.
 function zMoveReading(dex: GenDex, move: ReturnType<GenDex['moves']['get']>): PowerMove {
   const crystal = dex.items.get(String(move.isZ));
   return crystal.zMoveFrom ? { base: crystal.zMoveFrom } : { open: { kind: 'attack', type: crystal.zMoveType ?? move.type } };
 }
 
-/** The base move a status Z-move prints: the `[anim]` marker, else the name after "Z-"; null when the name is no Z-move's. */
+// The base move of a status Z-move: the `[anim]` marker, else the name after "Z-".
 function statusZReading(dex: GenDex, line: LogLine): PowerMove | null {
   const name = arg(line, 2);
   if (!name.startsWith('Z-') || dex.moves.get(name).exists) return null;
@@ -34,7 +29,6 @@ function statusZReading(dex: GenDex, line: LogLine): PowerMove | null {
   return base.exists ? { base: base.name } : null;
 }
 
-/** The reading of a `move` line, or null for a move that is its own base. */
 export function readPowerMove(dex: GenDex, line: LogLine): PowerMove | null {
   const move = dex.moves.get(arg(line, 2));
   if (!poweredMove(dex, move.id)) return statusZReading(dex, line);
@@ -43,7 +37,7 @@ export function readPowerMove(dex: GenDex, line: LogLine): PowerMove | null {
   return { open: move.category === 'Status' ? { kind: 'status' } : { kind: 'attack', type: move.type }, gigantamax };
 }
 
-/** A Z-move or Max move books what it proves: the base move when the log names it, else an open slot for it; a G-Max move shows the Gigantamax. */
+/** Books what the line proves: the base move when named, else an open slot for it. */
 export function bookPowerMove(pokemon: RevealedPokemonInfo, power: PowerMove): void {
   if ('base' in power) {
     if (!pokemon.moves.some(move => toId(move.name) === toId(power.base))) pokemon.moves.push({ name: power.base, source: 'revealed' });

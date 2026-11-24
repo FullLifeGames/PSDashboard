@@ -18,21 +18,17 @@ export const SWAP_ITEM_SOURCES: Record<string, Set<string>> = {
   // eslint-disable-next-line names/no-new-dex-name -- held by swap-item-sources-oracle.spec.ts (Pickup)
   ability: new Set(['Magician', 'Pickpocket', 'Pickup']),
 };
-/**
- * `|-activate|` effects that hand an item from the first Pokémon of the line to the `[of]` Pokémon: Symbiosis writes no `|-item|` line
- * (`|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>`).
- */
+/** `|-activate|` effects that hand an item to the `[of]` Pokémon; Symbiosis writes no `|-item|` line. */
 // oracle: packages/replay-core/test/swap-item-sources-oracle.spec.ts
 export const ITEM_HANDOVER_ACTIVATIONS: Record<string, Set<string>> = { ability: new Set(['Symbiosis']) };
-/** Swap moves whose resolving-move context pairs giver and receiver (no [of] emitted). */
+// Swap moves emit no [of]: the resolving move pairs giver and receiver.
 const SWAP_PAIR_MOVES = new Set(['trick', 'switcheroo', 'thief', 'covet']);
 
-/** The item is still open: nothing shown, or only the team preview's flag that the Pokémon holds something; an item the log shows replaces the flag. */
+// Open: nothing shown, or only the team preview's flag that the Pokémon holds something.
 function itemOpen(pokemon: { item: PokemonFieldInfo }): boolean {
   return !pokemon.item.value || pokemon.item.value === '(has item)';
 }
 
-/** Lines after which no move resolves any more (the move's damage lines are over). */
 const MOVE_BOUNDARIES = new Set(['-miss', '-immune', '-fail', '-end', 'turn', 'upkeep', 'cant', 'faint']);
 
 function sideSubject(line: LogLine, side: string): string | null {
@@ -40,10 +36,8 @@ function sideSubject(line: LogLine, side: string): string | null {
   return ident?.side === side ? ident.name : null;
 }
 
-/**
- * Two plain moves disprove a Choice lock, a plain Status move Assault Vest; a Z-move or Max move is no plain move (a Dynamaxed body picks
- * any Max move whatever it holds, and Max Guard still disproves Assault Vest).
- */
+// Two plain moves disprove a Choice lock, a plain Status move Assault Vest; a Z or Max move is no plain move
+// (a Dynamaxed body picks any Max move whatever it holds; Max Guard still disproves Assault Vest).
 function recordPlainMove(state: InferrerState, ident: string, moveName: string, powered: boolean) {
   const nickname = identOf(ident)?.name.trim();
   if (!nickname) return;
@@ -60,7 +54,6 @@ function recordPlainMove(state: InferrerState, ident: string, moveName: string, 
   }
 }
 
-/** The resolving move (for damage attribution) and its target; boundaries clear it. */
 export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
   if (line.cmd === 'move') {
     const attacker = arg(line, 1);
@@ -77,7 +70,6 @@ export function noteMoveOrBoundary(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Entries reset the plain-move count and map idents (both sides) and opponent nicknames to species. */
 export function noteEntry(state: InferrerState, line: LogLine) {
   if (line.cmd !== 'switch' && line.cmd !== 'drag') return;
   state.pendingMove = null;
@@ -93,10 +85,7 @@ export function noteEntry(state: InferrerState, line: LogLine) {
   state.plainMovesSince.delete(ident);
 }
 
-/**
- * Disproving evidence: a Pokémon that takes hazard, status, weather or recoil damage cannot be Magic Guard; rocks chip rules out Heavy-Duty
- * Boots (a Clefable simmed with Magic Guard visibly took Stealth Rock damage).
- */
+// Damage from hazards, status, weather or recoil disproves Magic Guard; rocks chip disproves Heavy-Duty Boots.
 const HAZARDS = new Set(['Stealth Rock', 'Spikes']);
 const INDIRECT = new Set(['psn', 'tox', 'brn', 'Sandstorm', 'Hail']);
 
@@ -126,7 +115,6 @@ function revealedPokemon(parsed: { species: string; level: number; gender: strin
   };
 }
 
-/** Team preview: |poke|p2|Species, L50, M|item */
 export function addFromPreview(state: InferrerState, line: LogLine) {
   if (line.cmd !== 'poke' || arg(line, 1) !== state.opponentSide) return;
   const hasItem = arg(line, 3) === 'item';
@@ -136,10 +124,7 @@ export function addFromPreview(state: InferrerState, line: LogLine) {
   }
 }
 
-/**
- * Switch: |switch|p2a: Nickname|Species, L50, M|100/100. A forme the team preview hid behind "-*" (Urshifu-*, Zamazenta-*) is revealed
- * here: the marker entry becomes that forme instead of a seventh body.
- */
+/** A forme the team preview hid behind "-*" (Urshifu-*) is revealed here: the marker entry becomes that forme. */
 export function addFromSwitch(state: InferrerState, line: LogLine) {
   if ((line.cmd !== 'switch' && line.cmd !== 'drag') || sideSubject(line, state.opponentSide) === null) return;
   const details = detailsOf(arg(line, 2));
@@ -151,21 +136,16 @@ export function addFromSwitch(state: InferrerState, line: LogLine) {
   else state.pokemonMap.set(parsed.species, revealedPokemon(parsed, unknownField()));
 }
 
-/**
- * The move line a `|cant|` line stands for, or null when it names no move (sleep, paralysis, flinch, recharge, Truant): the blocked move
- * never ran, so the log shows it only here (Taunt, Imprison, Disable, Heal Block). A blocker's `[of]` line (Dazzling, Queenly Majesty,
- * Armor Tail, Damp) reaches the inference as `-block` after the attacker's own `|move|` line, so it is no `cant` here.
- */
+// A `|cant|` line names the move only for Taunt, Imprison, Disable and Heal Block: the blocked move never ran.
+// A blocker's [of] line (Dazzling, Damp) arrives as `-block` after the attacker's `|move|` line, so it is no `cant`.
 function blockedMoveLine(line: LogLine): LogLine | null {
   const moveName = arg(line, 3);
   return moveName ? { ...line, cmd: 'move', args: ['move', arg(line, 1), moveName], kwArgs: {} } : null;
 }
 
-/** Move: |move|p2a: Nickname|Move Name|target, or the move of a |cant| line; the client's rule decides which move the line books. */
 export function recordMove(state: InferrerState, line: LogLine) {
   const moveLine = line.cmd === 'cant' ? blockedMoveLine(line) : line;
   if (!moveLine || moveLine.cmd !== 'move') return;
-  // A copy's move books to the body it copied, whichever side the copy stands on.
   const booked = identOf(bookingIdent(state, arg(moveLine, 1)));
   if (booked?.side !== state.opponentSide) return;
   const nickname = booked.name;
@@ -180,8 +160,6 @@ export function recordMove(state: InferrerState, line: LogLine) {
   else if (!pokemon.moves.some(move => move.name === moveName)) pokemon.moves.push({ name: moveName, source: 'revealed' });
 }
 
-/** Giver: the [of] ident when present, else the OTHER party of the
- *  resolving swap move (Trick swaps emit no [of]). */
 function swapGiverIdent(state: InferrerState, line: LogLine, ident: string): string | null {
   const { pendingMove } = state;
   const of = ofIdent(line);
@@ -194,12 +172,9 @@ function swapGiverIdent(state: InferrerState, line: LogLine, ident: string): str
     : null);
 }
 
-/** The same line DOES reveal the GIVER's set item: whatever arrived came
- *  off the other party of the resolving swap. */
+// The same line reveals the giver's set item: whatever arrived came off the other party of the swap.
 function creditSwapGiver(state: InferrerState, line: LogLine, ident: string, itemName: string) {
   const giver = swapGiverIdent(state, line, ident);
-  // A giver that swap-acquired in an EARLIER action only gives away
-  // acquired goods; its counterpart line in THIS action still counts.
   const priorSwap = giver !== null && state.swappedIdents.has(giver) && state.swappedIdents.get(giver) !== state.pendingMove;
   if (giver && giver.startsWith(state.opponentSide) && !priorSwap) {
     const giverNickname = identOf(giver)?.name;
@@ -210,27 +185,19 @@ function creditSwapGiver(state: InferrerState, line: LogLine, ident: string, ite
   }
 }
 
-/**
- * An item handed over by an ability's `|-activate|` line: the receiver holds an item that is not its set item, and the giver's set item is
- * the one the line names.
- */
 function recordHandover(state: InferrerState, line: LogLine) {
   const [type, name] = arg(line, 2).split(': ');
   if (!ITEM_HANDOVER_ACTIVATIONS[type]?.has(name)) return;
   const receiver = ofIdent(line);
   if (receiver && identOf(receiver)?.side === state.opponentSide) state.swappedIdents.set(receiver.trim(), state.pendingMove);
   const giver = identOf(arg(line, 1));
-  const itemName = kwText(line, 'item'); // the protocol reads the item of this line as a keyword argument
+  const itemName = kwText(line, 'item');
   if (!giver || giver.side !== state.opponentSide || !itemName || state.swappedIdents.has(arg(line, 1))) return;
   const pokemon = findPokemon(state, giver.name);
   if (pokemon && itemOpen(pokemon)) pokemon.item = revealedField(itemName);
 }
 
-/**
- * Item: |-item|pXa: Nickname|Item Name[|tags]. A swap-acquired item (Trick, Switcheroo, Thief, Covet, Bestow, Magician, Pickpocket, Pickup;
- * Symbiosis hands its item over through an |-activate| line) is not the holder's set item: crediting Vileplume with the scarf a Trick
- * planted on it manufactured a choice lock that hid its real moves.
- */
+/** A swap-acquired item is not the holder's set item: crediting it would make up a Choice lock that hides moves. */
 export function recordItem(state: InferrerState, line: LogLine) {
   if (line.cmd === '-activate') return recordHandover(state, line);
   if (line.cmd !== '-item') return;
@@ -254,11 +221,7 @@ export function recordItem(state: InferrerState, line: LogLine) {
   }
 }
 
-/**
- * Item damage that hurts the attacker reveals its holder (Rocky Helmet, Jaboca and Rowap Berry): the [of] Pokémon, or in
- * video-reconstructed logs that drop [of] the target of the damaged Pokémon's own move; the holder's own recoil items (Life Orb, Black
- * Sludge) come from client-facts.ts.
- */
+/** Item damage that hurts the attacker reveals its holder: the [of] Pokémon, or the target where [of] is dropped. */
 export function recordItemDamage(state: InferrerState, line: LogLine) {
   const from = fromEffect(line);
   if (line.cmd !== '-damage' || from.type !== 'item' || !ATTACKER_PUNISH_ITEMS.has(toId(from.name))) return;
@@ -272,7 +235,6 @@ export function recordItemDamage(state: InferrerState, line: LogLine) {
   }
 }
 
-/** Terastallize: |-terastallize|p2a: Nickname|Type */
 export function recordTera(state: InferrerState, line: LogLine) {
   const nickname = line.cmd === '-terastallize' ? sideSubject(line, state.opponentSide) : null;
   if (nickname === null) return;
@@ -283,17 +245,12 @@ export function recordTera(state: InferrerState, line: LogLine) {
   }
 }
 
-/**
- * Effect attributions reveal abilities (`[from] ability: Poison Heal` on heal, damage and status lines); the holder is the line's [of] or
- * its subject as the Dex allows (ability-holder.ts).
- */
 export function recordAbilityAttribution(state: InferrerState, line: LogLine) {
   const from = fromEffect(line);
   if (from.type !== 'ability' || !from.name) return;
   const abilityName = from.name;
   const ofText = ofIdent(line);
   const of = ofText && /^p[12]/.test(ofText) ? ofText.trim() : null;
-  // The subject of a minor line ("|-heal|p2a: Nick|..."); a move line's user is no subject here.
   const subjectIdent = identOf(arg(line, 1));
   const subject = /^-[a-z]+$/.test(line.cmd) && subjectIdent && /^p[12]$/.test(subjectIdent.side) ? arg(line, 1).trim() : null;
   const holder = identOf(abilityHolderIdent(state, subject, of, abilityName) ?? undefined);

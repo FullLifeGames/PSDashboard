@@ -12,46 +12,31 @@ import type { HitWalk } from './hits.ts';
 import type { BlockedWatch } from './blocked-effects.ts';
 import { arg, type LogLine } from './log-line.ts';
 
-/** The scan state one team inference carries from line to line. */
 export interface InferrerState {
-  /** Every line of the log, read once through @pkmn/protocol. */
   lines: readonly LogLine[];
   opponentSide: 'p1' | 'p2';
   pokemonMap: Map<string, RevealedPokemonInfo>;
-  // Each ident's latest move target: resolves Rocky Helmet reveals in video-reconstructed logs that drop the [of] attribution.
+  // Latest move target per ident: resolves Rocky Helmet in video-reconstructed logs that drop [of].
   lastMoveTarget: Map<string, string>;
-  // The move action currently resolving; bare |-damage| lines attribute to it only until an action boundary (a stale attribution would let
-  // a confusion self-hit or a Future Sight resolution "prove" that an immune-blocked Earthquake landed).
+  // Bare `|-damage|` lines attribute to it only until an action boundary; a stale one would prove an immune move hit.
   pendingMove: { attacker: string; moveName: string } | null;
-  // Ident to species for both sides (the attacker of a rule-out line can be on either side).
   identSpecies: Map<string, string>;
-  // Distinct plain move names each opponent ident used since it last entered the field; `[from]`-attributed lines (Sleep Talk calls,
-  // bounces, Dancer copies) never count, they are not the holder's choice.
+  // Plain moves per opponent ident since it entered; `[from]` lines (Sleep Talk, Dancer) never count (not its choice).
   plainMovesSince: Map<string, Set<string>>;
-  // Opponent nickname to species, fed by the same switch/drag lines as identSpecies; serves the rule-out path without re-scanning the log
-  // (the full scan is the fallback for synthetic logs).
   nicknameSpecies: Map<string, string>;
-  // Idents whose current item arrived via a swap (Trick & co): later reveals show the acquired item, not the set item. The value is the
-  // swap's resolving-move action (object identity): within the same action the counterpart line may still credit the giver's original; from
-  // a later action the ident only gives away acquired items.
+  // Idents whose item came by a swap (Trick & co): later reveals show the acquired item. The value is the swap's
+  // resolving-move action (object identity): in that action the counterpart line may credit the giver, later none.
   swappedIdents: Map<string, object | null>;
-  /** The replay's generation (|gen| line): the Dex that decides who may hold an ability. */
   gen: number;
-  /** The replay's mod, read from its tier line ('champions' for a Pokémon Champions format): the Dex of the game is `rulesDex(gen, mod)`. */
+  /** The replay's mod, read from its tier line; the game's Dex is `rulesDex(gen, mod)`. */
   mod: typeof CHAMPIONS_MOD | undefined;
-  /** A format that lets any species hold any ability (Balanced Hackmons; a custom game keeps the usual ones): the Dex decides nothing. */
+  /** A format that lets any species hold any ability (Balanced Hackmons; a custom game keeps the usual ones). */
   freeAbilities: boolean;
-  /** Item evidence by absence (the resolving move and the residual phase); item-evidence.ts creates it. */
   itemWatch?: ItemWatch;
-  /** Item evidence by a trigger without its line; trigger-evidence.ts creates it. */
   triggerWatch?: TriggerWatch;
-  /** Item evidence by a screen's turns; screen-evidence.ts creates it. */
   screenWatch?: ScreenWatch;
-  /** Item evidence by a weather's or a terrain's turns; field-evidence.ts creates it. */
   fieldWatch?: FieldWatch;
-  /** The client walk that collects each opponent attacker's clean hits; hits.ts creates it. */
   hitWalk?: HitWalk;
-  /** The abilities a landed effect rules out; blocked-effects.ts creates it. */
   blockedWatch?: BlockedWatch;
 }
 
@@ -89,7 +74,6 @@ export function ruleOut(state: InferrerState, nickname: string, kind: 'abilities
   if (!ruledOut[kind].includes(id)) ruledOut[kind].push(id);
 }
 
-/** The opponent Pokémon behind a nickname, through the log's switch lines. */
 export function findPokemon(state: InferrerState, nickname: string): RevealedPokemonInfo | undefined {
   return findPokemonByNickname(dexOf(state), state.pokemonMap, nickname, state.lines, state.opponentSide);
 }

@@ -1,11 +1,11 @@
 import { toId } from './ids.ts';
 
-/** The one rule that decides whether a format is Pokémon Champions: no format of the base Dex carries the word `champions` and every format of the mod does. */
+// No format of the base Dex carries the word `champions`; every format of the mod does.
 const CHAMPIONS_FORMAT = /champions/;
 const MEMO_LIMIT = 512;
 const memo = new Map<string, boolean>();
 
-/** Whether `format` (a Dex id, replay id, branch format with custom rules or a logged tier name) names a Pokémon Champions format; memoized because a search asks per node. */
+/** Whether `format` (Dex id, replay id, branch format or logged tier name) names a Pokémon Champions format. */
 export function isChampionsFormat(format: string): boolean {
   let champions = memo.get(format);
   if (champions === undefined) {

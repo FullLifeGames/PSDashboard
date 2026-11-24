@@ -2,7 +2,7 @@ import { factsOfDex, type FactsDex, type ProtectKind } from './facts.ts';
 
 type DexMove = ReturnType<FactsDex['moves']['get']>;
 
-/** The Protect family of a move, read from the Dex entry's fields only (null outside it): `shield` and `stall` roll the stall counter, `side` does not. */
+/** The Protect family of a move, from the Dex entry's fields only (null outside it); `side` rolls no stall counter. */
 export function protectKind(dex: FactsDex, move: DexMove): ProtectKind | null {
   const memo = factsOfDex(dex).protect;
   let kind = memo.get(move.id);

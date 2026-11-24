@@ -1,4 +1,4 @@
-/** The screens with the flag the damage calculator reads each by; a constant, because `onAnyModifyDamage` finds them only from Generation 5 on. */
+/** Each screen with its calculator flag; a constant because `onAnyModifyDamage` finds them only from Gen 5 on. */
 // oracle: packages/replay-core/test/screens-oracle.spec.ts
 export const SCREEN_FLAGS = { reflect: 'isReflect', lightscreen: 'isLightScreen', auroraveil: 'isAuroraVeil' } as const;
 
@@ -23,6 +23,6 @@ export interface ScreenHolder {
   active: readonly (null | undefined | { volatiles: Readonly<Record<string, unknown>> })[];
 }
 
-/** The screens standing on a side: a side condition, or, in Generation 1, a volatile of the Pokémon that used Reflect or Light Screen (gone when it leaves). */
+/** The screens standing on a side: a side condition, or in Gen 1 a volatile of the user of Reflect or Light Screen. */
 export const standingScreens = (side: ScreenHolder): ScreenId[] =>
   SCREENS.filter(id => side.sideConditions[id] || side.active.some(mon => mon?.volatiles[id]));

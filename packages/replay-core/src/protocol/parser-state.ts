@@ -15,44 +15,34 @@ interface TurnMover {
   cleanSecond: boolean;
 }
 
-/** A Choice Scarf that came (`held`) or went at this turn. */
 export interface ScarfChange {
   turn: number;
   held: boolean;
 }
 
-/** What one target of the pending move took so far: a second damage line spoils the observation of the first (multi-hit). */
 export interface TargetHit {
   count: number;
   observation: DamageObservation | null;
 }
 
-/** The pending move context: crits and multi-hits disqualify the damage of their target. */
 export interface PendingMove {
   attacker: string;
   target: string;
   moveId: string;
-  /** The move's name as the move line prints it. */
   moveName: string;
   /** The move line names `[spread]`: the simulator cut the damage. */
   spread: boolean;
-  /** Targets a `|-crit|` line named: their damage is no reading. */
   crits: Set<string>;
-  /** Per target ident, in the order the damage lines came (a spread move has up to three, Dragon Darts two). */
   hits: Map<string, TargetHit>;
-  /** The item of a Pokémon whose item ended inside this move before its damage line: it counted for the hit. */
   itemsBefore: Map<string, ItemReading>;
-  /** Targets with an item or ability line inside this move before their damage line: a Focus Sash, Sturdy or Endure may hold the hit back. */
+  /** Targets with an item or ability line before their damage line: a Focus Sash, Sturdy or Endure may hold the hit. */
   marked: Set<string>;
-  /** The attacker's speed-evidence cleanliness at move time. */
   speedClean: boolean;
   attackerSide: 'p1' | 'p2';
   attackerSpecies: string;
-  /** Effectiveness marker seen for this move (HP-type evidence). */
   effectiveness?: 'super' | 'resisted';
 }
 
-/** The scan state one replay parse carries from line to line. */
 export interface ParserState {
   battle: Battle;
   snapshots: TurnSnapshot[];
@@ -62,30 +52,23 @@ export interface ParserState {
   currentTurnLines: string[];
   singles: boolean;
   genNum: GenerationNum;
-  // Speed-order evidence: the |move| lines of a turn prove effective speed order between opposite sides, but only when nothing else could
-  // explain it.
+  // Speed-order evidence: a turn's |move| lines prove speed order between opposite sides when nothing else explains it.
   speedTurn: number;
   turnMovers: TurnMover[];
   switchedThisTurn: Set<string>;
   actedThisTurn: Set<string>;
-  /** Idents whose slot After You or Quash rearranged this turn. */
   reordered: Set<string>;
-  /** Idents that acted early on a Quick Claw, Quick Draw, or Custap Berry this turn. */
   quickActed: Set<string>;
-  /**
-   * Per `side:species`, the turns a Choice Scarf came or went: the races around them are read with the Scarf the mon held, the races
-   * of a change turn are dropped.
-   */
+  /** Per `side:species`, the turns a Choice Scarf came or went; the races of a change turn are dropped. */
   scarfChanges: Map<string, ScarfChange[]>;
-  /** The stat stages each Pokémon had when its Protosynthesis or Quark Drive last activated. */
   paradoxStages: Map<Pokemon, Record<string, number>>;
-  /** The Pokémon whose ability a `|-endability|` line took away (Gastro Acid): the client keeps no trace of it. */
+  /** Whose ability a `|-endability|` line took away (Gastro Acid): the client keeps no trace of it. */
   abilityEnded: Set<Pokemon>;
   lastMove: PendingMove | null;
   capturedInitial: boolean;
 }
 
-/** A fresh scan state; `format` is the log's tier, which picks the Generations the client battle is built on. */
+/** A fresh scan state; `format` is the log's tier, which picks the Generations of the client battle. */
 export function createParserState(format = ''): ParserState {
   return {
     battle: new Battle(generationsFor(format)),
@@ -110,18 +93,15 @@ export function createParserState(format = ''): ParserState {
   };
 }
 
-/**
- * @pkmn/client 0.7.4 never charges Pressure's extra PP point: `getPressurePP` compares `effectiveAbility()`, which returns an ID
- * (`pressure`), with the name `Pressure`. The simulator charges it (a Pressure holder as the target of a move costs two PP per use).
- * This copy is the client's method with the comparison made on IDs; the Pressure row of `low-pp-sweep.spec.ts` holds it to the simulator.
- */
+// @pkmn/client 0.7.4 never charges Pressure's extra PP point: `getPressurePP` compares an ID with the name `Pressure`.
+// This copy compares IDs; the Pressure row of `low-pp-sweep.spec.ts` holds it to the simulator.
 // eslint-disable-next-line names/no-new-dex-name -- the client's own ability ID, held to the simulator by the Pressure rows of low-pp-sweep.spec.ts
 const PRESSURE = 'pressure';
 type PressurePP = number | [number, number];
 (Pokemon.prototype as unknown as { getPressurePP(pp: PressurePP, foes: Pokemon[]): PressurePP }).getPressurePP = function (this: Pokemon, pp, foes) {
   for (const foe of foes) {
     const abilities = Object.values(this.side.battle.gen.species.get(foe.speciesForme)?.abilities ?? {}).map(toId);
-    // The game's generation is the client Dex's own number; calc-generation.spec.ts keeps the calculator generation's number out of this read
+    // The game's generation is the client Dex's own number, never the calculator's (`calc-generation.spec.ts`).
     const canHavePressure = this.side.battle.gen.dex.gen === 3 &&abilities.includes(PRESSURE);
     if (toId(foe.effectiveAbility()) === PRESSURE || (canHavePressure && abilities.length === 1)) {
       if (typeof pp === 'number') pp += 1;
@@ -134,11 +114,7 @@ type PressurePP = number | [number, number];
   return pp;
 };
 
-/**
- * The PP the log shows spent per move of the body, as @pkmn/client counts it (`ppUsed` of its move slots: it charges Pressure and takes
- * a Leppa or Mystery Berry back off). The copies a Transform holds stay out. A pair is a range: the foe's Pressure is open, or a charge
- * move whose second move line some generations do not charge. Undefined when the body shows no move.
- */
+/** PP spent per move as @pkmn/client counts it; a pair is a range (the foe's Pressure is open, or a charge move). */
 export function ppUsedOf(mon: Pokemon): PokemonSnapshot['ppUsed'] {
   const own = mon.moveSlots.filter(slot => !slot.virtual);
   if (own.length === 0) return undefined;
@@ -146,20 +122,14 @@ export function ppUsedOf(mon: Pokemon): PokemonSnapshot['ppUsed'] {
   const finite = (points: number) => Math.min(points, Number.MAX_SAFE_INTEGER);
   return Object.fromEntries(own.map(slot => {
     const [least, most] = typeof slot.ppUsed === 'number' ? [slot.ppUsed, slot.ppUsed] : [Math.min(...slot.ppUsed), Math.max(...slot.ppUsed)];
-    // A charge move prints its move line on both turns, and the first generations spend the PP once: the count is a range there.
+    // A charge move prints its move line on both turns, and the first generations spend the PP once: a range.
     const charges = !!mon.side.battle.gen.moves.get(slot.name)?.flags?.charge;
     const range: [number, number] = [finite(charges ? Math.ceil(least / 2) : least), finite(most)];
     return [slot.name, range[0] === range[1] ? range[0] : range];
   }));
 }
 
-/**
- * Directional contamination, read at decision time: an observation drops only when the factor could explain the observed order, a
- * speed-raising factor (Tailwind, +spe stages, paradox boosters) on the first mover or a speed-lowering one (paralysis, -spe stages) on
- * the second. The kept directions are implied constraints: outrunning a Tailwind-doubled opponent outruns its base speed a fortiori, and
- * a paralyzed mon moving first won the race at a quarter of its speed. Trick Room inverts order outright and same-turn entries are
- * unknowable at order time: both stay bilateral. Paradox boosters are volatiles, not stat stages; any variant counts as a raiser.
- */
+/** Whether a factor could explain the observed order: a raiser on the first mover or a lowerer on the second. */
 export function speedContaminatedAt(state: ParserState, ident: string, role: 'first' | 'second'): boolean {
   const { battle } = state;
   const mon = battle.getPokemon(ident as ClientIdent);
@@ -176,10 +146,7 @@ export function speedContaminatedAt(state: ParserState, ident: string, role: 'fi
   return mon.status === 'par' || (mon.boosts.spe ?? 0) < 0;
 }
 
-/**
- * Every opposite-side pair of the turn's movers in action order is a race the earlier one won (doubles turns carry up to four movers).
- * A pair drops when the earlier mover is not clean as a first mover, the later one not as a second, or either slot was rearranged.
- */
+/** Every opposite-side pair of the turn's movers in action order is a race the earlier won (doubles: four movers). */
 export function flushSpeedOrder(state: ParserState) {
   const movers = state.turnMovers;
   for (let i = 0; i < movers.length; i++) {

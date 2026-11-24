@@ -15,7 +15,7 @@ export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
 }
 
-/** A line reaches at most one evidence handler, in this fixed order. */
+// A line reaches at most one evidence handler, in this fixed order.
 function dispatch(state: ParserState, line: string) {
   if (line.startsWith('|gametype|')) {
     handleGametype(state, line);
@@ -43,7 +43,7 @@ function dispatch(state: ParserState, line: string) {
   }
 }
 
-/** One pass over the log: the handlers read the client battle before each line applies (the state at decision time), then the line feeds the client. */
+/** One pass over the log: the handlers read the client before each line applies, then the line feeds it. */
 export function parseReplayLogWithObservations(rawLog: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];

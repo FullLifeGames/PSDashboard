@@ -8,14 +8,11 @@ import { toId } from '../ids.ts';
 import { terrainConditions } from '../dex-facts/index.ts';
 import { newFieldItemWatch, watchFieldItems, type FieldItemWatch } from './field-item-triggers.ts';
 
-/** Rules out Air Balloon, Booster Energy and Eject Pack by the trigger the protocol shows without the item's line. */
+// Design: EVALUATION.md "Rule-outs".
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 
-/**
- * An entry waiting for its Air Balloon announcement (it shows as its holder enters, unless Gravity is up or the item is ignored) or its
- * Booster Energy line.
- */
+// Air Balloon shows as its holder enters, unless Gravity is up or the item is ignored.
 interface EntryCheck {
   ident: string;
   balloon: boolean;
@@ -25,13 +22,10 @@ interface EntryCheck {
 export interface TriggerWatch {
   gravity: boolean;
   magicRoom: boolean;
-  /** The weather and the terrain as ids, '' for none. */
   weather: string;
   terrain: string;
-  /** The opponent Pokémon on each field position ("p2a"), and the fainted ones. */
   slots: Map<string, string>;
   fainted: Set<string>;
-  /** How many Pokémon the opponent brought (`|teamsize|`, else the preview, else every one the log brings in). */
   teamSize: number;
   embargoed: Set<string>;
   commanding: Set<string>;
@@ -40,9 +34,7 @@ export interface TriggerWatch {
   entries: Map<string, EntryCheck>;
   /** Drops waiting for their Eject Pack line; `moved` once a move followed the drop. */
   drops: Map<string, { moved: boolean }>;
-  /** The Lum Berry, Sitrus Berry, Eject Button and Red Card windows (item-triggers.ts). */
   items: ItemTriggerWatch;
-  /** The terrain seeds and Room Service (field-item-triggers.ts). */
   field: FieldItemWatch;
 }
 
@@ -54,13 +46,11 @@ function newWatch(state: InferrerState): TriggerWatch {
   };
 }
 
-/** The item exists in the replay's generation. */
 function inGen(state: InferrerState, itemId: string): boolean {
   const item = dexOf(state).items.get(itemId);
   return item.exists && item.gen <= state.gen;
 }
 
-/** Whether Booster Energy's own handler spends the item for a holder with this ability on this field. */
 function spendsWith(onUpdate: ItemHandler, ability: string, watch: TriggerWatch): boolean {
   let used = false;
   const named = (name: string | string[], id: string) => [name].flat().map(toId).includes(id);
@@ -80,10 +70,7 @@ function spendsWith(onUpdate: ItemHandler, ability: string, watch: TriggerWatch)
   return used;
 }
 
-/**
- * Every ability the Pokémon may have makes Booster Energy spend itself at entry (gen 9), outside the weather or terrain it reads, so a
- * holder shows the line.
- */
+// Booster Energy spends itself at entry (Gen 9) for every ability the holder may have, outside its weather or terrain.
 function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch): boolean {
   if (watch.neutralized || watch.magicRoom || !inGen(state, 'boosterenergy')) return false;
   const { onUpdate } = dexOf(state).items.get('boosterenergy') as { onUpdate?: ItemHandler };
@@ -91,7 +78,6 @@ function boosterSpends(state: InferrerState, ident: string, watch: TriggerWatch)
   return !!onUpdate && !!abilities && abilities.size > 0 && [...abilities].every(ability => spendsWith(onUpdate, ability, watch));
 }
 
-/** A Pokémon entered a position: whoever stood there left (its drop judges nothing), and the newcomer's entry opens. */
 function onEntry(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
   const ident = arg(line, 1);
   const position = ident.slice(0, 3);
@@ -106,7 +92,6 @@ function onEntry(state: InferrerState, watch: TriggerWatch, line: LogLine, key: 
   });
 }
 
-/** The entries' window closes at the next move or turn: an entry still without its line rules the item out. */
 function closeEntries(state: InferrerState, watch: TriggerWatch) {
   for (const [key, entry] of watch.entries) {
     const klutz = possibleAbilities(state, entry.ident);
@@ -116,7 +101,7 @@ function closeEntries(state: InferrerState, watch: TriggerWatch) {
   watch.entries.clear();
 }
 
-/** A drop on an opponent Pokémon that an Eject Pack would answer (gens 8 and 9: after any drop but Parting Shot's). */
+// Eject Pack answers any drop but Parting Shot's (Gens 8 and 9).
 function onDrop(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
   if (!(Number(arg(line, 3)) > 0) || !inGen(state, 'ejectpack') || watch.drops.has(key)) return;
   if (toId(state.pendingMove?.moveName ?? '') === 'partingshot') return;
@@ -125,7 +110,6 @@ function onDrop(state: InferrerState, watch: TriggerWatch, line: LogLine, key: s
   watch.drops.set(key, { moved: false });
 }
 
-/** The residual phase after a move: a holder still on the field with a teammate to come in would have left by now. */
 function closeDrops(state: InferrerState, watch: TriggerWatch) {
   const active = new Set(watch.slots.values());
   const bench = watch.teamSize - active.size - watch.fainted.size > 0;
@@ -138,7 +122,6 @@ function closeDrops(state: InferrerState, watch: TriggerWatch) {
 
 const fieldOf = (watch: TriggerWatch) => `${watch.weather}|${watch.terrain}|${watch.gravity}|${watch.magicRoom}`;
 
-/** Gravity, Magic Room, the terrain and the weather the triggers read. */
 function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   const id = toId(Protocol.parseEffect(arg(line, 1)).name);
   const on = line.cmd !== '-fieldend';
@@ -147,11 +130,10 @@ function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   else if (id === 'gravity') watch.gravity = on;
   else if (id === 'magicroom') watch.magicRoom = on;
   else if (terrainConditions(dexOf(state)).has(id)) watch.terrain = on ? id : (watch.terrain === id ? '' : watch.terrain);
-  // A field change inside an entry's window: the Booster Energy reading is no longer clean. A lasting weather's upkeep line changes nothing.
+  // A field change inside an entry's window spoils the Booster Energy reading; a lasting weather's upkeep does not.
   if (fieldOf(watch) !== before) for (const entry of watch.entries.values()) entry.booster = false;
 }
 
-/** The item lines that answer a waiting entry or drop. */
 function onItemLine(watch: TriggerWatch, line: LogLine, key: string) {
   const item = toId(arg(line, 2));
   const entry = watch.entries.get(key);
@@ -160,7 +142,6 @@ function onItemLine(watch: TriggerWatch, line: LogLine, key: string) {
   if (line.cmd === '-enditem' && item === 'ejectpack') watch.drops.delete(key);
 }
 
-/** Ally Switch: the Pokémon leaves its position for the numbered one and the one there takes its place. */
 function onSwap(watch: TriggerWatch, line: LogLine) {
   const from = arg(line, 1).slice(0, 3);
   const to = `${from.slice(0, 2)}${'abcd'[Number(arg(line, 2))] ?? ''}`;
@@ -183,7 +164,6 @@ function onFaint(watch: TriggerWatch, key: string) {
   for (const [slot, holder] of watch.slots) if (holder === key) watch.slots.delete(slot);
 }
 
-/** Lines about an opponent Pokémon. */
 function onOpponentLine(state: InferrerState, watch: TriggerWatch, line: LogLine, key: string) {
   const tag = line.cmd;
   if (tag === 'switch' || tag === 'drag' || tag === 'replace') onEntry(state, watch, line, key);
@@ -194,20 +174,18 @@ function onOpponentLine(state: InferrerState, watch: TriggerWatch, line: LogLine
   else if (tag === '-start' || tag === '-end') onCondition(watch, line, key);
 }
 
-/** The windows' clock: a move or a turn closes the entries, a residual phase after a move closes the drops. */
 function notePhase(state: InferrerState, watch: TriggerWatch, tag: string) {
   if (tag === 'move' || tag === 'turn') closeEntries(state, watch);
   if (tag === 'move') for (const drop of watch.drops.values()) drop.moved = true;
   if (tag === 'upkeep') closeDrops(state, watch);
 }
 
-/** Commander puts both Pokémon out of reach of a switch: no Eject Pack is judged for them. */
+// Commander puts both Pokémon out of reach of a switch: no Eject Pack is judged for them.
 function noteCommander(watch: TriggerWatch, line: LogLine) {
   if (!namesEffect(line, 'Commander')) return;
   for (const ident of [arg(line, 1), ofIdent(line)]) if (ident) watch.commanding.add(keyOf(ident));
 }
 
-/** The line handler: the field the triggers read, the windows they open, and at their close the items whose line never came. */
 export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.triggerWatch ??= newWatch(state));
   const tag = line.cmd;

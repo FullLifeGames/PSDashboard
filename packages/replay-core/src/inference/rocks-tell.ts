@@ -5,10 +5,7 @@ import { toId } from '../ids.ts';
 type GenDex = RulesDex;
 type DamageHandler = (this: never, ...args: never[]) => unknown;
 
-/**
- * Whether the ability's own damage handler in the simulator refuses Stealth Rock damage (Magic Guard refuses every damage that is not
- * a move). A handler that fails on the stub counts as refusing: then the tell proves nothing.
- */
+// A handler that fails on the stub counts as refusing: then the tell proves nothing.
 function keepsRocksOff(dex: GenDex, name: string): boolean {
   const { onDamage } = dex.abilities.get(name) as { onDamage?: DamageHandler };
   if (!onDamage) return false;
@@ -21,10 +18,7 @@ function keepsRocksOff(dex: GenDex, name: string): boolean {
   }
 }
 
-/**
- * Whether an ability the Pokémon may have keeps the rock damage off it: the known one, else its species' abilities minus the rule-outs,
- * in a format with free abilities any ability. A switch-in without rock damage then shows no Heavy-Duty Boots.
- */
+/** Whether an ability the Pokémon may have keeps the rock damage off it: no rock damage then shows no boots. */
 export function rocksMayMiss(info: RevealedPokemonInfo, dex: RulesDex, freeAbilities: boolean): boolean {
   const known = info.ability.source === 'revealed' || info.ability.source === 'manual' ? info.ability.value : '';
   if (known) return keepsRocksOff(dex, known);
