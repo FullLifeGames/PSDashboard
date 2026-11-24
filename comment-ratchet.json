@@ -5,11 +5,11 @@
     "source:replay-core": 2120,
     "source:app": 3137,
     "source:app-css": 97,
-    "test:app": 1772,
-    "test:replay-core": 1251,
-    "test:eval-engine": 5314,
-    "test:ui": 1248,
-    "test:e2e": 1037,
+    "test:app": 1771,
+    "test:replay-core": 1250,
+    "test:eval-engine": 5306,
+    "test:ui": 1247,
+    "test:e2e": 1036,
     "test:e2e-feedback": 139,
     "test:e2e-build": 30
   }
