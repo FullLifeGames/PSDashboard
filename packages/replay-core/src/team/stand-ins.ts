@@ -7,23 +7,23 @@ import { normalizeLineEndings } from '../line-endings.ts';
 import { guessedField, unknownEvs, unknownField } from '../team-info.ts';
 import { toId } from '../ids.ts';
 
-/** The bodies a side never showed (ARCHITECTURE.md, "Stand-ins"): every build path calls `withStandIns` before it enriches the infos. */
+// Stand-ins: ARCHITECTURE.md "Stand-ins"; every build path calls `withStandIns` before it enriches the infos.
 export type SideInfos = { p1: OpponentTeamInfo; p2: OpponentTeamInfo };
 type Side = 'p1' | 'p2';
 const SIDES: Side[] = ['p1', 'p2'];
 
 /** A role of the published random-set file, or the species itself where the file lists no roles (Generation 1). */
 export interface RandomSetRole { abilities?: string[]; items?: string[]; moves?: string[] }
-/** A format's published random-set file (data.pkmn.cc/random/<formatid>.json): species, level and roles with their moves, abilities and items. */
+/** A format's published random-set file (data.pkmn.cc/random/<formatid>.json): species, level and roles. */
 export type RandomSetFile = Record<string, RandomSetRole & { level?: number; roles?: Record<string, RandomSetRole> }>;
 
-/** The provenance the filled bodies carry on their moves, ability and item; the stand-in mark reads it to word the guess. */
+/** The provenance the filled bodies carry; the stand-in mark reads it to word the guess. */
 export const RANDOM_SET_DETAIL = 'random-set data';
 
-/** A pasted body the user's team lists: its species is all the fill reads (the set itself overlays through the paste's own path). */
+/** A pasted body the user's team lists: its species is all the fill reads. */
 export type PastedBody = { species: string };
 
-/** Whether a body of the side already is this pasted species (the paste overlay's own matching: the id, or the id before the first hyphen). */
+// The paste overlay's own matching: the id, or the id before the first hyphen.
 function sameBody(info: RevealedPokemonInfo, pasted: PastedBody): boolean {
   const ids = (name: string) => [toId(name), toId(name.split('-')[0])];
   const shown = ids(info.species);
@@ -34,10 +34,9 @@ const blankBody = (species: string, level: number): RevealedPokemonInfo => ({
   species, moves: [], ability: unknownField(), item: unknownField(), teraType: unknownField(), evs: unknownEvs(), level, gender: '',
 });
 
-/** Whether the log's side listed its bodies at a team preview: the preview already says everything the log will show. */
 const hasPreview = (log: string, side: Side) => log.includes(`\n|poke|${side}|`);
 
-/** How many bodies a side still lacks: its `|teamsize|` minus the bodies built; 0 with a team preview, without a size, or when the side is not short. */
+/** How many bodies a side still lacks: its `|teamsize|` minus the bodies built; 0 with a team preview or no size. */
 export function missingBodies(log: string, built: number, side: Side): number {
   const lf = normalizeLineEndings(log);
   const size = teamSizes(lf)[side];
@@ -45,13 +44,12 @@ export function missingBodies(log: string, built: number, side: Side): number {
   return Math.max(0, size - built);
 }
 
-/** Whether the format's Dex entry generates the team (Random Battle, Hackmons Cup): the rule of `withStandIns`, read from the Dex, never from a name. */
+/** Whether the format's Dex entry generates the team (Random Battle, Hackmons Cup): from the Dex, never a name. */
 export function generatesTeam(formatId: string): boolean {
   const format = simFormats().get(formatId);
   return format.exists && !!format.team;
 }
 
-/** teammates[species] as id maps, once per stats object: the greedy step asks per body per candidate. */
 const mateMaps = new WeakMap<SmogonUsageStats, Map<string, Map<string, number>>>();
 function mateMap(stats: SmogonUsageStats, speciesId: string): Map<string, number> | undefined {
   let byEntry = mateMaps.get(stats);
@@ -69,7 +67,6 @@ function mateMap(stats: SmogonUsageStats, speciesId: string): Map<string, number
   return map;
 }
 
-/** Whether the species may stand on a team of this format: the game's Dex knows it and the format's rule table lets it in. */
 function legalIn(dex: RulesDex, validator: TeamValidator | null, name: string): { name: string; base: string } | null {
   const species = dex.species.get(name);
   if (!species.exists || species.gen > dex.gen) return null;
@@ -80,10 +77,6 @@ function legalIn(dex: RulesDex, validator: TeamValidator | null, name: string): 
   return { name: species.name, base: species.baseSpecies || species.name };
 }
 
-/**
- * `count` guesses for a side that holds `known`, most likely first: greedy by the summed share of teams that carry the candidate with each body
- * the side already has, one per base species (Species Clause), legal in the game's format.
- */
 function guessBodies(stats: SmogonUsageStats, known: RevealedPokemonInfo[], count: number, log: string, formatId: string): RevealedPokemonInfo[] {
   const dex = dexOf(logRules(log));
   const format = simFormats().get(formatId);
@@ -114,7 +107,6 @@ function guessBodies(stats: SmogonUsageStats, known: RevealedPokemonInfo[], coun
   return chosen;
 }
 
-/** mulberry32 over an FNV-1a hash of the text: the draw's deterministic source. */
 function seededDraw(text: string): () => number {
   let state = 0x811c9dc5;
   for (let index = 0; index < text.length; index++) state = Math.imul(state ^ text.charCodeAt(index), 0x01000193) >>> 0;
@@ -126,7 +118,6 @@ function seededDraw(text: string): () => number {
   };
 }
 
-/** One body of the file: its level, and one drawn role's first ability and item with four of its moves (all of them when it lists four or fewer). */
 function randomBody(name: string, entry: RandomSetFile[string], below: (limit: number) => number): RevealedPokemonInfo {
   const roles = Object.values(entry.roles ?? {});
   const role = roles.length > 0 ? roles[below(roles.length)] : entry;
@@ -143,11 +134,6 @@ function randomBody(name: string, entry: RandomSetFile[string], below: (limit: n
   };
 }
 
-/**
- * `count` guesses for a side of a generated-team game: a draw seeded by the log's header (its players, rules and sizes, which one replay never
- * changes) and the side, so a game keeps its guess on every build path. Candidates are the file's species the game's Dex knows and the format lets
- * in, one per base species, none of them a base the side shows; each draws one role and four of its moves, and takes that role's first ability and item.
- */
 function randomBodies(
   file: RandomSetFile, known: RevealedPokemonInfo[], count: number, log: string, formatId: string, side: Side,
 ): RevealedPokemonInfo[] {
@@ -176,7 +162,6 @@ function randomBodies(
   return chosen;
 }
 
-/** One side filled up to `lacking` bodies: the pasted ones it does not show yet, then stand-ins; null when nothing was added. */
 function filledSide(
   info: OpponentTeamInfo, lacking: number, lf: string, formatId: string,
   usageStats: SmogonUsageStats | null | undefined, pasted: readonly PastedBody[], side: Side, randomSets: RandomSetFile | null,
@@ -199,7 +184,7 @@ function filledSide(
   return bodies.length === info.pokemon.length ? null : { ...info, pokemon: bodies };
 }
 
-/** Fills every short side up to its `|teamsize|` with pasted bodies, then stand-ins (`randomSets` for generated teams); `raw` itself when nothing changes. */
+/** Fills every short side up to its `|teamsize|` with pasted bodies, then stand-ins; `raw` when nothing changes. */
 export function withStandIns(
   raw: SideInfos,
   log: string,
@@ -207,7 +192,7 @@ export function withStandIns(
   pasted?: Partial<Record<Side, readonly PastedBody[]>>,
   randomSets?: RandomSetFile | null,
 ): SideInfos {
-  // The build maps the bodies the log shows one to one onto sets: a side that showed 3 of its 6 would play the engine as a 3 against 6 game.
+  // The build maps shown bodies one to one onto sets: a side that showed 3 of 6 would play as a 3 against 6 game.
   const lf = normalizeLineEndings(log);
   const formatId = inferReplayFormatId({ log: lf });
   const generated = generatesTeam(formatId);

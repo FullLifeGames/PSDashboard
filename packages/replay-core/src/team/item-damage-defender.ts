@@ -9,16 +9,11 @@ import {
   hitDex, type AbilityVariant, type CalcOptions, type GenDex, type HitTeams, type Spread, type Stat,
 } from './item-damage-shared.ts';
 
-/** The damage judge in the defender's direction: an item that reduces damage falls when a hit is too strong for the softest body that could hold it. */
-
-// The softest body: no EVs, IV 0 and a lowering nature in HP and the defense the move reads, the item on, every ability the species may have.
-// The Assault Vest (the calculator takes it for special hits only) and the Eviolite (both defenses, for a species that can still evolve);
-// an item the calculator's generation lacks (both in Pokemon Champions) is not judged. The attacker is as built except its unproven item and
-// spread, which are guesses too. Doubt, a spread move and an unreadable move drop the hit as in the attacker's direction; a hit no candidate
-// and no item explains is no evidence.
+// The softest body: no EVs, IV 0 and a lowering nature, the item on, every ability the species may have.
+// The calculator takes the Assault Vest for special hits only, the Eviolite for both defenses (an unevolved species).
 const DEFENDER_ITEMS = ['assaultvest', 'eviolite'];
 
-/** The stat of the holder the move's damage reads; null when the holder's own stats feed the move (Foul Play) and the hit cannot be judged. */
+// null when the holder's own stats feed the move (Foul Play): the hit cannot be judged.
 function defenseStat(dex: GenDex, moveId: string): Stat | null {
   const move = dex.moves.get(moveId);
   if (move.overrideOffensivePokemon === 'target') return null;
@@ -26,7 +21,6 @@ function defenseStat(dex: GenDex, moveId: string): Stat | null {
   return move.category === 'Physical' ? 'def' : 'spd';
 }
 
-/** The softest and the hardest legal body for that defense: the format's per-stat cap in HP and the defense, and its opposite. */
 function bodyExtremes(dex: GenDex, stat: Stat, budget: EvBudget): { soft: Spread; hard: Spread } {
   return {
     hard: { evs: { hp: budget.perStat, [stat]: budget.perStat }, ivs: {}, nature: natureOf(dex, stat, 'spe') },
@@ -89,11 +83,6 @@ function attackerAbilities(dex: GenDex, attacker: RevealedPokemonInfo, hit: Logg
   return variantsOf(possible.length > 0 ? possible : [built.ability ?? ''], hit.attacker);
 }
 
-/**
- * The attacker with what the log has not shown ranged: its item, its offensive spread (the strongest and the weakest legal one, since a
- * built spread is a guess: a Dragonite that hit with Thunderbolt) and its ability. Variants that roll alike against the extreme bodies
- * collapse into one, so the common case costs a handful of configurations.
- */
 function attackerVariants(
   dex: GenDex, attacker: RevealedPokemonInfo, ctx: Omit<DefenderContext, 'attackers'>, attackerItems: DefenderRole['attackerItems'],
 ): CalcOptions[] {
@@ -122,13 +111,11 @@ function contextOf({ attacker, hit }: TakenHit, holder: RevealedPokemonInfo, rol
   return { ...base, attackers: attackerVariants(dex, attacker, base, role.attackerItems) };
 }
 
-/** By what factor the hit lies outside the hull the holder's configurations give with this item ('' for none); 1 when some explains it. */
 function missOf(ctx: DefenderContext, item: string): number | null {
   const rolled = (spread: Spread) => () => ctx.attackers.flatMap(attacker => ctx.holders.map(variant => rolls(ctx.gen, ctx.hit, attacker, holderOptions(spread, variant, item))));
   return missBeyond(ctx.hit, rolled(ctx.spreads.soft), rolled(ctx.spreads.hard));
 }
 
-/** Whether the item acts on this holder: the calculator's generation lists it, and an Eviolite needs a species that can evolve. */
 const modelled = (ctx: DefenderContext, id: string, dex: GenDex) =>
   !!(ctx.gen.items as unknown as { get(id: string): unknown }).get(id) && (id !== 'eviolite' || !!dex.species.get(ctx.hit.defender.species).nfe);
 
@@ -151,10 +138,7 @@ export function widestMisses(holder: RevealedPokemonInfo, ids: string[], teams: 
   return { misses, bare, counted };
 }
 
-/**
- * The candidates the hits `holder` took refute, as ids: a miss beyond the margin. Hits that between them refute every candidate the log
- * still allows, and no item as well, contradict each other, and none of them decides.
- */
+/** The candidates the hits `holder` took refute, as ids; hits that contradict each other decide nothing. */
 export function judgeDefenderItems(holder: RevealedPokemonInfo, candidates: string[], teams: HitTeams, role: DefenderRole): string[] {
   // With no hit taken there are no rules to read the item names by, and no verdict either way.
   const first = takenHits(holder, role, teams)[0];

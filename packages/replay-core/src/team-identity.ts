@@ -6,14 +6,11 @@ import { toId } from './ids.ts';
 import { teamSpecies } from './inference/lookup.ts';
 import { arg, identOf, type LogLine } from './inference/log-line.ts';
 
-/** Books each body's name, shiny flag and genderlessness from the replay and puts them on the built set, so the simulator writes the game's switch-in line. */
+/** Books each body's name, shiny flag and genderlessness so the simulator writes the game's switch-in line. */
 
 const ENTRY_COMMANDS = new Set(['switch', 'drag', 'replace']);
 
-/**
- * The team entry for a sheet's species: its own id, else its base id before the first hyphen (the preview may carry the base, the
- * sheet the forme); shared by `applyTeamSheet` and the identity pass.
- */
+/** The team entry for a sheet's species: its own id, else its base id before the first hyphen. */
 export function sheetMatcher(pokemonMap: ReadonlyMap<string, RevealedPokemonInfo>): (species: string) => RevealedPokemonInfo | undefined {
   const byId = new Map<string, RevealedPokemonInfo>();
   for (const [species, info] of pokemonMap) {
@@ -23,7 +20,6 @@ export function sheetMatcher(pokemonMap: ReadonlyMap<string, RevealedPokemonInfo
   return species => byId.get(toId(species)) ?? byId.get(toId(species.split('-')[0]));
 }
 
-/** Books the name and the shiny flag of a body once: the first line that shows it wins. */
 function bookIdentity(info: RevealedPokemonInfo, name: string, shiny: boolean, noGender = false): void {
   if (info.shiny !== undefined) return;
   info.shiny = shiny;
@@ -32,11 +28,8 @@ function bookIdentity(info: RevealedPokemonInfo, name: string, shiny: boolean, n
   if (trimmed) info.nickname = trimmed;
 }
 
-/**
- * The name and the shiny flag the log shows for each body of the side, from its first `switch`, `drag` or `replace` line. An
- * Illusion's disguise line books to the disguised body, the `replace` line that ends the disguise books the Zoroark. Team preview
- * (`|poke|`) is not read: it strips the shiny flag and names no nickname.
- */
+// Team preview (`|poke|`) strips the shiny flag and names no nickname; an Illusion's disguise books to the disguised.
+/** The name and shiny flag the log shows per body, from its first `switch`, `drag` or `replace` line. */
 export function noteLogIdentities(dex: RulesDex, lines: readonly LogLine[], side: string, pokemonMap: Map<string, RevealedPokemonInfo>): void {
   for (const line of lines) {
     if (!ENTRY_COMMANDS.has(line.cmd)) continue;
@@ -44,7 +37,7 @@ export function noteLogIdentities(dex: RulesDex, lines: readonly LogLine[], side
     if (!ident || ident.side !== side) continue;
     const details = Protocol.parseDetails(ident.name, arg(line, 1) as Protocol.PokemonIdent, arg(line, 2) as Protocol.PokemonDetails);
     const info = pokemonMap.get(teamSpecies(dex, pokemonMap, details.speciesForme.trim()));
-    // A line without a gender for a species that has one (a fixed one included): the game ran the body as genderless.
+    // A line without a gender for a species that has one: the game ran the body as genderless.
     const noGender = details.gender === undefined && dex.species.get(details.speciesForme.trim()).gender !== 'N';
     if (info) bookIdentity(info, ident.name, details.shiny, noGender);
   }
@@ -61,15 +54,8 @@ export function noteSheetIdentities(dex: RulesDex, sets: readonly PokemonSet[], 
   }
 }
 
-/**
- * Leaves out a name the simulator would not keep or a lookup could not tell apart: a name that is the species (or base species) of any
- * body of the side, its own included, because the simulator then names a body by its species and a lookup of eval-engine/src/branch takes
- * a name for a species. The body stays under its species name; the shiny flag stays.
- *
- * Names the id function cannot tell apart stay: an id of "" (a Chinese or Japanese name, an emoji), two names of one id (`Rias!` and
- * `Rias?`), one name on two bodies, a quote or a backslash. The lookups compare the exact name first and take an empty id for no key
- * (team-order.ts, `sameBodyName`), and the stream line that seats the players is built with `JSON.stringify`.
- */
+// Names the id cannot tell apart stay (an id of "", one name on two bodies, a quote): lookups compare names first.
+/** Drops a name that is a species of the side's bodies (the sim would not keep it); the body keeps its species. */
 export function dropAmbiguousNicknames(dex: RulesDex, pokemonMap: Map<string, RevealedPokemonInfo>): void {
   const speciesIds = new Set<string>();
   for (const [key, info] of pokemonMap) {
@@ -85,11 +71,7 @@ export function dropAmbiguousNicknames(dex: RulesDex, pokemonMap: Map<string, Re
   }
 }
 
-/**
- * The set with the replay's name and shiny flag. A body the replay (or its sheet) showed takes them over whatever the set carried, a
- * pasted team's nickname included, since the replay's own line outranks it; a body no line showed keeps what its source gave. A body
- * without a nickname is named by its species.
- */
+/** The set with the replay's name and shiny flag: the replay's own line outranks a pasted team's nickname. */
 export function withReplayIdentity(set: PokemonSet, info: RevealedPokemonInfo): PokemonSet {
   if (info.shiny === undefined) return set;
   const named: PokemonSet = { ...set, name: info.nickname ?? info.species };

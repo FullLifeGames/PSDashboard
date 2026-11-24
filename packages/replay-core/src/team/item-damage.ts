@@ -9,30 +9,18 @@ import {
   type AbilityVariant, type CalcOptions, type GenDex, type Spread,
 } from './item-damage-shared.ts';
 
-/**
- * The damage judge, attacker direction: an item falls when no allowed spread and ability of the holder lets the calculator reach the logged
- * hit, or stay under it.
- */
-
-// Allowed means legal: the stat the move reads from no EVs, IV 0 and a lowering nature up to the format's cap, IV 31 and a raising nature.
-// The defender's item and ability count as built only where the log showed them; a guessed one is ranged with no item and with the
-// species' other abilities (a guessed Assault Vest ruled out a Keldeo's Choice Scarf). Any doubt drops the hit. The app reaches this
-// module only through the inference's dynamic import, so the entry chunk stays free of the calculator.
+// A guessed defender item or ability is ranged (no item, the species' other abilities); any doubt drops the hit.
+// The app reaches this module only through the inference's dynamic import: the entry chunk stays calculator-free.
 
 interface HitContext {
   hit: LoggedHit;
   gen: CalcGeneration;
-  /** The format's spread scale: Stat Points in a Champions game. */
   budget: EvBudget;
   abilities: AbilityVariant[];
   spreads: { strong: Spread; weak: Spread };
   defenders: CalcOptions[];
 }
 
-/**
- * By what factor the hit lies outside the hull the holder's allowed configurations give with this item, after the slack: 1 when some
- * configuration explains it, above 1 by how far it misses (too strong reads observed / max, too weak min / observed); null when it cannot judge.
- */
 function missOf(ctx: HitContext, item: string): number | null {
   const { hit, gen, abilities, spreads, defenders } = ctx;
   const pairs = defenders.flatMap(defender => abilities.map(ability => ({ defender, ability })));
@@ -47,10 +35,6 @@ function variantKey(ctx: Omit<HitContext, 'defenders'>, defender: CalcOptions): 
   }).join('|');
 }
 
-/**
- * The defender as built, with what the log has not shown ranged: no item beside a guessed one, each ability the species may have beside a
- * guessed one. Variants that give the holder's strong spreads the same rolls collapse into one.
- */
 function defenderVariants(dex: GenDex, info: RevealedPokemonInfo, ctx: Omit<HitContext, 'defenders'>): CalcOptions[] {
   const party = ctx.hit.defender;
   const built = defenderOptions(dex, info, party, ctx.budget);
@@ -84,10 +68,8 @@ function contextOf(attacker: RevealedPokemonInfo, hit: LoggedHit, teams: { p1: O
   return { ...base, defenders: defenderVariants(dex, info, base) };
 }
 
-/**
- * Per candidate id (item names in, ids out), the widest factor by which a counted hit misses its hull (1: every hit explained), and the same
- * for no item. A hit counts only when some candidate, or no item, explains it; the rest drop out as unexplained, never as evidence.
- */
+// A hit counts only when some candidate, or no item, explains it; the rest drop out as unexplained, never as evidence.
+/** Per candidate id and for no item, the widest factor by which a counted hit misses its hull (1: all explained). */
 export function itemMisses(
   attacker: RevealedPokemonInfo, candidates: string[], teams: { p1: OpponentTeamInfo; p2: OpponentTeamInfo },
 ): { misses: Map<string, number>; bare: number } {
@@ -111,14 +93,12 @@ export function itemMisses(
   return { misses, bare };
 }
 
-/** The candidate ids that the hits `holder` dealt (attacker role) or took (defender role) refute; hits that contradict each other decide nothing. */
+/** Candidate ids refuted by the hits `holder` dealt (attacker) or took (defender); contradictions decide nothing. */
 export const judgeItemsByDamage: ItemDamageJudge = (holder, candidates, teams, role) => {
   if (role) return judgeDefenderItems(holder, candidates, teams, role);
   const { misses, bare } = itemMisses(holder, candidates, teams);
   const refuted = [...misses].filter(([, miss]) => miss > MISS_MARGIN).map(([id]) => id);
   const ruled = holder.ruledOut?.items ?? [];
-  // Hits that between them refute every candidate the log still allows, and no item as well, contradict each other: none decides.
-  // An item the log already ruled out counts as refuted.
   const contradictory = bare > MISS_MARGIN && [...misses.keys()].every(id => refuted.includes(id) || ruled.includes(id));
   return contradictory ? [] : refuted;
 };

@@ -1,6 +1,6 @@
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 
-/** The one factory of the twin battle the engine asks the simulator on: the caller owns the sets, so no species or move name lives here. */
+/** The one factory of the twin battle; the caller owns the sets, so no species or move name lives here. */
 
 /** One side of a twin battle. */
 export interface TwinSide {
@@ -11,7 +11,6 @@ export interface TwinSide {
 
 /** Options of a twin battle. */
 export interface TwinOptions {
-  /** The battle's PRNG seed; the callers' fixed `1,2,3,4` by default. */
   seed?: string;
   /** The team preview choice per side; the whole team in order by default, `false` to leave the preview open. */
   preview?: { p1: string; p2: string } | false;
@@ -19,7 +18,7 @@ export interface TwinOptions {
 
 const inOrder = (team: readonly PokemonSet[]): string => `team ${team.map((_, index) => index + 1).join('')}`;
 
-/** A seeded battle of the format between the two sides, past team preview (when it has one); a body the generation lacks throws as `new Battle` does. */
+/** A seeded battle past team preview (when it has one); a body the generation lacks throws as `new Battle` does. */
 export function twinBattle(format: string, sides: { p1: TwinSide; p2: TwinSide }, options: TwinOptions = {}): Battle {
   const battle = new Battle({
     formatid: toID(format), seed: (options.seed ?? '1,2,3,4') as never,

@@ -1,14 +1,10 @@
 import type { SpreadCandidate } from './ladder.ts';
 
-/** The item rows of a Dex (the Dex of the replay's generation). */
 export interface ItemDex {
   items: { get(id: string): { exists: boolean; name: string } };
 }
 
-/**
- * A body holding the item it held at the hit: the client's shown item is the truth; an item the log took away (used up, knocked off,
- * stolen) is gone; an item the log never showed stays what the body carries, the candidate's before the set's. Items read by Dex id.
- */
+/** The item a body held at the hit: the shown one, none once the log took it away, else the candidate's or set's. */
 export function withItemAtHit(
   dex: ItemDex, body: SpreadCandidate, setItem: string | undefined, shown: string | undefined, changed: boolean | undefined,
 ): SpreadCandidate {

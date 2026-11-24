@@ -7,8 +7,6 @@ import { raceSpeed, scarfedSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
 
-/** Choice Scarf decisions from move orders: a mover that cannot reach an observed order against every plausible configuration holds a Scarf; a contradicted guess is dropped. */
-
 /** What the solver may assume about one mon's item and Speed. */
 export interface SpeedKnowledge {
   /** Item from evidence (revealed, manual) or a sheet: never touched. */
@@ -17,25 +15,19 @@ export interface SpeedKnowledge {
   scarfRuledOut: boolean;
   /** EVs and nature from evidence or a sheet: the set's Speed is the real one. */
   spreadKnown: boolean;
-  /** Usage spreads of the species in the format; empty without usage. */
   spreads: { nature: string; evs: PokemonEvs; probability: number }[];
-  /**
-   * The items the species' usage lists, in usage order, that the log does not refute; the item rung swaps in the first damage-boost
-   * item among them that makes a refuted knockout reach. Absent or empty: nothing to offer.
-   */
+  /** The items the species' usage lists, in usage order, that the log does not refute; absent or empty: none. */
   itemOffers?: readonly string[];
-  /** The format's Item Clause: at most this many Pokémon of a team hold the same item. Absent: no clause (a Custom Game). */
+  /** The format's Item Clause: at most this many Pokémon of a team hold one item. Absent: no clause (a Custom Game). */
   itemLimit?: number;
 }
 /** Keyed `side:speciesId`. */
 export type SpeedKnowledgeMap = Map<string, SpeedKnowledge>;
 export type ItemDecision = 'holds' | 'lacks';
 
-/** A usage spread below this share is an oddity, not a configuration to measure against. */
 const PLAUSIBLE_SHARE = 0.05;
-/** Speed EVs from which a spread counts as tempo-invested; on Stat Points the points with the same Speed (25). */
+// Speed EVs from which a spread counts as tempo-invested; 25 Stat Points give the same Speed.
 const INVESTED_SPE = 200;
-/** A tempo camp holding this much of the plausible mass drops the other camp. */
 const CONFIDENT_CAMP_SHARE = 0.8;
 
 const NONE: SpeedKnowledge = { itemKnown: false, scarfRuledOut: false, spreadKnown: false, spreads: [] };
@@ -49,17 +41,11 @@ interface Mover {
   know: SpeedKnowledge;
   prior: SpreadCandidate;
   plausible: SpreadCandidate[];
-  /** Whether a spread counts as tempo-invested, on the format's scale. */
   invested: (spread: SpreadCandidate) => boolean;
-  /** The battle forme the order says raced, on its own base Speed. */
   forme?: string;
 }
 
-/**
- * The known spread, else the usage spreads worth 5% (on the format's scale:
- * a Scarlet/Violet usage spread in a Champions build reads as its Stat
- * Points), thinned to a camp holding 80% of the mass.
- */
+// A Scarlet/Violet usage spread in a Champions build reads as its Stat Points.
 function plausibleSpreads(know: SpeedKnowledge, prior: SpreadCandidate, budget: EvBudget, invested: Mover['invested']): SpreadCandidate[] {
   if (know.spreadKnown) return [prior];
   const spreads = know.spreads.filter(spread => spread.probability >= PLAUSIBLE_SHARE)
@@ -86,38 +72,28 @@ function mover(ctx: SolveContext, side: 'p1' | 'p2', species: string, knowledge:
 const speeds = (ctx: SolveContext, m: Mover, spreads: SpreadCandidate[]) =>
   spreads.map(spread => speedStat(ctx, m.side, m.species, spread, m.forme)).filter(speed => speed > 0);
 
-/** Full Speed without a Scarf: the known spread's own, else max Speed EVs with a plus nature. */
 function maxSpeed(ctx: SolveContext, m: Mover): number {
   if (m.know.spreadKnown) return speedStat(ctx, m.side, m.species, m.prior, m.forme);
   return speedStat(ctx, m.side, m.species, { evs: { ...m.prior.evs, spe: ctx.budget.perStat }, nature: 'Jolly' }, m.forme);
 }
 
-/** The slowest plausible configuration without an item. */
 const floor = (ctx: SolveContext, m: Mover) => Math.min(...speeds(ctx, m, m.plausible));
 
-/** The slowest Speed-invested plausible configuration, else the prior: the spreads a Scarf rides on. */
 function investedFloor(ctx: SolveContext, m: Mover): number {
   const fast = speeds(ctx, m, m.plausible.filter(m.invested));
   return fast.length > 0 ? Math.min(...fast) : speedStat(ctx, m.side, m.species, m.prior, m.forme);
 }
 
-/** A Scarf rides on a tempo species: some plausible spread invests in Speed (a known spread decides for itself). */
 const tempoSpecies = (m: Mover) => (m.know.spreads.length === 0 && !m.know.spreadKnown) || m.plausible.some(m.invested);
 
 function scarfInAllowed(m: Mover): boolean {
   return !m.know.itemKnown && !m.know.scarfRuledOut && toId(m.set.item ?? '') !== 'choicescarf' && tempoSpecies(m);
 }
 
-/** Scarf-in for the first mover when allowed and the Scarf closes the gap to `ref`. */
 function scarfIn(ctx: SolveContext, first: Mover, max: number, ref: number): [string, ItemDecision] | null {
   return scarfInAllowed(first) && scarfedSpeed(dexOfCalc(ctx.gen), max) >= ref ? [first.key, 'holds'] : null;
 }
 
-/**
- * The second mover carries a guessed Scarf: reachable against its Scarfed
- * tempo spreads means nothing; a floor the first mover reaches drops the
- * Scarf; otherwise the first mover may hold one instead.
- */
 function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Mover, max: number): [string, ItemDecision] | null {
   const scarfRef = scarfedSpeed(dexOfCalc(ctx.gen), investedFloor(ctx, second));
   if (max >= scarfRef) return null;
@@ -125,13 +101,9 @@ function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Move
   return scarfIn(ctx, first, max, scarfRef);
 }
 
-/**
- * One order's decision: [key, decision], or null when the order is reachable or unexplained. A race the order reads with the Scarf a
- * mover held that turn decides nothing about that mover's set item.
- */
+// A race read with the Scarf a mover held that turn decides nothing about that mover's set item.
 function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover): [string, ItemDecision] | null {
   const max = maxSpeed(ctx, first);
-  // A first mover already carrying a Scarf is the ladder's business.
   if (max === 0 || order.firstScarf !== undefined || toId(first.set.item ?? '') === 'choicescarf') return null;
   const secondScarf = order.secondScarf ?? toId(second.set.item ?? '') === 'choicescarf';
   if (secondScarf && order.secondScarf === undefined && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, first, second, max);
@@ -139,10 +111,8 @@ function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover
   return max >= ref ? null : scarfIn(ctx, first, max, ref);
 }
 
-/**
- * One pass over the orders before the ladder; the first decision per mon stands. A weak race never earns an item (the settling drops it
- * before it adds a Scarf), nor does a copied race: its Speed is the copied Pokémon's, its item the transformed mover's.
- */
+// A weak race never earns an item (the settling drops it first), nor does a copied race: its Speed is the copied one's.
+/** One pass over the orders before the ladder; the first decision per mon stands. */
 export function decideScarfs(ctx: SolveContext, knowledge: SpeedKnowledgeMap): Map<string, ItemDecision> {
   const decisions = new Map<string, ItemDecision>();
   for (const order of ctx.speedOrders) {

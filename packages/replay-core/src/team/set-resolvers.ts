@@ -14,18 +14,13 @@ import { settleOpenMoves, unfilledOpenMoves } from './open-moves.ts';
 
 type SmogonSet = ReturnType<typeof getSpeciesSetAssumption>;
 type CuratedSet = ReturnType<typeof selectCuratedSet>;
-/** A solved spread; the speed solver may add the IVs a seen move order demands. */
 type SolvedSpread = SpreadCandidate & { ivs?: Partial<PokemonEvs> };
 
 const ALL_31: PokemonSet['ivs'] = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
-/** Usage-move candidates fetched per species; the vetoes refill from the tail. */
 export const USAGE_MOVE_POOL = 10;
 
-/**
- * The usage moves past USAGE_MOVE_POOL: the last refill of a pool the vetoes left short (a set has under four moves only when the whole
- * pool holds fewer than four allowed moves).
- */
+/** The usage moves past USAGE_MOVE_POOL: the last refill of a pool the vetoes left short. */
 export function usageMoveTail(usageStats: SmogonUsageStats | null | undefined, species: string): UsageProbability[] {
   return getSpeciesUsageStats(species, usageStats)?.moves.slice(USAGE_MOVE_POOL) ?? [];
 }
@@ -35,8 +30,8 @@ export interface EditedFields {
   editedEvs: PokemonEvs | null;
   editedNature: PokemonSet['nature'] | null;
   /**
-   * The nature the info shows beside EVs the user set. The panel keeps it (`applyInferredSpreads` leaves a body with set EVs alone), so the
-   * build plays it: the solver's nature is fitted to the solver's own EVs.
+   * The nature the info shows beside EVs the user set: the panel keeps it, so the build plays it
+   * (the solver's nature is fitted to the solver's own EVs).
    */
   shownNature: PokemonSet['nature'] | null;
   editedIvs: PokemonSet['ivs'] | null;
@@ -59,10 +54,7 @@ export function editedFields(info: RevealedPokemonInfo): EditedFields {
   return { editedEvs, editedNature, shownNature: shownNatureOf(info, editedEvs), editedIvs };
 }
 
-/**
- * Only knowledge that outranks a team sheet: seen in game or user-edited. Enriched infos carry usage GUESSES in value: a 58% Leftovers guess
- * must never beat a sheet's Choice Scarf.
- */
+// Enriched infos carry usage GUESSES in value: a 58% Leftovers guess must never beat a sheet's Choice Scarf.
 function known(field: { value: string; source: KnowledgeSource }): string {
   return field.source === 'revealed' || field.source === 'manual' ? field.value : '';
 }
@@ -84,15 +76,12 @@ function allowed(value: string | undefined, ruledOut?: string[]): string {
 
 type FallbackSpread = { nature: string; evs: PokemonSet['evs'] } | null;
 
-/** The sheet's spread gaps fill from usage, then the marginal set. */
 function fallbackSpreadFor(usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): FallbackSpread {
   return usageSet?.spread || smogonSet?.spread || null;
 }
 
-/**
- * A sheet that shows no EVs leaves them unknown, not zero: the solver's EVs (a spread the damage, the move order or the HP lines checked, never
- * its prior) come before the usage fallback; the sheet's nature and IVs stay.
- */
+// A sheet that shows no EVs leaves them unknown, not zero: a solved spread comes before the usage fallback;
+// the sheet's nature and IVs stay.
 function sheetSpread(
   userMatch: PokemonSet, edited: EditedFields, fallbackSpread: FallbackSpread, inferred?: SpreadCandidate,
 ): { nature: PokemonSet['nature']; evs: PokemonSet['evs']; ivs: PokemonSet['ivs'] } {
@@ -105,11 +94,7 @@ function sheetSpread(
   };
 }
 
-/**
- * A full team sheet normally defines the moveset, but a manual edit (team editor, sets import, hypothetical move) must beat it, or "load Draco
- * Meteor on Kyurem" silently vanishes on sheet replays. Open Team Sheets omit EVs and nature: fall back to usage spreads instead of simulating
- * an all-zero spread.
- */
+/** A sheet defines the moveset unless a manual edit beats it; Open Team Sheets omit EVs and nature: usage fills in. */
 export function buildSheetSet(
   info: RevealedPokemonInfo,
   userMatch: PokemonSet,
@@ -138,13 +123,12 @@ export function buildSheetSet(
   };
 }
 
-/** Coherent-set selection: scores every published set against the revealed evidence; the winner fills the unrevealed slots as one unit. */
+/** Scores every published set against the revealed evidence; the winner fills the unrevealed slots as one unit. */
 export function selectCuratedFor(dex: RulesDex, info: RevealedPokemonInfo, smogonSet: SmogonSet, usageSet: SpeciesUsageSet | null): CuratedSet | null {
   const seen = info.moves.filter(move => move.source === 'revealed' || move.source === 'manual');
   return smogonSet ? selectCuratedSet([smogonSet, ...(smogonSet.alternatives ?? [])], {
     dex,
     revealedMoves: seen.map(move => toId(move.name)),
-    // The Z-moves and Max moves the revealed moves do not explain: a set with a move to fill them fits better.
     openMoves: unfilledOpenMoves(dex, info.openMoves, seen.map(move => move.name)),
     // A consumed or knocked-off item is still the set's item.
     revealedItem: toId(itemSetValue(known(info.item))),
@@ -153,17 +137,12 @@ export function selectCuratedFor(dex: RulesDex, info: RevealedPokemonInfo, smogo
     ruledOutAbilities: info.ruledOut?.abilities ?? [],
     usageProbability: moveId =>
       usageSet?.moves.find(move => toId(move.value) === moveId)?.probability ?? 0,
-    // The item after a rule-out: the info's guess (the Boots tell, or the enrichment's own pick), then the usage majority.
     guessedItem: info.item.source === 'guessed' ? itemSetValue(info.item.value) : '',
     usageItem: usageSet?.item?.value ?? '',
   }) : null;
 }
 
-/**
- * Known (revealed, consumed) beats everything; then an item the move-order evidence inferred; then an item the protocol inference tells
- * (`tellItem`: Heavy-Duty Boots after a Stealth Rock switch-in without damage: evidence, as the panel shows it); then the curated set
- * and the usage marginal.
- */
+/** The item by precedence: known, move-order inference, the protocol's tell, then the curated set and usage. */
 export function resolveItem(
   info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, inferredItem = '',
   tellItem = '',
@@ -172,13 +151,12 @@ export function resolveItem(
   return evidence || guessedItem(info, curated, usageSet, smogonSet);
 }
 
-/** The guess when no evidence names the item: the curated set's, else the info's guess or the usage marginal. */
 function guessedItem(info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
   const curatedItem = curated ? allowed(curated.item?.value, info.ruledOut?.items) : '';
   return curatedItem || cleanItem(info.item.value, usageSet?.item?.value || allowed(smogonSet?.item?.value, info.ruledOut?.items));
 }
 
-/** The item the build would pick if the excluded items were ruled out: the replacement for a dropped Scarf or a dropped boost item. */
+/** The item the build picks if the excluded items were ruled out: a dropped Scarf's or boost item's stand-in. */
 export function resolveItemWithout(
   dex: RulesDex, info: RevealedPokemonInfo, usageStats: SmogonUsageStats | null | undefined, setAssumptions: SmogonSetAssumptions | null | undefined,
   excludedItemIds: string | readonly string[],
@@ -193,11 +171,7 @@ export function resolveItemWithout(
   return resolveItem(stripped, selectCuratedFor(dex, stripped, smogonSet, usageSet), usageSet, smogonSet);
 }
 
-/**
- * Move assembly: revealed or manual knowledge first (immune to vetoes), then the winning curated set's moves (its slots already read against the
- * evidence), then the enrichment's guesses, then usage fills, the usage tail last. Coherence vetoes drop jointly implausible fills and the rest
- * of the pool refills the slots. The panel's enrichment offers the same order (team-info.ts).
- */
+/** The moves in offer order: known (immune to vetoes), curated set, guesses, usage, tail; vetoes drop fills. */
 export function assembleMoves(
   dex: RulesDex, info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet, item: string,
   usageTail: UsageProbability[] = [],
@@ -230,7 +204,6 @@ export function resolveAbility(dex: RulesDex, info: RevealedPokemonInfo, curated
     defaultAbility(dex, info.species, info.ruledOut?.abilities);
 }
 
-/** Damage-consistent spreads beat usage guesses, never edited/revealed EVs. */
 type UsageSpreadLike = { nature: string; evs: PokemonSet['evs'] } | undefined;
 
 function spreadNature(
@@ -248,10 +221,7 @@ function spreadEvs(
     defaultEvsFor(dex, species, revealedMoves, budget);
 }
 
-/**
- * The IVs, stat by stat: edited ones win whole, then an IV the speed solver decided, then the IVs the chosen Smogon set publishes (the first
- * set's when its spread is the one played), then 31.
- */
+// Per stat: edited IVs win whole, then an IV the speed solver decided, then the chosen Smogon set's, then 31.
 function spreadIvs(
   edited: EditedFields, inferred: SolvedSpread | undefined, curated: CuratedSet | null,
   usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet,
@@ -278,7 +248,6 @@ function hasNonZeroEvs(evs: PokemonSet['evs'] | undefined): boolean {
   return !!evs && Object.values(evs).some(value => (value ?? 0) > 0);
 }
 
-/** The offense side the revealed attacks agree on; null when none or both categories were shown. */
 function revealedOffense(dex: RulesDex, revealedMoves: string[]): 'atk' | 'spa' | null {
   const categories = new Set(
     revealedMoves.map(name => dex.moves.get(name))
@@ -289,12 +258,8 @@ function revealedOffense(dex: RulesDex, revealedMoves: string[]): 'atk' | 'spa' 
   return categories.has('Special') ? 'spa' : 'atk';
 }
 
-/**
- * Species-shaped last-resort spread (no usage data, no inference, no sets): max the HIGHER base offense, plus Speed on fast species and HP
- * otherwise. A flat 252 HP / 252 Atk would put physical EVs on special attackers and leave base-123-Speed Noivern outsped by everything.
- * Revealed attacks name the offense side first (a Kyurem that showed only Freeze-Dry defaulted to 252 Atk). Where the server gives a set
- * without EVs a start (Gens 1 and 2: 252 in every stat) that start is the default, whatever the species.
- */
+// Species-shaped last resort: max the HIGHER base offense, plus Speed on fast species else HP; revealed attacks lead.
+// Where the server gives a set without EVs a start (Gens 1 and 2: 252 in every stat), that start is the default.
 function defaultEvsFor(dex: RulesDex, species: string, revealedMoves: string[], budget: EvBudget): PokemonSet['evs'] {
   if (budget.start > 0) return evsOfSet(undefined, budget);
   const data = dex.species.get(species);
@@ -327,23 +292,19 @@ function cleanItem(replayItem: string, fallback: string): string {
   return itemSetValue(replayItem) || fallback;
 }
 
-/**
- * A packed set with an empty ability gives the sim Pokemon NO ability at all (custom games skip team validation): a reconstructed Uxie died to
- * an Earthquake it should have been immune to. Slot 0 is Showdown's own teambuilder default when nothing better is known; protocol rule-outs
- * walk to the next slot (a Bronzong that took an Earthquake is not Levitate).
- */
+// A packed set with an empty ability gives the sim Pokemon NO ability at all (custom games skip team validation);
+// slot 0 is Showdown's own default. Protocol rule-outs walk to the next slot.
 function defaultAbility(dex: RulesDex, species: string, ruledOut?: string[]): string {
   const abilities = (dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
   for (const slot of ['0', '1', 'H'] as const) {
     const ability = abilities[slot];
     if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;
   }
-  // Every slot ruled out (single-ability species with contradictory evidence,
-  // e.g. a video log's mis-read): keep slot 0 — a wrong ability beats none.
+  // Every slot ruled out (contradictory evidence): keep slot 0, a wrong ability beats none.
   return abilities['0'] || '';
 }
 
-/** `primary` defines the set; `fill` only tops it up to four moves. */
+// `primary` defines the set; `fill` only tops it up to four moves.
 function mergeMoveLists(fill: string[], primary: string[]): string[] {
   const result = [...primary];
   for (const move of fill) {

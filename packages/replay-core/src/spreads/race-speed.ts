@@ -3,11 +3,8 @@ import { CHAMPIONS_MOD } from '../calc-gen.ts';
 import type { RulesDex } from '../rules-dex.ts';
 import { twinBattle } from '../sim-ask/twin.ts';
 
-/**
- * The Speed a race ran at, as the simulator of the replay's generation plays it. A Choice Scarf's Speed is the simulator's own modifier
- * and rounding (201 races at 301, not 301.5): one Scarf holder per generation answers every stat through `getStat`, memoized per stat.
- * In a generation before the item exists the holder carries nothing.
- */
+// A Choice Scarf's Speed is the simulator's own modifier and rounding (201 races at 301, not 301.5): one holder per
+// generation, read through `getStat`; before the item exists the holder carries nothing.
 
 const holders = new Map<string, Pokemon | null>();
 const memo = new Map<string, number>();

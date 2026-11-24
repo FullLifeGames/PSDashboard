@@ -19,7 +19,7 @@ export interface PokemonUsageStats {
   items: UsageProbability[];
   moves: UsageProbability[];
   spreads: UsageSpread[];
-  /** The species that share a team with this one, most common first (`probability`: the share of this species' teams that carry it); absent when none. */
+  /** Teammates, most common first; `probability` is the share of this species' teams that carry the teammate. */
   teammates?: UsageProbability[];
 }
 

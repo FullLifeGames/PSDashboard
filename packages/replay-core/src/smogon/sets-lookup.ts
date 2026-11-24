@@ -1,4 +1,3 @@
-/** The published-set assumption model and its pure lookup; smogon-sets.ts fetches the sets and re-exports these names. */
 import { toId } from '../ids.ts';
 
 /** One published slot (ability, item or move): its value, where it came from and every option listed. */
@@ -23,9 +22,9 @@ export interface PokemonSetAssumption {
   item?: SetAssumption;
   moves: SetAssumption[];
   spread?: SetSpreadAssumption;
-  /** The IVs the set lists (Trick Room Speed 0); absent when it lists none, and the build then plays 31. A list of options gives its first. */
+  /** The IVs the set lists (Trick Room Speed 0); absent when it lists none (the build then plays 31). */
   ivs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
-  /** The species' other published sets (this entry is the first); coherent-set selection scores all of them against the evidence. */
+  /** The species' other published sets; this entry is the first. */
   alternatives?: PokemonSetAssumption[];
 }
 
@@ -34,7 +33,6 @@ export interface SmogonSetAssumptions {
   format: string;
   source: string;
   pokemon: Record<string, PokemonSetAssumption>;
-  /** Per-species fetch failures ("Toxapex: Failed to fetch"); absent when every species resolved or was merely absent. */
   errors?: string[];
   /** Every set file that contributed, the format's own first, then the generation Ubers fallback. */
   formats?: string[];

@@ -1,4 +1,3 @@
-/** Pure lookups over fetched usage statistics; smogon-stats.ts fetches and re-exports them. */
 import type { PokemonFieldInfo, PokemonMoveInfo } from '../types.ts';
 import type { PokemonUsageStats, SmogonUsageStats, SpeciesUsageSet, UsageProbability } from './stats-types.ts';
 import { dexOf, formatRules, type RulesDex } from '../rules-dex.ts';
@@ -14,10 +13,6 @@ function ownUsageStats(species: string, usageStats: SmogonUsageStats): PokemonUs
     Object.values(usageStats.pokemon).find(entry => toId(entry.species) === toId(species));
 }
 
-/**
- * The base species of a forme that battles exactly like it (same types, base stats and abilities: Gastrodon-East, Maushold-Four);
- * null otherwise (Rotom-Wash).
- */
 function battleAlikeBase(dex: RulesDex, species: string): string | null {
   const forme = dex.species.get(species);
   if (!forme.exists || forme.baseSpecies === forme.name) return null;
@@ -44,13 +39,12 @@ export function getSpeciesUsageSet(
   usageStats: SmogonUsageStats | null | undefined,
   species: string,
   ruledOut?: { abilities?: string[]; items?: string[] },
-  /** Usage-move candidates to expose (coherence vetoes refill from the tail). */
   moveCount = 4,
 ): SpeciesUsageSet | null {
   const stats = getSpeciesUsageStats(species, usageStats);
   if (!stats || !usageStats) return null;
 
-  // Protocol evidence can disprove the top usage pick (a Clefable that takes Stealth Rock damage is not Magic Guard): fall to the next.
+  // Protocol evidence can disprove the top pick (Stealth Rock damage rules out Magic Guard): fall to the next.
   const firstAllowed = (entries: UsageProbability[], excluded?: string[]) =>
     entries.find(entry => !(excluded ?? []).includes(toId(entry.value)));
 
@@ -63,7 +57,7 @@ export function getSpeciesUsageSet(
   };
 }
 
-/** Up to two usage items that differ from the current guess and that evidence did not rule out; empty without a usage entry. */
+/** Up to two usage items that differ from the current guess and that evidence did not rule out; empty without usage. */
 export function alternativeItems(
   usageStats: SmogonUsageStats | null | undefined,
   species: string,

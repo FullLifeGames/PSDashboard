@@ -12,23 +12,17 @@ import { forcedSpread, SPREAD_TARGETS } from '../spreads/observation-read.ts';
 import { toId } from '../ids.ts';
 import { screenFlags } from '../dex-facts/index.ts';
 
-/** What both directions of the damage judge share: the hull test's constants, the hits fit to judge, the calculator Pokemon and the rolls. */
-
 /** HP-bar reading noise: the slack of the spread fit and the Choice-lock check. */
 export const OBSERVATION_SLACK = 0.02;
-/**
- * A hit must miss a candidate's hull by more than the smallest damage item factor (Muscle Band, Wise Glasses: x1.1): a smaller miss
- * cannot tell an item from the guessed spread of the defender as built.
- */
+/** A hit must miss a hull by more than the smallest damage item factor (Muscle Band, Wise Glasses: x1.1). */
 export const MISS_MARGIN = 1.1;
 /** Handlers by which an ability changes another Pokémon's damage (Friend Guard, Power Spot, the auras, Ruin). */
 export const FIELD_DAMAGE_HOOK = /^on(Ally|Any|Foe)(BasePower|ModifyAtk|ModifyDef|ModifySpA|ModifySpD|ModifyDamage)$/;
-/** Move handlers that set power, damage or type from state the record does not carry. */
+// Move handlers that set power, damage or type from state the record does not carry.
 const UNREADABLE_MOVE = ['basePowerCallback', 'damageCallback', 'damage', 'ohko', 'multihit', 'isZ', 'isMax', 'onModifyType', 'onModifyMove'];
 
 export type GenDex = RulesDex;
 
-/** The Dex of the game a logged hit was played in: its generation and the mod its format names. */
 export const hitDex = (hit: Pick<LoggedHit, 'gen' | 'format'>): GenDex => rulesDex(hit.gen, calcModOf(hit.format));
 export type CalcOptions = NonNullable<ConstructorParameters<typeof Pokemon>[2]>;
 export type Stat = keyof PokemonEvs;
@@ -49,10 +43,7 @@ export function readableMove(dex: GenDex, moveId: string): boolean {
   return move.exists && move.category !== 'Status' && UNREADABLE_MOVE.every(key => !move[key]);
 }
 
-/**
- * The hit is fit to judge: no doubt at the hit, abilities the Dex fixes (a Champions game is judged on its Stat Points), a readable move,
- * no Stellar first use, the holder's own item in play, and nobody else on the field whose possible ability changes the damage or hides the weather.
- */
+/** Whether the hit is fit to judge: no doubt, a readable move, no Stellar first use, no field ability changing it. */
 export function judgeable(hit: LoggedHit): boolean {
   if (hit.doubt || hit.attacker.itemChanged || hit.attacker.tera === 'Stellar') return false;
   if (abilitiesAreFree(`|tier|${hit.format}`)) return false;
@@ -112,9 +103,7 @@ export function rolls(gen: CalcGeneration, hit: LoggedHit, attacker: CalcOptions
       attackerSide: { isHelpingHand: hit.helpingHand },
       defenderSide: screenFlags(hit.screens),
     });
-    // A spread move the log shows without [spread] hit one target: no spread factor. The calculator rebuilds the move from its name and
-    // overrides, so the target goes in as an override. A move the generation lacks (Pound in Champions' generation 0) builds as a 0-damage
-    // Status move: the hit cannot be judged.
+    // A spread move shown without [spread] hit one target: no spread factor, so the target goes in as an override.
     if (!calcKnowsMove(gen, hit.move)) return null;
     const named = new Move(gen, hit.move);
     const move = hit.doubles && !hit.spread && SPREAD_TARGETS.has(named.target)
@@ -122,7 +111,6 @@ export function rolls(gen: CalcGeneration, hit: LoggedHit, attacker: CalcOptions
       : named;
     const target = calcPokemon(gen, hit.defender, defender);
     const result = calculate(gen, calcPokemon(gen, hit.attacker, attacker), target, move, field);
-    // A spread the calculator forces on a hit that had one target in the game is no reading.
     if (forcedSpread(hit, result.move.target)) return null;
     const damage = (Array.isArray(result.damage) ? (result.damage as number[]).flat() : [Number(result.damage)]).map(Number);
     const maxHp = target.maxHP();
@@ -136,11 +124,8 @@ export const shown = (field: { source: string }) => field.source === 'revealed' 
 
 export type Rolled = ({ min: number; max: number } | null)[];
 
-/**
- * By what factor the hit lies outside the hull of the rolls the allowed configurations give, after the slack: 1 when some configuration
- * explains it, above 1 by how far it misses (a hit too strong reads observed / max, one too weak min / observed); null when the calculator
- * cannot judge. The weak configurations are rolled only when the strong ones do not decide.
- */
+// Too strong reads observed / max, too weak min / observed; weak configurations roll only if the strong ones fail.
+/** By what factor the hit misses the hull of the allowed rolls: 1 when some explains it, null when it cannot judge. */
 export function missBeyond(hit: LoggedHit, strong: () => Rolled, weak: () => Rolled): number | null {
   const high = strong();
   if (high.some(range => range === null)) return null;
@@ -163,10 +148,7 @@ export const holderOptions = (spread: Spread, { ability, abilityOn }: AbilityVar
   evs: spread.evs, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...spread.ivs },
 });
 
-/**
- * The abilities with their states: Flash Fire and Slow Start as the log shows them; Stakeout both ways, because whether the target counts
- * as new the record cannot say (the simulator reads its active turns).
- */
+/** The abilities with their states, Stakeout both ways: the record cannot say whether the target counts as new. */
 export function variantsOf(abilities: string[], party: HitParty): AbilityVariant[] {
   return abilities.flatMap(ability => {
     const id = toId(ability);
@@ -175,10 +157,8 @@ export function variantsOf(abilities: string[], party: HitParty): AbilityVariant
   });
 }
 
-/**
- * The holder's strongest and weakest legal spreads for that stat: the format's per-stat cap (252 EVs, or 32 Stat Points in a Champions game,
- * which has no IVs to lower, so its weak spread keeps IV 31 as the calculator's generation 0 ignores them anyway).
- */
+// A Champions game has no IVs to lower: its weak spread keeps IV 31, which the calculator's generation 0 ignores.
+/** The holder's strongest and weakest legal spreads for that stat: 252 EVs, or 32 Stat Points in a Champions game. */
 export function extremes(dex: GenDex, stat: Stat | null, budget: EvBudget): { strong: Spread; weak: Spread } {
   if (!stat) return { strong: { evs: {}, ivs: {}, nature: 'Hardy' }, weak: { evs: {}, ivs: {}, nature: 'Hardy' } };
   const other: Stat = stat === 'atk' ? 'spa' : 'atk';

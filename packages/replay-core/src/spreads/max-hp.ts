@@ -8,10 +8,7 @@ export interface ObservedMaxHp {
   level: number;
 }
 
-/**
- * The exact maximum HP a server log prints on every switch line (`|switch|p2a: Name|Garchomp, F|409/409`), keyed like the solver
- * (`side:speciesId`), first sighting per Pokémon. Percent logs (`100/100`) carry no measurement and are skipped.
- */
+/** The exact maximum HP a server log prints on a switch line, per `side:speciesId`; percent logs carry none. */
 export function observedMaxHp(log: string): Map<string, ObservedMaxHp> {
   const seen = new Map<string, ObservedMaxHp>();
   for (const line of log.split('\n')) {
@@ -27,16 +24,11 @@ export function observedMaxHp(log: string): Map<string, ObservedMaxHp> {
   return seen;
 }
 
-/** The library's stat formula, @pkmn/data's `gen.stats.calc`, in the modern generations (the replays this reads are Gen 3 and later). */
+// The modern stat formula; the replays this reads are Gen 3 and later.
 const modernStats = generationsFor('').get(9).stats;
 
-/**
- * The HP EVs that reproduce an observed maximum HP: the library's HP formula (`gen.stats.calc`,
- * `floor((2·base + iv + floor(ev/4) + 100) · level / 100) + 10`) inverted over the legal EV counts, held to the simulator's `maxhp` by
- * max-hp-sweep.spec.ts. Level 100 inverts exactly; lower levels leave a few candidates, of which the one nearest the prior's HP EVs wins.
- * `undefined` when no count reaches the HP (foreign IVs; Shedinja, whose 1 HP is no function of the spread). On Stat Points the
- * candidates are the points 0..32, each through calcEvs, and the answer is in points.
- */
+// On Stat Points the answer is in points (0..32, each through calcEvs); Shedinja's 1 HP is no function of the spread.
+/** The HP EVs that reproduce an observed maximum HP (the library's formula inverted); `undefined` when none does. */
 export function hpEvsForMaxHp(
   baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31, budget: EvBudget = evBudget(''),
 ): number | undefined {

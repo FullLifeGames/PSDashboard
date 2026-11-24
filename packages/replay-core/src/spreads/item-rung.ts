@@ -3,13 +3,7 @@ import { toId } from '../ids.ts';
 import { belongsToOthers, changesSpeed, isBoostItem, requiresItem } from './boost-items.ts';
 import { keyOf, setOf, type SolveContext } from './fit.ts';
 
-/**
- * The items the solver may swap in for a mon whose knockouts no spread of its set reaches: the species' usage-listed items the log does
- * not refute (the knowledge map's `itemOffers`, usage order) that the simulator gives a damage hook (`isBoostItem`), that belong to the
- * species (`itemUser`) and that no other Pokémon of the team is known to hold when the format has an Item Clause (a limit of N lets N hold
- * one; a Custom Game has none). Nothing is offered when the guessed item is a boost item itself, an item the species needs (a Mega Stone),
- * a Choice Scarf a move order decided, or an item that changes Speed while the mon has move orders (the orders priced its Speed).
- */
+/** The usage-listed boost items that belong to the species and that no teammate is known to hold (Item Clause). */
 export function itemOffers(ctx: SolveContext, key: string, hasSpeedObs: boolean): string[] {
   const [side, species] = key.split(':') as ['p1' | 'p2', string];
   const set = setOf(ctx, side, species);
@@ -25,7 +19,6 @@ export function itemOffers(ctx: SolveContext, key: string, hasSpeedObs: boolean)
   });
 }
 
-/** How many teammates are known to hold each item: the build's known items, and a boost item the solver gave another mon of the side. */
 function heldBy(ctx: SolveContext, side: 'p1' | 'p2', species: string): Map<string, number> {
   const held = new Map<string, number>();
   for (const mate of ctx.sets[side]) {

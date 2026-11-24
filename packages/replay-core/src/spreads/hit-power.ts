@@ -1,4 +1,4 @@
-/** The base power from the battle's history (Last Respects, Rage Fist): a Dex `basePowerCallback` reading only these two counts; other callbacks stay with the calculator. */
+/** Base power from the battle's history (Last Respects, Rage Fist): a `basePowerCallback` reading only these counts. */
 
 export interface HistoryFacts {
   fainted: number;
@@ -15,7 +15,6 @@ export interface PowerDex {
 
 const HISTORY_READS = new Set(['pokemon.side', 'pokemon.side.totalFainted', 'pokemon.timesAttacked']);
 
-/** A stand-in that records every property path read on it; `values` answer by path, anything else answers another stand-in. */
 function recorder(path: string, reads: Set<string>, values: Record<string, unknown>): unknown {
   return new Proxy(function stand() { /* callable */ }, {
     get(_target, prop) {
@@ -28,7 +27,6 @@ function recorder(path: string, reads: Set<string>, values: Record<string, unkno
   });
 }
 
-/** The paths the move's callback reads and what it returns, with the history stand-in; null when the move has no callback. */
 function runCallback(dex: PowerDex, moveId: string, facts: HistoryFacts): { reads: Set<string>; power: unknown } | null {
   const callback = dex.moves.get(moveId).basePowerCallback;
   if (typeof callback !== 'function') return null;

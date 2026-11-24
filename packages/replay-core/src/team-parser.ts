@@ -1,4 +1,3 @@
-// German stat labels in a pasted team: KP=HP, Ang=Atk, Vert=Def, SpV=SpD, Init=Spe; SpA is the same in both languages.
 
 const GERMAN_STAT_MAP: Record<string, string> = {
   'KP': 'HP',
