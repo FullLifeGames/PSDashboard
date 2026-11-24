@@ -5,6 +5,8 @@ import {
   INFERRED_SPREAD_DETAIL,
   MEASURED_HP_SPREAD_DETAIL,
   ORDER_SPREAD_DETAIL,
+  applyTeamSheetToInfo,
+  extractTeamSheets,
   inferOpponentTeam,
   withStandIns,
   KNOCKOUT_BOOST_ITEM_DETAIL,
@@ -12,7 +14,8 @@ import {
 } from '@fulllifegames/replay-core';
 import { RANDOM_SET_MARK, RANDOM_SET_TITLE } from '../../../src/lib/stand-in-mark';
 import { BattleStatsPanel } from '../../../src/components/BattleStatsPanel';
-import { singlesReplay } from '../fixtures/replay';
+import { sourceLabel } from '../../../src/lib/provenance-labels';
+import { doublesReplay, singlesReplay } from '../fixtures/replay';
 import { evs, field, move, revealedPokemon, teamInfo } from '../fixtures/team-info';
 
 describe('BattleStatsPanel', () => {
@@ -102,9 +105,8 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Singles and doubles replays share the panel, so both run each case.
-  describe.each(['singles', 'doubles'] as const)('provenance of a solved spread (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  describe('provenance of a solved spread (singles)', () => {
+    const replayData = () => singlesReplay();
     const spread = { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 };
 
     test('a spread the move order checked says so, one the HP of the log set says so', () => {
@@ -118,8 +120,8 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  describe.each(['singles', 'doubles'] as const)('an unknown spread (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  describe('an unknown spread (singles)', () => {
+    const replayData = () => singlesReplay();
 
     test('reads "EVs not yet known" with no source word, and the hover title still says unknown', () => {
       const mon = revealedPokemon('Latias', { evs: evs('unknown'), moves: [] });
@@ -189,8 +191,8 @@ describe('BattleStatsPanel', () => {
   });
 
   // A set without a nature (Generations 1 and 2) shows no tag.
-  describe.each(['singles', 'doubles'] as const)('the nature tag (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  describe('the nature tag (singles)', () => {
+    const replayData = () => singlesReplay();
 
     test('a Jolly set shows Jolly with its source word; a set without a nature shows none', () => {
       const jolly = revealedPokemon('Garchomp', { nature: field('Jolly', 'guessed', { probability: 0.4 }) });
@@ -204,8 +206,14 @@ describe('BattleStatsPanel', () => {
   });
 });
 
-describe.each(['singles', 'doubles'] as const)('the reason of a boost item a knockout needs (%s)', kind => {
-  const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+function reasonReadsInPlainWords() {
+  expect(KNOCKOUT_BOOST_ITEM_DETAIL).toBe('only a boost item reaches the knockout');
+  expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toBe(NO_BOOST_ITEM_DETAIL);
+  expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toMatch(/[—–]/);
+}
+
+describe('the reason of a boost item a knockout needs (singles)', () => {
+  const replayData = () => singlesReplay();
 
   test('the item tag carries the reason as its hover text and stays a guess', () => {
     const mon = revealedPokemon('Gengar', { item: { value: 'Choice Specs', source: 'guessed', sourceDetail: KNOCKOUT_BOOST_ITEM_DETAIL } });
@@ -215,15 +223,15 @@ describe.each(['singles', 'doubles'] as const)('the reason of a boost item a kno
     expect(tag).toHaveTextContent('guessed');
   });
 
-  test('the reason reads in plain words and differs from the dropped boost item\'s', () => {
-    expect(KNOCKOUT_BOOST_ITEM_DETAIL).toBe('only a boost item reaches the knockout');
-    expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toBe(NO_BOOST_ITEM_DETAIL);
-    expect(KNOCKOUT_BOOST_ITEM_DETAIL).not.toMatch(/[—–]/);
-  });
+  test('the reason reads in plain words and differs from the dropped boost item\'s', reasonReadsInPlainWords);
 });
 
-describe.each(['singles', 'doubles'] as const)('IVs in the stats panel (%s)', kind => {
-  const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+describe('the reason of a boost item a knockout needs (doubles)', () => {
+  test('the reason reads in plain words and differs from the dropped boost item\'s', reasonReadsInPlainWords);
+});
+
+describe('IVs in the stats panel (singles)', () => {
+  const replayData = () => singlesReplay();
 
   test('a Trick Room body shows the IVs below 31 beside its EVs', () => {
     const ivs = { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 };
@@ -238,5 +246,23 @@ describe.each(['singles', 'doubles'] as const)('IVs in the stats panel (%s)', ki
     const mon = revealedPokemon('Garchomp', { ivs: { value: all31, source: 'guessed' } });
     render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
     expect(screen.getByRole('img', { name: 'Garchomp' }).parentElement!).not.toHaveTextContent('IVs');
+  });
+});
+
+describe('a doubles game', () => {
+  test('doubles: both active Pokémon of each side show their item and ability with the word that names the team sheet as their origin', () => {
+    const replay = doublesReplay();
+    const sheets = extractTeamSheets(replay.log);
+    const infoOf = (side: 'p1' | 'p2') => applyTeamSheetToInfo(inferOpponentTeam(replay.log, side), sheets[side]);
+    render(<BattleStatsPanel replayData={replay} p1Info={infoOf('p1')} p2Info={infoOf('p2')} />);
+    const leads = [
+      ['Pikachu', 'Light Ball', 'Static'], ['Eevee', 'Eviolite', 'Adaptability'],
+      ['Bulbasaur', 'Eviolite', 'Overgrow'], ['Charmander', 'Eviolite', 'Blaze'],
+    ];
+    for (const [species, item, ability] of leads) {
+      const card = screen.getByRole('img', { name: species }).parentElement!;
+      expect(within(card).getByText(item, { exact: false })).toHaveTextContent(`${item}${sourceLabel('sheet')}`);
+      expect(within(card).getByText(ability, { exact: false })).toHaveTextContent(`${ability}${sourceLabel('sheet')}`);
+    }
   });
 });
