@@ -140,6 +140,27 @@ describe('rows-compare', () => {
     expect(expectLost(['app | x > two'], [...after, row('app', 'x > three')]).code, 'a gain').toBe(1);
   });
 
+  test('--expect-gained names the rows a change adds: exit 0 when exactly those are gained and none is lost, 1 for an unnamed gain, an unmet name or a loss', () => {
+    const added = [...before, row('app', 'x > three'), row('ui', 'x > four', 'u.spec.tsx')];
+    const expectGained = (names: string[], rows: Row[] = added, lost?: string[]) => {
+      const args = [write('rows-before.json', before), write('rows-after.json', rows), '--expect-gained', write('rows-gained.json', names)];
+      if (lost) args.push('--expect-lost', write('rows-expected.json', lost));
+      return run('rows-compare.mjs', ...args);
+    };
+    const exact = expectGained(['app | x > three', 'ui | x > four']);
+    expect(exact.code).toBe(0);
+    expect(exact.out).toContain('GAINED 1x app | x > three (now in a.spec.ts), expected');
+    expect(exact.out).toContain('gained 2 of 2 expected, unexpected 0');
+    expect(expectGained(['app | x > three']).code, 'a gain that no one named').toBe(1);
+    expect(expectGained(['app | x > three', 'ui | x > four', 'app | x > five']).out, 'a named row that is not gained').toContain('NOT GAINED 1x app | x > five');
+    expect(expectGained(['app | x > three', 'ui | x > four', 'app | x > five']).code).toBe(1);
+    expect(expectGained(['app | x > three'], [...before, row('app', 'x > three')], ['app | x > two']).code, 'a loss that no one named').toBe(1);
+    const moved = [row('app', 'x > one'), row('ui', 'x > one', 'u.spec.tsx'), row('app', 'x > three')];
+    expect(expectGained(['app | x > three'], moved).code, 'a loss beside the named gain').toBe(1);
+    expect(expectGained(['app | x > three'], moved, ['app | x > two']).code, 'a loss and a gain, both named').toBe(0);
+    expect(expectGained([], before).code, 'nothing named and nothing gained').toBe(0);
+  });
+
   test('the longest prefix wins and a table entry that matches no row exits 2', () => {
     const { rows } = applyTable([row('app', 'a > b > c')], { prefixes: { 'a > ': 'X > ', 'a > b > ': 'Y > ' } });
     expect(rows[0].name).toBe('Y > c');
