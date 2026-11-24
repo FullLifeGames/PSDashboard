@@ -17,13 +17,10 @@ import { correctBattleFromSnapshot } from '../src/branch/corrections';
 import { getMainChoice } from '../src/branch/protocol-choices';
 
 /**
- * Round 63 (T115): an item line a move writes (`[from] move:` — Trick,
- * Switcheroo, Knock Off and their kin) is the protocol's word on what a body
- * holds from then on. The board follows it at the next boundary, and a
- * Choice item handed over locks the body into its first move after the
- * arrival. Before, the board kept whatever the sim's own swap produced from
- * the build's guesses: in 655336 the sim's Trick handed Bisharp the guessed
- * Colbur Berry, so turn 6 offered four moves to a Choice-Scarf-locked body.
+ * An item line a move writes (`[from] move:`: Trick, Switcheroo, Knock Off and their kin) is the protocol's word on what a body
+ * holds from then on. The board follows it at the next boundary, and a Choice item handed over locks the body into its first move
+ * after the arrival. Scene: in 655336 the sim's Trick handed Bisharp the guessed Colbur Berry, so turn 6 offered four moves to a
+ * Choice-Scarf-locked body.
  */
 
 const log = (lines: string[]) => lines.join('\n');
@@ -77,7 +74,7 @@ describe('held items from the protocol', () => {
       // Latias received Life Orb by Trick and lost it to Knock Off in the same turn.
       { side: 'p2', species: 'Latias', item: '', firstMove: null, touched: true },
     ]);
-    // Since round 64 (T121) every boundary lists the bodies shown so far; no item line yet means null.
+    // Every boundary lists the bodies shown so far; no item line yet means null.
     expect(context.heldItems.get(1)).toEqual([
       { side: 'p1', species: 'Bisharp', item: null, firstMove: null, touched: false },
       { side: 'p2', species: 'Latias', item: null, firstMove: null, touched: false },
@@ -116,9 +113,8 @@ type Replay = { id: string; format: string; formatid?: string; players: string[]
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
 
 /**
- * The live pass the app and the bank run (boundary capture with snapshot
- * correction, choice locks on); `read` sees each listed boundary's board as
- * the capture hands it out — the battle object moves on after that.
+ * The live pass the app and the bank run (boundary capture with snapshot correction, choice locks on); `read` sees each listed
+ * boundary's board as the capture hands it out, because the battle object moves on after that.
  */
 async function boundaries<T>(
   replay: Replay, p1Team: PokemonSet[], p2Team: PokemonSet[], turns: number[], read: (battle: Battle) => T,
@@ -159,7 +155,6 @@ describe('the board follows the protocol after a hand-over (round 63, T115)', ()
     // Bisharp is locked into Knock Off and the real player clicked it.
     const replay = fixture('smogtours-gen6ou-655336.json');
     const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
-    // The harness's gen6ou usage stats, parsed once and cut to this replay's species.
     const usageStats = JSON.parse(readFileSync(new URL('./fixtures/usage-gen6ou-655336.json', import.meta.url), 'utf-8')) as SmogonUsageStats;
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders, usageStats });
     // The scene is a build that guessed the giver's item (usage's first
@@ -178,10 +173,8 @@ describe('the board follows the protocol after a hand-over (round 63, T115)', ()
   });
 
   test('751407: Dragonite holds nothing after the turn-1 Knock Off, at turn 2 and on its return at turn 14', { timeout: 240000 }, async () => {
-    // Protocol facts: Deoxys's Eject Pack brings Dragonite in and Ogerpon's
-    // Knock Off removes its Choice Band. Until round 64 the sim's Eject Pack
-    // switch brought Gholdengo and the Knock Off hit Gholdengo; the board
-    // follows the protocol either way (protocol-choices.spec.ts reads the switch).
+    // Protocol facts: Deoxys's Eject Pack brings Dragonite in and Ogerpon's Knock Off removes its Choice Band; the board follows
+    // the protocol (protocol-choices.spec.ts reads the switch).
     const replay = fixture('smogtours-gen9ou-751407.json');
     const { observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
@@ -247,7 +240,6 @@ describe('doubles hand-over (round 63, T115)', () => {
   const replay = { id: 'synthetic-doubles-trick', format: 'gen9doublesou', formatid: 'gen9doublesou', players: ['Alice', 'Bob'], log: trickLog };
 
   test('a Trick hands p1b a Choice Scarf mid-turn: p1b is locked at the next boundary, its partner is not', async () => {
-    // The build guessed Leftovers for Chansey; the protocol shows a Choice Scarf.
     const { runtime } = await boundaries(replay, p1Team, p2Team('Leftovers'), [1], () => null);
     expect(runtime.choiceErrors.count).toBe(0);
     const battle = runtime.battleStream.battle!;
@@ -269,7 +261,6 @@ describe('doubles hand-over (round 63, T115)', () => {
       targetTurn: 2, snapshot: snapshots[1] ?? null,
       capturePositions: { snapshotFor: turn => snapshots[turn - 1] ?? null, onPosition: () => {} },
     });
-    // The sim's own Trick and Choice Scarf already produced the protocol's board.
     expect(bodyView(withLocks.runtime.battleStream.battle!.sides[0].active[1])).toEqual({ species: 'Snorlax', item: 'choicescarf', lock: 'bodyslam' });
     expect(stable(withLocks.runtime.battleStream.battle!)).toBe(stable(plain.battleStream.battle!));
   });
@@ -331,7 +322,6 @@ describe('bench-hp', () => {
       expect(toxapex.hp / toxapex.maxhp).toBeGreaterThan(0.7);
       expect(toxapex.hp / toxapex.maxhp).toBeLessThan(0.8);
 
-      // The active body is still corrected from the protocol, and a benched faint still lands.
       const snapshot = parseReplayLog(log).find(entry => entry.turn === 3)!;
       const gliscor = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Gliscor')!;
       gliscor.hp = Math.round(gliscor.maxhp / 2);
@@ -352,12 +342,8 @@ describe('bench-hp', () => {
   });
 
   /**
-   * Round 47 (T46): the round-40 rule left a benched body to the sim on the
-   * premise that the active was corrected at every boundary before it left.
-   * A body that is hit and leaves within the SAME turn never meets a boundary
-   * (913994 t5: Rillaboom 100 → 22 %, U-turn, the app read 100 % from then
-   * on). The bench now reads the last sighting; a Regenerator holder gets its
-   * third on top.
+   * A body that is hit and leaves within the same turn never meets a boundary (913994 turn 5: Rillaboom 100 → 22 %, U-turn, the app
+   * read 100 % from then on). The bench reads the last sighting; a Regenerator holder gets its third on top.
    */
   const pivotTeam = (species: 'Scizor' | 'Alomomola'): PokemonSet[] => [
     species === 'Scizor'
@@ -427,7 +413,7 @@ describe('bench-hp', () => {
     });
 
     test('the bench reads the same with and without a correction at every boundary', async () => {
-      // The round-40 premise, pinned: the rule no longer leans on the capture path.
+      // The rule does not lean on the capture path.
       const log = pivotLog('Scizor', 'M', 'U-turn', 22);
       expect(await benchFraction('Scizor', log, true)).toBeCloseTo(await benchFraction('Scizor', log, false), 8);
     });

@@ -2,11 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { Battle, Dex, State, Teams, type PokemonSet } from '@pkmn/sim';
 
 /**
- * Round 72, T238: the built sets carry the replay's shiny flag, so the simulator writes `, shiny` in a switch-in line the
- * way the game did. This sweep holds that the flag changes nothing else: for every species of generations 1 to 9
- * (singles and doubles formats), a body with the flag and a body without it, one turn played with the same dice, give
- * the same serialized battle once the flag and the details string that spells it are masked. Generations 1 and 2 are
- * in it on purpose (their shiny came from the DVs; the simulator does not read the flag there).
+ * The built sets carry the replay's shiny flag, so the simulator writes `, shiny` in a switch-in line the way the game did. This
+ * sweep holds that the flag changes nothing else: for every species of generations 1 to 9 (singles and doubles formats), a body
+ * with the flag and a body without it, one turn played with the same dice, give the same serialized battle once the flag and the
+ * details string that spells it are masked. Generations 1 and 2 are in it on purpose (their shiny came from the DVs; the
+ * simulator does not read the flag there).
  */
 
 const FOE: PokemonSet = {

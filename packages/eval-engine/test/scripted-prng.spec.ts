@@ -8,11 +8,7 @@ import { PairPRNG, type PairScript } from '../src/pair/prng';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 43: the simulator's dice on demand. A scripted PRNG answers the
- * accuracy roll, the crit roll, the damage roll and the speed-tie order of
- * one named move; everything else rolls from the seed as before.
- */
+/** A scripted PRNG answers the accuracy roll, the crit roll, the damage roll and the speed-tie order of one named move; everything else rolls from the seed. */
 
 function makeSet(name: string, species: string, moves: string[], spe = 0, level = 100): PokemonSet {
   return {
@@ -71,7 +67,6 @@ describe('scripted PRNG (round 43)', () => {
     expect(ratio).toBeGreaterThan(0.83);
     expect(ratio).toBeLessThan(0.87);
     expect(champHp(critMax)).toBeLessThan(champHp(max));
-    // Deterministic: the same script twice is the same child.
     expect(at(7, false).child.serialized).toBe(at(7, false).child.serialized);
   });
 
@@ -149,7 +144,6 @@ const DOUBLES_TURN = ['move 1 1, move 1', 'move 1, move 1'] as const;
 
 interface Dice extends PRNG { attach?(battle: Battle): void }
 
-/** Puts the dice on the board, starts the condition, plays one turn. */
 function play(board: Battle, dice: Dice, start: ((battle: Battle) => void) | null, [p1, p2]: readonly [string, string]): Battle {
   dice.attach?.(board);
   board.prng = dice;
@@ -163,7 +157,6 @@ const shown = (pattern: RegExp) => (log: readonly string[]): boolean => log.some
 interface Check {
   /** The first generation whose simulator draws this check. */
   from: number;
-  /** Puts the condition on the attacker, p1's first active. */
   start(battle: Battle): void;
   /** The check went the way that stops or hurts the attacker this turn. */
   shows(log: readonly string[]): boolean;
@@ -239,7 +232,6 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
 
   test('a confusion self-hit keeps the damage roll of the plain seed', () => {
     const confusion = CHECKS['confusion self-hit'];
-    /** The HP the self-hit took, or null on a seed without one. */
     const selfHit = (seed: string, dice: Dice): number | null => {
       const battle = play(singlesBoard(rules, seed), dice, confusion.start, SINGLES_TURN);
       return confusion.shows(battle.log) ? attacker(battle).maxhp - attacker(battle).hp : null;

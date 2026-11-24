@@ -68,8 +68,8 @@ describe('cloneBattle', () => {
     expect(simFastStatus()).toBe('fallback');
   });
 
-  // Round 82, the user's test of 01.11.2026 (gen9draft-2058494320, turn 1): a copy of a branch's live battle kept the battle's
-  // `send`, so the copy's output went into the live stream; a click the copy refused read as a refused turn of the branch.
+  // A copy of a branch's live battle must not keep the battle's `send`: its output went into the live stream, and a click the copy
+  // refused read as a refused turn of the branch (gen9draft-2058494320, turn 1).
   type Fields = Record<string, unknown>;
   const fields = (object: object): Fields => object as Fields;
   const levels = (battle: Battle): [string, Fields][] => [

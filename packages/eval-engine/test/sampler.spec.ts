@@ -19,13 +19,12 @@ import { sampleCell, type CellSample } from '../src/search/cell-sampler';
 import { cellSeeds } from '../src/search/root-quantile';
 
 /**
- * Round 70 (T217, gate of 13.10.2026 20:26, 2a): a doubles tree carries the pair plan's answer for the cells a replay turn's card
- * reads. T178 shipped the planner's answer per matrix cell for singles only (planCellEvents gives up on every combined choice);
- * the pair plan that prices doubles cells says the same thing: a plain cell has no accuracy roll and no kill range ("none"), a
- * planned cell lists its outcome classes ("events"), a guard that sends the cell to the plain mean leaves it unlisted (it
- * failed). The offset-0 tree plans the played row against every column and every row against the played column, the cells the
- * luck sentences (the played cell), the hindsight gate (the best row and the played row against the click) and the odds clause
- * read. The rest of the matrix stays unplanned: a full 13 x 13 grid would draw some 300 pair plans for a card that reads 25.
+ * A doubles tree carries the pair plan's answer for the cells a replay turn's card reads (singles plans per cell already;
+ * planCellEvents gives up on every combined choice): a plain cell has no accuracy roll and no kill range ("none"), a planned cell
+ * lists its outcome classes ("events"), a guard that sends the cell to the plain mean leaves it unlisted (it failed). The offset-0
+ * tree plans the played row against every column and every row against the played column, the cells the luck sentences (the played
+ * cell), the hindsight gate (the best row and the played row against the click) and the odds clause read. The rest of the matrix
+ * stays unplanned: a full 13 x 13 grid would draw some 300 pair plans for a card that reads 25.
  */
 
 const position = JSON.parse(readFileSync(new URL('./fixtures/positions/gen9vgc2026regi-2630685175-t7-played.json', import.meta.url), 'utf-8')) as {
@@ -65,7 +64,7 @@ describe('a doubles root plans the cells of the played row and column (VGC 26306
   });
 
   test('each answer is the pair plan\'s own: plain is none, a planned cell lists its classes (heaviest first, weights summing to 1)', () => {
-    // r89 A5 gate: the tree reads the root through `benchOrder`, and a cell's seeds (T324) key the saved position, so the spec builds it the same way.
+    // The tree reads the root through `benchOrder`, and a cell's seeds key the saved position, so the spec builds it the same way.
     const order = benchOrder(position.serialized);
     const root = createRootPosition(order ? order.serialized : position.serialized, position.ruleset);
     const cache = createMatchupCache(position.ruleset);
@@ -204,7 +203,7 @@ describe('a doubles turn without its protocol reads its luck from the planned ce
     const row = tree.p1Options.indexOf(findPlayedOption(tree.p1Options, position.keepPlayed.p1Slots)!);
     const column = tree.p2Options.indexOf(findPlayedOption(tree.p2Options, position.keepPlayed.p2Slots)!);
     const playedOutcome = result.matrix!.values[row][column];
-    // A result from before the plan reached doubles (an old cache): the same cells without their answers.
+    // An old cache entry: the same cells without their answers.
     const cells = result.matrix!.cells!.map(line => line.map(cell => (stripPlans ? { visits: cell.visits, verified: cell.verified } : cell)));
     const bare = { ...result, matrix: { ...result.matrix!, cells } };
     const analysis = analyzeTurn({ turn: 7, result: bare, played, playedOutcome, scoreBefore: playedOutcome, scoreAfter: playedOutcome - 0.8, actives: { p1: null, p2: null, gen: 9 } });
@@ -235,8 +234,8 @@ const meanOver = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, s
 const seeds = (count: number) => Array.from({ length: count }, (_, k) => `${101 + 4 * k},${102 + 4 * k},${103 + 4 * k},${104 + 4 * k}`);
 
 /**
- * A sample as data: the children by their serialized identity (the live battle behind each carries per-run
- * state such as |t:| lines) — the first child, and since round 63 the class children the verify step deepens.
+ * A sample as data: the children by their serialized identity (the live battle behind each carries per-run state such as |t:|
+ * lines): the first child and the class children the verify step deepens.
  */
 const asData = (sample: CellSample) => ({
   ...sample, firstChild: sample.firstChild.serialized,
@@ -256,9 +255,7 @@ describe('the pair plan at the root (round 56)', () => {
     expect(Math.abs(cell.sample.value - truth)).toBeLessThan(0.05);
     const blend = cell.sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    // Round 86 (T305): the first draw burned the Matcha Gotcha's target, so its class names the burn (old key: `...=hit-nokill`).
-    // r89 A5 gate: the first draw is slot 0 of the cell's own list now (T324); it kills with Play Rough and burns nobody. Old key:
-    // 'p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn'.
+    // The first draw is slot 0 of the cell's own list: it kills with Play Rough and burns nobody.
     expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=hit-kill|p2a:matchagotcha>p1a=hit-nokill|p2a:matchagotcha>p1b=hit-nokill');
   });
 
@@ -284,7 +281,7 @@ describe('the pair plan at the root (round 56)', () => {
     const root = anchorRoot();
     const battle = positionBattle(root);
     const cell = sampleCell(root, countFainted(battle), ...PLAYED, 1, createMatchupCache());
-    // r89 A5 gate: was the mean over the fixed seed '1,2,3,4' (-0.6562485351511125); the cell's slot 0 prices -0.17427480662206596.
+    // The cell's slot 0 prices -0.17427480662206596 (the mean over the fixed seed '1,2,3,4' was -0.6562485351511125).
     expect(cell.value).toBe(meanOver(root, ...PLAYED, cellSeeds(root, ...PLAYED).slice(0, 1)));
   });
 
@@ -300,8 +297,8 @@ describe('the pair plan at the root (round 56)', () => {
     expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_DRAWS)), 12); // r89 A5 gate: the cell's eight
   });
 
-  // Round 86 (T305): old expectation, the cell fell back after the first draw with `flinch-chance` (8 draws, the plain mean). New: the
-  // flinch die is part of the class, the cell is a plan, and the classes with the flinch carry its chance.
+  // The flinch die is part of the class and the cell is a plan, not a fallback to the plain mean; the classes with the flinch
+  // carry its chance.
   test('a flinch die is part of the plan: the classes with the flinch weigh its chance', () => {
     // The battle of pair-pattern.spec.ts: every acting body has its own speed (no tie).
     const root = doublesRoot(
@@ -324,9 +321,8 @@ describe('the pair plan at the root (round 56)', () => {
     const twice = pairCellSample(root, ...PLAYED, 3, createMatchupCache());
     expect(cellData(twice)).toEqual(cellData(once));
     if (once.kind !== 'sample') throw new Error('expected a sample');
-    // r89 A5 gate: was 0.05 on the fixed seeds; the cell's own three base seeds read 0.082 away (a 3-draw class estimate).
-    // Round 89 SB-3 (re-pin for the gate): a drop counts only while its holder cannot switch out, which moves the leaves of this board;
-    // the same 3-draw estimate reads 0.127 away from the 256-seed mean (0.082 before). Bound 0.1 to 0.15.
+    // The cell's own three base seeds read 0.127 away from the 256-seed mean (a 3-draw class estimate; a drop counts only while its
+    // holder cannot switch out). Bound 0.1 to 0.15.
     expect(Math.abs(once.sample.value - meanOver(root, ...PLAYED, seeds(256)))).toBeLessThan(0.15);
   });
 

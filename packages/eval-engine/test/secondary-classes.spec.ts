@@ -15,15 +15,11 @@ import {
 } from './secondary-classes-support';
 
 /**
- * Round 86 (T305), step A4: the red sweep of the secondary classes, part one (the reader and the scripts). Every generation 1 to
- * 9 and the Champions mod, singles and from Gen 3 doubles; a plain run plays the sample of `sweepSelection`, `DICE_SWEEPS=full`
- * every Dex move. The paths (class weights, scenes, fork counts) are in `secondary-classes-paths.spec.ts`; the contract of
- * the shapes is in `secondary-classes-support.ts`.
- *
- * Today the rows named in KNOWN fail, each for the reason of the plan (3.6, point 4): `dice/secondaries.ts` has no reader of the
- * entries a played move draws, and neither `ScriptedPRNG` nor `PairPRNG` answers a secondary die. The rows after the oracle
- * (the first describe) pass today: they show that the oracle sees the chances, so a row that is red is not red by a blind oracle.
- * `T305_RED=1` runs the KNOWN rows as plain tests.
+ * Part one of the sweep of the secondary classes (the reader and the scripts). Every generation 1 to 9 and the Champions mod,
+ * singles and from Gen 3 doubles; a plain run plays the sample of `sweepSelection`, `DICE_SWEEPS=full` every Dex move. The paths
+ * (class weights, scenes, fork counts) are in `secondary-classes-paths.spec.ts`; the contract of the shapes is in
+ * `secondary-classes-support.ts`. The rows after the oracle (the first describe) show that the oracle sees the chances, so a red
+ * row is not red by a blind oracle. `T305_RED=1` runs the KNOWN rows as plain tests.
  */
 await loadSimMods('gen9championsou');
 
@@ -32,7 +28,6 @@ const choicesOf = (mode: Mode, move: DexMove): { p1: string; p2: string } => (mo
   ? { p1: `move ${move.id}`, p2: 'move splash' }
   : { p1: `move ${move.id}${aimed(mode, move)}, move splash`, p2: 'move splash, move splash' });
 
-/** A move the oracle can play on a plain turn: no charge turn needed here, nothing that lands later. */
 const playable = (move: DexMove): boolean => !isDelayed(move) && !isCharge(move);
 
 describe.each(SWEEP_CASES)('the oracle sees the entries of a played move: $name', ({ rules, mode }) => {
@@ -55,7 +50,6 @@ describe.each(SWEEP_CASES)('the reader against the simulator: $name', ({ rules, 
   const { moves } = sweepMoves(rules, move => hasChanceEntry(move) && !isDelayed(move));
   let exercised = 0;
 
-  /** The problem of one move on one board, or null; a board where no target took damage on any seed is not counted. */
   function problem(first: Battle, move: DexMove, label: string): string | null {
     const slots = sweepTargets(mode, move.target);
     // a charge move is read on its second turn, the one that draws
@@ -106,7 +100,6 @@ describe.each(SWEEP_CASES)('the reader against the simulator: $name', ({ rules, 
   }
 });
 
-/** The log of one scripted turn: the script answers the move's hit, crit and roll and the entry (and the others of the move) as asked. */
 function scriptedLog(mode: Mode, move: DexMove, board: Battle, secondary: Record<string, boolean>): string[] {
   const script = { hit: true, crit: false, roll: 7, secondary };
   const choices = choicesOf(mode, move);
@@ -121,7 +114,7 @@ const witnessed = (entry: SecondaryEntry): boolean =>
   entry.chance !== undefined && entry.chance < 100 && !entry.self && !!(entry.status || entry.volatileStatus === 'flinch' || entry.boosts);
 
 describe.each(SWEEP_CASES)('a script answers the secondary die: $name', ({ rules, mode, name }) => {
-  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): a script answers it once per effect, a rest for the gate
+  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): a script answers it once per effect
   const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && playable(move) && move.priority >= 0 && !move.multihit);
   const target = (['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'] as const);
 

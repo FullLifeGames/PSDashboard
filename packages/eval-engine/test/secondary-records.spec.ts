@@ -13,7 +13,7 @@ import {
 import { entriesOf, FAST, rootOf, toleranceOf } from './secondary-classes-support';
 
 /**
- * Round 86 (T305), step A5a: the record of the secondary dice. A class draw hands the fork a `DiceSink` as its scripts and reads
+ * The record of the secondary dice. A class draw hands the fork a `DiceSink` as its scripts and reads
  * `sink.secondaries` after the advance; the doubles pair plan reads the `secondary` records of `PairPRNG`. Every generation 1 to
  * 9 and the Champions mod, singles and from Gen 3 doubles, over the moves whose entry the protocol shows by a standard line:
  *
@@ -32,13 +32,11 @@ const choicesOf = (mode: Mode, move: DexMove): { p1: string; p2: string } => (mo
 /** The log without its wall-clock lines (`|t:|`), which differ between two plays of one turn. */
 const withoutClock = (log: string[]): string => log.filter(line => !line.startsWith('|t:|')).join('|');
 
-/** An entry whose effect the protocol shows by a standard line on the target. */
 const witnessed = (entry: SecondaryEntry): boolean =>
   entry.chance !== undefined && entry.chance < 100 && !entry.self && !!(entry.status || entry.volatileStatus === 'flinch' || entry.boosts);
 
 interface Seen { effectId: string; chance: number; happened: boolean; slot?: string; moveId?: string; targetSlot?: string; key?: string }
 
-/** What a draw recorded and the log of the turn, singles through the sink, doubles through the pair plan's records. */
 function played(mode: Mode, board: Battle, move: DexMove, seed: string): { log: string[]; plain: string[]; seen: Seen[] } {
   const choices = choicesOf(mode, move);
   const plain = advancePositionWithLog(rootOf(board), choices.p1, choices.p2, seed).log;
@@ -53,7 +51,7 @@ function played(mode: Mode, board: Battle, move: DexMove, seed: string): { log: 
 }
 
 describe.each(SWEEP_CASES)('the record of the secondary dice: $name', ({ rules, mode, name }) => {
-  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): one record per hit is a rest for the gate
+  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): one record per hit
   const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && !isDelayed(move) && !isCharge(move) && !move.multihit && move.priority >= 0
     && ['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'].includes(move.target));
   const sample = SWEEPS_FULL ? moves : moves.slice(0, 10);

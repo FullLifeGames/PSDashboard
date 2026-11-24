@@ -7,20 +7,19 @@ import { LINE_MIN_VISITS, lineFrom, principalVariation, rowLines as rowLinesAt, 
 import type { EvalSettings, RowLines, TreeLineStep } from '../src/types';
 
 /**
- * Round 89 (#104), step G2: the line of a root row. Synthetic nodes by hand (only the fields the walk reads): the row's first cell is
- * the one against the opponent's top row once it has 8 visits, else the row's heaviest cell; a step under 8 visits ends the line;
- * three steps at most (the fixtures' nodes carry equal means, so each later step is the pair of the most visited options, as the walk
- * of visits read it before LN-2; the last describe holds the by-value rule); a replacement step keeps the waiting label. `principalVariation` returns what it always returned (the
- * reference below is the walk as it stood before the rows had lines). Rows are keyed by label: a reordered bench moves the choice
- * strings and not the labels (singles and doubles boards).
+ * The line of a root row, on synthetic nodes by hand (only the fields the walk reads): the row's first cell is the one against the
+ * opponent's top row once it has 8 visits, else the row's heaviest cell; a step under 8 visits ends the line; three steps at most
+ * (the fixtures' nodes carry equal means, so each later step is the pair of the most visited options; the last describe holds the
+ * by-value rule); a replacement step keeps the waiting label. `principalVariation` is held to a reference copy of the plain walk
+ * below. Rows are keyed by label: a reordered bench moves the choice strings and not the labels (singles and doubles boards).
  */
 
 interface Cell { i: number; j: number; visits: number; child?: Node }
 
-/** The tops a tree reports: each side's best rows by label, best first (one name each in the older fixtures). */
+/** The tops a tree reports: each side's best rows by label, best first. */
 const tops = (p1: string, p2: string, ...more: string[]): { p1: string[]; p2: string[] } => ({ p1: [p1], p2: [p2, ...more] });
 
-/** The walk at the threshold of 8 visits, which the fixtures below were written for (G14b: the line walk's own default is 4). */
+/** The walk at the threshold of 8 visits, which the fixtures below were written for (the walk's own default is 4). */
 const rowLines = (root: Node, tops: { p1: readonly string[]; p2: readonly string[] }): RowLines => rowLinesAt(root, tops, 8);
 
 const options = (labels: string[]) => labels.map((label, index) => ({ choice: `move ${index + 1}`, label }));
@@ -49,7 +48,7 @@ function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = 
   } as unknown as Node;
 }
 
-/** The walk as it stood before round 89: kept here so the shared walk is held to it. */
+/** A reference copy of the walk, so the shared walk is held to it. */
 function referenceVariation(start: Node): { p1: string; p2: string }[] {
   const steps: { p1: string; p2: string }[] = [];
   let current = start;
@@ -177,7 +176,6 @@ describe('a tree ships its rows\' lines by label', () => {
     }
     const top = stats.result.perSide.p1[0]?.label;
     if (top && lines.p1[top]) expect(lines.p1[top][0][0].p2).toBe(stats.result.perSide.p2[0].label);
-    // a row keeps at most three lines, each against another answer
     for (const side of ['p1', 'p2'] as const) {
       for (const [label, list] of Object.entries(lines[side])) {
         expect(list.length, `${side} ${label}`).toBeLessThanOrEqual(3);
@@ -189,9 +187,9 @@ describe('a tree ships its rows\' lines by label', () => {
 });
 
 /**
- * Round 89 (#104), step G12 (ruling G8a): a row keeps up to three lines, one against each of the tree's top three answers that holds
- * the visits a line needs. The first is the line the tree always kept; the others are new. The reference below is `rowLines` as it
- * stood before the step (one line per row, against the tree's top row only): the first entry of every row is held to it.
+ * A row keeps up to three lines, one against each of the tree's top three answers that holds the visits a line needs. The first is
+ * the plain line. The reference below is `rowLines` with one line per row (against the tree's top row only): the first entry of
+ * every row is held to it.
  */
 function referenceRowLines(root: Node, tops: { p1?: string; p2?: string }): Record<'p1' | 'p2', Record<string, TreeLineStep[]>> {
   const out: Record<'p1' | 'p2', Record<string, TreeLineStep[]>> = { p1: {}, p2: {} };
@@ -218,7 +216,6 @@ function referenceRowLines(root: Node, tops: { p1?: string; p2?: string }): Reco
   return out;
 }
 
-/** The first entry of every row of a result of the new walk, as the old walk returns it. */
 const firsts = (lines: RowLines): Record<'p1' | 'p2', Record<string, TreeLineStep[]>> => ({
   p1: Object.fromEntries(Object.entries(lines.p1).map(([label, list]) => [label, list[0]])),
   p2: Object.fromEntries(Object.entries(lines.p2).map(([label, list]) => [label, list[0]])),
@@ -291,9 +288,8 @@ describe('lines against the tree\'s top three answers', () => {
 });
 
 /**
- * Round 89 (#104), step G14b (ruling G9a, option T): a line may stand on a cell with 4 visits, on every turn. The walk of the rows asks
- * `LINE_MIN_VISITS` (4); the principal variation, which the summary's ", then ..." prose reads, keeps its 8. Nothing in the search
- * changes, only what the walk calls a line.
+ * A line may stand on a cell with 4 visits, on every turn. The walk of the rows asks `LINE_MIN_VISITS` (4); the principal variation,
+ * which the summary's ", then ..." prose reads, keeps its 8.
  */
 describe('the line threshold of the rows is 4 visits, the principal variation keeps 8', () => {
   const thin = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
@@ -336,9 +332,9 @@ describe('the line threshold of the rows is 4 visits, the principal variation ke
 });
 
 /**
- * Round 89 (#153, Hard mode): beside the lines against its top three answers a row keeps the line through the cell of the answer the
- * caller names as the row's floor (`floors`, by row label), when that cell holds the visits a line needs. The rows' own lists stay
- * what they were: the donors of the plain request read them, and the setting's lines must not move them.
+ * Beside the lines against its top three answers a row keeps the line through the cell of the answer the caller names as the row's
+ * floor (`floors`, by row label), when that cell holds the visits a line needs. The rows' own lists stay what they were: the donors
+ * of the plain request read them, and the setting's lines must not move them.
  */
 describe('the line through a row\'s floor cell', () => {
   const deep = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
@@ -362,10 +358,10 @@ describe('the line through a row\'s floor cell', () => {
 });
 
 /**
- * Round 89 (LN-2, ruling 44 LN1a): the later steps of a row's line read each node by value. Each side takes its best mean (p1 the
- * highest, p2 the lowest, both in p1's view) among its options with `min` visits and a quarter of the node's most visited option; the
- * step is that pair's cell when it holds `min` visits, else the node's heaviest cell. The first step stays the row's cell. The principal
- * variation keeps the heaviest cell. Scene (655336 turn 25): Roost draws most of the visits at a lower mean than Dragon Claw.
+ * The later steps of a row's line read each node by value. Each side takes its best mean (p1 the highest, p2 the lowest, both in
+ * p1's view) among its options with `min` visits and a quarter of the node's most visited option; the step is that pair's cell
+ * when it holds `min` visits, else the node's heaviest cell. The first step stays the row's cell. The principal variation keeps the
+ * heaviest cell. Scene (655336 turn 25): Roost draws most of the visits at a lower mean than Dragon Claw.
  */
 describe('the later steps of a row\'s line read each node by value', () => {
   /** Charizard (p1) below Dragon Dance/High Jump Kick: Roost is the heaviest option and the heaviest cell, Dragon Claw the better mean. */

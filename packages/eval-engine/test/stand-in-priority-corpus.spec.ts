@@ -8,16 +8,16 @@ import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 89 (#111): the never-acted conflicts of the corpus count (lanes/C/c1-count-p2s0.jsonl and -p2s1.jsonl, 7,032 games rebuilt on the base)
- * as constructed rows with the real bodies. In each row a body that the log never shows acting falls to the foe's action, which the log shows
- * first; the base took the first move of the Dex's priority-0 tie, and the simulator ran it ahead of the foe (Prankster at +1, Grassy Glide at
- * +1 in Grassy Terrain). The count: 352 such stand-ins in the corpus (singles 21, Doubles OU 94, VGC 195, Champions VGC 50, the rest in
- * Champions OU singles), 59 left after a pick by the queue's priority with the old cut at 0. Every row names its game, turn and slot.
+ * The never-acted conflicts of the corpus as constructed rows with the real bodies. In each row a body that the log never shows
+ * acting falls to the foe's action, which the log shows first; taking the first move of the Dex's priority-0 tie would run it ahead
+ * of the foe in the simulator (Prankster at +1, Grassy Glide at +1 in Grassy Terrain). The corpus holds 352 such stand-ins in 7,032
+ * rebuilt games (singles 21, Doubles OU 94, VGC 195, Champions VGC 50, the rest in Champions OU singles). Every row names its game,
+ * turn and slot.
  *
  * A row builds the body with its species, ability, item and moves, and the foe with its species and move, on the rule set of the game
  * (Gen 9 singles or doubles, VGC with its bench, the Champions mod). The test asks `getMainChoice` for the body's stand-in, then plays the
  * turn on a copy under both answers of the dice: the stand-in must act behind the foe (or not at all, the foe knocks it out first), and the
- * base's pick must act ahead of it, which is the contradiction of the log.
+ * base pick (`base`) must act ahead of it, which is the contradiction of the log.
  */
 await loadSimMods('gen9championsou');
 

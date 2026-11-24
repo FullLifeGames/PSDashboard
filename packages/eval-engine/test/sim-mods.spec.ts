@@ -47,41 +47,32 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Round 72 (T240): relation checks on search-made leaves. The static is fitted on real positions, and the search
- * builds boards the fit never saw (a +4 Cobalion at 5 % HP priced above a healthy body, gen9draft-2058494320). Five
- * statements must hold on any board, so they run on the 34 roots of the fixture manifest and on the leaves of a
- * one-ply sweep (three choices per side by stride, every pair advanced under the seed 1,2,3,4):
+ * Relation checks on search-made leaves. The static is fitted on real positions, and the search builds boards the fit never saw
+ * (a +4 Cobalion at 5 % HP priced above a healthy body, gen9draft-2058494320). Five statements must hold on any board, so they run
+ * on the 34 roots of the fixture manifest and on the leaves of a one-ply sweep (three choices per side by stride, every pair
+ * advanced under the seed 1,2,3,4):
  *   own HP down never raises the score; foe HP down never lowers it (p1's view, steps of 10 points from 90 to 10 %);
  *   a stage on a fainted body adds nothing; a stage on an active body that every foe in front KOs before it acts adds
- *   nothing (T249, round 73: 5 % HP, +4 attack and special attack, the simulator decides who moves first and who KOs);
+ *   nothing (5 % HP, +4 attack and special attack, the simulator decides who moves first and who KOs);
  *   swapped sides negate.
  * Each group (singles, doubles OU, VGC, Champions) reads its own positions. The detectors are proved by planted
  * faults in an evaluator, on a constant stub and on the real one.
  *
- * Known breaks (T248, design gate 2a of round 73: every break above 1e-3 goes, a smaller slope stays with its reason). The
- * size of a break is the largest wrong-way change of the score at ONE HP point: a break found on the grid of 10 % steps
- * is scanned point by point (`jump` of the violation). A pending break is above 1e-3 and waits for its cause; it is
- * checked by a `test.fails`: the day it passes, that test turns red and the entry goes. Every other position of the
- * group passes at 1e-9 as a plain test, so the list never hides an unnamed fault. The race flips of boostsBiting that
- * stood here (nine positions) went with the fresh-race reading of `stageBites` (score/boost-race.ts); the slopes of the
- * matchup term (five positions, 1e-5 to 1.3e-3 per HP point) went with the pair value of the winner's HP share
- * (score/matchup.ts, `pairValue`); no smooth slope is left, so the list holds no slope entry. The one pending break was
- * the bench gate of a stage drop (score/boost-bite.ts, `frontGate`): when the holder starts to win its front race, the
- * drop starts to count against the bench behind it, and the whole step lands where a priced recoil moves an integer
- * clock by one turn (Champions 2634199230 turn 5, Incineroar 81 to 80 of 174, 0.031). It went on 21.11.2026 (SB3c, round 89)
- * with the drop's reading: a holder that can switch out carries no drop (score/switch-out.ts), so the step at the gate is
- * gone for that position, and the list is empty. A pending break goes back into `KNOWN_BREAKS` with its reason.
+ * Known breaks: every break above 1e-3 goes, a smaller slope stays with its reason. The size of a break is the largest wrong-way
+ * change of the score at ONE HP point: a break found on the grid of 10 % steps is scanned point by point (`jump` of the
+ * violation). A pending break is above 1e-3 and waits for its cause; it is checked by a `test.fails`: the day it passes, that test
+ * turns red and the entry goes. Every other position of the group passes at 1e-9 as a plain test, so the list never hides an
+ * unnamed fault. The list is empty; a pending break goes back into `KNOWN_BREAKS` with its reason.
  */
 
 interface KnownBreak {
   relation: 'ownHpDown' | 'foeHpDown';
   group: RelationGroup;
   position: string;
-  /** The cause, for the title. */
   reason: string;
 }
 
-/** Empty since 21.11.2026 (SB3c). An entry is `{ relation, group, position, reason }`; its `test.fails` row turns red the day the position passes. */
+/** An entry is `{ relation, group, position, reason }`; its `test.fails` row turns red the day the position passes. */
 const KNOWN_BREAKS: KnownBreak[] = [];
 
 await loadSimMods('gen9championscustomgame');
@@ -98,7 +89,6 @@ const GROUPS: { group: RelationGroup; name: string }[] = [
   { group: 'champions', name: 'Champions' },
 ];
 
-/** What each relation says, for the test titles. */
 const STATEMENT: Record<RelationName, string> = {
   ownHpDown: 'own HP down never raises the score',
   foeHpDown: 'foe HP down never lowers the score',
@@ -174,7 +164,6 @@ for (const { group, name } of GROUPS) {
       });
 
       for (const entry of knownHere) {
-        // Expected failure: red today, so the day the position passes, this test fails and the entry goes.
         test.fails(`${entry.reason} ${name}: ${STATEMENT[relation]} by more than ${JUMP_LIMIT} (${entry.position})`, () => {
           const board = mine.filter(subject => subject.position === entry.position);
           expect(scene(above(board))).toEqual([]);
@@ -197,7 +186,6 @@ for (const { group, name } of GROUPS) {
 }
 
 describe('relation checks: planted faults', () => {
-  /** Share of the standing HP a side keeps, 1 for a full side. */
   const hpShare = (battle: Battle, side: 0 | 1): number => {
     const bodies = battle.sides[side].pokemon;
     return bodies.reduce((sum, mon) => sum + mon.hp, 0) / bodies.reduce((sum, mon) => sum + mon.maxhp, 0);
@@ -209,16 +197,14 @@ describe('relation checks: planted faults', () => {
   const plants: Record<RelationName, (base: Evaluator) => Evaluator> = {
     // Own damage pays: p1 gains 4 points (more than the real slope of any body) for every share of its own HP it has lost.
     ownHpDown: base => (battle, ruleset) => base(battle, ruleset) + 4 * (1 - hpShare(battle, 0)),
-    // Foe damage costs: p1 loses 4 points for every share of the foe's HP that is gone.
     foeHpDown: base => (battle, ruleset) => base(battle, ruleset) - 4 * (1 - hpShare(battle, 1)),
-    // A fainted body of p1 still counts its stages.
     idleStage: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * battle.sides[0].pokemon
       .filter(mon => mon.hp <= 0)
       .reduce((sum, mon) => sum + mon.boosts.atk + mon.boosts.spa + mon.boosts.spe, 0),
     // Stages on an active body count in full: p1's actives gain 0.05 per stage of attack and special attack, p2's lose it.
     idleStageActive: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * [0, 1].reduce((sum, side) => (side === 0 ? 1 : -1) * battle.sides[side].active
       .reduce((stages, mon) => stages + (mon ? mon.boosts.atk + mon.boosts.spa : 0), 0) + sum, 0),
-    // An additive bias for p1: the swapped board gets the same bias and the two scores no longer cancel.
+    // An additive bias for p1: the swapped board gets the same bias and the two scores do not cancel.
     swapNegates: base => (battle, ruleset) => base(battle, ruleset) + 0.05,
   };
 
@@ -288,7 +274,6 @@ function plan(scene: Scene, mode: Mode, happens: boolean) {
   const die: ForcedDie = !pivots && !doubles
     ? accuracy('p1a', scene.trigger, 'p2a', happens)
     : accuracy(pivots ? 'p2a' : 'p2b', 'poisonpowder', doubles ? 'p1b' : 'p1a', happens);
-  // a spread move takes no aim
   const aim = scene.trigger === 'growl' ? '' : ' 1';
   const commands: Commands = doubles
     ? [{ side: 'p1', command: `move 1${aim}, move 1` }, { side: 'p2', command: pivots ? 'move 1 2, move 1' : 'move 1 1, move 1 2' }]
@@ -307,7 +292,7 @@ function plan(scene: Scene, mode: Mode, happens: boolean) {
   return { format: doubles ? 'gen9doublescustomgame' : 'gen9customgame', p1, p2, commands, choices, replacement, die };
 }
 
-/** Both calls of the turn. `happens` null plays the turn as today: no dice argument in either call. */
+/** Both calls of the turn. `happens` null plays the turn without a dice argument in either call. */
 async function playTurn(scene: Scene, mode: Mode, seed: string, happens: boolean | null) {
   const setup = plan(scene, mode, happens ?? true);
   const runtime: BranchRuntime = await branchOf(setup.format, setup.p1, setup.p2, seed);
@@ -392,7 +377,6 @@ describe('dice-keep-dice', () => {
     return blocks;
   }
 
-  /** The targets of a queued move line: the aimed one and the `[spread]` list. */
   function aimsOf(line: string): string[] {
     const spread = parts(line).find(part => part.startsWith('[spread]'))?.slice('[spread]'.length).trim().split(',').filter(Boolean) ?? [];
     return [...new Set([identSlot(parts(line)[4]), ...spread].filter(Boolean))];
@@ -552,7 +536,6 @@ function reading(details: string, rules: GameRules): { base: string; flags: stri
   return { base: speciesBaseId(species.trim().replace(/-\*$/, ''), rules), flags: flags.filter(flag => STATIC_FLAG.test(flag)).join(', ') };
 }
 
-/** Every distinct body a replay shows: side, the name on its line, base species and static flags. */
 function shownBodies(log: string): Array<{ side: 'p1' | 'p2'; name: string; base: string; flags: string; line: string }> {
   const bodies = new Map<string, { side: 'p1' | 'p2'; name: string; base: string; flags: string; line: string }>();
   const rules = logRules(log);

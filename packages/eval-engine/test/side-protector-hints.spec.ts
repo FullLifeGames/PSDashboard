@@ -9,14 +9,14 @@ import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
 /**
- * Round 70: a side protector in a doubles option. Wide Guard, Quick Guard, Crafty Shield and Mat Block stop a class of hits on
- * the user's whole side, so they carry a side condition instead of a volatile and no `stallingMove` flag, and the Protect
- * reading of the hints (T42: a self-targeted stalling move) never saw them: every one of them was the 0.25 support floor,
- * 16th to 42nd of the 42 legal combos of VGC 2630685175 turn 7, where Wide Guard turned Tera Starstorm away. The reading
- * comes from the Dex (an allySide move whose side condition has an onTryHit); which hits the condition stops comes from the
- * simulator's own handler, held here against real turns. The hint earns the damage the protector denies, up to the flinch-sized
- * ceiling of T42's pair term. Both rule sets run it, Scarlet/Violet and Pokémon Champions (the Champions mod has its own Dex).
- * Singles keep their path (every base move survives the singles cap).
+ * A side protector in a doubles option. Wide Guard, Quick Guard, Crafty Shield and Mat Block stop a class of hits on the user's
+ * whole side, so they carry a side condition instead of a volatile and no `stallingMove` flag, and the Protect reading of the hints
+ * (a self-targeted stalling move) does not cover them: each would be the 0.25 support floor, 16th to 42nd of the 42 legal combos
+ * of VGC 2630685175 turn 7, where Wide Guard turned Tera Starstorm away. The reading comes from the Dex (an allySide move whose
+ * side condition has an onTryHit); which hits the condition stops comes from the simulator's own handler, held here against real
+ * turns. The hint earns the damage the protector denies, up to the flinch-sized ceiling of the pair term. Both rule sets run it,
+ * Scarlet/Violet and Pokémon Champions (the Champions mod has its own Dex). Singles keep their path (every base move survives the
+ * singles cap).
  */
 
 await loadSimMods('gen9championsou');
@@ -40,7 +40,7 @@ const RULES: Rules[] = [
 ];
 
 const SUPPORT_FLOOR = 0.25;
-/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS, the T42 pair term). */
+/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS, the pair term). */
 const CEILING = 0.3;
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
@@ -57,7 +57,6 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => mon(species, ['splash'], extra);
   const battleWith = (p1: PokemonSet[], p2: PokemonSet[]) => battleOf(rules.format, p1, p2);
 
-  /** A slow foe uses `moveId` on a Blissey that opened with `protector`. */
   const slowFoeBoard = (protector: string, moveId: string) =>
     battleWith([mon('Blissey', [protector, 'splash']), splash('Blissey')], [mon('Shuckle', [moveId, 'splash']), splash('Shuckle')]);
   /** The simulator's own answer (the log's "move: <name>" activation). */
@@ -92,7 +91,6 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
       expect(probes.length).toBeGreaterThanOrEqual(4);
       const seen = probes.map(probe => `${probe} ${stoppedInSim(protector, probe)}`);
       expect(probes.map(probe => `${probe} ${readStops(protector, probe)}`)).toEqual(seen);
-      // The class is real: each protector stops something and lets something through.
       expect(seen.some(line => line.endsWith('true'))).toBe(true);
       expect(seen.some(line => line.endsWith('false'))).toBe(true);
     });
@@ -112,7 +110,6 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
     if (hp !== undefined) battle.sides[0].active[0]!.sethp(hp);
     return battle;
   }
-  /** Whether p1's slot 1 faints when p1 opens with `protector` and p2's Garchomp uses `attack` at a 1-HP body. */
   function faintsInSim(protector: string, attack: string): boolean {
     const battle = board(protector, attack, 1);
     battle.choose('p1', 'move 1, move 1');
@@ -199,7 +196,6 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
       played.choose('p2', 'move 1, move 1');
       expect(played.sides[0].active[0]!.fainted).toBe(false);
       expect(played.log.some(line => line.startsWith('|-activate|p1') && line.includes('move: Wide Guard'))).toBe(true);
-      // Read as a single-target move it would earn nothing; read as the spread hit it is, it earns the damage on both bodies.
       const tempo = tempoOf(stellar(), 'p1', choice('wideguard'));
       expect(tempo).toBeGreaterThan(0.1);
       expect(tempo).toBeCloseTo(deniedBy(stellar(), 'terastarstorm', true), 10);

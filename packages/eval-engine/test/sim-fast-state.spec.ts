@@ -55,7 +55,7 @@ describe('sim-fast-fork', () => {
 
   const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-  /** A turn and the next one (first options), as the spec's "weitergespielt" asks for mid-turn states. */
+  /** A turn and the next one (first options), for mid-turn states. */
   function played(serialized: string, p1: string, p2: string, seed: PRNGSeed, afterFirst?: () => void): string {
     const first = advancePositionWithLog(createRootPosition(serialized), p1, p2, seed);
     afterFirst?.();
@@ -109,11 +109,9 @@ describe('sim-fast-fork', () => {
   }
 
   /**
-   * Alakazam (faster, no item) Tricks Snorlax's Leftovers away: takeItem leaves
-   * Snorlax an own pendingStaleness holding undefined (pokemon.mjs:1583), which
-   * the JSON round trip drops. Snorlax then moves (lastMoveTargetLoc lands after
-   * that slot). The second Trick gives the item back: setItem writes
-   * pendingStaleness (pokemon.mjs:1599), appended after the newer keys today.
+   * Alakazam (faster, no item) Tricks Snorlax's Leftovers away: takeItem leaves Snorlax an own pendingStaleness holding undefined
+   * (pokemon.mjs:1583), which the JSON round trip drops. Snorlax then moves (lastMoveTargetLoc lands after that slot). The second
+   * Trick gives the item back: setItem writes pendingStaleness (pokemon.mjs:1599), appended after the newer keys.
    */
   function trickTwiceCases(): { name: string; serialized: string; p1: string; p2: string }[] {
     const snorlax = { ...makeSet('Snorlax', 'Snorlax', ['Tackle']), item: 'Leftovers' };
@@ -131,10 +129,9 @@ describe('sim-fast-fork', () => {
    * Gen 2 calls moveUsed without a target on every move (mods/gen2/scripts.mjs:128),
    * so each mover holds an own lastMoveTargetLoc of undefined (pokemon.mjs:640),
    * a key the Pokemon constructor never creates; the JSON round trip drops it.
-   * Mew (faster, no item) steals Snorlax's Leftovers with Thief: pendingStaleness
-   * lands after that slot. Mirror Move then copies Snorlax's Rollout, whose
-   * onModifyMove writes a defined lastMoveTargetLoc (moves.mjs:15651): today
-   * appends it after pendingStaleness, a copy that kept the slot fills it in place.
+   * Mew (faster, no item) steals Snorlax's Leftovers with Thief: pendingStaleness lands after that slot. Mirror Move then copies
+   * Snorlax's Rollout, whose onModifyMove writes a defined lastMoveTargetLoc (moves.mjs:15651): the JSON round trip appends it
+   * after pendingStaleness, a copy that kept the slot fills it in place.
    */
   function gen2MirrorRollout(): string {
     return serialize(makeBattle('gen2customgame', [makeSet('Mew', 'Mew', ['Thief', 'Mirror Move'], 100)],
@@ -414,7 +411,6 @@ describe('sim-fast-champions', () => {
     return choices.find(choice => choice.includes('mega')) ?? choices[seedIndex % Math.max(choices.length, 1)] ?? 'default';
   }
 
-  /** Two turns from the start, the battles and the turn logs. */
   function played(serialized: string, seed: PRNGSeed, seedIndex: number): string {
     const lines: string[] = [];
     let position = createRootPosition(serialized);
@@ -481,7 +477,6 @@ describe('sim-fast-rules', () => {
     return { rules: [...table], valueRules: [...table.valueRules], tagRules: [...table.tagRules] };
   }
 
-  /** One turn per seed with both sides' first legal options: the table in play, not only at rest. */
   function playedTurns(serialized: string): string[] {
     const root = createRootPosition(serialized);
     const p1 = legalChoices(root, 'p1')[0].choice;
@@ -498,8 +493,8 @@ describe('sim-fast-rules', () => {
     return { state: serializeBattleStable(battle), table: tableOf(battle), turns: playedTurns(serialized) };
   }
 
-  // Today's state of gen9ou: the sim never stores its table (the ruleset repeals a
-  // rule); another spec file of this worker may have left one on the shared format.
+  // The sim never stores its table (the ruleset repeals a rule); another spec file of this worker may have left one on the
+  // shared format.
   beforeEach(() => { Dex.formats.get('gen9ou', true).ruleTable = null; });
   afterEach(() => resetSimFastForTests());
 

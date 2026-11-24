@@ -3,21 +3,18 @@ import { ROOMS } from '../src/pair/snapshot';
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 14: `ROOMS` in pair/snapshot.ts names the pseudo-weathers the damage calculator's Field reads
- * (isGravity, isMagicRoom, isWonderRoom). The Dex has more pseudo-weathers; the question for the list is which of them change
- * a damage roll. This spec adds each pseudo-weather the view's moves set to a battle and asks the simulator for the damage of
- * six hits (a physical and a special Normal hit, a Ground move at a Flying target, a Normal hit at a Ground target, an
- * Electric and a Fire hit, and a Life Orb hit) with and without it. The pseudo-weathers that change one of them are:
- *  - the three of ROOMS, in every view that has the move (Gravity, Magic Room, Wonder Room);
- *  - FINDING W8: Mud Sport, Water Sport and Ion Deluge (which Plasma Fists sets as well) change the roll and the calculator's
- *    Field has no flag for them, so the pair snapshot prices those hits without them (Ion Deluge, Plasma Fists, Mud Sport and
- *    Water Sport are Past moves in Generation 9; Mud Sport and Water Sport are live in Generations 3 to 8).
- * Trick Room and Fairy Lock change no roll. The hand list stays as it is; the unlisted three are named for the integrator.
+ * `ROOMS` in pair/snapshot.ts names the pseudo-weathers the damage calculator's Field reads (isGravity, isMagicRoom, isWonderRoom).
+ * This spec adds each pseudo-weather the view's moves set to a battle and asks the simulator for the damage of six hits (a physical
+ * and a special Normal hit, a Ground move at a Flying target, a Normal hit at a Ground target, an Electric and a Fire hit, and a
+ * Life Orb hit) with and without it. Those that change a roll: the three of ROOMS, and Mud Sport, Water Sport and Ion Deluge (which
+ * Plasma Fists sets as well), which the calculator's Field has no flag for, so the pair snapshot prices those hits without them
+ * (Ion Deluge and Plasma Fists are Past moves in Generation 9; Mud Sport and Water Sport are live in Generations 3 to 8). Trick Room
+ * and Fairy Lock change no roll.
  */
 
 const SPEC = 'packages/eval-engine/test/rooms-oracle.spec.ts';
 
-/** Pseudo-weathers that change a roll but are not in ROOMS (finding W8). */
+/** Pseudo-weathers that change a roll but are not in ROOMS. */
 const UNKEYED = ['iondeluge', 'mudsport', 'watersport'];
 
 interface Scenario { name: string; user: string; item?: string; move: string; target: string }
@@ -36,7 +33,6 @@ const isReal = (view: SimView, kind: 'moves' | 'items', id: string): boolean => 
   return entry.exists && entry.isNonstandard !== 'Future';
 };
 
-/** The damage the simulator gives the hit, on a battle where `prepare` has run. */
 function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType<typeof battleIn>, user: ReturnType<typeof battleIn>['sides'][0]['pokemon'][0]) => void): unknown {
   const battle = battleIn(view,
     [mon(scenario.user, ['splash'], scenario.item ? { item: scenario.item } : {}), mon('Blissey', ['splash'])],

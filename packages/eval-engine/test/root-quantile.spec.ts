@@ -10,10 +10,10 @@ import { sweepBoard } from './dice-sweep-support';
 import { rootOf } from './secondary-classes-support';
 
 /**
- * Round 89 (#59, T322 block 1), A3 stage 1: the stratifier. Tree k of T answers each named die of a root draw with
- * `U = (pi_d(k) + u_d) / T` (ruling 9 of 09.11.2026): `pi_d` is the die's own order of the T quarters, `u_d` a hash. Rows: (a1) each
- * single die over 1,000 salts, (a2) the joint strands of two dice, (a3) the answer stays in the draw's range, (a4) both PRNGs
- * give the plain advance when the quantiles answer nothing, (a5) both PRNGs take a quantile's answer and the records carry it.
+ * The stratifier: tree k of T answers each named die of a root draw with `U = (pi_d(k) + u_d) / T`: `pi_d` is the die's own order of
+ * the T quarters, `u_d` a hash. Rows: (a1) each single die over 1,000 salts, (a2) the joint strands of two dice, (a3) the answer
+ * stays in the draw's range, (a4) both PRNGs give the plain advance when the quantiles answer nothing, (a5) both PRNGs take a
+ * quantile's answer and the records carry it.
  */
 await loadSimMods('gen9championsou');
 
@@ -74,7 +74,6 @@ describe('(a1) each single die is stratified over the four trees', () => {
 });
 
 describe('(a2) the joint strands of two dice get trees by their chance', () => {
-  /** Mean number of trees per salt whose answers to dice A and B are (a, b). */
   function strand(pa: number, pb: number, a: boolean, b: boolean): number {
     const counts = salts.map(salt => treesOf(salt, quantiles => [
       quantiles.answer(die('p1a'), chance(pa, 100)) as boolean, quantiles.answer(die('p2a'), chance(pb, 100)) as boolean,
@@ -89,7 +88,6 @@ describe('(a2) the joint strands of two dice get trees by their chance', () => {
   });
 
   test('two moves of 85 percent (Doubles OU): one misses 1.02 trees, both miss 0.09', () => {
-    // A hits, B misses and the other way round
     const oneMisses = strand(85, 85, true, false) + strand(85, 85, false, true);
     expect(Math.abs(oneMisses - 4 * 2 * 0.85 * 0.15)).toBeLessThan(0.05);
     expect(Math.abs(strand(85, 85, false, false) - 4 * 0.15 * 0.15)).toBeLessThan(0.05);
@@ -169,7 +167,6 @@ describe('(a4) quantiles that answer nothing give the plain advance, both PRNGs'
   });
 });
 
-/** A quantile that answers the accuracy and the secondary die as asked and leaves every other draw to the stream. */
 const asking = (hit: boolean, secondary: boolean): DieQuantiles => ({
   answer(name, draw) {
     if (name.kind === 'accuracy' && draw.call === 'chance') return hit;

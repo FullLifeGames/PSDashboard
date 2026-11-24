@@ -109,7 +109,6 @@ describe('lever dispatch: the pre-check', () => {
     const staleCounters = takeSimFastReport().counters;
     expect(staleCounters).toMatchObject({ ruleTables: 0, dispatchCalls: 0, dispatchAnswered: 0, fallbacks: 0 });
     expect(staleCounters.clones).toBeGreaterThan(0);
-    // Everything off: today's path.
     configureSimFast([]);
     takeSimFastReport();
     const again = advancePositionWithLog(root, a.choice, b.choice, SEEDS[1]);

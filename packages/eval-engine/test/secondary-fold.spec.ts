@@ -12,7 +12,7 @@ import { set } from './move-oracle';
 import { FAST, rootOf } from './secondary-classes-support';
 
 /**
- * Round 86 (T305), step A5a: the arithmetic of the secondary classes in `cell-blend.ts` and `search/secondary-classes.ts`.
+ * The arithmetic of the secondary classes in `cell-blend.ts` and `search/secondary-classes.ts`.
  *
  * - Which effects cut the target's move is read from the Dex condition (`truncates`: lasts one turn, has a `BeforeMove`
  *   handler). The sweep holds that to the simulator: for every volatile status that any move of a rule set can put on a target
@@ -32,7 +32,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.mode === 'singles'))('which seco
     .filter(entry => entry.volatileStatus && !entry.self)
     .map(entry => entry.volatileStatus!))];
 
-  /** The simulator's answer: does a target that carries the volatile lose its move on every one of the seeds? */
   function losesMove(id: string): boolean {
     for (let index = 0; index < 8; index++) {
       const board = sweepBoard(rules, 'tackle', 'singles', seedOf(index + 1), false, FAST);

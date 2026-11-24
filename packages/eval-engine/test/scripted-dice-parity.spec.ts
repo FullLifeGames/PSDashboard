@@ -9,16 +9,15 @@ import { sweepMoves, SWEEP_CASES } from './dice-sweep-support';
 import { LegacyScriptedPRNG } from './scripted-prng-legacy';
 
 /**
- * Round 86 (T299): the parity sweep of the tree's two scripted PRNGs. Both now ask the module's namer (`dice/namer.ts`) which
- * die a draw is, so the sweep holds the change to what must stay as it was, in every generation 1 to 9 and the Champions mod,
- * singles and (from Gen 3) doubles:
+ * The parity sweep of the tree's two scripted PRNGs. Both ask the module's namer (`dice/namer.ts`) which die a draw is; the sweep
+ * holds that to what must stay as it was, in every generation 1 to 9 and the Champions mod, singles and (from Gen 3) doubles:
  *
  * 1. A script for a move that is not played changes nothing the simulator can see: the plain PRNG's log, end seed and stable
  *    serialization, and after the turn the battle has none of the watch's wrappers (the live battle unchanged: the namer calls
  *    no Dex handler, it reads `battle.event` and `battle.effect`, so this is the proof AGENTS.md asks of a stand-in).
- * 2. For Gens 3 to 9 and Champions, on scenes with no status check, the new `ScriptedPRNG` and a frozen copy of the class as
- *    it was before round 86 give the same log, end seed and serialization for the scripts `hit and crit`, `miss, no crit`,
- *    `roll 0` and `roll 15`: every cell that read right keeps its price.
+ * 2. For Gens 3 to 9 and Champions, on scenes with no status check, `ScriptedPRNG` and the frozen copy of the class
+ *    (scripted-prng-legacy.ts, which told a draw by its numbers) give the same log, end seed and serialization for the scripts
+ *    `hit and crit`, `miss, no crit`, `roll 0` and `roll 15`: every cell that read right keeps its price.
  * 3. The roll mapping: a script's top roll hurts more than its bottom roll under `PairPRNG` too.
  * 4. Mid-turn arrival: the faster body's status move lands (every Dex move that inflicts paralysis, confusion or infatuation
  *    on a foe, read from the Dex of the rule set) and the slower body's scripted move still gets its accuracy, crit and
@@ -80,7 +79,7 @@ describe.each(cases)('a script for a move that is not played changes nothing: $n
   });
 });
 
-/** The scenes with no status check on the attacker: the cells that read right before round 86. */
+/** The scenes with no status check on the attacker. */
 const CHECK_FREE = GRID_SCENES.filter(scene => !scene.setup || scene.id === 'tackle into a Substitute');
 
 const SCRIPTS: Record<string, RollScript> = {

@@ -5,7 +5,7 @@ import { fingerprint } from '../src/sim-ask';
 import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
 /**
- * Round 72 (T196a): the sweep behind speed-tie-sim.spec.ts. Every Dex entry of a generation (or the Champions mod) that
+ * The sweep behind speed-tie-sim.spec.ts. Every Dex entry of a generation (or the Champions mod) that
  * can move the queue's answer, as the holder on either side, against the moves of the Dex, in the speed situations that
  * tie or do not: the cheap oracle of speed-tie-oracle.ts is the simulator's answer, the code under test is held to it.
  * What counts as an entry that can move the answer comes from the Dex, not from a list of names: a handler for the
@@ -96,7 +96,7 @@ export const RULE_SETS = [
   { name: 'Champions', format: 'gen9championsou' },
 ];
 
-/** The suite's cut: the generations with their own speed or priority code (1 to 5 carry the Gen 1 to 4 mods and the base rules) and the two newest rule sets; the probe lanes/B/tie-matrix.vt.ts runs all ten in all eight speed-layer modes. */
+/** The suite's cut: the generations with their own speed or priority code (1 to 5 carry the Gen 1 to 4 mods and the base rules) and the two newest rule sets. */
 export const SUITE_RULE_SETS = RULE_SETS.filter(rules => ['gen 1', 'gen 2', 'gen 3', 'gen 4', 'gen 5', 'gen 9', 'Champions'].includes(rules.name));
 
 const EQUAL: Scenario = { name: 'equal speed', holderLevel: 100, otherLevel: 100, full: true };
@@ -105,7 +105,6 @@ export interface TieSweep { holders: number; scenarios: number; asked: number; t
 
 type SpeedTie = (battle: Battle, p1Choice: string, p2Choice: string) => boolean;
 
-/** One holder on one side in one scenario: every move pair against the oracle, then the live battle's fingerprint. */
 function sweepConfig(format: string, holder: Holder | null, side: 0 | 1, scenario: Scenario, reps: { holder: string[]; other: string[] }, speedTie: SpeedTie, result: TieSweep): void {
   const label = `${holder?.id ?? 'no holder'} on p${side + 1}, ${scenario.name}`;
   const battle: Battle = sweepBattle(format, holder, side, scenario);

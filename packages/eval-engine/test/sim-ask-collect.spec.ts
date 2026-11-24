@@ -8,13 +8,13 @@ import { protectorStops } from '../src/search/hints';
 import { loadPositions, withSimFast } from './sim-fast-helpers';
 
 /**
- * Round 72 (T256): a question to the simulator leaves nothing behind. The browser feedback run of gen9vgc2026regi-2630685175
- * lost its renderer to an out-of-memory exit in 3 of 6 attempts once the Protect hint asked through views. Cause: the
- * speed layer (forward/sim-fast/dispatch.ts) keeps a Map from an effect object (a body's base species, the battle's format) to
- * the event handlers it carries, in a table that lives as long as the Dex. A view of the species or the format is a new object
- * on every question, so every question added its views, with the graph behind them, to that table for good: 5 to 8 KB per
- * question here, 22 KB in a search (100 MB over the 4,500 questions of one position). Game data (a species, a format, a move, an ability, an item, a condition) reaches the handler as itself; a
- * body, a side, the field and the active move stay views.
+ * A question to the simulator leaves nothing behind. Scene: the browser feedback run of gen9vgc2026regi-2630685175 lost its
+ * renderer to an out-of-memory exit in 3 of 6 attempts once the Protect hint asked through views. Cause: the speed layer
+ * (forward/sim-fast/dispatch.ts) keeps a Map from an effect object (a body's base species, the battle's format) to the event
+ * handlers it carries, in a table that lives as long as the Dex. A view of the species or the format is a new object on every
+ * question, so every question added its views, with the graph behind them, to that table for good: 5 to 8 KB per question here,
+ * 22 KB in a search (100 MB over the 4,500 questions of one position). Game data (a species, a format, a move, an ability, an
+ * item, a condition) reaches the handler as itself; a body, a side, the field and the active move stay views.
  */
 
 v8.setFlagsFromString('--expose-gc');
@@ -78,7 +78,6 @@ describe('a view keeps game data as itself (round 72, T256)', () => {
   });
 });
 
-/** The Dex entries of one rule set, by kind; the Dex is the one a battle of the rule set holds. */
 function entriesOf(dex: Battle['dex']): { kind: string; entry: object }[] {
   const rows: { kind: string; entry: object }[] = [];
   const add = (kind: string, entries: readonly object[]) => { for (const entry of entries) rows.push({ kind, entry }); };

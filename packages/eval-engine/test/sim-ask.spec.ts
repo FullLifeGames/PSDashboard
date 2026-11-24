@@ -15,11 +15,11 @@ import { loadPositions, withSimFast } from './sim-fast-helpers';
 import { MODES, MODES_MOVES_SHORT, MOVES_PER_RULES_DOUBLES, MOVES_PER_RULES_SUITE, RULE_SETS, modeName, oneTurn, sweepRules } from './sim-ask-sweep';
 
 /**
- * Round 72 (T239): the one module that asks the simulator. Its pieces are held against the simulator itself: the twin
- * battle is the one the six callers built by hand, a play on a copy leaves the live battle byte for byte as it was in
- * every speed-layer mode, a handler called with a throwaway `this` leaves the live battle and the Dex entry alone, and
- * a sweep calls every handler the stand-ins of the engine reach, in every generation and the Champions mod, on the
- * copy-on-write view and on a real copy: where the view answers, the copy answers the same.
+ * The one module that asks the simulator. Its pieces are held against the simulator itself: the twin battle is the one the six
+ * callers built by hand, a play on a copy leaves the live battle byte for byte as it was in every speed-layer mode, a handler
+ * called with a throwaway `this` leaves the live battle and the Dex entry alone, and a sweep calls every handler the stand-ins of
+ * the engine reach, in every generation and the Champions mod, on the copy-on-write view and on a real copy: where the view
+ * answers, the copy answers the same.
  */
 
 await loadSimMods('gen9championsou');
@@ -90,7 +90,7 @@ describe('playOnCopy', () => {
     expect(positions.some(position => position.gameType === 'doubles')).toBe(true);
   });
 
-  /** The first fixture of each format the files hold (singles of Gens 3, 6, 8 and 9, doubles of Gen 9): the eight-mode matrix over all of them is the lane's probe. */
+  /** The first fixture of each format the files hold (singles of Gens 3, 6, 8 and 9, doubles of Gen 9). */
   const few = positions.filter((position, index) => positions.findIndex(other => other.format === position.format) === index);
 
   const leavesLive = (list: typeof positions) => {
@@ -159,7 +159,7 @@ describe('playOnCopy', () => {
   });
 
   test('FixedDice note the first chance a handler asks and answer a quantile of zero with the low end', () => {
-    // Round 82 (forced dice): the status probe asks which chance a handler draws, and plays on these dice.
+    // The status probe asks which chance a handler draws, and plays on these dice.
     const dice = new FixedDice({ quantile: 0, chance: true });
     expect(dice.firstChance).toBeNull();
     expect([dice.randomChance(3, 4), dice.randomChance(1, 2)]).toEqual([true, true]);
@@ -259,7 +259,7 @@ describe('sweep: every handler the stand-ins reach', () => {
     process.stdout.write(`sim-ask sweep ${rules.format}: ${moves} moves, ${calls} calls, ${refused.length} refused (${[...new Set(refused)].join(' ')})\n`);
   }, 300_000);
 
-  // The sweep in every speed-layer mode, all fixtures and a longer list of moves is the lane's probe (sim-ask-matrix.vt.ts); the suite takes the layer off.
+  // The suite takes the speed layer off; the sweep in every speed-layer mode is a probe, not a spec.
   test('gen 9 doubles with the speed layer off: the short sweep on the view and on a copy', () => {
     const rules = RULE_SETS.find(entry => entry.name === 'gen 9 doubles')!;
     withSimFast([], () => expect(sweepRules(rules, MODES_MOVES_SHORT).calls).toBeGreaterThan(0));

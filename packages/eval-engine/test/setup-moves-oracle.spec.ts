@@ -5,13 +5,13 @@ import { setupMoveClicked, setupMovesOf } from '../src/turn-analysis/played-matc
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 7, FINDING W2: `SETUP_MOVES` in turn-analysis/played-match.ts names the pure self-boosting moves,
- * for the sentence "a setup move the engine may undervalue". The hand list held 31 ids. The simulator is the oracle: every
- * status move of a view is played once (twice for a move with a charge turn) by a Blissey against a Snorlax that splashes, and
- * a move is a setup move when it leaves its user at least two stages up in all stats together, evasion left out. Over the
- * twelve views the corpus plays (singles Generations 1 to 9 and Champions, the two doubles rule sets):
+ * `SETUP_MOVES` in turn-analysis/played-match.ts names the pure self-boosting moves, for the sentence "a setup move the engine may
+ * undervalue". The simulator is the oracle: every status move of a view is played once (twice for a move with a charge turn) by a
+ * Blissey against a Snorlax that splashes, and a move is a setup move when it leaves its user at least two stages up in all stats
+ * together, evasion left out. Over the twelve views the corpus plays (singles Generations 1 to 9 and Champions, the two doubles rule
+ * sets):
  *  - the moves found are the set, except Acupressure (it draws the stat at random) and Metronome (it plays a move chosen at
- *    random); the hand list lacked Shelter (Defense +2), Take Heart (Sp. Atk and Sp. Def +1) and Tidy Up (Attack and Speed +1);
+ *    random);
  *  - the set is read from the Dex's own boost fields (a status move that raises its user's stats by two stages or more), plus the
  *    moves whose boosts the simulator applies in a handler; the spec holds that short list to the moves no field covers.
  */
@@ -49,7 +49,7 @@ function setupMovesIn(view: SimView): string[] {
   return here;
 }
 
-// Round 75 (T160): the set is the view's own Dex's (setupMovesOf), not a global one.
+// The set is the view's own Dex's (setupMovesOf), not a global one.
 describe('The setup moves are held to the simulator (round 72)', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('every setup move the simulator shows here is in the set', () => {

@@ -76,7 +76,7 @@ describe('identity-based choice resolution (B1)', () => {
     const resolvedOriginal = resolveSideChoices(original.battleStream.battle!, 'p1', [protectChoice], [true]);
     expect(resolvedOriginal).toEqual({ ok: true, command: 'move 2' });
 
-    // Same stored choice after a team edit shuffled the move order (B1b core):
+    // Same stored choice after a team edit shuffled the move order:
     const edited = await makeSinglesRuntime(['Protect', 'Thunderbolt']);
     const resolvedEdited = resolveSideChoices(edited.battleStream.battle!, 'p1', [protectChoice], [true]);
     expect(resolvedEdited).toEqual({ ok: true, command: 'move 1' });
@@ -209,7 +209,6 @@ describe('branch runtime validation (B7/B17)', () => {
       targetTurn: 2,
       abort: controller.signal,
     });
-    // The replay loop never ran, so the battle is still on turn 1.
     expect(runtime.battleStream.battle?.turn).toBe(1);
   });
 });
@@ -269,7 +268,6 @@ describe('random-format', () => {
       const battle = runtime.battleStream.battle;
       expect(battle).toBeTruthy();
       expect(battle!.turn).toBe(1);
-      // The supplied teams must be used instead of generated random teams.
       expect(battle!.sides[0].active[0]?.name).toBe('Pikachu');
       expect(battle!.sides[1].active[0]?.name).toBe('Bulbasaur');
 
@@ -389,7 +387,6 @@ describe('rejected replay choices', () => {
     const snapshot = snapshots.find(entry => entry.turn === 2);
     expect(snapshot).toBeTruthy();
 
-    // The "edited" p1 team no longer knows Curse — the move the protocol used.
     const p1Team = [makeSet('Snorlax', 'Snorlax', ['Amnesia', 'Protect'])];
     const p2Team = [
       makeSet('Pikachu', 'Pikachu', ['Protect', 'Substitute']),
@@ -407,12 +404,10 @@ describe('rejected replay choices', () => {
 
     const battle = runtime.battleStream.battle!;
     expect(battle.sides[1].active[0]?.name).toBe('Eevee');
-    // No side may enter the branch with a locked leftover choice.
     for (const side of battle.sides) {
       expect(side.isChoiceDone(), `${side.id} entered the branch with a pending choice`).toBe(false);
     }
 
-    // The user's turn: p1 sets up, p2 switches back to Pikachu.
     const result = await executeBranchChoices({
       streams: runtime.streams,
       log: runtime.log,

@@ -27,15 +27,11 @@ import {
 } from './secondary-classes-support';
 
 /**
- * Round 86 (T305), step A4: the red sweep of the secondary classes, part two (the four class paths, the scenes and the fork
- * counts). The reader and the scripts are in `secondary-classes.spec.ts`; the shapes this file pins (the class keys with their
- * `+effect` tokens, the scripts' `secondary` map) are listed in `secondary-classes-support.ts`.
- *
- * Today every KNOWN row fails for the reason of the plan (3.6, point 4): a cell with a secondary under 100 percent is no class
- * plan or its classes carry no secondary token (`planCellEvents` skips a hit that cannot miss or kill), a flinch draw returns
- * null from `classifyChild`, and the pair read answers `flinch-chance`. A guard stays a guard: a cell the plan refuses (`fail`)
- * is no row. The fork rows hold the ruling after A3: a missing class is forced by script, at most one draw per missing class,
- * never chased with probe seeds. `T305_RED=1` runs the KNOWN rows as plain tests.
+ * Part two of the sweep of the secondary classes (the four class paths, the scenes and the fork counts). The reader and the scripts
+ * are in `secondary-classes.spec.ts`; the shapes this file pins (the class keys with their `+effect` tokens, the scripts'
+ * `secondary` map) are listed in `secondary-classes-support.ts`. A guard stays a guard: a cell the plan refuses (`fail`) is no row.
+ * The fork rows: a missing class is forced by script, at most one draw per missing class, never chased with probe seeds.
+ * `T305_RED=1` runs the KNOWN rows as plain tests.
  */
 await loadSimMods('gen9championsou');
 
@@ -46,7 +42,6 @@ const joined = (problems: string[]): string => problems.join(' | ');
 
 interface Cell { board: Battle; root: SimPosition; p1: string; p2: string; events: CellEvent[]; want: Map<string, number> }
 
-/** The singles cell of a move against a splash: its plan and the classes the simulator's chances give; a problem when the plan is no class plan. */
 function cellOf(rules: Parameters<typeof toleranceOf>[0], move: DexMove): { cell?: Cell; problem?: string } {
   const board = sweepBoard(rules, move.id, 'singles', '1,2,3,4', false, FAST);
   if (!clicksAccepted(board, sweepClicks('singles', move.target))) return {};
@@ -66,7 +61,6 @@ const classMap = (blend: CellBlend | undefined): Map<string, number> => new Map(
 describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules, name }) => {
   const { moves } = sweepMoves(rules, move => hasChanceEntry(move) && !isDelayed(move) && !isCharge(move) && !move.multihit);
   const tolerance = toleranceOf(rules);
-  /** One path over every move of the rule set: the problems and how many cells it read. */
   function over(path: (cell: Cell) => Map<string, number> | string): { problems: string[]; read: number } {
     const problems: string[] = [];
     let read = 0;
@@ -82,8 +76,8 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
     return { problems, read };
   }
 
-  // Round 86 (T305, A5a): `boundaryEvent` reads no hit of Generation 1 or 2 (the calc has no rule set for them), so no cell there
-  // has a class plan; a secondary stays seed-priced. The three class rows below are rows of Gens 3 and up.
+  // `boundaryEvent` reads no hit of Generation 1 or 2 (the calc has no rule set for them), so no cell there has a class plan; a
+  // secondary stays seed-priced. The three class rows below are rows of Gens 3 and up.
   if (rules.generation <= 2) {
     test(`${name}: no cell has a class plan, so the secondary dice stay seed-priced`, () => {
       const kinds = moves.slice(0, 12).map(move => planCellEvents(sweepBoard(rules, move.id, 'singles', '1,2,3,4', false, FAST), `move ${move.id}`, 'move splash').kind);
@@ -114,7 +108,7 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
       if (!children) return 'no class path';
       const shares = new Map<string, number>();
       for (const entry of [...children.children, ...children.missing]) shares.set(entry.key.replace(/^p1:/, ''), entry.share);
-      // a class with an effect under the mass floor stays unpriced (T305: the pair plan's floor), and the weights row allows its mass
+      // a class with an effect under the mass floor stays unpriced (the pair plan's floor), and the weights row allows its mass
       const open = children.missing.filter(entry => entry.share >= MIN_MASS);
       if (open.length > 0) return `classes never reached: ${open.map(entry => entry.key)}`;
       return shares;
@@ -124,7 +118,6 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
   });
 });
 
-/** The aim a doubles move needs in its click. */
 const aimOf = (move: DexMove): string => (['normal', 'any', 'adjacentFoe'].includes(move.target) ? ' 1' : '');
 const tokensOf = (segment: string): string[] => segment.slice(segment.indexOf('=') + 1).split('+').slice(1);
 
@@ -186,7 +179,7 @@ describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules
         continue;
       }
       if (cell.via === 'fallback') {
-        // a guard stays a guard; the two reasons that read a flinch as unpriced chance are T305's
+        // a guard stays a guard; the two reasons that read a flinch as unpriced chance count as problems
         if (cell.reason === 'flinch-chance' || cell.reason === 'cant:flinch') problems.push(`${move.id}: fallback ${cell.reason}`);
         continue;
       }
@@ -204,10 +197,10 @@ describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules
         const chance = accuracy * entry.chance;
         const gap = Math.abs(mass - chance);
         if (gap <= 0.07) continue;
-        // r89 S2 (user gate 16.11.2026, P7a): a plan that stops below full coverage divides the classes it found by the coverage `c`
-        // (sampler.ts `blended`), so the missing classes take their chance away from the targets they sit on. The mass of an effect is
-        // (found part)/c, the found part lies between chance - (1 - c) and chance, so the mass is off by at most max(chance, 1 - chance) * (1 - c) / c.
-        // Past the old flat bound of 0.07, the row asks for that bound of the coverage the plan reached.
+        // a plan that stops below full coverage divides the classes it found by the coverage `c` (sampler.ts `blended`), so the
+        // missing classes take their chance away from the targets they sit on. The mass of an effect is (found part)/c, the found
+        // part lies between chance - (1 - c) and chance, so the mass is off by at most max(chance, 1 - chance) * (1 - c) / c. The row
+        // asks that bound of the coverage the plan reached.
         const slots = new Set(blend.classes.flatMap(cls => cls.key.split('|').map(segment => segment.slice(segment.indexOf('>') + 1, segment.indexOf('=')))));
         const dice = new Map([...slots].map(slot => [slot, playedChances(board, clicks, [slot]).get(slot) ?? []]));
         const cover = coverageOf(blend, accuracy, slot => dice.get(slot) ?? []);
@@ -220,7 +213,6 @@ describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules
   });
 });
 
-// --- scenes ---------------------------------------------------------------------------------------------------------
 
 const feedback = (name: string): ReplayData =>
   JSON.parse(readFileSync(new URL(`../../../test/e2e-feedback/fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
@@ -228,13 +220,10 @@ const feedback = (name: string): ReplayData =>
 const has = (log: readonly string[], pattern: RegExp): boolean => log.some(line => pattern.test(line));
 
 describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (singles)', () => {
-  // Round 86 (B4b with lane A's scene, user gate of 06.11.2026, 2a). Before the merge the reconstructed turn-8 position left
-  // Conscripts infatuated (a Cute Charm proc of turn 1 that the log never shows, the volatile `attract`), and the cell guard
-  // fences an infatuated attacker: a guard stays a guard, so the real cell stayed seed-priced and the row read `fail`. Lane B
-  // forces the logged dice and quiets the phantom proc (`quietProcs`), so the real position carries no `attract` and reads
-  // `none` (Clefable stands burned already, so the Scald burn is no event, and Merciless adds none). The row that the guard
-  // fences an infatuated attacker keeps its purpose: it sets the volatile on purpose. The burn die of the Scald is the scene:
-  // the same board without the infatuation prices the burn as a class.
+  // The reconstructed turn-8 position carries no `attract`: the logged dice are forced and `quietProcs` quiets the phantom Cute
+  // Charm proc of turn 1 that the log never shows. So the real cell reads `none` (Clefable stands burned already, so the Scald burn
+  // is no event, and Merciless adds none). The row that the guard fences an infatuated attacker sets the volatile on purpose. The
+  // burn die of the Scald is the scene: the same board without the infatuation prices the burn as a class.
   type Scalder = { removeVolatile(id: string): boolean; addVolatile(id: string, source: unknown): unknown; volatiles: Record<string, unknown>; ability: string; baseAbility: string };
   async function turn8(mode: 'real' | 'infatuated' | 'clear'): Promise<{ board: Battle; root: SimPosition }> {
     const { runtime } = await reconstruct('smogtours-gen8ou-573756', 8, feedback('smogtours-gen8ou-573756'));
@@ -277,7 +266,6 @@ describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (
   });
 });
 
-/** A singles board of the engine's paths from two sets (Gen 9 custom game). */
 function board1v1(p1: { species: string; moves: string[] }, p2: { species: string; moves: string[] }): { board: Battle; root: SimPosition } {
   const board = battleOf('gen9customgame', [set(p1.species, p1.moves)], [set(p2.species, p2.moves)]);
   return { board, root: rootOf(board) };
@@ -300,7 +288,7 @@ describe('scene: a singles cell with a flinching first mover', () => {
   // Blissey, not Pikachu: an Electric body is immune to the Thunder's paralysis, and the row reads the status in the log
   const { board, root } = board1v1({ species: 'Blissey', moves: ['waterfall'] }, { species: 'Snorlax', moves: ['thunder'] });
   const plan = planCellEvents(board, WATERFALL.p1, WATERFALL.p2);
-  // Round 86 (T305): Thunder carries a 30 percent paralysis die of its own, so its hit splits in two classes
+  // Thunder carries a 30 percent paralysis die of its own, so its hit splits in two classes
   const chance = (hit: number, thunder: number, flinch: number, par: number): Map<string, number> => new Map([
     ['hit-nokill|miss', hit * (1 - flinch) * (1 - thunder)],
     ['hit-nokill|hit-nokill', hit * (1 - flinch) * thunder * (1 - par)],
@@ -356,7 +344,7 @@ describe('scene: a singles cell with a flinching first mover', () => {
       const j = stats.p2Options.findIndex(option => option.choice === WATERFALL.p2);
       const cell = stats.cells.find(entry => entry.key === cellKey(i, j))!;
       const drawn = new Set<string>();
-      // Round 86 (T323): the seed hashes (offset, iteration), so the cell's draw is one of the first iterations' seeds
+      // the seed hashes (offset, iteration), so the cell's draw is one of the first iterations' seeds
       for (let iteration = 0; iteration < 40; iteration++) {
         drawn.add(waterfallKey(advancePositionWithLog(root, WATERFALL.p1, WATERFALL.p2, treeSeed(iteration, offset)).log, true));
       }
@@ -402,7 +390,6 @@ describe('fork counts: a missing secondary class costs one forced draw, never a 
   const { board, root } = board1v1({ species: 'Pikachu', moves: ['firefang'] }, { species: 'Vaporeon', moves: ['splash'] });
   const want = new Map<string, number>([...expectedClasses(0.95, [{ effectId: 'brn', chance: 0.1 }, { effectId: 'flinch', chance: 0.1 }])]);
   const priced = [...want].filter(([, weight]) => weight >= MIN_MASS).map(([key]) => key);
-  /** The classes the first `count` seeds show, and how many of the priced classes they miss. */
   const missingAfter = (count: number): number => priced.length - new Set(SEARCH_SEEDS.slice(0, count)
     .map(seed => fangKey(advancePositionWithLog(root, FANG.p1, FANG.p2, seed).log)).filter(key => priced.includes(key))).size;
 
@@ -455,8 +442,8 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
     expect(cell).toMatchObject({ kind: 'sample', via: 'plan', reason: null });
     const blend = (cell as { sample: { blend?: CellBlend } }).sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    // r89 A5 gate: was toBeCloseTo(0.27, 1) (within 0.05). The cell's own seeds (T324) leave the plan at a coverage of 0.84 (the least the
-    // sampler accepts is 0.8), so the p2a mass reads 0.3226; the bound is 0.06 now.
+    // The cell's own seeds leave the plan at a coverage of 0.84 (the least the sampler accepts is 0.8), so the p2a mass reads
+    // 0.3226; the bound is 0.06.
     for (const target of ['p2a', 'p2b']) expect(Math.abs(massOf(blend, `p1a:rockslide>${target}`, 'flinch') - 0.9 * 0.3)).toBeLessThan(0.06);
   });
 
@@ -473,7 +460,7 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
   row('forks-pair')('the pair plan of a one-die cell draws the natural first draw and one forced draw', () => {
     const cell = pairCellSample(eyes(), ...EXTRASENSORY, 3, cache);
     expect(cell).toMatchObject({ kind: 'sample', via: 'plan' });
-    // the three base seeds and at most one forced draw for the flinch (the A4 row counted the draws beyond the base: at most 2)
+    // the three base seeds and at most one forced draw for the flinch
     expect((cell as { draws: number }).draws).toBeLessThanOrEqual(3 + 1);
     const rock = pairCellSample(eyes(), ...ROCKSLIDE, 3, cache);
     expect((rock as { draws?: number }).draws ?? 0).toBeLessThanOrEqual(PAIR_DRAW_BUDGET);

@@ -43,11 +43,10 @@ function twoBattles(formatid: string): [esm.Battle, esm.Battle] {
 
 /** Undefined writes whose receiver is no Battle, Field, Side or Pokemon ("<file> <receiver>"). */
 const NOT_BATTLE_STATE = new Set([
-  'sim/side.mjs req', // an entry of side.activeRequest, which today's fork rebuilds (state.mjs:112-126)
+  'sim/side.mjs req', // an entry of side.activeRequest, which the standard fork rebuilds (state.mjs:112-126)
   'sim/team-validator.mjs this', // the TeamValidator
 ]);
 
-/** Own function-valued keys whose function differs between two battles: per-instance closures. */
 function closures(a: object, b: object): string[] {
   const left = a as Record<string, unknown>;
   const right = b as Record<string, unknown>;
@@ -99,7 +98,6 @@ function censusRoot(formatid: string): string {
 
 interface CensusTally { forks: number; templates: number; snapshots: number; mismatches: string[] }
 
-/** Where two lists first differ, with a little context. */
 function firstDifference(today: readonly string[], copied: readonly string[]): string {
   let index = 0;
   while (index < Math.max(today.length, copied.length) && today[index] === copied[index]) index++;
@@ -109,7 +107,7 @@ function firstDifference(today: readonly string[], copied: readonly string[]): s
   return `#${index}: today ...${a.slice(Math.max(0, at - 60), at + 60)} | copy ...${b.slice(Math.max(0, at - 60), at + 60)}`;
 }
 
-/** Every copy source (position template, mid-turn snapshot): a copy of it against today's round trip of it. */
+/** Every copy source (position template, mid-turn snapshot): a copy of it against the JSON round trip of it. */
 function censusTemplate(template: esm.Battle, tally: CensusTally): void {
   tally.templates++;
   if (template.sides.some(side => side.requestState === 'switch')) tally.snapshots++;
@@ -122,7 +120,7 @@ function censusTemplate(template: esm.Battle, tally: CensusTally): void {
   if (copied.join('\n') !== today.join('\n')) tally.mismatches.push(`${template.format.id} template: ${firstDifference(today, copied)}`);
 }
 
-/** A few plies, the same picks with the lever clone and without: every fork's own keys and every child as today. */
+/** A few plies, the same picks with the lever clone and without: every fork's own keys and every child as on the standard path. */
 function censusPlayout(label: string, root: string, seed: (typeof SEEDS)[number], pick: number, tally: CensusTally): void {
   let copied = createRootPosition(root);
   let today = createRootPosition(root);
@@ -204,8 +202,8 @@ describe('the pins the layer relies on', () => {
   });
 
   test('every constructor key the sim empties by name holds undefined on a fresh object, in every gen', () => {
-    // Today's round trip drops a key holding undefined and leaves the constructor's value; a copy keeps
-    // undefined. adoptTemplate (sim-fast/index.ts) relies on the two agreeing for constructor keys.
+    // The JSON round trip drops a key holding undefined and leaves the constructor's value; a copy keeps undefined. adoptTemplate
+    // (sim-fast/index.ts) relies on the two agreeing for constructor keys.
     // A source scan sees only literal writes (gen 2's lastMoveTargetLoc = targetLoc it cannot see):
     // the census below plays the rest.
     const esmDir = join(SIM_BUILD, 'esm');

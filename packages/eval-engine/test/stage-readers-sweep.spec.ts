@@ -6,7 +6,7 @@ import { dexOfRules, SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 88 (T336, #72, E2b): the census of the moves that read or move stat stages (`endgame/stage-readers.ts`), played on a twin
+ * The census of the moves that read or move stat stages (`endgame/stage-readers.ts`), played on a twin
  * battle per move, against every Dex move of every rule set the corpus plays (Gens 1 to 9 and the Champions mod; the twin is a
  * singles battle of the generation, and the rule it serves fires only in singles: a doubles cell draws no class). The census must
  * name exactly the moves that read the target's stages (Foul Play, Punishment), copy or steal them (Psych Up, Spectral Thief,

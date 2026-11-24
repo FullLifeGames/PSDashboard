@@ -5,16 +5,16 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 72 (T196a): the two oracles the speed-tie checker holds `speedTie` to, written from the simulator's queue and
- * independent of the code under test.
+ * The two oracles the speed-tie checker holds `speedTie` to, written from the simulator's queue and independent of the code under
+ * test.
  *
- * The cheap oracle is the round-70 probe: each side's move action resolved by `battle.queue.resolveAction` on a
- * disposable battle (a round trip through the stable serialization, not the module's copy), a tie when
- * `battle.comparePriority` says 0. Quick Claw and Quick Draw draw from the PRNG inside the resolve: it is asked with
- * every chance answering false and again with every chance true, and a tie under either answer is a possible tie.
+ * The cheap oracle: each side's move action resolved by `battle.queue.resolveAction` on a disposable battle (a round trip through
+ * the stable serialization, not the module's copy), a tie when `battle.comparePriority` says 0. Quick Claw and Quick Draw draw from
+ * the PRNG inside the resolve: it is asked with every chance answering false and again with every chance true, and a tie under
+ * either answer is a possible tie.
  *
- * The played oracle plays the turn on a copy with the same dice and watches `speedSort`: a tie is a shuffle of a range
- * that holds both move actions.
+ * The played oracle plays the turn on a copy with the same dice and watches `speedSort`: a tie is a shuffle of a range that holds
+ * both move actions.
  */
 
 export type Chance = boolean;
@@ -66,11 +66,10 @@ export function playedOracle(live: Battle, first: Slot, second: Slot, choices: {
   return flipped;
 }
 
-/** The played oracle under either answer of the dice. */
 export const playedTie = (live: Battle, first: Slot, second: Slot, choices: { p1: string; p2: string }): boolean =>
   CHANCES.some(chance => playedOracle(live, first, second, choices, chance));
 
-/** One board of the round-70 probe: two Pokémon, the two moves they click, an optional field set-up. */
+/** One board: two Pokémon, the two moves they click, an optional field set-up. */
 export interface Board {
   name: string;
   p1: PokemonSet;
@@ -83,7 +82,6 @@ export interface Board {
 const fast = (species: string, moves: string[], extra: Partial<PokemonSet> = {}) =>
   set(species, moves, { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 252 }, ...extra });
 
-/** The eight boards of the lessons' speed-tie probe. */
 export function boards(): Board[] {
   return [
     { name: 'control: Tackle against Tackle', p1: fast('Sableye', ['tackle'], { ability: 'Keen Eye' }), p2: fast('Sableye', ['tackle'], { ability: 'Keen Eye' }), m1: 'tackle', m2: 'tackle' },

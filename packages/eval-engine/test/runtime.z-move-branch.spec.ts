@@ -20,10 +20,10 @@ import { landedMove } from '../src/score/move-facts';
 import type { BranchSlotChoice } from '../src/branch-choices';
 
 /**
- * Round 70 (batch fix), the scene of the bug: smogtours-gen7ou-450650 turn 2, p2's Garchomp uses a Dragon Z-move. The build stored
- * "Devastating Drake" as its only move, so the branch at turn 3 offered Struggle, the picker said "Garchomp no longer knows
- * Devastating Drake", and the play-out stopped. Now the build holds a Dragon attack, the rebuild plays the Z-move without a rejected
- * choice, and the branch stands where the game stood: the side has spent its Z-power and the body offers its moves.
+ * Scene: smogtours-gen7ou-450650 turn 2, p2's Garchomp uses a Dragon Z-move. The build stored "Devastating Drake" as its only move,
+ * so the branch at turn 3 offered Struggle, the picker named the lost move, and the play-out stopped. The build holds a Dragon
+ * attack, the rebuild plays the Z-move without a rejected choice, and the branch stands where the game stood: the side has spent
+ * its Z-power and the body offers its moves.
  */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
@@ -95,7 +95,7 @@ describe('hits-taken-pin', () => {
     test('the snapshot carries the client\'s count', () => {
       const snapshot = parseReplayLogWithObservations(replay.log).snapshots.find(entry => entry.turn === 7)!;
       expect(snapshot.p1.pokemon.find(mon => mon.speciesForme === 'Annihilape')!.timesAttacked).toBe(4);
-      // Absent at none, so a snapshot written before round 76 reads the same.
+      // Absent at none, so an older snapshot reads the same.
       expect(snapshot.p2.pokemon.every(mon => mon.timesAttacked === undefined || mon.timesAttacked > 0)).toBe(true);
     });
 

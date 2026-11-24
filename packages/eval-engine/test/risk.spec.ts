@@ -7,18 +7,16 @@ import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 import { buildGameReport } from '../src/report';
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 1a, words only): when the opponent's actual click equals the played row's punisher and
- * the played row's worst case trails the best row's worst case by at least a mistake band, the card says what the played row
- * walked into; every grade stays. VGC 2630685175 turn 7: pixelfrost's U-turn into Zamazenta with Tera Starstorm (worst case
- * -0.09, the punisher Pollen Puff with Wide Guard) against the best row's 0.65; Mstr_Hawk clicked exactly that punisher, the
- * equilibrium put no weight on it (regret 0.0005, no tier), and the card said "Both sides picked reasonable options; the engine
- * re-read the position after the turn (-21%)" without a word on Wide Guard.
+ * The card says what the played row walked into when the opponent's click equals the played row's punisher and the played row's
+ * worst case trails the best row's by at least a mistake band; every grade stays. VGC 2630685175 turn 7: pixelfrost's U-turn into
+ * Zamazenta with Tera Starstorm (worst case -0.09, the punisher Pollen Puff with Wide Guard) against the best row's 0.65; Mstr_Hawk
+ * clicked exactly that punisher, the equilibrium put no weight on it (regret 0.0005, no tier), and the card said "Both sides picked
+ * reasonable options; the engine re-read the position after the turn (-21%)" without a word on Wide Guard.
  *
- * The words are the shift sentences the card already has: the open-turn split and the hindsight read, "The read was there for
- * pixelfrost: against what was actually clicked (...), <best response> was worth +55% more." They reach this turn through the
- * chance part rule (the decision part, -67%, is the larger one) and the plain cell rule (the best response against the click
- * is a plain cell with 4 visits). A turn whose chance part is the larger one keeps its chance sentence and gains the same read
- * sentence for the side that walked into its punisher. Singles and doubles share every rule.
+ * The words are the card's hindsight sentence: "The read was there for pixelfrost: against what was actually clicked (...),
+ * <best response> was worth +55% more." This turn reaches it through the chance part rule (the decision part, -67%, is the larger
+ * one) and the plain cell rule (the best response against the click is a plain cell with 4 visits). A turn whose chance part is the
+ * larger one keeps its chance sentence and gains the same read sentence. Singles and doubles share every rule.
  */
 
 type Cell = NonNullable<EvalMatrix['cells']>[number][number];
@@ -98,18 +96,17 @@ interface Options {
   playedCell?: Cell;
   /** The best row's worst case (the played row's is -0.0948). */
   bestWorst?: number;
-  /** The opponent clicked line [1] instead of the punisher. */
   clickedOther?: boolean;
   /** scoreBefore, playedOutcome, scoreAfter. */
   scores?: [number, number, number];
-  /** Round 76 (T233): the played row's value against line [1] sits this far above its worst case (default: far above). */
+  /** The played row's value against line [1] sits this far above its worst case (default: far above). */
   siblingGap?: number;
 }
 
 // The turn-7 numbers: the decision part -1.342 and the chance part -0.417 (a shift), or a chance part larger than the decision part.
 const SHIFT: [number, number, number] = [0.9054284770830265, -0.4366561935931187, -0.8535168316469056];
 const CHANCE: [number, number, number] = [0.9054284770830265, 0.72, -0.8535168316469056];
-// Round 76 (T233): the score did not move and the dice had nothing to say: a quiet turn.
+// The score did not move and the dice had nothing to say: a quiet turn.
 const QUIET: [number, number, number] = [0.9054284770830265, 0.9, 0.9];
 
 function turnOf(make: () => Game, options: Options = {}): { analysis: TurnAnalysis; names: [string, string] } {
@@ -174,7 +171,6 @@ describe.each(GAMES)('%s: the trigger', (_name, make) => {
     expect(analysis.p1.played!.punishedBy).toBe(analysis.p2.played!.label);
     expect(analysis.p1.best!.worstCase - analysis.p1.played!.worstCase).toBeGreaterThanOrEqual(TIER_THRESHOLDS.mistake);
     expect(walkedInto(analysis.p1, analysis.p2)).toBe(true);
-    // The opponent's side did not: the click it met was not its punisher.
     expect(walkedInto(analysis.p2, analysis.p1)).toBe(false);
   });
 
@@ -186,14 +182,13 @@ describe.each(GAMES)('%s: the trigger', (_name, make) => {
     expect(walkedInto(edge.p1, edge.p2)).toBe(true);
   });
 
-  // Round 76 (T233): the click is a sibling of the punisher when the played row's value against it lies within one inaccuracy of its worst case.
+  // The click is a sibling of the punisher when the played row's value against it lies within one inaccuracy of its worst case.
   test('a click that ties the punisher within an inaccuracy is a walk into it, one band further out is not (red before: only the exact label)', () => {
     const tied = turnOf(make, { clickedOther: true, siblingGap: TIER_THRESHOLDS.inaccuracy - 0.02 }).analysis;
     expect(tied.p1.played!.punishedBy).not.toBe(tied.p2.played!.label);
     expect(walkedInto(tied.p1, tied.p2)).toBe(true);
     const far = turnOf(make, { clickedOther: true, siblingGap: TIER_THRESHOLDS.inaccuracy + 0.02 }).analysis;
     expect(walkedInto(far.p1, far.p2)).toBe(false);
-    // The opponent's side did not walk into anything.
     expect(walkedInto(tied.p2, tied.p1)).toBe(false);
   });
 
@@ -283,7 +278,7 @@ describe.each(GAMES)('%s: the card of a quiet turn (round 76, T233)', (_name, ma
     const { analysis, names } = turnOf(make, { scores: QUIET });
     expect(analysis.attribution).toBe('quiet');
     const text = summarizeTurn(analysis, names);
-    // Round 89 (B8a): the walked read stands beside the sentence, so the card says "Neither side made a mistake." and never "A quiet turn.".
+    // The walked read stands beside the sentence, so the card says "Neither side made a mistake." and never "A quiet turn.".
     expect(text).toContain('Neither side made a mistake.');
     expect(text).not.toContain('quiet');
     expect(text).toContain(`${READ} ${names[0]}: against`);
@@ -356,7 +351,6 @@ describe('attribution-chance-larger', () => {
 
     test('a chance part larger than the decision part stays a chance swing', () => {
       expect(turnOf(make, 0.1, 0.15, -0.4).attribution).toBe('chance');
-      // The residual alone moved the turn: no decision part at all.
       expect(turnOf(make, 0.25, 0.25, -0.25).attribution).toBe('chance');
     });
 
@@ -390,7 +384,6 @@ describe('attribution-chance-larger', () => {
       const card = summarizeTurn(opposite, names);
       expect(card).toContain('No single mistake stands out');
       expect(card).not.toContain('pushed the same way');
-      // The same direction keeps the frame.
       const same = turnOf(make, 0.5, -0.25, -0.5);
       expect(same.attribution).toBe('shift');
       expect(summarizeTurn(same, names)).toContain('pushed the same way');

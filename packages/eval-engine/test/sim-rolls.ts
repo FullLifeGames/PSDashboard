@@ -3,12 +3,10 @@ import { positionBattle, type SimPosition } from '../src/forward-model';
 import { drawPair } from '../src/pair/draw';
 
 /**
- * Round 69 (lane D) test helper: the simulator's own damage of one hit for
- * each of the 16 damage rolls, normal and crit, the oracle the calc paths of
- * T152 and T154 are held against. The turn is drawn under the recording dice
- * (pair/draw.ts) with the hit's accuracy, crit and roll answered by a script;
- * the damage is the target's HP the turn took, so give the target an HP no
- * roll can empty. Everything else the draw leaves to the seed.
+ * The simulator's own damage of one hit for each of the 16 damage rolls, normal and crit, the oracle the calc paths are held
+ * against. The turn is drawn under the recording dice (pair/draw.ts) with the hit's accuracy, crit and roll answered by a script;
+ * the damage is the target's HP the turn took, so give the target an HP no roll can empty. Everything else the draw leaves to the
+ * seed.
  */
 
 export interface SimDamages {
@@ -36,14 +34,13 @@ export function simDamages(root: SimPosition, p1Choice: string, p2Choice: string
   return { normal: rolls.map(roll => damageOf(roll, false)), crit: rolls.map(roll => damageOf(roll, true)) };
 }
 
-/** How many of the rolls reach `hp`. */
 export const killing = (damages: readonly number[], hp: number): number => damages.filter(damage => damage >= hp).length;
 
 /**
  * The seeds (of `1,2,3,4`, `2,2,3,4`, ...) whose natural draw of a move that draws its strength came out weak and strong:
  * the log shows `marker` (the move's `|-activate|` line) when the stronger draw happened. The strength draw does not
  * depend on the roll and crit scripts (an answered roll still draws its number), so each seed keeps its strength for every
- * script and `simDamages` can be asked per strength with these seeds (round 69, T154).
+ * script and `simDamages` can be asked per strength with these seeds.
  */
 export function strengthSeeds(root: SimPosition, p1Choice: string, p2Choice: string, marker: string): { weak: string; strong: string } {
   let weak: string | undefined;

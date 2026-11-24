@@ -47,11 +47,9 @@ const singlesLog = [
 ].join('\n');
 
 describe('correctActivesFromProtocol', () => {
-  // When the sim resolves a random switch (e.g. a Whirlwind drag) differently
-  // than the replay protocol, the correction must keep side.pokemon aligned
-  // with side.active — otherwise the sim's next real switch swaps stale
-  // positions, duplicating one team member and erasing another (the
-  // "Cannot switch to Metagross" bug from gen9draft-2298735122).
+  // When the sim resolves a random switch (a Whirlwind drag) differently than the replay protocol, the correction must keep
+  // side.pokemon aligned with side.active: else the sim's next real switch swaps stale positions, duplicating one team member and
+  // erasing another (the "Cannot switch to Metagross" bug from gen9draft-2298735122).
   test('keeps side.pokemon aligned when repointing an active slot', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
@@ -73,9 +71,8 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('a repointed Pokémon enters fresh — no inherited choice lock (GPL T38)', async () => {
-    // A diverged sim can keep a mon on the field locked into a Choice move
-    // while the REAL game switched it out and back in. The correction that
-    // forces it active must clear the lock trio — the real entry was fresh.
+    // A diverged sim can keep a mon on the field locked into a Choice move while the real game switched it out and back in. The
+    // correction that forces it active must clear the lock trio: the real entry was fresh.
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -86,7 +83,6 @@ describe('correctActivesFromProtocol', () => {
     const battle = runtime.battleStream.battle!;
     const side = battle.sides[0];
     const eve = side.pokemon.find(pokemon => pokemon.name === 'Eve')!;
-    // Manufacture the diverged state: benched Eevee carrying a stale lock.
     eve.volatiles['choicelock'] = { id: 'choicelock', move: 'tackle' } as never;
     eve.moveSlots.forEach(slot => { slot.disabled = true; });
 
@@ -99,9 +95,8 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('the request regenerates after a correction — options follow the corrected active', async () => {
-    // Stale requests after a repoint made legalChoices offer the WRONG mon's
-    // moves (gen9doublesou-2660802611: Grimmsnarl's screens offered while
-    // Indeedee was the corrected active; Imprison-disabled flags missing).
+    // Stale requests after a repoint made legalChoices offer the wrong mon's moves (gen9doublesou-2660802611: Grimmsnarl's screens
+    // offered while Indeedee was the corrected active; Imprison-disabled flags missing).
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -120,10 +115,8 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('a repointed mon entering beside a standing Imprison gets recomputed disable flags', async () => {
-    // The sim's DisableMove pass ran at end-of-turn, BEFORE corrections
-    // mutate the board; a freshly repointed mon (flags cleared by the
-    // fresh-entry reset) would otherwise offer — and the branch would play —
-    // moves the real game blocks.
+    // The sim's DisableMove pass ran at end-of-turn, before corrections mutate the board; a freshly repointed mon (flags cleared by
+    // the fresh-entry reset) would otherwise offer, and the branch would play, moves the real game blocks.
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -193,11 +186,9 @@ describe('protocol lock restamp after correction', () => {
   };
 
   test('repointing ONTO the locked mon restores its protocol lock; the request disables the rest', async () => {
-    // The real loss case: the DIVERGED sim has the wrong mon on the field;
-    // the correction repoints onto Keldeo and deletes lock bookkeeping —
-    // the protocol trail (Specs + a lone Hydro Pump in the REAL log) must
-    // bring the lock back. The runtime deliberately replays a log where
-    // the sim never saw Keldeo act.
+    // The diverged sim has the wrong mon on the field; the correction repoints onto Keldeo and deletes lock bookkeeping; the
+    // protocol trail (Specs + a lone Hydro Pump in the real log) must bring the lock back. The runtime replays a log where the sim
+    // never saw Keldeo act.
     const divergedLog = [
       '|switch|p1a: Filler|Blissey|100/100',
       '|switch|p2a: Blissey|Blissey|100/100',
@@ -209,7 +200,6 @@ describe('protocol lock restamp after correction', () => {
       replayLog: divergedLog, targetTurn: 1,
     });
     const battle = runtime.battleStream.battle!;
-    // Context from the REAL replay's log — that is its whole premise.
     const context = buildChoiceLockContext(keldeoLog, { p1Team, p2Team: specsTeams.p2Team }, []);
     correctActivesFromProtocol(battle, ['|switch|p1a: Keldeo|Keldeo|100/100'], { context, turn: 2 });
     const keldeo = battle.sides[0].active[0]!;
@@ -498,10 +488,8 @@ describe('set substitution', () => {
   });
 });
 
-// The protocol ALWAYS hides the HP type ("|move|...|Hidden Power|..."), so a
-// substituted typed set must still understand the generic id everywhere the
-// protocol meets the sim — the 653785 regression: rejected replay choices
-// cost two reconstructed turns and flipped the re-pinned t19 verdict.
+// The protocol always hides the HP type ("|move|...|Hidden Power|..."), so a substituted typed set must still understand the
+// generic id everywhere the protocol meets the sim (653785: rejected replay choices cost two reconstructed turns).
 describe('generic protocol Hidden Power against a typed set', () => {
   test('the choice replay maps Hidden Power onto the typed slot (no rejects, no divergence)', async () => {
     const typedSet: PokemonSet = {
@@ -540,10 +528,8 @@ describe('generic protocol Hidden Power against a typed set', () => {
   });
 
   test('the sim keeps the generic id for a typed set, so the played match holds', () => {
-    // Load-bearing invariant behind the whole seam: @pkmn/sim normalizes
-    // "Hidden Power Ice" to slot/request id 'hiddenpower' (the type lives in
-    // hpType) — so option tokens stay generic and the protocol's generic
-    // "Hidden Power" matches them. A sim upgrade that breaks this shows here.
+    // Load-bearing invariant behind the whole seam: @pkmn/sim normalizes "Hidden Power Ice" to slot/request id 'hiddenpower' (the
+    // type lives in hpType), so option tokens stay generic and the protocol's generic "Hidden Power" matches them.
     const option = {
       choice: 'move hiddenpower', label: 'Hidden Power Ice',
       worstCase: 0, expected: 0, ev: 0,

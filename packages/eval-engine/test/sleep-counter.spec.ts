@@ -5,13 +5,10 @@ import { correctBattleFromSnapshot } from '../src/branch/corrections';
 import type { SimBattle } from '../src/branch/types';
 
 /**
- * Round 69, T187 (spec decision 29): the snapshot carries the sleep turns
- * @pkmn/client counts, and the correction gives a sleeper a remaining count the
- * protocol allows. The range comes from the simulator's own sleep condition
- * (run on a stand-in that records the draw), Rest's exact count from the Rest
- * move, and the Outrage length from the lock condition. Battle B is the game
- * (its log is the protocol); battle A is the simulator's run that drew another
- * length.
+ * The snapshot carries the sleep turns @pkmn/client counts, and the correction gives a sleeper a remaining count the protocol
+ * allows. The range comes from the simulator's own sleep condition (run on a stand-in that records the draw), Rest's exact count
+ * from the Rest move, and the Outrage length from the lock condition. Battle B is the game (its log is the protocol); battle A is
+ * the simulator's run that drew another length.
  */
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
