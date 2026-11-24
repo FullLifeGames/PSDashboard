@@ -6,12 +6,6 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { variationPanel } from './dock-helpers';
 
-/**
- * Hard mode. A click on the engine's top move of player 1 plays the turn out in a variation; the opponent answers with
- * the reply that hurts that move most when the setting is on (the lowest cell of the clicked row in the card's matrix: a matrix pass
- * counts every cell), and with its best row when it is off. One test per game type; each plays both arms on the same turn: singles
- * (Gen 6 OU 655336), Doubles OU, VGC (Scarlet/Violet) and Champions OU. The variation's history row names the choices the executed turn held.
- */
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
@@ -25,15 +19,8 @@ const GAMES = [
   { kind: 'Champions OU', id: 'gen9championsou-2691703002', turns: [8, 12, 5] },
 ];
 
-/**
- * The words the history row prints for one ranked label. A doubles label holds a part per slot ("Fake Out→Rillaboom + Spore→Tornadus")
- * and the history names the move and the target's position instead of its target's species, so a move part keeps the move. A switch
- * part ("→ Calyrex-Ice") names the species, while the history prints the Pokémon's name as the game's log gave it ("→ Calyrex"):
- * `names` maps a species to that name. A gimmick part ("Tera + Encore→X") is printed as "(Tera)" beside the move.
- */
 type Names = ReadonlyMap<string, string>;
 
-/** The name each species goes by in the replay's log (`|switch|p2b: Calyrex|Calyrex-Ice, L50|…`). */
 const namesOf = (replay: ReplayData): Names => {
   const names = new Map<string, string>();
   for (const line of String(replay.log).split('\n')) {
@@ -58,7 +45,6 @@ const partsOf = (label: string, names: Names): string[] => label.split(' + ')
   .filter(part => part !== '');
 
 async function openPage(page: Page, replay: ReplayData, hardMode: boolean): Promise<void> {
-  // a click or a read that misses fails in seconds, not at the test's limit
   page.setDefaultTimeout(30_000);
   await routeOfflineFixtures(page);
   await page.addInitScript(on => {
@@ -73,10 +59,7 @@ async function openPage(page: Page, replay: ReplayData, hardMode: boolean): Prom
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 }
 
-/**
- * The setting is called "Opponent reads my move" and lives in the Setup menu. Opens the menu, hands the box to
- * `check` and closes the menu again, so the pickers under it stay clickable.
- */
+// Closes the menu again, so the pickers under it stay clickable.
 async function withSetupBox(page: Page, check: (box: Locator) => Promise<void>): Promise<void> {
   await page.getByRole('button', { name: 'Setup', exact: true }).click();
   await check(page.getByRole('checkbox', { name: 'Opponent reads my move' }));
@@ -84,13 +67,9 @@ async function withSetupBox(page: Page, check: (box: Locator) => Promise<void>):
   await expect(page.getByRole('checkbox', { name: 'Opponent reads my move' })).toBeHidden();
 }
 
-/** What the evaluated turn offers: the clicked row, the opponent's best row and the matrix's reading of the row. */
 interface Offer { own: string; best: string; hurtMost: string[] }
 
-/**
- * The panel lands on the game report when the first report of a game appears, which can happen right after a turn's search finishes:
- * the turn's view then closes. A click on the turn's column of the graph opens it again; the loop accepts the view when it stays.
- */
+// The first report of a game lands the panel on the game report and closes the turn's view; a column click reopens it.
 async function settleOnTurn(page: Page, panel: Locator, turn: number): Promise<void> {
   const deadline = Date.now() + 150_000;
   while (Date.now() < deadline) {
@@ -108,7 +87,6 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number): Promise<v
 async function evaluateTurn(page: Page, turn: number): Promise<Offer> {
   const panel = page.locator('.ps-main-right .ps-eval-panel');
   await page.locator('input[type="range"]').fill(String(turn));
-  // the replay view of a main-line turn searches through "Analyze this position"; the card, ranked rows and matrix follow
   const analyze = panel.getByRole('button', { name: /^Analyze this position/ });
   await expect(analyze).toBeEnabled({ timeout: 60_000 });
   await analyze.click();
@@ -118,7 +96,6 @@ async function evaluateTurn(page: Page, turn: number): Promise<Offer> {
   const own = await label(0);
   const best = await label(1);
   await panel.getByRole('button', { name: 'Matrix', exact: true }).click();
-  // a cell's title reads "<own row> × <reply>: <player 1> NN% · <player 2> MM%"
   const titles = await panel.locator('td[title], td button[title]').evaluateAll(cells => cells.map(cell => cell.getAttribute('title') ?? ''));
   const cells = titles.flatMap(title => {
     const match = /^(.*?) × (.*?): .*? (\d+)% · /.exec(title);
@@ -138,14 +115,10 @@ async function clickEngineMove(page: Page, turn: number): Promise<string> {
   return (await history.textContent()) ?? '';
 }
 
-/** Both arms on one turn: Hard mode on reads the matrix and the history, Hard mode off the opponent's best row. */
 async function runGame(contexts: BrowserContext[], browser: Browser, replay: ReplayData, turns: number[]): Promise<void> {
   const names = namesOf(replay);
   const partsIn = (label: string): string[] => partsOf(label, names);
-  // arm one: Hard mode on, on the first turn whose worst reply is not the opponent's best row (the last candidate otherwise)
-  // each arm gets its own browser context: the preferences live in localStorage, which pages of one context share, and a page that
-  // persists them after the other page's init script ran would hand its setting over (the "off" page read the
-  // "on" page's Hard mode). Two tabs of one user do share the stored value in the app; each keeps its own until the next load.
+  // each arm gets its own browser context: the preferences live in localStorage, which pages of one context share
   const onContext = await browser.newContext();
   contexts.push(onContext);
   const on = await onContext.newPage();
@@ -161,19 +134,15 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   expect(offer.hurtMost.length, 'the matrix names a reply that hurts the clicked move most').toBeGreaterThan(0);
   const worstParts = offer.hurtMost.map(partsIn);
   const hardText = await clickEngineMove(on, turn);
-  // the variation's dock says it, with the button that turns it off
   await expect(on.getByText('Opponent reads your move')).toBeVisible();
   await expect(on.getByRole('button', { name: 'Turn off' })).toBeVisible();
-  // the opponent's choice in the executed turn is one of the lowest cells of the row (a tie is the engine's pick of equals)
   expect(worstParts.some(parts => parts.every(part => hardText.includes(part))), `the history names the reply that hurts most (${offer.hurtMost.join(' | ')}); it reads: ${hardText.replace(/\s+/g, ' ').slice(0, 600)}`).toBe(true);
   const bestOnly = partsIn(offer.best).filter(part => !worstParts.some(parts => parts.includes(part)) && !partsIn(offer.own).includes(part));
   for (const part of bestOnly) expect(hardText, `the best row's ${part} is not played`).not.toContain(part);
-  // "Turn off" in the dock switches the Setup setting off and takes the note away
   await on.getByRole('button', { name: 'Turn off' }).click();
   await expect(on.getByText('Opponent reads your move')).toHaveCount(0);
   await withSetupBox(on, box => expect(box).not.toBeChecked());
 
-  // arm two: the same turn with the setting off: the opponent's best row
   const offContext = await browser.newContext();
   contexts.push(offContext);
   const off = await offContext.newPage();

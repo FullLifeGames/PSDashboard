@@ -7,11 +7,7 @@ import { lightEngine, loadDockReplay, openVariationHistory, variationPanel } fro
 
 test.beforeAll(installReplayEmbedCache);
 
-// A bench offers only bodies the side could have brought. Replay gen9vgc2025regg-2335527677 (bring four): P1 fielded Clefable, Dusclops,
-// Ursaluna and Gastrodon, so its bench holds no Torracat and no Tsareena. P2 fielded three bodies (Overqwil, Archaludon, Pelipper), so its
-// fourth is unknown: its bench holds its fielded bodies and the guess (a body of its team preview) of the heaviest world, never all six.
-// The filter reads the same on the replay's own turns (a stored position), on the What-if's turns (a stored position of the variation,
-// the live tip) and at a forced replacement.
+// P2's fourth body is unknown: its bench holds its fielded bodies and the heaviest world's guess, never all six.
 const FILE = 'interlude-vgc-2335527677.json';
 const P1_BROUGHT = /Clefable|Dusclops|Ursaluna|Gastrodon/;
 const P1_HOME = /Torracat|Tsareena/;
@@ -32,14 +28,12 @@ async function load(page: Page) {
 const stamp = Date.now();
 const log = (text: string) => console.log(`[bench-bring +${Math.round((Date.now() - stamp) / 1000)}s] ${text}`);
 
-/** The bodies one slot's tray offers as a switch (none when the slot's tray offers no switch: a position that waits on the other side). */
 async function bench(page: Page, slot: DockSlotKey): Promise<string[]> {
   const tray = await openTray(page, slot);
   await tray.locator('.ps-switchbtn').first().waitFor({ timeout: 8_000 }).catch(() => undefined);
   return (await tray.locator('.ps-switchbtn').allInnerTexts()).map(text => text.replace(/\s+/g, ' ').trim());
 }
 
-/** P1's bench never names a body that stayed home; P2's bench holds its guess, a body of its preview (its fourth body is unknown). */
 async function expectBenches(page: Page, label: string, { expectP1 = true } = {}) {
   for (const slot of ['p1a', 'p1b'] as const) {
     const offered = await bench(page, slot);
@@ -55,7 +49,6 @@ async function expectBenches(page: Page, label: string, { expectP1 = true } = {}
   expect(p2, `${label} p2a offers its guess`).toMatch(P2_HOME);
 }
 
-/** A forced replacement of the variation: the bench it offers is the filtered one; the first body takes the slot. */
 async function settleForced(page: Page, label: string) {
   for (let round = 0; round < 6; round++) {
     const forced = page.locator('.ps-dock-chip[data-forced="true"]');
@@ -98,7 +91,6 @@ test('doubles, bring four: the replay turn offers no body that stayed home', asy
 test('doubles, bring four: the What-if tip, its inner turn and its forced replacement offer no body that stayed home', async ({ page }) => {
   test.setTimeout(420_000);
   await startAtTurnOne(page);
-  // The What-if from turn 1: two turns by hand, so the variation holds an inner turn and a live tip.
   await playTurn(page, 'variation turn 1');
   await playTurn(page, 'variation turn 2');
   await expectBenches(page, 'variation tip', { expectP1: false });
@@ -108,10 +100,6 @@ test('doubles, bring four: the What-if tip, its inner turn and its forced replac
   await expectBenches(page, 'variation inner turn');
 });
 
-// Champions VGC 2625939941, doubles. P1 fielded Farigiraf, Basculegion and Lopunny and never its fourth body (Ceruledge, Ninetales-Alola
-// or Kingambit); P2 brought Aerodactyl, Kingambit, Farigiraf and Sylveon and left Kangaskhan and Torkoal home. The rebuild trims both sides
-// to four: P1's fourth is the heaviest world's guess, and the other worlds blend into the values. Singles have no e2e fixture: the unit
-// rows of the worlds (replay-context-worlds, bench-sweep) read the same code.
 const CHAMPIONS_SHORT = 'gen9championsvgc2026regma-2625939941';
 const P2_HOME_BODIES = /Kangaskhan|Torkoal/;
 const P1_FIELDED = /Farigiraf|Basculegion|Lopunny/;
@@ -130,7 +118,6 @@ test.describe('Champions VGC, P1 short by one body (2625939941)', () => {
   test('P1\'s fourth tile carries the guess mark and the engine panel ranks no body P2 left home', async ({ page }) => {
     test.setTimeout(600_000);
     expect(dockReplays.some(replay => replay.id === CHAMPIONS_SHORT)).toBe(true);
-    // The bench of P1: its other fielded body and the guess, which wears the mark and names where it comes from.
     const tray = await openTray(page, 'p1a');
     const tiles = tray.locator('.ps-switchbtn');
     await tiles.first().waitFor({ timeout: 10_000 });
@@ -142,12 +129,10 @@ test.describe('Champions VGC, P1 short by one body (2625939941)', () => {
     await expect(marked).toContainText(P1_CANDIDATES);
     await expect(marked.locator('.ps-guess-badge')).toHaveAttribute('title', /The log never showed this player's last Pokémon\. The engine plays/);
     await expect(tray.locator('.ps-switchbtn', { hasText: P1_FIELDED }).locator('.ps-guess-badge')).toHaveCount(0);
-    // P2 fielded four, so its bench is the four brought bodies and wears no mark.
     const p2 = (await (await openTray(page, 'p2a')).locator('.ps-switchbtn').allInnerTexts()).join(' | ');
     expect(p2).not.toMatch(P2_HOME_BODIES);
     await expect(dockTray(page).locator('.ps-guess-badge')).toHaveCount(0);
 
-    // The panel ranks choices of the worlds' blend: the rows name no unbrought body of P2.
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 360_000 });

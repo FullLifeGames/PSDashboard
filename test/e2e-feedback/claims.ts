@@ -3,22 +3,13 @@ import type { TurnAnalysis } from '../../packages/eval-engine/src/analysis';
 import { summarizeTurn } from '../../packages/eval-engine/src/summary';
 import { BASELINE_PINNED, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim, type TurnClaim } from './corpus';
 
-/**
- * Pure comparison brain of the drift harness. WARN-ONLY by construction: every status is report content, nothing here
- * throws or fails a test. Pinned in test/regression/feedback-claims.spec.ts.
- */
 
-/**
- * 'error' is never produced by the evaluator — the RUNNER constructs it when
- * a replay could not be graded at all (wedged sweep, empty extraction), so
- * the report carries the breakage instead of silently omitting the items.
- */
+// 'error' comes from the runner (a replay that could not be graded at all), never from the evaluator.
 type ClaimStatus = 'ok' | 'drift' | 'gap-open' | 'gap-moved' | 'pending' | 'error';
 
 export interface ClaimResult {
   item: FeedbackItem;
   status: ClaimStatus;
-  /** Human-readable mismatches / current values, verbatim into the report. */
   details: string[];
 }
 
@@ -66,8 +57,7 @@ function turnClaimMismatches(
     if (isKey !== claim.keyMoment) out.push(`keyMoment membership is ${isKey}, expected ${claim.keyMoment}`);
   }
   if (claim.summaryIncludes && claim.summaryIncludes.length > 0) {
-    // Narrative pins render the SAME summary the UI shows. Missing names are
-    // a loud mismatch, never a silent pass.
+    // Missing names are a loud mismatch, never a silent pass.
     if (!playerNames) out.push('claim has summaryIncludes but no player names were provided');
     else {
       const summary = summarizeTurn(analysis, playerNames);
@@ -110,7 +100,6 @@ export function evaluateItem(
   item: FeedbackItem,
   analyses: (TurnAnalysis | null)[],
   report: GameReport | null,
-  /** Needed only by narrative pins (summaryIncludes) — the replay's player names. */
   playerNames?: [string, string],
 ): ClaimResult {
   if (item.kind === 'truth') {
@@ -127,7 +116,6 @@ export function evaluateItem(
     : { item, status: 'gap-moved', details: mismatches };
 }
 
-/** Schema gate — the only corpus-side RED conditions. */
 export function validateCorpus(
   corpus: FeedbackItem[],
   turnsByReplay: Record<string, number>,

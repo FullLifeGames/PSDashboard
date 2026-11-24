@@ -15,9 +15,7 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch divergence: healed mid-cascade turns branch silently; the ended final turn is guarded', async ({ page }) => {
-    // The REAL draft replay (not the shared 4-turn fixture): the UNHEALED choice replay dies from turn 56 (five forced switches fed into a
-    // kill zone), while the app's per-turn snapshot healing arrives live on every turn through 67. t56 branches with NO divergence notice
-    // (healing works), and the real final turn (68) cannot be branched at all: the button is disabled with the end-position explanation.
+    // The unhealed choice replay dies from turn 56 (five forced switches); the app's healing carries every turn to 67.
     test.setTimeout(300_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
     await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
@@ -32,8 +30,6 @@ test.describe('PS Dashboard', () => {
 
     await slider.fill('56');
     await expect(page.getByText('T56/')).toBeVisible();
-    // Executing a turn here funnels through the healed reconstruction: t56 must arrive LIVE and play.
-    // Each slot gets the first enabled move through its tray.
     await pickMove(page, 'p1a');
     await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
@@ -43,7 +39,6 @@ test.describe('PS Dashboard', () => {
     await discardVariation(page);
     await expect(slider).toBeVisible({ timeout: 10_000 });
     await slider.fill('68');
-    // The end snapshot is the post-battle sentinel: no play-out is offered there (the bar says the game ended), and none arms.
     await expect(page.locator('button', { hasText: 'Let it play out' })).toHaveCount(0);
     await expect(page.getByText('The game ended at this position: nothing left to play out.')).toBeVisible();
     await expect(page.getByText(/Engine is playing both sides/)).toHaveCount(0);
@@ -51,11 +46,8 @@ test.describe('PS Dashboard', () => {
   });
 
   test('the draft t56 play-out wins for p2 without crawling', async ({ page }) => {
-    // The failure it guards: from turn 56 (p1 Kyurem Ice Beam, p2 into Slowking) a play-out that sent Heatran into Mienshao's Knock Off
-    // lost it, then crawled 21 turns to a 5% win. The pin keeps the intent, not the switch order; what it forbids is the crawl. P2 alternates
-    // Slowking and Heatran while Mienshao stays locked into Knock Off: over 16 arrival dice in Node p2 wins 15 of 16, with 5.63 switches on
-    // average (range 2 to 10), and the CI run plays nine switches and wins at turn 71. So the bounds are ten switches and turn 75.
-    // Nicknames in the history rows: Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
+    // Bounds: over 16 arrival dice in Node p2 wins 15 of 16 with 5.63 switches on average (range 2 to 10);
+    // the CI run plays nine switches and wins at turn 71. Sludge Shadow = Muk-Alola, Fire Shadow = Heatran.
     test.setTimeout(600_000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
     await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({
@@ -79,8 +71,6 @@ test.describe('PS Dashboard', () => {
     // innerText reads the rendered text, so the closed history opens first.
     await openVariationHistory(page);
     const lines = (await page.locator('.ps-panel', { hasText: 'Variation moves' }).innerText()).split('\n');
-    // P2's switch targets in play order: the right half of a turn's move row
-    // when it is a switch, and the forced-replacement rows of P2.
     const p2Switches: string[] = [];
     lines.forEach((line, index) => {
       const forced = /replacement \(P2\): → (.+)$/.exec(line);
@@ -92,8 +82,6 @@ test.describe('PS Dashboard', () => {
     });
     const lastTurn = Number(/Variation tip: Turn (\d+)/.exec(await page.getByText(/Variation tip: Turn \d+/).innerText())?.[1]);
     const line = `ended at turn ${lastTurn}, p2 switches: ${p2Switches.join(', ')}`;
-    // The finished run leaves the frame where the user watches it (no return to the start turn; the last turn does not drag the pointer to
-    // the tip either); the click goes to the tip, which names the winner.
     await page.getByRole('button', { name: 'End of the variation: the game is over here' }).click();
     await expect(page.locator('.ps-branch-ended'), line).toContainText('Bene wins this variation.');
     expect(lastTurn, line).toBeLessThanOrEqual(75);
@@ -104,8 +92,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 2);
 
-    // After executing turn 2 the sim (and the pointer) stand one past it —
-    // the appended-turn animation settles there on its own.
     const iframeHandle = await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 10000 });
     const frame = await iframeHandle?.contentFrame();
     expect(frame).toBeTruthy();
@@ -113,9 +99,6 @@ test.describe('PS Dashboard', () => {
   });
 
   test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone', async ({ page }) => {
-    // Scene: in the draft replay, a few turns from turn 0, one turn back and a new choice. The frame must hold the rebuilt line only (not the
-    // old attack and then the new one), and the new turn must reach it although the embed script still loads: the embed comes a second late
-    // here, as from the network. Turn 2 is Ice Beam first and Freeze-Dry after the step back.
     test.setTimeout(180_000);
     await routeSlowReplayEmbed(page, 1000);
     const draftReplay = JSON.parse(readFileSync(fixturePath('draft-replay.json'), 'utf-8'));
@@ -131,7 +114,6 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Variation tip: Turn 1/)).toBeVisible({ timeout: 60_000 });
 
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
-    // Turn 1: U-turn and Chilly Reception, each side then sends its first switch-in.
     await pickMove(page, 'p1a', 'U-turn');
     await pickMove(page, 'p2a', 'Chilly Reception');
     await page.locator('.ps-execute-btn').click();
@@ -139,7 +121,6 @@ test.describe('PS Dashboard', () => {
       await pickForcedReplacement(page);
       await expect(history).toContainText(`replacement (${side})`, { timeout: 30_000 });
     }
-    // Turn 2 as played first, then one turn back and Freeze-Dry instead.
     await pickMove(page, 'p1a', 'Ice Beam');
     await pickMove(page, 'p2a', 'Close Combat');
     await page.locator('.ps-execute-btn').click();
@@ -152,7 +133,6 @@ test.describe('PS Dashboard', () => {
     await expect(history).toContainText('Freeze-Dry | Close Combat', { timeout: 60_000 });
     await expect(history).not.toContainText('Ice Beam | Close Combat');
 
-    // The frame holds the variation's moves, each once: the old turn 2 is gone.
     await page.locator('.ps-log-toggle').click();
     const simMoves = (await page.locator('.ps-log').innerText()).split('\n').filter(line => line.startsWith('|move|'));
     expect(simMoves.some(line => line.includes('|Freeze-Dry|'))).toBe(true);
@@ -162,7 +142,6 @@ test.describe('PS Dashboard', () => {
       ((window as ReplayWindow & { Replays?: { battle?: { stepQueue?: string[] } } }).Replays?.battle?.stepQueue ?? [])
         .filter(line => line.startsWith('|move|'))
     ), { timeout: 30_000 }).toEqual(simMoves);
-    // And it shows the new turn: the frame plays through turn 2 to the variation's tip.
     await expectReplayTurnAtLeast(frame!, 3);
   });
 
@@ -182,7 +161,6 @@ test.describe('PS Dashboard', () => {
     await startVariationAt(page, 1);
 
     // Swords Dance for P1 (no damage — a max-damage pick can crit-KO and
-    // turn P2's controls into a forced-switch prompt), any move for P2.
     await pickMove(page, 'p1a', 'Swords Dance');
     await pickMove(page, 'p2a');
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
@@ -194,7 +172,6 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay follows appended branch events and keeps iframe turn controls usable', async ({ page }) => {
-    // The frame plays turn 2 and the appended turn to their ends at normal speed, about 16 s.
     test.setTimeout(150_000);
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 10000 });
@@ -207,8 +184,7 @@ test.describe('PS Dashboard', () => {
 
     const logLength = () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').length);
-    // Both lengths count once the frame has played everything it holds. Read while it still played turn 2, the appended growth came from
-    // turn 2 itself, and Last turn's return to the start of turn 2 landed above that reading on a slow runner.
+    // Read while the frame still plays turn 2, the appended growth came from turn 2 itself, not the new turn.
     const settledLogLength = async () => {
       await expectReplaySettled(frame!);
       return logLength();
@@ -220,16 +196,13 @@ test.describe('PS Dashboard', () => {
     await page.locator('.ps-execute-btn').click();
 
     // The appended turn grows the visible log — a marker that does not
-    // depend on damage rolls, KOs, or the inferred spreads.
     await expect.poll(logLength).toBeGreaterThan(beforeLength + 20);
     const afterLength = await settledLogLength();
     await expect.poll(async () =>
       frame!.evaluate(() => (document.querySelector('.battle-log')?.textContent ?? '').match(/Battle started/g)?.length ?? 0)
     ).toBe(1);
 
-    // The frame's Last turn and Next turn: the variation from turn 2 covers turns 3 and 4 after the two Executes. Last turn shortens the log
-    // of the same frame, and Next turn twice brings it back. The timeline's own moves of the frame stay with frame-controls.spec.ts: right
-    // after the frame's clicks the pointer may already stand on turn 3, and a move to 3 then changes nothing.
+    // right after the frame's clicks the pointer may already stand on turn 3, and a move to 3 then changes nothing.
     await frame!.locator('button', { hasText: 'Last turn' }).click();
     await expect.poll(logLength).toBeLessThan(afterLength);
     await frame!.locator('button', { hasText: 'Next turn' }).click();
@@ -266,7 +239,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('.ps-execute-btn').click();
 
     // startVariationAt already executed turn 2 (and resolved its forced
-    // replacement), so the instrumented append plays from turn 3.
     await expect.poll(async () => frame!.evaluate(() =>
       (window as ReplayWindow).__psPostedMessages?.some(message => {
         const data = message as { type?: string; playFromTurn?: number };
@@ -277,7 +249,6 @@ test.describe('PS Dashboard', () => {
   });
 
   test('branch replay play controls stay muted without audio errors', async ({ page }) => {
-    // The frame plays the variation's turn to its end first, about 10 s at normal speed.
     test.setTimeout(150_000);
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -291,9 +262,7 @@ test.describe('PS Dashboard', () => {
     expect(frame).toBeTruthy();
     await expectReplayTurnAtLeast(frame!, 2);
 
-    // The frame plays the variation's turn in on its own (animate default), and the app repeats its seek for 1.2 s. A seek that lands after
-    // a pause plays again, and the Play button never shows. Once the frame has played everything, it rests unpaused at the end of its log:
-    // pause, then play.
+    // The app repeats its seek for 1.2 s: a seek that lands after a pause plays again, and the Play button never shows.
     await expectReplaySettled(frame!);
     await frame!.locator('button', { hasText: 'Pause' }).click();
     await expect.poll(() => frame!.evaluate(() => (window as ReplayWindow).Replays?.battle?.paused)).toBe(true);
@@ -306,8 +275,7 @@ test.describe('PS Dashboard', () => {
 
   test('branch replay iframe does not shrink as history grows', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    // P1 plays Swords Dance — a max-damage Earthquake can crit-KO Kingambit
-    // on turn 1, which turns P2's controls into a forced-switch prompt.
+    // A max-damage Earthquake can crit-KO Kingambit on turn 1 and turn P2's controls into a forced-switch prompt.
     await startVariationAt(page, 1, { p1Move: 'Swords Dance' });
 
     const branchIframe = page.locator('iframe[title="Branch Simulation"]');
@@ -329,7 +297,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();
 
-    // the chips name the active bodies.
     await expect(dockChip(page, 'p1a')).toContainText('Garchomp');
     await expect(dockChip(page, 'p2a')).toContainText('P2');
 
@@ -373,7 +340,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
-    // Cancel keeps the variation; the second answer discards it.
     await discardVariation(page, { confirm: false });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 1');
     await discardVariation(page);
@@ -390,8 +356,6 @@ test.describe('the branch frame plays executed turns', () => {
   });
 
   test('the first turn of a new variation plays in from its start', async ({ page }) => {
-    // Scene: Iron Head into Recover opened a variation, and the frame showed the end of that turn at once, while every later turn played
-    // out. The branch frame mounts after the turn ran; it opens on the turn's start.
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await page.locator('.ps-branch-bar input[type="range"]').fill('2');
     await expect(page.getByText('T2/')).toBeVisible();

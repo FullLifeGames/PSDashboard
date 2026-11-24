@@ -1,17 +1,7 @@
-/**
- * Saved engine results for the browser specs that judge a view, not the engine. `scripts/capture-eval-store.mjs` runs
- * the analysis once per game and settings in the browser and writes the IndexedDB records (`StoredEval`, src/lib/eval-cache-store.ts) to
- * `test/e2e/fixtures/eval-store/`; a spec seeds them before the analysis (`eval-store-seed.ts`), so "Analyze game" reads the store.
- *
- * This module holds the parts that need no browser: the file form, the cache-version rewrite (a score-touching change needs no new capture)
- * and the two failure paths, each naming the capture command: a record that does not fit, and a page that starts
- * a search although the store was seeded. `test/regression/eval-store-fixtures.spec.ts` holds them.
- */
 
 export const EVAL_STORE_DIR = 'test/e2e/fixtures/eval-store';
 export const CAPTURE_COMMAND = 'node scripts/capture-eval-store.mjs';
 
-/** What a capture is keyed by: the replay and the settings the analysis ran with (the suffix of the store key). */
 export interface EvalStoreSettings {
   depth: number;
   samples: number;
@@ -19,11 +9,10 @@ export interface EvalStoreSettings {
   tera: string;
 }
 
-/** One capture: a replay and the settings, and either the whole game ("Analyze game") or the turns a spec analyzes one by one. */
 export interface EvalStoreCapture {
   replay: string;
   settings: EvalStoreSettings;
-  /** The turns the spec analyzes with "Analyze this position" (the store key of a single turn); absent: the game's sweep. */
+  /** The turns the spec analyzes with "Analyze this position" (a single turn's store key); absent: the game's sweep. */
   turns?: number[];
 }
 
@@ -31,11 +20,6 @@ const S_MCTS: EvalStoreSettings = { mode: 'mcts', depth: 1, samples: 1, tera: 'a
 const S_MATRIX: EvalStoreSettings = { mode: 'matrix', depth: 1, samples: 1, tera: 'auto' };
 const S_AUTO: EvalStoreSettings = { mode: 'auto', depth: 1, samples: 1, tera: 'auto' };
 
-/**
- * The captures: one file per replay, settings and turns. A spec names its file with `evalStoreFileName(replay, settings, turns)`. The
- * replay is the fixture of the same id under packages/eval-engine/test/fixtures/ or test/e2e-feedback/fixtures/. These specs read them:
- * the Game review rows except the Auto row, the single turns of lines-play and the sweeps of win-paths. Hard-mode stays live.
- */
 export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'gen9ou-2658662321', settings: S_MCTS },
   { replay: 'gen9vgc2026regi-2630452654', settings: S_AUTO },
@@ -51,7 +35,6 @@ export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'smogtours-gen9doublesou-912045', settings: S_MATRIX },
 ];
 
-/** The record the app stores: the fields the app reads are checked, the rest passes through untouched. */
 export interface EvalStoreRecord {
   key: string;
   result: unknown;
@@ -69,27 +52,23 @@ export interface EvalStoreFile {
   /** The cache version the records were captured under (`v80`); a seed rewrites it to the current one. */
   cacheVersion: string;
   settings: EvalStoreSettings;
-  /** The single turns the records hold; absent for a game's sweep. */
   turns?: number[];
   records: EvalStoreRecord[];
 }
 
-/** The file name of a capture: one file per game, settings and turns (`-t8_12` for the single turns 8 and 12; none for the sweep). */
 export const evalStoreFileName = (replay: string, settings: Pick<EvalStoreSettings, 'depth' | 'samples' | 'mode'>, turns?: readonly number[]): string =>
   `${replay}--${settings.mode}-d${settings.depth}s${settings.samples}${turns?.length ? `-t${turns.join('_')}` : ''}.json`;
 
 const fix = (what: string): Error => new Error(`${what}. Run \`${CAPTURE_COMMAND}\` to capture the saved engine results again, then commit test/e2e/fixtures/eval-store/.`);
 
-/** `v80` or `v80~tag`: the version and search-budget tag every store key starts with, up to the first bar. */
 const VERSION_PREFIX = /^v\d+(?:~[^|]*)?(?=\|)/;
 
-/** The saved key under the current cache version; `tag` is the app's own `vN` or `vN~budget` (`evalStorePrefix` up to its bar). */
+/** `tag` is the app's own `vN` or `vN~budget`. */
 export function rewriteCacheVersion(key: string, tag: string): string {
   if (!VERSION_PREFIX.test(key)) throw fix(`The saved key "${key.slice(0, 60)}" starts with no cache version`);
   return key.replace(VERSION_PREFIX, tag);
 }
 
-/** The fields of the stored record that the sweep and the turn view read. */
 function checkRecord(record: unknown, replay: string, index: number): EvalStoreRecord {
   const entry = record as Partial<EvalStoreRecord> | null;
   const bad = (why: string) => fix(`Saved record ${index} of ${replay} ${why}`);
@@ -103,7 +82,7 @@ function checkRecord(record: unknown, replay: string, index: number): EvalStoreR
   return entry as EvalStoreRecord;
 }
 
-/** The records of a file, ready for the store: keys under the current version, times fresh (the app prunes records older than 30 days). */
+/** Times fresh: the app prunes records older than 30 days. */
 export function seedRecords(file: EvalStoreFile, options: { tag: string; now: number }): EvalStoreRecord[] {
   if (file.format !== 1) throw fix(`The saved file of ${file.replay} has format ${String(file.format)}, this helper reads format 1`);
   if (!Array.isArray(file.records) || file.records.length === 0) throw fix(`The saved file of ${file.replay} holds no records`);
@@ -113,7 +92,6 @@ export function seedRecords(file: EvalStoreFile, options: { tag: string; now: nu
   });
 }
 
-/** Keys in a fixed order (the record's `key` first, then alphabetical), so a capture of the same engine writes the same bytes. */
 function sorted(value: unknown, top = false): unknown {
   if (Array.isArray(value)) return value.map(item => sorted(item));
   if (value && typeof value === 'object') {
@@ -124,7 +102,6 @@ function sorted(value: unknown, top = false): unknown {
   return value;
 }
 
-/** One record per line in key order, the save time zeroed: a diff shows the records that changed. */
 export function serializeEvalStoreFile(file: EvalStoreFile): string {
   const lines = [...file.records]
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
@@ -141,14 +118,9 @@ export function parseEvalStoreFile(text: string, name: string): EvalStoreFile {
   }
 }
 
-/** The worker requests that run a search or a prover; the listing of choices (`choices`) is no search. */
+/** The listing of choices (`choices`) is no search. */
 export const SEARCH_REQUESTS = ['search', 'mctstree', 'cells', 'subsearch', 'prove', 'lines', 'job'] as const;
 
-/**
- * Watches the worker requests of a seeded page. A search that starts although the store holds the result means the saved key no longer
- * matches (a changed team build, rules or record shape): the guard fails the wait it is racing, and `assertClean` fails the test at its end.
- * `pause` ends the watch for a part of the spec that may search by design.
- */
 export function createSearchGuard(fixture: string) {
   const seen: string[] = [];
   let paused = false;
@@ -165,7 +137,6 @@ export function createSearchGuard(fixture: string) {
     },
     pause(): void { paused = true; },
     resume(): void { paused = false; },
-    /** The wait, or the failure when a search starts first. */
     race<T>(wait: Promise<T>): Promise<T> {
       if (failure) {
         void wait.catch(() => {});
@@ -176,7 +147,6 @@ export function createSearchGuard(fixture: string) {
     assertClean(): void {
       if (failure) throw failure;
     },
-    /** Every worker request the page made, in order (a paused part included), for the probe's report. */
     requests: (): readonly string[] => seen,
   };
 }

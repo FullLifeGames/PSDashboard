@@ -3,12 +3,6 @@ import { readFileSync } from 'fs';
 import { emptySmogon, routeSmogon } from './smogon-routes';
 import { fixturePath, installReplayEmbedCache, pickForcedReplacement, pickMove, routeOfflineFixtures, waitForExactPickers } from './helpers';
 
-/**
- * The draft replay gen9draft-2058494320 viewed at turn 1, U-turn against
- * Chilly Reception, Execute from the viewed position. A branch's first turn plays through the dice module. While Execute waited
- * for the turn, the panel asked for the turn's dice on a copy of the paused battle, and the copy's refusal reached the live
- * error log: the variation was undone with "Can't move: You need a switch response" and no switch-in could be picked.
- */
 test.beforeAll(installReplayEmbedCache);
 
 test('U-turn against Chilly Reception from the viewed turn 1: both sides send their switch-in', async ({ page }) => {
@@ -24,7 +18,6 @@ test('U-turn against Chilly Reception from the viewed turn 1: both sides send th
   await expect(page.getByText('T1/')).toBeVisible();
   await waitForExactPickers(page);
 
-  // the picks go through the slots' trays; the dice wait in "Dice · What if".
   await pickMove(page, 'p1a', 'U-turn');
   await pickMove(page, 'p2a', 'Chilly Reception');
   await page.locator('.ps-execute-btn').click();

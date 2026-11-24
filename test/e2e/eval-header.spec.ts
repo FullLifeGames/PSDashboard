@@ -3,18 +3,10 @@ import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 import { dockChip, dockTray } from './helpers';
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
-/**
- * The Evaluation panel's header is one row at the desktop width of the right column (1280 px and wider):
- * "Evaluation", the engine controls, "Tera" and the checkbox "Always on" share one line, and the row "Game graph" with
- * "Analyze game" stays its own row below. Depth and Samples are rows of the Setup menu, so a stored matrix depth adds nothing
- * to the header. At 390 px the header may wrap. The spec reads the boxes of the header's children; the
- * screenshots at 1280 and 390 px go to SHOTS_DIR when it is set.
- */
 test.beforeAll(installReplayEmbedCache);
 
 test.beforeEach(async ({ page }) => {
   await lightEngine(page);
-  // Depth Auto, as the user's setup reads (lightEngine stores the matrix mode); the stored-depth rows override it.
   await page.addInitScript(() => {
     localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, mode: 'auto', auto: false, tera: 'auto' }));
   });
@@ -38,7 +30,6 @@ async function headerBoxes(page: Page): Promise<{ boxes: Box[]; panel: { left: n
   });
 }
 
-/** One line: every child's vertical span holds the middle of the first child ("Evaluation"), and none leaves the panel. */
 function expectOneLine(boxes: Box[], panel: { right: number }): void {
   const middle = (boxes[0].top + boxes[0].bottom) / 2;
   for (const box of boxes) {
@@ -62,17 +53,13 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1707, height: 900
     expect(names.some(text => text.startsWith('Always on')), `header children ${names.join(' | ')}`).toBe(true);
     expectOneLine(boxes, panel);
     expect(names.some(text => text.startsWith('Depth') || text.startsWith('Samples')), `no Depth or Samples in the header: ${names.join(' | ')}`).toBe(false);
-    // the Analyze game row stays below the header
     expect(graphTop).toBeGreaterThan(Math.max(...boxes.map(box => box.bottom)));
     if (SHOTS) await page.locator('.ps-eval-panel').screenshot({ path: `${SHOTS}/eval-header-${viewport.width}-panel.png` });
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/eval-header-${viewport.width}.png` });
   });
 }
 
-/**
- * The test machine has no Verdana and falls back to a narrower face (Liberation Sans); Verdana runs about 12 % wider. The header must hold
- * its one row with the header's type enlarged by that much, or it wraps again on the machines that have Verdana.
- */
+// The test machine has no Verdana and falls back to a face that is about 12 % narrower: enlarge the type by that much.
 test('the header is still one row at 1280 px with Verdana-wide type (12 % larger)', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -160,7 +147,6 @@ test.describe('with a stored matrix depth', () => {
       if (SHOTS) await page.locator('.ps-eval-panel').screenshot({ path: `${SHOTS}/eval-header-${width}-variation-panel.png` });
       if (width === 1280) expectOneLine(boxes, panel);
       if (width === 1280) {
-        // Measured, not pinned: with Verdana-wide type (12 % larger) the variation row has less slack than the main line's.
         await page.addStyleTag({ content: '.ps-eval-controls label, .ps-eval-controls button, .ps-eval-controls select { font-size: 11.2px !important } .ps-eval-controls-title { font-size: 14.6px !important }' });
         const wide = await headerBoxes(page);
         console.log(`VARIATION-WIDE ${JSON.stringify(wide.boxes.map(box => [box.text, Math.round(box.left), Math.round(box.right), Math.round(box.top)]))} panel right ${wide.panel.right}`);

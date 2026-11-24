@@ -1,11 +1,7 @@
 import type { ClaimResult } from './claims';
 import type { AlignmentSummary } from '../../packages/eval-engine/src/hax-alignment';
 
-/**
- * Renders the drift run. The JSON's `results` array is STABLE — no wall
- * times, dates, or commit hashes inside — so two runs on identical code
- * diff empty there; volatile context lives in `meta` only.
- */
+/** `results` holds no wall times, dates or commit hashes, so two runs on identical code diff empty. */
 
 export interface DriftMeta {
   commit: string;
@@ -13,13 +9,10 @@ export interface DriftMeta {
   settingsLine: string;
   wallTimes: Record<string, number>;
   noticeByReplay: Record<string, string | null>;
-  /** Per-replay eval-layer failures (turn + reason) — the self-explaining gap trail. */
   evalErrorsByReplay: Record<string, { turn: number; error: string }[]>;
   /** Per-replay hax-alignment summary (null = sweep never ran / old build). */
   alignmentByReplay: Record<string, AlignmentSummary | null>;
-  /** Per-replay count of analytic-vs-sampled KO-odds mismatches (probe budget exhausted). */
   koMismatchByReplay?: Record<string, number>;
-  /** Speed-layer gate runs (FEEDBACK_SIM_FAST set): the perf trace per replay (pass times, speed-layer counters). */
   perfByReplay?: Record<string, unknown>;
 }
 

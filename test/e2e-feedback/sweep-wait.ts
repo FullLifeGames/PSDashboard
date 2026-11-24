@@ -1,19 +1,9 @@
 import type { Page } from '@playwright/test';
 
-/**
- * The wait for the analysis sweep of the feedback harness (`feedback-drift.spec.ts`), in a module of its own so
- * that a plain spec can import it (`test/regression/feedback-sweep-wait.spec.ts`).
- *
- * Every `page.evaluate` of the harness races a timeout: a renderer that ran out of memory (the 573756 test) closed all workers and
- * stopped the page's own timer, `page.evaluate` never returned and Playwright raised no `crash` event, so neither the stall check
- * nor the cap below was reached and the run held the machine for the whole 40 minute test timeout. Three timed-out polls in a row
- * end the wait.
- */
+// A renderer out of memory raises no `crash` event and `page.evaluate` never returns: every evaluate races a timeout.
 
 export interface SweepWaitOptions {
-  /** Pause between two polls. */
   pollMs?: number;
-  /** How long one evaluate may take before it counts as a timeout: three poll intervals. */
   evalTimeoutMs?: number;
 }
 
@@ -28,13 +18,9 @@ interface SweepPoll {
 const POLL_MS = 10_000;
 const STALL_MS = 360_000;
 const CAP_MS = 2_100_000;
-/** Timed-out evaluates in a row that declare the page dead. */
 const DEAD_AFTER = 3;
 
-/**
- * The reason of a dead page. Fixed text with no figures: the report prints it, and a determinism diff stays clean
- * when two runs lose the page at different moments.
- */
+/** The reason of a dead page: text with no figures, so a determinism diff stays clean across runs. */
 export const RENDERER_DEAD_REASON = 'renderer unresponsive: three evaluate calls in a row timed out';
 
 class EvaluateTimeout extends Error {
@@ -44,11 +30,10 @@ class EvaluateTimeout extends Error {
   }
 }
 
-/** `page.evaluate` raced against a timeout; a page error passes through unchanged. */
 function raceEvaluate<R>(page: Page, fn: () => R | Promise<R>, timeoutMs: number): Promise<R> {
   return new Promise<R>((resolve, reject) => {
     const timer = setTimeout(() => reject(new EvaluateTimeout()), timeoutMs);
-    // A dead page leaves the evaluate pending for good; the late settle of a live one must not become an unhandled rejection.
+    // A dead page leaves the evaluate pending for good; a live one's late settle must not be an unhandled rejection.
     page.evaluate(fn).then(
       value => { clearTimeout(timer); resolve(value as R); },
       (error: unknown) => { clearTimeout(timer); reject(error); },
@@ -56,25 +41,16 @@ function raceEvaluate<R>(page: Page, fn: () => R | Promise<R>, timeoutMs: number
   });
 }
 
-/**
- * The evaluate of the harness for a single read (the perf counter, the debug extract, the dump): one timeout of
- * three poll intervals; a dead page throws an error with the stable reason, which the test turns into ERROR rows.
- */
 export function guardedEvaluate<R>(page: Page, fn: () => R | Promise<R>, options: SweepWaitOptions = {}): Promise<R> {
   const pollMs = options.pollMs ?? POLL_MS;
   return raceEvaluate(page, fn, options.evalTimeoutMs ?? pollMs * DEAD_AFTER);
 }
 
-/** True for the error `guardedEvaluate` throws when the page stops answering. */
 export function isRendererDead(error: unknown): boolean {
   return error instanceof EvaluateTimeout;
 }
 
-/**
- * What one poll says. The sweep's end is not the report's end. The early-lines stage starts the moment the sweep
- * ends and writes lines into the graph turn by turn; a dump taken while it runs holds however many turns it had reached, so two
- * runs differed. The end is the stage's end (it names itself inactive when every turn holds lines, one failed or Stop).
- */
+// The sweep's end is not the report's end: the early-lines stage keeps writing lines, so the end is the stage's end.
 function judgePoll(state: SweepPoll, now: { settled: boolean; stalled: boolean }): { ok: true } | { ok: false; reason: string } | null {
   const stageActive = state.stage?.active === true;
   if (!state.running && !stageActive && now.settled) return { ok: true };
@@ -86,16 +62,7 @@ function judgePoll(state: SweepPoll, now: { settled: boolean; stalled: boolean }
   return null;
 }
 
-/**
- * Waits for the sweep to TERMINATE (running false), with a stall detector:
- * the 653785 baseline wedged mid-sweep at "10/26" and burned the full
- * 35-minute wait — running stayed true with frozen progress (the registered
- * return102 family taking down the whole sweep, not just branching). Six
- * minutes without a progress tick is declared a wedge; the slowest healthy
- * per-turn step in the baseline was far under one minute. The stable reason
- * string (no elapsed seconds) feeds the report so determinism diffs stay
- * clean. A page whose evaluate times out three polls in a row is dead: the same stable reason rule holds.
- */
+// A wedged sweep stays `running` with frozen progress, so the wait watches progress ticks as well.
 export async function waitForSweepEnd(
   page: Page,
   options: SweepWaitOptions = {},

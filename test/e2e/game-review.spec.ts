@@ -8,30 +8,21 @@ import { openReplayAnalysis } from './eval-store-seed';
 import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
-/**
- * The Game review under the game report. One test per game type: the sweep analyzes the whole game, the
- * report view lists the turns the cards grade per player, the graph carries one mark per listed row (a circle for player 1, a square
- * for player 2), a click on a listed turn opens it, and ▶ Play on a row's line opens a variation that plays the line from that turn.
- * Singles, VGC (Scarlet/Violet) and Champions VGC (short games: the sweep is the cost).
- */
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
 
 test.beforeAll(installReplayEmbedCache);
-// A red row fails in minutes, not after the test's whole budget: no single click or assertion waits longer than this.
 test.use({ actionTimeout: 60_000 });
 
-// These rows judge the view, so they read saved engine results (`EVAL_STORE=live` runs them live; the
-// capture is scripts/capture-eval-store.mjs). The Auto row below keeps its live search: it judges the pipeline that searches after the report.
-/** Singles runs the matrix on its early turns in auto, and a matrix turn holds no line: that row sweeps with the tree on every turn. */
+// These rows read saved engine results (`EVAL_STORE=live` runs them live); the Auto row keeps its live search.
+// Singles in auto runs the matrix on its early turns, which holds no line: that row sweeps with the tree on every turn.
 const GAMES = [
   { kind: 'singles (Scarlet/Violet OU)', id: 'gen9ou-2658662321', mode: 'mcts' },
   { kind: 'VGC (Scarlet/Violet)', id: 'gen9vgc2026regi-2630452654', mode: 'auto' },
   { kind: 'Champions VGC', id: 'gen9championsvgc2026regma-2625939941', mode: 'auto' },
 ].map(game => ({ ...game, seed: evalStoreFileName(game.id, { mode: game.mode, depth: 1, samples: 1 }) }));
 
-/** The rows of the review: the turn, the side's list and whether a line has its play button. */
 async function readRows(review: Locator) {
   return review.locator('.ps-eval-review-row').evaluateAll(rows => rows.map(row => ({
     turn: Number((row.querySelector('button')?.textContent ?? '').replace(/^T/, '')),
@@ -40,7 +31,6 @@ async function readRows(review: Locator) {
   })));
 }
 
-/** A die's words without its chance or its knock-out count: what the history's mark says. */
 const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
@@ -61,12 +51,10 @@ for (const game of GAMES) {
 
     const rows = await readRows(review);
     expect(rows.length, 'the game holds a graded turn').toBeGreaterThanOrEqual(1);
-    // the marks equal the list: a circle per row of player 1, a square per row of player 2
     const p1Rows = rows.filter(row => row.side === replay.players[0]).length;
     await expect(panel.locator('.ps-eval-graph circle[data-review-mark="p1"]')).toHaveCount(p1Rows);
     await expect(panel.locator('.ps-eval-graph rect[data-review-mark="p2"]')).toHaveCount(rows.length - p1Rows);
 
-    // a click on a listed turn opens it; the marks stay on the graph
     const first = rows[0];
     await review.locator('.ps-eval-review-row').first().getByRole('button', { name: `T${first.turn}` }).click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${first.turn}`, { timeout: 30_000 });
@@ -76,7 +64,6 @@ for (const game of GAMES) {
     guard.assertClean();
     console.log(`${game.id}: worker requests up to the report and a turn: ${guard.requests().join(', ') || 'none'}`);
 
-    // ▶ Play on a row with a line: the variation plays the line from the graded turn with the dice the tooltip lists
     const withLine = review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') });
     const playable = await withLine.count();
     const summary = `${rows.length} graded rows (${rows.map(entry => `T${entry.turn}`).join(', ')}), ${playable} with a line`;
@@ -87,7 +74,6 @@ for (const game of GAMES) {
     const turn = Number(((await row.getByRole('button').first().textContent()) ?? '').replace(/^T/, ''));
     const play = row.getByRole('button', { name: '▶ Play' }).first();
     guard.pause(); // the variation a line opens is a new position: its own evaluation may search
-    // the button stands inline in the row's 10 px text, not as a full-size button
     expect((await play.boundingBox())!.height, 'the play button is inline').toBeLessThan(26);
     const tooltip = (await play.getAttribute('title')) ?? '';
     lap('▶ Play clicked');
@@ -103,9 +89,6 @@ for (const game of GAMES) {
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
     await expect(page.getByRole('button', { name: /Let it play out/ })).toBeEnabled();
 
-    // a second ▶ Play over the open variation asks first, under the line that was clicked and on screen.
-    // While the variation is on screen the panel shows its evaluation, never the report: its button goes back to the main line (as
-    // "Main line" of the Line selector does) and lands on the Game review the line was played from.
     await panel.getByRole('button', { name: 'Back to the main line' }).click();
     await expect(review).toBeVisible();
     await expect(panel.getByRole('button', { name: /← Game report/ })).toHaveCount(0);
@@ -113,7 +96,6 @@ for (const game of GAMES) {
     const question = review.getByRole('alertdialog');
     await expect(question).toContainText('replace the existing variation');
     await expect(question).toBeInViewport();
-    // both buttons keep their words whole on one line, at the same height (they broke into letters in the right column)
     const replaceBox = (await question.getByRole('button', { name: 'Replace' }).boundingBox())!;
     const cancelBox = (await question.getByRole('button', { name: 'Cancel' }).boundingBox())!;
     expect(replaceBox.height, 'Replace on one line').toBeLessThan(40);
@@ -124,11 +106,6 @@ for (const game of GAMES) {
   });
 }
 
-/**
- * Singles in Auto run the matrix on the early turns, which keeps no lines. After
- * the report the app searches every graded matrix turn with the trees and keeps only the lines: the review's header shows the stage,
- * every graded early row then holds its lines in the stored result, and ▶ Play on one opens a variation that starts at its turn.
- */
 test('singles in Auto: the graded early turns get their lines after the report, ▶ Play opens one', async ({ page }) => {
   test.setTimeout(1_500_000);
   const replay = fixture('gen9ou-2658662321');

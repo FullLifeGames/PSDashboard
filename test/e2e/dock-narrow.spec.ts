@@ -10,7 +10,6 @@ test.beforeEach(async ({ page }) => {
 
 for (const width of [1000, 390]) {
   test(`a narrow window (${width} px): the dock stands fixed at the lower edge, the page pads by its height, the tray is a sheet above it`, async ({ page }) => {
-    // at 1050 px and below the layout stacks and the dock leaves the column's flow.
     test.setTimeout(120_000);
     await page.setViewportSize({ width, height: 800 });
     await page.reload();
@@ -26,7 +25,6 @@ for (const width of [1000, 390]) {
     expect(Math.abs(box.width - width)).toBeLessThanOrEqual(1);
     expect(Math.abs(box.y + box.height - 800)).toBeLessThanOrEqual(1);
 
-    // --ps-dock-h follows the dock's box, and the page pads by it.
     const written = await page.evaluate(() => parseFloat(document.documentElement.style.getPropertyValue('--ps-dock-h')));
     expect(Math.abs(written - box.height)).toBeLessThanOrEqual(1);
     const padding = await page.locator('.ps-app-root').evaluate(element => parseFloat(getComputedStyle(element).paddingBottom));
@@ -35,8 +33,6 @@ for (const width of [1000, 390]) {
     const rightBox = (await page.locator('.ps-main-right').boundingBox())!;
     expect(rightBox.y + rightBox.height).toBeLessThanOrEqual(box.y + 1);
 
-    // Above 640 px two chips a row; at 640 px and below one chip a row: four rows in doubles, each 46 px.
-    // Execute takes its own row under the chips, the app's 40 px minimum at 640 px.
     const first = (await dockChip(page, 'p1a').boundingBox())!;
     const partner = (await dockChip(page, 'p1b').boundingBox())!;
     const last = (await dockChip(page, 'p2b').boundingBox())!;
@@ -54,7 +50,6 @@ for (const width of [1000, 390]) {
     }
     expect(execute.y).toBeGreaterThanOrEqual(last.y + last.height);
 
-    // The tray opens above the dock, across the width, up to 70 % of the viewport.
     const tray = await openTray(page, 'p1a');
     const trayBox = (await tray.boundingBox())!;
     expect(trayBox.y + trayBox.height).toBeLessThanOrEqual(box.y + 1);

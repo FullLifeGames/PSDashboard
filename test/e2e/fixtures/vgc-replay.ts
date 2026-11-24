@@ -1,6 +1,5 @@
 import type { ReplayData } from '@fulllifegames/replay-core';
 
-/** A bring-four format: 6 at preview, 4 in the game (leads + 2 switched in). */
 export const vgcReplay: ReplayData = {
   id: 'gen9vgc-test',
   format: '[Gen 9] VGC 2026 Regulation I',

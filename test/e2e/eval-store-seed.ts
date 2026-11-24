@@ -8,23 +8,15 @@ import {
 } from './eval-store';
 import { routeOfflineFixtures } from './helpers';
 
-/**
- * The browser half of the saved engine results (the file form and the two failure paths are in `eval-store.ts`).
- * A spec that judges a view calls `openReplayAnalysis(page, replay, { seed })`: the records go into the app's own store before the
- * reload, so "Analyze game" reads them, and the returned guard fails the spec, naming the capture command, when the page starts a search.
- * `EVAL_STORE=live` runs the same rows without the seed (a check that the saved results still equal a live run).
- */
 const here = dirname(fileURLToPath(import.meta.url));
 const STORE_MODULE = '/src/lib/eval-cache-store.ts';
 
 export const evalStoreLive = (): boolean => process.env.EVAL_STORE === 'live';
 
-/** A file of the saved results by name (as `evalStoreFileName` writes it). */
 export function readEvalStoreFile(name: string): EvalStoreFile {
   return parseEvalStoreFile(readFileSync(join(here, 'fixtures', 'eval-store', name), 'utf-8'), `${EVAL_STORE_DIR}/${name}`);
 }
 
-/** The app's current version tag (`v80`, with the budget tag when one is set), read from the app's own module. */
 export async function currentTag(page: Page): Promise<string> {
   return page.evaluate(async path => {
     const store = await import(/* @vite-ignore */ path);
@@ -32,7 +24,6 @@ export async function currentTag(page: Page): Promise<string> {
   }, STORE_MODULE);
 }
 
-/** Tells the guard about every worker request the page posts (init script on every load, bridge to the test). */
 async function watchWorkerRequests(page: Page, guard: SearchGuard): Promise<void> {
   await page.exposeFunction('__e2eWorkerRequest', (type: string) => guard.note(type));
   await page.addInitScript(() => {
@@ -47,7 +38,7 @@ async function watchWorkerRequests(page: Page, guard: SearchGuard): Promise<void
   });
 }
 
-/** Writes the saved records into the app's store, under the app's current cache version. Call on a loaded page, before the reload. */
+/** Call on a loaded page, before the reload. */
 export async function seedEvalStore(page: Page, name: string): Promise<void> {
   const file = readEvalStoreFile(name);
   const records = seedRecords(file, { tag: await currentTag(page), now: Date.now() });
@@ -57,7 +48,6 @@ export async function seedEvalStore(page: Page, name: string): Promise<void> {
   }, { path: STORE_MODULE, saved: records });
 }
 
-/** Every record the app holds for a replay under the current version (what the capture writes). */
 export async function readEvalStore(page: Page, replayId: string): Promise<EvalStoreRecord[]> {
   const records = await page.evaluate(async ({ path, id }) => {
     const store = await import(/* @vite-ignore */ path);
@@ -80,10 +70,6 @@ export interface OpenedReplay {
   seeded: boolean;
 }
 
-/**
- * The route every analysis spec takes: offline fixtures, the Evaluation preferences, the saved results when `seed` names a file (and the
- * run is not `EVAL_STORE=live`), the reload, the replay served by id, "Load". The page is on the replay when this returns.
- */
 export async function openReplayAnalysis(
   page: Page, replay: ReplayData, settings: AnalysisSettings, options: { seed?: string } = {},
 ): Promise<OpenedReplay> {

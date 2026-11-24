@@ -1,7 +1,6 @@
 import type { BranchSharePayload } from '../../../src/lib/branch-share';
 import { fixtureReplay } from '../helpers';
 
-/** A turn-2 branch of the singles fixture, as a share link carries it. */
 export const sharedBranchPayload: BranchSharePayload = {
   version: 1,
   replayId: fixtureReplay.id,

@@ -4,14 +4,7 @@ import {
 } from './helpers';
 import { lightEngine, loadDockReplay } from './dock-helpers';
 
-/**
- * The workspace's replay frames hide the two choosers that do nothing in the app (Color scheme, Music). Play, Last turn, Next turn,
- * Go to turn..., Reset, Speed and Switch sides stay and work, and the dock's top row belongs to the side the frame shows near: at load
- * (P1, P2 with ?p2), after Switch sides and after a rebuild of the frame. Singles and doubles. State is read from the frame's own battle
- * (`Replays.battle`), never from a click count.
- */
 const DOUBLES = 'gen9doublesou-2693620934';
-/** The turn each fixture is loaded at: singles at turn 2 (the fixture has four), doubles at turn 5. */
 const SINGLES_TURN = 2;
 const DOUBLES_TURN = 5;
 
@@ -22,7 +15,6 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
-/** The document of the frame on show (the main frame, or the branch frame once a variation has a turn of its own). */
 async function frameOf(page: Page, title: 'PS Replay' | 'Branch Simulation' = 'PS Replay'): Promise<Frame> {
   const handle = await page.locator(`iframe[title="${title}"]`).elementHandle({ timeout: 30_000 });
   const frame = await handle!.contentFrame();
@@ -30,7 +22,6 @@ async function frameOf(page: Page, title: 'PS Replay' | 'Branch Simulation' = 'P
   return frame!;
 }
 
-/** The `data-action` (or `value`) of every visible button of one control row, in order. */
 const visibleActions = (frame: Frame, row: string) => frame.evaluate(selector => [...document.querySelectorAll(`${selector} button`)]
   .filter(button => getComputedStyle(button).display !== 'none' && button.getBoundingClientRect().width > 0)
   .map(button => button.getAttribute('data-action') ?? button.getAttribute('value')), row);
@@ -38,14 +29,9 @@ const visibleActions = (frame: Frame, row: string) => frame.evaluate(selector =>
 const nearSide = (frame: Frame) => frame.evaluate(() => (window as ReplayWindow).Replays?.battle?.nearSide?.sideid ?? null);
 const switchSides = (frame: Frame) => frame.locator('.replay-controls button[data-action="switchViewpoint"]').click();
 
-/** The sides of the dock's first row: `data-chip` is the side and the slot index (p10 is P1's first slot, p20 P2's). */
 const firstRowSides = (page: Page) => page.locator('.ps-dock-row').first().locator('.ps-dock-chip')
   .evaluateAll(chips => chips.map(chip => (chip.getAttribute('data-chip') ?? '').slice(0, 2)));
 
-/**
- * The sides of the dock's first row with `near` on top: singles hold both chips in one row (the near side's first), doubles and VGC
- * hold the near side's two chips.
- */
 const nearRow = (near: 'p1' | 'p2', slots: number) => {
   if (slots > 1) return [near, near];
   return near === 'p1' ? ['p1', 'p2'] : ['p2', 'p1'];
@@ -57,14 +43,13 @@ async function loadSingles(page: Page) {
 }
 
 async function expectFrameControls(frame: Frame) {
-  // One button plays and pauses (the live branch frame plays at once, so it reads pause): both stand for the first control.
+  // the live branch frame plays at once, so its button reads pause
   const row1 = async () => (await visibleActions(frame, '.replay-controls')).map(action => (action === 'pause' ? 'play' : action));
   await expect.poll(row1).toEqual(['play', 'reset', 'rewind', 'ff', 'ffto', 'switchViewpoint']);
   await expect(frame.locator('.replay-controls-2 .speedchooser')).toBeVisible();
   await expect(frame.locator('.replay-controls-2 .colorchooser')).toBeHidden();
   await expect(frame.locator('.replay-controls-2 .soundchooser')).toBeHidden();
   expect(await visibleActions(frame, '.replay-controls-2 .speedchooser')).toEqual(['hyperfast', 'fast', 'normal', 'slow', 'reallyslow']);
-  // Music stays off with its chooser gone: the embed's own flag and the stubbed BattleSound both read muted.
   await expect.poll(() => frame.evaluate(() => (window as ReplayWindow).Replays?.muted === true && (window as ReplayWindow).BattleSound?.muted === true)).toBe(true);
 }
 
@@ -105,7 +90,6 @@ test.describe('the frame keeps Play, the turn buttons, Reset, Speed and Switch s
     await frame.locator('.replay-controls button[data-action="pause"]').click();
     await expect.poll(async () => (await battle()).paused).toBe(true);
 
-    // Next turn and Last turn move the frame one turn, and the timeline follows the frame's report
     const paused = (await battle()).turn;
     await frame.locator('.replay-controls button[data-action="rewind"]').click();
     await expect.poll(async () => (await battle()).turn).toBe(paused - 1);
@@ -123,10 +107,6 @@ test.describe('the frame keeps Play, the turn buttons, Reset, Speed and Switch s
   });
 });
 
-/**
- * Switch sides, then rebuild the frame: a variation with a turn of its own mounts the branch frame (a new document), which starts
- * from P1 and tells so; Switch sides there gives P2; back on the main line the main frame mounts anew and reads P1 again.
- */
 async function expectRebuildStartsFromP1(page: Page, mainFrame: Frame, turn: number, slots: number) {
   const home = nearRow('p1', slots);
   const away = nearRow('p2', slots);
@@ -139,7 +119,6 @@ async function expectRebuildStartsFromP1(page: Page, mainFrame: Frame, turn: num
   await switchSides(branch);
   await expect.poll(() => nearSide(branch)).toBe('p2');
   await expect.poll(() => firstRowSides(page)).toEqual(away);
-  // The variation starts at `turn`: one turn before it is the main line, and the main frame mounts anew.
   await moveTimeline(page, turn - 1);
   await expect(page.locator('iframe[title="PS Replay"]')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => firstRowSides(page)).toEqual(home);

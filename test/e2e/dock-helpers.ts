@@ -2,9 +2,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { dockChip, dockTray, expectReplaySettled, waitForExactPickers, type DockSlotKey } from './helpers';
 
-/** What the dock's task specs share: the click counter, the layout rules, the chip boxes, the engine gate and the reader of a logged turn. */
 
-/** Counts the clicks of a task. Loading the fixture, waiting for the exact pickers and reading do not count; typing into a field does not either. */
+/** Loading the fixture, waiting for the pickers and reading do not count as clicks, nor does typing into a field. */
 export class Clicks {
   count = 0;
 
@@ -14,10 +13,8 @@ export class Clicks {
   }
 }
 
-/** The viewport the tasks are counted at (1366 x 768). */
 export const TASK_VIEWPORT = { width: 1366, height: 768 };
 
-/** Loads a dock fixture by its id and waits for the exact pickers at `turn`. */
 export async function loadDockReplay(page: Page, id: string, turn: number): Promise<void> {
   await page.locator('input[type="text"]').fill(id);
   await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
@@ -27,11 +24,6 @@ export async function loadDockReplay(page: Page, id: string, turn: number): Prom
 
 const replayFrame = (page: Page): Locator => page.locator('.ps-iframe-wrap iframe').first();
 
-/**
- * The layout rules that hold at every moment of a task at 1366 x 768: the left column never scrolls, the replay frame keeps its
- * 456 px, an open tray stays at 256 px with the dice closed (at 560 px with "Dice · What if" open), and a closed tray leaves the
- * frame in the viewport with the frame, not the dock, under its centre.
- */
 export async function expectDockLayout(page: Page): Promise<void> {
   expect(await page.locator('.ps-main-left').evaluate(element => element.scrollTop), 'scrollTop of .ps-main-left').toBe(0);
   const box = (await replayFrame(page).boundingBox())!;
@@ -51,14 +43,12 @@ export async function expectDockLayout(page: Page): Promise<void> {
 
 export interface Box { x: number; y: number; width: number; height: number }
 
-/** The boxes of the dock's chips, by slot. */
 export async function chipBoxes(page: Page, slots: DockSlotKey[]): Promise<Record<string, Box>> {
   const boxes: Record<string, Box> = {};
   for (const slot of slots) boxes[slot] = (await dockChip(page, slot).boundingBox())!;
   return boxes;
 }
 
-/** No chip moved or changed its size (half a pixel of rounding is allowed). */
 export function expectSameBoxes(actual: Record<string, Box>, expected: Record<string, Box>, when: string): void {
   for (const [slot, box] of Object.entries(expected)) {
     for (const key of ['x', 'y', 'width', 'height'] as const) {
@@ -67,17 +57,12 @@ export function expectSameBoxes(actual: Record<string, Box>, expected: Record<st
   }
 }
 
-/** The slots a game type has. */
 export const DOUBLES_SLOTS: DockSlotKey[] = ['p1a', 'p1b', 'p2a', 'p2b'];
 
 export interface EvalGate { hold(): void; release(): void; held(): number }
 type GateWindow = Window & { __evalGate?: EvalGate };
 
-/**
- * Wraps the evaluation pool's workers (the pool and the replay-jobs worker run one script, `eval-worker`; the replay-jobs worker
- * is left alone) so that a spec can hold their messages: while the gate holds, `postMessage` queues, and `release` sends the
- * queue in order. No production code is involved; Playwright's init script runs before the page's own. Call it before `page.goto`.
- */
+/** The replay-jobs worker runs the same script and stays free. Call it before `page.goto`. */
 export async function installEvalGate(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const gated = new WeakSet<object>();
@@ -88,8 +73,6 @@ export async function installEvalGate(page: Page): Promise<void> {
     window.Worker = new Proxy(NativeWorker, {
       construct(target, args: ConstructorParameters<typeof Worker>) {
         const worker = Reflect.construct(target, args) as Worker;
-        // The replay-jobs worker (reconstruction, spread solving) runs the same script; its jobs stay free, so a held evaluation
-        // still gets its position and Execute still rebuilds. Only the pool of `lib/eval/worker-client` is gated.
         if (String(args[0]).includes('eval-worker') && !String(new Error().stack).includes('replay-jobs')) gated.add(worker);
         return worker;
       },
@@ -114,7 +97,6 @@ export const holdEval = (page: Page) => page.evaluate(() => (window as GateWindo
 export const releaseEval = (page: Page) => page.evaluate(() => (window as GateWindow).__evalGate?.release());
 export const heldEvalMessages = (page: Page): Promise<number> => page.evaluate(() => (window as GateWindow).__evalGate?.held() ?? -1);
 
-/** Light evaluation settings, as `eval.spec` sets them: a 2-worker pool, depth 1, one sample, no auto. Call it before `page.goto`. */
 export async function lightEngine(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
@@ -122,13 +104,11 @@ export async function lightEngine(page: Page): Promise<void> {
   });
 }
 
-/** What the log shows one slot doing in a turn. */
 export interface LoggedAction {
   slot: DockSlotKey;
   kind: 'move' | 'switch';
-  /** The move, or the species the slot switched to. */
   name: string;
-  /** The slot a single-target move names, when it is another slot's; null for a self-target, a spread move or no target. */
+  /** The slot a single-target move names when it is another slot's; null for a self-target, spread or no target. */
   target: DockSlotKey | null;
   tera: boolean;
   mega: boolean;
@@ -140,7 +120,7 @@ const asSlot = (ref: string | undefined): DockSlotKey | null => {
   return match ? `${match[1]}${match[2]}` as DockSlotKey : null;
 };
 
-/** The actions of the active slots in one turn of a log (the lines after `|turn|N`), read apart from the app: a slot that only flinched, was blocked or fainted before it moved has none. */
+/** A slot that only flinched, was blocked or fainted before it moved has no action. */
 export function loggedTurn(replay: ReplayData, turn: number): LoggedAction[] {
   const lines = replay.log.split('\n');
   const start = lines.findIndex(line => line === `|turn|${turn}`);
@@ -159,7 +139,6 @@ export function loggedTurn(replay: ReplayData, turn: number): LoggedAction[] {
     else if (actions.has(slot) || fainted.has(slot)) continue;
     else if (parts[1] === 'move' && !line.includes('[from]')) {
       const target = asSlot(parts[4]);
-      // A singles move names no target on its chip; a spread move takes none; a move on its own slot is a self-target.
       const single = doubles && target !== null && target !== slot && !line.includes('[spread]');
       actions.set(slot, { slot, kind: 'move', name: parts[3], target: single ? target : null, tera: gimmick.get(slot) === 'tera', mega: gimmick.get(slot) === 'mega' });
     } else if (parts[1] === 'switch' && !line.includes('[from]')) {
@@ -169,12 +148,10 @@ export function loggedTurn(replay: ReplayData, turn: number): LoggedAction[] {
   return [...actions.values()];
 }
 
-/** The slots that were active at the start of the turn and acted: every one of them, or the turn does not belong to the seeded-Execute checks. */
 export function expectEverySlotActed(actions: LoggedAction[], slots: DockSlotKey[], where: string): void {
   expect(actions.map(action => action.slot).sort(), `${where}: slots with a logged action`).toEqual([...slots].sort());
 }
 
-/** The chips of the dock read the logged turn: the move or the body, the target label of a single-target move, and the gimmick. Each slot is marked as the played choice. */
 export async function expectChipsShowLoggedTurn(page: Page, actions: LoggedAction[]): Promise<void> {
   for (const action of actions) {
     const chip = dockChip(page, action.slot);
@@ -186,7 +163,6 @@ export async function expectChipsShowLoggedTurn(page: Page, actions: LoggedActio
   }
 }
 
-/** The log lines the branch frame shows, once the frame has played everything it holds. */
 export async function branchFrameEntries(page: Page): Promise<() => Promise<string[]>> {
   const frame = await (await page.locator('iframe[title="Branch Simulation"]').elementHandle({ timeout: 30_000 }))?.contentFrame();
   expect(frame).toBeTruthy();
@@ -194,13 +170,9 @@ export async function branchFrameEntries(page: Page): Promise<() => Promise<stri
   return () => frame!.evaluate(() => [...document.querySelectorAll('.battle-log .battle-history')].map(entry => entry.textContent ?? ''));
 }
 
-/** The history panel of a variation. */
 export const variationPanel = (page: Page): Locator => page.locator('.ps-panel', { hasText: 'Variation moves' });
 
-/**
- * The history panel stands closed under its toggle in every variation. A spec that reads or clicks the history cells (the cells, the tip
- * button, the hint) opens it first; the text of a closed panel stays in the DOM, so `toContainText` needs no opening.
- */
+/** The text of a closed panel stays in the DOM, so `toContainText` needs no opening. */
 export async function openVariationHistory(page: Page): Promise<void> {
   const toggle = variationPanel(page).getByRole('button', { name: /Variation moves/ });
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
@@ -209,11 +181,6 @@ export async function openVariationHistory(page: Page): Promise<void> {
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/**
- * After Execute without a change, the history row names what the log shows (moves, bodies switched to, "(Tera)" and
- * "(Mega)"), and the branch frame played the moves: each move shows at least as often as the log shows it up to the end of the
- * turn (the frame's log starts with the same turns).
- */
 export async function expectExecutedLoggedTurn(page: Page, replay: ReplayData, turn: number, actions: LoggedAction[]): Promise<void> {
   await expect(variationPanel(page)).toContainText(`Turn ${turn}`, { timeout: 90_000 });
   for (const action of actions) {
@@ -240,10 +207,7 @@ export async function expectExecutedLoggedTurn(page: Page, replay: ReplayData, t
 
 const resizeLoops = new WeakMap<Page, string[]>();
 
-/**
- * A spec that calls this fails when its page raises "ResizeObserver loop completed with undelivered notifications": the browser reports
- * it as an uncaught error that no assertion reads, so it would pass silently. Call it once at the top of the spec file, with the file's `test`.
- */
+/** The browser reports a ResizeObserver loop as an uncaught error no assertion reads, so a spec would pass silently. */
 export function failOnResizeLoops(spec: typeof import('@playwright/test').test): void {
   spec.beforeEach(({ page }) => {
     const found: string[] = [];
@@ -257,10 +221,7 @@ export function failOnResizeLoops(spec: typeof import('@playwright/test').test):
   });
 }
 
-/**
- * Pins the app's size before `page.goto` (the Size setting's stored step, `ui-scale-setting.ts`). A spec whose window is large enough
- * for Auto to grow the app (1750 x 1025 and up) and whose geometry belongs to the app's own 100 % pins 1.
- */
+/** Auto grows the app from 1750 x 1025 up: a spec whose geometry belongs to the app's own 100 % pins step 1. */
 export async function pinUiScale(page: Page, step: number): Promise<void> {
   await page.addInitScript(value => localStorage.setItem('ps-replay-interceptor:ui-scale', String(value)), step);
 }
