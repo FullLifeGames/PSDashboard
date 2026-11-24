@@ -19,7 +19,6 @@ import {
 
 export type { ReconstructParams, ReplacementPoint } from './runtime-session.ts';
 
-/** Hands out the position at the start of the block's turn, as a per-turn reconstruction of that turn returns it. */
 function captureBoundary(session: ReconstructionSession, battle: SimBattle, turn: number) {
   const { capturePositions } = session.params;
   if (capturePositions && battle.turn === turn) {
@@ -30,21 +29,14 @@ function captureBoundary(session: ReconstructionSession, battle: SimBattle, turn
   }
 }
 
-/**
- * Picks the candidate seed whose rolls reproduce the block's protocol events (crits, misses, secondaries, faints). The live battle is
- * reseeded EVERY turn (also for candidate 0), so one turn's RNG consumption never shifts the next turn's rolls. Events are keyed by name;
- * the built sets carry the replay's names.
- */
+// The live battle is reseeded EVERY turn (also for candidate 0): one turn's RNG use never shifts the next turn's rolls.
 function chooseBlockSeed(
   session: ReconstructionSession, battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
 ): AlignedBlock {
   return alignBlockSeed(battle, turnBlock, p1Choice, p2Choice, () => stopRequested(session));
 }
 
-/**
- * Writes one part of a block (the choices of both sides, or the answers to a forced replacement) through the dice module when the
- * block has dice to force, plain otherwise. False: the module could not play it and nothing reached the live battle (`writeBlockPart`).
- */
+// False: the module could not play it and nothing reached the live battle (`writeBlockPart`).
 function writePart(
   session: ReconstructionSession, battle: SimBattle, dice: readonly ForcedDie[] | null, commands: { side: 'p1' | 'p2'; command: string }[],
 ): boolean {
@@ -56,10 +48,7 @@ function writePart(
   return writeBlockPart({ live: battle, dice, commands, write });
 }
 
-/**
- * Commits the main choices of both sides. The wait wakes on a choice rejection, so a wedged turn does not burn the full timeout on every
- * retry (30 to 60 s "Preparing branch..." hangs). False: the dice module could not play the choices and nothing was written.
- */
+// False: the dice module could not play the choices and nothing was written.
 async function commitMainChoices(
   session: ReconstructionSession, turnBeforeChoice: number, p1Choice: string, p2Choice: string, dice: readonly ForcedDie[] | null = null,
 ): Promise<boolean> {
@@ -84,11 +73,8 @@ async function commitMainChoices(
   return true;
 }
 
-/**
- * The open request as a replacement point. Null where it is no knockout (a pivot's or an ejected body's request is its own half-turn);
- * 'gap' where the protocol does not agree with the simulator: a forced slot whose body fainted outside this block, or that the log
- * sends no one into. A gap counts as a request (the ordinal stays the protocol's) and fires nothing.
- */
+// Null where it is no knockout (a pivot's or an ejected body's request is its own half-turn); 'gap' where the protocol
+// does not agree with the sim (a forced slot whose body fainted outside this block, or that the log sends no one into).
 function replacementPoint(
   battle: SimBattle, turn: number, ordinal: number, blockLines: readonly string[],
   forced: Record<'p1' | 'p2', string[]>, cursors: Record<'p1' | 'p2', number>,
@@ -113,7 +99,6 @@ function replacementPoint(
   return agrees ? { turn, ordinal, forced: slots, played } : 'gap';
 }
 
-/** Hands an open knockout request to the capture hook; true where the request counts as a point of the block (a gap counts too). */
 function offerReplacement(
   session: ReconstructionSession, battle: SimBattle, turn: number, ordinal: number, blockLines: readonly string[],
   forced: Record<'p1' | 'p2', string[]>, cursors: Record<'p1' | 'p2', number>,
@@ -131,7 +116,6 @@ function offerReplacement(
   return !!point;
 }
 
-/** Answers the sim's forced replacements with the protocol's switch-ins, in order. */
 async function resolveForcedSwitches(
   session: ReconstructionSession, turnBeforeChoice: number, alignForced: AlignedBlock['alignForced'], blockLines: readonly string[],
   dice: readonly ForcedDie[] | null = null,
@@ -141,7 +125,6 @@ async function resolveForcedSwitches(
   const p2Forced = alignForced.p2;
   const p1ForceIndex = { current: 0 };
   const p2ForceIndex = { current: 0 };
-  // What the protocol says about each side's bench: read once, and only when a forced switch needs it.
   const protocolBench = protocolBenchOf(session.params.replayLog, blockLines, turnBeforeChoice);
 
   let forcedDice = dice;
@@ -155,7 +138,6 @@ async function resolveForcedSwitches(
     const p2Needs = hasForceSwitch(currentBattle, 1);
     if (!p1Needs && !p2Needs) break;
 
-    // The request is open and nothing answered it yet: the capture reads the battle as the player faced it.
     const forcedAnswers = { p1: p1Forced, p2: p2Forced };
     const cursors = { p1: p1ForceIndex.current, p2: p2ForceIndex.current };
     if (offerReplacement(session, currentBattle, turnBeforeChoice, ordinal, blockLines, forcedAnswers, cursors)) ordinal++;
@@ -168,9 +150,8 @@ async function resolveForcedSwitches(
 
     if (commands.length === 0) break;
     const forcedChoiceErrors = choiceErrors.count;
-    // The requests the simulator holds now; a new object on either side means it moved on (a second replacement, a chain)
+    // The requests the simulator holds now; a new object on either side means it moved on (a second replacement).
     const requestsBefore = currentBattle.sides.map(side => side.activeRequest);
-    // a part the dice module cannot play goes in plain, and so does the rest of the block
     if (!writePart(session, currentBattle, forcedDice, commands)) {
       forcedDice = null;
       writePart(session, currentBattle, null, commands);
@@ -189,10 +170,7 @@ async function resolveForcedSwitches(
   }
 }
 
-/**
- * After the block's events the board sits at the START of the next turn, and that boundary's trail is the lock truth for the position.
- * Then scores the block the sim emitted (`battle.log` is synchronous; the async collectedLog pump may lag) against the protocol.
- */
+// After the block's events the board sits at the START of the next turn: that boundary's trail is the lock truth.
 function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligned: AlignedBlock, simLogStart: number) {
   const latestBattle = session.battleStream.battle;
   if (!latestBattle) return;
@@ -215,10 +193,7 @@ function scoreBlock(session: ReconstructionSession, turnBlock: TurnBlock, aligne
   });
 }
 
-/**
- * Plays the block under the hidden dice of seed index 0 with the log's dice forced; a block the dice module cannot play (a choice the
- * copy refuses, a state the reader cannot name the clicks of) falls back to the sixteen-seed search. Forced replacements play through the module too.
- */
+// Seed index 0 with the log's dice forced; a block the dice module cannot play falls back to the sixteen-seed search.
 async function playBlock(
   session: ReconstructionSession, battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
 ): Promise<{ aligned: AlignedBlock; simLogStart: number }> {
@@ -229,13 +204,11 @@ async function playBlock(
   let simLogStart = battle.log.length;
   const choices = { p1: p1Choice, p2: p2Choice };
   const logged = forcedTurnDiceOrNull(battle, lines, choices);
-  // The damage roll of the hits that decide a faint or a die the log shows; null sends the block to the seed search
   const step = logged && faintStep({
     battle, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, lines, forced: aligned.alignForced,
     bench: protocolBenchOf(session.params.replayLog, lines, turnBeforeChoice),
   }, logged);
   const dice = step && step.dice;
-  // A turn that still missed the log under seed 0 plays under the seed the step found for the dice no `DieKind` names
   if (dice && step.seed !== aligned.seedChoice.seed) {
     aligned = { ...aligned, seedChoice: { ...aligned.seedChoice, seed: step.seed } };
     battle.resetRNG(step.seed);
@@ -251,7 +224,6 @@ async function playBlock(
   return { aligned, simLogStart };
 }
 
-/** Replays one turn block (re-align the sim, hand out the boundary, play the choices, score); 'break' ends the replay. */
 async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock): Promise<'continue' | 'break'> {
   const { params, battleStream } = session;
   if (params.onRawBoundary && battleStream.battle) {
@@ -268,7 +240,7 @@ async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock)
   if (!battle || battle.ended) return 'break';
   params.onProgress?.(turnBlock.turn, params.targetTurn);
 
-  // A sim that ran ahead skips stale blocks, one that fell behind advances on defaults first: the block's choices only reach the sim at its turn.
+  // A sim ahead skips stale blocks, one behind advances on defaults first: choices reach the sim only at their turn.
   if (battle.turn > turnBlock.turn) return 'continue';
   if (battle.turn < turnBlock.turn) {
     if (!(await advanceSimToTurn(session, turnBlock.turn))) return 'break';
@@ -285,7 +257,6 @@ async function replayBlock(session: ReconstructionSession, turnBlock: TurnBlock)
   return 'continue';
 }
 
-/** The trailing waits, the target-turn corrections, and the runtime hand-over. */
 async function finishReconstruction(session: ReconstructionSession): Promise<BranchRuntime> {
   const { params, battleStream, collectedLog } = session;
   const { snapshot, replayLog, targetTurn, onLogLines } = params;
@@ -308,7 +279,6 @@ async function finishReconstruction(session: ReconstructionSession): Promise<Bra
 
   if (battleStream.battle) {
     refreshRequestsFromLiveState(battleStream.battle);
-    // The arrival at a replay turn plays that turn under the seed the log's block has (a lead game has no snapshot).
     if (snapshot && !session.timedOut) alignArrivalDice(battleStream.battle, replayLog, targetTurn, () => stopRequested(session));
     const correctionLines = syncLogActivesFromBattle(collectedLog, battleStream.battle, targetTurn);
     if (correctionLines.length > 0) onLogLines?.(correctionLines);
@@ -324,7 +294,7 @@ async function finishReconstruction(session: ReconstructionSession): Promise<Bra
   };
 }
 
-/** Rebuilds the battle up to `targetTurn` by replaying the protocol's choices block by block, then corrects the arrival position from the snapshot. */
+/** Rebuilds the battle to `targetTurn` by replaying the protocol's choices, then corrects the arrival position. */
 export async function reconstructBranchRuntime(rawParams: ReconstructParams): Promise<BranchRuntime> {
   // The log's line endings are settled here once; every reader below sees LF.
   const params = { ...rawParams, replayLog: normalizeLineEndings(rawParams.replayLog) };

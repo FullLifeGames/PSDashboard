@@ -17,19 +17,19 @@ export type { ReconstructParams, ReplacementPoint } from './branch/runtime.ts';
 export { adoptSerializedRuntime } from './branch/adopt.ts';
 export type { AdoptParams } from './branch/adopt.ts';
 
-// @pkmn/sim's random-format rulesets read Node's `global` (`global.Config?.potd`), which browsers lack: without it every Random Battle
-// branch dies with a ReferenceError.
+// Random-format rulesets of @pkmn/sim read Node's `global` (`global.Config?.potd`), which browsers lack;
+// without it every Random Battle branch dies with a ReferenceError.
 if (typeof (globalThis as Record<string, unknown>).global === 'undefined') {
   (globalThis as Record<string, unknown>).global = globalThis;
 }
 
-/** The end-of-reconstruction correction chain for a caller-owned battle, in the order of the tail of `reconstructBranchRuntime` (snapshot correction, then request refresh). */
+/** The end-of-reconstruction correction chain for a caller-owned battle, in `reconstructBranchRuntime`'s order. */
 export function applyTargetCorrections(battle: SimBattle, snapshot: TurnSnapshot | null | undefined): void {
   if (snapshot) correctBattleFromSnapshot(battle, snapshot);
   refreshRequestsFromLiveState(battle);
 }
 
-/** Whether the reconstruction reached `turn` as a live position; an ended battle fails, since a sampled turn lies before the real game's end. */
+/** Whether the reconstruction reached `turn` as a live position; an ended battle fails. */
 export function reconstructionReached(runtime: BranchRuntime, turn: number): boolean {
   if (runtime.timedOut) return false;
   const battle = runtime.battleStream.battle;
@@ -37,7 +37,6 @@ export function reconstructionReached(runtime: BranchRuntime, turn: number): boo
   return battle.turn >= turn;
 }
 
-/** An error message when the battle is wedged (timed out, no pending request, a forced switch with no eligible switch-in), else null. */
 export function validateBranchRuntime(runtime: BranchRuntime): string | null {
   if (runtime.timedOut) {
     return 'Reconstruction timed out before reaching this turn. Try branching from a nearby turn.';

@@ -3,7 +3,6 @@ import type { SimBattle, SimPokemon } from './types.ts';
 import { formatTargetLoc, slotLetter } from './team-order.ts';
 import { aimThatFailsAsLogged, hidesItsTarget } from '../sim-ask/index.ts';
 
-/** The aim of a click: the loc the log's target maps to, the suffix a doubles click carries, and the aim of a move line whose target the protocol hides. */
 
 export function protocolTargetLoc(
   battle: SimBattle,
@@ -42,10 +41,8 @@ function shouldAppendTargetLoc(
   return battle.actions.targetTypeChoices(targetType) && battle.validTargetLoc(targetLoc, active, targetType);
 }
 
-/**
- * A locked request (recharge, the release turn of Fly or Dig, a continued rampage) carries one entry WITHOUT a `target`, and the sim
- * rejects any loc on it together with the whole side choice, while the Dex fallback in `targetTypeForMove` would still name a target type.
- */
+// A locked request (recharge, a Fly or Dig release turn, a continued rampage) has one entry WITHOUT a `target`: the sim
+// rejects any loc on it and the whole side choice, while `targetTypeForMove`'s Dex fallback would name a target type.
 function requestEntryHasNoTarget(active: SimPokemon | null | undefined, moveName: string): boolean {
   if (!active) return false;
   const moveId = toId(moveName);
@@ -72,7 +69,7 @@ export function targetLocSuffixForChoice(
   return fallbackTargetLoc ? ` ${formatTargetLoc(fallbackTargetLoc)}` : '';
 }
 
-/** The aims a click may name for this target type, in the default order: the foe in slot a, the ally in slot a, the foe in slot b, the ally in slot b. */
+/** The aims a click may name for this target type, in default order: foe a, ally a, foe b, ally b. */
 export function legalTargetLocs(battle: SimBattle, active: SimPokemon, targetType: string): number[] {
   if (active.side.active.length < 2 || !battle.actions.targetTypeChoices(targetType)) return [];
   const locs: number[] = [];
@@ -88,21 +85,13 @@ export function firstLegalTargetLoc(battle: SimBattle, active: SimPokemon, targe
   return legalTargetLocs(battle, active, targetType)[0] ?? null;
 }
 
-/**
- * The aims of the turn's choices. `resolved` holds the aim a slot's hidden target was answered with (key side and slot: `p2b`);
- * `ask` is false while a question to the simulator builds the choices for one aim.
- */
+/** The aims of the turn's choices; `resolved` holds the aim a hidden target got (key side and slot: `p2b`). */
+// `ask` is false while a question to the simulator builds the choices for one aim.
 export interface Aiming { ask: boolean; resolved: Map<string, number> }
 
-/** The choice of one slot of `owner` with these answered aims and no further question: the caller's own `getChoiceForSlot`. */
 export type SlotChoice = (owner: 'p1' | 'p2', slot: number, aiming: Aiming) => string;
 
-/**
- * The aim of a move line that hides its target (`|move|p2b: Sableye|Disable||[still]`: the game stopped the move before it animated).
- * The default aim falls on the foe in slot a, while a Disable or Encore that failed on a fresh switch-in in slot b landed there. The
- * simulator is asked (`aimThatFailsAsLogged`): the turn's choices with each legal aim, played on a copy; the first aim that fails as the
- * log shows wins, else 0. Doubles only. Other hidden aims stay at their default while a slot is asked; a later slot reads the earlier answers.
- */
+/** The aim of a move line that hides its target (`|move|p2b: Sableye|Disable||[still]`); doubles only. */
 export function hiddenTargetLoc(
   line: string, side: 'p1' | 'p2', activeSlot: number, battle: SimBattle, moveName: string, aiming: Aiming, choiceOf: SlotChoice,
 ): number {

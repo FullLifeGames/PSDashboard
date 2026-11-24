@@ -22,7 +22,7 @@ function statTableWithDefaults(
 const DEFAULT_EVS: PokemonStatTable = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const DEFAULT_IVS: PokemonStatTable = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
-// @smogon/calc matches abilities and items by display name ('Technician'): an id ('technician') silently disables every modifier.
+// @smogon/calc matches abilities and items by display name ('Technician'); an id silently disables every modifier.
 function displayFields(pokemon: SimPokemon): Pick<SimPokemonInfo, 'ability' | 'item' | 'moves'> {
   const { dex } = pokemon.battle;
   return {
@@ -84,7 +84,6 @@ export function makePokemonInfo(
     gender,
     teraType,
     stellarBoostedTypes: [...pokemon.stellarBoostedTypes],
-    // What the calc cannot see on its own, read as the engine's one builder reads it.
     ...simBodyFacts(pokemon),
     ...(pokemon.battle.dex.currentMod === 'champions' ? { mod: 'champions' } : {}),
     ...(isCommanding(pokemon) ? { commanding: true } : {}),
@@ -101,7 +100,7 @@ export function extractPokemonInfo(side: SimSide): SimPokemonInfo[] {
   });
 }
 
-/** What a replay shows of a body's HP: the numerator and the scale of the log's `hp/maxhp` (100 for percent, 48 for pixels). */
+/** What a replay shows of a body's HP: the numerator and scale of the log's `hp/maxhp` (100 percent, 48 pixels). */
 export interface HpSighting {
   hp: number;
   maxhp: number;
@@ -115,12 +114,11 @@ export interface HpDisplayBody {
   battle: { reportPercentages: boolean; reportExactHP: boolean };
 }
 
-/** The HP a replay's percent stands for: the middle of the HPs at which the simulator's display shows that value, or null where none does. */
+/** The HP a replay's percent stands for: the middle of the HPs whose display shows that value; null where none does. */
 export function sightedHp(body: HpDisplayBody, shown: HpSighting): number | null {
   if (shown.hp <= 0 || shown.hp > shown.maxhp || body.maxhp <= 0) return null;
   const { battle } = body;
-  // Gen 7 and later round the percent up, Champions down, so `round(percent * maxhp / 100)` can leave the range. The display runs in the
-  // replay's mode (percent on the 100 scale, pixels otherwise) whatever the battle was built with; the body keeps its HP and modes.
+  // Gen 7 and later round the percent up, Champions down, so `round(percent * maxhp / 100)` can leave the range.
   const saved = { hp: body.hp, percentages: battle.reportPercentages, exact: battle.reportExactHP };
   battle.reportExactHP = false;
   battle.reportPercentages = shown.maxhp === 100;
@@ -153,17 +151,12 @@ export function sightedHp(body: HpDisplayBody, shown: HpSighting): number | null
   }
 }
 
-/** The HP of a body for a snapshot's sighting: `sightedHp` for percent or pixels, else the proportional rounding. */
 export function hpOfSighting(body: HpDisplayBody, sighting: { hp: number; maxhp: number; hpPercent: number }): number {
   const sighted = sighting.maxhp === 100 || sighting.maxhp === 48 ? sightedHp(body, sighting) : null;
   return sighted ?? Math.round((sighting.hpPercent / 100) * body.maxhp);
 }
 
-/**
- * The percent a player sees for a body: the numerator of the simulator's display (getHealth) on the 100 scale, 0 for a faint.
- * Gen 7 and later round it up (never 100 below full HP), Champions down; `Math.round(hp / maxhp * 100)` can read a point under the log.
- * The display runs in percent mode whatever the battle was built with; the body keeps its modes.
- */
+// Gen 7 and later round up (never 100 below full HP), Champions down: `Math.round(hp / maxhp * 100)` reads a point low.
 export function shownPercent(body: HpDisplayBody): number {
   if (!(body.maxhp > 0) || !(body.hp > 0)) return 0;
   const { battle } = body;
@@ -179,16 +172,10 @@ export function shownPercent(body: HpDisplayBody): number {
   }
 }
 
-/** The probe body per generation and rule set; null remembers a generation no candidate species fits. */
 const probeBodies = new Map<string, HpDisplayBody | null>();
 const PROBE_SPECIES = ['Mew', 'Pikachu', 'Garchomp'];
 
-/**
- * A body of the format's simulator to read the HP display from when no battle stands at hand (the quick picker on a snapshot); null
- * where the battle cannot be built (Champions mod not loaded, a generation without the species). Before the mod registers, the
- * simulator builds the unknown Champions format on the base rules without an error and shows the wrong display (the base rounds a
- * percent up, the mod down), so `twinFormat` gives null then and nothing is kept.
- */
+// Before the mod registers the sim builds Champions on base rules (rounds up, not down): `twinFormat` gives null then.
 function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
   const format = twinFormat(gen, champions);
   if (!format) return null;
@@ -213,7 +200,6 @@ function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
   return null;
 }
 
-/** `sightedHp` for a body that exists only as numbers: the format's probe body at the given maximum HP; null without one. */
 export function sightedHpAt(gen: number, champions: boolean, sighting: HpSighting, maxhp: number): number | null {
   const body = probeBody(gen, champions);
   if (!body) return null;
@@ -221,7 +207,7 @@ export function sightedHpAt(gen: number, champions: boolean, sighting: HpSightin
   return sightedHp(body, sighting);
 }
 
-/** Hidden Power's type and power for a set, as the simulator's Pokemon constructor gives them (the set's hpType, else a typed Hidden Power move, else the IVs). */
+/** Hidden Power's type and power as the simulator's constructor gives them: hpType, else a typed move, else the IVs. */
 export function hiddenPowerFacts(rules: GameRules, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string }): { hpType: string; hpPower: number } {
   const dex = dexOf(rules);
   const { gen } = rules;
@@ -235,7 +221,6 @@ export function hiddenPowerFacts(rules: GameRules, set: { moves?: readonly strin
   return { hpType: typed || read.type, hpPower: read.power };
 }
 
-/** What the calc reads off the simulator's body, from a snapshot: the client's volatile facts, the side's fallen, Hidden Power of the set or of the moves shown. */
 export function snapshotSimFacts(
   mon: { boostedStat?: string; fallen?: number; moves?: readonly string[] }, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string } | undefined, rules: GameRules, sideFainted: number,
 ): Pick<SimPokemonInfo, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'> {
@@ -243,12 +228,12 @@ export function snapshotSimFacts(
     ...(mon.boostedStat ? { boostedStat: mon.boostedStat } : {}),
     ...(mon.fallen ? { alliesFainted: mon.fallen } : {}),
     ...(sideFainted ? { totalFainted: sideFainted } : {}),
-    // A body without a set reads as the simulator reads one without IVs of its own: 31 everywhere, the moves the log showed.
+    // A body without a set reads as the simulator reads one without IVs: 31 everywhere, the moves the log showed.
     ...hiddenPowerFacts(rules, set ?? { moves: mon.moves }),
   };
 }
 
-/** The species a quick-picker body has after its Tera click, from the simulator's terastallize on a twin (Terapagos-Terastal becomes Terapagos-Stellar). */
+/** The species after a Tera click, from the simulator's terastallize on a twin (Terapagos-Terastal to -Stellar). */
 export function speciesAfterTeraClick(gen: number, info: SimPokemonInfo, teraType: string): string {
   return teraClicked(gen, { ...bodyFromInfo(info), tera: teraType }).species;
 }

@@ -7,11 +7,9 @@ import { openStreams, type SessionStreams } from './runtime-session.ts';
 import type { SimBattle } from './types.ts';
 import { sleep } from './execute.ts';
 
-/** Asks the simulator how a new game starts (header log, bodies, team preview) and which problems its validator reports per team; decides nothing. */
+/** Asks the simulator how a new game starts and which problems its validator reports per team; decides nothing. */
 
-/** One body as the chosen format's battle builds it. */
 export interface NewGameBody {
-  /** The species' name, as the battle prints it. */
   species: string;
   name: string;
   level: number;
@@ -22,31 +20,26 @@ export interface NewGameBody {
   stats: { atk: number; def: number; spa: number; spd: number; spe: number };
 }
 
-/** The start of a game as the chosen format's own battle reads it. */
 export interface NewGameStart {
-  /** The chosen format's id. */
   format: string;
-  /** The simulator's game type of the format: singles, doubles (or triples, which the app does not offer). */
   gameType: string;
-  /** The format has a team preview (Gen 1 to 4 have none: the leads come from the teams then). */
+  /** The format has a team preview (Gen 1 to 4 have none: the leads come from the teams). */
   teamPreview: boolean;
-  /** The bodies each side brings after a team preview (VGC: 4); null when the whole team plays or there is no preview. */
+  /** Bodies each side brings after a team preview (VGC: 4); null when the whole team plays or there is no preview. */
   bringCount: number | null;
-  /** The Pokémon each side fields at once. */
   activeCount: number;
-  /** The log up to the start of the game (no `|start|`, no `|t:|` lines, which carry the clock): a pure function of the start. */
+  /** The log up to the start (no `|start|`, no `|t:|` clock lines): a pure function of the start. */
   header: string[];
   /** The teams as the format's battle reads them: each set with the level the format gives its body. */
   teams: { p1: PokemonSet[]; p2: PokemonSet[] };
   bodies: { p1: NewGameBody[]; p2: NewGameBody[] };
 }
 
-/** A seed the simulator reads, or the problem that names the forms the dialog accepts. */
 export type GameSeedRead = { seed: string } | { problem: string };
 
 const SEED_PROBLEM = 'A seed is four whole numbers from 0 to 65535 with commas, like 1,2,3,4, or "sodium," and up to 64 hex digits (the form of a Showdown input log), or "gen5," and 16 hex digits.';
 
-/** Reads a typed or pasted seed in the simulator's `PRNG` forms and returns the normalized text the game starts on, or the problem. */
+/** Reads a typed or pasted seed in the simulator's `PRNG` forms and returns the normalized text, or the problem. */
 export function readGameSeed(text: string): GameSeedRead {
   // Stricter than the simulator: it takes any number, and a game with a wild seed could not be told from a typo.
   const seed = text.replace(/\s+/g, '').toLowerCase();
@@ -63,28 +56,25 @@ export function readGameSeed(text: string): GameSeedRead {
   return { seed };
 }
 
-/** The input of `startGameLog`: a format and two pasted teams. */
 export interface StartGameParams {
   format: string;
   p1Team: PokemonSet[];
   p2Team: PokemonSet[];
   playerNames?: [string, string];
   seed?: string;
-  /** Fills a set without an ability with the first one of its species the format allows; a rebuild of a saved game leaves its sets as stored. */
+  /** Fills a blank ability with the species' first one the format allows; a rebuild of a saved game does not. */
   fillAbilities?: boolean;
 }
 
-/** The team validator's problems per side, and per side the sentence `startGameLog` throws for a species the Dex does not know, or null. */
+/** The validator's problems per side, and per side the sentence `startGameLog` throws for an unknown species. */
 export interface GameTeamProblems {
   p1: string[];
   p2: string[];
   refused: { p1: string | null; p2: string | null };
 }
 
-/**
- * The level the format gives a set: the validator reads `Adjust Level` and `Adjust Level Down` off the rule table and rewrites the
- * set's level before a server battle starts (`validateSet` of team-validator.js); the battle itself plays whatever level it gets.
- */
+// The validator rewrites the set's level by `Adjust Level` and `Adjust Level Down` (`validateSet`, team-validator.js);
+// the battle itself plays whatever level it gets.
 function levelOfSet(rules: ReturnType<ReturnType<typeof simFormats>['getRuleTable']>, set: PokemonSet): number {
   let level = set.level || rules.defaultLevel;
   let adjust = rules.adjustLevel;
@@ -93,10 +83,8 @@ function levelOfSet(rules: ReturnType<ReturnType<typeof simFormats>['getRuleTabl
   return adjust || level;
 }
 
-/**
- * The simulator cannot start a battle with a species its Dex does not know (the stream throws "Cannot read properties of null");
- * a move, item or ability it does not know starts as given.
- */
+// A species the Dex does not know cannot start (the stream throws "Cannot read properties of null");
+// a move, item or ability it does not know starts as given.
 function unknownSpeciesRefusal(format: ReturnType<ReturnType<typeof simFormats>['get']>, team: PokemonSet[]): string | null {
   const dex = dexOfFormat(format);
   for (const set of team) {
@@ -112,18 +100,15 @@ function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['
   if (refusal) throw new Error(refusal);
 }
 
-/** The abilities a species can have in the Dex's slot order (0, 1, hidden, special), without gaps or repeats. */
+// The Dex's slot order (0, 1, hidden, special), without gaps or repeats.
 function abilitiesInSlotOrder(species: { abilities: object }): string[] {
   const slots = species.abilities as Record<string, string | undefined>;
   const names = ['0', '1', 'H', 'S'].map(slot => slots[slot]).filter((name): name is string => !!name);
   return names.filter((name, index) => names.indexOf(name) === index);
 }
 
-/**
- * The ability for a set without one: the simulator plays a blank as no ability, while Showdown's team import fills the species' first.
- * Here the fill is the first slot (Dex order) the format's validator allows (`checkAbility`), so Evasion Abilities Clause or a banned
- * Commander skips slot 0; when no slot passes it keeps slot 0. Generations 1 and 2 and unknown species fill nothing.
- */
+// A blank plays as no ability in the simulator; the fill is the first Dex slot the validator allows (`checkAbility`),
+// so Evasion Abilities Clause or a banned Commander skips slot 0. Generations 1 and 2 and unknown species fill nothing.
 function blankAbilityFill(dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, set: PokemonSet): string | null {
   if (set.ability || dex.gen < 3) return null;
   const species = dex.species.get(set.species);
@@ -137,7 +122,7 @@ function blankAbilityFill(dex: ReturnType<typeof dexOfFormat>, validator: TeamVa
 const filledAbilities = (dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, team: PokemonSet[]): PokemonSet[] =>
   team.map(set => { const fill = blankAbilityFill(dex, validator, set); return fill ? { ...set, ability: fill } : set; });
 
-/** Starts the chosen format's battle on the omniscient stream and reads its header (the lines before `|start|`) and bodies; throws when the battle does not come up. */
+/** Starts the format's battle on the omniscient stream, reads its header and bodies; throws if it does not come up. */
 export async function startGameLog(params: StartGameParams): Promise<NewGameStart> {
   const { format: formatId } = params;
   await loadSimMods(formatId);
@@ -177,7 +162,6 @@ export async function startGameLog(params: StartGameParams): Promise<NewGameStar
   };
 }
 
-/** The battle once both sides stand and its log stops growing (the header comes in one go: a team preview or the first turn); null when none came up. */
 async function standingBattle(streams: SessionStreams): Promise<SimBattle | null> {
   const startedAt = Date.now();
   let seen = -1;
@@ -206,14 +190,13 @@ function bodiesOf(pokemon: SimBattle['sides'][number]['pokemon']): NewGameBody[]
   }));
 }
 
-/** The abilities a species can have, from the game's Dex (its three slots and an event ability). */
 function ownAbilityIds(species: { abilities: object }): Set<string> {
   return new Set((Object.values(species.abilities) as string[]).filter(Boolean).map(ability => toId(ability)));
 }
 
-/** The simulator's validation of each team against the format, in its words (an empty list is a legal team), plus the Custom Game ability rule. */
+/** The simulator's validation of each team (empty: legal), plus the Custom Game ability rule. */
 export async function checkGameTeams(formatId: string, teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<GameTeamProblems> {
-  // A Custom Game checks nothing in the simulator, so the project's rule joins: each species plays its own abilities (Hackmons formats stay free).
+  // A Custom Game checks nothing in the simulator, so each species plays its own abilities here (Hackmons stay free).
   await loadSimMods(formatId);
   const format = simFormats().get(formatId);
   if (!format.exists) throw new Error(`Unknown format ${formatId}`);
@@ -221,7 +204,6 @@ export async function checkGameTeams(formatId: string, teams: { p1: PokemonSet[]
   const validator = TeamValidator.get(formatId);
   const free = !format.debug || simFormats().getRuleTable(format).has('obtainableabilities');
   const check = (pasted: PokemonSet[]): string[] => {
-    // Start fills a blank ability, so the validator reads the team as it will play and the check names each fill.
     const team = filledAbilities(dex, validator, pasted);
     const fills = pasted.flatMap((set, index) => (team[index].ability === set.ability ? [] : [`${dex.species.get(set.species).name} has no ability: plays ${team[index].ability}.`]));
     // The validator may rewrite a set (names, spreads): it reads a copy.

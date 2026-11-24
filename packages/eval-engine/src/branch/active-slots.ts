@@ -1,6 +1,6 @@
 import type { SimSide } from './types.ts';
 
-/** Two actives trade slots; both stay in play, so unlike a switch-in nothing about either body (its lock, its last move) is reset. */
+/** Two actives trade slots; both stay in play, so nothing about either body (its lock, its last move) is reset. */
 export function swapActiveSlots(side: SimSide, from: number, to: number) {
   const [first, second] = [side.active[from], side.active[to]];
   side.active[from] = second;

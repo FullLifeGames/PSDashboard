@@ -1,14 +1,13 @@
 import { toId, type RulesDex } from '@fulllifegames/replay-core';
 
-/** Snapshot display names of terrain and weather, translated to the sim's condition ids (the Dex of the battle's generation and mod). */
 export function terrainIdFromSnapshot(terrain: string, dex: RulesDex): string {
   if (!terrain) return '';
   const terrainCondition = dex.conditions.get(`${terrain} Terrain`);
   return terrainCondition.exists ? terrainCondition.id : toId(terrain);
 }
 
-// @pkmn/client snapshots name weather by display name (its WEATHERS map: "Sand", "Sun"), the sim only knows condition ids: an untranslated
-// name silently disables every weather residual.
+// @pkmn/client names weather by display name (its WEATHERS map: "Sand", "Sun"), the sim knows condition ids only:
+// an untranslated name silently disables every weather residual.
 const CLIENT_WEATHER_IDS: Record<string, string> = {
   sand: 'sandstorm',
   sun: 'sunnyday',

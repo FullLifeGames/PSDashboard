@@ -9,10 +9,7 @@ import { LoggedRollPRNG, recordForcedRolls, recordLoggedRolls } from './logged-r
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from './protocol-choices.ts';
 import type { SimBattle, TurnBlock } from './types.ts';
 
-/**
- * The dice of a logged turn: the reconstruction replays the game's choices, but the sim rolls its own crits, misses and secondary effects,
- * so each block plays under the seed whose rolls reproduce the block's protocol events.
- */
+// Design: ADR 0022.
 
 type ExpectedEvents = ReturnType<typeof extractProtocolEvents>;
 
@@ -20,11 +17,10 @@ export interface AlignedBlock {
   expectedEvents: ExpectedEvents;
   alignForced: { p1: string[]; p2: string[] };
   seedChoice: SeedChoice;
-  /** `forced` when the block plays under seed index 0 with the log's dice forced, `fallback` when the seed search chose. */
+  /** `forced`: seed index 0 with the log's dice forced; `fallback`: the seed search chose. */
   via: 'forced' | 'fallback';
 }
 
-/** What the block's lines say before any seed plays: the events the sim must reproduce and the species the log sends in for each forced replacement. */
 export function blockOf(battle: SimBattle, turnBlock: TurnBlock): Pick<AlignedBlock, 'expectedEvents' | 'alignForced'> {
   return {
     expectedEvents: extractProtocolEvents([...turnBlock.preUpkeep, ...turnBlock.postUpkeep]),
@@ -35,10 +31,6 @@ export function blockOf(battle: SimBattle, turnBlock: TurnBlock): Pick<AlignedBl
   };
 }
 
-/**
- * The block played with the log's dice forced, under the hidden dice of seed index 0; with no trial there is no score (`trialPerfect`
- * false, `candidatesTried` 0).
- */
 export function forcedBlock(battle: SimBattle, turnBlock: TurnBlock): AlignedBlock {
   return {
     ...blockOf(battle, turnBlock), via: 'forced',
@@ -46,10 +38,8 @@ export function forcedBlock(battle: SimBattle, turnBlock: TurnBlock): AlignedBlo
   };
 }
 
-/**
- * Picks the candidate seed whose rolls reproduce the block's protocol events (crits, misses, secondaries, faints) under its logged choices.
- * Events are keyed by name, since the built sets carry the replay's nicknames. Fails open: when no trial runs, candidate 0 stays.
- */
+/** Picks the candidate seed whose rolls reproduce the block's protocol events; fails open to candidate 0. */
+// Events are keyed by name, since the built sets carry the replay's nicknames.
 export function alignBlockSeed(
   battle: SimBattle, turnBlock: TurnBlock, p1Choice: string, p2Choice: string,
   shouldStop?: () => boolean,
@@ -81,15 +71,8 @@ export function alignBlockSeed(
   return { expectedEvents, alignForced, seedChoice, via: 'fallback' };
 }
 
-/**
- * Puts the position of replay turn `targetTurn` on the seed that turn plays under in the log, so the first turn a branch plays from here
- * shows the logged rolls for every action left as it was (singles and doubles); later actions draw from the same stream and stay
- * deterministic but are no longer the logged rolls. The seed is index 0 of `ALIGNMENT_SEEDS` with the log's dice forced (`arrivalRolls`);
- * the sixteen-seed search runs only when the forced turn cannot play. A direct PRNG swap, not `resetRNG`, which writes a message line into
- * the battle log (an adopted position's log is the replay's). Null (nothing changed) when the battle does not stand at the turn's move
- * request (ended, another turn, a forced replacement pending, a turn the log lacks), when no trial could play the logged choices (the
- * fallback seed is no reading of the log), and when reading the block's choices fails: that must never cost the branch its position.
- */
+/** Puts the position of replay turn `targetTurn` on the seed that turn plays under in the log; null: unchanged. */
+// A direct PRNG swap, not `resetRNG`, which writes a message line into the battle log (an adopted log is the replay's).
 export function alignArrivalDice(
   battle: SimBattle, replayLog: string, targetTurn: number, shouldStop?: () => boolean,
 ): SeedChoice | null {
@@ -118,12 +101,6 @@ export function alignArrivalDice(
   }
 }
 
-/**
- * The seed and the logged draws of the arrival turn, played as the reconstruction plays it: seed index 0 with the log's dice forced (and
- * the faint step's damage-roll steps), the draws it takes being the logged draws (`recordForcedRolls`). When the forced turn cannot play
- * (the copy refuses a choice, the state is odd) the sixteen-seed search chooses, and null comes back when no trial plays either: the
- * fallback seed is no reading of the log.
- */
 function arrivalRolls(
   battle: SimBattle, block: TurnBlock, replayLog: string, p1Choice: string, p2Choice: string, shouldStop?: () => boolean,
 ): { block: AlignedBlock; logged: ReturnType<typeof recordLoggedRolls> } | null {
@@ -132,7 +109,6 @@ function arrivalRolls(
     const lines = [...block.preUpkeep, ...block.postUpkeep];
     const choices = { p1: p1Choice, p2: p2Choice };
     const bench = protocolBenchOf(replayLog, lines, block.turn);
-    // The faint step the rebuild took for this block (same function, position and seed), then the draws of that turn.
     const { dice, seed } = faintStep({
       battle, expected: forced.expectedEvents, seed: forced.seedChoice.seed, choices, lines, forced: forced.alignForced, bench,
     }, forcedTurnDice(battle, lines, choices));

@@ -7,10 +7,8 @@ type Handler = (this: unknown, ...args: unknown[]) => unknown;
 type SleepRules = { lo: number; hi: number; rest: number | null };
 const sleepRulesOf = new WeakMap<object, SleepRules | null>();
 
-/**
- * The sleep counter's rules, asked of the simulator: the sleep condition's onStart runs on a stand-in that records the one random call
- * (start time in [lo, hi); Gen 9: 2 to 4, so 1 to 3 cants), and Rest's onHit on a stand-in that records the count it sets (`rest`).
- */
+// The sleep condition's onStart runs on a stand-in that records its one random call (start time in [lo, hi)),
+// and Rest's onHit on a stand-in that records the count it sets (`rest`). Gen 9: start time 2 to 4, so 1 to 3 cants.
 function sleepRules(dex: SimBattle['dex']): SleepRules | null {
   if (sleepRulesOf.has(dex)) return sleepRulesOf.get(dex)!;
   let rules: SleepRules | null = null;
@@ -37,7 +35,7 @@ function sleepRules(dex: SimBattle['dex']): SleepRules | null {
   return rules;
 }
 
-/** What one cant line takes off the counter for this body: 1, 2 for a body that wakes early (the condition's own onBeforeMove says). */
+// What one cant line takes off the counter: 1, or 2 for a body that wakes early (the condition's onBeforeMove says).
 function sleepStep(body: SimPokemon): number {
   const onBeforeMove = (body.battle.dex.conditions.get('slp') as unknown as { onBeforeMove?: Handler }).onBeforeMove;
   const sleeper = { hasAbility: (ability: string) => body.hasAbility(ability), statusState: { time: 64 }, cureStatus: () => undefined, lastMove: null };
@@ -49,11 +47,7 @@ function sleepStep(body: SimPokemon): number {
   return Math.max(1, 64 - sleeper.statusState.time);
 }
 
-/**
- * Gives a body asleep in the game a remaining count the game's cant lines allow (`turns` of them so far): the simulator's own count
- * stays when it is allowed, else a start time is drawn from the rest of the range. After Rest the count is exact. A snapshot without
- * a count and a generation without rules leave the counter alone.
- */
+/** Gives a body asleep in the game a count its cant lines allow (`turns` so far); the sim's own stays if allowed. */
 export function settleSleepCounter(body: SimPokemon, turns: number, rested: boolean, redraw: boolean) {
   const rules = sleepRules(body.battle.dex);
   if (!rules) return;
@@ -71,11 +65,8 @@ export function settleSleepCounter(body: SimPokemon, turns: number, rested: bool
   state.time = Math.max(1, start - used);
 }
 
-/**
- * Ends a lock with a random length (Outrage and its kin) that the game ended (its fatigue confusion is in the block) while the
- * simulator's draw goes on, and starts the fatigue confusion. The lock's volatile is the one the body's last move line names in the Dex
- * (`self.volatileStatus`).
- */
+/** Ends a random-length lock (Outrage and kin) the game ended while the sim's draw goes on; starts the confusion. */
+// The lock's volatile is the one the body's last move line names in the Dex (`self.volatileStatus`).
 export function endLocksTheGameEnded(battle: SimBattle, snapshot: TurnSnapshot, bodyOf: BodyOf) {
   const lastMove = new Map<string, string>();
   for (const line of snapshot.log ?? []) {

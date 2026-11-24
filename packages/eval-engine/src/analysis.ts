@@ -5,10 +5,7 @@ import { attributionFor, markRisk } from './turn-analysis/risk.ts';
 import { turnRolledFor } from './turn-analysis/luck.ts';
 import type { AnalyzeTurnParams, Side, SideAnalysis, TurnAnalysis } from './turn-analysis/types.ts';
 
-/**
- * Turns a turn's cached sweep data into a TurnAnalysis (regret per side, swing split into decision and chance). Pure: no @pkmn/sim imports,
- * main-bundle safe.
- */
+/** Turns a turn's cached sweep data into a TurnAnalysis. Pure: no @pkmn/sim imports, main-bundle safe. */
 
 export {
   BREADTH_MIN_OPTIONS, CHANCE_THRESHOLD,
@@ -24,11 +21,9 @@ export {
   phantomStayIn, playedSetupMove, splitCombinedLabel,
 } from './turn-analysis/played-match.ts';
 
-/** One side's record: the grading stages, then the narrative signals, keys in the report's order. */
 function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {
   const grading = gradeSide(params, key);
   const signals = signalSide(params, key, grading);
-  // The KO-odds claims the opponent's actual click leaves without a landed hit.
   const hitStopped = hitStoppedFor(params, key, grading.options, grading.played, grading.best, signals.bestNull);
   return {
     ...gradingFields(params, key, grading),
@@ -38,20 +33,15 @@ function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {
   };
 }
 
-/** The turn's fainted share echoed onto the record, only where the param carries one. */
 const shareField = (share: number | null | undefined): { faintedFraction?: number } =>
   typeof share === 'number' ? { faintedFraction: share } : {};
 
-/**
- * The turn's rolls: the protocol's markers and played KO odds when the turn has its log, else the classes of the played cell.
- * A doubles search plans the cells of the played row and column, so the same reading holds there.
- */
 function rolledForFields(params: AnalyzeTurnParams, p1: SideAnalysis, p2: SideAnalysis): Pick<TurnAnalysis, 'rolledFor'> {
   const rolledFor = turnRolledFor(params, p1, p2);
   return rolledFor ? { rolledFor } : {};
 }
 
-/** Explains one turn: what each side played against what the engine preferred, and how the score swing splits into decision and chance. */
+/** Explains one turn: each side's play against the engine's pick, and the swing split into decision and chance. */
 export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
   const playedTracking = params.playedTracking !== false;
   const p1 = analyzeSide(params, 'p1');
@@ -77,9 +67,7 @@ export function analyzeTurn(params: AnalyzeTurnParams): TurnAnalysis {
     p1,
     p2,
     playedTracking,
-    // Display only: the sentences split rolled from re-read.
     ...rolledForFields(params, p1, p2),
-    // Display only: the shares the percent texts print at.
     ...shareField(params.faintedFraction),
     ...(typeof params.faintedFractionAfter === 'number' ? { faintedFractionAfter: params.faintedFractionAfter } : {}),
   };

@@ -3,12 +3,8 @@ import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 
 type BodyOf = (side: SimSide, snapshotPokemon: TurnSnapshot['p1']['pokemon'][number]) => SimPokemon | undefined;
 
-/**
- * Sets each move's PP from the log's count of its uses (`ppUsed` of the snapshot, read by @pkmn/client) and returns whether a slot moved
- * (the request was built from the old PP). The rebuild drifts from the game: a Leppa Berry the set guessed restores the move, and a turn
- * played differently never spends it, so a move at 0 PP in the game (Revival Blessing, 1 PP) would rank first again. A range of spent
- * PP (Pressure left open) clamps the slot into it.
- */
+/** Sets each move's PP from the log's count of its uses (`ppUsed` of the snapshot); true when a slot moved. */
+// A range of spent PP (Pressure left open) clamps the slot into it; the rebuild drifts (a guessed Leppa Berry).
 export function restorePpFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot, bodyOf: BodyOf): boolean {
   let changed = false;
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {

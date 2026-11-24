@@ -1,11 +1,10 @@
 import type { BringList, BringSide } from '@fulllifegames/replay-core';
 import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../types.ts';
 
-/** One world of a bring-limited game: one set of guesses for both sides' unknown bodies; the lists are the fielded bodies plus the guesses (last), `weight` its share. */
+/** One world of a bring-limited game; the lists are the fielded bodies plus the guesses (last), `weight` its share. */
 export interface BringWorld {
   p1: string[];
   p2: string[];
-  /** How many trailing names of each list are guesses. */
   guessed: { p1: number; p2: number };
   weight: number;
 }
@@ -13,12 +12,11 @@ export interface BringWorld {
 /** The most worlds one game plays: the three heaviest by usage weight, renormalized. */
 export const BRING_WORLD_CAP = 3;
 
-/** Two weights this close are one weight: the products of equal shares differ in the last bits by the order of the factors. */
+// Two weights this close are one: products of equal shares differ in the last bits by factor order.
 const TIE = 1e-12;
 
 interface SideWorld { guess: string[]; weight: number }
 
-/** Every way a side's `open` bodies come from its candidates, in preview order, weighted by the product of the shares. */
 function sideWorlds(side: BringSide): SideWorld[] {
   const worlds: SideWorld[] = [];
   const pick = (from: number, guess: string[], weight: number) => {
@@ -36,7 +34,7 @@ function sideWorlds(side: BringSide): SideWorld[] {
   return worlds.map(world => ({ guess: world.guess, weight: total > 0 ? world.weight / total : 1 / worlds.length }));
 }
 
-/** The worlds of a game, heaviest first (ties by preview order), at most `cap`, weights summing to 1; null for a bring-all game; a game that pins both sides gives one world. */
+/** The worlds of a game, heaviest first (ties by preview order), at most `cap`, weights sum to 1; null if bring-all. */
 export function bringWorlds(list: BringList | null | undefined, cap: number): BringWorld[] | null {
   if (!list) return null;
   const p1Worlds = sideWorlds(list.p1);
@@ -59,7 +57,6 @@ export function bringWorlds(list: BringList | null | undefined, cap: number): Br
   return kept.map(world => ({ ...world, weight: world.weight / total }));
 }
 
-/** The weighted mean of `values` under `weights`, normalized by the weights present; one value comes back as it is, with no division. */
 export function blendValues(values: number[], weights: number[]): number {
   if (values.length === 1) return values[0];
   let sum = 0;
@@ -71,18 +68,13 @@ export function blendValues(values: number[], weights: number[]): number {
   return sum / total;
 }
 
-/** The weighted mean of `pick(entry)` over the entries that hold a value, or undefined when none does. */
 function blendHeld<T>(entries: { entry: T; weight: number }[], pick: (entry: T) => number | undefined): number | undefined {
   const held = entries.filter(({ entry }) => pick(entry) !== undefined);
   if (held.length === 0) return undefined;
   return blendValues(held.map(({ entry }) => pick(entry) as number), held.map(({ weight }) => weight));
 }
 
-/**
- * The blended rows of one side: the frame's rows (the first entry), each with the weighted mean of its numbers over the worlds
- * that hold its choice. A row only a lighter world ranks is dropped: its label names that world's unknown body, and the frame
- * did not rank it.
- */
+// A row only a lighter world ranks is dropped: its label names that world's unknown body, which the frame did not rank.
 function blendRows(sides: { rows: RankedChoice[]; weight: number }[]): RankedChoice[] {
   const [frame, ...others] = sides;
   const blended = frame.rows.map(base => {
@@ -102,7 +94,6 @@ function blendRows(sides: { rows: RankedChoice[]; weight: number }[]): RankedCho
   return blended.sort((a, b) => b.ev - a.ev);
 }
 
-/** The frame's matrix with each cell the weighted mean over the worlds that hold both ids; null when the frame carries no ids. */
 function blendMatrix(frame: EvalMatrix, others: { matrix: EvalMatrix | undefined; weight: number }[]): EvalMatrix {
   const rowIds = frame.p1Choices;
   const columnIds = frame.p2Choices;
@@ -142,11 +133,7 @@ function blendMatrix(frame: EvalMatrix, others: { matrix: EvalMatrix | undefined
   return { ...frame, values, ...(cells ? { cells } : {}), mixes: { p1: mix(rowIds, 'p1'), p2: mix(columnIds, 'p2') } };
 }
 
-/**
- * The lines of a blended result. Each world kept the line of its own best row and of the played row, but the blend ranks the rows again: a
- * line stays when its row is the blend's best row of its side (whichever world holds it, the heaviest first) or the played row. Nothing
- * reads `lines` to score or rank.
- */
+// A line stays when its row is the blend's best row of its side or the played row; nothing reads `lines` to score.
 function blendLines(entries: { entry: EvalResult }[], perSide: EvalResult['perSide']): EvalLine[] | undefined {
   const merged = new Map<string, EvalLine>();
   for (const { entry } of entries) {
@@ -162,11 +149,10 @@ function blendLines(entries: { entry: EvalResult }[], perSide: EvalResult['perSi
   return merged.size === 0 ? undefined : [...merged.values()];
 }
 
-/** One result for a game with several worlds (ADR 0013): the heaviest world's result is the frame, the numbers are weighted means; `results` and `weights` are index-aligned. */
+/** One result for a game with several worlds (ADR 0024): the heaviest world's result is the frame; the arrays align. */
 export function blendWorlds(results: EvalResult[], weights: number[]): EvalResult {
   if (results.length === 1) return results[0];
   // Rows and matrix cells blend by choice id; a forced win stays only when every world proves one for the same side.
-  // The heaviest world first (a tie keeps the earlier world): its rows come first, so a tie in the blended ev keeps its order.
   const order = results.map((_, index) => index).sort((a, b) => weights[b] - weights[a]);
   const frame = results[order[0]];
   const entries = order.map(index => ({ entry: results[index], weight: weights[index] }));

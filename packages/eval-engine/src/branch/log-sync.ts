@@ -25,7 +25,7 @@ export function replaceLogWithReplayPrefix(log: string[], replayLog: string, tar
   log.splice(0, log.length, ...replayLogPrefixThroughTurn(replayLog, targetTurn));
 }
 
-/** The protocol log a branch at `targetTurn` starts from: the replay's lines through `|turn|N`, plus switch lines for actives the corrections repointed. */
+/** The log a branch at `targetTurn` starts from: the replay through `|turn|N` plus switches for repointed actives. */
 export function branchLogForPosition(replayLog: string, targetTurn: number, battle: SimBattle): string[] {
   const log = replayLogPrefixThroughTurn(replayLog, targetTurn);
   syncLogActivesFromBattle(log, battle, targetTurn);
@@ -53,7 +53,6 @@ export function parseLoggedActive(line: string): LoggedActive | null {
 
 export function activeMatchesLog(pokemon: SimPokemon, logged: LoggedActive | undefined): boolean {
   if (!logged) return false;
-  // The species counts by the Dex of the battle, one body in another forme included.
   return sameBodyName(logged.name, pokemon.name) || sameBodyForme(pokemon.battle.dex, pokemon.species?.name, logged.speciesId);
 }
 

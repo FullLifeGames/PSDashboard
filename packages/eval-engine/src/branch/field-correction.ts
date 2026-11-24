@@ -2,10 +2,8 @@ import { type TurnSnapshot, toId } from '@fulllifegames/replay-core';
 import type { SimBattle } from './types.ts';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
 
-/**
- * Field and side conditions from the turn snapshot: @pkmn/client gives side conditions a `level` (a repeated setter) and the remaining
- * minimum and maximum turns, weather and terrain theirs in weatherState and terrainState.
- */
+// @pkmn/client gives side conditions a `level` (a repeated setter) and the remaining minimum and maximum turns,
+// weather and terrain theirs in weatherState and terrainState.
 
 type EffectEntry = { id?: string; duration?: number; effectOrder?: number; layers?: number };
 
@@ -19,10 +17,7 @@ export function snapshotConditionDuration(value: unknown): number | undefined {
   return undefined;
 }
 
-/**
- * The remaining turns the snapshot allows, from the client's minimum to its maximum. A maximum of 0 makes the minimum the
- * exact count (no item extends the condition); neither count means the client counts no turns.
- */
+// A maximum of 0 makes the minimum the exact count (no item extends the condition); neither count: no turns counted.
 function snapshotConditionRange(value: unknown): { min: number; max: number } | null {
   if (!value || typeof value !== 'object') return null;
   const counts = value as { minDuration?: unknown; maxDuration?: unknown; duration?: unknown };
@@ -35,20 +30,16 @@ function snapshotConditionRange(value: unknown): { min: number; max: number } | 
   return { min, max: max || min };
 }
 
-/**
- * The remaining turns a synced condition keeps: the simulator's own count where the snapshot allows it (it knows the setter's item; the
- * client never sees it and counts a Light Clay screen from five turns, not eight), else the snapshot's.
- */
+// The sim's own count wins where the snapshot allows it (it knows the setter's item; the client never sees it and
+// counts a Light Clay screen from five turns, not eight).
 function syncedDuration(held: number | undefined, value: unknown): number | undefined {
   const range = snapshotConditionRange(value);
   if (held !== undefined && range && held >= range.min && held <= range.max) return held;
   return snapshotConditionDuration(value);
 }
 
-/**
- * Whether the sim stacks this condition: its dex condition has `onSideRestart` (exactly Spikes and Toxic Spikes in 0.10.11, which count
- * layers); the client counts the same setter as `level`.
- */
+// The dex condition has `onSideRestart` (exactly Spikes and Toxic Spikes in 0.10.11, which count layers);
+// the client counts the same setter as `level`.
 function stacks(battle: SimBattle, id: string): boolean {
   // Side handlers are not on the dex's Condition type; the data object carries them.
   const condition = battle.dex.conditions.get(id);
@@ -79,7 +70,6 @@ function syncEffectTableFromSnapshot(battle: SimBattle, table: Record<string, Ef
   }
 }
 
-/** Weather the sim disagrees about takes the snapshot's id and remaining turns; matching weather keeps the rebuild's state. */
 function syncWeather(battle: SimBattle, snapshot: TurnSnapshot) {
   const weather = weatherIdFromSnapshot(snapshot.field.weather, battle.dex);
   if ((battle.field.weather as string) === weather) return;
@@ -90,7 +80,6 @@ function syncWeather(battle: SimBattle, snapshot: TurnSnapshot) {
   else delete battle.field.weatherState.duration;
 }
 
-/** Terrain the sim disagrees about: a cleared state (the sim's own helper), then the snapshot's id and remaining turns. */
 function syncTerrain(battle: SimBattle, snapshot: TurnSnapshot) {
   const terrain = terrainIdFromSnapshot(snapshot.field.terrain, battle.dex);
   if ((battle.field.terrain as string) === terrain) return;
@@ -101,7 +90,6 @@ function syncTerrain(battle: SimBattle, snapshot: TurnSnapshot) {
   if (duration) battle.field.terrainState.duration = duration;
 }
 
-/** Syncs weather, terrain, pseudo-weather and both sides' conditions of the battle to the turn snapshot. */
 export function correctFieldFromSnapshot(battle: SimBattle, snapshot: TurnSnapshot) {
   battle.turn = snapshot.turn;
   syncWeather(battle, snapshot);
