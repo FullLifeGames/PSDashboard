@@ -28,11 +28,6 @@ vi.mock('../../../src/lib/eval/worker-client', async importOriginal => {
 const { useAppController } = await import('../../../src/hooks/useAppController');
 const { WorkspaceEvalColumn } = await import('../../../src/components/WorkspaceEvalColumn');
 
-/**
- * A variation played late in a real game: the gold point and the panel's bar print one number, at the fainted share of the variation's
- * own board (read off the rosters the branch recorded), not at the opening map and not at the main line's share of that turn number.
- * The branches are real late positions of 655336 (singles) and 2663093831 (doubles); the search answers 0.79 for p1.
- */
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const pct = (score: number, share = 0) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
 
@@ -52,7 +47,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** The share of fainted bodies on a recorded board: both rosters, a body at 0 HP counted down. */
 const shareOfBoard = (entry: { p1Pokemon: { fainted: boolean; hp: number }[]; p2Pokemon: { fainted: boolean; hp: number }[] }) => {
   const bodies = [...entry.p1Pokemon, ...entry.p2Pokemon];
   return bodies.filter(body => body.fainted || body.hp <= 0).length / bodies.length;
@@ -71,7 +65,6 @@ describe('the variation of a late position prints one number in the graph and in
     await act(async () => { await app().ctx.replay.loadReplay(replay.id); });
     await waitFor(() => expect(app().engine.smogonPending).toBe(false));
 
-    // The first turn from which a third of the bodies lay down: the map the bar reads there is not the opening one.
     const snapshots = app().ctx.replay.snapshots;
     const lateTurn = snapshots.findIndex(snapshot => {
       const bodies = [...snapshot.p1.pokemon, ...snapshot.p2.pokemon];
@@ -84,7 +77,6 @@ describe('the variation of a late position prints one number in the graph and in
     await waitFor(() => expect(app().board.timeline.liveEvalView).toBe(true), { timeout: 90_000 });
     await waitFor(() => expect(app().ctx.branch.simState).not.toBeNull(), { timeout: 90_000 });
 
-    // Both sides play a legal move from every slot: one that needs no target, else the first target the simulator lists.
     const sim = app().ctx.branch.simState!;
     const firstLegal = (moves: typeof sim.p1MovesBySlot[0]) => {
       const move = moves.find(candidate => !candidate.disabled && !candidate.requiresTarget) ?? moves.find(candidate => !candidate.disabled)!;

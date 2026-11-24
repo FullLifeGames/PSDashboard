@@ -18,7 +18,6 @@ function props(overrides: Partial<Props> = {}): Props {
   };
 }
 
-/** The select inside the label that names it. */
 const select = (label: string) => within(screen.getByText(label)).getByRole('combobox');
 
 describe('EvalControls', () => {

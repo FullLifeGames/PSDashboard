@@ -7,10 +7,7 @@ import { pokemon, simState, NO_MODIFIERS } from '../../fixtures/sim-state';
 import { seedChoices } from '../../../../src/lib/dock-seed';
 import type { PlayedAtPosition } from '../../../../src/lib/played-pick';
 
-// The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
-
-/** A position without a played record starts without picks, so these cases click the way a user does at the tip. */
 
 describe('TurnDock.choices', () => {
   type Props = Parameters<typeof TurnDock>[0];
@@ -71,8 +68,6 @@ describe('TurnDock.choices', () => {
     });
   });
 
-  // A bench click at a forced replacement publishes its pick before the send goes out: the chip shows that body and Execute reads
-  // "Executing..." while the replacement plays.
   describe.each(['singles', 'doubles'] as const)('a forced replacement that is going out (%s)', type => {
     test('the chip shows the clicked body and Execute reads "Executing..."', () => {
       const forced = simState(type, {
@@ -95,7 +90,6 @@ describe('TurnDock.choices', () => {
 
       await userEvent.click(chip('P1A'));
       await userEvent.click(tray().getByRole('button', { name: /^Flare Blitz/ }));
-      // without damage numbers the first listed foe is the preselected one
       expect(wired.onSetChoice).toHaveBeenCalledWith('p1', { kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 }, 0);
       await userEvent.click(chip('P1B'));
       await userEvent.click(tray().getByRole('button', { name: /^Spore/ }));
@@ -195,7 +189,6 @@ describe('TurnDock.choices', () => {
       expect(chip('P1B')).toBeEnabled();
     });
 
-    // Urshifu fainted and Incineroar's Parting Shot asks for a switch in the same turn.
     test('doubles: a fainted slot that is not asked, beside a partner that must switch out, waits for the switch instead of claiming an empty bench', () => {
       const base: BranchSimState = simState('doubles');
       const downed = pokemon('Urshifu', { fainted: true, hp: 0, hpPercent: 0, isActive: true, activeSlot: 0 });
@@ -210,7 +203,6 @@ describe('TurnDock.choices', () => {
     });
   });
 
-  // P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
   describe('the side that does not replace takes no input', () => {
     const down = (side: 'p1' | 'p2') => ({ [`${side}ForceSwitch`]: true, [`${side}ForceSwitches`]: [true, false] });
 
@@ -235,8 +227,6 @@ describe('TurnDock.choices', () => {
       expect(screen.queryByText(/Waiting for/)).toBeNull();
     });
 
-    // The partner of a forced replacement is asked nothing, so its chip takes the waiting side's state (Champions VGC: P2B fainted and P2A
-    // stood live though the position asked nothing of it).
     test('doubles: the partner of the one forced slot takes no input, the forced slot stays live', () => {
       const { rerender } = render(<TurnDock {...props({ simState: simState('doubles', down('p2')) })} />);
       expect(chip('P2A')).not.toHaveAttribute('inert');
@@ -279,7 +269,6 @@ function props(overrides: Partial<Props> = {}): Props {
 const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
 const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
 
-/** A doubles position where both own slots hold a move pick (as the seed would), P1A with a Fire Tera type. */
 function seededDoubles(overrides: Partial<BranchSimState> = {}): BranchSimState {
   const base = simState('doubles');
   const modifiers = [{ ...NO_MODIFIERS, teraType: 'Fire' }, { ...NO_MODIFIERS, teraType: 'Grass' }];
@@ -430,7 +419,6 @@ describe('the states of a position', () => {
     const { rerender } = render(<TurnDock {...props({ simState: live, endOfGame: { winner: 'Bene' } })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Bene won the game. Go back a turn to play it another way.');
     expect(screen.queryByText(/variation/)).toBeNull();
-    // the reopened game has no live sim at its end: the picker shows a position that cannot be played
     rerender(<TurnDock {...props({ simState: simState('doubles'), endOfGame: { winner: null } })} />);
     expect(screen.getByRole('status')).toHaveTextContent('The game ended without a winner. Go back a turn to play it another way.');
     expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
@@ -438,7 +426,6 @@ describe('the states of a position', () => {
   });
 
   test.each([['singles'], ['doubles']] as const)('the end of a replay (%s) reads "<winner> won the battle!" with no dock to play', kind => {
-    // the picker of a replay's last turn shows a position that cannot be played; the end replaces it
     const { rerender } = render(<TurnDock {...props({ simState: simState(kind), endOfGame: { winner: 'Bene', battle: true } })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Bene won the battle! Go back a turn to play it another way.');
     expect(screen.queryByText(/won the game|variation/)).toBeNull();

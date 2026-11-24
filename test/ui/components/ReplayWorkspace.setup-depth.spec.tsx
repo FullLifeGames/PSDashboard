@@ -9,13 +9,11 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
-// The legal move pool is heavy dex data the what-if row loads lazily; a fixed pool keeps the workspace render cheap.
 vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const { useAppController } = await import('../../../src/hooks/useAppController');
 const { ReplayWorkspace } = await import('../../../src/components/ReplayWorkspace');
 
-/** The workspace over the real controller; the ref always holds the newest render's controller. */
 function Workspace({ latestRef }: { latestRef: { current: AppController | null } }) {
   const app = useAppController();
   useEffect(() => { latestRef.current = app; });

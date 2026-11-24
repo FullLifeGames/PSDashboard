@@ -10,7 +10,6 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
-// The legal move pool is heavy dex data the what-if row loads lazily; a fixed pool keeps the workspace render cheap.
 vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const { useAppController } = await import('../../../src/hooks/useAppController');
@@ -48,7 +47,6 @@ async function mountLoaded(kind: ReplayKind, link?: (id: string) => string) {
 const sideLabels = () => [...document.querySelectorAll('.ps-dock-label')].map(label => label.textContent);
 const chip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
 
-// A side report the way the frame's tracker posts it; the iframe's window is a stand-in the test owns.
 const frameWindow = (title = 'PS Replay') => {
   const frame = screen.getByTitle(title) as HTMLIFrameElement;
   if (!(frame as unknown as { fakeWindow?: unknown }).fakeWindow) {
@@ -85,7 +83,6 @@ describe('ReplayWorkspace', () => {
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
     expect(sideLabels()).toEqual(['P1', 'P2']);
-    // Every slot starts with the choice the log played, so Execute is ready at once.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Execute Turn' })).toBeEnabled(), { timeout: 30_000 });
     expect(screen.getByText(/^Choices/)).toBeInTheDocument();
     expect(document.querySelector('.ps-main-left')!.lastElementChild).toHaveClass('ps-dock');
@@ -115,7 +112,6 @@ describe('ReplayWorkspace', () => {
     };
     act(() => app().board.deviation.handleSetChoice('p1', firstLegal(sim.p1MovesBySlot[0]), 0));
     act(() => app().board.deviation.handleSetChoice('p2', firstLegal(sim.p2MovesBySlot[0]), 0));
-    // Switch sides in the main frame puts P2 first; the branch frame that takes over is a new document at the viewpoint.
     reportSide(frameWindow(), 'p2');
     expect(sideLabels()[0]).toBe('P2');
     await userEvent.click(screen.getByRole('button', { name: 'Execute Turn' }));
@@ -151,13 +147,11 @@ describe('ReplayWorkspace', () => {
       await userEvent.click(chip('P1'));
       await screen.findAllByRole('button', { name: /^Tera \(/ }, { timeout: 10_000 });
     };
-    // Both positions rebuilt once: the way back reads them from the store, with no snapshot step in between.
     await exactAt(3);
     await exactAt(2);
     await openTray();
     await userEvent.click(tera());
     expect(tera()).toHaveAttribute('aria-pressed', 'true');
-    // Turn 3 comes from the store at once with the same two actives, so only the move to a new position can release the toggle.
     await exactAt(3);
     expect(document.querySelector('.ps-tray')).toBeNull();
     await openTray();
@@ -186,14 +180,11 @@ describe('ReplayWorkspace', () => {
     await waitFor(() => expect(app().engine.pickerSimState).not.toBeNull(), { timeout: 30_000 });
     expect(sideLabels()).toEqual(['P1A', 'P1B', 'P2A', 'P2B']);
     expect([...document.querySelectorAll('.ps-dock-row')].map(row => row.querySelectorAll('.ps-dock-chip').length)).toEqual([2, 2]);
-    // The fixture's turn 2 logs no action for some slot, so that chip starts empty and Execute waits for its pick.
     expect(document.querySelector('.ps-dock-chip[data-empty="true"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
   }, 90_000);
 });
 
-// The side the frame shows near stands first in the dock (left chip in singles, upper row in doubles and VGC); a `ps-side` report
-// counts only from the frame's own window.
 describe("ReplayWorkspace: the dock follows the frame's near side", () => {
   const firstRow = () => [...document.querySelector('.ps-dock-row')!.querySelectorAll('.ps-dock-label')].map(label => label.textContent);
 

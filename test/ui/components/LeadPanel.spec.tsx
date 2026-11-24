@@ -56,7 +56,6 @@ describe('LeadPanel', () => {
       expect(wired.onStart).toHaveBeenCalledWith({ p1: ['Amoonguss', 'Urshifu'], p2: ['Tornadus', 'Kingambit'] });
     });
 
-    // Gen 4 has no Team Preview; the free pick of a lead is a tool of the app, not the format's step.
     test('a format without Team Preview does not say "team preview", and says the pick moves the lead to the front', () => {
       const { rerender } = render(<LeadPanel {...props({ teamPreview: false })} />);
       expect(screen.queryByText(/^Turn 0 · team preview/)).toBeNull();
@@ -91,7 +90,6 @@ describe('LeadPanel', () => {
       expect(screen.getByText(/The teams are still loading/)).toBeInTheDocument();
     });
 
-    // the picker names a Pokemon the way the switch chips do (displayName), nickname and species together
     test.each([
       ['singles', singles, 1],
       ['doubles', doubles, 2],
@@ -103,7 +101,6 @@ describe('LeadPanel', () => {
       expect(screen.getAllByText(p1Options[1].species).length).toBeGreaterThan(0);
     });
 
-    // the play-out button outside the panel reads the picks the panel shows
     test('reports the picks while they are complete and clears them when the panel leaves', async () => {
       const onPicksChange = vi.fn();
       const { unmount } = render(<LeadPanel {...props({ ...doubles, leadsPerSide: 2, onPicksChange })} />);
@@ -124,7 +121,6 @@ describe('LeadPanel', () => {
       expect(onPicksChange).toHaveBeenLastCalledWith({ p1: ['Latias'], p2: ['Weavile'] });
     });
 
-    // the picker lists the near side first, as the dock's rows do
     test.each([
       ['singles', singles, 1],
       ['doubles', doubles, 2],

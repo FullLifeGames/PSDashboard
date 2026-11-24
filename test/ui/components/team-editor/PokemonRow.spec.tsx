@@ -96,11 +96,6 @@ describe('ev-limits', () => {
     }
   });
 
-  /**
-   * A Champions format the mod does not list (an earlier regulation, another
-   * tier) still gets the Champions caps and the budget line: the pools hand the
-   * row the total they read for the id.
-   */
   describe('EV inputs on a Champions format the mod does not list', () => {
     beforeAll(async () => {
       await loadSimMods('gen9championsou');

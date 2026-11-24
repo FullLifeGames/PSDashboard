@@ -6,12 +6,7 @@ import { createBranchStateFromBattle } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { simState } from '../../fixtures/sim-state';
 
-/**
- * Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The calculator spreads the move over every foe and
- * holds no screen factor for the one target the simulator plays, so the preview hands the live battle of the branch to the engine and shows
- * the simulator's own range. Without a live battle it shows no range. The oracle is the simulator: it plays the move and the HP the foe
- * loses lies in the shown range. The tile of the open tray reads the range from its tooltip.
- */
+// The calc spreads the move over every foe and holds no screen factor for a lone target; the simulator plays it.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -20,7 +15,6 @@ const set = (species: string, moves: string[]): PokemonSet => ({
   evs: { ...STATS, hp: 252, atk: 252, spa: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50, gender: '',
 });
 
-/** A doubles battle in Psychic Terrain in which the first foe stands alone behind a screen. */
 function loneFoeBehind(screen: string | null): Battle {
   const battle = new Battle({
     formatid: toID('gen9doublescustomgame'), seed: [1, 2, 3, 4],
@@ -36,7 +30,6 @@ function loneFoeBehind(screen: string | null): Battle {
   return battle;
 }
 
-/** The percent of Blissey's HP the simulator takes off when Hatterene plays the move. */
 function simulatorPercent(screen: string): number {
   const battle = loneFoeBehind(screen);
   const foe = battle.sides[1].active[0]!;
@@ -58,7 +51,6 @@ async function renderDock(screen: string | null, live: boolean) {
 }
 
 const RANGE = /(\d+(?:\.\d+)?)% - (\d+(?:\.\d+)?)%/;
-/** The range of a move tile: the calc's sentence in its tooltip (the tile itself shows whole percent). */
 const shownRange = (row: HTMLElement) => row.getAttribute('title') ?? '';
 
 describe('the dock: the preview of a forced spread on a lone foe behind a screen', () => {
@@ -95,7 +87,6 @@ const props = (overrides: Partial<Props> = {}): Props => ({
 
 const read = () => document.documentElement.style.getPropertyValue('--ps-dock-h');
 
-/** The fixed dock of a narrow window tells the page its height; it stands for singles and doubles, and goes with the dock. */
 describe('the dock reports its height', () => {
   afterEach(() => {
     vi.restoreAllMocks();

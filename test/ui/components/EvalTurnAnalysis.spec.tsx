@@ -102,7 +102,6 @@ describe('EvalTurnAnalysis', () => {
     const rows = screen.getAllByRole('button', { name: '✓ the engine\'s move ↗' });
     expect(rows).toHaveLength(2);
     await userEvent.click(rows[0]);
-    // the click also hands the result the card reads (none here), for Hard mode
     expect(onExplore).toHaveBeenCalledWith('p1', analysis.p1.best, analysis.p2.best, undefined);
     await userEvent.click(rows[1]);
     expect(onExplore).toHaveBeenLastCalledWith('p2', analysis.p2.best, analysis.p1.best, undefined);
@@ -160,7 +159,6 @@ describe('EvalLeadAnalysis', () => {
   });
 
   test('doubles: a lead pair keeps the engine\'s pick as a neutral line, without a verdict', () => {
-    // the doubles lead reading sits close to a coin flip, so no mistake or inaccuracy is named.
     const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
     const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
     const { rerender } = render(<EvalLeadAnalysis leads={leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } })} playerNames={names} />);
@@ -172,7 +170,6 @@ describe('EvalLeadAnalysis', () => {
   });
 
   test('doubles: a led pair that matches the engine\'s pick gets no tick either, only the neutral engine line', () => {
-    // gen9doublesou-2660802611 p1: led Landorus + Incineroar, the engine's pick too.
     const pair = rankedChoice('team 12', 'Lead Landorus + Incineroar', 0.1);
     render(<EvalLeadAnalysis leads={leadAnalysis({ p1: { played: pair, best: pair, regret: 0 } })} playerNames={names} />);
     expect(screen.queryByText('✓ the engine\'s leads')).toBeNull();
@@ -288,7 +285,6 @@ describe.each([
     await userEvent.click(open);
     expect(opened.winPaths.hide).toHaveBeenCalled();
 
-    // the next endgame turn starts closed: the open run is the other turn's
     rerender(<EvalTurnAnalysis analysis={turnAnalysis(5)} playerNames={names} linesHost={opened} doubles={doubles} />);
     expect(screen.getByRole('button', { name: 'How could Bob have won from here?' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();
@@ -302,7 +298,6 @@ describe.each([
   });
 });
 
-// The card hands its result to the rows, so the ranked row's "then ..." and the Lines section show one line per row.
 describe.each([
   ['singles', 'Earthquake', evalResult('singles'), true],
   ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', evalResult('doubles'), false],

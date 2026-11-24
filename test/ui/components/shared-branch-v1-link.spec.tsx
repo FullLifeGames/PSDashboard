@@ -7,11 +7,6 @@ import { useSharedBranch } from '../../../src/hooks/useSharedBranch';
 import { decodeBranchShare, encodeBranchShare, loadSavedBranches, savedBranchKey } from '../../../src/lib/branch-share';
 import { V1_SHARE_LINK, V1_SHARE_LINK_FACTS } from '../fixtures/v1-share-link';
 
-/**
- * An old v1 link plays the log it carries. The fixture is a played-out branch of 450650 whose `finalLog` the v1 `branchFrameLog` had
- * already put into the replay's nicknames and flags; a link holds no sets, only that log and the choices shown beside it.
- */
-
 let blobs: Blob[] = [];
 
 beforeEach(() => {
@@ -37,7 +32,6 @@ describe('a share link built on v1', () => {
     expect(payload.branchTurn).toBe(V1_SHARE_LINK_FACTS.branchTurn);
     expect(payload.choices).toHaveLength(V1_SHARE_LINK_FACTS.choices);
     expect(payload.finalLog.split('\n')).toHaveLength(V1_SHARE_LINK_FACTS.lines);
-    // The v1 frame spoke the replay's names: the log carries a nickname, not the species the set was named for.
     expect(payload.finalLog).toContain('|switch|p2a: EARFQUAKE?|Garchomp, F|');
     expect(encodeBranchShare(payload)).toBe(V1_SHARE_LINK);
   });

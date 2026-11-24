@@ -16,7 +16,6 @@ const doubles = simState('doubles');
 
 type WhatIfProps = Partial<Parameters<typeof WhatIfRow>[0]>;
 
-/** The What-if row over its own state, as the tray hosts it. */
 function WhatIfHost(props: WhatIfProps) {
   const [whatIfMove, setWhatIfMove] = useState('');
   const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
@@ -133,7 +132,6 @@ describe('the What-if section of the tray (singles)', () => {
   });
 });
 
-/** The nickname-and-species label of a body: one rule for the history, the switch tiles and the picker. */
 describe('displayName in the picker', () => {
   test('a nicknamed body reads "Nickname (Species)", a body without a nickname reads its species alone', () => {
     expect(displayName('Power Police', 'Meowstic')).toBe('Power Police (Meowstic)');

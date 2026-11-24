@@ -35,7 +35,6 @@ describe('BranchHistoryPanel', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  // At 150 % the open panel slid under the sticky dock.
   test('it starts closed: the toggle counts the turns, the body and the hint are hidden, and a click opens and closes it', () => {
     render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3)]} snapshots={snapshots} onNavigate={vi.fn()} />);
     expect(toggle()).toHaveTextContent('▸ Variation moves · 2 turns');
@@ -95,7 +94,6 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
-  // The panel does not know singles from doubles.
   test('an ended tip says the game ends there and no longer invites to continue', async () => {
     const onNavigate = vi.fn();
     renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3)]} snapshots={snapshots} onNavigate={onNavigate} ended />);
@@ -104,7 +102,6 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
-  // A replacement on both sides is stored as an entry of kind turn with the number of the entry before it.
   test.each([
     ['singles', 1],
     ['doubles', 2],
@@ -225,7 +222,6 @@ describe('the dice of a turn in its row', () => {
   });
 });
 
-/** The caller hands in the buttons for the toggle line, a line under it, and the saved rows for the body. */
 describe('the slots of the toggle line', () => {
   const slots = (onOpenChange = vi.fn()) => ({
     actions: <><button type="button">Save here</button><button type="button">Share here</button></>,

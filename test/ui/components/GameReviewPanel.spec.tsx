@@ -10,7 +10,6 @@ import type { WinPathsHost } from '../../../src/lib/win-paths-host';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 const host = (onPlay = vi.fn()): LinesHost => ({ rules: { gen: 9, mod: undefined }, onPlay });
-/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and pixelfrost's opponent pair are each side's top choice. */
 const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
 const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({
   ...evalResult(kind), lines,
@@ -216,7 +215,7 @@ describe('GameReviewPanel, both numbers', () => {
   });
 });
 
-/** Singles only in practice; the panel draws what the host hands it for either game type. */
+// Singles only in practice; the panel draws what the host hands it for either game type.
 describe('GameReviewPanel, the early-lines progress line', () => {
   const PROGRESS = 'Finding lines for graded turns: 2 of 6';
 

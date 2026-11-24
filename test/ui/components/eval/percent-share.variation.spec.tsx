@@ -8,16 +8,10 @@ import type { BranchHistoryEntry } from '../../../../src/lib/branch-history';
 import { evalGraph, evalResult } from '../../fixtures/eval-result';
 import { pokemon, type FormatKind } from '../../fixtures/sim-state';
 
-// The workspace test needs the evaluation column only; the bars below it have their own specs.
 vi.mock('../../../../src/components/PlayOutBar', () => ({ PlayOutBar: () => null }));
 vi.mock('../../../../src/components/BattleStatsPanel', () => ({ BattleStatsPanel: () => null }));
 
-/**
- * A variation point in the graph and the panel's bar of the same position print one number, at the fainted share of the variation's own
- * board (not the main line's share of that turn number, and not the opening map), in every engine mode. Expected values come from the
- * formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10 at 0.5), not from winPercent. Scene: late game, the main line stood at
- * 3 of 8 bodies down on turn 7, the variation lost one more body and stands at 4 of 8; the live result scores 0.79 for Alice.
- */
+// Expected values come from the formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10 at 0.5).
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const pct = (score: number, share = 0) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
 const names: [string, string] = ['Alice', 'Bob'];
@@ -30,10 +24,8 @@ const MODES = ['auto', 'matrix', 'mcts'] as const;
 
 const prefsFor = (mode: EvalPreferences['mode']): EvalPreferences => ({ depth: 1, samples: 1, mode, auto: false, autoAnalyze: false, tera: 'auto' });
 
-/** The card's share per swept turn as useGameAnalysis lists it in any engine mode; turn 7 is the late one. */
 const mainShares = () => Array.from({ length: 10 }, (_, i) => (i === TURN - 1 ? MAIN_SHARE : i / 40));
 
-/** The sweep's own record: the auto engine writes it, Matrix and MCTS leave it empty. */
 function lateGraph(kind: FormatKind, mode: EvalPreferences['mode']) {
   const base = evalGraph(kind);
   return evalGraph(kind, {
@@ -97,7 +89,6 @@ describe('a variation point and the panel print one number', () => {
 });
 
 describe('the workspace feeds the variation board shares from the branch history', () => {
-  /** A late variation of one executed turn: `down` bodies of each side fainted on the board it ended on. */
   const lateEntry = (kind: FormatKind, down: number): BranchHistoryEntry => {
     const bodies = kind === 'singles' ? 6 : 4;
     const roster = () => Array.from({ length: bodies }, (_, i) => (i < down ? pokemon(`Mon${i}`, { fainted: true, hp: 0, hpPercent: 0 }) : pokemon(`Mon${i}`)));
@@ -109,7 +100,6 @@ describe('the workspace feeds the variation board shares from the branch history
 
   function workspace(kind: FormatKind, mode: EvalPreferences['mode']) {
     const graph = lateGraph(kind, mode);
-    // Half of each roster is down on the variation board: singles 3 of 6 per side, doubles 2 of 4 per side.
     const history = [lateEntry(kind, kind === 'singles' ? 3 : 2)];
     return {
       ctx: {

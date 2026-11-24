@@ -4,7 +4,6 @@ import { DockRows } from '../../../../src/components/dock/DockRows';
 import type { DockModel, DockSlotModel, Side } from '../../../../src/components/dock/dock-model';
 import { switchOption } from '../../fixtures/sim-state';
 
-/** The row order follows the side the replay frame shows near: after Switch sides P2's chips take the top row (doubles, VGC) or the left place (singles). */
 function slot(side: Side, index: number, label: string, switches = 0): DockSlotModel {
   return {
     side, slot: index, label, name: 'Greninja', species: 'Greninja', hpPercent: 80, fainted: false, moves: [],
@@ -17,7 +16,6 @@ function slot(side: Side, index: number, label: string, switches = 0): DockSlotM
 const model = (p1: DockSlotModel[], p2: DockSlotModel[]) => ({ p1, p2 }) as unknown as DockModel;
 const SINGLES = model([slot('p1', 0, 'P1')], [slot('p2', 0, 'P2')]);
 const DOUBLES = model([slot('p1', 0, 'P1A'), slot('p1', 1, 'P1B')], [slot('p2', 0, 'P2A'), slot('p2', 1, 'P2B')]);
-// VGC: four brought, two active; the bench lists differ from doubles, the chips do not.
 const VGC = model([slot('p1', 0, 'P1A', 2), slot('p1', 1, 'P1B', 2)], [slot('p2', 0, 'P2A', 2), slot('p2', 1, 'P2B', 2)]);
 
 function rows(m: DockModel, nearSide?: Side) {

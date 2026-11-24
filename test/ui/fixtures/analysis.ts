@@ -4,13 +4,11 @@ import { rankedChoice } from './eval-result';
 const p1Line = () => rankedChoice('move earthquake', 'Earthquake', 0.35);
 const p2Line = () => rankedChoice('move leechseed', 'Leech Seed', -0.3);
 
-/** One side of an analyzed turn that played the engine's own line: no regret, no tier. */
 export function sideAnalysis(overrides: Partial<SideAnalysis> = {}): SideAnalysis {
   const best = p1Line();
   return { playedRaw: { kind: 'move', name: 'Earthquake' }, played: best, best, safe: best, regret: 0, ...overrides };
 }
 
-/** A side that missed the engine's line by a mistake-sized or blunder-sized margin. */
 export function misplayedSide(tier: 'mistake' | 'blunder' = 'mistake', overrides: Partial<SideAnalysis> = {}): SideAnalysis {
   const best = rankedChoice('move earthquake', 'Earthquake', 0.35, { punishedBy: 'Protect' });
   const played = rankedChoice('move stoneedge', 'Stone Edge', tier === 'blunder' ? -0.15 : 0.1, { punishedBy: 'Leech Seed' });
@@ -20,7 +18,6 @@ export function misplayedSide(tier: 'mistake' | 'blunder' = 'mistake', overrides
   };
 }
 
-/** A quiet analyzed turn: both sides on the engine's line, a small upward drift for p1. */
 export function turnAnalysis(turn: number, overrides: Partial<TurnAnalysis> = {}): TurnAnalysis {
   const leech = p2Line();
   return {
@@ -32,7 +29,6 @@ export function turnAnalysis(turn: number, overrides: Partial<TurnAnalysis> = {}
   };
 }
 
-/** The lead decision graded: p1 led the engine's pair, p2 missed it by a mistake. */
 export function leadAnalysis(overrides: Partial<LeadAnalysis> = {}): LeadAnalysis {
   const p1Best = rankedChoice('team 1', 'Lead Garchomp', 0.2);
   const p2Best = rankedChoice('team 2', 'Lead Rotom-Wash', -0.1);

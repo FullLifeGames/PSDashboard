@@ -3,10 +3,6 @@ import { render } from '@testing-library/react';
 import { HitBar } from '../../../../src/components/dock/HitBar';
 import { BarLegend } from '../../../../src/components/dock/BarLegend';
 
-/**
- * Four parts in a fixed order: what stays after the highest roll, the roll's part, the lowest roll's part, what was lost before. The tone
- * belongs to the bar and colors the roll's and the lowest roll's part.
- */
 const widths = (container: HTMLElement) =>
   [...container.querySelectorAll<HTMLElement>('.ps-hitbar > i')].map(part => [part.className, part.style.width]);
 

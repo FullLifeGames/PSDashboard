@@ -9,10 +9,7 @@ import { hitTitle, variationHitTitle } from '../../../../src/lib/eval-graph-view
 import { evalGraph, evalResult } from '../../fixtures/eval-result';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 
-/**
- * The graph tooltip, the advantage bar, the ranked lines, the matrix and the turn card print one map at the turn's fainted share. Expected
- * values are written from the formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10 at 0.5), not read back from winPercent.
- */
+// Expected values come from the formula (K 1.85 up to a share of 0.25, then +5 per share to 3.10 at 0.5).
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const pct = (score: number, share = 0) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
 const names: [string, string] = ['Alice', 'Bob'];
@@ -67,8 +64,6 @@ describe('graph and panel read one number', () => {
     expect(screen.getByRole('img', { name: `Advantage estimate: Alice ${p1}%, Bob ${100 - p1}%` })).toBeInTheDocument();
   });
 
-  // A branch result prints at the share of its own board; the main line's share of the same turn number stands in for nothing. The scenes
-  // are in percent-share.variation.spec.tsx.
   test('a branch result (not the graph\'s own) on a variation board of unknown share reads the opening map', () => {
     const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, () => 0.5) });
     const branch = evalResult('singles', { score: 0.4 });

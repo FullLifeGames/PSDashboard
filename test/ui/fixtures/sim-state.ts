@@ -27,7 +27,6 @@ export function switchOption(species: string, overrides: Partial<BranchSwitchOpt
   return { name: species, species, activeSlot: 0, slot: 2, hp: '300/300', hpPercent: 100, fainted: false, ...overrides };
 }
 
-/** A move target as the sim labels it: the slot ("P2A"), then the Pokémon standing there. */
 export function targetOption(side: 'p1' | 'p2', activeSlot: number, species: string, targetLoc: number): BranchTargetOption {
   return { label: `${side.toUpperCase()}${String.fromCharCode(65 + activeSlot)}`, targetLoc, side, activeSlot, name: species, species, hpPercent: 100 };
 }

@@ -38,7 +38,6 @@ describe('SideRow', () => {
     expect(screen.getByText('· worst vs Leech Seed')).toBeInTheDocument();
     expect(screen.getByText(`${winPctText(0.35)} better:`)).toBeInTheDocument();
     expect(screen.getByText('· worst vs Protect')).toBeInTheDocument();
-    // Two different moves differ wholesale: the labels tell the story, no condensed difference.
     expect(screen.queryByText('difference:')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Earthquake ↗' }));
     expect(onExplore).toHaveBeenCalledWith(side.best);
@@ -57,7 +56,6 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  // The better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
   test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
     const line = (steps: [string, string][], extra = {}) => ({
@@ -86,7 +84,7 @@ describe('SideRow', () => {
   });
 
   test('a stayed sack the window did not verify claims no payback (the 573756 t68 shape without verified)', () => {
-    // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted, not verified (grading.ts sackVerdict).
+    // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted (grading.ts sackVerdict).
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { tier: 'inaccuracy', sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true } })} />);
     const note = screen.getByText('· sacked Weavile (77% HP)');
     expect(note).toHaveAttribute('title', expect.stringContaining('payoff window'));
@@ -162,7 +160,6 @@ describe('SideRow', () => {
     const read = { response: '→ Heatran', against: 'Iron Head', gain: 0.56 };
     const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: { ...read, shown: true, line } })} />);
     expect(screen.getByText(line)).toBeInTheDocument();
-    // A read the gate held back (few visits, or too close to the regret) says nothing on the row.
     rerender(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: read })} />);
     expect(screen.queryByText(line)).toBeNull();
     expect(screen.queryByText(/was worth/)).toBeNull();
@@ -180,7 +177,6 @@ describe('SideRow', () => {
       'The floor assumes Leech Seed; the opponent chose Toxic instead, and against that the safe line did as well or better.',
     );
     expect(screen.queryByText(/read paid off/)).toBeNull();
-    // Without the field (a result with no matrix) the old title stands.
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
     expect(screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
   });
@@ -190,14 +186,11 @@ describe('SideRow', () => {
     const { rerender } = render(<SideRow name="Alice" side={paid} />);
     expect(screen.getByText(`read paid off · ${winDeltaText(0.09)}`)).toBeInTheDocument();
     expect(screen.queryByText(/· inaccuracy/)).toBeNull();
-    // the side lost ground: the read is not praised, so the inaccuracy stays
     rerender(<SideRow name="Alice" side={paid} lostGround />);
     expect(screen.queryByText(/read paid off/)).toBeNull();
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
   });
 
-  // "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's description of a stand-in as a choice and
-  // ticked it (649664 t23 and t24). A body knocked out before it moved has no choice in the log.
   test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
     const standIn = rankedChoice('move painsplit', 'stayed in (KO’d before acting)', 0.11);
     const best = rankedChoice('move painsplit', 'Pain Split', 0.11);

@@ -5,7 +5,6 @@ import { EvictedGameNotice } from '../../../src/components/EvictedGameNotice';
 import { MAX_SAVED_GAMES, saveGame } from '../../../src/lib/new-game/store';
 import type { NewGameRecord } from '../../../src/lib/new-game/record';
 
-/** The notice names the saved game a 21st save pushed out; singles and doubles rows read the same: the format's name and the players. */
 const stand = (n: number, turns: number, formatName: string): NewGameRecord => ({
   recordVersion: 1, id: `newgame-${n}`, format: 'x', formatName, players: [`P${n}`, `Q${n}`], turns, seed: '1,2,3,4',
   updatedAt: new Date(Date.UTC(2026, 10, 1, 0, n)).toISOString(),

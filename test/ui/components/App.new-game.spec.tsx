@@ -132,7 +132,6 @@ describe('a new game in the app', () => {
 
   test('a finished game opened again shows its end as the live game did: the winner, no dock to play', async () => {
     const played = await playedRecord(1);
-    // the last turn ends with the win instead of the next `|turn|` line: the game's end snapshot is its tip
     const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
     saveGame(finished);
     window.history.replaceState(null, '', `/?game=${finished.id}`);
@@ -210,7 +209,6 @@ describe('a new game in the app', () => {
   test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy', async () => {
     const played = await playedRecord(1);
     window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
-    // the sharer's game is not in this browser: the link comes from elsewhere
     deleteGame(played.id);
     render(<App />);
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 60_000 });
@@ -277,7 +275,6 @@ describe('a new game in the app', () => {
 
   test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood', async () => {
     const played = await playedRecord(2);
-    // the main line holds the lead and turn 1; the sharer's branch replays turn 2 from turn 1 and he stands on its tip
     const main = { ...played, entries: played.entries.slice(0, 2), turns: 1 };
     const payload = makeGameSharePayload({
       record: main, variation: { startTurn: 1, history: played.entries.slice(2) }, view: { turn: 2, line: 'variation' },
@@ -360,7 +357,7 @@ describe('a new game in the app', () => {
   }, 90_000);
 });
 
-/** The panel's own submit button is named "Load" as well, so the toggle is found by its class. */
+// The panel's own submit button is named "Load" as well, so the toggle is found by its class.
 const toggle = () => document.querySelector('.ps-loader-toggle') as HTMLElement;
 
 describe('the replay loader in the app', () => {
@@ -396,7 +393,7 @@ describe('the replay loader in the app', () => {
   });
 
   test('Load with the Smogon hosts down names both notices in the top bar', async () => {
-    // The VGC fixture: the Smogon modules cache an earlier answer per format and species, and no other row loads it.
+    // The Smogon modules cache an earlier answer per format and species, and no other row loads the VGC fixture.
     const replay = replayData('vgc');
     const fetchMock = stubReplayFetch([replay]);
     const served = fetchMock.getMockImplementation()!;
@@ -412,7 +409,6 @@ describe('the replay loader in the app', () => {
   }, 90_000);
 });
 
-/** Text and state of the app's own markup: no replay iframe, so they run here. */
 describe('the start page and the Load panel', () => {
   test('the start page: one header with Beta, Report issue and the creator link; the featured draft link and a Load button; the three guide steps; the team paste', async () => {
     render(<App />);
@@ -473,7 +469,6 @@ async function openGame(turns: number) {
   return record;
 }
 
-/** Setup, Import/Export Sets: every Protect becomes Rest, so the second turn (both sides played Protect) no longer plays. */
 async function importWithoutProtect(): Promise<string> {
   await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
   await userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
@@ -485,7 +480,6 @@ async function importWithoutProtect(): Promise<string> {
   return typed;
 }
 
-/** The hook specs (`useGameTeamEdit.spec.tsx`, `useNewGame.spec.tsx`) hold the question for singles and doubles; these rows run it through the app. */
 describe('a team edit that cuts played turns asks first', () => {
   beforeEach(() => { stubReplayFetch([]); });
 

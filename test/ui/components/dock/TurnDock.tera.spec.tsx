@@ -8,13 +8,9 @@ import {
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { NO_MODIFIERS, moveOption, pokemon, simState, targetOption } from '../../fixtures/sim-state';
 
-// The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
 
-/**
- * One Tera per side and turn; an armed toggle belongs to one position. A tile keeps the calc's own range in its tooltip, so the numbers are
- * read from there.
- */
+// One Tera per side and turn; an armed toggle belongs to one position.
 type Props = Parameters<typeof TurnDock>[0];
 
 function props(overrides: Partial<Props> = {}): Props {
@@ -26,7 +22,6 @@ function props(overrides: Partial<Props> = {}): Props {
 
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
-/** The dock over a position whose picks the host keeps, as the app keeps them: a toggle on a picked move edits that pick. */
 function Stateful({ base, first, positionKey }: { base: BranchSimState; first: Picks; positionKey?: string }) {
   const [picks, setPicks] = useState<Picks>(first);
   const state = { ...base, p1Choices: picks.p1, p1Choice: picks.p1[0] ?? null, p2Choices: picks.p2, p2Choice: picks.p2[0] ?? null };
@@ -43,7 +38,6 @@ const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
 const tile = (name: RegExp) => tray().getByRole('button', { name });
 const toggle = (label: string) => screen.getByRole('button', { name: label });
 
-/** The tile's tooltip holds the calc's range of the hit it shows. */
 const showsRange = (find: () => HTMLElement, range: string) =>
   waitFor(() => expect(find()).toHaveAttribute('title', expect.stringContaining(range)));
 
@@ -107,8 +101,8 @@ describe('the Tera toggle reaches the damage preview', () => {
     await userEvent.click(toggle('Mega Evolve'));
     expect(toggle('Mega Evolve')).toHaveAttribute('aria-pressed', 'true');
     expect(toggle('Tera (Ground)')).toHaveAttribute('aria-pressed', 'false');
-    // The number before the click cannot show a leak: no recomputation may have landed yet. The defender's Tera recomputes the preview for
-    // sure, and that recomputation reads P1's armed Mega too.
+    // No recomputation has landed before the click, so it cannot show a leak; the defender's Tera recomputes
+    // the preview for sure, and that recomputation reads P1's armed Mega too.
     const megaLeftOut = calcRange(garchomp, { ...ferrothorn, teraType: 'Fire' }, earthquake, 'Singles');
     expect(megaLeftOut).not.toBe(calcRange({ ...garchomp, teraType: 'Ground' }, { ...ferrothorn, teraType: 'Fire' }, earthquake, 'Singles'));
     await userEvent.click(chip('P2'));

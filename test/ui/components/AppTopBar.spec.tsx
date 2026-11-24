@@ -145,7 +145,6 @@ describe('AppTopBar', () => {
     expect(wired.onCancelPreparation).toHaveBeenCalledTimes(1);
   });
 
-  // The status names the live simulator's tip, which is not the turn on the slider after a play-out.
   test.each(['singles', 'doubles'] as const)('%s: the live branch status reads "Variation tip: Turn N", and a preparing branch keeps its progress words', kind => {
     const { rerender } = render(<AppTopBar {...props({ showBranch: true, simState: simState(kind, { turnNumber: 33 }) })} />);
     expect(screen.getByText('Variation tip: Turn 33')).toBeInTheDocument();

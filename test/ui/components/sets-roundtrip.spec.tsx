@@ -12,26 +12,19 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
-// The App owns its controller; the wrapper keeps the newest one so the test can read the settled state.
 const captured = vi.hoisted(() => ({ app: null as unknown }));
 vi.mock('../../../src/hooks/useAppController', async importOriginal => {
   const actual = await importOriginal<typeof import('../../../src/hooks/useAppController')>();
   return { ...actual, useAppController: () => { const app = actual.useAppController(); captured.app = app; return app; } };
 });
-// The legal move pool is heavy dex data the what-if row loads lazily; a fixed pool keeps the workspace render cheap.
 // The editor's pools read the rest of the module (prepareFormat), so the mock keeps it.
 vi.mock('../../../src/lib/pokemon-options', async importOriginal => ({ ...(await importOriginal<typeof import('../../../src/lib/pokemon-options')>()), getMovePool: async () => ['Dragon Claw'] }));
 
 const { default: App } = await import('../../../src/App');
 
-/**
- * Export then import leaves every set as it was: the export reads the solved spreads the stats panel shows, not the enriched infos
- * (their EVs and natures are usage guesses; 2663093831's Sinistcha: the log refutes the published Speed IV 0). The scenes are real
- * replays with pinned Smogon data, singles and doubles, built through the app's own chain.
- */
+// The export reads the solved spreads the stats panel shows, not the enriched infos (usage-guess EVs and natures).
 const SMOGON_HOSTS = /^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/;
 
-/** The replay JSON by id, the Smogon data from the feedback corpus' pinned files, 404 for everything else. */
 function stubNetwork(replay: ReplayData) {
   const replayFetch = stubReplayFetch([replay]);
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -85,8 +78,6 @@ describe('the sets export and import leave the inference where it was', () => {
     ['singles', 'smogtours-gen6ou-655336'],
     ['doubles', 'gen9doublesou-2663093831'],
     ['Champions singles, Stat Points', 'gen9championsou-2628340185'],
-    // The two sets the coherence veto swapped on a round trip (a guessed fourth move, once the solved item
-    // is a Choice item), then the rest of the feedback fixtures: 144 sets in all.
     ['Champions VGC, Head Smash', 'gen9championsvgc2026regmc-2695803506'],
     ['singles, Body Press', 'smogtours-gen8ou-573756'],
     ['singles', 'smogtours-gen6ou-648453'],
@@ -146,7 +137,6 @@ async function settledRows(replay: ReplayData) {
   return rows;
 }
 
-/** The editor and the sets panel read the same solved values as the stats panel; a panel opened before the first spread solve waits for it. */
 describe('the team editor and an early sets panel keep the inference', () => {
   test.each([
     ['singles', 'smogtours-gen6ou-655336'],

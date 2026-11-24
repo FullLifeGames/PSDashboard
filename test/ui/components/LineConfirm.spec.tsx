@@ -9,10 +9,6 @@ import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/**
- * The question "replace the existing variation?" after ▶ Play stands under the line the user clicked, in the turn card's Lines section and
- * in the Game review, singles and doubles (it showed 800 px above the screen, and under the dock bar).
- */
 const MESSAGE = 'Play this line from turn 20: replace the existing variation from turn 12 (3 turns)?';
 const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({ ...evalResult(kind), lines });
 const hostWith = (line: EvalLine, turn: number, proceed = vi.fn(), cancel = vi.fn()): LinesHost => ({
@@ -57,7 +53,6 @@ describe('the replace question of ▶ Play', () => {
     const row = banner.closest('.ps-eval-review-row') as HTMLElement;
     expect(within(row).getByRole('button', { name: 'T20' })).toBeInTheDocument();
     expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
-    // it follows the clicked line: the engine's, not the played one
     expect(banner.parentElement!.previousElementSibling).toHaveTextContent('engine line:');
   });
 
@@ -69,10 +64,7 @@ describe('the replace question of ▶ Play', () => {
   });
 });
 
-/**
- * In the 354 px right column the message took the width and the two buttons broke into letters ("Rep/lace", "Ca/nc/el"). The buttons keep
- * their words whole and the question wraps instead. jsdom has no layout, so the row reads the styles that decide it.
- */
+// jsdom has no layout: the row reads the styles that decide the buttons' words and the wrap.
 describe('the replace question in a narrow column', () => {
   test.each(['singles', 'doubles'] as const)('%s: the row wraps and both buttons keep their words whole', kind => {
     const line = kind === 'singles' ? singlesLine : doublesLine;

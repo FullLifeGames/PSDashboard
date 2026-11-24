@@ -9,7 +9,6 @@ import { leadAnalysis } from '../fixtures/analysis';
 const names: [string, string] = ['Alice', 'Bob'];
 const pctPair = (score: number) => `Alice ${winPercent(score)}% · Bob ${100 - winPercent(score)}%`;
 
-/** The invisible hit column of a turn on the main line, or on the variation. */
 const hit = (turn: number, line?: 'variation') =>
   document.querySelector(`rect[data-turn="${turn}"]${line ? '[data-line="variation"]' : ':not([data-line])'}`) as SVGRectElement;
 
@@ -35,8 +34,6 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(5, 'main');
   });
 
-  // React logged `Received NaN for the y2 attribute` while a game's graph filled (Champions VGC): a score the sweep has not written yet reads
-  // undefined, and only `null` meant "no point" in the line from the lead and in the edge's highlight.
   test('a lead score before any turn score, and a turn whose next score is not there yet, draw no line with a NaN end', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const unfilled = (turns: number, filled: Record<number, number>) => {
@@ -96,14 +93,10 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(3, 'main');
     expect(svg.querySelector('circle[r="4.5"]')).not.toBeNull();
 
-    // The pointer on the main line at turn 4 has no main point to ring.
     rerender(<EvalGraph {...shared} currentLine="main" />);
     expect(svg.querySelector('circle[r="4.5"]')).toBeNull();
   });
 
-  // On a turn where both lines have a point, the two hit areas share the whole column and split it at the middle between the two points, so
-  // the nearer point wins at any width (the gold area took the middle half of a column about 5 px wide, and the blue point under it could
-  // not be hit).
   describe('a turn where the variation and the main line both have a point', () => {
     const rect = (turn: number, line?: 'variation') => {
       const element = hit(turn, line);
@@ -119,7 +112,6 @@ describe('EvalGraph', () => {
       const yellow = rect(3, 'variation');
       expect(yellow.x).toBe(blue.x);
       expect(yellow.width).toBe(blue.width);
-      // The higher score draws higher on the graph and owns the upper area.
       const top = main > gold ? blue : yellow;
       const bottom = main > gold ? yellow : blue;
       expect(top.y).toBe(0);

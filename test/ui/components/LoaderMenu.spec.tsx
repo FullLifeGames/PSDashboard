@@ -14,11 +14,6 @@ const file = (name = 'replay.html') => new File(['<html>x</html>'], name, { type
 const dropOnPage = (dropped: File) =>
   fireEvent.drop(document.body, { dataTransfer: { files: [dropped], types: ['Files'] } });
 
-/**
- * The panel holds what the loader offers on the start page, minus the title and the workflow guide; it closes on Escape, on a click beside
- * it and after a load that succeeded. A failed load keeps it open with the error. An exported .html dropped anywhere on the page loads
- * while the replay is loaded.
- */
 describe('LoaderMenu', () => {
   test('a closed menu shows only the button; a click opens the URL form, the file picker and the team paste', async () => {
     render(<LoaderMenu {...props()} />);
@@ -120,7 +115,6 @@ describe('LoaderMenu', () => {
   });
 });
 
-/** Loading a replay, dropping a file and opening a saved game ask first when an unsaved variation is open: the question stands in the menu's panel, Discard variation goes on, Cancel leaves everything. */
 describe('LoaderMenu with an unsaved variation open', () => {
   test('the URL form asks before it loads; Cancel loads nothing, Discard variation loads once', async () => {
     const wired = props({ unsavedVariation: () => true });

@@ -46,7 +46,6 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('analyzing… turn 4/10')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
-    // auto runs early singles turns on the matrix.
     expect(headingTitle()).toBe(hintTitle('auto (matrix early, MCTS late)'));
 
     rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
@@ -56,7 +55,6 @@ describe('GameGraphSection', () => {
     expect(headingTitle()).toBe(hintTitle('MCTS'));
   });
 
-  // A single evaluation that took over a running sweep leaves a status line instead of a silent stop.
   test('a sweep that a single evaluation stopped says where it stopped and offers Analyze again', () => {
     const stopped = evalGraph('singles', { running: false, stopped: { done: 1, total: 2 } });
     render(<GameGraphSection {...props({ graph: stopped })} />);
@@ -135,7 +133,6 @@ describe('GameGraphSection', () => {
   });
 
   test('the decided strip stands only where the bar backs the sweep', () => {
-    // 649664 t15 to t22 named Medicham-Mega for p2 under a bar leaning to p1; t23 stood at 0.89 for p2.
     const graph = evalGraph();
     const sweep = { p1: [], p2: [], decided: { side: 'p2' as const, species: 'Medicham-Mega' } };
     graph.scores[3] = 0.2;
@@ -194,10 +191,6 @@ describe('GameGraphSection.review', () => {
     });
   });
 
-  /**
-   * With a variation open the panel shows the variation's evaluation and neither the report nor the review. Where the report's button
-   * stands, a button names the way back and does what "Main line" of the Line selector does; no report to return to, no button.
-   */
   describe('GameGraphSection: the way back from a variation', () => {
     const inVariation = (overrides: Partial<GameGraphSectionProps> = {}) => props({ showReportView: false, report: null, reviewAnalyses: null, currentLine: 'variation', ...overrides });
 

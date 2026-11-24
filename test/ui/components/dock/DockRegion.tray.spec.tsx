@@ -6,16 +6,11 @@ import type { AppController } from '../../../../src/hooks/useAppController';
 import { DockRegion } from '../../../../src/components/dock/DockRegion';
 import { simState } from '../../fixtures/sim-state';
 
-// The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 const poolCalls = vi.hoisted(() => ({ list: [] as unknown[][] }));
 vi.mock('../../../../src/lib/pokemon-options', () => ({
   getMovePool: async (...args: unknown[]) => { poolCalls.list.push(args); return ['Dragon Claw', 'Fire Fang']; },
 }));
 
-/**
- * A forced replacement and the choice after it share the turn, so the dock's position key needs the step within the turn: a bench click
- * sends the replacement at once, and the next request at the same turn must not inherit the open tray.
- */
 interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string }; prefs?: { hardMode?: boolean }; setPrefs?: (prefs: object) => void }
 
 function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, setPrefs = vi.fn() }: Where): AppController {
@@ -64,7 +59,6 @@ describe.each(['singles', 'doubles'] as const)('the tray at a forced replacement
   });
 });
 
-/** The tray's "What if it had ..." list reads the game's format: Champions offers the Champions mod's moves, a National Dex draft its Past species. */
 describe.each([
   ['singles', 'gen9championsou-2600000001', 'gen9championsou'],
   ['doubles', 'gen9championsvgc2026regma-2623421463', 'gen9championsvgc2026regma'],

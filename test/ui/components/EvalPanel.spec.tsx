@@ -49,8 +49,6 @@ describe('EvalPanel', () => {
     expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent reads your move and plays the reply'));
   });
 
-  // Evaluate at a finished variation showed a 100 % bar and an empty line list. The panel says who won, as the branch panel does; the end
-  // of a game reads the same in singles and doubles.
   test('at a finished variation the panel names the winner instead of a bar and empty lines, and offers no Evaluate', () => {
     const stale = evalResult('singles', { score: 1, perSide: { p1: [], p2: [] } });
     const { rerender } = render(<EvalPanel {...props({ status: 'done', result: stale, onEvaluate: vi.fn(), showAuto: true, positionLabel: 'Turn 21 · variation', ended: { winner: 'Alice' } })} />);
@@ -95,7 +93,6 @@ describe('EvalPanel', () => {
     expect(document.querySelector('.ps-eval-stale')).not.toBeNull();
   });
 
-  // A stop before any partial result (a tree search before its first interim result) leaves no card; the panel says why.
   test.each([['singles', false], ['doubles', true]] as const)('%s: a search stopped before a first result says so beside Evaluate, and only then', (_kind, doubles) => {
     const onEvaluate = vi.fn();
     const { rerender } = render(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
@@ -140,8 +137,6 @@ describe('EvalPanel', () => {
     expect(onAnalyzeGame).toHaveBeenCalledTimes(1);
   });
 
-  // "Back to the main line" from a played win path opened the last turn's card, not the Game review the click came from. The panel returns
-  // to where the line was started: the review (from the review or the win-path panel), the card of its turn (from a card).
   describe.each([['singles', false], ['doubles', true]])('%s: back from a variation', (_kind, doubles) => {
     const graph = evalGraph(doubles ? 'doubles' : 'singles');
     const report = gameReport({ keyMoments: [turnAnalysis(6, { attribution: 'chance', swing: -0.4 })] });
@@ -158,7 +153,6 @@ describe('EvalPanel', () => {
       rerender(<EvalPanel {...inLine({ onBackToMain: back })} />);
       await userEvent.click(screen.getByRole('button', { name: 'Back to the main line' }));
       expect(back).toHaveBeenCalledWith(null);
-      // the report is back and the analysis turn moved in the same render (the main line's last turn)
       rerender(<EvalPanel {...replay({ analysisTurn: 12, currentTurn: 12, analysis: turnAnalysis(12) })} />);
       expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '← Game report' })).toBeNull();

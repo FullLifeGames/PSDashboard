@@ -4,7 +4,6 @@ import { SlotChip } from '../../../../src/components/dock/SlotChip';
 import type { DockSlotModel } from '../../../../src/components/dock/dock-model';
 import { moveOption, switchOption } from '../../fixtures/sim-state';
 
-/** The chip's box does not depend on the state (the CSS side is `test/regression/styles.spec.ts`). */
 function slot(over: Partial<DockSlotModel>): DockSlotModel {
   return {
     side: 'p1', slot: 0, label: 'P1A', name: 'Greninja', species: 'Greninja', hpPercent: 80, fainted: false, moves: [], switches: [],

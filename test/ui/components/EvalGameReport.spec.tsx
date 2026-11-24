@@ -9,7 +9,6 @@ import { leadAnalysis, turnAnalysis } from '../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
-/** The chip of one turn (turn 3 but not turn 30). */
 const chip = (turn: number) => screen.getByRole('button', { name: new RegExp(`^T${turn}(?!\\d)`) });
 
 describe('EvalGameReport', () => {
@@ -88,7 +87,6 @@ describe('EvalGameReport', () => {
   });
 
   test('doubles: a lead pair graded a mistake gets no chip, because the lead reading there is close to a coin flip', () => {
-    // 912045, "led Ogerpon-Cornerstone + Rillaboom, better: Chi-Yu + Okidogi" at a 0.25 regret.
     const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
     const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
     const leads = leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } });

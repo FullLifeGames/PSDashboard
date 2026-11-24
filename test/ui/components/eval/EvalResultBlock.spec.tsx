@@ -37,7 +37,6 @@ describe('EvalResultBlock', () => {
     const shared = { result, playerNames: names, onPickChoice, onPickPair };
     const { rerender } = render(<EvalResultBlock {...shared} status="done" />);
     await userEvent.click(screen.getByRole('button', { name: /Swords Dance/ }));
-    // the result the rows are from is the 4th argument (Hard mode reads the reply that hurts the clicked move most from it)
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0], result);
     await userEvent.click(screen.getByRole('button', { name: /Body Press/ }));
     expect(onPickChoice).toHaveBeenLastCalledWith('p2', result.perSide.p2[1], result.perSide.p1[0], result);
@@ -84,7 +83,6 @@ describe('EvalResultBlock', () => {
   });
 });
 
-// One card shows one line per row; the ranked row reads the later steps of the line the Lines section shows.
 describe('EvalResultBlock: the row\'s "then ..." follows the Lines section', () => {
   const pick = (label: string, slots = 1) => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
   test.each([

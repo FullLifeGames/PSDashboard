@@ -23,7 +23,6 @@ describe('LinesSection', () => {
     expect(screen.getAllByText(/^ends at \d+% for /)).toHaveLength(3);
     const turns = screen.getAllByText(/^T2\d$/).map(node => node.textContent);
     expect(turns).toEqual(['T20', 'T20', 'T21', 'T22', 'T20']);
-    // chips: only the dice that could have gone the other way
     expect(screen.getByText('Hydro Pump: hits (80%)')).toBeInTheDocument();
     expect(screen.getByText('Brave Bird: KO (10 of 16 rolls)')).toBeInTheDocument();
     expect(screen.queryByText(/no crit/)).toBeNull();
@@ -69,7 +68,6 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line: Other engine sends none.')).toBeInTheDocument();
   });
 
-  // A turn that is about to get lines does not tell the user to analyze it again.
   test.each([['singles', false], ['doubles', true]])('%s: a turn whose lines are coming says when, and a turn that waits for nothing keeps the matrix sentence', (_kind, doubles) => {
     const names = doubles ? DOUBLES_NAMES : SINGLES_NAMES;
     const { unmount } = render(<LinesSection turn={3} result={withLines()} playerNames={names} doubles={doubles} host={{ ...host(), lineComing: () => 'stage' }} />);
@@ -83,7 +81,6 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
   });
 
-  // The review is not there with its flag off, so the sentence does not send the reader to it.
   test.each([['singles', false], ['doubles', true]])('%s: with the Game review flag off the coming-lines sentence names no review', (_kind, doubles) => {
     vi.stubEnv('VITE_FEATURE_GAME_REVIEW', '');
     try {
@@ -108,7 +105,6 @@ describe('LinesSection', () => {
   });
 
   test('two chips with the same words do not collide as React keys', () => {
-    // one die listed twice on a slot: two chips with the same words
     const [first, ...rest] = doublesLine.steps;
     const slots = first.p1.slots.map((slot, index) => (index === 0 && slot?.kind === 'move' && slot.dice ? { ...slot, dice: [...slot.dice, ...slot.dice] } : slot));
     const twice = { ...doublesLine, steps: [{ ...first, p1: { ...first.p1, slots } }, ...rest] };
@@ -144,7 +140,6 @@ describe('the Lines section in the turn card', () => {
   test('the card mounts it under its closed Lines toggle when its host hands one over, and not otherwise', async () => {
     const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} linesHost={host()} />);
-    // closed first: the section's lines are not built until the toggle opens it
     expect(screen.queryByText('Pepitopalotin · engine: Hydro Pump')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
@@ -224,13 +219,8 @@ describe('the answer a line meets', () => {
   });
 });
 
-/**
- * With the setting on, a row's line is the one that meets the reply the search rates lowest for the row, named by what stands behind it; a
- * row whose search holds no such line shows the ordinary line and says so; with the setting off the worst lines are not shown at all.
- * Singles and doubles.
- */
 describe('Hard mode in the Lines section', () => {
-  /** Pepitopalotin (p2) plays Hydro Pump or Hyper Voice against Tzon's Draining Kiss or Surf; Surf is the lowest cell of Hydro Pump's row (p1's highest cell of its column, 0.4). */
+  // Surf is the lowest cell of Hydro Pump's row: p1's highest cell of its column, 0.4.
   const hurtBy = (lines: EvalLine[]): EvalResult => {
     const base = withLines(lines);
     const p1 = [rankedChoice('move 0', 'Draining Kiss', 0.1), rankedChoice('move 1', 'Surf', 0.05)];

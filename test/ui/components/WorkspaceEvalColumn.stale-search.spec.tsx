@@ -9,13 +9,10 @@ import { singlesReplay } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 
-// A search for a position the user just left must not keep clickable partial lines: a click would map the old position's choice onto
-// the new one. The panel reads one evaluation for singles and doubles alike (the click handlers ignore the game type), so the singles
-// replay stands for both.
+// The panel reads one evaluation for singles and doubles alike, so the singles replay stands for both.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
-// The search streams one partial result and never finishes.
 vi.mock('../../../src/lib/eval/worker-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/eval/worker-client')>();
   class HangingEvalWorkerClient {
@@ -73,7 +70,6 @@ describe('a search for a position the user left', () => {
       await waitFor(() => expect(app().ctx.branch.history).toHaveLength(played), { timeout: 60_000 });
     }
     await waitFor(() => expect(app().board.timeline.liveTip).toBe(true));
-    // Auto off: the search below starts only from the button.
     act(() => app().ctx.evaluation.setPrefs({ ...app().ctx.evaluation.prefs, auto: false, autoAnalyze: false }));
 
     act(() => app().engine.evalView.handleEvaluate());

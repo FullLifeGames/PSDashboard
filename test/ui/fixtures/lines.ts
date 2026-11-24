@@ -12,7 +12,6 @@ const waiting = (slots: number): LineChoice => ({ choice: 'wait', label: '(waiti
 
 const hit = (die: ForcedDie, chance: number, shown: boolean): LineDie => ({ die, chance, shown });
 
-/** Singles, p2 (Pepitopalotin) engine line: Hydro Pump hits (80%), Moonblast, then a knock-out that depends on the damage roll. */
 const accuracy = happens(name('p2a', 'hydropump', 'accuracy', { targetSlot: 'p1a' }), true);
 const crit = happens(name('p2a', 'hydropump', 'crit', { targetSlot: 'p1a' }), false);
 const secondary = happens(name('p2a', 'moonblast', 'secondary', { targetSlot: 'p1a', effectId: 'boosts:spa' }), false);
@@ -32,7 +31,6 @@ export const singlesLine: EvalLine = {
   ],
 };
 
-/** The same player's played line, and a player who played the engine's move (both roles on one line). */
 export const playedLine: EvalLine = {
   ...singlesLine, label: 'Hyper Voice', choice: 'move 2', for: ['played'], end: -0.24,
   steps: [{ p1: singlesLine.steps[0].p1, p2: choice('Hyper Voice', [move('hypervoice', 'Hyper Voice')]), dice: [] }],
@@ -42,7 +40,6 @@ export const bothRolesLine: EvalLine = {
   steps: [{ p1: singlesLine.steps[0].p1, p2: choice('Hydro Pump', [move('hydropump', 'Hydro Pump')]), dice: [] }],
 };
 
-/** Doubles, p1 (pixelfrost): four choices a turn, a faint after the first turn, and the opponent's replacement as its own step. */
 const tie: ForcedDie = { name: name('p1a', '', 'speed-tie'), result: { first: 'p2a' } };
 const bash: ForcedDie = { name: name('p2a', 'behemothbash', 'damage-roll', { targetSlot: 'p1b' }), result: { step: 11 } };
 const spore = happens(name('p1b', 'spore', 'accuracy', { targetSlot: 'p2b' }), true);

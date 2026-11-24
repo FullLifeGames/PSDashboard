@@ -34,7 +34,6 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-/** P1 plays level 100, P2 level 1: the first move of the first turn knocks out P2's lead (singles) or both of its leads (doubles). */
 const level = (team: PokemonSet[], value: number): PokemonSet[] => team.map(set => ({ ...set, level: value }));
 
 const CASES = [
@@ -51,7 +50,6 @@ async function mountGame(format: string) {
   return { app: () => latest.current!, record };
 }
 
-/** The leads, then a first turn whose first move knocks out the opponent: its replacement is pending. */
 async function playKnockoutTurn(app: () => AppController, leads: { p1: string[]; p2: string[] }) {
   act(() => app().board.deviation.startLeadVariation(leads));
   await waitFor(() => expect(app().ctx.branch.branching).toBe(true), { timeout: 60_000 });
@@ -66,7 +64,6 @@ async function playKnockoutTurn(app: () => AppController, leads: { p1: string[];
 }
 
 
-/** A game with one finished turn, then a different first turn from turn 1: a variation of the game. */
 async function openVariation(format: string, leads: { p1: string[]; p2: string[] }) {
   const { app } = await mountGame(format);
   await playKnockoutTurn(app, leads);
@@ -150,7 +147,6 @@ describe('Discard variation', () => {
   }, 300_000);
 });
 
-/** Everything a variation shows: the line chip, Discard, the panel and its buttons, the graph's gold note, the card's tag. */
 function expectNoVariationChrome() {
   expect(screen.queryByRole('group', { name: 'Line selector' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Discard variation' })).toBeNull();
@@ -163,7 +159,6 @@ function expectNoVariationChrome() {
   expect(document.body.textContent).not.toMatch(/Turn \d+ · variation/);
 }
 
-/** The Game menu's Copy Share Link, the link it writes into its field, read back as the app reads a link. */
 async function copiedGameLink() {
   await userEvent.click(screen.getByRole('button', { name: 'Game' }));
   // with a variation open the branch bar has a button of the same name: this one is the menu's
@@ -179,7 +174,6 @@ describe('a game tip whose knockout turn waits for its replacement is no variati
   test.each(CASES)('$name: no variation chrome while the replacement is pending, and none after it joins the turn', async ({ format, leads }) => {
     const { app, record } = await mountGame(format);
     await playKnockoutTurn(app, leads);
-    // the scene: the turn ran, the opponent's replacement is asked for, the turn is not on the main line yet
     const state = app().ctx.branch.simState!;
     expect(state.p2ForceSwitch).toBe(true);
     expect(app().ctx.newGame.record!.turns).toBe(0);
@@ -236,7 +230,6 @@ describe('a reload while a replacement is pending keeps the played turn', () => 
     const viewBefore = first.app().board.timeline.viewTurn;
     const entriesBefore = first.app().ctx.branch.history.length;
     expect(entriesBefore).toBeGreaterThan(0);
-    // the reload: a fresh app over the saved game (the browser's storage is all that survives)
     cleanup();
     const saved = loadGame(first.record.id)!;
     expect(saved.turns).toBe(0);

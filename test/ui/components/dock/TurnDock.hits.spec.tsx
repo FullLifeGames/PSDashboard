@@ -7,12 +7,7 @@ import { chainResults, createBranchStateFromBattle, loadSimMods, type BranchSlot
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
-/**
- * The engine's offer names a die per hit; the table folds them into one "Hits" row of the counts 1 to N under "Hit", and a click on the count k
- * sets the first hit, hits 2 to k and the miss of hit k + 1 (`chainResults`), the way the engine plays them. Scarlet/Violet and Champions,
- * singles and doubles (a body on slot b in the four-slot dock). The panel reads the move's hits from the Dex through the offer, so a team of
- * six (VGC) shows the same row.
- */
+// A click on count k sets hit 1, hits 2 to k and the miss of hit k + 1 (`chainResults`), as the engine plays them.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 const shown = vi.hoisted(() => ({ logged: [] as unknown[] }));
 vi.mock('../../../../src/lib/lazy/branch-engine', async importOriginal => ({
@@ -84,7 +79,6 @@ describe.each(CASES)('the dock Hits row: %s', (_label, format, champions, double
     const row = await within(dice).findByRole('group', { name: 'Hits' });
     expect(within(row).getAllByRole('button').map(button => button.textContent)).toEqual(Array.from({ length: hits }, (_, count) => `${count + 1} ${count === 0 ? 'hit' : 'hits'}`));
     expect([...dice.querySelectorAll('.ps-dice-caption')].map(caption => caption.textContent).slice(0, 2)).toEqual(['Hit', 'Hits']);
-    // no row per hit: only the plain Hit row has the chips "Hits" and "Misses"
     expect(within(dice).getAllByRole('button', { name: 'Misses' })).toHaveLength(1);
 
     const count = Math.min(hits, 2);

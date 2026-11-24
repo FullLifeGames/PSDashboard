@@ -63,7 +63,6 @@ describe('the gimmick toggle in the open tray', () => {
   });
 });
 
-/** The fast snapshot picker carries the Tera type, so the toggle shows before the exact position arrives. */
 const mon = (name: string, active: boolean): TurnSnapshot['p1']['pokemon'][number] => ({
   name, speciesForme: name, hp: 100, maxhp: 100, hpPercent: 100, status: '', fainted: false, isActive: active,
   boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 100, gender: '',

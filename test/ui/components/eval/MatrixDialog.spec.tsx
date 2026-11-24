@@ -9,7 +9,6 @@ import { sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
-/** The fixture's singles turn: p1 played Swords Dance (row 1) against Body Press (column 1); the engine's rows are Earthquake and Leech Seed. */
 function singles(): { result: EvalResult; analysis: TurnAnalysis } {
   const result = evalResult('singles');
   const [earthquake, swordsDance] = result.perSide.p1;
@@ -21,7 +20,6 @@ function singles(): { result: EvalResult; analysis: TurnAnalysis } {
   return { result, analysis };
 }
 
-/** A doubles turn with a 12 x 19 matrix (the size of Doubles OU 912045 turn 8): joint choices as pairs, long labels. */
 function doubles(): { result: EvalResult; analysis: TurnAnalysis } {
   const rows = Array.from({ length: 12 }, (_, i) => rankedChoice(`move a${i} 1, move b${i}`, `Fake Out → Rillaboom ${i} + Spore → Tornadus ${i}`, 0.3 - i * 0.02));
   const columns = Array.from({ length: 19 }, (_, j) => rankedChoice(`move c${j}, move d${j} 1`, `Tailwind ${j} + Grassy Glide → Incineroar ${j}`, -0.2 - j * 0.01));
@@ -88,7 +86,6 @@ describe('MatrixDialogButton', () => {
     renderButton({ result, analysis });
     await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
     const table = screen.getByRole('table');
-    // p1 played Swords Dance, the engine's row is Earthquake; p2 played Body Press, the engine's column is Leech Seed
     expect(headerOf(table, 'Swords Dance')).toHaveTextContent(/played/);
     expect(headerOf(table, 'Swords Dance')).not.toHaveTextContent(/engine/);
     expect(headerOf(table, 'Earthquake')).toHaveTextContent(/engine/);
@@ -157,7 +154,6 @@ describe('MatrixDialogButton', () => {
     const table = within(dialog).getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(13);
     expect(within(table).getAllByRole('columnheader')).toHaveLength(20);
-    // the wide table scrolls in its own box, the dialog does not grow sideways
     const scroller = table.parentElement!;
     expect(scroller).toHaveStyle({ overflow: 'auto' });
     const label = headerOf(table, 'Fake Out → Rillaboom 5 + Spore → Tornadus 5');
@@ -171,7 +167,6 @@ describe('MatrixDialogButton', () => {
     expect(headerOf(table, 'Tailwind 9 + Grassy Glide → Incineroar 9')).toHaveTextContent(/played/);
     expect(headerOf(table, 'Tailwind 4 + Grassy Glide → Incineroar 4')).toHaveTextContent(/engine/);
     expect(headerOf(table, 'Tailwind 4 + Grassy Glide → Incineroar 4')).toHaveTextContent('100%');
-    // the worst cell of p1's played row is the one the Hard mode rule names
     const worst = worstReply(result, 'p1', analysis.p1.played!)!;
     const cell = screen.getByTitle(new RegExp(`^${escaped('Fake Out → Rillaboom 5 + Spore → Tornadus 5')} × ${escaped(worst.reply.label)}:`));
     expect(cell).toHaveTextContent(/worst/);

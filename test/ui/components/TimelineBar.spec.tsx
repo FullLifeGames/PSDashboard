@@ -13,7 +13,6 @@ function props(overrides: Partial<Props> = {}): Props {
   };
 }
 
-/** The position label next to the slider ("T3/10", "T0", "End"). */
 const positionLabel = () => screen.getByRole('slider').closest('.ps-branch-bar')!.querySelector('span[style*="min-width"]')!.textContent;
 
 describe('TimelineBar', () => {

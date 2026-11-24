@@ -24,7 +24,6 @@ describe('PSReplayFrame', () => {
     rerender(<PSReplayFrame log={LOG} title="Battle" height={480} />);
     const frame = screen.getByTitle('Battle');
     expect(frame).toHaveAttribute('src', 'blob:test/1');
-    // the document may set --ps-frame-h in phone mode; without it the frame keeps its own height
     expect(frame.style.height).toBe('var(--ps-frame-h, 480px)');
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
@@ -63,8 +62,6 @@ describe('PSReplayFrame', () => {
     expect(quiet).not.toContain('trackTurn');
   });
 
-  // The workspace's frames hide the two choosers and report the side they show near; the shared-branch page renders the same component with
-  // neither.
   test('a frame with a side listener and no choosers carries the tracker and the hiding style, and forwards a side report of its window', async () => {
     const onSideChange = vi.fn();
     render(<PSReplayFrame log={LOG} liveUpdates reloadKey="session" title="Workspace" choosers={false} onSideChange={onSideChange} viewpoint="p2" />);
@@ -101,8 +98,6 @@ describe('PSReplayFrame', () => {
   });
 
   test('a live log that stops extending the shown one starts a new document, and the next turn appends to that', async () => {
-    // One turn back in a variation and a new choice rebuilt the branch. The frame kept the old line and the new turn appended after its tail,
-    // so the frame played the old attack and then the new one.
     const oldLine = `${LOG}\n|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn\n|turn|3`;
     const newTurn = ['|move|p1a: Garchomp|Stone Edge|p2a: Ferrothorn', '|turn|3'];
     const { rerender } = render(<PSReplayFrame log={oldLine} liveUpdates reloadKey="session" title="Branch" />);
@@ -124,8 +119,6 @@ describe('PSReplayFrame', () => {
   });
 
   test('a new live document for a turn just played opens at the start of that turn and plays it in', async () => {
-    // The first turn of a new variation (Iron Head into Recover) showed its end at once, while every later turn played out. The frame mounts
-    // after the turn ran, with the turn already in its log.
     const played = ['|move|p1a: Garchomp|Earthquake|p2a: Ferrothorn', '|-damage|p2a: Ferrothorn|40/100', '|turn|2'];
     const log = `|player|p1|Alice|\n|player|p2|Bob|\n|turn|1\n${played.join('\n')}`;
     const props = { log, liveUpdates: true, reloadKey: 'session', title: 'Branch', seekTurn: 2, liveAppendMode: 'play' as const, liveAppendTurn: 1 };
@@ -144,7 +137,6 @@ describe('PSReplayFrame', () => {
     act(() => { window.dispatchEvent(ready); });
     expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'ps-append-log', lines: played, playFromTurn: 1 }), '*');
 
-    // The pointer moving on keeps the document; only a new document reads the opening turn.
     rerender(<PSReplayFrame {...props} openAtTurn={null} />);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });

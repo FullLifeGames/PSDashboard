@@ -5,8 +5,6 @@ import { Dex } from '@pkmn/sim';
 import { NewGameDialog } from '../../../src/components/NewGameDialog';
 import { savedRecord } from '../fixtures/saved-game';
 
-/** The real simulator runs under the dialog: the format list, the team check and Start are the engine's. */
-
 const GOOD = `Garchomp @ Rocky Helmet
 Ability: Rough Skin
 EVs: 252 HP / 4 Def / 252 Spe
@@ -122,7 +120,6 @@ describe('the format list', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   }, 60_000);
 
-  // The dialog reads the format's rules from the Dex, never a list of generations.
   test('the intro says Team Preview only for a format that has one; Gen 4 OU and Gen 9 OU read from the Dex', async () => {
     render(<NewGameDialog {...props()} />);
     expect(screen.getByText(/Start opens the game at Team Preview/)).toBeInTheDocument();
@@ -258,7 +255,6 @@ describe('the dice seed', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
     fireEvent.change(field, { target: { value: '1,2,3,4' } });
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
-    // a sodium seed of a Showdown input log is a seed too
     fireEvent.change(field, { target: { value: 'sodium,0123456789abcdef' } });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
@@ -353,10 +349,6 @@ describe('the saved games', () => {
   }, 60_000);
 });
 
-/**
- * Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is modal), keeps the pasted teams, and
- * Cancel starts nothing. Singles and doubles start through the same line.
- */
 describe('Start with an unsaved variation open', () => {
   for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
     test(`${label}: the question comes before Start; Cancel starts nothing and keeps the teams, Discard variation starts the game`, async () => {
@@ -406,10 +398,6 @@ describe('Start with an unsaved variation open', () => {
   }, 60_000);
 });
 
-/**
- * An empty seed field means a fresh seed, and the placeholder says so. A pasted set without an ability starts with the species' first
- * ability, written into the saved team; the team check names it before Start. Singles and doubles run both.
- */
 describe('an empty seed field', () => {
   test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
     const wired = props();
@@ -436,7 +424,7 @@ describe('a pasted set without an ability', () => {
       await pickFormat(search, name);
       paste(1, NO_ABILITY);
       paste(2, GOOD);
-      // slot 0 of Garchomp, Sand Veil, is banned by Evasion Abilities Clause in both formats: the fill takes its next slot
+      // Sand Veil (slot 0) is banned by Evasion Abilities Clause in both formats: the fill takes the next slot
       const abilityOf = (species: string) => (species === 'Garchomp' ? 'Rough Skin' : Dex.forGen(9).species.get(species).abilities['0']);
       expect(id).toBeTruthy();
       expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();

@@ -1,11 +1,7 @@
 import { vi } from 'vitest';
 import type { ReplayData } from '@fulllifegames/replay-core';
 
-/**
- * A fetch that serves replay JSON by id and answers everything else (the
- * Smogon data hosts included) with 404, so a loaded replay settles with
- * "no usage stats" instead of waiting on the network.
- */
+/** Everything but the replay JSON answers 404, so a loaded replay settles with no usage stats. */
 export function stubReplayFetch(replays: ReplayData[]) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);

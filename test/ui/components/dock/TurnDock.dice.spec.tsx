@@ -7,13 +7,9 @@ import { calcSingleDamageRange, createBranchStateFromBattle, type BranchSlotChoi
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
-/**
- * The dock asks the simulator which dice the chosen move draws once a tray opens "Dice · What if": one set of chips per slot (one per target
- * of a spread move). A closed tray asks nothing.
- */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
-/** What the log shows for the first turn: a spec sets it. The engine reads it from the battle's logged PRNG (arrival-dice.ts), which a battle built in this file does not have. */
+// The engine reads the log's dice from the battle's logged PRNG (arrival-dice.ts); a battle built here has none.
 const shown = vi.hoisted(() => ({ logged: [] as unknown[] }));
 vi.mock('../../../../src/lib/lazy/branch-engine', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../src/lib/lazy/branch-engine')>()),
@@ -22,7 +18,6 @@ vi.mock('../../../../src/lib/lazy/branch-engine', async importOriginal => ({
 
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
-/** The dock over a live battle with its own picks, as the app keeps them. `latest` shows what the app would hold. */
 function renderDock(battle: Battle, options: { live?: boolean; first?: Picks } = {}) {
   const { live = true, first = { p1: [], p2: [] } } = options;
   const latest: { picks: Picks } = { picks: first };
@@ -49,12 +44,10 @@ function renderDock(battle: Battle, options: { live?: boolean; first?: Picks } =
 
 const dockChip = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\b`) });
 const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
-/** Opens the slot's tray and its "Dice · What if" section. */
 async function openDice(label: string) {
   await userEvent.click(dockChip(label));
   await userEvent.click(tray().getByRole('button', { name: /Dice · What if/ }));
 }
-/** A move tile of the open tray. */
 const tile = (name: RegExp) => tray().getByRole('button', { name });
 
 const singles = () => diceBattle({
@@ -99,7 +92,6 @@ describe('the dock dice chips', () => {
     const chip = () => within(screen.getByRole('group', { name: 'Flinch' })).getByRole('button', { name: 'Flinch' });
     await waitFor(() => expect(chip()).toHaveAttribute('aria-pressed', 'true'));
 
-    // a second click gives the flinch back to the seed; the hit it pulled in stays set and shows, one click from clear
     await userEvent.click(chip());
     expect(kinds(diceOf(latest.picks, 'p1'))).toEqual([['accuracy', { happens: true }]]);
     await waitFor(() => expect(chip()).toHaveAttribute('aria-pressed', 'false'));
@@ -301,7 +293,6 @@ describe('the dock damage roll select', () => {
   const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
   const percent = (option: HTMLElement) => Number(/(\d+(?:\.\d)?)%/.exec(option.textContent ?? '')![1]);
 
-  /** The damage of each step as the calculator prices it, read the way the panel reads it. */
   function stepsOf(battle: Battle, crit = false): number[] {
     const state = createBranchStateFromBattle(battle as never, [], {});
     const result = calcSingleDamageRange(state.p1ActiveSlots![0]!, state.p2ActiveSlots![0]!, state.p1MovesBySlot![0][0], { gen: 9, rolls: true, ...(crit ? { isCrit: true } : {}) });

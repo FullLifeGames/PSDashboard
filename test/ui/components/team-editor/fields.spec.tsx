@@ -64,7 +64,6 @@ describe('team editor fields', () => {
     await userEvent.type(item, 'Mystery Orb');
     await userEvent.tab();
     expect(draftOf().item.value).toBe('Mystery Orb');
-    // The warning lives on the row; the field only records it.
     await userEvent.click(item);
     await userEvent.clear(item);
     await userEvent.type(item, 'load');
@@ -97,7 +96,6 @@ describe('team editor fields', () => {
     render(<Fields initial={revealedPokemon('Garchomp')} withPools={pools} />);
     await userEvent.click(screen.getByPlaceholderText('Add move...'));
     const names = within(screen.getByRole('listbox')).getAllByRole('option').map(option => option.textContent);
-    // Protect and Earthquake stand in the set already.
     expect(names).toEqual(['Fire Fang', 'Scale Shot', 'Stone Edge', 'Power Whip not learnable', 'Spore not learnable']);
     expect(screen.getByRole('option', { name: 'Fire Fang' })).toBeInTheDocument();
   });

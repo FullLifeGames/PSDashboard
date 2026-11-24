@@ -13,11 +13,9 @@ describe('TeamEditor', () => {
     expect(screen.getByText('Garchomp', { exact: false })).toBeInTheDocument();
     expect(screen.getAllByText(/Moves \(2\/4\)/)).toHaveLength(6);
 
-    // The pools arrive after the lazy load: the ability field becomes a select with the species' abilities.
     const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
     await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
     expect(within(ability).getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
-    // The other abilities of the generation follow, so Garchomp can hold Intimidate.
     expect(within(ability).getByRole('option', { name: 'Intimidate' })).toBeInTheDocument();
     await userEvent.selectOptions(ability, 'Rough Skin');
 
@@ -132,7 +130,6 @@ describe.each([
     expect(screen.getByLabelText('Remove Thousand Arrows from Zygarde')).toBeInTheDocument();
     expect(screen.queryByText('not learnable')).not.toBeInTheDocument();
 
-    // A move of the battle that lies outside Dracovish's pool joins the set with the note.
     await userEvent.type(adders[0], 'Flying Press{Enter}');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Remove Flying Press from Dracovish')).toBeInTheDocument();
@@ -142,7 +139,7 @@ describe.each([
 
 describe('a standard format keeps refusing both moves (singles and doubles)', () => {
   test.each([['singles', 'gen9ou'], ['doubles', 'gen9doublesou']])('%s: %s', async (_kind, format) => {
-    // Garchomp stands in the team to show when the pools have loaded (Dracovish has no abilities in a standard format).
+    // Garchomp's ability select shows when the pools have loaded; Dracovish has no abilities in a standard format.
     const withGarchomp = { pokemon: [...team.pokemon, revealedPokemon('Garchomp')] };
     render(<TeamEditor title="Edit Opp" teamInfo={withGarchomp} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
     const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });

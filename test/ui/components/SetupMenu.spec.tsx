@@ -95,7 +95,6 @@ describe('SetupMenu.size', () => {
       expect(option(/^150 %/).disabled).toBe(false);
       expect(getUiScaleState()).toMatchObject({ setting: 2, scale: 1.5, width: 1600 });
       expect(document.documentElement.style.getPropertyValue('--ps-scale')).toBe('1.5');
-      // The choice stays stored: the window growing back gives the 200 % again.
       windowOf(2560, 1290);
       act(() => { window.dispatchEvent(new Event('resize')); });
       expect(option(/^200 %/).disabled).toBe(false);

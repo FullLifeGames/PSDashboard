@@ -6,18 +6,11 @@ import { misplayedSide, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult } from '../../fixtures/eval-result';
 import { singlesLine } from '../../fixtures/lines';
 
-/**
- * Which graded singles turns the game analysis searches once more with the trees, and what that search is told. The rule is the report's
- * own graded rule (`gradedSides`). The stage covers every graded turn in Auto, singles and doubles, and asks the search for the line pass
- * (`LINE_PASS` extra iterations per tree); a result is done when it carries the pass (`linePass`), not when it holds lines, since a tree turn
- * holds lines from the sweep already.
- */
 const MATRIX: TurnEvalSettings = { depth: 1, samples: 3, mode: 'matrix' };
 const TREE: TurnEvalSettings = { depth: 1, samples: 1, mode: 'mcts' };
 const matrixResult = (overrides: Partial<EvalResult> = {}): EvalResult => evalResult('singles', overrides);
 const played: PlayedTurn = { p1: { kind: 'move', name: 'Stone Edge' }, p2: { kind: 'move', name: 'Leech Seed' } };
 
-/** Turns 3 and 7 graded on matrix results, turn 5 not graded, turn 12 graded on a tree result. */
 function game() {
   const analyses: (TurnAnalysis | null)[] = Array.from({ length: 12 }, () => null);
   analyses[2] = turnAnalysis(3, { p1: misplayedSide('mistake') });
@@ -90,7 +83,7 @@ describe('earlyLineSettings: the tree search that only keeps lines', () => {
   });
 
   test('each side\'s lines come from the card\'s engine row and meet the answer the card ranks first', () => {
-    // turn 7: p1 and p2 both misplayed; the fixtures' best rows are Earthquake (p1) and Earthquake again (misplayedSide)
+    // turn 7: both sides misplayed; the best rows are Earthquake (p1) and Earthquake again (misplayedSide)
     expect(asked.lineRows).toEqual({ p1: ['Earthquake'], p2: ['Earthquake'] });
     expect(asked.lineReplies).toEqual({ p1: ['Earthquake'], p2: ['Earthquake'] });
   });

@@ -17,10 +17,6 @@ import type { LeadOption } from '../../../../src/lib/lead-options';
 import { simState, switchOption } from '../../fixtures/sim-state';
 import type { BringWorld } from '@fulllifegames/eval-engine';
 
-/**
- * A body the log never showed (a stand-in) wears the stats panel's marker wherever the user can pick it in the What-if: the dock's switch
- * tile, its "All choices" list and the lead picker. Singles and doubles run the same tile path.
- */
 const rules = logRules('|gen|4|\n|tier|[Gen 4] OU');
 const info = (...species: [string, boolean][]): OpponentTeamInfo => ({
   pokemon: species.map(([name, standIn]) => ({ species: name, ...(standIn ? { standIn: true as const } : {}) })) as OpponentTeamInfo['pokemon'],
@@ -148,10 +144,6 @@ describe('the marker of a stand-in in the lead picker', () => {
   });
 });
 
-/**
- * A body from the format's random-set data (a Random Battle) wears its own words in the same places. The bodies are the real output of
- * `withStandIns` on logs the simulator played, so the provenance the lookup reads is the provenance the fill writes.
- */
 describe('the marker of a random-set stand-in', () => {
   const game = (id: string) => JSON.parse(readFileSync(`packages/replay-core/test/fixtures/random-${id}.json`, 'utf-8')) as { log: string; randomSets: never };
   const filledOf = (id: string) => {
@@ -226,13 +218,11 @@ describe('bring-guess-tiles', () => {
   const rules = logRules('|gen|9|\n|tier|[Gen 9] VGC 2026 Reg I');
   const world = (p1: string[], weight: number, guessed = 1, p2 = ['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']): BringWorld =>
     ({ p1, p2, guessed: { p1: guessed, p2: 0 }, weight });
-  /** Doubles: P1 fielded Farigiraf, Basculegion and Lopunny; Kingambit, Ninetales-Alola and Ceruledge are the guesses. */
   const DOUBLES_WORLDS = [
     world(['Farigiraf', 'Basculegion', 'Lopunny', 'Kingambit'], 0.7),
     world(['Farigiraf', 'Basculegion', 'Lopunny', 'Ninetales-Alola'], 0.2),
     world(['Farigiraf', 'Basculegion', 'Lopunny', 'Ceruledge'], 0.1),
   ];
-  /** Singles: P1 fielded Garchomp and Gholdengo; Kingambit or Dragonite is the third. */
   const SINGLES_WORLDS = [
     world(['Garchomp', 'Gholdengo', 'Kingambit'], 0.6, 1, ['Weavile', 'Clefable', 'Heatran']),
     world(['Garchomp', 'Gholdengo', 'Dragonite'], 0.4, 1, ['Weavile', 'Clefable', 'Heatran']),
@@ -251,7 +241,6 @@ describe('bring-guess-tiles', () => {
       expect(marks('p1', 'Kingambit')?.title).toMatch(BRING_TITLE);
       expect(marks('p1', 'Lopunny')).toBeNull();
       expect(marks('p2', 'Kingambit')).toBeNull();
-      // A lighter world's guess is not on the heaviest world's bench.
       expect(marks('p1', 'Ceruledge')).toBeNull();
     });
 

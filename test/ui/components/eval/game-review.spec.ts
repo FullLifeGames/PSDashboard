@@ -15,15 +15,12 @@ import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analys
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../../fixtures/lines';
 
-/** The Game review lists the graded turns only, as the turn cards grade them. */
 const host: LinesHost = { rules: { gen: 9, mod: undefined } };
-/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and Pepitopalotin's Hydro Pump are each side's top choice. */
 const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
 const withLines = (lines?: EvalLine[]): EvalResult => ({
   ...evalResult('singles'), ...(lines ? { lines } : {}), perSide: { p1: topped(['Draining Kiss', 'Surf']), p2: topped(['Hydro Pump', 'Hyper Voice']) },
 });
 
-/** A side that played Hyper Voice where the engine's best was Hydro Pump (the labels of the line fixtures). */
 const gradedP2 = (tier: 'inaccuracy' | 'mistake' | 'blunder', overrides: Partial<SideAnalysis> = {}): SideAnalysis => {
   const best = rankedChoice('move 1', 'Hydro Pump', 0.1);
   const played = rankedChoice('move 2', 'Hyper Voice', -0.24 + (tier === 'inaccuracy' ? 0.3 : 0));
@@ -152,7 +149,6 @@ describe('gameReview: the engine of a row is the turn card\'s engine choice, and
     const row = rowOf(gradedP2('mistake', { riskUnpunished: true, safe }), [singlesLine, playedLine]);
     expect(row.engineWord).toBe('safe');
     expect(row.engine).toBe(`Surf ${winPctText(0.02 - 0.2)}`);
-    // the engine's own line belongs to Hydro Pump, which is not the card's choice here
     expect(row.lines.map(line => line.role)).toEqual(['played']);
   });
 
@@ -203,11 +199,6 @@ describe('gameReview, doubles', () => {
   });
 });
 
-/**
- * The report page said "read paid off +9%" and, one list below, "inaccuracy −9%" for the same click. The report lists a read from
- * `riskPaidOff` unless the side lost ground, and keeps it off its misplays; the review and the marks read the same two facts through
- * `gradedTier`. The real report is built for every combination, singles (p2) and doubles (both sides graded on one turn).
- */
 describe('the review and the report list one verdict per side', () => {
   const combos = [
     { tier: 'inaccuracy', paid: false }, { tier: 'inaccuracy', paid: true },
@@ -226,7 +217,7 @@ describe('the review and the report list one verdict per side', () => {
       .flatMap(view => view.rows).some(row => row.turn === 2 && row.side === 'p2');
     expect(reviewed, 'rows and marks agree').toBe(marked);
     expect(listedRead && marked, 'a listed read is not graded').toBe(false);
-    // a paid-off read the side did not lose ground on is listed; a graded side is a misplay or an inaccuracy the report does not list as a read
+    // a paid-off read without lost ground is listed; a graded side is a misplay or inaccuracy, not a read
     if (paid && swing < 0) expect(listedRead).toBe(true);
   });
 
@@ -246,7 +237,7 @@ describe('gameReview: the end of each line beside its row', () => {
     const [engine, played] = view[1].rows[0].lines;
     expect(engine.end).toBe(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`);
     expect(played.end).toBe(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`);
-    // the engine row prints 0.1 and the line ends at 0.06 (a different print), the played row 0.06 against a line at -0.24
+    // the engine row prints 0.1 and its line ends at 0.06; the played row 0.06 against a line at -0.24
     expect(engine.block.row).toBe(winPctText(0.1));
     expect(played.block.row).toBe(winPctText(0.06));
     expect(engine.block.differs).toBe(true);
@@ -315,7 +306,7 @@ describe('gameReview: Hard mode', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
   const hard: LinesHost = { ...host, hardMode: true };
   const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
-  /** Surf is the reply the search rates lowest for Hydro Pump: the highest cell of its column in p1's view (0.4, so p2's row reads -0.4). */
+  // Surf is the reply the search rates lowest for Hydro Pump: p1's highest cell of its column, 0.4 (p2's row: -0.4).
   const withMatrix = (lines: EvalLine[]): EvalResult => ({
     ...withLines(lines), perSide: { p1: ranking(['Draining Kiss', 'Surf']), p2: ranking(['Hydro Pump', 'Hyper Voice']) },
     matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },

@@ -6,7 +6,6 @@ import { ComboBox } from '../../../src/components/ComboBox';
 
 const OPTIONS = ['Earthquake', 'Earth Power', 'Fire Fang', 'Scale Shot', 'Stone Edge'];
 
-/** A controlled host, as the editor fields use it. */
 function Host({ onSelect, onEnterFreeText, onBlur, disabled }: {
   onSelect: (option: string) => void;
   onEnterFreeText?: (text: string) => void;

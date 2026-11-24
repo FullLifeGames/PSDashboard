@@ -65,7 +65,6 @@ describe('BattleStatsPanel', () => {
     expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
   });
 
-  // A format generates its team by its Dex entry, never by its name.
   test('the Dex decides: Hackmons Cup generates its team, a name with "random" in it does not', () => {
     const mon = revealedPokemon('Garchomp', { evs: evs('unknown'), moves: [move('Earthquake', 'revealed')] });
     const hackmons = render(<BattleStatsPanel replayData={{ ...singlesReplay(), formatid: 'gen9hackmonscup' }} p1Info={{ pokemon: [mon] }} p2Info={null} />);
@@ -77,7 +76,6 @@ describe('BattleStatsPanel', () => {
     expect(screen.queryByText('Not yet revealed')).not.toBeInTheDocument();
   });
 
-  // A Random Battle that showed 4 of 6 lists six bodies; the guesses wear the random-set mark. Singles (Gen 3) and doubles (Gen 9 Random Doubles).
   describe.each([
     { label: 'singles', id: 'gen3randombattle-1', missing: 3 },
     { label: 'doubles', id: 'gen9randomdoublesbattle-11', missing: 2 },
@@ -155,7 +153,6 @@ describe('BattleStatsPanel', () => {
     expect(panel.querySelector(':scope > .ps-stats-grid')).not.toBeNull();
   });
 
-  // A game without team preview where a side showed fewer bodies than its |teamsize|. Singles and doubles both.
   describe.each([['singles', 'gen4ou', '[Gen 4] OU'], ['doubles', 'gen4doublesou', '[Gen 4] Doubles OU']] as const)('the bodies a side never showed (%s)', (_kind, formatid, tier) => {
     const NL = String.fromCharCode(10);
     const log = (teamsize: number, preview = false) => [

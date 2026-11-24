@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { mergeChoices, seedChoices } from '../../../../src/lib/dock-seed';
 import type { PlayedAtPosition } from '../../../../src/lib/played-pick';
 
-// The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
 
 type Props = Parameters<typeof TurnDock>[0];
@@ -265,7 +264,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
 });
 
 describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacement, %s', (kind) => {
-  // P1 replaces: singles its only slot, doubles slot B (the other slot plays on); P2 waits.
   const slot = kind === 'doubles' ? 1 : 0;
   const forcedChip = kind === 'doubles' ? 'P1B' : 'P1';
   const waitingChip = kind === 'doubles' ? 'P2A' : 'P2';
@@ -335,7 +333,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacem
 });
 
 describe('TurnDock fill, two forced slots of one side (doubles)', () => {
-  // P1 replaces both bodies; P2 waits. The engine holds slot A with Flutter Mane; the user's bench click is in slot B.
   const flags = { p1ForceSwitch: true, p1ForceSwitches: [true, true] };
   const flutter: BranchSlotChoice = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
   const urshifu: BranchSlotChoice = { kind: 'switch', speciesId: 'urshifu', pokemonName: 'Urshifu' };
@@ -379,10 +376,6 @@ describe('TurnDock fill, two forced slots of one side (doubles)', () => {
 });
 
 
-/**
- * The click asks the fill (`restore`) for the choice and writes it like any pick, but without telling the fill that the user chose: the slot
- * is the engine's again. Singles and doubles; in doubles per slot.
- */
 describe.each(['singles', 'doubles'] as const)('TurnDock fill, Back to the engine\'s pick, %s', (kind) => {
   const first = kind === 'doubles' ? 'P1A' : 'P1';
   const engineMove = kind === 'doubles' ? move('flareblitz', 'Flare Blitz', 2) : move('earthquake', 'Earthquake');
@@ -529,7 +522,6 @@ describe('TurnDock, doubles', () => {
   test('Execute sends the effective choices: the seed under the picks', async () => {
     const onExecuteTurn = vi.fn();
     render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{ onExecuteTurn }} />);
-    // the slot nothing was logged for gets its pick first, so the turn is ready
     expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
     await userEvent.click(chip('P2B'));
     await userEvent.click(tray().getByRole('button', { name: /Taunt/ }));
@@ -577,7 +569,6 @@ describe('TurnDock, singles', () => {
     expect(onExecuteTurn.mock.calls[0][0]).toMatchObject({ p1: [{ moveId: 'earthquake' }], p2: [{ kind: 'switch', speciesId: 'rotomwash' }] });
   });
 
-  // A position with no logged action starts empty; a pick fills the chip as the user's own.
   test('a tile pick and a choice from the tray\'s picker each fill an empty chip as the user\'s own pick', async () => {
     render(<Harness base={simState('singles')} played={{ p1: null, p2: null }} spies={{}} />);
     expect(chip('P1')).toHaveAttribute('data-empty', 'true');
