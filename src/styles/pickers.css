@@ -1,8 +1,6 @@
-/* Pickers: the parts the turn dock, the turn 0 lead picker and the dice chips share (HP bars, badges, switch chips, Execute, gimmick toggles, choice picker, protocol log). */
 
-/* The colors of the move tiles, the badges and the switch chips. A move tile gets its type colors as --type, --type-on, --tint,
-   --tint-low and --tint-edge (typeTileVars in src/lib/type-colors.ts); test/regression/contrast.spec.ts holds every text below at
-   4.5 : 1 or more on every type. */
+/* A move tile gets --type, --type-on, --tint, --tint-low and --tint-edge from typeTileVars (src/lib/type-colors.ts);
+   test/regression/contrast.spec.ts holds every text below at 4.5 : 1 or more on every type. */
 :root {
   --ps-tile-text: #f6f9ff;
   --ps-tile-sub: #e2eaf5;
@@ -38,8 +36,6 @@
 .ps-hpbar-yellow { background: linear-gradient(180deg, #f0d000 0%, #c8a800 100%); }
 .ps-hpbar-red { background: linear-gradient(180deg, #f02020 0%, #c00000 100%); }
 
-/* "played" marks the move or switch actually taken at the viewed position; "forced" marks a move that carries forced dice. A filled
-   label in plain 9px type reads sharp on every tile (the outlined 8px capitals looked soft). */
 .ps-played-badge,
 .ps-forced-badge,
 .ps-engine-badge,
@@ -215,7 +211,6 @@
 }
 
 
-/* Execute (the dock's and the lead picker's Start): the base look; dock.css sets the size and the colors under .ps-dock. */
 .ps-execute-btn {
   width: 100%;
   padding: 7px;

@@ -1,11 +1,6 @@
 import type { WinStep } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, rankWords, type LineBlockView, type LinesHost } from './line-view';
 
-/**
- * What the win-path panel shows, as plain data: a stronger play with its chance whatever the opponent answers, the likeliest lucky
- * dice with their chance, the smallest mistake by the opponent, and one sentence for a step without a find. The lines are the
- * engine's `EvalLine`s of the job, drawn by `lineBlocks` (the rows, the dice chips and the tooltip of ▶ Play, one rule in one module).
- */
 
 type Side = 'p1' | 'p2';
 
@@ -109,12 +104,7 @@ const TITLES: Record<WinStepKind, (opponent: string) => string> = {
   mistake: opponent => `3 · A mistake by ${opponent}`,
 };
 
-/**
- * What the number of a luck or a mistake step counts: the exact chance of the dice it needs, which are the dice whose other result
- * would change who faints. A chip also shows a die that changes nothing (a 95 percent hit whose miss leaves the same bodies
- * standing), and the stronger play's share adds every sequence that wins, so the two never read as one sum. Null when no luck or
- * mistake step found a path.
- */
+// Counts only the dice whose other result would change who faints; a chip may also show a die that changes nothing.
 export const SEQUENCE_NOTE = 'A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.';
 export const sequenceNote = (views: readonly WinStepView[]): string | null =>
   views.some(view => view.kind !== 'stronger' && view.headline !== null) ? SEQUENCE_NOTE : null;

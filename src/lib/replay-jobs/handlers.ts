@@ -10,14 +10,11 @@ import type { ReconstructJob, ReconstructOutcome, ReplayJobRequest, ReplayJobRes
 
 export type ReplayPost = (message: ReplayJobResponse) => void;
 
-/** Progress messages per job at most this often; a block runs in milliseconds. */
 const PROGRESS_INTERVAL_MS = 100;
 
-/** The worker side of the replay jobs: the same code the main thread ran, so a reconstruction yields the same positions byte for byte. */
 export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPost): Promise<void> {
   try {
-    // This worker is its own realm (its own simulator): the main thread's load of the Champions mod does not reach it. Both jobs read
-    // the game's Dex from the log's tier line before the branch engine would load the mod, so the job loads it first.
+    // Its own realm: the main thread's Champions mod load does not reach this worker, so the job loads it first.
     await loadReplayMods(message.type === 'solveSpreads' ? { log: message.job.log } : { format: message.job.format, log: message.job.replayLog });
     if (message.type === 'solveSpreads') {
       const { job } = message;
@@ -35,13 +32,11 @@ export async function handleReplayJob(message: ReplayJobRequest, post: ReplayPos
   }
 }
 
-/** The copy of the turn with the roll's die turned over; null where the log shows no such miss. */
 function playRolledCopy(job: RolledCopyJob): RolledCopyOutcome | null {
   const copy = rolledCopy({ position: job.position, replayLog: job.replayLog, turn: job.turn, roll: job.roll });
   return copy ? { serialized: copy.serialized, stage: copy.stage, terminal: copy.terminal } : null;
 }
 
-/** The boundaries (and, when the job asks, the open replacement requests) as messages. A broken one is a gap for the caller, never a failed job. */
 function capturePositionsFor(
   job: ReconstructJob, id: number, post: ReplayPost, snapshotFor: (turn: number) => TurnSnapshot | null,
 ): NonNullable<ReconstructParams['capturePositions']> {

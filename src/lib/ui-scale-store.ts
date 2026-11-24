@@ -1,17 +1,11 @@
 import { autoScale, resolveScale, type UiScaleSetting, type UiScaleStep, type WindowSize } from './ui-scale';
 import { readUiScale, writeUiScale } from './ui-scale-setting';
 
-/**
- * The app's size, kept in one store that `main.tsx` starts once: it reads the setting and the window, writes the factor onto the root
- * element as `--ps-scale` (base.css turns it into the root's `zoom` and divides the vh and vw rules by it) and follows the window with
- * a resize listener, so no React state decides the size. Components read it through `useUiScale`. The window is the real one:
- * `innerWidth` and `innerHeight` are in CSS pixels of the browser's own zoom and never see the root's `zoom`, so the rule never
- * doubles a browser zoom already set.
- */
+// innerWidth and innerHeight never see the root's `zoom` (CSS pixels of the browser's own zoom), so the scale never
+// doubles one; base.css turns `--ps-scale` into the root's `zoom` and divides the vh and vw rules by it.
 
 export const UI_SCALE_PROPERTY = '--ps-scale';
 
-/** The window event that follows a change of the factor: the replay frames refit their content to it. */
 export const UI_SCALE_EVENT = 'ps-ui-scale';
 
 export interface UiScaleState {
@@ -42,7 +36,7 @@ export function subscribeUiScale(listener: () => void): () => void {
   return () => { listeners.delete(listener); };
 }
 
-/** The factor the root carries now, from its own property: what the measuring hooks divide a visual length by. */
+/** What the measuring hooks divide a visual length by. */
 export function appliedUiScale(root: HTMLElement = document.documentElement): number {
   const value = Number(root.style.getPropertyValue(UI_SCALE_PROPERTY));
   return value > 0 ? value : 1;
@@ -70,7 +64,6 @@ export function setUiScaleSetting(setting: UiScaleSetting): void {
   adopt(compute(setting), activeRoot ?? document.documentElement);
 }
 
-/** Starts the store: applies the stored setting and follows the window. Returns the stop function (tests, hot reload). */
 export function startUiScale(root: HTMLElement = document.documentElement): () => void {
   activeRoot = root;
   state = null;

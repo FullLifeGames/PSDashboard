@@ -1,4 +1,3 @@
-/* The New game dialog: each rule copies an existing one, so no color, radius, shadow or font appears that the app does not use already. */
 
 .ps-newgame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .ps-newgame-intro { font-size: 10px; line-height: 1.45; color: #8899aa; }     
@@ -56,8 +55,7 @@
 .ps-newgame-seed-problem { flex: 1 0 100%; font-size: 10px; }
 
 .ps-newgame-actions { display: flex; gap: 8px; }
-/* Start stays in view while two long problem lists scroll the dialog (ModalDialog's box pads 20 px and scrolls): the row sticks to
-   the box's bottom edge on the box's own background and border color. */
+/* Start stays in view while two long problem lists scroll the dialog: the row sticks to the box's bottom edge. */
 .ps-newgame > .ps-newgame-actions {
   position: sticky; bottom: -20px; z-index: 1; margin: 0 -20px -20px; padding: 10px 20px 20px;
   background: #2a3a5c; border-top: 1px solid rgba(255,255,255,0.09);
@@ -80,7 +78,6 @@
 .ps-newgame-saved-meta .ps-btn + .ps-btn { margin-left: -4px; }
 .ps-newgame-saved-confirm { color: #f3a6a6; }                                  
 
-/* The menu is the Load panel (loader.css .ps-loader-panel), a little wider for the saved rows: SetupMenu's panel is 440 px too. */
 .ps-loader-panel.ps-entry-panel { width: min(480px, calc(100 * var(--ps-vw) - 14px)); }
 .ps-entry-head { font-size: 11px; font-weight: bold; color: #ccddee; margin: 0 0 6px; }
 .ps-newgame-saved > .ps-entry-head { margin: 0; }
@@ -93,16 +90,13 @@
 .ps-entry-notice { margin-top: 8px; font-size: 11px; color: #f3a6a6; }   
 .ps-entry-landing .ps-newgame-saved { margin-top: 8px; }
 
-/* The menu's panel holds up to 20 saved rows: it scrolls inside the workspace column instead of growing past it, so the top bar and the
-   frame stay in view and the last row stays under the pointer (the column clips what stands below its height, `--ps-layout-h`; the
-   window's height stands in before it is measured). */
+/* The panel (up to 20 saved rows) scrolls inside the workspace column: the column clips below `--ps-layout-h`. */
 .ps-loader-panel.ps-entry-panel { max-height: calc(var(--ps-layout-h, 100 * var(--ps-vh)) - 60px); overflow-y: auto; overscroll-behavior: contain; }
-/* The left column is as tall as its content (a game at Team Preview is short), and it clips what hangs below it: while the menu is open
-   the column is at least the layout's height, so the panel's cap (layout minus 60 px) always ends inside it (the last of 20 rows once stood under the clip). */
+/* The column clips what hangs below it: with the menu open it is at least the layout's height, so the cap ends in. */
 .ps-main-left:has(.ps-loader-panel.ps-entry-panel) { min-height: var(--ps-layout-h, 0); }
 
 .ps-format-tag.ps-newgame-tag { background: linear-gradient(180deg, #3d6998 0%, #2d5078 100%); color: #ffffff; font-weight: bold; }
-/* The bar's shrinking order (layout.css) clips the format tags first; the "New game" tag keeps its words and the format tag gives way. */
+/* The bar's shrinking order (layout.css) clips the format tags first; the "New game" tag keeps its words. */
 .ps-topbar-match > .ps-format-tag.ps-newgame-tag { flex: 0 0 auto; min-width: auto; }
 
 @media (max-width: 640px) {
@@ -116,7 +110,6 @@
   .ps-format-list .ps-combobox-option { flex-wrap: wrap; white-space: normal; }
   .ps-newgame-saved-meta { margin-left: 0; }
   .ps-newgame-saved-match { flex-wrap: wrap; row-gap: 3px; }
-  /* The app's 640 px control sizes (layout.css gives the branch bar's buttons 40 px). */
   .ps-newgame-actions .ps-btn { min-height: 40px; }
   .ps-newgame-paste { height: 150px; }
 }

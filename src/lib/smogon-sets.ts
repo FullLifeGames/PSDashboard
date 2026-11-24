@@ -8,7 +8,6 @@ import { fetcherKey } from './smogon/fetcher-key';
 import { withSmogonFallback, type SmogonFetch } from './smogon/hosts';
 import { fetchRandomSets, type RandomSetFile } from './random-sets';
 
-/** The published sets of a request; a generated-team format carries its random-set file beside them. */
 export type SmogonSetAssumptions = PublishedSets & { randomSets?: RandomSetFile };
 
 type SmogonFetcher = ConstructorParameters<typeof Smogon>[0];
@@ -23,15 +22,13 @@ type AssumptionSet = {
   ivs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
 };
 
-/** A published sets file: species, then set name; a move slot or the item is one name or its options. */
 type RawSet = { moves?: (string | string[])[]; item?: string | string[] };
 type RawSetsFile = Record<string, Record<string, RawSet | undefined> | undefined>;
 
-// Published sets are read as published, on the standard Generations of replay-core (no mod).
 const gens = generationsFor('');
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
 
-/** fetch as a free function: @pkmn/smogon calls `this.fetch(url)`, and a browser's window.fetch throws "Illegal invocation" on a foreign `this`. */
+// A free function: @pkmn/smogon calls `this.fetch(url)`; window.fetch throws "Illegal invocation" on a foreign `this`.
 const boundFetch: SmogonFetch = (input, init) => fetch(input, init);
 
 function genFromFormat(formatId: string | undefined): number {
@@ -39,11 +36,7 @@ function genFromFormat(formatId: string | undefined): number {
   return match ? Number.parseInt(match[1], 10) : 9;
 }
 
-/**
- * The sets file a format reads. VGC reads the VGC file of its year (gen9vgc2025, gen9championsvgc2026) and never the Doubles OU
- * analyses; a year without a file leaves the guess to the usage file. Every other Champions format reads its own file, named without
- * the generation (championsou), and no Scarlet/Violet file: fallbackFormat adds no Ubers file.
- */
+// VGC reads its year's VGC file, never the Doubles OU analyses; other Champions formats read their own, no generation.
 function normalizeFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou');
   return nationalDexDoublesFormat(id) ?? vgcYearFormat(id) ?? championsSetsFormat(id) ?? ouFallbackFormat(id);
@@ -53,7 +46,7 @@ function sourceDetail(format: string): string {
   return `Smogon sets ${format}`;
 }
 
-/** The generation's Ubers file (Doubles Ubers for doubles): where a banned species' set lives. VGC and Champions take none. */
+// The generation's Ubers file (Doubles Ubers for doubles) holds a banned species' set; VGC and Champions take none.
 function fallbackFormat(format: string): string | null {
   const gen = format.match(/^gen\d+/)?.[0];
   if (!gen || format.includes('vgc')) return null;
@@ -61,10 +54,7 @@ function fallbackFormat(format: string): string | null {
   return fallback === format ? null : fallback;
 }
 
-/**
- * The species' sets from one file; a file that is not there reads as no sets. The fetch wrapper hands a 404 through, and @pkmn/smogon
- * then calls json() on it: a test fake throws "404", a real 404 page fails to parse. Network failures ("Failed to fetch") stay failures.
- */
+// A missing file reads as no sets: the fetch wrapper hands a 404 through and @pkmn/smogon then calls json() on it.
 async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: string, format: string): Promise<AssumptionSet[]> {
   try {
     return await smogon.sets(gen, name, format as ID) as AssumptionSet[];
@@ -74,14 +64,8 @@ async function setsFrom(smogon: Smogon, gen: ReturnType<typeof gens.get>, name: 
   }
 }
 
-/**
- * Keeps the sets files this request parsed: @pkmn/smogon flattens every move slot to its first option (toSet), the published file
- * still holds them all ("Heat Wave / Hidden Power Ice" is one slot, Knock Off a fixed one). @pkmn/smogon reads nothing but `json()`.
- * A missing sets file (404) reads as an empty one before json() runs: browsers word the parse error of a 404 page differently, and
- * WebKit's "The string did not match the expected pattern." passed no error filter. The species of one request share one fetch and
- * one parse per file: @pkmn/smogon keeps a file only once its response arrived, and the species ask at the same time (a VGC 2026 team
- * asked twelve times for its missing file). A failed fetch is not kept.
- */
+// A 404 reads as an empty file before json() runs (browsers word its parse error differently); one fetch and parse per
+// file for all species of a request, as @pkmn/smogon keeps a file once its response arrived. A failure is not kept.
 function keepingSetsFiles(fetcher: SmogonFetch, files: RawSetsFile[]): SmogonFetch {
   const shared = new Map<string, Promise<Response>>();
   const read = async (input: string, init?: RequestInit): Promise<Response> => {
@@ -167,16 +151,14 @@ function normalizeSet(
     species,
     sourceDetail: detail,
     ability: assumption(set.ability, detail),
-    // The item slot as published ("Leftovers / Metal Coat").
     item: set.item ? slotAssumption(set.item, published?.item, detail) : undefined,
     moves: (set.moves ?? []).slice(0, 4).map((move, index) => slotAssumption(move, published?.moves?.[index], detail)),
     spread: spreadAssumption(set, detail),
-    // The IVs as published (Speed 0, Attack 0).
     ...(set.ivs && Object.keys(set.ivs).length > 0 ? { ivs: { ...set.ivs } } : {}),
   };
 }
 
-/** The random-set file of a generated-team format, or null; a failed fetch leaves its message in `errors` and the game plays as before. */
+// A failed fetch leaves its message in `errors`; the game plays as before.
 async function randomSetsOf(formatId: string | undefined, fetcher: SmogonFetch, errors: string[]): Promise<RandomSetFile | null> {
   const id = toId(formatId || '');
   if (!generatesTeam(id)) return null;
@@ -232,10 +214,8 @@ export async function fetchSmogonSetAssumptions(params: {
       }
     }));
 
-    // Every species failed: the source is down, not the species absent.
     if (errors.length === species.length) throw new Error(`Smogon sets unavailable: ${errors[0]}`);
-    // A format that generates its team has no sets file; its random-set file fills the bodies the log never showed. The Smogon
-    // hosts' wrapper is no use here (the file is not on the Smogon mirror): fetchRandomSets tries its own two hosts.
+    // The Smogon hosts' wrapper does not apply (the file is not on the mirror): fetchRandomSets tries its own hosts.
     const randomSets = await randomSetsOf(params.formatId, (params.fetcher ?? boundFetch) as SmogonFetch, errors);
     return Object.keys(pokemon).length > 0 || randomSets ? {
       format,
@@ -248,7 +228,6 @@ export async function fetchSmogonSetAssumptions(params: {
   })();
 
   cache.set(cacheKey, request);
-  // A failure is never cached: the next load retries.
   request.catch(() => {
     if (cache.get(cacheKey) === request) cache.delete(cacheKey);
   });

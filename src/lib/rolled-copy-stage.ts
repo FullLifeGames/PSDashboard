@@ -5,12 +5,7 @@ import { engineCacheTag } from './eval/engine-setting';
 import { ReplayWorkerClient } from './replay-jobs/client';
 import type { RolledCopyJob, RolledCopyOutcome } from './replay-jobs/types';
 
-/**
- * The app's half of the sweep's biggest-roll stage (hooks/evaluation/sweep-rolled.ts): the report's walk names the roll, a replay
- * worker that lives for the one call plays the copy of its turn, and the copy's evaluation is cached beside the replay's turn keys.
- */
 
-/** What the app hands the sweep's stage: the report's roll over the graph, the worker's copy, and the cache key of the copy's evaluation. */
 export interface RolledCopyParams {
   namedRoll(graph: AnalysisGraphData): BiggestRoll | null;
   playCopy(roll: BiggestRoll, position: string): Promise<RolledCopyOutcome | null>;
@@ -31,7 +26,6 @@ export function rolledCopyParams(args: {
   makeClient?: () => Pick<ReplayWorkerClient, 'rolledCopy' | 'dispose'>;
 }): RolledCopyParams {
   const { replayData, snapshots, rules, setsFingerprint, makeClient = () => new ReplayWorkerClient() } = args;
-  // The walk reads the replay's own events and tendencies, which do not change with the sweep: read them once.
   let replay: Pick<Parameters<typeof namedRollOf>[0], 'tendencies'> & { turnEventsIndex: string[][] } | null = null;
   const replayOnce = () => (replay ??= {
     turnEventsIndex: allTurnEvents(replayData.log),

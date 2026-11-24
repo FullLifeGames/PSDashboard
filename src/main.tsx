@@ -9,7 +9,6 @@ import { startUiScale } from './lib/ui-scale-store'
 import { startTeambuilderTablePart } from './lib/teambuilder-table'
 
 installStaleChunkReloadOnWindow()
-// The app's size goes on the root before the first paint; the store follows the window from here
 startUiScale()
 simFastLevers()
 searchBudgetStamp()

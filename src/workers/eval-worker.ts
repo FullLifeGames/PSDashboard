@@ -9,22 +9,16 @@ import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../l
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);
-/** Every final answer carries the speed layer's status and its counters of the interval after the last one. */
 const settle = (message: EvalWorkerResponse) => post({ ...message, simFast: takeSimFastReport() });
 const postReplay = (message: ReplayJobResponse) => scope.postMessage(
   message.type === 'replayProgress' || message.type === 'replayPosition' ? message : { ...message, simFast: takeSimFastReport() },
 );
-/** MCTS iterations between two progress messages. */
 const PROGRESS_EVERY = 10;
 
-// One executor (with its matchup cache and lazily deserialized root) is reused across every message about the same position under
-// the same rule set (the rule set picks the static's weight table).
+// One executor serves every message about the same position under the same rule set (it picks the weight table).
 const executors = new Map<string, SearchExecutor>();
 
-/**
- * Every search message names its rule set. A missing one is a caller's bug, answered with an error instead of the standard weights
- * (which would price a VGC or Champions position with the wrong table).
- */
+// A missing rule set is a caller's bug: answered with an error, as the standard weights would misprice a VGC position.
 function requireRuleset(ruleset: StaticRuleset | undefined): StaticRuleset {
   if (!ruleset) throw new Error('evaluation worker: a search message without a rule set');
   return ruleset;
@@ -46,14 +40,12 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
   const message = event.data;
   // The host's speed-layer levers ride on every message (workers see no localStorage).
   adoptSimFastStamp(message);
-  // The replay jobs (spread solve, reconstruction) ride the same script in their own worker instance (ReplayWorkerClient). Their
-  // handlers load on demand: they carry replay-core's team builder, the standalone dex and the learnsets, which the evaluation pool never needs.
+  // The replay jobs ride this script in their own worker instance; their handlers load on demand (builder, dex, sets).
   if (isReplayJob(message)) {
     const { handleReplayJob } = await import('../lib/replay-jobs/handlers');
     await handleReplayJob(message, postReplay);
     return;
   }
-  // Search messages carry the search budget (iterations per tree).
   adoptSearchBudgetStamp(message);
   try {
     // A Champions position revives on the Champions mod, which nothing else in this worker loads.
@@ -69,13 +61,12 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
     } else if (message.type === 'mctstree') {
       requireRuleset(message.settings.ruleset);
       const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
-        // One message per ten iterations (plus the last) is all a progress bar can show, and each message is a main-thread clone plus a render.
         onProgress: progress => {
           if (progress.done % PROGRESS_EVERY === 0 || progress.done >= progress.total) {
             post({ type: 'progress', id: message.id, progress });
           }
         },
-        // Tree 0 of a search with a listener streams its interim result (every 150 iterations); the others ask for none.
+        // Tree 0 streams its interim result (every 150 iterations); the others ask for none.
         ...(message.partials && { onPartial: partial => post({ type: 'partial', id: message.id, result: partial }) }),
       });
       settle({ type: 'mctsTreeResult', id: message.id, tree });
@@ -95,7 +86,6 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
       const lines = await executorFor(message.serializedBattle, message.ruleset).lines!(message.input);
       settle({ type: 'linesResult', id: message.id, lines });
     } else if (message.type === 'job') {
-      // An on-request job runs on a worker of its own and streams each step the moment it is done.
       const result = runOnRequestJob(message.serializedBattle, requireRuleset(message.ruleset), message.job, step => post({ type: 'jobStep', id: message.id, step }));
       settle({ type: 'jobResult', id: message.id, result });
     }

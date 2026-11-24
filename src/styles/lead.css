@@ -1,5 +1,4 @@
-/* The turn 0 lead picker (components/LeadPanel.tsx, LeadSide.tsx): its root is a dock (`ps-dock ps-lead`), so the dock rules of dock.css
-   apply as they are; only what the picker adds stands here. */
+/* The picker's root is a dock (`ps-dock ps-lead`): dock.css applies as it is, only what the picker adds stands here. */
 
 .ps-lead-rows { display: grid; gap: 10px; min-width: 0; }
 .ps-lead-side { display: grid; gap: 8px; min-width: 0; }
@@ -34,7 +33,6 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-/* A fixed bar of two sides with six bodies each is tall on a phone: it keeps to 60 % of the window and scrolls inside. */
 @media (max-width: 1050px) {
   .ps-lead .ps-dock-bar { max-height: calc(60 * var(--ps-vh)); overflow-y: auto; }
 }

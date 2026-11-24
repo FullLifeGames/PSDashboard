@@ -1,11 +1,5 @@
-/**
- * The part of Showdown's teambuilder table a replay frame reads. The whole table (`data/teambuilder-tables.js`, 15.8 MB, one
- * `JSON.parse`) cost 185 to 200 ms on the main thread at load and 140 to 185 ms at every variation start. The replay client reads it
- * only in `battledata.js` (ModdedDex): `BattleTeambuilderTable["gen" + i]` for the replay's generation up to Generation 8, and
- * `BattleTeambuilderTable[modid]` for the mods it builds a Dex for. A worker cuts that part once per session (1.14 MB), and the
- * frame's script hook loads it in place of Showdown's file; until it is ready, or when the worker fails, frames load Showdown's file.
- * `test/e2e/teambuilder-table.spec.ts` compares the client's Dex over the part with its Dex over the whole table.
- */
+// The replay client reads the table only in battledata.js (ModdedDex): the generation's entry up to Gen 8, the mods'.
+// A worker cuts that part (1.14 of 15.8 MB); test/e2e/teambuilder-table.spec.ts compares the Dex over part and whole.
 
 export const TEAMBUILDER_TABLE_URL = 'https://play.pokemonshowdown.com/data/teambuilder-tables.js';
 
@@ -18,15 +12,11 @@ export function cutTablePart(table: Record<string, unknown>): Record<string, unk
   return Object.fromEntries(Object.entries(table).filter(([key]) => GENERATION_KEY.test(key) || mods.includes(key)));
 }
 
-/** The script a frame runs in place of Showdown's file: it sets the global the client reads (the embed sets `exports = window`). */
 export function tablePartScript(table: Record<string, unknown>): string {
   return `window.BattleTeambuilderTable = JSON.parse(${JSON.stringify(JSON.stringify(cutTablePart(table)))});\n`;
 }
 
-/**
- * The frame's hook: the embed appends its scripts to <head>, and the table's script takes the part's URL instead. It wraps
- * `EMBED_SCRIPT_ORDER_SCRIPT`, so the part keeps the table's place in the order and fires its own load event.
- */
+/** Wraps `EMBED_SCRIPT_ORDER_SCRIPT`: the part keeps the table's place in the order and fires its own load event. */
 export function tableSwapScript(partUrl: string): string {
   return `<script>
 (function () {
@@ -43,10 +33,6 @@ export function tableSwapScript(partUrl: string): string {
 </script>`;
 }
 
-/**
- * How long after the app starts a new frame document waits for the part: the worker answers about 1 s after navigation, and the wait never
- * reaches past this mark.
- */
 export const TABLE_PART_WAIT_MS = 1500;
 
 let partUrl: string | undefined;
@@ -60,12 +46,11 @@ const settle = () => {
   for (const listener of listeners) listener();
 };
 
-/** The URL of the part's script once the worker has cut it; undefined before and after a failure. */
 export function teambuilderTablePartUrl(): string | undefined {
   return partUrl;
 }
 
-/** Whether a new frame document waits for the part: only while the worker runs and before `TABLE_PART_WAIT_MS`. Once false, never true again. */
+/** Once false, never true again. */
 export function tablePartPending(): boolean {
   return waiting;
 }
@@ -95,7 +80,6 @@ export function startTeambuilderTablePart(): void {
       settle();
     };
   } catch {
-    // No worker: frames keep Showdown's file.
     settle();
   }
 }

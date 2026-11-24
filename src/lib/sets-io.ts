@@ -4,10 +4,6 @@ import {
 } from '@fulllifegames/replay-core';
 import { EV_STATS, canonicalMove, type EditorPools } from './team-editor';
 
-/**
- * Text import and export for both players' sets: Showdown export blocks under `=== p1: … ===` headers; the document round-trips through
- * parseSetsImport.
- */
 
 const ALL_31_IVS: PokemonEvs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
@@ -41,8 +37,7 @@ function spreadLines(pokemon: RevealedPokemonInfo): string[] {
   const known = pokemon.ivs && pokemon.ivs.source !== 'unknown' ? pokemon.ivs.value : null;
   const ivLine = known ? statLine('IVs', known, 31) : null;
   if (ivLine) lines.push(ivLine);
-  // The import (the library's) gives a set with a typed Hidden Power that type's own IVs unless the text lists IVs, and the build
-  // plays the IVs it has (31 when nothing says otherwise): all 31 stay explicit then.
+  // The library's import gives a typed Hidden Power that type's own IVs unless the text lists IVs: 31s stay explicit.
   else if (typedHiddenPowerId(pokemon.moves.map(move => move.name))) lines.push(statLine('IVs', ALL_31_IVS, 0)!);
   return lines;
 }
@@ -66,11 +61,7 @@ function exportSide(header: string, info: OpponentTeamInfo | null): string {
   return `${header}\n\n${sets}`.trimEnd();
 }
 
-/**
- * Both teams as `=== p1: … ===` export blocks. Every known value is written, and `applyPastedTeam` reads it back as the user's own
- * input, ahead of the solver. The caller passes the infos the stats panel shows: their spreads are the solved ones, so an import pins
- * what the build already plays; the enriched infos hold the guesses and would bring a refuted guess back.
- */
+/** The caller passes the infos the stats panel shows (solved spreads), so an import pins what the build plays. */
 export function buildSetsExport(params: {
   p1Name: string;
   p2Name: string;
@@ -120,10 +111,7 @@ export function parseSetsImport(text: string): { p1: PastedSet[]; p2: PastedSet[
 
 export interface ImportGame { gen: number; pools: EditorPools | null }
 
-/**
- * The import's pools for the species of a game, loaded lazily (the move pools read learnsets). The team editor's pools, except for a
- * format id the simulator does not list: there the import accepts what the generation's Custom Game plays (`PoolUse` in pokemon-options.ts).
- */
+// The team editor's pools; a format id the simulator does not list takes the generation's Custom Game pool (`PoolUse`).
 export async function loadImportPools(speciesList: string[], gen: number, format: string): Promise<EditorPools> {
   const options = await import('./pokemon-options');
   await options.prepareFormat(format);
@@ -147,14 +135,8 @@ export async function loadImportPools(speciesList: string[], gen: number, format
 
 type SideId = 'p1' | 'p2';
 
-/**
- * What an import cannot apply, one message per value (empty: the text is fine). The import is all or nothing: the caller applies
- * nothing while the list is not empty. A move or an ability the species cannot have applies; the editor marks it with a note. Only
- * values that differ from what the panel already holds are checked, so the export of the panel itself always imports (a swapped
- * ability, a move copied by Transform, an item of a custom game stay as they are). The pool checks wait until the pools load
- * (`pools: null`). `shown` is the view the export reads (the stats panel's solved sets): a value it holds counts as held too (a
- * guessed Head Smash of Champions VGC 2695803506).
- */
+// The import is all or nothing. Only values that differ from the panel's are checked, so its own export always imports;
+// `shown` is the view the export reads (a value it holds counts as held); `pools: null` skips the pool checks.
 export function validateSetsImport(
   parsed: { p1: PastedSet[]; p2: PastedSet[] },
   current: { p1: OpponentTeamInfo; p2: OpponentTeamInfo },

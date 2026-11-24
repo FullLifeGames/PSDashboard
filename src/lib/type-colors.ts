@@ -1,4 +1,3 @@
-/** Pokémon Showdown's type colors, the badge backgrounds across the UI. */
 export const TYPE_BG: Readonly<Record<string, string>> = {
   Normal: '#A8A878',
   Fire: '#F08030',
@@ -26,7 +25,6 @@ export function typeBg(type: string): string {
   return TYPE_BG[type] || '#68A090';
 }
 
-/** The navy a move tile mixes its type color into: the surface of the branch panel. */
 const TILE_NAVY = '#16233b';
 
 const channels = (hex: string): number[] => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16));
@@ -45,7 +43,6 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** WCAG's contrast ratio of two #rrggbb colors, from 1 (the same) to 21 (white on black). */
 export function contrastRatio(a: string, b: string): number {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
@@ -56,10 +53,6 @@ export function onTypeColor(type: string): string {
   return contrastRatio('#ffffff', color) >= contrastRatio(TILE_NAVY, color) ? '#ffffff' : TILE_NAVY;
 }
 
-/**
- * A move tile carries its type as a tint mixed deep into the navy, so light text reads on every type; the full type color goes on its
- * top line, badge and selection ring (pickers.css reads these properties).
- */
 export function typeTileVars(type: string): { '--type': string; '--type-on': string; '--tint': string; '--tint-low': string; '--tint-edge': string } {
   const color = typeBg(type);
   return {

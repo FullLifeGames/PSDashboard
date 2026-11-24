@@ -1,10 +1,7 @@
 import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
-/**
- * The sets a user saved in the team editor of a replay survive a reload: one record per replay holds the saved infos whole. The
- * record leaves the page's memory, so it carries a version; a record of another version is left in storage and ignored. The import
- * text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
- */
+// The record leaves the page's memory, so it carries a version: another version's record stays in storage, ignored.
+// The import text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
 
 export const TEAM_EDITS_VERSION = 1;
 
@@ -23,10 +20,7 @@ function isTeam(value: unknown): value is OpponentTeamInfo {
     && typeof mon.item === 'object' && mon.item !== null && typeof mon.ability === 'object' && mon.ability !== null);
 }
 
-/**
- * A saved side fits the replay when it holds every species the log showed for that side. It may hold more: a game without team
- * preview gets stand-ins for the bodies it never showed, and an edit saved with them keeps them.
- */
+// A saved side may hold more than the log showed: a game without team preview gets stand-ins, and an edit keeps them.
 function fits(saved: OpponentTeamInfo | null, shown: OpponentTeamInfo): boolean {
   if (saved === null) return true;
   if (!isTeam(saved) || saved.pokemon.length < shown.pokemon.length) return false;
@@ -42,11 +36,7 @@ export function saveTeamEdits(replayId: string, edits: TeamEdits): void {
   }
 }
 
-/**
- * The saved edit of a replay, or null for none, an unreadable record, another version, or sides that do not fit the replay's
- * inferred teams (a record left by a different build of the same id). Nothing is deleted: a record this version cannot read stays
- * for the version that wrote it.
- */
+/** Nothing is deleted: a record this version cannot read stays for the version that wrote it. */
 export function loadTeamEdits(replayId: string, inferred: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): TeamEdits | null {
   try {
     const raw = localStorage.getItem(teamEditsKey(replayId));
@@ -69,7 +59,6 @@ export function readImportText(replayId: string): string | null {
   }
 }
 
-/** Removes the stored import text: a saved edit holds the import already, because the editor started from it. */
 export function forgetImportText(replayId: string): void {
   try {
     localStorage.removeItem(importKey(replayId));

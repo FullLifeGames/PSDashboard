@@ -1,4 +1,3 @@
-/* Design tokens, the page background, the app header, and the panel shell every column uses. */
 
 :root {
   --ps-bg-deep: #18243a;
@@ -14,15 +13,12 @@
   --ps-accent-warm: #f0c76b;
   --ps-danger: #cc4455;
   --ps-shadow: 0 16px 36px rgba(6, 12, 24, 0.28);
-  /* The viewport units of a zoomed tree count the window's real pixels, so inside the root's zoom a full-height rule in vh renders at the
-     scale's multiple of the window. Every vh and vw rule reads these two units instead (`calc(100 * var(--ps-vh))`). The factor is
-     written by `ui-scale-store.ts`; absent means 100 %. */
+  /* A plain vh renders at the scale's multiple inside the root's zoom: rules read `calc(100 * var(--ps-vh))`. */
   --ps-vh: calc(1vh / var(--ps-scale, 1));
   --ps-vw: calc(1vw / var(--ps-scale, 1));
 }
 
-/* The app's size: the browser's own zoom on the root element, so everything grows evenly, the replay frame included
-   (`replay-frame-zoom.ts` brings the engine that does not carry the zoom into the frame). */
+/* Zoom on the root grows everything evenly; `replay-frame-zoom.ts` brings it into the frame for engines without it. */
 html {
   zoom: var(--ps-scale, 1);
 }

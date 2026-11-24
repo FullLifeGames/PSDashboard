@@ -1,10 +1,9 @@
 import type { HiddenPowerEvidence, OpponentTeamInfo, SpeedOrderObservation, SpreadCandidate } from '@fulllifegames/replay-core';
 
-/** Type-only: the team builder stays behind ./lazy/team-builder at runtime. */
+// Type-only: the team builder stays behind ./lazy/team-builder at runtime.
 type BuildOptions = NonNullable<Parameters<typeof import('./lazy/team-builder')['buildTeamsFromReplay']>[1]>;
 type SolveOptions = NonNullable<Parameters<typeof import('./lazy/team-builder')['solveReplaySpreads']>[2]>;
 
-/** The team knowledge a replay build reads, however the caller assembled it. */
 export interface ReplayBuildSources {
   /** Already normalized: an empty paste is `undefined`, never `''`. */
   userTeamText?: string;
@@ -16,15 +15,11 @@ export interface ReplayBuildSources {
   hpEvidence: HiddenPowerEvidence[];
 }
 
-/**
- * Names every option the builder knows, so a new one fails the type check here until both blocks below have decided about it. The
- * builder reads several options by presence (`observations?.length`, `inferredSpreads`), so a key a block leaves undefined is dropped.
- */
+// Names every option, so a new one fails the type check here; the builder reads some by presence: undefined drops it.
 function passed<T>(block: Record<keyof T, unknown>): T {
   return Object.fromEntries(Object.entries(block).filter(([, value]) => value !== undefined)) as T;
 }
 
-/** The spread solve's options: the worker's job and the bank's build share them. */
 export function replaySolveOptions(sources: Omit<ReplayBuildSources, 'hpEvidence'>): SolveOptions {
   return passed<SolveOptions>({
     userTeamText: sources.userTeamText,
@@ -33,14 +28,12 @@ export function replaySolveOptions(sources: Omit<ReplayBuildSources, 'hpEvidence
     usageStats: sources.usageStats,
     setAssumptions: sources.setAssumptions,
     speedOrders: sources.speedOrders,
-    // The worker's solve job carries no HP evidence; only the build reads it.
     hpEvidence: undefined,
-    // The app's infos arrive filled (withStandIns in the panel and in buildAppTeams); only a Node caller hands the file to the builder.
+    // The app's infos arrive filled (withStandIns, buildAppTeams); only a Node caller hands the file in.
     randomSets: undefined,
   });
 }
 
-/** The build's options, once the solve has answered. */
 export function replayBuildOptions(
   sources: Omit<ReplayBuildSources, 'speedOrders'>,
   inferredSpreads: Map<string, SpreadCandidate> | undefined,

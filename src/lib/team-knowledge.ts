@@ -2,10 +2,7 @@ import { alternativeItems } from './smogon-stats';
 import type { SensitivityTarget } from '@fulllifegames/eval-engine';
 import { INFERRED_ITEM_DETAIL, RULED_OUT_ITEM_DETAIL, type OpponentTeamInfo } from '@fulllifegames/replay-core';
 
-/**
- * Guessed-item mons and their usage-plausible alternatives, the search space for the sensitivity probes. An item the move order
- * inferred is not probed (its alternatives contradict the evidence), and a dropped Scarf stays dropped among the alternatives.
- */
+/** An item the move order inferred is not probed (its alternatives contradict the evidence); a dropped Scarf stays. */
 export function buildSensitivityTargets(
   info: OpponentTeamInfo | null,
   stats: Parameters<typeof alternativeItems>[0],

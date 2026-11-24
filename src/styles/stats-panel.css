@@ -1,4 +1,3 @@
-/* Stats panel: the inferred team information for both players. */
 
 .ps-stats-grid {
   display: flex;
@@ -6,12 +5,8 @@
   gap: 8px;
 }
 
-/* The panel is closed at the dock's foot; its heading stays and its list scrolls inside it, fading out over the last 36 px while more
-   follows (`data-more`, written by `useScrollFade`; no fade at the list's end). The floor is 285 px: the heading (53.5 px with the
-   panel's padding) plus the tallest first entry the probes read (a doubles OU team header and Pokemon, 172.5 px, and a VGC entry of
-   148.5 px, each under 32 px of team chrome); a window too short for Evaluation and that floor scrolls the whole column. At 96 px the
-   list was a strip under the heading, faded and too thin to read or to aim the wheel at. With a floor of 185 px or more the list keeps
-   at least 132 px, over three times its 36 px fade, so `useScrollFade` needs no threshold. */
+/* The floor is 285 px: the heading plus the tallest first entry the probes read (172.5 px, a doubles OU team header
+   and Pokemon). A window too short for Evaluation and that floor scrolls the column; at 96 px the list was too thin. */
 .ps-main-right > .ps-stats-panel {
   flex: 1 1 auto;
   flex-shrink: 1;

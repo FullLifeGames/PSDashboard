@@ -1,6 +1,5 @@
 import { UI_SCALE_STEPS, type UiScaleSetting } from './ui-scale';
 
-/** The "Size" setting of the Setup menu, kept per browser like the app's other settings. Missing, unreadable or unknown means Auto. */
 export const UI_SCALE_STORAGE_KEY = 'ps-replay-interceptor:ui-scale';
 
 export function parseUiScale(raw: string | null | undefined): UiScaleSetting {
@@ -12,7 +11,6 @@ export function readUiScale(): UiScaleSetting {
   try {
     return parseUiScale(typeof localStorage !== 'undefined' ? localStorage.getItem(UI_SCALE_STORAGE_KEY) : null);
   } catch {
-    // Storage unavailable: Auto.
     return 'auto';
   }
 }

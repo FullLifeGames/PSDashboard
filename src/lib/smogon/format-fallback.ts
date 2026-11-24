@@ -1,27 +1,17 @@
-/**
- * A VGC format's year-level data name: Scarlet/Violet VGC `gen9vgc2026`, Pokémon Champions VGC `gen9championsvgc2026`; null for every
- * other format. The stats files carry it as is; for sets, @pkmn/smogon names Champions files without the generation
- * (sets/championsvgc2026.json).
- */
+/** A VGC format's year-level data name (`gen9vgc2026`, `gen9championsvgc2026`); null for every other format. */
 export function vgcYearFormat(id: string): string | null {
   const match = id.match(/(champions)?vgc(\d{4})/);
   return match ? `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}${match[1] ?? ''}vgc${match[2]}` : null;
 }
 
-/**
- * The sets file of a Pokémon Champions format without a VGC year: @pkmn/smogon names Champions sets files without the generation
- * (sets/championsou.json); `gen9championsou` would ask for a file that does not exist. Null for every other format.
- */
+/** @pkmn/smogon names Champions sets files without the generation (sets/championsou.json); null for other formats. */
 export function championsSetsFormat(id: string): string | null {
   return id.match(/^gen\d+(champions[a-z0-9]+)$/)?.[1] ?? null;
 }
 
-/**
- * Where a format's published data lives when the format itself has none: doubles ladders read their generation's Doubles OU, draft
- * formats and Custom Game their generation's OU, everything else is itself. A VGC id without a year lands on Doubles OU.
- */
+/** Where a format's data lives when it has none: doubles ladders read Doubles OU, draft and Custom Game the OU. */
 export function ouFallbackFormat(id: string): string {
-  // The generation stays: Gen 4 Doubles OU has a stats file of its own, and a Gen 3 one falls through to the generation's OU.
+  // Gen 4 Doubles OU has a stats file of its own; a Gen 3 one falls through to the generation's OU.
   if (id.includes('doubles') || id.includes('vgc')) return `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}doublesou`;
   if (/^gen\d+draft/.test(id)) return id.replace(/draft.*$/, 'ou');
   const customGame = id.match(/^(gen\d+)customgame$/);
@@ -29,10 +19,6 @@ export function ouFallbackFormat(id: string): string {
   return id || 'gen9ou';
 }
 
-/**
- * The National Dex Doubles file of the format's own generation (gen9nationaldexdoubles); null for every other format. A generation without
- * a file falls through to the OU.
- */
 export function nationalDexDoublesFormat(id: string): string | null {
   return id.includes('nationaldexdoubles') ? `${id.match(/^gen\d+/)?.[0] ?? 'gen9'}nationaldexdoubles` : null;
 }
