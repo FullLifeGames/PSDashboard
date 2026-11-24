@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { commentBaseline, commentLineCount, filesUnder, historyCounts, lineCounts, overBaseline, overLines, workflowHistoryCounts } from '../../scripts/comment-counts.mjs';
+import { commentBaseline, commentLineCount, filesUnder, historyCounts, lineCounts, overBaseline, overLines, ROOT, shapeReport, shapeSources, workflowHistoryCounts } from '../../scripts/comment-counts.mjs';
 import { historyLinesOf } from '../../scripts/comment-lib.mjs';
 
 /**
@@ -107,6 +108,43 @@ describe('workflow comments', () => {
       rmSync(root, { recursive: true, force: true });
     }
     expect(workflowHistoryCounts()).toEqual({});
+  });
+});
+
+describe('shape of workflows and stylesheets', () => {
+  const files = {
+    '.github/workflows/three.yml': '# one\n# two\n# three\non: push\n',
+    '.github/workflows/two.yml': '# one\n# two\n\n# three\non: push\n',
+    'src/wide.css': `/* ${'x'.repeat(130)} */\n.a { color: red; }\n`,
+    'src/fine.css': '/* one */\n.a { color: red; }\n',
+    'src/app.tsx': '// not read here\n',
+  };
+
+  test('a run of three # lines and a 130-column stylesheet comment report; a run of two does not', () => {
+    const root = tree(files);
+    try {
+      expect(shapeSources(root)).toEqual(['.github/workflows/three.yml', '.github/workflows/two.yml', 'src/fine.css', 'src/wide.css']);
+      expect(shapeReport(root, shapeSources(root)).map(hit => `${hit.file}:${hit.line}:${hit.rule}`)).toEqual([
+        '.github/workflows/three.yml:1:lines',
+        'src/wide.css:1:wide',
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('--shape with files prints the hits and exits 1; a clean file exits 0', () => {
+    const root = tree(files);
+    const run = (file: string) =>
+      spawnSync(process.execPath, [path.join(ROOT, 'scripts/comment-counts.mjs'), '--shape', path.join(root, file)], { encoding: 'utf8' });
+    try {
+      const bad = run('src/wide.css');
+      expect(bad.status).toBe(1);
+      expect(bad.stderr).toContain('wide.css:1');
+      expect(run('src/fine.css').status).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

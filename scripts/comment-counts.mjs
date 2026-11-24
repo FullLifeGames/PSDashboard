@@ -1,19 +1,9 @@
-// The comment ratchets (AGENTS.md, "Rules for the code", comments). Two baselines in comment-ratchet.json, both only falling:
-//
-//   history   per source file, the comment lines that carry history (a round, a ruling, a date, a T-number, an issue number; the
-//             patterns are in comment-lib.mjs). The rule comments/no-history (eslint.comments.mjs) reads this baseline and fails a
-//             file above its count, so `npm run lint` holds it. The workflows have no lint rule: `node scripts/comment-counts.mjs` holds
-//             their history at the baseline (zero).
-//   lines     per project (the three source trees, the app's stylesheets, each test project, the workflows, scripts and the root
-//             config files), the non-blank lines that hold only a comment. `node scripts/comment-counts.mjs` checks it and `npm run lint` runs the check; the calibration ledger
-//             (test/regression/eval-calibration.spec.ts) is the history of the engine rounds, kept by rule, and stays out.
-//
-// `node scripts/update-lint-ratchet.mjs` writes the baseline from the tree and lowers it after a clean-up; it refuses to raise a
-// count unless `--allow-raise` names the reason.
+// The ratchets of comment-ratchet.json, both only falling: `history` per file and `lines` per project (update-lint-ratchet.mjs).
+// `--shape [files]` checks the shape of the workflows, the stylesheets or the given files, which no lint rule reads.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { commentsOf, historyLinesOf } from './comment-lib.mjs';
+import { commentsOf, historyLinesOf, shapeHits } from './comment-lib.mjs';
 import { SPEC_PROJECTS } from './spec-counts.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,7 +130,21 @@ export function lineCounts(root = ROOT) {
 /** The projects above their line baseline. */
 export const overLines = (baseline, counts) => overBaseline(baseline.lines ?? {}, counts);
 
+/** The files no lint rule reads for the shape of comments: the workflows and the stylesheets of the app. */
+export const shapeSources = (root = ROOT) => [...workflowSources(root), ...filesUnder(root, 'src', file => /\.css$/.test(file))].sort();
+
+/** The shape hits of `files` (paths from `root`, or absolute) as `{ file, line, rule, message }`. */
+export const shapeReport = (root, files, options = {}) =>
+  files.flatMap(file => shapeHits(readFileSync(path.resolve(root, file), 'utf8'), file, options).map(({ line, rule, message }) => ({ file, line, rule, message })));
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const args = process.argv.slice(2);
+  const shape = args.includes('--shape');
+  const files = shape ? args.filter(arg => !arg.startsWith('--')) : [];
+  const hits = shape ? (files.length > 0 ? shapeReport(process.cwd(), files) : shapeReport(ROOT, shapeSources())) : [];
+  const failed = hits.length > 0;
+  for (const hit of hits) console.error(`${hit.file}:${hit.line} ${hit.rule}: ${hit.message}`);
+  if (files.length > 0) process.exit(failed ? 1 : 0);
   const counts = lineCounts();
   const baseline = commentBaseline();
   const over = overLines(baseline, counts);
@@ -151,5 +155,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error('Comments only fall (AGENTS.md, "Rules for the code", comments). Cut the comment; node scripts/update-lint-ratchet.mjs lowers the baseline.');
     process.exit(1);
   }
+  if (failed) process.exit(1);
   console.log('comment ratchet: no project above its baseline');
 }

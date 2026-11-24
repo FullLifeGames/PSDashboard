@@ -121,6 +121,98 @@ describe('comments/no-history', () => {
   });
 });
 
+describe('comments/shape', () => {
+  const shape = (code: string, options: Record<string, unknown> = {}) =>
+    lint(code, 'comments/shape', [options]).filter(message => message.ruleId === 'comments/shape').map(message => `${message.line}:${/^(\w+):/.exec(message.message)?.[1]}`);
+
+  const fixed = (code: string) =>
+    linter.verifyAndFix(code, [{
+      files: ['**/*.{ts,tsx}'],
+      languageOptions: { parser: tseslint.parser },
+      plugins: { comments: commentsPlugin },
+      rules: { 'comments/shape': 'error' },
+    }], { filename: 'x.ts' }).output;
+
+  const wide = (columns: number, lead = '// ') => lead + 'x'.repeat(columns - lead.length);
+
+  test('a comment line past column 120 reports, one at 120 does not, and the code before a trailing comment counts', () => {
+    expect(shape(`${wide(121)}\nexport const a = 1;`)).toEqual(['1:wide']);
+    expect(shape(`${wide(120)}\nexport const a = 1;`)).toEqual([]);
+    expect(shape(`const a = 1; ${wide(121 - 13)}`)).toEqual(['1:wide']);
+    expect(shape(`const a = 1; ${wide(120 - 13)}`)).toEqual([]);
+    expect(shape(`/**\n * one\n * ${'x'.repeat(130)}\n */\nconst a = 1;`)).toEqual(['3:wide']);
+  });
+
+  test('a custom width moves the limit', () => {
+    expect(shape(`${wide(61)}\nexport const a = 1;`, { width: 60 })).toEqual(['1:wide']);
+  });
+
+  test('a lone URL line is exempt', () => {
+    expect(shape(`// https://example.com/${'a'.repeat(120)}\nexport const a = 1;`)).toEqual([]);
+  });
+
+  test('more than two text lines in a row report, two do not, and the delimiter lines of a JSDoc do not count', () => {
+    expect(shape('const a = 1;\n// one\n// two\n// three\nconst b = 2;')).toEqual(['2:lines']);
+    expect(shape('const a = 1;\n// one\n// two\nconst b = 2;')).toEqual([]);
+    expect(shape('const a = 1;\n/**\n * one\n * two\n */\nconst b = 2;')).toEqual([]);
+    expect(shape('const a = 1;\n/**\n * one\n * two\n * three\n */\nconst b = 2;')).toEqual(['3:lines']);
+  });
+
+  test('a blank line does not split a block, and a file header counts apart from the comment of the first import', () => {
+    expect(shape('const a = 1;\n// one\n// two\n\n// three\n// four\nconst b = 2;')).toEqual(['2:lines']);
+    expect(shape("// one\n// two\n\n// three\n// four\nimport a from 'a';\nexport const b = a;")).toEqual([]);
+    expect(shape("// one\n// two\n// three\n\nimport a from 'a';\nexport const b = a;")).toEqual(['1:lines']);
+  });
+
+  test('a trailing comment is its own comment', () => {
+    expect(shape('const a = 1; // one\n// two\n// three\nconst b = 2;')).toEqual([]);
+  });
+
+  test('the JSDoc of an exported declaration holds one text line; a member, a non-exported declaration and a named export follow their own rule', () => {
+    const two = '/**\n * one\n * two\n */\n';
+    expect(shape(`${two}export function f() {}`)).toEqual(['1:exportDoc']);
+    expect(shape(`${two}export const c = 1;`)).toEqual(['1:exportDoc']);
+    expect(shape('/** one */\nexport function f() {}')).toEqual([]);
+    expect(shape(`export interface I {\n  /**\n   * one\n   * two\n   */\n  a: number;\n}`)).toEqual([]);
+    expect(shape(`${two}function g() {}`)).toEqual([]);
+    expect(shape(`${two}function g() {}\nexport { g };`)).toEqual(['1:exportDoc']);
+  });
+
+  test('a comment of one text line on three physical lines reports, and the autofix writes it on one line', () => {
+    const source = '/**\n * one line\n */\nexport const a = 1;';
+    expect(shape(source)).toEqual(['1:oneLine']);
+    expect(fixed(source)).toBe('/** one line */\nexport const a = 1;');
+    expect(fixed('const a = 1;\n  /*\n   * one line\n   */\nconst b = 2;')).toBe('const a = 1;\n  /* one line */\nconst b = 2;');
+    expect(fixed(`/**\n * ${'x'.repeat(115)}\n */\nexport const a = 1;`)).toContain('\n * ');
+  });
+
+  test('comments that code reads never report: directives, references, legal headers, an oracle line inside a block', () => {
+    const source = [
+      `// eslint-disable-next-line no-console -- ${'x'.repeat(140)}`,
+      `// @ts-expect-error ${'x'.repeat(140)}`,
+      '/// <reference types="vite/client" />',
+      '/*! legal',
+      ' * a',
+      ' * b',
+      ' * c',
+      ' */',
+      '// one',
+      '// oracle: packages/eval-engine/test/x-oracle.spec.ts',
+      '// two',
+      'export const a = 1;',
+    ].join('\n');
+    expect(shape(source)).toEqual([]);
+  });
+
+  test('with localDoc forbid a JSDoc on a declaration the module does not export reports; an export does not', () => {
+    expect(shape('/** one */\nfunction f() {}', { localDoc: 'forbid' })).toEqual(['1:localDoc']);
+    expect(shape('/** one */\nconst c = 1;\nexport { c };', { localDoc: 'forbid' })).toEqual([]);
+    expect(shape('/** one */\nexport function f() {}', { localDoc: 'forbid' })).toEqual([]);
+    expect(shape('/** one */\nfunction f() {}')).toEqual([]);
+    expect(shape('/** one */\n\nfunction f() {}', { localDoc: 'forbid' })).toEqual([]);
+  });
+});
+
 describe('tests/no-history', () => {
   const titles = (code: string, filename = 'x.spec.ts') =>
     lint(code, 'tests/no-history', [], filename).filter(message => message.ruleId === 'tests/no-history').map(message => message.line);

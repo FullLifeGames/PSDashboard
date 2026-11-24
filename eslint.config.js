@@ -55,6 +55,20 @@ export default defineConfig([
     plugins: { comments: commentsPlugin },
     rules: { 'comments/no-history': 'error' },
   },
+  // History in the comments of tests, scripts and root configs: a warning until the comment pass cleans them, then an error like the sources.
+  {
+    files: ['**/*.{ts,tsx,mjs,js,cjs}'],
+    ignores: ['packages/*/src/**', 'src/**', 'test/regression/eval-calibration.spec.ts'],
+    plugins: { comments: commentsPlugin },
+    rules: { 'comments/no-history': 'warn' },
+  },
+  // Shape of comments: width, two lines, one-line JSDoc on an export, no JSDoc on a local declaration (see eslint.comments.mjs).
+  {
+    files: ['**/*.{ts,tsx,mjs,js,cjs}'],
+    ignores: ['test/regression/eval-calibration.spec.ts'],
+    plugins: { comments: commentsPlugin },
+    rules: { 'comments/shape': ['warn', { localDoc: 'forbid' }] },
+  },
   // History in test titles and spec file names (see eslint.tests.mjs).
   {
     files: ['test/**/*.{ts,tsx}', 'packages/*/test/**/*.ts'],

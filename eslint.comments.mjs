@@ -1,18 +1,11 @@
-// The rule comments/no-history. AGENTS.md, Rules for the code: a comment never carries history (a round, a ruling, a gate, a date, a
-// T-number, an issue number, "used to"); history lives in docs/completed/ and the commit log. The patterns are in
-// scripts/comment-lib.mjs (HISTORY_PATTERNS). Comments that code reads are never history: an eslint directive, a `// oracle:` marker
-// line, a TypeScript or test-runner pragma, a reference, a shebang, a legal header.
-//
-// The rule counts per file against comment-ratchet.json, which only falls
-// (scripts/update-lint-ratchet.mjs rewrites it): a file with more history lines than its baseline reports every one of them, a file at
-// or below it reports none. The rule's rows are in test/regression/lint-rules.spec.ts.
+// The rules comments/no-history (history per file against comment-ratchet.json) and comments/shape (size of comments).
+// Both read scripts/comment-lib.mjs; comments that code reads count for neither.
 import path from 'node:path';
-import { historyHits } from './scripts/comment-lib.mjs';
+import { historyHits, shapeHits } from './scripts/comment-lib.mjs';
 import { commentBaseline, ROOT } from './scripts/comment-counts.mjs';
 
 let shipped;
 
-/** The history baseline the repository ships, read once per process. */
 const shippedBaseline = () => (shipped ??= commentBaseline().history);
 
 const rule = {
@@ -47,4 +40,39 @@ const rule = {
   },
 };
 
-export default { rules: { 'no-history': rule } };
+const shape = {
+  meta: {
+    type: 'suggestion',
+    fixable: 'code',
+    schema: [
+      {
+        type: 'object',
+        properties: {
+          width: { type: 'integer', minimum: 40 },
+          lines: { type: 'integer', minimum: 1 },
+          exportLines: { type: 'integer', minimum: 1 },
+          localDoc: { enum: ['allow', 'forbid'] },
+        },
+        additionalProperties: false,
+      },
+    ],
+    messages: { shape: '{{rule}}: {{detail}} (AGENTS.md, Rules for the code, comments).' },
+  },
+  create(context) {
+    const options = context.options[0] ?? {};
+    return {
+      'Program:exit'() {
+        for (const hit of shapeHits(context.sourceCode.text, context.filename, options)) {
+          context.report({
+            loc: { start: { line: hit.line, column: 0 }, end: { line: hit.line, column: 1 } },
+            messageId: 'shape',
+            data: { rule: hit.rule, detail: hit.message },
+            fix: hit.fix ? fixer => fixer.replaceTextRange([hit.fix.start, hit.fix.end], hit.fix.text) : null,
+          });
+        }
+      },
+    };
+  },
+};
+
+export default { rules: { 'no-history': rule, shape } };

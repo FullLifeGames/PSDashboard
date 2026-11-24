@@ -1,10 +1,5 @@
-// The one reader of comments for the comment tools: scripts/comment-only-diff.mjs (proof that an edit moved no code),
-// scripts/comment-counts.mjs (the comment ratchet), eslint.comments.mjs (the rule comments/no-history) and, for the history
-// patterns, eslint.tests.mjs (the rule tests/no-history).
-//
-// A comment that code reads is never history and never changes in a comment-only edit: `// oracle:` markers (they name the spec that holds the list; one spec still reads its own),
-// eslint directives, TypeScript and test-runner pragmas, triple-slash references, shebangs and legal headers. `readByCode` is the
-// one list of them; the checker compares them byte for byte, the rule and the counter leave them out.
+// The one reader of comments for the comment tools and rules: comment-only-diff.mjs, comment-counts.mjs, eslint.comments.mjs.
+// `readByCode` lists the comments code reads (`oracle:` lines, directives, pragmas, references, shebangs, legal headers).
 import ts from 'typescript';
 
 const SCRIPT_KINDS = {
@@ -28,7 +23,7 @@ export const isCss = fileName => fileName.endsWith('.css');
 
 export const isYaml = fileName => /\.ya?ml$/.test(fileName);
 
-/** What a comment of the repository's own marker looks like: `// oracle: <spec path>`; it names the spec that holds the list below it, and one spec still reads its own. */
+/** The repository's marker `// oracle: <spec path>`, which names the spec that holds the list below it. */
 const ORACLE_LINE = /^\s*(\/\/|\/\*+|\*)?\s*oracle:/;
 
 /**
@@ -184,7 +179,7 @@ export function readSource(text, fileName) {
     items.push({ k: 't', text: raw, lb, line: lineOf(start), jsx: isText });
   };
   visit(sf);
-  return { items: finalize(items), errors };
+  return { items: finalize(items), errors, sf };
 }
 
 /** Folds JSX text tokens, drops the ones that hold nothing, and numbers every comment by the tokens before it. */
@@ -313,4 +308,187 @@ export function historyHits(raw) {
 /** The history lines of a whole file, with their 1-based line numbers; used by the ratchet and by the rule's spec. */
 export function historyLinesOf(text, fileName) {
   return commentsOf(text, fileName).flatMap(comment => historyHits(comment.text).map(hit => ({ line: comment.line + hit.line, pattern: hit.pattern })));
+}
+
+/** The limits of `shapeHits`: width, lines per gap, lines of an export's JSDoc, and `localDoc` (allow or forbid). */
+export const SHAPE_DEFAULTS = { width: 120, lines: 2, exportLines: 1, localDoc: 'allow' };
+
+const LINE_BREAK = /\r\n|[\n\r\u2028\u2029]/g;
+const BLANK_LINE = /(?:\r\n|[\n\r\u2028\u2029])[ \t]*(?:\r\n|[\n\r\u2028\u2029])/;
+const LONE_URL = /^<?https?:\/\/\S+>?$/;
+const DECLARATIONS = new Set([
+  ts.SyntaxKind.FunctionDeclaration,
+  ts.SyntaxKind.ClassDeclaration,
+  ts.SyntaxKind.InterfaceDeclaration,
+  ts.SyntaxKind.TypeAliasDeclaration,
+  ts.SyntaxKind.EnumDeclaration,
+  ts.SyntaxKind.ModuleDeclaration,
+  ts.SyntaxKind.VariableStatement,
+]);
+
+// The start and end of each physical line (the end leaves the line break out) and the line of an offset.
+function lineMap(text) {
+  const starts = [0];
+  const ends = [];
+  for (const match of text.matchAll(LINE_BREAK)) {
+    ends.push(match.index);
+    starts.push(match.index + match[0].length);
+  }
+  ends.push(text.length);
+  const lineAt = offset => {
+    let low = 0;
+    let high = starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (starts[mid] <= offset) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  };
+  return { starts, ends, lineAt };
+}
+
+// One physical line of a comment without its delimiters and outer whitespace.
+const lineBody = segment => segment.replace(/^\s*(?:\/\/+|\/\*+|\*+\/?|#+)\s?/, '').replace(/\*\/\s*$/, '').trim();
+
+// A comment as `shapeHits` reads it: its physical lines, the ones that hold counted text, and whether it trails code.
+function describeComment(comment, text, map) {
+  const start = comment.start;
+  const end = start + comment.text.length;
+  const first = map.lineAt(start);
+  const last = map.lineAt(Math.max(start, end - 1));
+  const read = readByCode(comment.text);
+  const lines = [];
+  for (let index = first; index <= last; index++) {
+    const segment = text.slice(Math.max(map.starts[index], start), Math.min(map.ends[index], end));
+    const skipped = read?.all || read?.lines?.includes(index - first);
+    lines.push({ line: index + 1, body: skipped ? '' : lineBody(segment), width: map.ends[index] - map.starts[index] });
+  }
+  const before = text.slice(map.starts[first], start);
+  return {
+    start,
+    end,
+    raw: comment.text,
+    read,
+    lines,
+    counted: lines.filter(line => line.body !== ''),
+    own: /^\s*\{?\s*$/.test(before),
+    indent: before,
+  };
+}
+
+// The names that `export { }` or `export default x` make exports of declarations of the same module.
+function exportedNames(sf) {
+  const names = new Set();
+  for (const stmt of sf.statements) {
+    if (ts.isExportAssignment(stmt) && ts.isIdentifier(stmt.expression)) names.add(stmt.expression.text);
+    else if (ts.isExportDeclaration(stmt) && !stmt.moduleSpecifier && stmt.exportClause && ts.isNamedExports(stmt.exportClause)) {
+      for (const element of stmt.exportClause.elements) names.add((element.propertyName ?? element.name).text);
+    }
+  }
+  return names;
+}
+
+const bindingNames = name => (ts.isIdentifier(name) ? [name.text] : name.elements.flatMap(element => (ts.isOmittedExpression(element) ? [] : bindingNames(element.name))));
+
+const declaredNames = stmt =>
+  (stmt.kind === ts.SyntaxKind.VariableStatement ? stmt.declarationList.declarations.flatMap(declaration => bindingNames(declaration.name)) : stmt.name ? [stmt.name.text] : []);
+
+const hasExportKeyword = stmt => ts.canHaveModifiers(stmt) && (ts.getModifiers(stmt) ?? []).some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword);
+
+// The last `/**` before a top-level statement, with no blank line between.
+function docBefore(stmt, text, sf) {
+  const trivia = scanTrivia(text, stmt.pos);
+  const docs = trivia.comments.filter(comment => comment.text.startsWith('/**') && (stmt.pos === 0 || /[\n\r\u2028\u2029]/.test(text.slice(stmt.pos, comment.start))));
+  const doc = docs.at(-1);
+  return doc && !BLANK_LINE.test(text.slice(doc.end, stmt.getStart(sf))) ? doc : undefined;
+}
+
+// The `lines` hit of one gap; `fileText` (file start only) splits the header run from the rest.
+function gapHits(descs, limit, fileText) {
+  const groups = [];
+  const runs = [];
+  if (fileText) {
+    let run = [];
+    for (const desc of descs) {
+      if (run.length > 0 && BLANK_LINE.test(fileText.slice(run.at(-1).end, desc.start))) {
+        runs.push(run);
+        run = [];
+      }
+      run.push(desc);
+    }
+    runs.push(run);
+    const at = runs.findIndex(run => run.some(desc => desc.counted.length > 0));
+    if (at < 0) return [];
+    groups.push(runs[at], runs.filter((_, index) => index !== at).flat());
+  } else groups.push(descs);
+  return groups.flatMap(group => {
+    const counted = group.flatMap(desc => desc.counted);
+    return counted.length > limit ? [{ line: counted[0].line, rule: 'lines', message: `${counted.length} comment text lines in a row, at most ${limit}` }] : [];
+  });
+}
+
+/** The shape hits of a file as `{ line, rule, message, fix? }`: wide, lines, oneLine, exportDoc and localDoc. */
+export function shapeHits(text, fileName, options = {}) {
+  const opt = { ...SHAPE_DEFAULTS, ...options };
+  const map = lineMap(text);
+  const code = scriptKindOf(fileName) !== undefined;
+  const source = code ? readSource(text, fileName) : undefined;
+  const comments = source ? source.items.filter(item => item.k === 'c') : commentsOf(text, fileName);
+  const descs = comments.map(comment => ({ ...describeComment(comment, text, map), at: comment.at }));
+  const hits = [];
+
+  for (const desc of descs) {
+    if (desc.read?.all) continue;
+    for (const line of desc.lines) {
+      if (line.body !== '' && line.width > opt.width && !LONE_URL.test(line.body)) {
+        hits.push({ line: line.line, rule: 'wide', message: `comment line runs to column ${line.width}, at most ${opt.width}` });
+      }
+    }
+    if (!desc.read && desc.own && desc.lines.length > 1 && desc.counted.length === 1 && desc.raw.startsWith('/*')) {
+      const fixed = `${desc.raw.startsWith('/**') ? '/**' : '/*'} ${desc.counted[0].body} */`;
+      const fits = desc.indent.length + fixed.length <= opt.width && !desc.counted[0].body.includes('*/');
+      hits.push({
+        line: desc.lines[0].line,
+        rule: 'oneLine',
+        message: 'a comment of one text line takes one physical line',
+        ...(fits ? { fix: { start: desc.start, end: desc.end, text: fixed } } : {}),
+      });
+    }
+  }
+
+  const gaps = [];
+  let previous;
+  for (const desc of descs.filter(item => item.own)) {
+    const joined = previous && (code
+      ? previous.at === desc.at
+      : isYaml(fileName)
+        ? previous.lines.at(-1).line + 1 === desc.lines[0].line
+        : /^\s*$/.test(text.slice(previous.end, desc.start)));
+    if (joined) gaps.at(-1).push(desc);
+    else gaps.push([desc]);
+    previous = desc;
+  }
+  for (const desc of descs.filter(item => !item.own)) gaps.push([desc]);
+  for (const gap of gaps) hits.push(...gapHits(gap, opt.lines, code && gap[0].at === 0 ? text : undefined));
+
+  if (source) {
+    const exported = exportedNames(source.sf);
+    for (const stmt of source.sf.statements) {
+      const declaration = DECLARATIONS.has(stmt.kind);
+      const isExport = hasExportKeyword(stmt) || ts.isExportDeclaration(stmt) || ts.isExportAssignment(stmt)
+        || (declaration && declaredNames(stmt).some(name => exported.has(name)));
+      if (!isExport && !(declaration && opt.localDoc === 'forbid')) continue;
+      const doc = docBefore(stmt, text, source.sf);
+      if (!doc || readByCode(doc.text)) continue;
+      const described = describeComment({ start: doc.start, text: doc.text }, text, map);
+      const line = described.lines[0].line;
+      if (isExport && described.counted.length > opt.exportLines) {
+        hits.push({ line, rule: 'exportDoc', message: `JSDoc of an export holds ${described.counted.length} text lines, at most ${opt.exportLines}` });
+      } else if (!isExport && described.counted.length > 0) {
+        hits.push({ line, rule: 'localDoc', message: 'JSDoc on a declaration the module does not export' });
+      }
+    }
+  }
+  return hits.sort((a, b) => a.line - b.line || a.rule.localeCompare(b.rule));
 }
