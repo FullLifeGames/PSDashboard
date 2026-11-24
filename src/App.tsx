@@ -87,8 +87,7 @@ function AppModals({ app }: { app: AppController }) {
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           game={record !== null}
-          // The export reads the panel's solved spreads and posted sheet, not the enriched infos: those hold usage guesses and published IVs,
-          // which an import would take as the user's own input.
+          // The export reads the solved spreads and posted sheet, not the enriched infos: those hold usage guesses.
           exportText={buildSetsExport({
             p1Name: replayData.players[0] ?? 'p1',
             p2Name: replayData.players[1] ?? 'p2',
@@ -96,8 +95,6 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            // A game's sets belong to its record: the import plays it again on them (editTeams) and the panel closes when the edit applies,
-            // not at the click.
             const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
             if (!importError && !record) setSetsPanelOpen(false);
             return importError;
@@ -142,7 +139,6 @@ function App() {
 
   return (
     <div className="ps-app-root">
-      {/* Hidden when a host site frames the app and once a replay is loaded: every row above the pickers costs height on a 1080p screen. */}
       {!embed && !replayData && (
         <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
           <h1>PS Dashboard</h1>

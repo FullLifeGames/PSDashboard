@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { GameTeamProblems } from '@fulllifegames/eval-engine';
 
-/** A newer input hides an older result at once, and a result that arrives late is dropped. The check informs; it never stops Start. */
+// A result that arrives late is dropped; the check informs and never stops Start.
 
 const DEBOUNCE_MS = 300;
 

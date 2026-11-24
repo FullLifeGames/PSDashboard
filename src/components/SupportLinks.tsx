@@ -8,7 +8,7 @@ export function BetaMark() {
   );
 }
 
-/** `withName` adds the name and the Beta mark. A host site's frame (embed mode) carries its own imprint, so the creator link is left out. */
+/** In embed mode the host site's frame carries its own imprint, so the creator link is left out. */
 export function SupportLinks({ embed, withName = false, onReportIssue }: {
   embed: boolean;
   withName?: boolean;

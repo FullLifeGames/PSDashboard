@@ -20,43 +20,35 @@ type LiveBattle = LiveHit['battle'];
 
 export interface TurnDockProps {
   simState: BranchSimState | null;
-  /** The position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of a turn. */
   endOfGame?: MainLineEnd;
   isGame?: boolean;
-  /** The state shown is the last resolved position's while the viewed one resolves: the dock keeps its height and takes no input. */
+  /** The last resolved position's state while the viewed one resolves: the dock takes no input. */
   stale?: boolean;
-  /** Where this position's choices come from: 'live' (the branch sim), 'stored' (rebuilt exact position) or 'snapshot' (approximated). */
+  /** 'live' (the branch sim), 'stored' (rebuilt exact position) or 'snapshot' (approximated). */
   source?: PickerSource;
-  /** The app is reconstructing this position's exact choices right now; the snapshot approximation upgrades in place when it lands. */
   acquiringExact?: boolean;
   executeError: string | null;
   executing: boolean;
   gen: number;
   format?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
-  /** Stores a pick without sending anything (the live tip only). Without it every pick goes through `onSetChoice`. */
+  /** Stores a pick without sending anything (the live tip only); without it every pick goes through `onSetChoice`. */
   onRecordChoice?: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
   onHypotheticalMove: (side: Side, activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
   onExecuteTurn: (choices: SideChoices) => void;
   played?: PlayedAtPosition | null;
   positionKey?: string;
-  /** The live battle, handed over only while the viewed position is the branch tip: the preview prices hits the calc cannot. */
+  /** The live battle, handed over only while the viewed position is the branch tip. */
   getBattle?: () => LiveBattle | null;
-  /** The replay's log with the battle of a stored position on the main line: the chips read the log's dice from its lines. */
   replayLog?: string;
   seed?: SeedChoices | null;
-  /** The engine's fill at the live tip: a pending run holds the empty chips and queues an Execute; null off the tip. */
   fill?: DockFillView | null;
   nearSide?: Side;
   opponentReads?: boolean;
   onOpponentReadsChange?: (value: boolean) => void;
 }
 
-/**
- * A pick of the user takes the slot from the engine's fill first, then the choice is stored. A forced replacement normally goes out
- * at once; while another forced slot of the turn holds only the engine's pick the pick is recorded and Execute sends it.
- * `writeChoice` stores a choice without that first step: "Back to the engine's pick" gives the slot back to the fill and writes its choice.
- */
+// `writeChoice` stores a choice without taking the slot from the engine's fill first.
 function useUserChoice(
   simState: TurnDockProps['simState'], fill: DockFillView | null | undefined, onSetChoice: TurnDockProps['onSetChoice'],
   onRecordChoice: TurnDockProps['onRecordChoice'],
@@ -74,7 +66,6 @@ function useUserChoice(
   return { setChoice, writeChoice };
 }
 
-/** Tells the fill which slot's tray is open, so a result that lands later never writes it. The effect only writes a ref. */
 function useHeldTray(fill: DockFillView | null | undefined, open: TrayOpen | null) {
   const holdTray = fill?.holdTray;
   const side = open?.side;
@@ -101,8 +92,6 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
   onClose: () => void;
 }) {
   const waitsForFill = !!fill?.pending && !model.flags.bothChosen;
-  // A forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench click sends the body in
-  // at once.
   if (model.flags.isForceSwitch && !model.flags.bothChosen && !waitsForFill) return null;
   return (
     <ExecuteButton
@@ -119,10 +108,6 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
   );
 }
 
-/**
- * The tray offers "Back to the engine's pick" where the slot holds a pick of the user's (the engine's mark is gone) that differs from what
- * the fill chose for it. A forced replacement goes out at once, so its tray has none.
- */
 function backHandler(fill: DockFillView | null | undefined, slot: DockSlotModel | undefined, write: (side: Side, choice: BranchSlotChoice, slot: number) => void): (() => void) | undefined {
   if (!fill || !slot) return undefined;
   const own = fill.picks[slot.side][slot.slot];

@@ -74,20 +74,13 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   );
 }
 
-/**
- * Names the frame the workspace shows (the main line's, or the branch's for one session of the variation); the replay's id and
- * viewpoint belong to it, so a new document of the same replay (a link with ?p2) starts a new report.
- */
+// A new document of the same replay (a link with ?p2) starts a new report.
 function frameIdentity(app: AppController, replayData: ReplayData): string {
   const base = `${replayData.id}:${replayData.viewpoint ?? 'p1'}`;
   return app.analysis.showBranch && app.board.timeline.viewingVariation ? `${base}:branch:${app.analysis.branchReloadKey}` : `${base}:replay`;
 }
 
-/**
- * The side the frame shows near, for the dock. The frame's document reports it (Switch sides, the ?p2 flag); until its first report, and for a
- * frame that mounted after the last report (the swap between the main and the branch frame, a new branch session, a new replay), it is the
- * replay's viewpoint. A report belongs to the frame that sent it.
- */
+// A report belongs to the frame that sent it; until its first report the replay's viewpoint stands.
 function useNearSide(identity: string, viewpoint: FrameSide | undefined) {
   const [report, setReport] = useState<{ frame: string; side: FrameSide | null }>({ frame: identity, side: null });
   if (report.frame !== identity) setReport({ frame: identity, side: null });
@@ -100,7 +93,6 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   const { viewingVariation, viewTurn, viewT0, navSeek, handleReplayTurn, followedPlay, tipTurn } = app.board.timeline;
   const { playOut } = app.transients;
   const appendMode = playOut?.active ? 'hold' : app.ctx.animateBranchTurns ? 'play' : 'follow-end';
-  // The pointer followed a turn that just ran: a branch frame that opens now plays that turn in.
   const openAtTurn = appendMode === 'play' && followedPlay && tipTurn !== null && viewTurn === tipTurn ? tipTurn - 1 : null;
   return (
     <div className="ps-iframe-wrap">
@@ -147,10 +139,6 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   );
 }
 
-/**
- * The main frame's document key. A new game's log grows with every promoted turn, so its frame opens again on the longer log; a replay's
- * log never changes.
- */
 const mainFrameKey = (replayData: { id: string; log: string }) =>
   isGameId(replayData.id) ? `${replayData.id}:original:${replayData.log.length}` : `${replayData.id}:original`;
 
@@ -256,7 +244,6 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
       {(branching || variationSpan !== null) && !idleTip(app) && <BranchSidePanels app={app} replayData={replayData} />}
-      {/* At turn 0 the lead picker stands where the dock stands, as the column's last child. */}
       <LeadSlot app={app} replayData={replayData} nearSide={nearSide} />
       <DockRegion app={app} replayId={replayData.id} nearSide={nearSide} />
     </div>
@@ -265,12 +252,9 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
 
 export function ReplayWorkspace({ app, replayData, onNewGame }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
-  // The bodies the log never showed wear the stats panel's marker wherever the What-if offers them.
   const { statsP1Info, statsP2Info } = app.ctx.knowledge;
-  // A short-side game's heaviest world guesses the bodies its side never fielded; they wear a mark of their own.
   const { bringWorlds } = app.ctx.meta;
   const isGuessed = useMemo(() => guessedBodies(statsP1Info, statsP2Info, rules, bringWorlds), [statsP1Info, statsP2Info, rules, bringWorlds]);
-  // The layout's height caps the left column; the right column follows the dock's foot.
   const layoutRef = useLayoutHeight();
   return (
     <ReplayRulesContext.Provider value={rules}>

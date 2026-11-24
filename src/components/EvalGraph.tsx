@@ -14,29 +14,17 @@ interface EvalGraphProps {
   currentTurn: number;
   currentLine?: 'main' | 'variation';
   onSelectTurn?: (turn: number, line?: 'main' | 'variation') => void;
-  /**
-   * Variation overlay: gold curve anchored at the branch point's main value, indexed like `scores`, filled only for played variation
-   * positions (gaps stay gaps). Its points print at `shares`, the fainted share of the variation's own board, never the main line's.
-   */
+  /** Gold curve indexed like `scores`, null where the variation did not play; its points print at its own `shares`. */
   variation?: VariationSeries | null;
-  /** The game value at team preview; it adds the turn-0 point before turn 1. */
   leadScore?: number | null;
-  /** The best and the played lead per side; the turn-0 diamond's tooltip names them. */
   leadDetail?: LeadAnalysis | null;
   evalErrors?: (string | null)[];
-  /** faintedFractions[t-1] = the main line turn's fainted share (graph.faintedFractions): a main-line tooltip prints at it, like the bar. */
+  /** faintedFractions[t-1] = the main line turn's fainted share; a main-line tooltip prints at it. */
   faintedFractions?: (number | null)[];
-  /**
-   * decided[t-1] = the turn's decided-sweep state: the board is practically over for `side`; a thin strip on that side's edge (top = p1,
-   * bottom = p2) plus a node-label note.
-   */
+  /** decided[t-1] = the turn's decided-sweep state; the strip sits on `side`'s edge (top = p1, bottom = p2). */
   decided?: DecidedSignal[];
-  /** Full main-line length: without it a lone variation collapses the x-axis to its few turns and sits at the far right of an empty box. */
+  /** Full main-line length: without it a lone variation collapses the x-axis to its few turns. */
   maxTurn?: number;
-  /**
-   * The turns the Game review lists: a circle marks a graded turn of player 1, a square one of player 2, in the player's colour; both when
-   * both sides are graded.
-   */
   reviewMarks?: ReviewMark[];
 }
 
@@ -45,10 +33,7 @@ const VARIATION_COLOR = '#f0c76b';
 
 type SelectTurn = EvalGraphProps['onSelectTurn'];
 
-/**
- * The viewBox tracks the rendered width 1:1 (ResizeObserver): a fixed viewBox stretched with preserveAspectRatio="none" made every circle
- * an ellipse.
- */
+// The viewBox tracks the rendered width 1:1: a fixed one with preserveAspectRatio="none" made circles ellipses.
 function useMeasuredWidth() {
   const svgRef = useRef<SVGSVGElement>(null);
   const [width, setWidth] = useState(300);
@@ -77,8 +62,6 @@ function GraphFrame({ width, y }: { width: number; y: GraphScales['y'] }) {
   );
 }
 
-/* A turn-0 variation (lead branch) starts left of the axis — its
-   marker clamps to the first plotted turn. */
 function VariationBand({ variation, first, variationEnd, x }: { variation: VariationSeries; first: number; variationEnd: number; x: GraphScales['x'] }) {
   const markerTurn = Math.max(variation.startTurn, first);
   return (
@@ -156,8 +139,6 @@ function LeadPoint({ scores, leadScore, leadDetail, playerNames, hitWidth, scale
           stroke="#cde" strokeOpacity={0.5} strokeDasharray="3 2"
         />
       )}
-      {/* Diamond, not circle — the lead decision is a different kind of
-          point, drawn larger so it reads as its own clickable stop. */}
       <rect
         x={x(0) - 3.4} y={y(leadScore) - 3.4} width={6.8} height={6.8}
         transform={`rotate(45 ${x(0)} ${y(leadScore)})`}
@@ -246,10 +227,7 @@ function MainHits({ scores, hitWidth, x, bands, onSelectTurn, titleArgs }: {
   );
 }
 
-/* Variation hits render AFTER the main hits so they win the overlap. On a turn
-   where the main line has a point too, the column is split by height (see
-   splitHitColumn); on a turn without one the gold area is the middle half of
-   the column, and the main column (a gap turn's analysis) stays around it. */
+/* Rendered after the main hits so they win the overlap; splitHitColumn splits a shared column by height. */
 function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
   points: VariationPoint[]; hitWidth: number; playerNames: [string, string]; bands: Map<number, HitBand>; onSelectTurn: SelectTurn;
 }) {
@@ -275,10 +253,7 @@ function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
   );
 }
 
-/**
- * Chess-style evaluation line over the game: point color carries the polarity; blunder markers add a shape ring plus tooltip text, never
- * color alone.
- */
+/** Evaluation line over the game; blunder markers add a shape ring and tooltip text, never colour alone. */
 export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn, reviewMarks }: EvalGraphProps) {
   const { svgRef, width } = useMeasuredWidth();
 

@@ -1,9 +1,6 @@
 import { hitBarSegments } from '../../lib/hit-bar';
 
-/**
- * A target's HP bar under one hit: `rest` surely stays (grey), `roll` is what the damage roll decides (striped), `sure` what even the
- * lowest roll takes, `lost` what the target has lost already (`hitBarSegments`); the four add up to 100. The tone colors `roll` and `sure`.
- */
+/** `rest`, `roll`, `sure` and `lost` add up to 100 (`hitBarSegments`); the tone colors `roll` and `sure`. */
 export function HitBar({ hp, min, max }: { hp: number; min: number; max: number }) {
   const segments = hitBarSegments(hp, min, max);
   return (

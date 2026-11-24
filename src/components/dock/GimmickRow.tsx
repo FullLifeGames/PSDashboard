@@ -26,7 +26,6 @@ function ModifierToggle({ label, kind, gimmick }: { label: string; kind: BranchM
   );
 }
 
-/** A toggle edits the slot's pending move; a slot with no move pick arms the next pick instead. */
 export function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: BranchSlotModifiers; gimmick: Gimmick }) {
   return (
     <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>

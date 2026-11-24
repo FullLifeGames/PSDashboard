@@ -5,10 +5,6 @@ import { SpriteImg } from '../SpriteImg';
 import { TEAM_SIZE, type TeamRead } from '../../lib/new-game/start';
 import type { TeamCheck } from './use-team-check';
 
-/**
- * The check shows the problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the
- * box that causes it.
- */
 
 interface Props {
   side: 'p1' | 'p2';
@@ -21,7 +17,6 @@ interface Props {
   formatName: string;
   check: TeamCheck;
   reason: string | null;
-  /** True when anything stops Start (either side or the seed): the note "Start plays the team as pasted" is only true when nothing does. */
   startBlocked: boolean;
   onValidate: () => void;
 }
@@ -31,8 +26,6 @@ function Sprites({ sets, format }: { sets: PokemonSet[]; format: string }) {
   return (
     <>
       {sets.map((set, index) => (
-        // a species the sprite sheet does not hold: its base species shows, or, when that is missing too, the problem list names it
-        // and the empty image box (alt text) goes
         <SpriteImg key={`${set.species}-${index}`} species={set.species} rules={rules} alt={set.species} title={set.species} hideOnMiss />
       ))}
     </>

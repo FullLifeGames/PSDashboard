@@ -12,7 +12,6 @@ export interface ReplayLoaderProps {
   teamStatus?: string | null;
   teamError?: string | null;
   showGuide?: boolean;
-  /** 'menu' is the body in the top bar's Load panel: no frame, no title, and the page takes the dropped file. */
   variant?: 'panel' | 'menu';
 }
 
@@ -141,8 +140,6 @@ function TeamPasteDetails({ teamStatus, teamError, onTeamLoad }: Pick<Props, 'te
 export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false, variant = 'panel' }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
 
-  // Once a replay is loaded the input shows ITS link, not the default or a stale draft: a replay can arrive through share links, files or
-  // embed messages. Mirrored during render, not in an effect.
   const [mirroredUrl, setMirroredUrl] = useState<string | null>(null);
   if (loadedUrl !== mirroredUrl) {
     setMirroredUrl(loadedUrl);

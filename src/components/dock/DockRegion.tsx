@@ -30,22 +30,20 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     onSetChoice: handleSetChoice,
     onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,
     onHypotheticalMove: app.handleHypotheticalMove,
-    // The tip executes its own pending choices; off the tip the effective choices (the played seed under the picks) go along.
     onExecuteTurn: choices => (liveTip ? void app.handleExecuteTurn() : handleExecuteDraft(choices)),
     played: playedAtView,
-    // A forced replacement and the choice after it share the turn, but not the tray and the armed gimmicks: the step within the turn counts.
+    // A forced replacement and the choice after it share the turn but not the tray and armed gimmicks: the step counts.
     positionKey: `${replayId}:${evalViewKey}:${liveTip ? app.ctx.branch.history.length : 0}`,
     getBattle: liveTip ? app.ctx.branch.getBattle : getPickerBattle,
     replayLog: pickerReplayLog,
     seed: liveTip ? null : pickerSeed,
     fill: app.engine.dockFill,
-    // The stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
     opponentReads: !!app.ctx.evaluation.prefs.hardMode,
     onOpponentReadsChange: value => app.ctx.evaluation.setPrefs({ ...app.ctx.evaluation.prefs, hardMode: value }),
   };
 }
 
-/** A steady stand-in while the engine plays: the per-turn picker would keep switching, and a click mid-run would corrupt the loop. */
+// The per-turn picker would keep switching, and a click mid-run would corrupt the loop.
 function PlayOutStandIn() {
   return (
     <div className="ps-panel" role="status" style={{ fontSize: 11, color: '#aabbcc' }}>

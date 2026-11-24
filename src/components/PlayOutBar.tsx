@@ -31,7 +31,6 @@ function RunningRow({ fastPlayOut, stopping, onStopPlayOut }: Pick<PlayOutBarPro
   return (
     <>
       <span className="ps-spinner" aria-hidden="true" />
-      {/* The detailed progress line lives in the Evaluation panel, not here. */}
       <span style={{ fontSize: 11, color: '#f0c76b' }}>
         {stopping
           ? 'Stopping: the engine finishes the turn in flight, then stops.'

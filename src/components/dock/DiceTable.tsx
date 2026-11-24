@@ -4,15 +4,10 @@ import { captionOf, diceTable, pullNotes, targetHeading } from '../../lib/branch
 import type { StepDamage } from '../../lib/branch-rolls';
 import { DieRow, StrayDice } from '../branch/DiceChips';
 
-/**
- * A column is a target, a row a kind of die, so a spread move reads the same die across its targets. A set die the move no longer
- * offers stays below the table, one click from clear.
- */
 
 export interface DiceTableProps {
   offers: DieOffer[] | null;
   dice: readonly ForcedDie[];
-  /** What the log shows for this turn (first turn of a branch). */
   logged: readonly ForcedDie[];
   words: DieWords;
   label: string;

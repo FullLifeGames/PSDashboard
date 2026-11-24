@@ -9,7 +9,7 @@ interface ConfirmBannerProps {
 
 const KEEP_WORDS = { whiteSpace: 'nowrap', flexShrink: 0 } as const;
 
-/** Inline confirm before an action that discards work. It scrolls into view: the question may stand below the part the user is looking at. */
+/** Inline confirm before an action that discards work. */
 export function ConfirmBanner({ message, onProceed, onCancel, proceedLabel = 'Replace' }: ConfirmBannerProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest' }); }, []);
@@ -24,7 +24,6 @@ export function ConfirmBanner({ message, onProceed, onCancel, proceedLabel = 'Re
       }}
     >
       <span style={{ flex: '1 1 12em' }}>{message}</span>
-      {/* The two buttons wrap as one pair, so a narrow column never leaves Cancel alone on its own line. */}
       <span style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
         <button type="button" className="ps-btn ps-btn-red" style={KEEP_WORDS} onClick={onProceed}>
           {proceedLabel}

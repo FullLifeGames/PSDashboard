@@ -41,14 +41,12 @@ function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   ] as const;
   const nonZero = labels.filter(([, value]) => value > 0);
   if (nonZero.length === 0) {
-    // Random sets run a fixed 85 EVs everywhere; "0 EVs" would mislead.
     if (isRandomFormat && evs.source === 'unknown') return '85 EVs each (random set)';
     return evs.source === 'unknown' ? EVS_UNKNOWN : '0 EVs';
   }
   return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
 }
 
-/** The IVs the build plays when any is below 31 (a Trick Room body); '' when every IV is 31 or none is known. */
 function formatIvs(ivs: PokemonEvsInfo | undefined): string {
   if (!ivs || ivs.source === 'unknown') return '';
   const lowered = (['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const)
@@ -179,10 +177,6 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
   );
 }
 
-/**
- * A side whose `|teamsize|` counts bodies the panel could not fill (no team preview, and no stats file or an unreachable one): the engine
- * plays the bodies shown.
- */
 function missingNotice(log: string, side: 'p1' | 'p2', built: number): string | null {
   const missing = missingBodies(log, built, side);
   const size = teamSizes(log)[side];
@@ -196,7 +190,6 @@ function TeamColumn({ label, playerName, info, isRandomFormat, notice }: {
   isRandomFormat: boolean;
   notice: string | null;
 }) {
-  // A Random Battle always runs six Pokémon: show the unrevealed slots, not a team that looks complete.
   const hiddenSlots = isRandomFormat ? Math.max(0, 6 - info.pokemon.length) : 0;
 
   return (

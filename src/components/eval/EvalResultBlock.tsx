@@ -11,7 +11,7 @@ type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice
 
 function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   choice: RankedChoice; index: number; best: RankedChoice | undefined; faintedFraction?: number | null;
-  /** The later steps of the row's line (`rowLineTail`): the line the Lines section shows, not the principal variation. */
+  /** The later steps of the row's line (`rowLineTail`): the Lines section's line, not the principal variation. */
   tail?: { p1: string; p2: string }[];
 }) {
   const evPct = winPercent(choice.ev, faintedFraction);
@@ -36,10 +36,6 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   );
 }
 
-/**
- * The equilibrium value in the eval bar's language: the win odds this choice is worth against balanced play; the floor and the punishing
- * reply live in the tooltip.
- */
 function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null, opponentReads = false): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
@@ -54,7 +50,6 @@ function ChoiceList({
   side: 'p1' | 'p2';
   choices: RankedChoice[];
   reply: RankedChoice | null;
-  /** The result these rows are from: a click hands it on, so Hard mode can read the reply that hurts the clicked move most. */
   result: EvalResult;
   onPickChoice?: PickChoice;
   doubles?: boolean;
@@ -118,7 +113,7 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
   onPickChoice?: PickChoice;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   doubles?: boolean;
-  /** The fainted share of the shown turn; the percents print at it, as the graph does. Absent: the opening map. */
+  /** The fainted share of the shown turn; absent: the opening map. */
   faintedFraction?: number | null;
   opponentReads?: boolean;
 }) {
@@ -138,8 +133,7 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
       </div>
       <SettingsLine result={result} resultSettings={resultSettings} />
       <div className="ps-eval-columns">
-        {/* Stale results describe the PREVIOUS position — clicking them
-            would map old choices onto the new state (wrong switches). */}
+        {/* Stale results describe the previous position: a click would map old choices onto the new state. */}
         <ChoiceList side="p1" choices={result.perSide.p1} reply={result.perSide.p2[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} opponentReads={opponentReads} />
         <ChoiceList side="p2" choices={result.perSide.p2} reply={result.perSide.p1[0] ?? null} result={result} onPickChoice={status === 'stale' ? undefined : onPickChoice} doubles={doubles} faintedFraction={faintedFraction} opponentReads={opponentReads} />
       </div>

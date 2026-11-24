@@ -3,7 +3,6 @@ import { TURN_KINDS, captionOf, heldHits, isCountDie, resultWord, targetHeading 
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
-/** One result of one die: a click forces it, a second click gives the die back to the seed; the chance shows after Execute. */
 
 const sameResult = (a: ForcedDie['result'], b: ForcedDie['result']): boolean => JSON.stringify(a) === JSON.stringify(b);
 
@@ -40,7 +39,6 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
   const key = dieKey(offer.name);
   const held = dice.find(die => dieKey(die.name) === key);
   const seen = logged.find(die => dieKey(die.name) === key);
-  // the Hits row of a multi-accuracy move: a chip is pressed for the count of the move's later hit dice, not for a die of its own
   const counted = isCountDie(offer.name);
   const heldCount = counted ? heldHits(dice, offer.name) : undefined;
   const seenCount = counted ? heldHits(logged, offer.name) : undefined;
@@ -55,7 +53,6 @@ export function DieRow({ offer, dice, logged, words, target, withMove, rollsOf, 
     <div className={`ps-dice-row${cell ? ` ps-dice-cell${cell === 'shared' ? ' ps-dice-cell-shared' : ''}` : ''}`} role="group" aria-label={label}>
       {!cell && <span className="ps-dice-caption">{caption}</span>}
       {offer.fixedBy !== undefined ? (
-        // an ability or item fixed the count: the simulator draws no die, so the row names the count and its source and offers no chip
         <span className="ps-dice-note">{'hits' in offer.results[0] ? offer.results[0].hits : ''} ({offer.fixedBy})</span>
       ) : offer.name.kind === 'damage-roll' ? <RollSelect offer={offer} held={held} label={label} words={words} rolls={rollsOf?.(offer.name)} crit={critForced(dice, offer.name)} onToggle={onToggle} /> : offer.results.map(result => {
         const die: ForcedDie = { name: offer.name, result };

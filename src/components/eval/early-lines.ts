@@ -3,19 +3,13 @@ import type { TurnEvalSettings } from '../../hooks/useEvaluation';
 import { gradedSides } from './game-review';
 import { engineChoice } from './turn-copy';
 
-/**
- * Which graded turns get the line pass. The depth-1 matrix of the early singles turns keeps no lines, so those turns are searched
- * once more with the trees (in Auto the stage covers every graded turn). The pass (`LINE_PASS` extra iterations per tree, aimed at the
- * rows the card shows) gives the second turn of a line its visits without moving a score; a turn is done when its result carries it.
- */
+/** Extra iterations per tree for the line pass: they give a line's second turn its visits without moving a score. */
 
 export const LINE_PASS = 300;
 
-/** A turn the app evaluated itself with the matrix or the tree; a result another engine wrote keeps its own sentence. */
 const searchedHere = (result: EvalResult | null | undefined, settings: TurnEvalSettings | null | undefined): result is EvalResult =>
   !!result && !result.engine && (settings?.mode === 'matrix' || settings?.mode === 'mcts');
 
-/** A result whose lines had the pass (a pass of a smaller quota does not count). */
 const passed = (result: EvalResult): boolean => (result.linePass ?? 0) >= LINE_PASS;
 
 export interface EarlyLineJob { turn: number; analysis: TurnAnalysis }
@@ -26,10 +20,7 @@ interface GameInputs {
   settings: readonly (TurnEvalSettings | null | undefined)[];
 }
 
-/**
- * The graded turns whose lines have not had the pass yet, in turn order, one job per turn (a turn graded on both sides is one search).
- * A result that carries the pass counts as searched, even with an empty list of lines; lines the sweep made on a tree turn do not.
- */
+/** A result that carries the pass counts as searched, even with no lines; a tree turn's sweep lines do not. */
 export function earlyLineJobs({ analyses, results, settings }: GameInputs): EarlyLineJob[] {
   const found = new Map<number, EarlyLineJob>();
   for (const { analysis } of gradedSides(analyses)) {
@@ -49,11 +40,6 @@ export function earlyLineProgress({ analyses, results, settings }: GameInputs): 
   return { done: total - pending, total };
 }
 
-/**
- * The tree search of one turn: depth 1, the line pass asked for, the played pair kept (`keepPlayed`), the rows the card shows named
- * by the card (`lineRows`) and the answer its ranking puts first named as the one the lines meet (`lineReplies`). The prover stays
- * on; the host keeps `lines` only.
- */
 export function earlyLineSettings(
   job: EarlyLineJob,
   context: { tera: TeraAllowance; sleepClause?: boolean; ruleset: StaticRuleset; keepPlayed?: EvalSettings['keepPlayed'] },
@@ -73,7 +59,6 @@ export function earlyLineSettings(
     depth: 1, samples: 1, mode: 'mcts', linePass: LINE_PASS, tera: context.tera, sleepClause: context.sleepClause, ruleset: context.ruleset,
     ...(context.keepPlayed ? { keepPlayed: context.keepPlayed } : {}),
     lineRows: asked(rows),
-    // player 1's lines meet the answer the card ranks first for player 2, and the other way round
     lineReplies: asked(side => rows(side === 'p1' ? 'p2' : 'p1')),
   };
 }

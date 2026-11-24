@@ -10,16 +10,12 @@ import type { FormatGroup, FormatOption } from '../lib/new-game/format-options';
 import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
 import { readTeamPaste, seedProblem, startBlocks, startNewGame, stopsStart } from '../lib/new-game/start';
 
-/**
- * The dialog stays mounted while closed, so the pasted teams survive a click beside it or Cancel. It knows only `open` and
- * `onOpenChange`; the saved games are listed in the menu and on the start page, never here.
- */
+// The dialog stays mounted while closed: the pasted teams survive a click beside it or Cancel.
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onStart: (record: NewGameRecord) => Promise<unknown> | void;
-  /** Whether a variation is open and not saved; Start asks first then (the game itself is saved after every turn). */
   unsavedVariation?: () => boolean;
 }
 
@@ -27,7 +23,7 @@ const DEFAULT_FORMAT = CALIBRATED_FORMATS[0];
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-/** The format list, loaded the first time the dialog opens (the Champions formats join once the mod is loaded in this realm). */
+// The Champions formats join once the mod is loaded in this realm.
 function useFormatGroups(open: boolean): FormatGroup[] | null {
   const [groups, setGroups] = useState<FormatGroup[] | null>(null);
   useEffect(() => {
@@ -97,7 +93,6 @@ function useNewGameDraft({ onOpenChange, onStart, open, unsavedVariation }: Pick
     void run('start', async () => {
       const record = await startNewGame({ format, formatName: picked.name, names, texts, seed });
       await onStart(record);
-      // the next game draws its own dice; the teams stay for a rematch
       setSeed(newGameSeed('fresh'));
     });
   };

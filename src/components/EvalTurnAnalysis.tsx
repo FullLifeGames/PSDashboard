@@ -24,7 +24,7 @@ interface EvalTurnAnalysisProps {
   result?: EvalResult | null;
   linesHost?: LinesHost;
   doubles?: boolean;
-  /** The turn is a game's open tip: nobody has played it, so there is no played choice to grade, only the engine's lines. */
+  /** The game's open tip: nobody played it, so only the engine's lines show. */
   open?: boolean;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   opponentReads?: boolean;
@@ -53,10 +53,6 @@ function ReadRows({ reads, playerNames, faintedFraction }: Pick<EvalTurnAnalysis
   );
 }
 
-/**
- * The estimate change split in two: what the chosen pair was expected to move and the rest. The rest is "how it rolled" only with a roll
- * in its direction, else the part no roll explains.
- */
 function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) {
   const unrolled = chanceRolled(analysis) === false;
   return (
@@ -72,10 +68,6 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
   );
 }
 
-/**
- * The summary sits closed under a one-line toggle, so the card opens on the verdict and both sides; the card keys it by turn, so every turn
- * starts closed (like `CardToggle`).
- */
 function TurnSummary({ text }: { text: string }) {
   return <CardToggle label="Explanation" bodyClassName="ps-eval-analysis-summary">{text}</CardToggle>;
 }
@@ -98,8 +90,6 @@ function OpenTurnAnalysis({ analysis, playerNames, reads, onExplore, result, onP
 }
 
 export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, result, linesHost, doubles, open = false, onPickPair, opponentReads }: EvalTurnAnalysisProps) {
-  // The turn whose Lines section is open. It follows the turn prop (every turn starts closed) and survives a result that goes away
-  // and comes back under the card; reconciled during render, never in an effect.
   const [lines, setLines] = useState({ turn: analysis.turn, open: false });
   if (lines.turn !== analysis.turn) setLines({ turn: analysis.turn, open: false });
   if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} opponentReads={opponentReads} />;
@@ -164,7 +154,6 @@ function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   );
 }
 
-/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. */
 function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
   const agrees = !!side.played && !!side.best && side.played.choice === side.best.choice;
   const pair = isPairLead(side);

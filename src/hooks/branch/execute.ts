@@ -6,7 +6,6 @@ import {
   type BranchEngineModule, type BranchRefs, type BranchSetters, type LiveBattle, type SideId,
 } from './shared';
 
-/** The entry has landed; a new game promotes its tip turn here (a replay has no hook set). */
 const runAfterTurn = async (refs: BranchRefs): Promise<void> => {
   await refs.afterTurnRef?.current?.();
 };
@@ -107,7 +106,7 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
       const turnNumber = battleStream.battle?.turn ?? 0;
       const battle = battleStream.battle;
       const start = battle ? turnStart(battle, logRef.current) : null;
-      // the turn's dice wait on the battle when the turn paused for this switch: the replacement plays the rest of the turn with them
+      // A turn that paused for this switch keeps its dice on the battle: the replacement plays the rest with them.
       const result = await branchEngine.executeBranchChoices({
         streams,
         log: logRef.current,
@@ -146,10 +145,6 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
     setExecuting, setExecuteError, setHistory, setSimState]);
 }
 
-/**
- * The single-side forced-switch rule: when exactly one side must replace and that side just completed its choices, its command resolves
- * now. Returns the command, an error, or null when the rule does not apply.
- */
 function forcedSideCommand(
   branchEngine: BranchEngineModule, battle: LiveBattle, refs: BranchRefs, side: SideId,
   forced: { p1: boolean; p2: boolean },
@@ -173,7 +168,7 @@ function recordSlotChoice(refs: BranchRefs, side: SideId, activeSlot: number, ch
 }
 
 function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
-  // The picks are copied now, not when the updater runs: a send that clears the refs first cannot publish an empty list.
+  // The picks are copied now, not when the updater runs: a send that clears the refs first would publish an empty list.
   const p1Choices = [...refs.p1ChoicesRef.current];
   const p2Choices = [...refs.p2ChoicesRef.current];
   setters.setSimState(prev => prev ? {
@@ -185,10 +180,6 @@ function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
   } : null);
 }
 
-/**
- * What a complete forced replacement sets in motion, after `side` just completed its picks: the lone replacing side's command
- * resolves now, and when both sides replace the turn runs once both are complete. False when nothing is due yet.
- */
 function useSettle(
   refs: BranchRefs, setters: BranchSetters,
   executeTurn: () => Promise<void>,
@@ -229,17 +220,12 @@ function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: S
     recordSlotChoice(refs, side, activeSlot, choice);
     setExecuteError(null);
     if (!refs.battleStreamRef.current?.battle || !refs.branchEngineRef.current) return;
-    // The pick is published before the send goes out, so the chip shows the clicked body and Execute "Executing..." while the replacement
-    // plays. The updater is queued ahead of the send's own `setSimState(nextState)`, which wins.
+    // Published before the send: the updater is queued ahead of the send's `setSimState`, which wins.
     publishChoices(refs, setters);
     settle(side);
   }, [settle, refs, setters, executingRef, setExecuteError]);
 }
 
-/**
- * Records a pick and sends nothing, as the engine's fill writes a forced replacement the user has not confirmed; a bench click uses
- * `setChoice`, which sends at once.
- */
 function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
   const { executingRef } = refs;
   const { setExecuteError } = setters;

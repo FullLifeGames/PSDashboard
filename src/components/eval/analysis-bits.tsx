@@ -63,10 +63,7 @@ export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
   );
 }
 
-/**
- * The analytic-odds suffix ("· 43% KO"), with the accuracy × kill-roll decomposition in the tooltip; hidden when the product rounds to
- * nothing or certainty.
- */
+/** The analytic-odds suffix ("· 43% KO"); hidden when accuracy × kill roll rounds to nothing or certainty. */
 export function KoSuffix({ odds }: { odds?: { accuracy: number; killFraction: number } }) {
   if (!odds) return null;
   const pct = Math.round(odds.accuracy * odds.killFraction * 100);

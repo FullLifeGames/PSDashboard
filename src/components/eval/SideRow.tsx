@@ -48,7 +48,7 @@ function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProp
   if (!side.best || !engine) return null;
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
-  // a stand-in for a choice the log does not show earns no tick: the engine's move stands as it does for a side that played nothing
+    // A stand-in for a choice the log does not show earns no tick.
   if (!side.played || side.neverActed) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
@@ -72,7 +72,6 @@ function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProp
   );
 }
 
-/** The chip title of an unpunished risk; where the matrix shows the safe line did as well against the reply that came, it says so. */
 function unpunishedTitle(side: SideAnalysis): string {
   const punisher = side.played?.punishedBy ?? 'the punishing reply';
   const held = side.safeAgainstClick;
@@ -113,7 +112,6 @@ function sackTitle(sacrifice: NonNullable<SideAnalysis['sacrifice']>): string {
     return 'Switched into the entry hazards and fell before acting, so the next Pokémon came in on a free switch: a sacrifice, not graded as a misplay.';
   }
   if (sacrifice.stayed) {
-    // only a verified feed was paid back; a demoted one lands within the window (as sackClause says).
     return sacrifice.verified
       ? 'The body was left in to take the hit the line priced in, and the next turns paid it back: a sacrifice, not graded as a misplay.'
       : "The body was left in to take the hit the line priced in, and the line's payoff lands within the payoff window: a sacrifice, not graded as a misplay.";

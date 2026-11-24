@@ -1,4 +1,4 @@
-/** The tag and the names clip with an ellipsis and carry their full text in a title; `.ps-topbar-match` in `layout.css` orders the shrinking. */
+/** The tag and the names clip with an ellipsis; `.ps-topbar-match` in `layout.css` orders the shrinking. */
 export function MatchTitle({ format, players, newGame = false }: { format: string; players: readonly string[]; newGame?: boolean }) {
   return (
     <>

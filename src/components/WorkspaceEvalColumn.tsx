@@ -31,37 +31,27 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
   };
 }
 
-/**
- * A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the lines stay
- * readable and stop being buttons until the position on screen has its own result.
- */
+// A result still streaming in for a position the pointer left maps its choices onto the wrong position.
 const linesClickable = (liveEvalView: boolean, evalResultMatchesView: boolean) => !liveEvalView || evalResultMatchesView;
 
 const endedFor = (atVariationEnd: boolean, simState: AppController['ctx']['branch']['simState']) =>
   (atVariationEnd ? { winner: simState?.winner ?? null } : null);
 
-/** A game's tip turn that waits for its replacement is the main line's next turn: no gold line, no "variation" in the card's tag. */
 function idleReads(app: AppController, viewingVariation: boolean, resultTag: string | null) {
   const idle = idleTip(app);
   return { idle, viewingVariation: viewingVariation && !idle, resultTag: idle ? resultTag?.replace(/^variation:/, 'main:') ?? null : resultTag };
 }
 
-/**
- * The gold points and the panel's bar print at the share of the variation's own board, read from the rosters recorded after each
- * executed turn; the main line's share of the same turn number is another board.
- */
 function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
   return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
 }
 
-/** A line started from a turn card (`cardTurn`) goes back to that turn, whichever turn the variation reached. */
 function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: number | null) => void) | undefined {
   if (!viewingVariation || !app.analysis.gameReport) return undefined;
   const { viewTurn, maxTurn, navigateTo } = app.board.timeline;
   return cardTurn => navigateTo(cardTurn === null ? mainLineTarget(viewTurn, maxTurn) : mainLineTarget(cardTurn, maxTurn));
 }
 
-/** The depth of the partial result a user stop kept, while that result is the live position's; null otherwise. */
 function stoppedDepth(stopped: StoppedRun | null, shown: { live: boolean; status: EvalStatus; matches: boolean }, result: EvalResult | null): number | null {
   return stopped && shown.live && shown.status === 'stale' && shown.matches ? result?.depthCompleted ?? 1 : null;
 }
@@ -80,7 +70,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   } = app.engine.evalView;
   const { handleExploreChoice, handlePickPair } = app.engine.walk;
   const { playOut, fastPlayOut } = app.transients;
-  // The rows at T0 rank the leads; a click on one found no live position and opened an empty variation at turn 1.
+  // The rows at turn 0 rank the leads: a click on one finds no live position.
   const clickable = linesClickable(liveEvalView, evalResultMatchesView) && analysisTurn !== 0;
   const reads = idleReads(app, viewingVariation, evaluation.resultTag);
   const variationShares = useVariationShares(app.ctx.branch.history, variationSpan);

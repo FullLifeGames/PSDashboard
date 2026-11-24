@@ -3,7 +3,6 @@ import {
 } from '@fulllifegames/eval-engine';
 import { evTitle } from './turn-copy';
 
-/** A note on the card of the turn after a knockout: what the player sent in with its win chance, then the engine's pick. Nothing is graded. */
 
 const joined = (species: string[]) => species.join(' and ');
 

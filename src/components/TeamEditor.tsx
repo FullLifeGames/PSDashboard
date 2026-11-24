@@ -7,9 +7,7 @@ import { withEditedStandIns } from '../lib/team-editor';
 interface Props {
   title: string;
   teamInfo: OpponentTeamInfo;
-  /** Replay generation — decides which pools exist (abilities gen 3+, tera gen 9). */
   gen: number;
-  /** The replay's format id: its EV limits and, for Pokémon Champions, its own pools. */
   format: string;
   onSave: (updatedInfo: OpponentTeamInfo) => void;
   onClose: () => void;

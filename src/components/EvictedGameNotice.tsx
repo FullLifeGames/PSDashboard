@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { onGameEvicted, type SavedGameRow } from '../lib/new-game/store';
 
-/**
- * The store keeps 20 games; a save over the limit pushes one out (first a game without a played turn, then the oldest) and this line names
- * it until dismissed.
- */
 const describeRow = (row: SavedGameRow): string => {
   const played = row.turns === 0 ? 'no turn played' : `${row.turns} ${row.turns === 1 ? 'turn' : 'turns'} played`;
   return `${row.players[0]} vs ${row.players[1]} (${row.formatName}, ${played})`;

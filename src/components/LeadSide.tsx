@@ -14,10 +14,7 @@ function columnPrompt(maxPicks: number, leadsPerSide: number): string {
       : 'Who leads?';
 }
 
-/**
- * One body of the lead picker as the bench's tile. The pick order and the "played" badge sit in the tile's flag row after the name in
- * the DOM, so a pick never changes the tile's box and the tile's accessible name still begins with the body's name.
- */
+// The flag row follows the name in the DOM: the tile's accessible name still starts with the body's name.
 function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   side: GuessedSide;
   option: LeadOption;
@@ -27,7 +24,6 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   onToggle: (species: string) => void;
 }) {
   const rules = useReplayRules();
-  // A body the log never showed (a stand-in) wears the stats panel's marker, as on the dock's switch tiles.
   const guessed = useIsGuessed()(side, option.species);
   const label = displayName(option.name, option.species);
   const picked = slot >= 0;

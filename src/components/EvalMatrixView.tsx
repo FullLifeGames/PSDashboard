@@ -14,7 +14,6 @@ interface EvalMatrixViewProps {
 
 export function EvalMatrixView({ matrix, playerNames, onPickPair, faintedFraction }: EvalMatrixViewProps) {
   const [open, setOpen] = useState(false);
-  // Results cached before the machine choice ids (cache v13) render the values read-only.
   const clickable = !!onPickPair && !!matrix.p1Choices && !!matrix.p2Choices;
 
   return (

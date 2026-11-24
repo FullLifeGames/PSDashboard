@@ -7,10 +7,7 @@ import { turnEntryCount } from '../../lib/variation-turns';
 import { rebuildGame } from './game-rebuild';
 import type { BranchEngineModule } from './shared';
 
-/**
- * The reader of a game's share link (version 2): it starts the format's battle on the link's seed and plays the entries onto it
- * (`rebuildGame`). The record it returns carries a new id: the reader's browser keeps its own copy, and a link opened twice makes two games.
- */
+/** The returned record carries a new id: a link opened twice makes two games. */
 
 export interface OpenedShare { id?: string; now?: Date }
 

@@ -7,10 +7,7 @@ import { makeGameSharePayload, type GameSharePayload } from '../lib/new-game/sha
 import { turnEntryCount } from '../lib/variation-turns';
 import { shareUrl } from './useBranchSaveShare';
 
-/**
- * A new game's live tip is the main line's next turn, no variation (`idleGameTip`): while no turn was played from it, or its first turn
- * waits for a replacement, the timeline, the side panels, the graph and the share link show none of a variation's chrome.
- */
+/** A new game's tip is no variation while no turn was played from it or its first turn waits for a replacement. */
 export function idleTip(app: AppController): boolean {
   const record = app.ctx.newGame.record;
   const { history, variationStartTurn, simState } = app.ctx.branch;
@@ -20,15 +17,12 @@ export function idleTip(app: AppController): boolean {
   });
 }
 
-/** Whether a variation is open: a branch with a played turn that is no idle tip of a game (a replay's branch always counts). */
+/** A branch with a played turn that is no idle tip of a game; a replay's branch always counts. */
 export function variationOpen(app: AppController): boolean {
   return app.ctx.branch.history.length > 0 && !idleTip(app);
 }
 
-/**
- * An open variation that no saved branch holds (Save Branch writes the row the comparison reads); it asks before Start, a load or an
- * open of a saved game closes it. A replay's branch and a game's variation read the same way.
- */
+/** An open variation that no saved branch holds; Save Branch writes the row the comparison reads. */
 export function unsavedVariation(app: AppController): boolean {
   if (!variationOpen(app)) return false;
   const { history, variationStartTurn } = app.ctx.branch;
@@ -51,11 +45,7 @@ function gameView(app: AppController, idle: boolean): NonNullable<GameSharePaylo
   return { turn: viewTurn, line: viewingVariation ? 'variation' : 'main', ...(viewT0 ? { t0: true } : {}) };
 }
 
-/**
- * The share link of the open game: its main line, the open variation when there is one, and the turn the pointer stands on (version 2).
- * It exists for a game at Team Preview, on the main line, at the tip and at the end, with or without a variation; a tip turn that waits
- * for its replacement is no variation. Null while no game is open.
- */
+/** Null while no game is open; a tip turn that waits for its replacement is no variation (link version 2). */
 export function gameShareLink(app: AppController): string | null {
   const record = app.ctx.newGame.record;
   if (!record) return null;

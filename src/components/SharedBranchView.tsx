@@ -23,7 +23,6 @@ function SharedBranchTopbar({
         <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
           Shared Branch
         </span>
-        {/* A game of the app has no Showdown replay to load. */}
         {!isGameId(branch.replayId) && (
           <button
             type="button"
@@ -58,7 +57,6 @@ function choiceLine(choice: SharedChoice): string {
   return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
 }
 
-/** The dice the user forced in a turn, by side: the texts the history row shows. Nothing for a link from before the dice. */
 function ChoiceDice({ choice }: { choice: SharedChoice }) {
   const dice = [
     ...(choice.p1DiceLabels ?? []).map(text => `P1 ${text}`),

@@ -32,7 +32,6 @@ const cellReset = {
   boxSizing: 'border-box' as const,
 };
 
-/** One interlude: a replacement on one side or on both, an entry of kind turn that no side marks. */
 function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   const p1 = notationSideLabel(entry.p1SlotChoices, entry.p1Choice);
   const p2 = notationSideLabel(entry.p2SlotChoices, entry.p2Choice);
@@ -54,10 +53,6 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   );
 }
 
-/**
- * The dice the user forced in the row's turn, each with its side; "(no effect)" marks a die the simulator did not use (the title gives the
- * reason).
- */
 function DiceMarksLine({ marks }: { marks: DiceMarks }) {
   const sides = (['p1', 'p2'] as const).flatMap(side => marks[side].map((mark, index) => ({ side, mark, key: `${side}-${index}` })));
   return (
@@ -101,7 +96,7 @@ function LineCell({ heading, summary, highlighted, color, onClick }: {
 
 function HistoryRow({ entry, settled, marks, originalTurn, variationTurn, snapshots, currentPosition, onNavigate }: Pick<Props, 'snapshots' | 'currentPosition' | 'onNavigate'> & {
   entry: BranchHistoryEntry;
-  /** The dice of the whole turn: a turn that paused for a switch reads the joined report of its last forced entry. */
+  /** The dice of the whole turn; after a pause for a switch, the joined report of its last forced entry. */
   marks: DiceMarks | undefined;
   settled: BranchHistoryEntry;
   originalTurn: number;
@@ -195,10 +190,7 @@ function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onN
   );
 }
 
-/**
- * Closed under a one-line toggle; the caller keys it by the variation's start turn, so each variation starts closed and keeps the user's
- * setting.
- */
+/** The caller keys it by the variation's start turn: each variation starts closed. */
 export function BranchHistoryPanel({ ended = false, slots, ...props }: Props) {
   const [open, setOpen] = useState(false);
   const bodyId = useId();

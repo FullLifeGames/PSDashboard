@@ -10,10 +10,7 @@ interface Props {
   game?: boolean;
 }
 
-/**
- * The textarea starts as the current export (revealed + guessed + manual, what the stats panel shows); imported text overlays both
- * sides as manual knowledge.
- */
+/** Imported text overlays both sides as manual knowledge. */
 export function SetsImportExportPanel({ exportText, onImport, onClose, game = false }: Props) {
   const [text, setText] = useState(exportText);
   const [error, setError] = useState<string | null>(null);

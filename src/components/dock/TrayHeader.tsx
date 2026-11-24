@@ -1,7 +1,6 @@
 import { ModifierRow } from './GimmickRow';
 import type { DockSlotModel } from './dock-model';
 
-/** The head of an open tray; a slot that must replace a body has neither gimmick toggles nor "Dice · What if". */
 export function TrayHeader({ slot, moreOpen, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   moreOpen: boolean;

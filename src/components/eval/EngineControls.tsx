@@ -8,7 +8,6 @@ interface EngineControlsProps {
   engines: EngineEntry[];
   selected: EngineEntry;
   running: boolean;
-  /** What the selected engine does, appended to the select's title (the Evaluation heading carries the same text). */
   note?: string;
   onSelect: (id: string) => void;
   onAdd: (name: string, url: string) => void;
@@ -59,7 +58,6 @@ function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineContr
   );
 }
 
-/** The dropdown shows once another engine is integrated; "+ engine" adds one by address in this browser. */
 export function EngineControls({ engines, selected, running, note, onSelect, onAdd, onRemove }: EngineControlsProps) {
   const [adding, setAdding] = useState(false);
   return (

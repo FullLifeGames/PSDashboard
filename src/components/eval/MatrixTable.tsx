@@ -9,7 +9,6 @@ export interface MatrixTableProps {
     p2: { choice: string; label: string },
   ) => void;
   faintedFraction?: number | null;
-  /** Cells play their pair out (a handler, and choice ids on both axes: results cached before the ids existed stay read-only). */
   clickable: boolean;
   dialog?: boolean;
   marks?: MatrixMarks;
@@ -27,7 +26,6 @@ const inlineHeaderStyle: React.CSSProperties = {
   maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 
-/** The dialog's header cells hold its background so the cells that scroll under them do not show through. */
 const DIALOG_BACKGROUND = '#2a3a5c';
 const dialogHeaderStyle: React.CSSProperties = {
   padding: '3px 6px', fontWeight: 'normal', color: '#cde', textAlign: 'left', verticalAlign: 'top',
@@ -43,7 +41,7 @@ const sameCell = (at: readonly [number, number] | null | undefined, i: number, j
 const ACCENT = 'var(--ps-accent)';
 const WARM = 'var(--ps-accent-warm)';
 const DANGER = 'var(--ps-danger)';
-/** The tag colour of "worst": the app's light red (misplay and error text), readable on the dialog's blue where --ps-danger is not. */
+// The app's light red, readable on the dialog's blue where --ps-danger is not.
 const DANGER_TEXT = '#f3a6a6';
 
 function playedOutline(row: boolean, column: boolean): string | undefined {

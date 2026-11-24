@@ -28,11 +28,7 @@ export function shareUrl(encoded: string): string {
   return `${base}#branch=${encoded}`;
 }
 
-/**
- * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: when
- * `build` changes the link is built again during render, and a "Copied" belongs to the build it copied. Nothing is built before the
- * first click (a game's link packs both teams), so the clipboard and the field carry one timestamp.
- */
+// A "Copied" belongs to the build it copied; nothing is built before the first click.
 function useShareLink(build: () => SavedBranch) {
   const [built, setBuilt] = useState<{ build: () => SavedBranch; link: string } | null>(null);
   const [copiedFor, setCopiedFor] = useState<(() => SavedBranch) | null>(null);
@@ -63,8 +59,7 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
   const [saved, setSaved] = useState<SavedBranch[]>(() => loadSavedBranches(replayData.id));
   const [justSaved, setJustSaved] = useState(false);
 
-  // Built when the user asks (a click) or, once a link is shown, when its inputs change; never per render before that. `game` is a
-  // fresh object each render, so the build depends on its fields.
+  // `game` is a fresh object each render, so the build depends on its fields.
   const gameRecord = game?.record ?? null;
   const viewTurn = game?.view?.turn ?? 0;
   const viewLine = game?.view?.line ?? 'main';
@@ -83,8 +78,7 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
     setJustSaved(true);
   };
 
-  // Opening a saved branch reuses the share-link flow: setting the hash triggers the app's hashchange handler. A replay's branch shows the
-  // read-only view; a game's row is a version 2 link, which opens the branch in the game.
+  // Setting the hash triggers the app's hashchange handler: the share-link flow.
   const openSaved = (entry: SavedBranch) => {
     window.location.assign(`#branch=${encodeBranchShare(entry)}`);
   };

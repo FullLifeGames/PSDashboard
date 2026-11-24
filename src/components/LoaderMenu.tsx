@@ -4,10 +4,6 @@ import { MenuGameParts, type GameEntryProps } from './GameEntry';
 import { ConfirmBanner } from './ConfirmBanner';
 import { useLeaveAsk } from '../hooks/useLeaveAsk';
 
-/**
- * A dropped file lands anywhere on the page while a replay is loaded; only a drag that carries files counts. `active` is true while one is
- * over the window.
- */
 function usePageFileDrop(onFile: (file: File) => void): boolean {
   const [active, setActive] = useState(false);
   const latest = useRef(onFile);
@@ -60,10 +56,7 @@ function useMenuDismiss(open: boolean, setOpen: (open: boolean) => void, rootRef
   }, [open, setOpen, rootRef]);
 }
 
-/**
- * The Game menu of the top bar. While `unsavedVariation()` says a variation is open and not saved, a load or an open of a saved game
- * asks first, in the panel (the game itself is saved after every turn and needs no question).
- */
+/** While `unsavedVariation()` says a variation is open and not saved, a load or an open of a saved game asks first. */
 export function LoaderMenu(props: Omit<ReplayLoaderProps, 'variant' | 'showGuide'> & Partial<GameEntryProps> & { unsavedVariation?: () => boolean }) {
   const { loading, error, onLoad, onLoadFile, onNewGame, onOpenGame, currentGameId = null, onShareGame, unsavedVariation, ...loader } = props;
   const leave = useLeaveAsk(unsavedVariation);

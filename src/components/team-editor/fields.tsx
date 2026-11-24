@@ -81,8 +81,6 @@ export function ItemField({ entry, index, pools, draft }: FieldProps) {
       </FieldCaption>
       <ComboBox
         options={pools?.items ?? []}
-        // Annotations like "(consumed)" are battle knowledge, not
-        // part of the set — the editor works on the plain item.
         value={entry.item.source === 'manual' ? entry.item.value : itemSetValue(entry.item.value)}
         onChange={value => updateField(index, 'item', value)}
         onSelect={value => {
@@ -169,7 +167,6 @@ export function NatureField({ entry, index, pools, draft }: FieldProps) {
   );
 }
 
-/** How much of the format's total the spread has spent, in the format's own unit; none when the format has no total. */
 function evBudgetLine(evs: PokemonEvs, { perStat, total, statPoints }: EvLimits): string | null {
   if (total === null) return null;
   const spent = EV_STATS.reduce((sum, stat) => sum + (evs[stat.id] ?? 0), 0);
@@ -225,7 +222,6 @@ function MoveChips({ entry, index, pools, draft }: FieldProps) {
           <span style={{ color: '#9fb5d9', fontSize: 9 }}>
             {sourceLabel(move.source, move.probability)}
           </span>
-          {/* Only the user's own pick gets the note: a revealed or guessed move is the battle's or the engine's word. */}
           {move.source === 'manual' && isOutsidePool(pools?.movesBySpecies[entry.species], move.name) && (
             <span style={{ color: '#e0c080', fontSize: 9 }}>not learnable</span>
           )}

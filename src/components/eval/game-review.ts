@@ -3,10 +3,6 @@ import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, neverActedOf, neverActedText, regretView, rowValueTexts } from './turn-copy';
 
-/**
- * What the Game review lists, as plain data: the turns the cards grade (inaccuracy, mistake, blunder), the same turns the graph marks
- * (`reviewMarks`). Each row carries the side's engine line and played line (`lineBlocks`).
- */
 
 type Side = 'p1' | 'p2';
 export type ReviewGrade = Extract<VerdictTier, 'inaccuracy' | 'mistake' | 'blunder'>;
@@ -26,7 +22,6 @@ export interface ReviewRowView {
   side: Side;
   grade: ReviewGrade;
   played: string;
-  /** The row's head as the card words it: "played Hyper Voice 42%", or that the body was knocked out before it moved. */
   playedText: string;
   engine: string;
   engineWord: 'engine' | 'safe';
@@ -39,12 +34,7 @@ export interface ReviewSideView { side: Side; player: string; rows: ReviewRowVie
 const SIDES: readonly Side[] = ['p1', 'p2'];
 const SIDE_INDEX: Record<Side, 0 | 1> = { p1: 0, p2: 1 };
 
-/**
- * The grade the turn card prints for a side, or null. A mistake or blunder that the card replaces by a sack or a read that paid off is
- * not graded. A read that paid off speaks for an inaccuracy too, as it does in the report, unless the side lost ground on the turn
- * (`lostGround`): otherwise the report says "read paid off +9%" and "inaccuracy -9%" for one click. An inaccuracy keeps its chip
- * beside a sack. A side without its played or its engine row has nothing to compare.
- */
+/** The grade the turn card prints for a side, or null; a sack or a read that paid off replaces a mistake or blunder. */
 export function gradedTier(side: SideAnalysis, lostGroundOnTurn = false): ReviewGrade | null {
   const tier = side.tier;
   if (tier !== 'inaccuracy' && tier !== 'mistake' && tier !== 'blunder') return null;
@@ -71,13 +61,8 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
   return gradedSides(analyses).map(({ analysis, side }) => ({ turn: analysis.turn, side }));
 }
 
-/**
- * One line on one row: the listed player's choice against the answer. A doubles step holds two moves for each player, so each pair
- * stands behind its player's name ("A + B vs C + D" would read as one run-on list of four moves).
- */
 function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
-  // the first answer carries its rank in the search's ranking; a replacement-first line has none
   const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);
   return line.steps.map((step, index) => {
     if (step.replacement) {
@@ -135,12 +120,9 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   };
 }
 
-export interface EndgameRowView { side: Side; player: string; /** The first turn of the endgame: the row's click searches it. */ turn: number; text: string }
+export interface EndgameRowView { side: Side; player: string; turn: number; text: string }
 
-/**
- * The Endgame row, for the player who lost a game that reached its endgame (`endgame`: three bodies or fewer standing at the turn's start);
- * the click searches from the endgame's first turn.
- */
+/** The Endgame row for the player who lost; `endgame` means three bodies or fewer standing at the turn's start. */
 export function endgameRow(endgame: { loser: Side; turns: readonly number[] } | null | undefined, playerNames: [string, string]): EndgameRowView | null {
   if (!endgame || endgame.turns.length === 0) return null;
   const player = playerNames[SIDE_INDEX[endgame.loser]];

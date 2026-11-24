@@ -7,7 +7,6 @@ export interface GameEntryProps {
   onNewGame: () => void;
   onOpenGame: (record: NewGameRecord) => Promise<unknown> | void;
   currentGameId: string | null;
-  /** The link of the open game as it stands (main line, open variation, turn on screen); absent where no game is open. */
   onShareGame?: () => string | null;
 }
 

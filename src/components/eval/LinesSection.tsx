@@ -65,10 +65,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
   );
 }
 
-/**
- * Why a turn holds no line. A matrix turn (a result with a matrix and no tree cells) ran no tree, so it cannot have kept lines;
- * a tree search that kept none says so of the search.
- */
+// A matrix turn ran no tree, so it cannot have kept lines.
 function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<LinesHost['lineComing']>> = null): string {
   if (result.engine) return `No line: ${result.engine.name} sends none.`;
   if (coming === 'stage') return `No line yet: the app searches this turn after the game report${gameReviewEnabled() ? ' (the review shows the progress)' : ''}.`;

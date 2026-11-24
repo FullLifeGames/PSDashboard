@@ -1,9 +1,5 @@
 import type { TurnEvalSettings } from '../../hooks/useEvaluation';
 
-/**
- * A gap turn's first analysis: a turn the line has not reached yet searches itself and its follow-up turn at the panel's settings.
- * An analyzed turn offers nothing: the deeper stage is "Think deeper".
- */
 export function AnalyzePositionButton({ onAnalyze, target, disabled, smogonPending }: {
   onAnalyze?: () => void;
   target?: TurnEvalSettings | { mode: 'auto' } | null;

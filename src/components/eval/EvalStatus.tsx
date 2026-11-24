@@ -28,11 +28,6 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
   );
 }
 
-/**
- * The line under a stale result. A search the user stopped says what it left: the first level of a search is the quick estimate (a forced
- * replacement's arrival values, a normal turn's depth-1 matrix), a later partial is the result so far. Any other stale result stands for a
- * position that changed.
- */
 function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
   return (
     <div role={stoppedAt === null ? undefined : 'status'} style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>

@@ -81,7 +81,6 @@ function FormatList({ picker, idBase, value, total, note }: { picker: PickerStat
     // the search field keeps focus while the list is used (a click on a scroll bar or a heading must not blur it)
     <div
       className="ps-combobox-pop ps-format-pop"
-      // the dialog scrolls and the list hangs below the button: bring the whole list, its footnote included, into the dialog's view
       ref={bringIntoView}
       onMouseDown={event => { if (event.target !== event.currentTarget.firstChild) event.preventDefault(); }}>
       <input

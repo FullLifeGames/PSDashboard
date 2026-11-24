@@ -16,7 +16,6 @@ export interface MoveTileProps {
   bars: TileBar[];
   selected: boolean;
   wasPlayed: boolean;
-  /** The engine's choice for the open slot, held back until the tray closes. */
   engine?: boolean;
   forced: boolean;
   zMoveName?: string | null;

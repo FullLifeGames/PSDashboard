@@ -52,7 +52,7 @@ function comboKeyHandler(ctx: KeyContext) {
       return;
     }
     if (event.key === 'Escape') {
-      // An open list closes alone: the dialog around it keeps its edits. With the list closed the key reaches the dialog.
+      // An open list closes alone: the dialog around it keeps its edits.
       if (ctx.open) {
         event.stopPropagation();
         ctx.setOpen(false);
@@ -167,7 +167,6 @@ export function ComboBox({
           setOpen(true);
           setHighlight(0);
         }}
-        // Focus lists every option and highlights none, so Enter in an empty field commits nothing.
         onFocus={() => {
           setOpen(true);
           setHighlight(value.trim() ? 0 : -1);

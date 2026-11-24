@@ -24,24 +24,18 @@ interface EvalPanelProps {
   onPrefsChange: (prefs: EvalPreferences) => void;
   onEvaluate?: () => void;
   onCancel: () => void;
-  /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
-  /** Replay view: the settings that produced the shown result (fast scan vs configured). */
   resultSettings?: TurnEvalSettings | null;
   onAnalyzeTurn?: () => void;
   analyzeTarget?: TurnEvalSettings | { mode: 'auto' } | null;
-  /** Smogon usage/sets still loading: a sweep started now would silently build teams without the guessed fills. */
+  /** Smogon usage/sets still loading: a sweep started now builds teams without the guessed fills. */
   smogonPending?: boolean;
   showAuto: boolean;
-  /** Gen 9 only — other gens have no Tera to gate. */
   showTera: boolean;
   engines?: EngineChoice;
   graph: EvalGraphState;
-  /**
-   * Variation overlay for the game graph: the gold curve's scores (`scores[turn − 1]`) and the fainted share of the variation's own board
-   * before each.
-   */
+  /** The gold curve's scores (`scores[turn − 1]`) and the fainted share of the variation's own board before each. */
   variation?: VariationSeries | null;
   currentLine?: 'main' | 'variation';
   onAnalyzeGame?: () => void;
@@ -58,11 +52,10 @@ interface EvalPanelProps {
   reviewAnalyses?: (TurnAnalysis | null)[] | null;
   doubles?: boolean;
   linesHost?: LinesHost;
-  /** The user stopped the search and its partial result stands for the position: its depth. Null: no stopped run. */
+  /** Depth of the partial result a user stop kept; null: no stopped run. */
   stoppedAt?: number | null;
   stoppedEmpty?: boolean;
   positionLabel?: string | null;
-  /** The pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
   ended?: { winner: string | null } | null;
   playOutProgress?: PlayOutProgress | null;
   graphMaxTurn?: number;
@@ -71,11 +64,8 @@ interface EvalPanelProps {
 
 function useReportView(report: GameReport | null | undefined, analysisTurn: number | null | undefined) {
   const [view, setView] = useState<'report' | 'turn'>('report');
-  // Render-time adjustment (not an effect): when a report first APPEARS —
-  // initial sweep done, or a new replay's sweep — land on the overview.
   const [hadReport, setHadReport] = useState(false);
-  // A variation takes the report away; the way back leads to where the line was started (the review, or the card of its turn). The
-  // analysis turn does not follow a variation, so it still names that card.
+  // A variation takes the report away; this remembers where the line started (the review or a turn card).
   const [startedFrom, setStartedFrom] = useState<{ view: 'report' | 'turn'; turn: number | null } | null>(null);
   let returned = false;
   if (!!report !== hadReport) {
@@ -88,8 +78,6 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
       setStartedFrom({ view, turn: analysisTurn ?? null });
     }
   }
-  // Same pattern for navigation: moving to another turn is the request to see its evaluation; the report stays one click away via "← Game
-  // report".
   const [seenAnalysisTurn, setSeenAnalysisTurn] = useState<number | null>(analysisTurn ?? null);
   if ((analysisTurn ?? null) !== seenAnalysisTurn) {
     setSeenAnalysisTurn(analysisTurn ?? null);
@@ -136,14 +124,6 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
   );
 }
 
-/**
- * The fainted share of the board the shown result was searched on, so the panel prints the same percents as the graph and the card.
- * - The graph's own result of the analyzed turn: the turn card's share.
- * - A branch result: the share of its own board. On the variation line that is the variation's board at the viewed turn (the share its
- *   gold tooltip prints at), never the main line's share of that turn number; on the main line (a branch that has not played a move
- *   yet) it is the main line's share of the viewed turn.
- * - The lead result (before any body fell) and a board whose share is unknown: the opening map.
- */
 function shownShare({ result, graph, analysis, analysisTurn, faintedShares, variation, currentLine, currentTurn }: EvalPanelProps): number | null {
   if (!result || result === graph.lead?.result) return null;
   const mainLineShare = (turn: number) => faintedShares?.[turn - 1] ?? graph.faintedFractions[turn - 1] ?? null;
@@ -160,7 +140,6 @@ function SingleResult(props: EvalPanelProps) {
   return (
     <EvalResultBlock
       result={result}
-      // a stopped run's result is the position's answer: not greyed, its rows play like a finished result's
       status={status === 'stale' && props.stoppedAt != null ? 'done' : status}
       playerNames={playerNames}
       positionLabel={positionLabel}

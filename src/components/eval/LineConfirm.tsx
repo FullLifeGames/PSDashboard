@@ -2,11 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ConfirmBanner } from '../ConfirmBanner';
 import type { LineConfirm as LineConfirmData } from '../../lib/line-view';
 
-/**
- * The replace question after ▶ Play, under the line that was clicked: the dock's banner stands 800 px above the screen at phone width and
- * under the dock bar with the history open, so this one sits in the block of the click and scrolls itself into the upper part of the
- * screen when it opens elsewhere.
- */
+/** Sits in the block of the click and scrolls itself into view: the dock's banner can be out of sight there. */
 export function LineConfirm({ confirm }: { confirm: LineConfirmData }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {

@@ -50,13 +50,8 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
   );
 }
 
-/**
- * "Always on" shares the row with the title, the engine link and Tera at the right column's desktop width (380 px, see
- * `.ps-eval-controls` in eval-panel.css); a narrower column wraps it. Depth and Samples live in the Setup menu (`SearchSelects`).
- */
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
-  /** The engines on offer; another engine than the own search decides its own depth. */
   engines?: EngineChoice;
   showTera: boolean;
   onEvaluate?: () => void;

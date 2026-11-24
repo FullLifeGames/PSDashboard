@@ -11,10 +11,7 @@ import { useIsGuessed, type GuessedSide, type StandInMark } from '../../lib/stan
 const PLAYED_TITLE = 'The action played at this position on the line you are viewing.';
 const ENGINE_TITLE = "The engine's choice for this slot. It takes the slot when you close the tray, unless you pick something else.";
 
-/**
- * The played and engine badges stand in the tile's flag row on its top edge (`.ps-tile-flags`), out of the tile's flow, so a badge
- * that appears under an open tray never widens the tile or reflows the bench.
- */
+// The badges stand in the tile's flag row, out of its flow: a badge under an open tray never widens the tile.
 function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine, guessed, onPick }: {
   sw: BranchSwitchOption; selected: boolean; disabled: boolean; disabledReason: string; wasPlayed: boolean; engine: boolean; guessed: StandInMark | null; onPick: () => void;
 }) {
@@ -50,7 +47,6 @@ function SwitchTile({ sw, selected, disabled, disabledReason, wasPlayed, engine,
 }
 
 export function SwitchRow({ side, activeName, switches, pending, blockedSwitchKeys, played, deferred = null, onPick }: {
-  /** The side the bench belongs to: a stand-in (a body the log never showed) wears the stats panel's marker. */
   side: GuessedSide;
   activeName: string;
   switches: BranchSwitchOption[];

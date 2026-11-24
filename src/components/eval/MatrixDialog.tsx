@@ -17,7 +17,6 @@ interface MatrixDialogProps {
 
 function MatrixDialog({ result, analysis, playerNames, onPickPair, onClose }: MatrixDialogProps) {
   const matrix = result.matrix!;
-  // Results cached before the machine choice ids (cache v13) render the values read-only.
   const clickable = !!onPickPair && !!matrix.p1Choices && !!matrix.p2Choices;
   const marks = matrixMarks(result, matrix, analysis);
   return (
@@ -39,7 +38,6 @@ function MatrixDialog({ result, analysis, playerNames, onPickPair, onClose }: Ma
   );
 }
 
-/** The turn card's "Open matrix" button with its dialog; absent where the result holds no matrix (a search that kept none, an older cache). */
 export function MatrixDialogButton({ result, analysis, playerNames, onPickPair }: Omit<MatrixDialogProps, 'result' | 'onClose'> & { result: EvalResult | null | undefined }) {
   const [open, setOpen] = useState(false);
   if (!result?.matrix) return null;

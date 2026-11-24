@@ -4,10 +4,7 @@ import type { NewGameRecord } from '../lib/new-game/record';
 
 const SHOWN = 3;
 
-/**
- * After a delete the rows below move up and the next row's Open lands under the pointer; the second click of a double click on the confirm's
- * red Delete would open that game. An Open within this time of a delete is not a deliberate click.
- */
+// After a delete the next row's Open lands under the pointer: a click within this time is not deliberate.
 const AFTER_DELETE_MS = 600;
 
 interface Props {

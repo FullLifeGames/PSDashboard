@@ -15,17 +15,11 @@ interface SetupMenuProps {
   onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
-  /**
-   * The search's Depth and Samples; left out, the menu draws neither (an embedded view). `external` is another engine, which decides its
-   * own depth.
-   */
+  /** Left out, the menu draws neither Depth nor Samples; `external` is another engine, which decides its own depth. */
   search?: SearchSelectsProps & { external: boolean };
 }
 
-/**
- * A pick closes the menu; the toggle and the selects keep it open, and so do Escape and a click outside it. The "Opponent reads my
- * move" box is drawn only with the flag `opponentReadsEnabled` (src/lib/feature-flags.ts).
- */
+/** The "Opponent reads my move" box is drawn only with the flag `opponentReadsEnabled` (`src/lib/feature-flags.ts`). */
 export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets, search }: SetupMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);

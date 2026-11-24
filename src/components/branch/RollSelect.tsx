@@ -2,10 +2,6 @@ import type { DieOffer, DieWords, ForcedDie } from '@fulllifegames/eval-engine';
 import { resultWord } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 
-/**
- * The damage roll as a select over the generation's steps (16; 39 in Gens 1 and 2), each with the calculator's damage, plus Min, Max
- * and Lowest KO roll; "As rolled" gives the die back to the seed. A forced crit on the target switches the numbers to the crit's.
- */
 
 const percentOf = (damage: number, maxhp: number): number => (maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0);
 

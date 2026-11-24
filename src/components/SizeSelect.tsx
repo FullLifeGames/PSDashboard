@@ -5,10 +5,7 @@ import { setUiScaleSetting } from '../lib/ui-scale-store';
 
 const valueOf = (setting: UiScaleSetting): string => String(setting);
 
-/**
- * Auto names the step it gives for this window; the five steps override it and persist per browser (`ui-scale-store.ts`). A step that
- * would leave the app less than 1050 px of width is disabled, and its label says how wide a window it needs.
- */
+/** Auto names the step it gives for this window; the steps persist per browser (`ui-scale-store.ts`). */
 export function SizeSelect() {
   const { setting, auto, width } = useUiScale();
   const id = useId();

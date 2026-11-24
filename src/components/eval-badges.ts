@@ -1,9 +1,6 @@
 import { chanceRolled, quietVoice, shownAttribution, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 
-/**
- * The team-preview verdict a side's lead may carry. A doubles lead sits close to a coin flip: matrix and tree name a different best
- * lead on 76 of 92 sides, so a doubles lead gets no mistake or inaccuracy, only the engine's pick.
- */
+/** A doubles lead (a pair) gets no mistake or inaccuracy tier, only the engine's pick. */
 export function leadTier(side: LeadSideAnalysis): LeadSideAnalysis['tier'] {
   return isPairLead(side) ? undefined : side.tier;
 }
@@ -52,7 +49,7 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
         ? { text: 'advantage shifted', color: '#b6a46a' }
         : { text: 'advantage shifted (no blunder)', color: '#b6a46a' };
     case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
-    // "quiet turn" stands only where the card highlights nothing else; a card that names an unpunished risk or inaccuracy says so.
+    // "quiet turn" stands only where the card highlights nothing else.
     default: return quietBadge(quietVoice(analysis, playerNames));
   }
 }

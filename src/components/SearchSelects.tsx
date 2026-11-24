@@ -15,7 +15,6 @@ function autoLineText(split: SearchBudget['singles']): string {
   return `the depth-${split.earlyDepth} matrix with ${draws} until ${threshold}, then the MCTS tree`;
 }
 
-/** The auto help text reads the budget in force, so a measurement form never shows stale numbers. */
 function autoTitle(budget: SearchBudget): string {
   return `Auto picks the engine per turn. Singles: ${autoLineText(budget.singles)}. Doubles: ${autoLineText(budget.doubles)}. ` +
     `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;

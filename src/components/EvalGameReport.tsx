@@ -10,7 +10,7 @@ interface EvalGameReportProps {
   report: GameReport;
   playerNames: [string, string];
   onSelectTurn?: (turn: number) => void;
-  /** Turn-0 verdicts: a T0 chip appears for mistake-level lead choices (singles; a doubles lead carries none, see eval-badges leadTier). */
+  /** Turn-0 verdicts; a doubles lead carries no mistake tier (`leadTier`). */
   leads?: LeadAnalysis | null;
   settingsFor?: (turn: number) => TurnEvalSettings | null;
 }
@@ -181,10 +181,6 @@ function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalG
   );
 }
 
-/**
- * A chance chip prints the chance part and the net ("+13% from the roll (net +5%)", 573756 t73: the biggest roll of the game netted +5%
- * because the decision part pulled the other way); the badge beside it is about the chance part. Every other attribution keeps the net swing.
- */
 function momentDelta(moment: TurnAnalysis, swing: number): string {
   if (shownAttribution(moment) !== 'chance' || moment.chanceDelta === null) return winDeltaText(swing);
   return `${winDeltaText(moment.chanceDelta)}${chanceRolled(moment) ? ' from the roll' : ''} (net ${winDeltaText(swing)})`;

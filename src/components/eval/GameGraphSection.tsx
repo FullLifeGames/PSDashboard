@@ -52,7 +52,6 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
           >
             {hasGraph ? 'Re-analyze' : 'Analyze game'}
           </button>
-          {/* A single evaluation took the sweep over; the status names where it stopped. */}
           {graph.stopped && (
             <span role="status" style={{ color: '#e6b36a' }}>
               Analysis stopped at turn {graph.stopped.done} of {graph.stopped.total}.
@@ -64,10 +63,6 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
   );
 }
 
-/**
- * What Analyze game does, with the configured mode (the heading's title). Auto reads the search budget; by default doubles run the
- * tree on every turn, singles the matrix until a quarter of all bodies fell.
- */
 function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
   const mode = prefs.mode === 'mcts' ? 'MCTS'
@@ -85,7 +80,6 @@ function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnaly
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
-  /** With a variation open the report is out of reach: this goes back to the main line; absent = nothing to return to. */
   onBackToMain?: () => void;
   result: EvalResult | null;
   currentTurn: number;
@@ -132,15 +126,11 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
           Back to the main line
         </button>
       )}
-      {/* The sweep's recorded reason this turn is a hole — without
-          it a blank turn view reads as app breakage. */}
       {!result && currentTurn >= 1 && graph.evalErrors[currentTurn - 1] && (
         <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 4, maxWidth: 520 }}>
           ⚠ This turn could not be evaluated: {graph.evalErrors[currentTurn - 1]}
         </div>
       )}
-      {/* A gap turn has no result block below — its analysis
-          control is the one way to search it on its own. */}
       {!result && hasAnalyzeTurn && (
         <div style={{ marginTop: 4 }}>{analyzeTurn}</div>
       )}
@@ -177,10 +167,6 @@ export interface GameGraphSectionProps extends TurnViewProps {
 
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
-/**
- * A circle marks a graded turn (GLOSSARY.md) of player 1, a square one of player 2, in the player's colour; the Game review lists
- * the same turns. Only the sides that carry a mark are named.
- */
 function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
   const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));
   if (sides.length === 0) return null;
@@ -251,8 +237,6 @@ export function GameGraphSection(props: GameGraphSectionProps) {
   return (
     <div style={{ margin: '6px 0' }}>
       <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} title={graphTitle(prefs, doubles)} />
-      {/* A short or missing line says why — an unexplained blank graph
-          reads as a broken app rather than a diverged reconstruction. */}
       {graph.notice && (
         <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 2, maxWidth: 520 }}>
           ⚠ {graph.notice}
