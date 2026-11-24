@@ -1,9 +1,10 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { createBranchStateFromBattle } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
+import { simState } from '../../fixtures/sim-state';
 
 /**
  * Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The calculator spreads the move over every foe and
@@ -82,5 +83,38 @@ describe('the dock: the preview of a forced spread on a lone foe behind a screen
     const row = await renderDock('lightscreen', false);
     await new Promise(resolve => setTimeout(resolve, 500));
     expect(shownRange(row)).toBe('');
+  });
+});
+
+type Props = Parameters<typeof TurnDock>[0];
+
+const props = (overrides: Partial<Props> = {}): Props => ({
+  simState: simState('singles'), executeError: null, executing: false, gen: 9,
+  onSetChoice: vi.fn(), onHypotheticalMove: vi.fn(), onExecuteTurn: vi.fn(), ...overrides,
+});
+
+const read = () => document.documentElement.style.getPropertyValue('--ps-dock-h');
+
+/** The fixed dock of a narrow window tells the page its height; it stands for singles and doubles, and goes with the dock. */
+describe('the dock reports its height', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.style.removeProperty('--ps-dock-h');
+  });
+
+  test.each(['singles', 'doubles'] as const)('a %s dock writes --ps-dock-h and removes it when it unmounts', kind => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 132 } as DOMRect);
+    const { unmount } = render(<TurnDock {...props({ simState: simState(kind) })} />);
+    expect(read()).toBe('132px');
+    unmount();
+    expect(read()).toBe('');
+  });
+
+  test('the ended notice reports it as well, and a dock without a state reports nothing', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 40 } as DOMRect);
+    const { rerender } = render(<TurnDock {...props({ simState: { ...simState('singles'), ended: true, winner: 'Alice' } })} />);
+    expect(read()).toBe('40px');
+    rerender(<TurnDock {...props({ simState: null })} />);
+    expect(read()).toBe('');
   });
 });
