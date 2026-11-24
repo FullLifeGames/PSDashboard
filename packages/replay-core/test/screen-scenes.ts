@@ -5,29 +5,22 @@ import type { OpponentTeamInfo } from '../src/types';
 import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, type SimView } from './sim-views';
 import { Dex } from '@pkmn/sim';
 
-/** The scenes of `screen-evidence.spec.ts`: every log comes from the simulator (the spectator's view), side p1 (Alpha) sets the screen, side p2 (Beta) faces it. */
-
-/** `timed`: the log as a server writes it (a `|t:|` line after each header); `plain`: the same without those lines (a reconstructed log). */
+/** `timed`: a `|t:|` line after each header, as a server writes it; `plain`: without, as a reconstructed log. */
 export type Style = 'timed' | 'plain';
 export type Side = 'p1' | 'p2';
 
-/** The screen's setter on side p1: its species, item and ability (the sets of the log's other bodies are fixed). */
 export interface Holder { species: string; item?: string; ability?: string }
 
 export interface SceneOptions {
   holder: Holder;
   screen: string;
   turns: number;
-  /** The setter's slot in doubles (the ally takes the other). */
   slot?: 0 | 1;
   style?: Style;
-  /** A move of the setter by turn (the setter uses the screen move on turn 1 and splashes otherwise). */
+  // A move of the setter by turn (the setter uses the screen move on turn 1 and splashes otherwise).
   setter?: Record<number, string>;
-  /** The foe's species, item and ability (Beta's first body). */
   foe?: Holder;
-  /** A move of the foe by turn (it splashes otherwise); the foe's first body knows every move it names. */
   foeMoves?: Record<number, string>;
-  /** Bodies behind the setter that can be Illusion users (team of the setter's side). */
   bench?: Holder[];
 }
 
@@ -75,7 +68,7 @@ export function infoOf(log: string, side: Side, species: string): OpponentTeamIn
 export const ruledOut = (log: string, side: Side, species: string, item = 'lightclay'): boolean =>
   (infoOf(log, side, species).ruledOut?.items ?? []).includes(item);
 
-/** The item the log proves: the revealed field's value ('' while none; team preview's "(has item)" flag names no item). */
+/** The item the log proves ('' while none; team preview's "(has item)" flag names no item). */
 export function proven(log: string, side: Side, species: string): string {
   const field = infoOf(log, side, species).item;
   return field.source === 'revealed' && field.value !== '(has item)' ? field.value : '';
@@ -83,7 +76,7 @@ export function proven(log: string, side: Side, species: string): string {
 
 export interface ScreenLine { kind: 'start' | 'end'; side: Side; screen: string; turn: number; phase: 'action' | 'residual' }
 
-/** Reads the screen lines of a log: the turn comes from `|turn|N`; the first bare `|` after it is the header, the second opens the residual phase. */
+/** The first bare `|` after `|turn|N` is the header, the second opens the residual phase. */
 export function screenLines(log: string): ScreenLine[] {
   const found: ScreenLine[] = [];
   let turn = 0;
@@ -98,10 +91,6 @@ export function screenLines(log: string): ScreenLine[] {
   return found;
 }
 
-/**
- * Whether a side's screen ran out on its own side in the residual phase with no removal or move on the way: the one case a
- * verdict may rest on. A start without such an end (a removal, a Court Change, a log that stops first) gives none.
- */
 export function endsCleanly(log: string, side: Side, screen: string): boolean {
   const lines = screenLines(log).filter(line => line.screen === screen);
   const started = lines.find(line => line.kind === 'start' && line.side === side);
@@ -117,7 +106,7 @@ export function screenMoves(view: SimView): string[] {
   });
 }
 
-/** Singles in Generations 1 to 9 and the Champions mod, doubles in Generations 3 to 9 and the Champions mod: the rule sets the corpus plays. */
+/** Singles Gens 1 to 9 and Champions, doubles Gens 3 to 9 and Champions: the corpus's rule sets. */
 export const RULE_VIEWS: SimView[] = [
   ...SINGLES_VIEWS,
   ...[3, 4, 5, 6, 7, 8].map(gen => ({ name: `Gen ${gen} doubles`, format: `gen${gen}doublescustomgame`, doubles: true, dex: Dex.forGen(gen) })),

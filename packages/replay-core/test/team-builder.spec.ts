@@ -8,12 +8,6 @@ import type { SmogonUsageStats } from '../src/smogon/stats-types';
 import { Generations, Pokemon } from '@smogon/calc';
 import type { PokemonSet } from '@pkmn/sim';
 
-/**
- * The inference books the name and the shiny flag the replay showed for a body, so the simulator can write the replay's own switch
- * lines. Singles name a body `p2a`, doubles `p1a` or `p1b`; the side key drops the slot. The sources are the first `switch`, `drag`
- * or `replace` line of a body and an Open Team Sheet; team preview (`|poke|`) carries no nickname and no shiny flag.
- */
-
 const header = (kind: 'singles' | 'doubles') => [`|gametype|${kind}`, '|player|p1|A|1|', '|player|p2|B|2|', '|gen|9', '|tier|[Gen 9] Custom Game'];
 const preview = ['|clearpoke', '|poke|p1|Pikachu, L50, F|', '|poke|p1|Landorus-Therian, L50, M|', '|poke|p2|Garchomp, L50, F|', '|poke|p2|Clefable, L50, F|', '|teampreview', '|start'];
 
@@ -93,7 +87,6 @@ describe('the inference books the replay\'s name and shiny flag', () => {
       expect(infoOf(log, 'p1', 'Clefable').nickname).toBe('Akeno【‿♥‿】');
       expect(infoOf(log, 'p2', 'Garchomp').nickname).toBe('Rias!');
       expect(infoOf(log, 'p2', 'Clefable').nickname).toBe('Rias?');
-      // The same text on the other side is no clash: a name is read against its own side's bodies.
       expect(infoOf(log, 'p1', 'Garchomp').nickname).toBe('Rias!');
     }
   });
@@ -137,7 +130,6 @@ describe('the built sets carry the booked name and shiny flag', () => {
     const paste = 'Pikachu Prime (Pikachu) (F) @ Light Ball\nAbility: Static\nLevel: 50\n- Tackle\n\nLandorus Hero (Landorus-Therian) (M)\nAbility: Intimidate\nLevel: 50\n- Tackle';
     const { p1Team } = buildTeamsFromReplay(log, { userTeamText: paste });
     expect(p1Team.find(mon => mon.species === 'Pikachu')?.name).toBe('Mouse');
-    // The body the replay never showed keeps the paste's own name.
     expect(p1Team.find(mon => mon.species === 'Landorus-Therian')?.name).toBe('Landorus Hero');
   });
 });
@@ -316,7 +308,6 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     const solved = solveReplaySpreads(log, contradictory('Garchomp', 'Gliscor', 'dragonclaw'), { speedOrders });
     const built = buildTeamsFromReplay(log, { inferredSpreads: solved });
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
-    // Forfeited to the pre-solve, not past it: the app's build is the pre-solve's build.
     expect(built).toEqual(preSolved);
   });
 
@@ -340,7 +331,6 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect(built).toEqual(preSolved);
   });
 
-  /** The scene of the carry tests: Gliscor moves before Garchomp, each hits the other once. */
   const scene = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
     '|poke|p1|Garchomp, M|', '|poke|p2|Gliscor, M|',
@@ -348,7 +338,6 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     '|move|p2a: Gliscor|Knock Off|p1a: Garchomp', '|-damage|p1a: Garchomp|80/100',
     '|move|p1a: Garchomp|Dragon Claw|p2a: Gliscor', '|-damage|p2a: Gliscor|60/100', '|turn|2',
   ].join('\n');
-  /** A usage spread that runs Garchomp at 0 Speed with half the EV budget open (252 Atk only). */
   const slowGarchomp: SmogonUsageStats = {
     format: 'gen9ou', month: 'test', source: 'test',
     pokemon: {
@@ -363,9 +352,6 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
   };
 
   test('a mon the full solve keeps is still solved by the full solve', () => {
-    // Clean damage lines do not forfeit: the carry must not overwrite the full solve's answer.
-    // The usage guess already runs Garchomp (240) under Gliscor (289), so no order needs repair; the pre-solve tops the open half
-    // of the budget up into HP, the full solve's damage lines take it back.
     const log = scene;
     const { observations, speedOrders } = parseReplayLogWithObservations(log);
     const doubled = [...observations, ...observations];
@@ -376,8 +362,6 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     const built = buildTeamsFromReplay(log, { inferredSpreads: solved, usageStats });
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(built.p1Team, 'Garchomp')));
     expect(speedOf(find(oneStage.p2Team, 'Gliscor'))).toBeGreaterThanOrEqual(speedOf(find(oneStage.p1Team, 'Garchomp')));
-    // Garchomp is the mon an overwriting carry would destroy: the full solve fits its damage with less HP than the pre-solve topped
-    // the freed Speed up into (only the HP the damage lines allow, not 0).
     expect(built).toEqual(oneStage);
     expect(built).not.toEqual(preSolved);
     expect(find(built.p1Team, 'Garchomp').evs.hp).toBeLessThan(find(preSolved.p1Team, 'Garchomp').evs.hp);
@@ -385,9 +369,7 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
   });
 
   test('the two chains agree on the settled Garchomp: HP 60 both ways', () => {
-    // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The settling frees only 60 Speed EVs
-    // (Garchomp 288); the pre-solve tops them up into HP, and the full solve keeps that HP because the damage lines fit it as well
-    // as none, so both chains land on HP 60.
+    // The settling frees only 60 Speed EVs (Garchomp 288); both chains land on HP 60.
     const { observations, speedOrders } = parseReplayLogWithObservations(scene);
     const doubled = [...observations, ...observations];
     const built = buildTeamsFromReplay(scene, { inferredSpreads: solveReplaySpreads(scene, doubled, { speedOrders }) });

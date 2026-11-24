@@ -5,23 +5,11 @@ import type { RulesDex } from '../src/rules-dex';
 import { RULE_VIEWS as VIEWS } from './screen-scenes';
 import { battleIn, mon, type SimView } from './sim-views';
 
-/**
- * The Dex reader `conditionTurns` is held to the simulator in every rule set the corpus plays (Generations 1 to 9 and the Champions
- * mod, singles; Generations 3 to 9 and the Champions mod, doubles). The reader asks each condition's `durationCallback` for the
- * turns of a source with no item and of a source holding each item, because the log never shows the item. Two sweeps:
- *  - S1, the turns: for every condition a move sets and every item, the reader's turns equal what a real Pokémon holding the item
- *    gets on a real battle; a condition with no callback gives null.
- *  - S2, the ignoring holders: a Light Clay holder's screen lasts its plain turns when, and only when, an ability, a volatile or a
- *    field condition makes the simulator ignore the item; the causes found equal `ITEM_BLOCKERS`, so a fourth cause fails here.
- * The reader takes no battle (a stand-in source), so a guard checks that it leaves a live battle untouched.
- */
-
 const asRulesDex = (view: SimView): RulesDex => view.dex as unknown as RulesDex;
 
 type DexMove = ReturnType<RulesDex['moves']['get']>;
 type Callback = (this: unknown, ...args: unknown[]) => unknown;
 
-/** The moves of a rule set that set a condition: [condition id, side or field, the move]. */
 function conditionSetters(view: SimView): { id: string; side: boolean; move: DexMove }[] {
   const dex = asRulesDex(view);
   const found = new Map<string, { id: string; side: boolean; move: DexMove }>();
@@ -35,7 +23,6 @@ function conditionSetters(view: SimView): { id: string; side: boolean; move: Dex
   return [...found.values()];
 }
 
-/** The board: Snorlax (side p1) beside a Blissey in doubles, a Vaporeon (side p2) beside a second one. */
 function board(view: SimView): { battle: Battle; setter: Pokemon; target: Pokemon } {
   const p1 = [mon('Snorlax', ['splash']), ...(view.doubles ? [mon('Blissey', ['splash'])] : [])];
   const p2 = [mon('Vaporeon', ['splash']), ...(view.doubles ? [mon('Vaporeon', ['splash'])] : [])];
@@ -56,7 +43,7 @@ describe.each(VIEWS)('S1, the turns of a condition: $name', view => {
   test('a condition with no durationCallback gives null', () => {
     const none = setters.filter(entry => typeof asked(entry.id) !== 'function');
     for (const entry of none) expect(conditionTurns(dex, entry.id), entry.id).toBeNull();
-    // Generation 1 builds its screens as volatiles and has no side condition or field move
+    // Generation 1 builds its screens as volatiles: no side condition or field move sets one.
     if (dex.gen >= 2) expect(setters.length).toBeGreaterThan(0);
   });
 
@@ -80,7 +67,6 @@ describe.each(VIEWS)('S1, the turns of a condition: $name', view => {
         if (turns!.byItem.has(item.id)) changed++;
       }
       hold(battle, setter, '');
-      // an item the table names changes the turns, and one it lacks leaves them alone
       for (const [item, count] of turns!.byItem) expect(count, `${entry.id} ${item}`).not.toBe(turns!.plain);
     }
     if (dex.gen >= 4) expect(changed).toBeGreaterThan(0);
@@ -111,7 +97,6 @@ describe.each(VIEWS)('S1, the turns of a condition: $name', view => {
 describe.each(VIEWS.filter(view => view.dex.gen >= 4))('S2, the holders that ignore the item: $name', view => {
   const dex = asRulesDex(view);
 
-  /** The causes found: every ability, and every condition as a volatile of the holder and as a field condition. */
   function causes(): string[] {
     const { battle, setter, target } = board(view);
     const move = dex.moves.all().find(entry => entry.exists && entry.gen <= dex.gen && entry.sideCondition === 'reflect')!;

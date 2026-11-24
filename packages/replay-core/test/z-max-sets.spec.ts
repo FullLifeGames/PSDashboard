@@ -9,18 +9,12 @@ import type { SmogonUsageStats } from '../src/smogon/stats-types';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * The set side of Z-moves and Max moves: how the open slot of a hidden base move settles (team/open-moves.ts) in the choice of a
- * published set, in the build, in the panel's enrichment and next to a team sheet. The log scenes come from @pkmn/sim, as in z-max-moves.spec.ts.
- */
-
 const mon = (species: string, item: string, ability: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet => ({
   name: species, species, item, ability, moves, nature: 'Serious', gender: '', level: 100,
   evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, ...extra,
 });
 const SKARMORY = mon('Skarmory', 'Leftovers', 'Sturdy', ['Splash']);
 
-/** The public log of a Gen 7 singles game in which p2's body clicks `clicks` and p1 splashes. */
 function zGame(tested: PokemonSet, clicks: string[]): string {
   const battle = new Battle({
     formatid: toID('gen7customgame') as never, seed: [1, 2, 3, 4],
@@ -60,7 +54,6 @@ describe('which published set a Z-move or Max move points to', () => {
   const SET_A = published('A', 'Rocky Helmet', ['Earthquake', 'Stealth Rock', 'Toxic', 'Roar']);
   const SET_B = published('B', 'Life Orb', ['Swords Dance', 'Outrage', 'Earthquake', 'Fire Fang']);
   const sets: SmogonSetAssumptions = { format: 'gen7ou', source: 'test', pokemon: { garchomp: { ...SET_A, alternatives: [SET_B] } } };
-  // Set A's moves are the better used: with nothing else to go on, A is the pick.
   const usageForA = usage('Garchomp', ['Earthquake', 'Stealth Rock', 'Toxic', 'Roar', 'Swords Dance', 'Outrage', 'Fire Fang']);
 
   test('control: a plain Earthquake fits both sets, and the better used set A wins', () => {
@@ -156,7 +149,6 @@ describe('open moves against the Dex', () => {
   test('a pin that pushes out the move filling another slot does not leave that slot open', () => {
     const pool = ['Earthquake', 'Rock Slide', 'Fire Blast', 'Brave Bird', 'Roost', 'Toxic'].map(name => ({ name, guessed: true }));
     const assemble = (candidates: typeof pool) => candidates.slice(0, 4);
-    // The four first guesses fill the Flying slot (Brave Bird, fourth) and not the status slot, which is asked first.
     const open = [{ kind: 'status' }, { kind: 'attack', type: 'Flying' }] as const;
     expect(settleOpenMoves(rulesDex(9), pool, open, assemble).map(entry => entry.name)).toEqual(['Roost', 'Brave Bird', 'Earthquake', 'Rock Slide']);
   });

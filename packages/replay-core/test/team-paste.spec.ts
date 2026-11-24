@@ -91,7 +91,6 @@ describe('team paste pipeline', () => {
     expect(applied.pokemon[0].level).toBe(78);
   });
 
-  // The user's own paste is knowledge, a stand-in is a guess; the overlay turns the guess into the user's body.
   test('a pasted set that matches a stand-in takes the flag off: the body is the user body now', () => {
     const standIn: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[1], standIn: true };
     const other: OpponentTeamInfo['pokemon'][number] = { ...baseInfo.pokemon[0], species: 'Skarmory', standIn: true };
@@ -193,7 +192,6 @@ describe('teamInfoOfSets (a new game\'s teams)', () => {
     expect(first.nature).toEqual({ value: 'Impish', source: 'manual' });
     expect(first.evs).toEqual({ value: { hp: 252, atk: 4, def: 252, spa: 0, spd: 0, spe: 0 }, source: 'manual' });
     expect(first.ivs?.source).toBe('manual');
-    // A second Garchomp keeps its own set: the species-keyed overlay would have given it the first one's.
     expect(second.moves).toEqual([{ name: 'Tackle', source: 'manual' }]);
     expect(second.ability.source).toBe('unknown');
     expect(second.level).toBe(100);

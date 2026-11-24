@@ -5,18 +5,8 @@ import * as championsMod from '@pkmn/mods/champions';
 import { CHAMPIONS_MOD, dexOf, generationsFor, inferOpponentTeam } from '../src/index';
 import type { GameRules } from '../src/index';
 
-/**
- * A body under Transform uses the moves of its target, so a move line of the copy shows that the TARGET knows the move.
- * @pkmn/client books such a move to the target (`rememberMove` recurses into `volatiles.transform.pokemon`, and again for a copy of
- * a copy); the inference must too, or the built target lacks a move the game showed and the rebuilt copy cannot play it.
- *
- * The sweep reads the Dex for every entry that transforms a body (a move, an ability or an item whose handlers call `transformInto`)
- * and plays each of them on @pkmn/sim in every generation the corpus plays (1 to 9) and the Champions mod, singles and, from
- * Generation 3, doubles. The copy uses the target's moves; the inference must book each to the target and nothing to the copy, and
- * its booking must equal the client's non-virtual move slots of the target. Doubles plays both foes as the target and an ally as the
- * target (a same-side Transform), and singles a copy of a copy where the generation lets one transform a transformed body. No
- * species or move name stands in the code that is under test.
- */
+// @pkmn/client books a copy's move to the target (`rememberMove` recurses into `volatiles.transform.pokemon`);
+// the inference must book it the same way.
 Dex.mod(CHAMPIONS_MOD, championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -70,7 +60,6 @@ function fillersOf(dex: Dexish, scene: Scene, count: number): string[] {
     .slice(0, count).map(species => species.name);
 }
 
-/** The target's own move and three moves that only the copy uses (no damage, no target: they play in every format). */
 const OWN = 'splash';
 const COPIED = ['harden', 'withdraw', 'defensecurl'];
 
@@ -78,11 +67,6 @@ interface Played { log: string; battle: Battle; unplayable: string[]; label: str
 
 type Aim = '1' | '2' | '-2';
 
-/**
- * Plays one scene. A move transformer uses Transform in turn 1 and the copy uses the three copied moves in turns 2 to 4; an
- * ability transformer copies at the lead and the copy uses them in turns 1 to 3. Both foes hold the full set in doubles (and the
- * ally the same), so the log names the body that was copied; the other bodies must book nothing from the copy.
- */
 function play(scene: Scene, kind: Kind, entry: Transformer, aim: Aim): Played {
   const dex = dexOf(scene.rules);
   const fillers = fillersOf(dex, scene, 8);
@@ -106,7 +90,7 @@ function play(scene: Scene, kind: Kind, entry: Transformer, aim: Aim): Played {
     choose('p2', Array.from({ length: width }, (_, slot) => `move ${slotOf('p2', slot, OWN)}`));
   };
   if (entry.kind === 'move') turn('transform', OWN);
-  // The copy keeps the Transform move's own slot order only in the generations that copy slots in order: ask the body by id.
+  // The copy keeps the Transform move's own slot order only in generations that copy slots in order: ask by id.
   for (const move of COPIED) turn(move, OWN);
   return { log: publicLog(battle), battle, unplayable, label: `${kind} ${entry.kind} ${entry.id} aim ${aim}` };
 }
@@ -114,7 +98,7 @@ function play(scene: Scene, kind: Kind, entry: Transformer, aim: Aim): Played {
 function clientOf(log: string): ClientBattle {
   const tier = log.split('\n').find(line => line.startsWith('|tier|'))?.split('|')[2] ?? '';
   const client = new ClientBattle(generationsFor(tier));
-  for (const line of log.split('\n')) if (line.trim()) { try { client.add(line); } catch { /* a line the client cannot apply, as the inference skips it */ } }
+  for (const line of log.split('\n')) if (line.trim()) { try { client.add(line); } catch { /* skipped */ } }
   return client;
 }
 
@@ -131,11 +115,6 @@ function bookings(log: string): Booking[] {
 const identOfName = (ident: string) => ident.replace(/^p[1-4][a-d]?: /, '');
 const sideOfIdent = (ident: string) => ident.slice(0, 2);
 
-/**
- * The checks of one played scene. `target` is the body a `-transform` line names; the copy used COPIED after it. The inference of the
- * target's side books them on the target and on no other body; no inference books them on the copy; and the booking of the target is the
- * client's non-virtual move slots of it.
- */
 function check(played: Played): string[] {
   const problems: string[] = [];
   const lines = played.log.split('\n');
@@ -152,13 +131,11 @@ function check(played: Played): string[] {
     if (!copied.length) problems.push(`${played.label}: the copy used none of the copied moves`);
     for (const move of copied) {
       if (!targetBooked?.booked.includes(move)) problems.push(`${played.label}: ${target} lacks ${move} that its copy ${copy} used`);
-      // No other body of the target's side, and not the copy itself, books a move of the target's.
       for (const entry of book) {
         if (entry.species !== target && entry.booked.includes(move) && entry.species === copy) problems.push(`${played.label}: the copy ${copy} books ${move} on ${entry.side}`);
         if (entry.species !== target && entry.species !== copy && entry.booked.includes(move)) problems.push(`${played.label}: ${entry.species} books ${move} (copied from ${target})`);
       }
     }
-    // The client's own booking of the target, non-virtual slots only.
     const mon = clientBody(client, sideOfIdent(targetIdent), target);
     const clientMoves = (mon?.moveSlots ?? []).filter(slot => !slot.virtual).map(slot => toID(slot.name)).sort();
     if (targetBooked && JSON.stringify(targetBooked.booked) !== JSON.stringify(clientMoves)) {
@@ -173,7 +150,6 @@ describe.each(SCENES)('$label', scene => {
   const transformers = transformersOf(dex, scene);
 
   test('the Dex lists what transforms a body in this generation', () => {
-    // The move in every generation, the ability from Generation 5 (the simulator's own transformation, read from the handlers).
     expect(transformers.map(entry => `${entry.kind}:${entry.id}`).sort()).toEqual(scene.gen >= 5 ? ['ability:imposter', 'move:transform'] : ['move:transform']);
   });
 
@@ -182,7 +158,6 @@ describe.each(SCENES)('$label', scene => {
       const problems: string[] = [];
       let transforming = 0;
       for (const entry of transformers) {
-        // Doubles: the foe in slot 1, the foe in slot 2 and the partner (a move aims; an ability copies the foe across by itself).
         for (const aim of (kind === 'doubles' && entry.kind === 'move' ? ['1', '2', '-2'] : ['1']) as Aim[]) {
           const played = play(scene, kind, entry, aim);
           problems.push(...played.unplayable.map(choice => `${played.label}: the simulator refused ${choice}`));
@@ -197,10 +172,7 @@ describe.each(SCENES)('$label', scene => {
   }
 });
 
-/**
- * A copy of a copy: Generation 1 lets a body transform into a transformed body; from Generation 2 the simulator fails the move. The
- * client books the copy's move through both bodies to the original, and so must the inference.
- */
+// Generation 1 lets a body transform into a transformed body; from Generation 2 the simulator fails the move.
 describe.each(SCENES)('$label', scene => {
   const dex = dexOf(scene.rules);
   const entry = transformersOf(dex, scene).find(candidate => candidate.kind === 'move');
@@ -226,7 +198,6 @@ describe.each(SCENES)('$label', scene => {
     go(`move ${slot(0, COPIED[1])}`, `move ${slot(1, OWN)}`);
     const log = publicLog(battle);
     const transforms = log.split('\n').filter(line => line.startsWith('|-transform|')).length;
-    // The simulator decides whether a transformed body can be copied; no generation name stands here.
     expect(transforms === 2, 'a copy of a copy exists in the simulator').toBe(scene.gen === 1);
     if (transforms < 2) return;
     expect(refused).toEqual([]);
@@ -236,9 +207,8 @@ describe.each(SCENES)('$label', scene => {
     expect(copyOfCopy?.booked, 'the second copy books only its own moves').toEqual([toID(entry!.id)].sort());
     const client = clientOf(log);
     const mon = clientBody(client, 'p2', fillers[3]);
-    // The client agrees but for one slot it invents: the second copy takes over the first copy's own Transform slot as a real slot
-    // (`-transform` calls `rememberMove` after it added the volatile, so the move is handed on to the original, which never knew it).
-    // The simulator's own body is the oracle for that slot: the original has no such move.
+    // The client agrees but for one slot it invents: `-transform` calls `rememberMove` after it added the volatile,
+    // so the second copy's own Transform slot reaches the original, which never knew it.
     const known = battle.sides[1].pokemon.find(mon => mon.baseSpecies.name === fillers[3])!.baseMoveSlots.map(move => move.id);
     expect(original?.booked.every(move => known.includes(move)), 'the original books only moves it knows').toBe(true);
     expect(original?.booked).toEqual((mon?.moveSlots ?? []).filter(move => !move.virtual && toID(move.name) !== entry!.id).map(move => toID(move.name)).sort());

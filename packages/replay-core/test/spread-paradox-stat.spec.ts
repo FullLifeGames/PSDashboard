@@ -13,13 +13,8 @@ import {
   type Kind, type Scene, type SceneSpec,
 } from './paradox-scenes';
 
-/**
- * Protosynthesis and Quark Drive raise the best stat, and the activation line names it. The simulator picks it with
- * `getBestStat(false, true)`: the stored stats with their stages (no item or ability modifier), the first of the stats in the game's
- * order on a tie. A spread whose best stat is another contradicts the log, so the solver prices that as it prices a move order the
- * body breaks, and it hands the calculator the named stat so the damage carries the 1.3 boost. The oracle is the simulator: its own
- * `getBestStat` for the rule, real Gen 9 singles and doubles battles for the hits.
- */
+// `getBestStat(false, true)` takes the stored stats with their stages, no item or ability modifier,
+// and the first of the stats in the game's order on a tie.
 
 const STATS = Dex.stats.ids().filter(stat => stat !== 'hp');
 
@@ -51,7 +46,6 @@ describe('the stat the log names is the simulator\'s rule', () => {
   test('200 random spreads, stage sets and ties agree with Pokemon.getBestStat', () => {
     const next = stream(7);
     for (let round = 0; round < 200; round++) {
-      // Few distinct values, so ties and near-ties after the stages are common.
       const stats = Object.fromEntries(STATS.map(stat => [stat, 100 + next(4) * 50 + next(3)]));
       const stages = Object.fromEntries(STATS.map(stat => [stat, next(3) === 0 ? next(13) - 6 : 0]));
       expect(boostedStatOf(stats, stages), JSON.stringify({ stats, stages })).toBe(simBest(stats, stages));
@@ -94,9 +88,7 @@ for (const kind of KINDS) {
         const key = keyOf('p1', 'Roaring Moon');
         const played = spreadFor(ctx, 'p1', 'Roaring Moon');
         expect(paradoxError(ctx, key, played)).toBe(0);
-        // Read at the hit (Attack +2) the played body would look wrong: that is the reading the simulator does not make.
         expect(boostedStatOf(statsOf(ctx, played), observations[0].attackerBoosts)).toBe('atk');
-        // A body whose Attack is the best stat at the activation contradicts the line that names Speed.
         expect(paradoxError(ctx, key, body('Adamant', { atk: 252 }))).toBeGreaterThan(0);
         expect(boostedStatOf(statsOf(ctx, body('Adamant', { atk: 252 })), observations[0].attackerParadox!.stages)).toBe('atk');
       }
@@ -109,7 +101,6 @@ for (const kind of KINDS) {
         const played = spreadFor(ctx, 'p1', 'Roaring Moon');
         expect(paradoxError(ctx, key, played)).toBe(0);
         expect(boostedStatOf(statsOf(ctx, played), {})).toBe('atk');
-        // 252 Attack with an Adamant nature stays ahead of Speed after the drop.
         expect(paradoxError(ctx, key, body('Adamant', { atk: 252 }))).toBeGreaterThan(0);
       }
     });
@@ -141,7 +132,6 @@ for (const kind of KINDS) {
           observations.forEach((obs, index) => {
             expect(contains(obs, hits[index])).toBe(true);
           });
-          // The scenes whose line names the offense stat lose the 1.3 without the reading.
           if (spec === ATTACK_BOOSTED || spec === QUARK_DRIVE) {
             const bare = { ...observations[0], attackerParadox: undefined };
             expect(contains(bare, hits[0])).toBe(false);

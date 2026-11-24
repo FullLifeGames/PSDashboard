@@ -4,12 +4,8 @@ import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex, simFormats } from '../src/rules-dex';
 import { teamSizes } from '../src/replay-format';
 
-/**
- * `|teamsize|` is a side's real body count. The simulator prints it at the start action for every side, after the preview if there is
- * one (battle.js: `this.add('teamsize', side.id, side.pokemon.length)`): the brought count with a preview (VGC 4), the whole team
- * without. One reader turns the line into numbers, and the stand-in step, the near sentence's phase and the inference's bench test
- * all read it there. The sweep plays every format of the Dex and the Champions mod that has a fixed team.
- */
+// `|teamsize|` is written by battle.js at the start action (`this.add('teamsize', ...)`): the brought count with a
+// preview, the whole team without.
 registerChampionsDex(championsMod as unknown as Parameters<typeof registerChampionsDex>[0], championsMod.Formats as unknown as Parameters<typeof registerChampionsDex>[1]);
 
 function sampleTeam(formatId: string): PokemonSet[] {

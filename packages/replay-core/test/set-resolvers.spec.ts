@@ -14,11 +14,6 @@ import { readFileSync } from 'node:fs';
 import type { PokemonSet } from '@pkmn/sim';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
 
-/**
- * Published IVs in the build: the chosen Smogon set's IVs reach the built set, a set without them keeps 31, user-edited IVs and the
- * speed solver's IVs come first, and a typeless Hidden Power still takes its type from the evidence or usage.
- */
-
 const all31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const usage = (species: string, moves: [string, number][]): PokemonUsageStats => ({
   species, rawCount: 1000, abilities: [], spreads: [], items: [],

@@ -3,16 +3,8 @@ import { SCREENS, standingScreens } from '../src/dex-facts/index';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * The screens are one constant (`SCREEN_FLAGS` in dex-facts/screens.ts, `SCREENS` its keys), because the Dex cannot say them: the
- * handler rule (`onAnyModifyDamage`) finds them only from Generation 5, and Generations 2 to 4 cut the damage inside the stat or
- * damage calculation. In every view the corpus plays, the damage of a physical (Tackle) and a special (Thunderbolt) hit against a
- * Snorlax is asked of the simulator with and without each side condition a move of the view sets (crits off, same dice): the
- * conditions that cut it are the list (Reflect physical, Light Screen special, Aurora Veil both, from Generation 7); in doubles the
- * cut is the same condition at a different fraction. Generation 1 builds Reflect and Light Screen as volatiles, so a read of
- * `side.sideConditions` never sees them: `standingScreens(side)` reads the side conditions and the volatiles of the actives, and the
- * log parser books the screen on a hit in every view.
- */
+// SCREEN_FLAGS is a constant: the handler rule (`onAnyModifyDamage`) finds screens only from Generation 5;
+// Gens 2 to 4 cut inside the damage calculation, Gen 1 builds them as volatiles that `sideConditions` never shows.
 
 const HITS = [{ category: 'Physical', move: 'tackle', user: 'Machamp' }, { category: 'Special', move: 'thunderbolt', user: 'Alakazam' }];
 
@@ -88,8 +80,8 @@ describe('SCREENS is held to the simulator', () => {
       for (const [id, hit] of [['reflect', HITS[0]], ['lightscreen', HITS[1]]] as const) {
         if (!isReal(view, id)) continue;
         const battle = battleIn(view, [mon(hit.user, [hit.move, 'splash']), mon('Blissey', ['splash']), mon('Blissey', ['splash'])], [mon('Blissey', [id, 'splash']), mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
-        battle.choose('p1', view.doubles ? 'move 2, move 1' : 'move 2'); battle.choose('p2', view.doubles ? 'move 1, move 1' : 'move 1'); // the screen goes up
-        battle.choose('p1', view.doubles ? 'move 1 1, move 1' : 'move 1'); battle.choose('p2', view.doubles ? 'move 2, move 1' : 'move 2'); // the hit
+        battle.choose('p1', view.doubles ? 'move 2, move 1' : 'move 2'); battle.choose('p2', view.doubles ? 'move 1, move 1' : 'move 1');
+        battle.choose('p1', view.doubles ? 'move 1 1, move 1' : 'move 1'); battle.choose('p2', view.doubles ? 'move 2, move 1' : 'move 2');
         const log = battle.log.filter((line, index) => !line.startsWith('|split|') && !battle.log[index - 1]?.startsWith('|split|'));
         const booked = parseReplayLogWithObservations([...log, '|win|Alpha'].join('\n')).observations.filter(observation => observation.moveId === hit.move);
         expect(booked.length, `${id}: a hit was observed`).toBeGreaterThan(0);

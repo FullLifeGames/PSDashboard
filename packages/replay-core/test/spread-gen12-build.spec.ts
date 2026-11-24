@@ -15,12 +15,7 @@ vi.mock('../src/spread-inference', async importOriginal => {
   return { ...actual, inferSpreads: vi.fn(actual.inferSpreads) };
 });
 
-/**
- * Gens 1 and 2 build at the server start: the server fills a set without EVs with 252 in every stat there (no EV limit), so the
- * default prior is the server's start where the budget has one, and the build's format hint ('gen1', not a format of the Dex) is read
- * through the generation of the format. The oracle is the simulator: a set validated by the server (which fills the EVs) and played
- * in a real battle. Gens 1 and 2 have no doubles format, so these tests are singles.
- */
+// The server fills a set without EVs with 252 in every stat in Gens 1 and 2 (no EV limit); Gens 3 and later start at 0.
 const GENS = [{ num: 1, formatid: 'gen1customgame' }, { num: 2, formatid: 'gen2customgame' }];
 const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const STATS = ['atk', 'def', 'spa', 'spd', 'spe'] as const;
@@ -30,7 +25,6 @@ const setOf = ({ species, moves, evs }: Sheet): PokemonSet => (
   { name: species, species, item: '', ability: '', moves, nature: '', evs, ivs: { ...ALL_31 }, level: 100, gender: '' } as unknown as PokemonSet
 );
 
-/** The set as the server plays it: validated (fills the EVs of a set without any), then a real battle's stored stats. */
 function serverBody(formatid: string, set: PokemonSet) {
   const played = JSON.parse(JSON.stringify(set)) as PokemonSet;
   new TeamValidator(formatid).validateSet(played, {});
@@ -43,7 +37,6 @@ function serverBody(formatid: string, set: PokemonSet) {
 const STARMIE = { species: 'Starmie', moves: ['Psychic'] };
 const SNORLAX = { species: 'Snorlax', moves: ['Body Slam'] };
 
-/** The percent of Snorlax's HP a Psychic from Starmie takes at the server's start (the middle roll of the calculator). */
 function hitPercent(gen: number): number {
   const calcGen = calcGenerationFor(gen);
   const make = (species: string) => buildCalcPokemon(calcGen, species, { level: 100, evs: { hp: 252, atk: 252, def: 252, spa: 252, spd: 252, spe: 252 } });
@@ -52,7 +45,6 @@ function hitPercent(gen: number): number {
   return Math.round(100 * rolls[Math.floor(rolls.length / 2)] / defender.maxHP());
 }
 
-/** A custom game replay of Starmie against Snorlax with `hits` damage lines of `percent` each: no Smogon data, nothing but the log. */
 const logOf = (gen: number, hits: number, percent = 20) => [
   '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|1', '|teamsize|p2|1', `|gen|${gen}`, `|tier|[Gen ${gen}] Custom Game`, '|start',
   '|switch|p1a: Star|Starmie|100/100', '|switch|p2a: Snor|Snorlax|100/100', '|turn|1',
@@ -76,7 +68,6 @@ for (const { num, formatid } of GENS) {
       build(logOf(num, 1));
       expect(solver).toHaveBeenCalled();
       const [, sets, hint] = solver.mock.calls[0];
-      // The build names the generation, not a format of the Dex: the budget has to read it from there.
       expect(hint).toBe(`gen${num}`);
       expect(sets.p1.map(set => set.species)).toEqual(['Starmie']);
       expect(sets.p1[0].evs).toEqual(server(STARMIE).evs);
@@ -100,7 +91,6 @@ for (const { num, formatid } of GENS) {
         const body = calcPokemon(ctx, side, sheet.species, spreadFor(ctx, side, sheet.species));
         expect(body.maxHP(), `${sheet.species} HP`).toBe(oracle.maxHp);
         for (const stat of STATS) expect(body.stats[stat], `${sheet.species} ${stat}`).toBe(oracle.stats[stat]);
-        // The set as built plays the body the server plays for a set without EVs.
         const played = serverBody(formatid, side === 'p1' ? built.p1Team[0] : built.p2Team[0]);
         expect(played.maxHp, `${sheet.species} played HP`).toBe(oracle.maxHp);
         expect(played.stats, `${sheet.species} played stats`).toEqual(oracle.stats);
@@ -108,14 +98,12 @@ for (const { num, formatid } of GENS) {
     });
 
     test('three hits of the damage the server body deals solve to the server start again: the prior explains them', () => {
-      // 20 % per hit would be a weaker Starmie or a bulkier Snorlax than the server plays; the hits the server body deals are the prior's.
       const built = build(logOf(num, 3, hitPercent(num)));
       expect(built.p1Team[0].evs).toEqual(server(STARMIE).evs);
       expect(built.p2Team[0].evs).toEqual(server(SNORLAX).evs);
     });
 
     test('a harder hit than the server body deals takes the HP EVs off the defender and nothing else: one Special, Speed kept', () => {
-      // 1.4 times the damage is a Snorlax with 0 HP EVs; the Special of both stays one stat, and no order measures Speed.
       const built = build(logOf(num, 2, Math.round(1.4 * hitPercent(num))));
       expect(built.p2Team[0].evs).toEqual({ ...server(SNORLAX).evs, hp: 0 });
       expect(built.p1Team[0].evs).toEqual(server(STARMIE).evs);
@@ -125,8 +113,6 @@ for (const { num, formatid } of GENS) {
 }
 
 describe('Gen 3 and later builds keep the species default prior', () => {
-  // A set without EVs starts at 0 there, and the build never hands one to the solver: the default stays the species-shaped one
-  // (the higher base offense and Speed at 252, 4 in Special Defense), and the budget stays the standard 508.
   for (const gen of [3, 4, 5, 6, 7, 8, 9]) {
     test(`Gen ${gen}: Starmie 0/0/0/252/4/252, Snorlax 252/252/0/0/4/0`, () => {
       const built = build(logOf(gen, 1));
@@ -138,8 +124,6 @@ describe('Gen 3 and later builds keep the species default prior', () => {
 });
 
 describe('the Gen 1 and 2 budget follows the generation of a format, checked against the simulator', () => {
-  // Every format of the Dex that plays its own teams: the generation the Dex gives it decides the one-Special rule; the start is
-  // what the server's validator gives a set without EVs, and Gen 3 and later keep a start of 0.
   const formats = Dex.formats.all().filter(format => /^gen\d/.test(format.id) && !format.team);
   const startOf = (formatid: string): number => {
     const probe = { name: '', species: 'Pikachu', moves: [] } as unknown as { evs?: PokemonEvs };

@@ -8,20 +8,13 @@ import { buildTeamsFromReplay } from '../src/team-builder';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
 
-/**
- * Pairwise coherence vetoes: guessed sets are assembled from independent marginals (top usage moves + top usage item), so the
- * combination is often incoherent (SD Cobalion carrying Body Press, Noivern with both Air Slash and Hurricane). Vetoes apply only
- * to GUESSED entries; revealed/manual knowledge is never second-guessed.
- */
-
 const guessed = (name: string): MoveCandidate => ({ name, guessed: true });
 const revealed = (name: string): MoveCandidate => ({ name, guessed: false });
 const names = (list: MoveCandidate[]) => list.map(entry => entry.name);
 
 describe('set-coherence vetoes', () => {
   test('a guessed attack the boost does not serve falls (SD Cobalion + Body Press)', () => {
-    // Body Press deals physical damage with the DEFENSE stat — Swords Dance
-    // does not serve it; the archetypes are disjoint.
+    // Body Press uses the Defense stat, so Swords Dance does not serve it.
     const kept = applyCoherenceVetoes([
       revealed('Swords Dance'), revealed('Iron Head'), guessed('Body Press'), guessed('Stone Edge'),
     ], { dex: rulesDex(9), itemId: '' });
@@ -36,9 +29,6 @@ describe('set-coherence vetoes', () => {
   });
 
   test('an orphaned defense-boost fill falls with its vetoed payoff (Iron Defense)', () => {
-    // GPL Cobalion: usage ranks Iron Defense high BECAUSE of Body Press.
-    // Row 1 already drops Body Press next to the revealed Swords Dance —
-    // the enabler must not stay behind without any Defense-scaling attack.
     const kept = applyCoherenceVetoes([
       revealed('Swords Dance'), revealed('Heavy Slam'),
       guessed('Body Press'), guessed('Iron Defense'), guessed('Thunder Wave'), guessed('Stone Edge'),
@@ -64,8 +54,6 @@ describe('set-coherence vetoes', () => {
     const kept = applyCoherenceVetoes([
       guessed('Nasty Plot'), guessed('Play Rough'), guessed('Knock Off'), guessed('U-turn'), guessed('Shadow Ball'),
     ], { dex: rulesDex(9), itemId: '' });
-    // Play Rough (90 BP physical) contradicts the special boost; Knock Off is
-    // sub-70-BP utility and U-turn is a pivot — both stay.
     expect(names(kept)).toEqual(['Nasty Plot', 'Knock Off', 'U-turn', 'Shadow Ball']);
   });
 
@@ -98,7 +86,6 @@ describe('set-coherence vetoes', () => {
   });
 
   test('revealed status moves survive a guessed choice item', () => {
-    // The guessed ITEM is the weaker knowledge — proof beats fills.
     const kept = applyCoherenceVetoes([
       revealed('Protect'), guessed('Draco Meteor'),
     ], { dex: rulesDex(9), itemId: 'choicescarf' });
@@ -119,8 +106,6 @@ describe('set-coherence vetoes', () => {
     ]);
   });
 
-  // Rows 1 and 2 must not throw whole movesets away: a Kyurem with Choice Specs kept only Icicle Spear, because a usage Dragon Dance
-  // that the Specs strike anyway still "served" Attack and vetoed every special move.
   const fromSet = (name: string): MoveCandidate => ({ name, guessed: true, fromSet: true });
 
   test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs)', () => {
@@ -163,7 +148,6 @@ describe('set-coherence vetoes', () => {
   });
 
   test('a revealed same-type pair is never vetoed, and the chosen set keeps its own pair', () => {
-    // A published set is read as published: row 2 spares the chosen set's moves.
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), fromSet('Stomping Tantrum'),
     ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake', 'Stomping Tantrum']);
@@ -173,8 +157,6 @@ describe('set-coherence vetoes', () => {
   });
 
   test('a boost from the usage tail serves nothing (Kingdra with Life Orb)', () => {
-    // The tail past the top ten usage moves only refills slots; a Dragon
-    // Dance at 0.1 % must not decide what the set's attacks scale with.
     const kept = applyCoherenceVetoes([
       revealed('Hydro Pump'), guessed('Draco Meteor'), guessed('Weather Ball'), guessed('Hurricane'),
       { name: 'Dragon Dance', guessed: true, tail: true },
@@ -188,8 +170,6 @@ describe('set-coherence vetoes', () => {
   });
 
   test('a boost later in the pool still vetoes an earlier off-stat guess', () => {
-    // Usage order can list the attack first; the veto scans the whole pool
-    // for boost context before deciding.
     const kept = applyCoherenceVetoes([
       guessed('Body Press'), revealed('Swords Dance'), guessed('Iron Head'),
     ], { dex: rulesDex(9), itemId: '' });
@@ -238,8 +218,6 @@ describe('coherent-set selection', () => {
     expect(picked).toBe(second);
   });
 
-  // Smogon publishes slots with alternatives; the build must read a slot as filled once one option is seen, and never trade a fixed
-  // move for a second option of a filled slot (648453 Tornadus-T).
   const slotted = (moves: (string | string[])[], item?: string): PokemonSetAssumption => ({
     species: 'Tornadus-Therian', sourceDetail: 't',
     moves: moves.map(slot => Array.isArray(slot)
@@ -279,7 +257,6 @@ describe('coherent-set selection', () => {
     const picked = selectCuratedSet([pex, spdef], evidence({ revealedMoves: ['toxic', 'knockoff', 'haze', 'recover'] }));
     expect(picked?.item?.value).toBe('Black Sludge');
     expect(values(picked)).toEqual(['Recover']);
-    // One Knock Off fills one slot: the other slot stays open and offers its other options.
     expect(values(selectCuratedSet([pex], evidence({ revealedMoves: ['knockoff'] }))))
       .toEqual(['Recover', 'Scald', 'Toxic', 'Poison Jab', 'Haze']);
   });
@@ -291,7 +268,6 @@ describe('coherent-set selection', () => {
 
   test('a revealed item counts toward the fit', () => {
     const boots = utility();
-    // Hurricane matches both sets; the revealed Boots break the tie by fit.
     expect(selectCuratedSet([specs(), boots], evidence({
       revealedMoves: ['hurricane'], revealedItem: 'heavydutyboots',
     }))).toBe(boots);
@@ -431,7 +407,6 @@ describe('set-provenance', () => {
     ].map(entry => [toId(entry.species), entry])),
   };
 
-  /** A Jirachi that only showed Iron Head (a second move would disprove the Choice lock): the published Choice Scarf set is the evidence's pick. */
   const jirachiLog = (doubles: boolean) => [
     '|player|p1|Alpha|', '|player|p2|Beta|', ...(doubles ? ['|gametype|doubles'] : []), '|gen|6', `|tier|[Gen 6] ${doubles ? 'Doubles OU' : 'OU'}`,
     '|poke|p1|Blissey, F|', '|poke|p1|Chansey, F|', '|poke|p2|Jirachi|', '|poke|p2|Skarmory, F|', '|start',

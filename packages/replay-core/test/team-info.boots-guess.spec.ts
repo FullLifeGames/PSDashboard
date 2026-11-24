@@ -31,12 +31,6 @@ import { judgeItemsByDamage } from '../src/team/item-damage';
 import { parsePastedTeam, type PastedSet } from '../src/team-paste';
 import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-text-sources';
 
-/**
- * The Heavy-Duty Boots guess: a Pokémon that enters on Stealth Rock without damage shows Boots only while no ability it may have
- * keeps the rock damage off. The inference asks the simulator, as the build does, so the panel shows no guess the build refuses, and
- * the guess cannot reach the build through the usage fallback or as the replacement after a rule-out. Logs come from @pkmn/sim.
- */
-
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false): string {
   const battle = new Battle({
     formatid: toID(doubles ? 'gen9doublesou' : 'gen9ou'), seed: '1,2,3,4',
@@ -77,7 +71,6 @@ const noSets: SmogonSetAssumptions = { format: 'test', source: 's', pokemon: {} 
 const clefable = (item = 'Life Orb', ability = 'Magic Guard') => mon('Clefable', item, ability, ['Moonblast', 'Calm Mind']);
 const rocks = () => mon('Skarmory', '', 'Sturdy', ['Stealth Rock', 'Roost', 'Brave Bird']);
 
-/** p1 lays Stealth Rock, p2 brings `entrant` in on it, then `entrant` attacks (or takes `hit` first). */
 function singlesEntry(entrant: PokemonSet, hit = 'roost'): string {
   return play([rocks()], [mon('Chansey', '', 'Natural Cure', ['Soft-Boiled']), entrant],
     [['move stealthrock', 'move softboiled'], ['move roost', 'switch 2'], [`move ${hit}`, 'move moonblast']]);
@@ -141,7 +134,6 @@ describe('no Boots guess while an ability the Pokémon may have keeps the rocks 
   });
 
   test('after a rule-out the guess is no replacement: the usage majority the log allows plays', () => {
-    // Brave Bird leaves the Clefable below full HP and no Leftovers heal shows: the Leftovers set gives way.
     const log = singlesEntry(clefable(), 'bravebird');
     expect(inferOpponentTeam(log, 'p2').pokemon.find(entry => entry.species === 'Clefable')!.ruledOut?.items).toContain('leftovers');
     const sets: SmogonSetAssumptions = {
@@ -173,11 +165,7 @@ describe('the guess stands where no possible ability keeps the rocks off (guards
   });
 });
 
-/**
- * Draft leagues play their games as custom games under the usual abilities, so a custom game keeps each species to its own
- * abilities. Noivern (Frisk, Infiltrator, Telepathy) can never have Magic Guard, and an entry on Stealth Rock without damage reads
- * as Heavy-Duty Boots there too (the GPL report's Noivern).
- */
+// A custom game keeps each species to its own abilities: Noivern (Frisk, Infiltrator, Telepathy) never has Magic Guard.
 describe('a custom game keeps each species to its own abilities', () => {
   test('a Noivern on Stealth Rock without damage reads as Heavy-Duty Boots in a custom game', () => {
     const noivern = mon('Noivern', 'Heavy-Duty Boots', 'Infiltrator', ['Draco Meteor', 'Hurricane']);
@@ -216,7 +204,6 @@ describe('the label of an applied spread', () => {
     expect(apply({ evs: changed, nature: 'Adamant', origin: 'damage' }).evs.sourceDetail).toBe(INFERRED_SPREAD_DETAIL);
     expect(apply({ evs: changed, nature: 'Adamant', origin: 'order' }).evs.sourceDetail).toBe(ORDER_SPREAD_DETAIL);
     expect(apply({ evs: changed, nature: 'Adamant', origin: 'hp' }).evs.sourceDetail).toBe(MEASURED_HP_SPREAD_DETAIL);
-    // An entry no evidence solved shows its numbers with the label of the guess they come from.
     const prior = apply({ evs: changed, nature: 'Adamant', origin: 'prior' });
     expect(prior.evs.value).toEqual(changed);
     expect(prior.evs.sourceDetail).toBe(SET_DETAIL);
@@ -253,7 +240,6 @@ describe('consumed-item', () => {
     format: 'test', month: 'm', source: 's', pokemon: Object.fromEntries(entries.map(entry => [toId(entry.species), entry])),
   });
 
-  /** 649664's shape: preview item markers, a Fighting move into Tyranitar, the berry eaten. */
   const singles = [
     '|player|p1|Alpha|', '|player|p2|Beta|', '|teamsize|p1|2', '|teamsize|p2|2', '|gen|6', '|tier|[Gen 6] OU',
     '|poke|p1|Tyranitar, F|item', '|poke|p1|Ferrothorn, F|item', '|poke|p2|Medicham, M|item', '|poke|p2|Latias, F|item', '|start',
@@ -296,7 +282,6 @@ const solved = (nature: string): Map<string, SpreadCandidate> => new Map([[
   'p1:quaquaval', { evs: { hp: 140, atk: 112, def: 0, spa: 0, spd: 4, spe: 252 }, nature, origin: 'order' } as SpreadCandidate,
 ]]);
 
-/** The reporter's edit: EVs typed in (manual), the nature the panel showed (guessed Jolly). */
 function editedInfo(evsSource: 'manual' | 'revealed', nature: ReturnType<typeof guessedField> | undefined): OpponentTeamInfo {
   const info = inferOpponentTeam(log, 'p1');
   const mon = info.pokemon.find(pokemon => pokemon.species === 'Quaquaval')!;
@@ -318,7 +303,7 @@ describe('a body with set EVs plays the nature its info shows', () => {
     const set = quaquaval(editedInfo(source, guessedField('Jolly', undefined, 'fits observed damage')), solved('Hardy'));
     expect(set.nature).toBe('Jolly');
     expect(set.evs).toEqual(userEvs);
-    // Cramorant plays Modest 252 Spe at 269: Quaquaval stays strictly ahead, as both turns of the log show.
+    // Cramorant plays Modest 252 Spe at 269: Quaquaval stays strictly ahead.
     expect(speedOf(set as never)).toBe(295);
   });
 
@@ -352,7 +337,6 @@ describe('logged-entry-stage', () => {
   });
   const GARCHOMP_SPREAD = sp({ atk: 252, spe: 252 });
   const garchomp = (move: string) => set('Garchomp', '', 'Rough Skin', [move], 'Jolly', GARCHOMP_SPREAD);
-  // No item: nothing heals Zamazenta between the hit and the end of the turn, so its HP loss is the hit.
   const zamazenta = () => set('Zamazenta', '', 'Dauntless Shield', ['Splash'], 'Jolly', {});
   const blissey = () => set('Blissey', '', 'Natural Cure', ['Protect'], 'Calm', { hp: 252 });
 
@@ -362,7 +346,6 @@ describe('logged-entry-stage', () => {
     maxHp: number;
   }
 
-  /** One turn: Garchomp (p1) hits Zamazenta (p2); null when the roll crit (the parser records no crit) or the simulator drew no hit. */
   function sceneOf(kind: Kind, seed: number): Scene | null {
     const doubles = kind === 'doubles';
     const battle = new Battle({
@@ -400,7 +383,6 @@ describe('logged-entry-stage', () => {
     return found[0];
   }
 
-  /** The calculator's rolls of the hit for a defender carrying the given boosts, built as the solver builds it. */
   function rollsOf(defenderBoosts: Record<string, number>, kind: Kind): number[] {
     const gen = calcGenerationFor(9);
     const attacker = buildCalcPokemon(gen, 'Garchomp', { level: 100, ability: 'Rough Skin', nature: 'Jolly', evs: GARCHOMP_SPREAD, boosts: {} });
@@ -428,7 +410,6 @@ describe('logged-entry-stage', () => {
         const scenes = scenesOf(kind, 6);
         expect(scenes.length).toBeGreaterThanOrEqual(4);
         for (const scene of scenes) {
-          // The boosts the solver (singles observation) and the judge (the logged hit, both game types) hand the calculator.
           const hit = inferOpponentTeam(scene.log, 'p1').pokemon.find(mon => mon.species === 'Garchomp')?.hits?.[0];
           expect(hit?.defender.boosts).toEqual({ def: 1 });
           expect(hitObservation(scene.log).defenderBoosts).toEqual(hit?.defender.boosts);
@@ -447,7 +428,6 @@ describe('logged-entry-stage', () => {
           const hit = attacker?.hits?.[0];
           expect(hit?.defender.boosts).toEqual({ def: 1 });
           expect(hit?.doubles).toBe(kind === 'doubles');
-          // Garchomp holds nothing: the hit is explained bare and by Leftovers, so the judge rules out none of the candidates.
           expect(judgeItemsByDamage(attacker!, ['Life Orb', 'Choice Band', 'Leftovers', 'Sitrus Berry'], teamsOf())).toEqual([]);
         }
       });
@@ -462,7 +442,6 @@ describe('logged-entry-stage', () => {
           const sets = { p1: [garchomp(MOVE[kind])], p2: [zamazenta()] };
           const ctx = buildSolveContext([obs], sets, FORMAT[kind], []);
           expect(observationError(ctx, obs, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBe(0);
-          // The same hit read as a defender with Def +2: what a double count makes of the played spread.
           const doubled: DamageObservation = { ...obs, defenderBoosts: { def: 2 } };
           expect(observationError(ctx, doubled, 'p2:zamazenta', { evs: sp({}), nature: 'Jolly' })).toBeGreaterThan(0);
         }
@@ -530,7 +509,6 @@ function legacyParsePastedTeam(teamText: string): PastedSet[] {
   return sets;
 }
 
-/** F1: the hand parser's bracket form of a typed Hidden Power, in the library's (the Dex's) spelling. */
 const dexSpelling = (sets: PastedSet[]): PastedSet[] =>
   sets.map(set => ({ ...set, moves: set.moves.map(move => move.replace(/^(Hidden Power) \[(\w+)\]$/, '$1 $2')) }));
 

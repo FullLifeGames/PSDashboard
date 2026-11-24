@@ -12,12 +12,6 @@ import { solveReplaySpreads } from '../src/team-builder';
 import { buildCalcPokemon } from '../src/calc-build';
 import { calcGenerationFor } from '../src/calc-gen';
 
-/**
- * What the solver reads from a move order. A race ran with the Choice Scarf the mover held that turn, and a Scarf that came or went
- * by Trick, Switcheroo or Knock Off is read at the races around it instead of voiding them (the build keeps the set's original
- * item, so a race won with a tricked Scarf is no claim on the set's Speed alone).
- */
-
 const header = (gametype: 'singles' | 'doubles') => [
   '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', `|gametype|${gametype}`,
   gametype === 'singles' ? '|tier|[Gen 9] OU' : '|tier|[Gen 9] Doubles OU', '|start',
@@ -98,9 +92,8 @@ describe('the solver reads a race with the Scarf the order names', () => {
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`a tricked Scarf carries its holder's race (2663108091 t25, ${formatid})`, () => {
-      // Kingambit (199, its set keeps the Air Balloon it started with) raced
-      // Dragonite (259) with Gholdengo's Scarf: 298 outruns it, Dragonite
-      // keeps its Speed. Read without the Scarf, the order slowed Dragonite to 196.
+      // Kingambit (199) raced Dragonite (259) with Gholdengo's Scarf: 298 outruns it, Dragonite keeps its Speed;
+      // read without the Scarf, the order slowed Dragonite to 196.
       const sets = { p1: [set('Dragonite', 'Heavy-Duty Boots')], p2: [set('Kingambit', 'Air Balloon')] };
       const order: SpeedOrderObservation = {
         firstSide: 'p2', firstSpecies: 'Kingambit', secondSide: 'p1', secondSpecies: 'Dragonite', turn: 25, firstScarf: true,
@@ -114,8 +107,7 @@ describe('the solver reads a race with the Scarf the order names', () => {
 });
 
 describe('a knock-out order says the victim fell before acting', () => {
-  // Its chosen move, and with it the move's priority, never shows: a Trick Room or a Roar the victim clicked would have moved last
-  // at any Speed (such an order is weak evidence).
+  // The victim's chosen move and its priority never show: a Trick Room or Roar it clicked would move last at any Speed.
   test('singles', () => {
     const log = [
       ...header('singles'), '|switch|p1a: A|Sylveon, F|100/100', '|switch|p2a: B|Cresselia, F|100/100', '|turn|1',
@@ -160,8 +152,6 @@ function hit(attacker: Mon, defender: Mon, moveName: string): DamageObservation 
 const total = (spread: PokemonEvs) => Object.values(spread).reduce((sum, value) => sum + value, 0);
 
 describe('a solve spends the budget the damage lines leave open', () => {
-  // The real Rillaboom runs a small offense and a little HP; the usage prior (Adamant 252 Atk / 252 Spe)
-  // hits too hard, so the fit takes the 0-offense rung, and the bulk rung beside it is uninvested.
   const truth: Mon = { species: 'Rillaboom', side: 'p1', nature: 'Hardy', evs: evs(100, 60, 0, 0, 0, 252) };
   const prior: Mon = { ...truth, nature: 'Adamant', evs: evs(0, 252, 4, 0, 0, 252) };
   const garchomp: Mon = { species: 'Garchomp', side: 'p2', nature: 'Jolly', evs: evs(0, 252, 4, 0, 0, 252) };
@@ -174,7 +164,6 @@ describe('a solve spends the budget the damage lines leave open', () => {
       const solved = inferSpreads(observations, sets, formatid)!.get('p1:rillaboom')!;
       expect(total(solved.evs)).toBeGreaterThan(440);
       expect(solved.evs.spe).toBe(252);
-      // The filled spread still fits both lines.
       const ctx = buildSolveContext(observations, sets, formatid, []);
       for (const obs of observations) expect(observationError(ctx, obs, 'p1:rillaboom', solved)).toBeLessThan(1e-12);
     });
@@ -182,9 +171,6 @@ describe('a solve spends the budget the damage lines leave open', () => {
 });
 
 describe('the open budget refills toward the prior first', () => {
-  // 573756 shape: the fit takes the physically defensive rung (252 HP / 252 Def) over the specially
-  // defensive prior (Calm 252 HP / 252 SpD), which zeroes SpD and leaves 4 EVs open. The lines cannot tell where those
-  // 4 go; the prior put its EVs in SpD, so they go there, not into an Attack no line asks for.
   const truth: Mon = { species: 'Toxapex', side: 'p1', nature: 'Bold', evs: evs(252, 0, 252, 0, 4, 0) };
   const prior: Mon = { ...truth, nature: 'Calm', evs: evs(252, 0, 4, 0, 252, 0) };
   const garchomp: Mon = { species: 'Garchomp', side: 'p2', nature: 'Jolly', evs: evs(0, 252, 4, 0, 0, 252) };
@@ -238,15 +224,10 @@ describe('spread-ladder-release', () => {
       p1: [asSet(clefable, ['Moonblast']), asSet(toxapex, ['Scald'])],
       p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],
     };
-    // Two clean Earthquakes from the real Adamant 252 Atk body; the top roll
-    // on Toxapex puts the line above what a Hardy body can deal.
     const observations = [hit(truth, clefable, 'Earthquake'), hit(truth, toxapex, 'Earthquake', false, 15)];
 
     for (const formatid of ['gen9ou', 'gen9doublesou']) {
       test(`a measured offense outlasts a kept Speed beside the log's HP (${formatid})`, () => {
-        // Prior Jolly 252 Atk / 252 Spe, the log says 420 HP (252 HP EVs), the order Garchomp-before-Clefable is satisfied by the prior
-        // (Speed kept), the Earthquakes measure 252 Atk. Dropping every offense rung the budget cannot express beside the kept Speed solves
-        // Jolly 252/0/0/0/4/252 (sim Earthquake 75% of the hit).
         const solved = inferSpreads(observations, sets, formatid, [beforeClefable], new Map(), maxHp420).get('p2:garchomp');
         expect(solved?.evs.hp).toBe(252);
         expect(solved?.evs.atk).toBe(252);
@@ -259,11 +240,7 @@ describe('spread-ladder-release', () => {
     test('without the HP reading the EVs stand, without the order the fit was already right', () => {
       const noHp = inferSpreads(observations, sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
       expect(noHp?.evs ?? offensive).toEqual(offensive);
-      // The kept Speed does not block the offense nature: holding Jolly here costs 10 % of the lines (the top roll on Toxapex lies above
-      // what a Jolly body deals); the order still holds at Adamant.
       expect(noHp?.nature).toBe('Adamant');
-      // Without the order nothing measures the prior's 252 Spe, so the log's HP and the offense claim do not take its room. A prior whose
-      // Speed is the truth's 4 still solves the bulky attacker.
       const noOrder = inferSpreads(observations, sets, 'gen9ou', [], new Map(), maxHp420).get('p2:garchomp');
       expect(noOrder?.evs.spe).toBe(252);
       expect(noOrder?.evs.hp).toBe(252);
@@ -274,19 +251,14 @@ describe('spread-ladder-release', () => {
     });
 
     test('a bulk claim beside an expressed offense claim does not release the kept Speed', () => {
-      // No HP reading: the offense rung fits beside the kept Speed (the prior itself), only the 252-HP claim riding with it is shaved.
-      // Speed is released for the offense claim's own room, never for a bulk claim (573756 t73: a bulk rung stripped the Speed).
       const defenderLines = [hit(clefable, truth, 'Moonblast'), hit(toxapex, truth, 'Scald')];
       const solved = inferSpreads([...observations, ...defenderLines], sets, 'gen9ou', [beforeClefable]).get('p2:garchomp');
       expect(solved?.evs.spe ?? 252).toBe(252);
-      // The Speed EVs stay (a bulk claim releases nothing); the offense nature of the seen lines opens.
       expect(solved?.nature).toBe('Adamant');
     });
 
     test('the released Speed must still satisfy the observed orders', () => {
-      // Garchomp moved before a Jolly 252 Spe Lucario (306): the prior's 333
-      // satisfies it, the released bodies (241 Hardy, 265 Jolly) do not. The
-      // order is proof, the damage only a bound: Speed stays, the offense goes.
+      // Lucario Jolly 252 Spe is 306: the prior's 333 outruns it, the released bodies (241 Hardy, 265 Jolly) do not.
       const lucario = mon('Lucario', 'p1', 'Jolly', { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 });
       const withLucario = { p1: [...sets.p1, asSet(lucario, ['Close Combat'])], p2: sets.p2 };
       const beforeLucario = { ...beforeClefable, secondSpecies: 'Lucario' };
@@ -307,9 +279,6 @@ describe('spread-ladder-release', () => {
     const maxRoll = (attacker: Side) => hit(attacker, clefable, 'Earthquake', true, 15).observedFraction;
 
     test('a knock-out the shaved offense cannot reach frees the kept Speed', () => {
-      // Knock-out-only offense (kept), the log's 420 HP (fixed), a satisfied order (Speed kept): 252 + 252 + 252 do not fit. The kept order
-      // must not shave the kept Atk to 4 (Jolly 252/4/0/0/0/252) with nothing measuring it: a knock-out that a 4-Atk body cannot deal picks
-      // the body that can (knock-out lines are lower bounds).
       expect(maxRoll(full)).toBeGreaterThan(maxRoll(shaved) + 0.04);
       const ko = (maxRoll(shaved) + 0.02 + maxRoll(full)) / 2;
       const observations = [
@@ -379,7 +348,6 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
 }
 
 describe('a mon the full solve discards keeps the pre-solve\'s origin', () => {
-  /** Two readings of one pairing no spread satisfies at once: the full solve forfeits both mons. */
   const contradictory = (attackerSpecies: string, defenderSpecies: string, moveId: string): DamageObservation[] =>
     [0.10, 0.60].map(observedFraction => ({
       attackerSpecies, defenderSpecies, attackerSide: 'p1' as const, moveId, observedFraction, lethal: false,
@@ -457,8 +425,6 @@ describe('spread-tempo-kept', () => {
 
     describe(`an unmeasured Speed keeps the prior (${world.name})`, () => {
       test('lines that ask for HP beside the offense leave the Speed alone', () => {
-        // Two clean Earthquakes (the top roll on Toxapex) and two Moonblasts from the bulky attacker: the fit wants
-        // 252 HP and 252 Atk, and the budget holds them only if the Speed the prior carries goes. No order measured it.
         const observations = [
           hit(world, bulkyAttacker, clefable, 'Earthquake'), hit(world, bulkyAttacker, toxapex, 'Earthquake', 15),
           hit(world, clefable, bulkyAttacker, 'Moonblast'), hit(world, toxapex, bulkyAttacker, 'Scald'),
@@ -479,12 +445,9 @@ describe('spread-tempo-kept', () => {
       });
 
       test('an order the prior breaks still measures the Speed', () => {
-        // Garchomp moved after a Jolly Lucario (the scene: the prior outspeeds it). The order refutes the Speed and a
-        // lower one repairs it, so the rule does not hold the prior here.
         expect(speedOf(world, prior)).toBeGreaterThan(speedOf(world, lucario));
         const observations = [hit(world, bulkyAttacker, clefable, 'Earthquake'), hit(world, clefable, bulkyAttacker, 'Moonblast')];
         const order = { firstSide: 'p1' as const, firstSpecies: 'Lucario', secondSide: 'p2' as const, secondSpecies: 'Garchomp', turn: 3 };
-        // Lucario's spread and item are known, so the Speed the order refutes can only be Garchomp's.
         const known = new Map([['p1:lucario', { itemKnown: true, scarfRuledOut: true, spreadKnown: true, spreads: [] }]]);
         const solved = inferSpreads(observations, sets, world.formatid, [order], known).get('p2:garchomp');
         expect(solved?.evs.spe ?? max).toBeLessThan(max);

@@ -12,12 +12,6 @@ import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * A guessed boost item (Choice Band, Choice Specs, Life Orb ...) the damage lines refute gives way: the usage guess hits 1.5 times
- * harder than the lines show at every spread (Kyurem Timid 0/0/0/0/0/252 with Choice Specs: Draco Meteor 28 % on Ting-Lu fits only
- * without the item). Every rung is scored with the item and without it; the lower fit error wins, the prior's distance breaks a tie,
- * and the item stays on a tie. A revealed, sheet or manual item never yields.
- */
 const WORLDS = [
   { name: 'gen9ou', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252 },
   { name: 'gen9doublesou', formatid: 'gen9doublesou', gen: calcGenerationFor(9), level: 100, max: 252 },
@@ -50,7 +44,7 @@ const knownItem = new Map([
 
 for (const world of WORLDS) {
   const { max } = world;
-  // Champions' generation 0 has no Choice Band and no Choice Specs (past items of the mod): Life Orb stands for the boost item there.
+  // Champions' generation 0 lacks Choice Band and Choice Specs (past items of the mod); Life Orb stands in.
   const champions = world.formatid.includes('champions');
   const scenes = [
     { label: 'a special attacker', species: 'Gengar', item: champions ? 'Life Orb' : 'Choice Specs', moves: ['Shadow Ball', 'Sludge Bomb'], nature: 'Timid', offense: 'spa' as const, defender: { species: 'Garchomp', nature: 'Calm', spread: { hp: max, spd: max } } },
@@ -58,10 +52,8 @@ for (const world of WORLDS) {
   ];
   for (const scene of scenes) {
     describe(`a guessed boost item the lines refute gives way: ${scene.item} on ${scene.label} (${world.name})`, () => {
-      // The prior is the usage guess with the item (offense and Speed invested); the truth is the same body without it.
       const prior: Mon = { species: scene.species, side: 'p2', nature: scene.nature, evs: evs({ [scene.offense]: max, spe: max }), item: scene.item };
       const truth: Mon = { ...prior, item: undefined };
-      // The defender already stands at the bulk the ladder tops out at, so no bulk rung can absorb a hit the item makes too hard.
       const wall: Mon = { species: scene.defender.species, side: 'p1', nature: scene.defender.nature, evs: evs(scene.defender.spread) };
       const sets = { p1: [asSet(wall, world.level, ['Protect'])], p2: [asSet(prior, world.level, scene.moves)] };
       const key = `p2:${toId(scene.species)}`;

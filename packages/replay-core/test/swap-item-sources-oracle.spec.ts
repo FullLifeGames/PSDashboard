@@ -4,27 +4,11 @@ import { ITEM_HANDOVER_ACTIVATIONS, SWAP_ITEM_SOURCES } from '../src/inference/h
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * `SWAP_ITEM_SOURCES` in inference/handlers.ts names the `[from]` sources of an `|-item|` line that mean the holder took the item from
- * another Pokémon, so the item is not its set item (a Trick scarf hid the real moves). The Dex cannot say it as a field, but the
- * simulator's handlers write those lines: every handler (a move's, an ability's, an item's, also inside `secondary`, `self` and
- * `condition`) whose source text emits an `-item` line names its `[from]` effect in a string literal, and the ones that call
- * `takeItem` move an item between two Pokémon. In every view the corpus plays:
- *  - the sources whose handler takes an item are the list, as `type: Name` (the moves Trick, Switcheroo, Thief, Covet and Bestow, the
- *    abilities Magician and Pickpocket), the Generation 2 forms of Thief and Covet included;
- *  - each of them is played (a user with no item, a user with an item, both with items) and the log's `|-item|` line carries the
- *    source in the shape the inference reads, through its own `readLine` and `fromEffect`;
- *  - Symbiosis hands an item over with `|-activate|<giver>|ability: Symbiosis|<item>|[of] <receiver>` and writes no `|-item|` line, so
- *    it is no entry of the `-item` list; `ITEM_HANDOVER_ACTIVATIONS` names it, and the inference credits the giver's set item and marks
- *    the receiver as handed an item (played in both doubles rule sets);
- *  - Pickup (Generation 5 on) writes `|-item|` with `[from] ability: Pickup` for an item it picks up from another Pokémon, without
- *    `takeItem`; the list names it, so the picker's item is not read as its set item.
- * Recycle, Harvest, Frisk and G-Max Replenish write `|-item|` lines too and move no item between Pokémon: they stay out.
- */
+// Handlers that emit `-item` name their `[from]` effect in a literal; `takeItem` callers move an item between Pokémon.
+// Symbiosis writes no `-item` line (ITEM_HANDOVER_ACTIVATIONS); Recycle, Harvest and Frisk move no item.
 
 type Entry = Record<string, unknown>;
 
-/** The log as a spectator reads it: the line after a |split| marker is the owner's private copy, left out. */
 const publicLog = (log: string[]) => log.filter((line, index) => !line.startsWith('|split|') && !log[index - 1]?.startsWith('|split|'));
 
 function handlerTexts(value: unknown, depth = 0): string[] {
@@ -35,7 +19,6 @@ function handlerTexts(value: unknown, depth = 0): string[] {
 
 interface Emitter { source: string; takes: boolean; id: string; kind: 'move' | 'ability' }
 
-/** Every move and ability of the view with a handler that writes an `-item` line, its `[from]` sources and whether it takes an item. */
 function emitters(view: SimView): Emitter[] {
   const found: Emitter[] = [];
   const scan = (kind: 'move' | 'ability', entry: Entry & { id: string; exists: boolean; isNonstandard?: string | null }) => {
@@ -53,7 +36,6 @@ function emitters(view: SimView): Emitter[] {
 
 const listed = (): string[] => Object.entries(SWAP_ITEM_SOURCES).flatMap(([type, names]) => [...names].map(name => `${type}: ${name}`)).sort();
 
-/** Listed sources whose handler moves an item without `takeItem` (the ground, not a Pokémon's hands). */
 const PICKS_UP = ['ability: Pickup'];
 
 const ITEM_ARRANGEMENTS: [string, string][] = [['', 'leftovers'], ['leftovers', ''], ['leftovers', 'quickclaw']];
@@ -86,7 +68,6 @@ describe('SWAP_ITEM_SOURCES is held to the simulator', () => {
     test('the handlers that take an item from a Pokémon are the listed sources (Pickup picks up without taking)', () => {
       const takers = [...new Set(writers.filter(writer => writer.takes).map(writer => writer.source))].sort();
       const expected = listed().filter(name => !PICKS_UP.includes(name));
-      // A source the view has no move or ability for (Generation 2 has no abilities) is not expected.
       const real = expected.filter(name => {
         const [kind, label] = name.split(': ');
         const id = label.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -139,7 +120,6 @@ describe('SWAP_ITEM_SOURCES is held to the simulator', () => {
 
   describe.each(ALL_VIEWS.filter(view => view.dex.gen >= 5))('$name: Pickup', view => {
     test("an item Pickup took from another Pokémon is not the picker's set item", () => {
-      // Doubles: the eater is the picker's partner. Singles: the eater is the foe, the picker acts on the other side.
       const picker = mon('Zigzagoon', ['splash'], { ability: 'pickup', name: 'Picker' });
       const eater = mon('Blissey', ['splash'], { item: 'sitrusberry', name: 'Eater' });
       const battle = view.doubles

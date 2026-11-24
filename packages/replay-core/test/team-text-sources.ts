@@ -3,8 +3,6 @@ import { fileURLToPath } from 'node:url';
 import type { PokemonSet } from '@pkmn/sim';
 import { ExhaustiveRunner } from '@pkmn/sim/tools';
 
-/** Team texts for team-info.boots-guess.spec.ts and sheet-text.spec.ts: the fixtures' own, and the simulator's generated teams. */
-
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURE_DIRS = [
   'packages/replay-core/test/fixtures',
@@ -42,7 +40,7 @@ export function fixtureTexts(): { exports: Array<{ tag: string; text: string }>;
   return { exports, sheets };
 }
 
-/** The simulator's own team generator (ExhaustiveRunner), per generation: nicknames are absent, everything else is random. */
+/** The simulator's own team generator (ExhaustiveRunner), per generation: no nicknames, everything else random. */
 export async function generatedTeams(gen: number, games: number): Promise<PokemonSet[][]> {
   const teams: PokemonSet[][] = [];
   const runner = new ExhaustiveRunner({
@@ -55,7 +53,6 @@ export async function generatedTeams(gen: number, games: number): Promise<Pokemo
   return teams;
 }
 
-/** A team with the awkward corners a generator leaves out: nickname, gender, shiny, level, Tera type, typed Hidden Power, no EVs. */
 export function withCorners(team: PokemonSet[]): PokemonSet[] {
   return team.map((set, i) => {
     const copy: PokemonSet = { ...set, moves: [...set.moves] };

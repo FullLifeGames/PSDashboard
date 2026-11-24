@@ -13,10 +13,6 @@ import { slotMoveKey } from '../src/team/move-slots';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
 
-/**
- * The one resolver of generation and mod: a game reads the Dex of its own generation (the global Dex is Generation 9 on Scarlet/Violet),
- * a Pokémon Champions game the registered Champions Dex. The mod is not registered before the throw test (one module registry per file).
- */
 describe('rulesDex', () => {
   test('a Champions game without the registered mod throws, never reads Scarlet/Violet', () => {
     expect(() => rulesDex(9, 'champions')).toThrow(/Champions mod is not registered/);
@@ -35,7 +31,7 @@ describe('rulesDex', () => {
   });
 
   test('the generations differ where the games differ: the type chart and the base stats of an older generation', () => {
-    // Gen 1 lets Bug hit Poison hard and Ghost do nothing to Psychic; Steel stops resisting Ghost in Gen 6; Clefable's Special Attack rises in Gen 6.
+    // Gen 1: Bug hits Poison hard, Ghost does nothing to Psychic; Gen 6: Steel stops resisting Ghost; Clefable SpA up.
     expect([rulesDex(1), rulesDex(2), rulesDex(9)].map(dex => dex.getEffectiveness('Bug', 'Poison'))).toEqual([1, -1, -1]);
     expect([rulesDex(1), rulesDex(2), rulesDex(9)].map(dex => dex.getEffectiveness('Ghost', 'Psychic'))).toEqual([0, 1, 1]);
     expect([rulesDex(5), rulesDex(6)].map(dex => dex.getEffectiveness('Ghost', 'Steel'))).toEqual([-1, 0]);
@@ -221,7 +217,6 @@ describe('row 3 spares the chosen set as published', () => {
 
   test('the chosen set keeps its Cosmic Power without a Defense-scaling attack (gen 9 Ubers Arceus-Psychic "Stored Power")', () => {
     expect(names(applyCoherenceVetoes(storedPower.map(fromSet), { dex: rulesDex(9), itemId: 'mindplate' }))).toEqual(storedPower);
-    // A guessed Cosmic Power outside the chosen set still needs its payoff.
     expect(names(applyCoherenceVetoes([guessed('Cosmic Power'), guessed('Stored Power')], { dex: rulesDex(9), itemId: '' }))).toEqual(['Stored Power']);
   });
 

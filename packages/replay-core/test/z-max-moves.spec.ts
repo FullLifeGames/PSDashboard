@@ -6,18 +6,7 @@ import { buildTeamsFromReplay } from '../src/team-builder';
 import { toId } from '../src/ids';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
-/**
- * A Z-move or Max move in the log is no move of the set: the log shows the powered move and never its base move (in
- * smogtours-gen7ou-450650 the inference booked "Devastating Drake" as Garchomp's only move, and a branch after the Z-move offered
- * only Struggle). The Dex tells what the log proves:
- * - A Z-move names its crystal (`isZ`), which the client already reads as the item. A species' own Z-move also names its base move
- *   (`zMoveFrom` of the crystal), and that move is revealed. A status Z-move prints "Z-" before its base move and names it in `[anim]`.
- * - Any other damaging Z-move and every damaging Max move (`isMax`, G-Max moves included) shows the type of a damaging base move,
- *   and Max Guard shows a base move of status category. The set keeps an open slot (`openMoves`) that the build fills from the
- *   chosen published set, the move guesses and the usage list, as it fills every unknown move.
- * Every log comes from @pkmn/sim. Each scene checks the lines the simulator writes, and each built set goes back into a battle of
- * the replay's format, where the simulator must offer the powered move again.
- */
+// The log shows the powered Z-move or Max move, never its base move; the Dex tells what it proves (`isZ`, `isMax`).
 
 type Format = 'singles' | 'doubles';
 const FORMATS: Format[] = ['singles', 'doubles'];
@@ -50,14 +39,9 @@ function battleOf(formatid: string, p1: PokemonSet[], p2: PokemonSet[]): Battle 
   return battle;
 }
 
-/** The log a viewer reads: the lines without the split markers and the private halves they announce. */
 const publicLog = (battle: Battle): string => battle.log
   .filter((line, index, lines) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
 
-/**
- * The public log of a game in which p2's tested body clicks `clicks` (one per turn; `foe` is the target text a doubles click needs)
- * and everyone else splashes.
- */
 function scene(gen: 7 | 8, format: Format, tested: PokemonSet, clicks: (foe: string) => string[]): { formatid: string; log: string } {
   const formatid = formatIdOf(gen, format);
   const { p1, p2 } = sides(format, tested);
@@ -101,7 +85,6 @@ const attacksOfType = (set: PokemonSet, type: string) =>
 const statusMoves = (set: PokemonSet) => set.moves.filter(name => Dex.moves.get(name).category === 'Status');
 
 describe('a damaging Z-move: the crystal is the item, a damaging base move of its type is open (Gen 7)', () => {
-  // Earthquake, Swords Dance, Stealth Rock and Toxic come first: the four best-used moves hold no Dragon attack.
   const GARCHOMP_USAGE = usage('Garchomp', ['Earthquake', 'Swords Dance', 'Stealth Rock', 'Toxic', 'Outrage', 'Dragon Claw', 'Fire Fang'], ['Dragonium Z']);
 
   test.each(FORMATS)('%s: the log shows the Z-move by name, and the inference books the crystal and an open Dragon attack', format => {
@@ -211,7 +194,6 @@ describe('a status Z-move shows its base move after "Z-" (Gen 7)', () => {
 });
 
 describe('a Max move: the base move is open, nothing is an item (Gen 8)', () => {
-  // The four best-used moves hold no Flying attack and no Roost: the open slots are what puts them in.
   const FLYING_USAGE = usage('Corviknight', ['U-turn', 'Body Press', 'Iron Head', 'Defog', 'Brave Bird', 'Roost', 'Hurricane']);
   const dynamaxTurn = (foe: string) => [`move 1${foe} dynamax`];
 

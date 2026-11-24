@@ -2,12 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { applyTeamSheetToInfo } from '../src/team-sheets.ts';
 import type { OpponentTeamInfo, PokemonEvs, PokemonEvsInfo } from '../src/types.ts';
 
-/**
- * A posted team sheet carries IVs, and the stats panel must show them (Slowking reads Speed IV 0 where the sheet plays 31 when the
- * overlay copies the sheet's EVs but not its IVs). The sheet is authoritative for its side, as for every other field; proof and the
- * user's own input still win.
- */
-
 const allIvs = (ivs: Partial<PokemonEvs> = {}): PokemonEvs => ({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...ivs });
 
 const infoWith = (ivs?: PokemonEvsInfo): OpponentTeamInfo => ({

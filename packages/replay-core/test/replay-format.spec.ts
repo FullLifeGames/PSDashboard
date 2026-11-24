@@ -74,7 +74,6 @@ describe('replay format inference', () => {
       log: '|gen|3\n|tier|[Gen 3] OU',
     })).toBe('gen3ou');
 
-    // Smogtours ids can omit the generation entirely — it comes from the log.
     expect(inferReplayFormatId({
       id: 'smogtours-ubers-54583',
       log: '|gen|6\n|tier|[Gen 6] Ubers',
@@ -91,9 +90,7 @@ describe('replay format inference', () => {
     expect(getBranchSimulatorFormat({ id: 'gen9vgc2024regh-2160552710', log: '|gametype|doubles\n|gen|9' })).toBe('gen9doublesou');
   });
 
-  // Champions branches on the Champions mod of @pkmn/mods. Singles play the mod's OU, doubles its Doubles Custom Game, which brings the
-  // whole team as Doubles OU does (the reconstruction trims to the brought Pokémon itself; a VGC format's team preview would keep the
-  // first four). The regulation (M-A, M-B, M-C) changes only legality, and a mod format takes no custom-rule suffix.
+  // Singles play the mod's OU, doubles its Doubles Custom Game; a mod format takes no custom-rule suffix.
   test('Champions replays branch on the Champions mod\'s formats', () => {
     expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9championsdoublescustomgame');
     for (const id of ['gen9championsvgc2026regma-2604410427', 'gen9championsvgc2026regmabo3-2603652560', 'gen9championsvgc2026regmc-2695803506',
@@ -102,7 +99,6 @@ describe('replay format inference', () => {
     }
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-2628340185', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' }))
       .toBe('gen9championsou');
-    // A Champions OU log declares Sleep Moves Clause, never Sleep Clause Mod; a rule-less one still gets no suffix.
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-1', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU\n|rule|Sleep Clause Mod: Limit one foe put to sleep' }))
       .toBe('gen9championsou');
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-2', log: '|gametype|singles\n|gen|9' })).toBe('gen9championsou');
@@ -129,20 +125,17 @@ describe('replay format inference', () => {
       log: '|gametype|singles\n|gen|9\n|rule|OHKO Clause: OHKO moves are banned',
     })).toBe('gen9customgame');
 
-    // A colon-less |rule| line is a pipeline watermark, not a ruleset —
-    // the singles default still applies (GPL video reconstructions).
+    // A colon-less |rule| line is a pipeline watermark, not a ruleset.
     expect(getBranchSimulatorFormat({
       id: 'gen9customgame-99',
       log: '|gametype|singles\n|gen|9\n|rule|Reconstructed from video by gpl-pipeline - best effort',
     })).toBe('gen9customgame@@@Sleep Clause Mod');
 
-    // NO rule lines at all (video pipelines): singles-standard default.
     expect(getBranchSimulatorFormat({
       id: 'gen9customgame-99',
       log: '|gametype|singles\n|gen|9\n|tier|[Gen 9] Custom Game',
     })).toBe('gen9customgame@@@Sleep Clause Mod');
 
-    // …unless the log itself shows a second simultaneous sleep.
     expect(getBranchSimulatorFormat({
       id: 'gen9customgame-99',
       log: [
@@ -152,7 +145,6 @@ describe('replay format inference', () => {
       ].join('\n'),
     })).toBe('gen9customgame');
 
-    // Rest sleeps never count against the clause detection.
     expect(getBranchSimulatorFormat({
       id: 'gen9customgame-99',
       log: [
@@ -162,7 +154,6 @@ describe('replay format inference', () => {
       ].join('\n'),
     })).toBe('gen9customgame@@@Sleep Clause Mod');
 
-    // Real formats are their own rule authority and never get suffixed:
     // gen3ou carries the clause natively; gen9 OU bans sleep moves instead.
     expect(getBranchSimulatorFormat({
       id: 'gen9ou-123',
@@ -174,9 +165,6 @@ describe('replay format inference', () => {
     expect(formatEnforcesSleepClause('gen9customgame@@@Sleep Clause Mod')).toBe(true);
   });
 
-  // A draft game that declares "Terastal Clause" ran as a Custom Game that offered Tera (gen9natdexdraft-2713067801: "Tera (Psychic)"
-  // in the tray, Execute Turn terastallized). The clause rides the branch format like Sleep Clause, in singles and in doubles; the
-  // simulator is the oracle for what the format then offers.
   describe('Terastal Clause from the log', () => {
     const rules = '|rule|Sleep Clause Mod: Limit one foe put to sleep\n|rule|Terastal Clause: You cannot Terastallize';
     const mon = {
@@ -192,7 +180,6 @@ describe('replay format inference', () => {
       const withClause = getBranchSimulatorFormat({ id: 'gen9natdexdraft-1', log: `|gametype|singles\n|gen|9\n${rules}` });
       expect(withClause).toBe('gen9customgame@@@Sleep Clause Mod,Terastal Clause');
       expect(offersTera(withClause)).toBe(false);
-      // Without the line the same game keeps Tera (the control), and the clause alone rides without Sleep Clause.
       const without = getBranchSimulatorFormat({ id: 'gen9natdexdraft-2', log: '|gametype|singles\n|gen|9\n|rule|Sleep Clause Mod: Limit one foe put to sleep' });
       expect(without).toBe('gen9customgame@@@Sleep Clause Mod');
       expect(offersTera(without)).toBe(true);
@@ -221,8 +208,6 @@ describe('replay format inference', () => {
     });
   });
 
-  // The static weighs a replay by the tables of its rule set, named from the replay's own format: Pokémon Champions (singles and
-  // doubles), VGC outside Champions, and every other format.
   test('a replay names its rule set from its own format', () => {
     expect(replayRuleset(vgcReplay)).toBe('champions');
     expect(replayRuleset({ id: 'gen9championsvgc2026regmabo3-2603652560', log: '|gametype|doubles\n|gen|9' })).toBe('champions');
@@ -233,9 +218,7 @@ describe('replay format inference', () => {
     expect(replayRuleset({ id: 'gen9doublesou-2663093831', log: '|gametype|doubles\n|gen|9\n|tier|[Gen 9] Doubles OU' })).toBe('standard');
   });
 
-  // A private replay link carries a 31-character password as a `-{password}pw` suffix on the id. The suffix belongs in the fetched id
-  // and nowhere else: read as part of the format it produced `gen9ou2632003305e10u...pw`, so an ordinary private OU replay branched
-  // as a rule-less custom game.
+  // A private replay link ends in `-{password}pw`; the suffix belongs in the fetched id and nowhere else.
   const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
   const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
 
@@ -256,7 +239,6 @@ const read = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${
 const lfOf = (text: string) => text.replace(/\r\n?/g, '\n');
 const crlfOf = (text: string) => lfOf(text).replace(/\n/g, '\r\n');
 
-/** A Gen 9 custom game whose switch lines print the exact HP (the maximum-HP reader pins HP EVs from them) and whose chat holds p1's team export. */
 const EXACT_HP_SINGLES = [
   '|j|Alice', '|j|Bob', '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|1', '|teamsize|p2|1', '|gen|9', '|tier|[Gen 9] Custom Game',
   '|rule|Sleep Clause Mod: Limit one foe put to sleep',
@@ -270,7 +252,6 @@ const EXACT_HP_SINGLES = [
   '|upkeep', '|turn|3',
 ].join('\n');
 
-/** Doubles with Open Team Sheets (the packed `|showteam|` lines end in an empty last field): damage lines of both sides follow. */
 const SHEETS_DOUBLES = [
   '|player|p1|Alice|', '|player|p2|Bob|', '|gametype|doubles', '|gen|9', '|tier|[Gen 9] VGC 2026', '|clearpoke',
   '|poke|p1|Swampert, L50, F|item', '|poke|p1|Pelipper, L50, M|item', '|poke|p2|Hydreigon, L50, M|item', '|poke|p2|Froslass, L50, F|item',
@@ -285,7 +266,6 @@ const SHEETS_DOUBLES = [
   '|-damage|p1a: Swampert|44/100', '|upkeep', '|turn|3',
 ].join('\n');
 
-/** A custom game with no rule lines and a second sleeper on one side: the Sleep Clause reading splits the log line by line. */
 const TWO_SLEEPERS = [
   '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|1', '|gen|9', '|tier|[Gen 9] Custom Game', '|start',
   '|switch|p1a: Para|Parasect, M|100/100', '|switch|p2a: Lax|Snorlax, M|100/100', '|turn|1',
@@ -302,7 +282,6 @@ const LOGS: Record<string, string> = {
   'singles custom game (two sleepers, no rule lines)': TWO_SLEEPERS,
 };
 
-/** The evidence a host hands the builder, read from the LF text for both twins: the build and the solve then show their own door. */
 const evidenceOf = (log: string) => parseReplayLogWithObservations(lfOf(log));
 
 const ENTRY_POINTS: Record<string, (log: string) => unknown> = {
@@ -376,7 +355,7 @@ describe('a log with Windows line endings reads like the same log with LF', () =
     const exact = lfOf(EXACT_HP_SINGLES);
     expect(extractTeamSheets(exact).p1?.map(set => set.species)).toEqual(['Garchomp']);
     expect([...observedMaxHp(exact)].map(([key, seen]) => [key, seen.maxhp])).toEqual([['p1:garchomp', 409], ['p2:snorlax', 524]]);
-    // The measured HP pins the EVs the solve hands out, from either twin: 409 is Garchomp's 208 HP EVs, 524 is Snorlax's 252.
+    // 409 is Garchomp's 208 HP EVs, 524 is Snorlax's 252.
     for (const log of [exact, crlfOf(exact)]) {
       const solved = solveReplaySpreads(log, evidenceOf(log).observations);
       expect(solved.get('p1:garchomp')?.evs.hp).toBe(208);
@@ -424,7 +403,6 @@ describe('header-facts', () => {
     return found;
   }
 
-  /** The oracle: the client after the header lines (everything before `|start`), as the plain `battle.add` calls read them. */
   function clientAfterHeader(source: Fixture['source']) {
     const lines = source.log.replace(/\r\n?/g, '\n').split('\n');
     const battle = new Battle(generationsFor(inferReplayFormatId(source)));
@@ -447,7 +425,6 @@ describe('header-facts', () => {
     test.each(all.map((f) => [f.tag, f] as const))('%s', (_tag, fixture) => {
       const { source } = fixture;
       const { battle, hasGametype } = clientAfterHeader(source);
-      // A log with no |gametype| line says nothing (the GPL pipeline's), where the client defaults to singles.
       expect(getReplayGameType(source.log)).toBe(hasGametype ? battle.gameType : null);
       expect(getReplayGeneration(source)).toBe(battle.gen.num);
       const brought = battle.teamPreviewCount >= 1 && battle.teamPreviewCount <= 5 ? battle.teamPreviewCount : null;

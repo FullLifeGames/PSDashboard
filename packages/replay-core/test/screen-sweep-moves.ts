@@ -3,15 +3,9 @@ import { toId } from '../src/ids';
 import { spectatorLog } from './screen-scenes';
 import { battleIn, mon, type SimView } from './sim-views';
 
-/**
- * Sweep S3 finds, by playing the move and never by its name, the moves of a rule set that end a screen outside the residual phase
- * (removers) or change which side holds a screen without a log line (silent movers): on a board with Reflect on p1's side and Light
- * Screen on p2's, a `-sideend` before the residual marker is a removal, a screen that changed sides with no line is a silent move.
- * The plain run plays the moves whose Dex entry mentions a side condition and every tenth move; `DICE_SWEEPS=full` plays them all.
- */
+// The plain run plays the moves whose Dex entry mentions a side condition and every tenth move; `DICE_SWEEPS=full` all.
 const FULL = process.env.DICE_SWEEPS === 'full';
 
-/** The moves the sweep must find in each rule set that has them. */
 const NAMED = ['brickbreak', 'psychicfangs', 'defog', 'ragingbull', 'courtchange'];
 
 type DexMove = ReturnType<SimView['dex']['moves']['get']>;
@@ -20,7 +14,6 @@ export interface Swept {
   played: number;
   named: string[];
   moves: Found[];
-  /** The log of a game where p1 plays the move on turn 5 (null: no move, the control). */
   log: (move: string | null) => string;
 }
 
@@ -40,10 +33,6 @@ function candidates(view: SimView): DexMove[] {
 
 const presence = (battle: ReturnType<typeof battleIn>): string => JSON.stringify(battle.sides.map(side => SCREENS.filter(id => side.sideConditions[id])));
 
-/**
- * The screen lines of the lines one choice added, split by phase. The first bare `|` is the header of the turn (the simulator
- * writes it when the turn starts), the second opens the residual phase.
- */
 function turnScreenLines(lines: string[]): { action: string[]; residual: string[] } {
   const screen = (line: string) => /^\|-side(?:start|end)\|/.test(line) && isScreen(toId(line.split('|')[3].replace(/^move: /, '')));
   const action: string[] = [];
@@ -73,7 +62,6 @@ function classify(view: SimView, move: DexMove): Found['kind'] | null {
   return null;
 }
 
-/** Plays six turns: both screens go up on turn 1, p1 plays the move on turn 5 (the last plain turn), everything else splashes. */
 function playSweepScene(view: SimView, moveId: string | null): string {
   const doubles = view.doubles;
   const battle = battleIn(view,

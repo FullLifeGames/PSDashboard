@@ -16,12 +16,6 @@ import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import type { SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
-/**
- * An observed move order is a hard limit for both sides. Before the ladder, every order holds: a plausible usage spread yields
- * first, then any legal Speed (the side without its own Speed evidence first, the second mover on a tie), then a Choice Scarf. A
- * repaired order ends strict, a cycle tied; a knock-out on a victim that may have clicked a move below priority 0 binds while a set
- * fits it and goes first when none does.
- */
 const gen = Generations.get(9);
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
@@ -46,7 +40,6 @@ const statOf = (solved: Map<string, SpreadCandidate>, sets: Sets, side: Side, sp
   const spread = spreadOf(solved, sets, side, species);
   return new Pokemon(gen, species, { nature: spread.nature, evs: spread.evs }).stats.spe;
 };
-/** The race's Speed: the stat times the Scarf the order names, else the solve's item, else the set's. */
 function raceSpeed(solved: Map<string, SpreadCandidate>, sets: Sets, side: Side, species: string, held?: boolean): number {
   const item = entryOf(solved, side, species)?.item ?? setOf(sets, side, species).item;
   return statOf(solved, sets, side, species) * ((held ?? toId(item ?? '') === 'choicescarf') ? 1.5 : 1);
@@ -59,8 +52,7 @@ const usedUsage = (spread: { nature: string; evs: PokemonEvs }, spreads: { natur
 
 describe('every observed order holds before the ladder', () => {
   test('singles: a plausible spread moves first, the mon without usage takes the rest (2663113816 t14)', () => {
-    // Gholdengo (219) moved before Maushold (321), whose slowest legal Speed is 232: Gholdengo takes its
-    // Timid 252 usage spread (293), Maushold (no usage, the second mover) comes down under it.
+    // Gholdengo (219) moved before Maushold (321, slowest legal 232): Gholdengo takes its Timid 252 usage spread (293).
     const sets = {
       p1: [mon('Maushold-Four', 'Hardy', evs(0, 252, 0, 0, 4, 252), '', ['Population Bomb'])],
       p2: [mon('Gholdengo', 'Bold', evs(252, 0, 196, 0, 0, 60), 'Air Balloon', ['Make It Rain'])],
@@ -133,8 +125,6 @@ describe('every observed order holds before the ladder', () => {
   });
 
   test('doubles: a chain against a Speed floor (2663093831, Ting-Lu above a Quiet 0 Sinistcha, below Incineroar)', () => {
-    // Both sides field a Quiet 0 Sinistcha (158, the floor at 31 IVs): p1's outran Incineroar at t8, which
-    // outran Ting-Lu at t4, which outran p2's at t12, so the chain must climb above 158.
     const orthworm = usage(['Careful', evs(252, 0, 4, 0, 252, 0), 0.39], ['Relaxed', evs(252, 0, 252, 0, 4, 0), 0.24]);
     const sets = {
       p1: [
@@ -155,13 +145,11 @@ describe('every observed order holds before the ladder', () => {
       'p2:incineroar': { itemKnown: true, spreads: usage(['Careful', evs(252, 0, 96, 0, 160, 0), 0.11], ['Adamant', evs(252, 4, 96, 0, 156, 0), 0.1]) },
     }));
     const [held, orthwormRepaired, sinistchaHeld, tingLuRepaired] = margins(solved, sets, orders);
-    // Incineroar outran Ting-Lu strictly before the settling and still does (no coin flip on a seen order).
     expect(held).toBeGreaterThan(0);
     expect(orthwormRepaired).toBeGreaterThan(0);
     expect(sinistchaHeld).toBeGreaterThanOrEqual(0);
     expect(tingLuRepaired).toBeGreaterThan(0);
     expect(statOf(solved, sets, 'p2', 'Sinistcha')).toBe(158);
-    // Only Speed moves: Ting-Lu keeps its HP and SpD.
     expect([spreadOf(solved, sets, 'p1', 'Ting-Lu').evs.hp, spreadOf(solved, sets, 'p1', 'Ting-Lu').evs.spd]).toEqual([248, 124]);
     expect(usedUsage(spreadOf(solved, sets, 'p1', 'Orthworm'), orthworm)).toBe(true);
   });
@@ -180,15 +168,12 @@ describe('every observed order holds before the ladder', () => {
       expect(margins(known, sets, orders)[0]).toBeGreaterThan(0);
       expect(statOf(known, sets, 'p2', 'Raging Bolt')).toBe(249);
       expect(statOf(known, sets, 'p1', 'Gholdengo')).toBeGreaterThan(249);
-      // Control: an unknown Raging Bolt is the second mover on a tie of evidence, so it yields.
       const open = inferSpreads([], sets, formatid, orders, knowledge({ 'p1:gholdengo': gholdengo, 'p2:ragingbolt': { itemKnown: true } }));
       expect(margins(open, sets, orders)[0]).toBeGreaterThan(0);
       expect(statOf(open, sets, 'p1', 'Gholdengo')).toBe(219);
     });
 
     test(`a cycle ends tied, every other order strict (${formatid}, 749828 t15 and t16)`, () => {
-      // Raging Bolt also outran a Timid 252 Clefable (240 under its 249): once the cycle ties Raging
-      // Bolt to Gholdengo (219), Clefable must come under it, strictly.
       const sets = {
         p1: [mon('Gholdengo', 'Bold', evs(252, 0, 196, 0, 0, 60), 'Air Balloon'), mon('Clefable', 'Timid', evs(252, 0, 4, 0, 0, 252), 'Leftovers')],
         p2: [mon('Raging Bolt', 'Modest', evs(0, 0, 4, 252, 0, 252), 'Leftovers')],
@@ -229,7 +214,6 @@ describe('every observed order holds before the ladder', () => {
       const dropped = inferSpreads([], weak, formatid, orders);
       expect(entryOf(dropped, 'p1', 'Toxapex')?.item).toBeUndefined();
       expect(statOf(dropped, weak, 'p2', 'Indeedee')).toBe(203);
-      // Control: a victim that never runs below priority 0 is a full race, and only a Scarf explains it.
       const full = build(['Psychic', 'Dazzling Gleam']);
       const scarfed = inferSpreads([], full, formatid, orders);
       expect(entryOf(scarfed, 'p1', 'Toxapex')?.item).toBe('Choice Scarf');
@@ -263,8 +247,7 @@ describe('the ladder keeps a minus-Speed nature the orders need', () => {
   }
 
   test('a Brave Garchomp the order keeps slow takes the offense rung as Brave, not Adamant', () => {
-    // Kingambit (Jolly 252: 218) moved before Garchomp: Brave 0 Speed (216) holds the order, any
-    // neutral nature (240) breaks it. The damage lines ask for 252 Atk with a plus nature.
+    // Kingambit (Jolly 252: 218) before Garchomp: Brave 0 Speed (216) holds the order, a neutral one (240) breaks it.
     const truth = mon('Garchomp', 'Brave', evs(0, 252, 4, 0, 0, 252), '', ['Earthquake']);
     const clefable = mon('Clefable', 'Bold', evs(252, 0, 252, 0, 4, 0));
     const sets = {
@@ -405,7 +388,6 @@ describe('spread-offense-release', () => {
       });
 
       test('the order price keeps the Jolly body when the Adamant body would no longer move first', () => {
-        // The scene itself: Jolly Garchomp outspeeds Jolly Lucario, Adamant Garchomp does not.
         expect(speedOf(world, prior)).toBeGreaterThan(speedOf(world, lucario));
         expect(speedOf(world, truth)).toBeLessThan(speedOf(world, lucario));
         const solved = solve(lines(truth), 'Lucario');
@@ -455,8 +437,6 @@ describe('spread-offense-release', () => {
     });
   }
 
-  // The nature block stays where the game forces it (see spread-inference.speed-order-input.spec.ts):
-  // a Bulk rung never gives held tempo (573756 t73) and a held offense never gives way.
   test('a Pokemon without clean attacker lines never gets an offense nature from the opening', () => {
     const world = WORLDS[0];
     const prior: Mon = { species: 'Garchomp', side: 'p2', nature: 'Jolly', evs: evs({ atk: 252, spe: 252 }) };
@@ -511,7 +491,6 @@ describe('spread-published-iv', () => {
         expect(solved?.ivs?.spe).toBe(31);
         const body = solved!;
         expect(speedOf('Sinistcha', body.nature, body.evs, body.ivs!)).toBeGreaterThan(rival);
-        // The fewest Speed EVs that beat the rival at IV 31 in the solved nature, and more of them at the published IV 0.
         const fewest = (ivs: Partial<PokemonEvs>) => Array.from({ length: 64 }, (_, i) => i * 4)
           .find(spe => speedOf('Sinistcha', body.nature, { ...body.evs, spe }, ivs) > rival) ?? 252;
         expect(body.evs.spe).toBe(fewest(body.ivs!));
@@ -544,9 +523,6 @@ describe('spread-published-iv', () => {
   });
 
   describe('the IV the pre-solve restored reaches the build (two-stage solve)', () => {
-    // 2663093831 in small: a published Trick Room Sinistcha (Quiet, Speed and Attack IV 0) moves before Incineroar twice, and
-    // its damage lines keep the full solve from forfeiting the mon. The restored IV rides on the pre-solve's entry; the
-    // full solve's answer for the same mon has none, so the carry has to bring it along.
     const published: SmogonSetAssumptions = {
       format: 'test', source: 's',
       pokemon: {
@@ -562,7 +538,6 @@ describe('spread-published-iv', () => {
       format: 'test', month: 'm', source: 's',
       pokemon: { sinistcha: { species: 'Sinistcha', rawCount: 1000, abilities: [], spreads: [], items: [], moves: ['Matcha Gotcha', 'Rage Powder', 'Trick Room', 'Shadow Ball'].map(value => ({ value, probability: 0.9, sourceDetail: 'u' })) } },
     };
-    // The damage lines come from the real body: Relaxed 252 HP / 252 Def, Speed IV 31 (the pre-solve's repair), Attack IV 0.
     const truth = new Pokemon(gen, 'Sinistcha', { level: 100, nature: 'Relaxed', evs: { hp: 252, def: 252, spa: 4 }, ivs: { atk: 0, spe: 31 } });
     const incineroar = new Pokemon(gen, 'Incineroar', { level: 100, nature: 'Hardy', evs: { hp: 252, atk: 252, spd: 4 } });
     const mid = (attacker: Pokemon, defender: Pokemon, move: string) => {

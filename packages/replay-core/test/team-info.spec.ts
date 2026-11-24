@@ -14,12 +14,6 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import type { SpreadCandidate } from '../src/spread-inference';
 import { slotMoveKey } from '../src/team/move-slots';
 
-/**
- * The item after a proven rule-out: when the log rules out the item of the set the evidence picks, that set gives way, and the item
- * the build plays is a guess the log supports (the Boots tell) or else the most used item the log still allows, marked as a guess.
- * The next published set's item is no evidence: in 2663102863 the Leftovers Gholdengo became a Choice Specs Gholdengo that way.
- */
-
 const curated = (species: string, moves: string[], item: string): PokemonSetAssumption => ({
   species, sourceDetail: 's', item: { value: item, sourceDetail: 's' },
   moves: moves.map(value => ({ value, sourceDetail: 's' })),
@@ -139,7 +133,6 @@ describe('the panel and the build play the same item after a rule-out', () => {
   });
 });
 
-/** The Nasty Plot set as published: its item slot lists Leftovers, then Metal Coat. */
 const plotSlot = (): PokemonSetAssumption => ({
   ...plot(), item: { value: 'Leftovers', sourceDetail: 's', options: ['Leftovers', 'Metal Coat'] },
 });
@@ -216,7 +209,6 @@ describe('item-tell', () => {
     [['Headlong Rush', 0.9], ['Rapid Spin', 0.8], ['Ice Spinner', 0.7], ['Knock Off', 0.5]],
     [['Rocky Helmet', 0.4], ['Booster Energy', 0.3], ['Heavy-Duty Boots', 0.2]]));
 
-  /** p1 lays Stealth Rock, p2 brings Great Tusk in on them without damage, then it attacks. */
   const singles = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|test',
     '|poke|p1|Skarmory|item', '|poke|p2|Blissey|item', '|poke|p2|Great Tusk|item', '|start',
@@ -269,7 +261,6 @@ describe('item-tell', () => {
     });
   });
 
-  /** A sim-generated spectator log (gen 9 OU or Doubles OU), as in item-evidence.spec.ts. */
   function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false): string {
     const battle = new Battle({
       formatid: toID(doubles ? 'gen9doublesou' : 'gen9ou'), seed: '1,2,3,4',
@@ -318,7 +309,6 @@ describe('item-tell', () => {
       expect(log).not.toMatch(/\|-damage\|p2a: Clefable\|[^\n]*\[from\] Stealth Rock/);
       expect(log).not.toMatch(/\[from\] item: Life Orb/);
       const { tell, built } = buildClefable(log);
-      // The inference asks the simulator as the build does: no guess at all.
       expect(tell.value).not.toBe('Heavy-Duty Boots');
       expect(built).toBe('Life Orb');
     });
@@ -543,14 +533,11 @@ describe('set-fidelity', () => {
       const maushold = build(singles(9, 'Maushold-Four', ['Tidy Up']), 'Maushold-Four',
         stats(usage('Maushold', [['Population Bomb', 0.9], ['Tidy Up', 0.8], ['Bite', 0.6], ['Protect', 0.5], ['Encore', 0.3]])), null);
       expect(maushold.built).toEqual(keysOf('Tidy Up', 'Population Bomb', 'Bite', 'Protect'));
-      // Rotom-Wash differs from Rotom in type and stats: Rotom's moves would be a different Pokémon's.
       const rotom = build(singles(9, 'Rotom-Wash', ['Hydro Pump']), 'Rotom-Wash',
         stats(usage('Rotom', [['Shadow Ball', 0.9], ['Thunderbolt', 0.8], ['Will-O-Wisp', 0.6], ['Nasty Plot', 0.5]])), null);
       expect(rotom.built).toEqual(keysOf('Hydro Pump'));
     });
 
-    // The usage tail must not join row 1's boost context: a boost at a fraction of a percent struck the guessed special attacks of
-    // every set no chosen Smogon set covered.
     const tail = (top: [string, number][]): [string, number][] => [...top, ['Dragon Dance', 0.002], ['Swords Dance', 0.001]];
 
     test('singles: a boost in the usage tail leaves Kingdra its special attacks', () => {

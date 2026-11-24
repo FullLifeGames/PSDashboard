@@ -6,11 +6,6 @@ import {
   type OpponentTeamInfo,
 } from '../src/index.ts';
 
-/**
- * A game whose format generates its teams (a Random Battle: no team preview, no stats file) fills the bodies a side never showed
- * from the format's random-set data. The corpus holds no Random Battle, so each row is a log the simulator played (two RandomPlayerAI
- * on teams drawn from the published file): Gen 3 singles, Gen 9 Random Doubles and both Champions formats (the mod registers first).
- */
 registerChampionsDex(championsMod as unknown as Parameters<typeof registerChampionsDex>[0], championsMod.Formats as unknown as Parameters<typeof registerChampionsDex>[1]);
 
 interface RandomFixture {
@@ -61,7 +56,6 @@ describe.each(ROWS)('$label', ({ id, short }) => {
       expect(speciesOf(filled[side]).slice(0, raw[side].pokemon.length)).toEqual(speciesOf(raw[side]));
       expect(filled[side].pokemon.filter(mon => mon.standIn)).toHaveLength(short[side]);
     }
-    // The side that showed all six is untouched, the same object.
     expect(filled.p2).toBe(raw.p2);
   });
 
@@ -112,7 +106,6 @@ describe.each(ROWS)('$label', ({ id, short }) => {
 });
 
 describe('which formats fill: the Dex entry decides, never a name', () => {
-  // Species that exist from Generation 1 on, so every generation has a legal pool.
   const POOL: Record<string, { level: number; moves: string[] }> = Object.fromEntries(
     ['Bulbasaur', 'Charmander', 'Squirtle', 'Pikachu', 'Eevee', 'Snorlax', 'Gengar', 'Alakazam', 'Machamp', 'Gyarados']
       .map(name => [name, { level: 80, moves: ['Tackle', 'Growl', 'Protect', 'Rest'] }]));
@@ -134,7 +127,6 @@ describe('which formats fill: the Dex entry decides, never a name', () => {
       if (changed) filled.push(format.id);
       expect(changed, format.id).toBe(!!format.team);
     }
-    // The sweep reaches the random formats of several generations, both Champions ones, and plenty that generate nothing.
     expect(filled.length).toBeGreaterThanOrEqual(12);
     expect(filled).toContain('gen9championsrandombattle');
     expect(filled).toContain('gen9randomdoublesbattle');

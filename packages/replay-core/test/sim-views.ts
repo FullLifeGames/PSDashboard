@@ -2,11 +2,7 @@ import { Battle, Dex, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import * as champions from '@pkmn/mods/champions';
 
-/**
- * The rule sets the corpus plays, for the specs that hold a hand list to the simulator (the `oracle:` tags in src): Generations 1 to
- * 9 as singles Custom Games, the Champions mod as one, and the two doubles rule sets the bank plays (Scarlet/Violet and Champions).
- * A list that is right in one view and wrong in another fails with the view's name.
- */
+/** Generations 1 to 9 as singles, the Champions mod, and the bank's two doubles rule sets (SV, Champions). */
 
 Dex.mod('champions', champions as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(champions.Formats);
