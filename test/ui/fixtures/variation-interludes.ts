@@ -96,7 +96,7 @@ export const SINGLES_DOUBLE_KNOCKOUT = {
 };
 
 export const INTERLUDE_CASES = [
-  { name: 'the reporter\'s state file (issue #4, doubles)', ...ISSUE4_STATE },
-  { name: 'the play-out of the check of 07.11.2026 (doubles)', ...ISSUE4C_PLAYOUT },
+  { name: 'the reporter\'s state file (doubles)', ...ISSUE4_STATE },
+  { name: 'a play-out with an interlude after seven of its turns (doubles)', ...ISSUE4C_PLAYOUT },
   { name: 'a singles double knockout', ...SINGLES_DOUBLE_KNOCKOUT },
 ];
