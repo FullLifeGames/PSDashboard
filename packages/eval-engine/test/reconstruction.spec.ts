@@ -172,25 +172,6 @@ describe('Replay reconstruction regression suite', () => {
     }
   });
 
-  test.skip('documents a known divergence after the first fixture turn', async () => {
-    const fixture = loadFixtureReplay();
-    await expectReplayCheckpointToReconstruct({
-      format: fixture.formatid || 'gen9ou',
-      log: fixture.log,
-      targetTurn: 2,
-    });
-  });
-
-  test.skip('documents a known deeper-turn divergence in the saved replay', async ({ skip }) => {
-    skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
-    const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
-    await expectReplayCheckpointToReconstruct({
-      format: 'gen9draft',
-      log,
-      targetTurn: 10,
-    });
-  });
-
   test('keeps battle-only forme switches merged into the revealed base species', () => {
     const log = [
       '|gametype|singles',
