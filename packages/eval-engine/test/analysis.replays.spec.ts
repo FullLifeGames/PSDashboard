@@ -9,7 +9,7 @@ import { DECIDED_SCORE, HEALTHY_SACK_FLOOR } from '../src/turn-analysis/types';
 import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
 import { resolveTeraPreference } from '../src/tera';
 
-/** The GPL game-report turns on the real reconstruction; assertions stay coarse (tiers, flags) so weight tuning cannot break them. */
+/** Whole replays through the reconstruction, the search and the analysis: the GPL game's four findings and the draft replay's Heatran switch. Assertions stay coarse (tiers, flags, direction, ordering) so weight tuning cannot break them. */
 
 describe('GPL replay end-to-end verdicts', () => {
   test('the four findings hold on the committed fixture', { timeout: 240000 }, async () => {
@@ -111,5 +111,57 @@ describe('GPL replay end-to-end verdicts', () => {
     expect(pairRows.length).toBeGreaterThan(0);
     for (const row of pairRows) expect(row.label).toContain(' → ');
     for (const row of pairRows) expect(Number.isFinite(row.ev)).toBe(true);
+  });
+});
+
+describe('draft replay end-to-end verdicts', () => {
+  test('T50: the trend layers surface the Heatran switch over the Recover stall', { timeout: 240000 }, async () => {
+    const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
+      id: string; log: string; players: string[];
+    };
+    const formatid = inferReplayFormatId(replay);
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    const tera = resolveTeraPreference('auto', formatid, replay.log);
+
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay),
+      p1Team, p2Team,
+      replayLog: replay.log,
+      targetTurn: 50,
+      snapshot: snapshots[49] ?? null,
+    });
+    const battle = runtime.battleStream.battle!;
+    const serialized = JSON.stringify(State.serializeBattle(battle));
+
+    const settings = {
+      samples: 1 as const, tera,
+      sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
+    };
+    // Find by label: bench slots are a reconstruction detail.
+    const rows = (depth: 1 | 2) => {
+      const p2 = searchPosition(serialized, { ...settings, depth, samples: 1 }).perSide.p2;
+      return {
+        p2,
+        recover: p2.find(choice => choice.choice === 'move recover')!,
+        heatran: p2.find(choice => choice.label === '→ Heatran')!,
+      };
+    };
+
+    const d1 = rows(1);
+    expect(d1.recover).toBeTruthy();
+    expect(d1.heatran).toBeTruthy();
+    // The probe trends fold into the values under the standing equilibrium (no re-solve): the building switch leads the bleeding
+    // stall by value already at depth 1.
+    expect(d1.heatran.ev).toBeGreaterThan(d1.recover.ev);
+    expect(d1.p2.indexOf(d1.heatran)).toBeLessThan(d1.p2.indexOf(d1.recover));
+
+    // At depth 2 or more the stall falls below the building switch by value.
+    const d2 = rows(2);
+    expect(d2.heatran.ev).toBeGreaterThan(d2.recover.ev);
+    // The crit-tail boundary cells around the Slowking column and the Flash Cannon row price as class means, which orders the
+    // near-tied wall pair (ev gap ~0.001; the Heatran column itself carries no boundary event). Which wall leads is a coin flip: the
+    // pin is that a wall switch leads and the stall sits below by value.
+    expect(d2.p2[0].label).toMatch(/^→ (Heatran|Slowking)$/);
   });
 });
