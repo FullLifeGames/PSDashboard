@@ -1,4 +1,3 @@
-
 /* A move tile gets --type, --type-on, --tint, --tint-low and --tint-edge from typeTileVars (src/lib/type-colors.ts);
    test/regression/contrast.spec.ts holds every text below at 4.5 : 1 or more on every type. */
 :root {

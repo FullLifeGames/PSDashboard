@@ -19,6 +19,7 @@ export interface ReplacementPoint {
   /** The block's open requests counted from 0 (a replacement that falls to an entry hazard opens a second one). */
   ordinal: number;
   forced: { p1: number[]; p2: number[] };
+  /** The species the replay sent into `forced`, in the same order. */
   played: { p1: string[]; p2: string[] };
 }
 

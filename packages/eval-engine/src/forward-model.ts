@@ -1,4 +1,3 @@
-
 export { deserializeBattleExact, restoreSideInvariants, serializeBattleStable } from './forward/serialize.ts';
 export { createRootPosition, positionBattle } from './forward/position.ts';
 export type { ChoiceOption, SimPosition } from './forward/position.ts';

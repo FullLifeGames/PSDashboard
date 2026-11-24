@@ -1,4 +1,3 @@
-
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 import { tableSwapScript } from './teambuilder-table';
 import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';

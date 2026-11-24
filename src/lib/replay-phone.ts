@@ -1,4 +1,3 @@
-
 /** The battle's box in the embed: 640 x 360 plus the 1 px border on each side. */
 export const PHONE_BATTLE = { width: 642, height: 362 } as const;
 

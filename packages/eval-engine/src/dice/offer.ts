@@ -114,6 +114,7 @@ function damageOffers(battle: Battle, move: ActiveMove, base: Base, targets: str
   if (move.category === 'Status' || fixedDamage(move) || (!move.basePower && !move.basePowerCallback && typeof move.onModifyMove !== 'function')) return [];
   const steps = Array.from({ length: genShape(battle.gen).roll.steps }, (_, step): DieResult => ({ step }));
   return targets.flatMap((targetSlot): DieOffer[] => [
+    // A Dex willCrit of true or false sets the crit without a draw; only an open one draws (battle-actions.js).
     ...(move.willCrit === undefined ? [{ name: { ...base, targetSlot, kind: 'crit' as const }, results: YES_NO }] : []),
     ...(move.noDamageVariance ? [] : [{ name: { ...base, targetSlot, kind: 'damage-roll' as const }, results: steps }]),
   ]);

@@ -100,7 +100,7 @@ function moveOptionsFor(
       name,
       activeSlot,
       slot: slot + 1,
-      // PP unknown without the sim — 0/0 renders as a dash, never a dex pool.
+      // PP unknown without the sim: 0/0 renders as a dash, never a dex pool.
       pp: 0,
       maxpp: 0,
       disabled: false,

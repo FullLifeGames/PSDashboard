@@ -42,6 +42,7 @@ export interface DockSlotModel {
   wait: EngineWait | null;
   origin: ChipOrigin | null;
   deferred: BranchSlotChoice | null;
+  /** Percent HP of the first living foe, for a move that names no target. */
   foeHp: number | undefined;
 }
 

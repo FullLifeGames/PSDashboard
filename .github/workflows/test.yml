@@ -14,6 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Limits stand at about twice the healthy time: a slower runner cancelled jobs at 30 minutes and hid red rows.
   node:
     name: Node suites
     runs-on: ubuntu-24.04

@@ -276,6 +276,7 @@ function useRuntimeAcquire(args: { replayData: ReplayData | null; exact: ExactSt
   return useCallback(async (params: ReconstructParams, plan: { isT0: boolean }): Promise<BranchRuntime> => {
     const branchEngine = await import('../lib/lazy/branch-engine');
     if (!replayData) return branchEngine.reconstructBranchRuntime(params);
+    // A Champions position revives on the Champions mod, so this realm loads it before the adopt.
     await branchEngine.loadSimMods(params.format);
     const adopt = (serialized: string, outcome?: ReconstructOutcome) => branchEngine.adoptSerializedRuntime({
       serialized, replayLog: params.replayLog, targetTurn: params.targetTurn,

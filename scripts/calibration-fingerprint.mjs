@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 export const FINGERPRINT_FORMAT = 2;
 
 /** The tracked inputs read at HEAD: what the bank imports and runs, and the files that decide how it resolves. */
+// Everything under test/regression/ is an input: a ledger block in eval-calibration.spec.ts changes the value.
 export const FINGERPRINT_PATHS = [
   'packages', 'src', 'test/regression', 'scripts',
   'package.json', 'package-lock.json',

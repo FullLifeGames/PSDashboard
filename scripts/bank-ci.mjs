@@ -118,6 +118,7 @@ export function pickRun(runs, sha) {
 
 /** The merge job of bank.yml (`name:` of the job `merge`); a run is over only when it has completed too. */
 export const MERGE_JOB = 'Merge the jobs';
+// GitHub can hold a finished run "in_progress" for about an hour: after this grace the jobs and the artifact decide.
 export const GRACE_MS = 5 * 60 * 1000;
 const WATCH_MS = 3 * 60 * 1000;
 

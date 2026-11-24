@@ -22,6 +22,7 @@ interface Props {
   viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
   onSideChange?: (side: FrameSide) => void;
+  /** False hides Color scheme and Music, which do nothing in the app's frames. Default true. */
   choosers?: boolean;
   /** One-shot seek for live-update frames, which ignore seekTurn after mount; bump `seq` to send, `play` starts it. */
   seekRequest?: SeekRequest | null;

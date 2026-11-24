@@ -1,4 +1,3 @@
-
 export const UI_SCALE_STEPS = [1, 1.25, 1.5, 1.75, 2] as const;
 
 export type UiScaleStep = (typeof UI_SCALE_STEPS)[number];

@@ -123,6 +123,7 @@ function useStartPlayOut(args: PlayOutInputs) {
         setVariationNotice('Finish the lead picks above before the engine plays from turn 0.');
         return;
       }
+      // Arms with turn 0 (the leads come in): Watch plays the frame from team preview while the pointer reads T1.
       startLeadVariation(picks, { onStart: () => armRun(0) });
       return;
     }

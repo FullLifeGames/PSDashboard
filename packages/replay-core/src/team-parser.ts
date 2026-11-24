@@ -1,4 +1,3 @@
-
 const GERMAN_STAT_MAP: Record<string, string> = {
   'KP': 'HP',
   'Ang': 'Atk',

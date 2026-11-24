@@ -37,7 +37,7 @@ const slicePart = SLICE ? { k: Number(SLICE[1]), n: Number(SLICE[2]) } : null;
 const bringOnlyFor = (...args: Parameters<typeof replayBringOnly>) => replayBringOnly(...args) ?? undefined;
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
-  schema: 2, // FitSample gained faintedFraction/genClass — bump forces one recapture
+  schema: 2, // FitSample gained faintedFraction/genClass, a bump forces one recapture
   featureKeys: FEATURE_KEYS,
   weights: { EVAL_WEIGHTS, FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, VGC_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS },
   manifestIds: manifest.replays.map(entry => entry.id),
@@ -187,7 +187,7 @@ interface FitSample {
   source: 'tournament' | 'ladder';
   gameType: 'singles' | 'doubles';
   genClass: 'gen9' | 'old';
-  /** Features scaled by scale/normalizer — the tanh argument's addends. */
+  /** Features scaled by scale/normalizer: the tanh argument's addends. */
   g: number[];
   score: number;
   faintedFraction: number;

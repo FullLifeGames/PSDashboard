@@ -11,7 +11,10 @@ export interface LoggedOptions {
   checks?: ReadonlyMap<string, readonly string[]>;
   /** Effect ids (`brn`, `flinch`, `boosts:spd`, `self:atk+def`) of a move's chance secondaries; none shown is a no. */
   secondariesOf?: (moveId: string) => readonly string[];
-  /** The condition that makes a clicked stalling move draw to succeed again, by slot; a |-fail| is then a failure. */
+  /**
+   * The condition that makes a clicked stalling move draw to succeed again, by slot; a |-fail| is then a failure.
+   * A stalling move the body knows but did not click (Encore's repeat) is keyed `slot:move`.
+   */
   stalling?: ReadonlyMap<string, string>;
   /** A move written with no aim (`|move|p1a: X|Psycho Shift||[still]`) passed its accuracy draw before failing. */
   accuracyTargets?: ReadonlyMap<string, readonly string[]>;

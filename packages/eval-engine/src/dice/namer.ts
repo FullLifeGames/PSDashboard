@@ -12,6 +12,7 @@ export class DrawNamer {
   }
 
   /** null when nothing names the draw, or after `release()`. */
+  // Call once per simulator draw, also for one the PRNG answers itself: a skipped draw leaves the watch's queue behind.
   name(draw: Draw): DieName | null {
     const watch = this.watch;
     if (!watch) return null;

@@ -1,4 +1,3 @@
-
 /** A side of a battle: `p1` or `p2`. */
 export type SideId = 'p1' | 'p2';
 

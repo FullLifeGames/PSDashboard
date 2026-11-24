@@ -18,6 +18,7 @@ type OfferedState = Pick<BranchSimState, 'p1MovesBySlot' | 'p2MovesBySlot' | 'p1
 export interface SeedSlot {
   /** The choice the slot starts with; null when nothing was played or the picker does not offer what was. */
   choice: BranchSlotChoice | null;
+  /** What the viewed line played here, kept also when the picker lacks it. */
   played: PlayedPick | null;
 }
 

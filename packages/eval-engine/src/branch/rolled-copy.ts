@@ -33,6 +33,7 @@ export interface RolledCopyInput {
 
 /** The position after the copy's turn with the die turned over, and how the turn ended. */
 export interface RolledCopy {
+  // No snapshot corrects this position: it is the copy's own.
   serialized: string;
   flip?: string;
   /** The game's end in the copy as a score from p1's view (1, -1, or 0 for a tie); null while it goes on. */

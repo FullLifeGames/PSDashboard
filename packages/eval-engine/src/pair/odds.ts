@@ -25,6 +25,7 @@ type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: u
 export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
   const dexMove = battle.dex.moves.get(action.moveId);
   if (typeof (dexMove as { onModifyMove?: unknown }).onModifyMove !== 'function') return dexMove.target;
+  // One answer per body, move and click: valid because a position's reader battle is never written (askCheckOn checks).
   let asked = targetsAsked.get(attacker);
   if (!asked) targetsAsked.set(attacker, asked = new Map());
   const key = `${action.moveId}|${action.tera === true}`;
@@ -92,8 +93,8 @@ function clearsField(battle: Battle, own: 0 | 1, actions: readonly PairAction[])
   });
 }
 
-// The option's headline: the uncertain kill (0 < kill, hit × kill < 1) with the best chance. A foe another slot of the
-// kills for sure is left out: odds on it say nothing about whether it lives.
+// The option's headline: the uncertain kill (0 < kill, hit × kill < 1) with the best chance. A foe that another slot
+// of the option kills for sure is left out: odds on it say nothing about whether it lives.
 function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | null {
   const events: { defender: Pokemon; odds: Odds }[] = [];
   const actions = parsePairChoice(battle, own, choice) ?? [];

@@ -222,7 +222,7 @@ describe('eval graph blunder detection', () => {
 
   test('key turns cover both sides of every big swing', () => {
     const scores = [0.1, 0.15, -0.3, -0.25, 0.4];
-    // Swings land on turns 3 and 5 — deepen the causing turn and the turn after.
+    // Swings land on turns 3 and 5: deepen the causing turn and the turn after.
     expect(selectKeyTurns(scores)).toEqual([2, 3, 4, 5]);
   });
 

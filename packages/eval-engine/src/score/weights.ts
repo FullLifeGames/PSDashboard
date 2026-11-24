@@ -1,4 +1,3 @@
-
 /** All tuning in one place: points on an arbitrary scale, the final score normalized to [-1, +1]. */
 export const EVAL_WEIGHTS = {
   alive: 100,

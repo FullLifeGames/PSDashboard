@@ -25,6 +25,7 @@ type AssumptionSet = {
 type RawSet = { moves?: (string | string[])[]; item?: string | string[] };
 type RawSetsFile = Record<string, Record<string, RawSet | undefined> | undefined>;
 
+// Published sets are read as published, on the standard Generations of replay-core (no mod).
 const gens = generationsFor('');
 const cache = new Map<string, Promise<SmogonSetAssumptions | null>>();
 

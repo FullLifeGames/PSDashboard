@@ -21,6 +21,8 @@ function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { nam
   return { name: `Hidden Power ${attacker.hpType}`, basePower: simGenNum(gen) < 6 && attacker.hpPower ? attacker.hpPower : null };
 }
 
+// A damaging move the simulator plays typeless (Struggle in Gens 2 to 4) goes to the calc typeless too:
+// calc 0.12 lets it take Normal items.
 function typelessOverride(gen: CalcGen, name: string): { type: never } | null {
   const move = dexOfCalc(gen).moves.get(name);
   return move.exists && move.type === '???' && move.category !== 'Status' ? { type: '???' as never } : null;

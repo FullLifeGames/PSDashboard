@@ -26,6 +26,7 @@ const chanceOfDraw = (draw: Draw): number | undefined => (draw.call === 'chance'
 
 function chanceLikeliest(name: DieName, draw: Draw): LikeliestDie {
   const chance = chanceOfDraw(draw);
+  // No chance on the draw (the Gen 2 crit compares random(256) with a threshold it does not show): does not happen.
   if (chance === undefined) return { die: { name, result: { happens: false } } };
   return chance >= 0.5 ? { die: { name, result: { happens: true } }, chance } : { die: { name, result: { happens: false } }, chance: 1 - chance };
 }

@@ -164,6 +164,7 @@ describe('the pools hold what the simulator lets exist (sweep over every non-sta
       expect(getEveryMovePool(9, format)).not.toContain('Spectral Thief');
       expect(getEveryAbilityPool(9, format)).not.toContain('Fire Mane');
     }
+    // National Dex lifts the existence rule for moves (its rule table says +Past) and keeps refusing the Past items.
     expect(getEveryMovePool(9, 'gen9nationaldex')).toContain('Spectral Thief');
     expect(getItemPool(9, 'gen9nationaldex')).not.toContain('Flying Gem');
   });

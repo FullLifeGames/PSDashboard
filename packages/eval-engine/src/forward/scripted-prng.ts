@@ -60,6 +60,7 @@ function isMoveRange(items: unknown[], start: number, end: number): boolean {
   return true;
 }
 
+// An answered die consumes no draw of the stream (a quantile answer draws the natural number first).
 export class ScriptedPRNG extends PRNG {
   private battle: Battle | null = null;
   private namer: DrawNamer | null = null;

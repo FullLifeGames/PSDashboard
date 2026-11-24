@@ -1,4 +1,3 @@
-
 export type Obj = Record<string, unknown>;
 export type CopyValue = (value: unknown, x: Ctx) => unknown;
 

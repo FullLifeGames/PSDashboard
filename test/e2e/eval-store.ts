@@ -1,4 +1,3 @@
-
 export const EVAL_STORE_DIR = 'test/e2e/fixtures/eval-store';
 export const CAPTURE_COMMAND = 'node scripts/capture-eval-store.mjs';
 

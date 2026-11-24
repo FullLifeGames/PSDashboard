@@ -113,6 +113,7 @@ function offerReplacement(
       // A failing consumer leaves a gap, never a failed replay.
     }
   }
+  // A gap counts as a request (the ordinal stays the protocol's) and fires no hook.
   return !!point;
 }
 

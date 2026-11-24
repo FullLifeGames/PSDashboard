@@ -74,6 +74,7 @@ function isStrike(board: Board, slot: number, part: Part): boolean {
   return clicks.every(click => boundaryEvent(battle, attacker, foeBody, part.id, click)?.pKill === 1);
 }
 
+// The calculator knows no Psychic Terrain, Dazzling or Focus Sash, so the strike is played: no foe move may show.
 function playsOut(position: SimPosition, side: Side, choice: string, replies: ChoiceOption[]): boolean {
   if (replies.length === 0) return false;
   const count = plainDrawCount(positionBattle(position));

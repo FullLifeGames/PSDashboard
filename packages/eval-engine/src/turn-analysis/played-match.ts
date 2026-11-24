@@ -199,6 +199,7 @@ export function phantomStayIn(
   const moves = result.perSide[side].filter(candidate => candidate.choice.startsWith('move '));
   const idOf = (candidate: RankedChoice): string => candidate.choice.split(' ')[1] ?? '';
   const open = bound ? moves.filter(candidate => !bound.moves.includes(idOf(candidate))) : [];
+  // Dex priority misses Prankster and Grassy Glide (ModifyPriority), so a bound, when there is one, picks the move.
   const option = open[0] ?? moves.find(candidate => (dex.moves.get(idOf(candidate)).priority ?? 0) === 0);
   return option ? { ...option, label: 'stayed in (KO’d before acting)' } : null;
 }

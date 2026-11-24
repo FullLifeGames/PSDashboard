@@ -112,7 +112,7 @@ test.describe('PS Dashboard', () => {
     const tray = await openTrayMore(page, 'p1a');
     const whatIf = tray.getByLabel('Hypothetical move for P1');
 
-    // Garchomp knows 3 moves — the hypothetical simply becomes the 4th.
+    // Garchomp knows 3 moves: the hypothetical simply becomes the 4th.
     await expect(whatIf).toBeVisible({ timeout: 15000 });
     await expect(tray.getByLabel('Replaced move for P1')).toHaveCount(0);
     await whatIf.fill('Flamethr');
@@ -128,7 +128,7 @@ test.describe('PS Dashboard', () => {
     }).toPass({ timeout: 15000 });
     const trayAgain = dockTray(page);
 
-    // Now the set is full — a second hypothetical must replace a chosen move.
+    // Now the set is full: a second hypothetical must replace a chosen move.
     const whatIfAgain = trayAgain.getByLabel('Hypothetical move for P1');
     await whatIfAgain.fill('Fire Blast');
     await trayAgain.getByLabel('Replaced move for P1').selectOption({ label: 'Earthquake' });

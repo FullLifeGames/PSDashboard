@@ -40,12 +40,13 @@ export interface EvalGraphState {
   sensitivity: (TurnSensitivity | null)[];
   /** evalErrors[t-1] = message of a throwing evaluation; acquisition gaps stay in `notice`. */
   evalErrors: (string | null)[];
-  /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
+  /** Turn 0 (team preview) evaluation; null when unavailable or not swept. */
   lead: LeadEvalData | null;
   /** replacements[t-1] = the replacements between turn t-1 and t; null = none or not priced, absent = no sweep ran. */
   replacements?: (ReplacementEvalData[] | null)[];
   /** p1-view score with the biggest roll's die turned over; null = no named roll or no copy, absent = no full sweep. */
   rollFlip?: RollFlip | null;
+  /** Why the line is short, when it is: the single pass reached only part of the game (a diverging reconstruction). */
   notice: string | null;
   running: boolean;
   progress: { done: number; total: number } | null;

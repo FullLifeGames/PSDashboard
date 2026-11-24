@@ -88,6 +88,7 @@ export function failsAgainstStanding(dex: ReturnType<typeof positionBattle>['dex
   const move = dex.moves.get(moveId);
   if (!move.sideCondition) return false;
   const standing = (move.target === 'foeSide' ? foe : own).sideConditions[move.sideCondition] as { layers?: number } | undefined;
+  // An onHitSide move (Quick Guard, Wide Guard) runs it either way and prints no failure.
   if (!standing || typeof (move as { onHitSide?: unknown }).onHitSide === 'function') return false;
   if (typeof (dex.conditions.get(move.sideCondition) as { onSideRestart?: unknown }).onSideRestart !== 'function') return true;
   const cap = LAYER_CAPS[move.sideCondition];

@@ -6,7 +6,7 @@ import type { RowValues } from '../../lib/line-view';
 export const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
 export const evTitle = (name: string) =>
   `${name}'s win probability with this choice against balanced play; higher is better for ${name}.`;
-/** Played-vs-engine EV gaps under this are display noise — the picks are equivalent. */
+/** Played-vs-engine EV gaps under this are display noise: the picks are equivalent. */
 export const ENGINE_EQUIVALENT_EPSILON = 0.01;
 
 function preventedText(reason: string): string {

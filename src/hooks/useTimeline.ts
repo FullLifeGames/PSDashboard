@@ -120,6 +120,7 @@ interface NavArgs {
 type SeekIntentRef = { current: { turn: number; until: number } | null };
 type FrameTurnRef = { current: number | null };
 
+// The bound outlasts a new frame document's load (over four seconds under the full e2e suite).
 const PLAY_IN_GUARD_MS = 20_000;
 
 // `toFrame`: the pointer takes a turn the frame shows, never seeks it; `true`: the last turn any frame reported,
@@ -188,6 +189,7 @@ function useTipFollow(args: NavArgs, seekIntentRef: SeekIntentRef, navigateTo: N
     }
     const key = `${variationSpan.startTurn}:${tipTurn}`;
     if (followedKeyRef.current === key) {
+      // The win can land a render after its turn: the guard then waits for the last played turn.
       const intent = seekIntentRef.current;
       if (variationEnded && intent?.turn === tipTurn) seekIntentRef.current = { ...intent, turn: tipTurn - 1 };
       return;
@@ -198,6 +200,7 @@ function useTipFollow(args: NavArgs, seekIntentRef: SeekIntentRef, navigateTo: N
       return;
     }
     // The frame plays the turn in from the one before the tip; its reports until it lands are the app's own.
+    // An ended tip has no turn of its own: the frame lands on the last played turn, and that landing ends the guard.
     seekIntentRef.current = { turn: variationEnded ? tipTurn - 1 : tipTurn, until: Date.now() + PLAY_IN_GUARD_MS };
     navigateTo({ turn: tipTurn, line: 'variation' }, { seek: false, internal: true, followPlay: true });
   }, [branching, tipTurn, variationSpan, variationEnded, navigateTo, seekIntentRef]);

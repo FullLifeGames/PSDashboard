@@ -160,7 +160,7 @@ test.describe('PS Dashboard', () => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
 
-    // Swords Dance for P1 (no damage — a max-damage pick can crit-KO and
+    // Swords Dance for P1 deals no damage: a max-damage pick could crit-KO and force P2 into a switch prompt.
     await pickMove(page, 'p1a', 'Swords Dance');
     await pickMove(page, 'p2a');
     const iframe = await page.locator('iframe[title="Branch Simulation"]').elementHandle();
@@ -195,7 +195,7 @@ test.describe('PS Dashboard', () => {
     await pickMove(page, 'p2a');
     await page.locator('.ps-execute-btn').click();
 
-    // The appended turn grows the visible log — a marker that does not
+    // The appended turn grows the visible log: a marker that does not depend on damage rolls, KOs or inferred spreads.
     await expect.poll(logLength).toBeGreaterThan(beforeLength + 20);
     const afterLength = await settledLogLength();
     await expect.poll(async () =>

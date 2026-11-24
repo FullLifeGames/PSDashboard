@@ -42,6 +42,7 @@ export interface PokemonSnapshot {
   boostedStat?: string;
   /** Supreme Overlord's count of fallen allies, from the client's `fallenN` volatile; absent without it. */
   fallen?: number;
+  /** The hits the body took, as @pkmn/client counts them (Rage Fist); absent at none. */
   timesAttacked?: number;
   /**
    * The PP the log shows spent, by move name, as @pkmn/client counts it (Pressure's extra point included, a Leppa or
@@ -247,6 +248,7 @@ export interface HitParty {
   itemChanged: boolean;
   /** 'M', 'F' or '' (genderless or unknown): Rivalry reads it. */
   gender: string;
+  /** Supreme Overlord's count of fallen allies at the hit (the calculator's `alliesFainted`). */
   alliesFainted: number;
   /** Ability states the calculator cannot see: Flash Fire, Slow Start, Protosynthesis or Quark Drive stat, a Charge. */
   flashFire: boolean;

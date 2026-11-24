@@ -25,6 +25,7 @@ function fromOf(parts: string[]): { name: string; typed: string } | null {
   return typed ? { typed: typed[1], name: typed[2] } : { typed: '', name: text };
 }
 
+// A status Z-move prints "Z-" before its base move, a name the Dex does not list.
 const poweredMove = (dex: RulesDex, name: string): boolean => {
   const move = dex.moves.get(name);
   return move.exists ? !!(move.isZ || move.isMax) : /^Z-/.test(name);
@@ -40,8 +41,10 @@ function bookedBy(dex: RulesDex, parts: string[]): { moves: string[]; via: Via }
   if (!from) return { moves: poweredMove(dex, shown) ? [] : [shown], via: 'own' };
   const fromId = toId(from.name);
   const calls = !!dex.moves.get(from.name).callsMove;
+  // Sleep Talk books the shown move, typed or not; Pursuit's switch hit is the body's own move.
   if (fromId === 'sleeptalk' || fromId === 'pursuit') return { moves: [shown], via: 'own' };
   if (from.typed === 'move') return calls ? { moves: [from.name], via: 'own' } : { moves: [shown], via: 'from-move' };
+  // A type-less [from] books the caller only for a callsMove move; Magic Coat, Snatch, lockedmove, echoes book none.
   return { moves: !from.typed && calls ? [from.name] : [], via: 'own' };
 }
 

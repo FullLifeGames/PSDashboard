@@ -17,6 +17,7 @@ export interface EmbedHostState {
   requestedGame: string | null;
 }
 
+// Disjoint from the viewer protocol (ps-turn, ps-seek-turn, ps-append-log, ps-replay-ready): one shared window.
 /** Host-page contract: `ps-load-replay` in; `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error` out. */
 export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): EmbedHostState {
   const [config] = useState<EmbedHostState>(() => {

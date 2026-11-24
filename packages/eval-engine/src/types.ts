@@ -99,7 +99,9 @@ export interface CellBlendClass {
   weight: number;
   leafSum: number;
   count: number;
+  /** The first-seed child (the one deepening expands) lives in this class. */
   hasFirst: boolean;
+  /** Every sampled child of this class ended the game (its leaves are exact: 1, -1 or 0). */
   ended: boolean;
   /** The class's representative child one ply deeper; set by the verify step on every open class. */
   deepened?: number;
@@ -363,7 +365,7 @@ export interface PlannedCell { key: number; plan: 'none' | 'events'; classes?: C
 
 /** An exploitative recommendation: best response to the opponent MODEL. */
 export interface ReadRecommendation {
-  /** choiceId is the machine id ('move recover', 'switch 3'). */
+  /** choiceId is the machine id ('move recover', 'switch 3'); absent on cached reads without ids. */
   choice: { label: string; ev: number; worstCase: number; choiceId?: string };
   /** Own-perspective EV against the model (wp-units). */
   net: number;

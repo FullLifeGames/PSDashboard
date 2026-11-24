@@ -1,4 +1,3 @@
-
 /** A later @font-face of the family replaces FA 4.7's woff2, whose stale glyph boxes make Firefox warn per glyph. */
 export function fontAwesomeOverrideStyle(woff2Url: string): string {
   const url = woff2Url.replace(/'/g, '%27');
