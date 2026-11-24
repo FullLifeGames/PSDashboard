@@ -9,24 +9,8 @@ import { checkBuiltSets, loggedBodies, ownerOf, type Gap } from './logged-moves'
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 import games from './fixtures/logged-move-corpus-ids.json';
 
-/**
- * Every move the log shows as a body's own is in the set the build makes, on every build path without a user's edit (a pasted or
- * edited set may lack one by the rule that a manual edit beats the log, `team/set-resolvers.ts:78-82`). The oracle is its own reading
- * of the log (`logged-moves.ts`); the sweep holds the inference and the build to it.
- *
- * Paths: `bare` (no Smogon data, `buildTeamsFromReplay`), `bank` (the app's and the bank's build with Smogon data: the feedback
- * fixtures' pinned files, the corpus games' disk cache), `nodata` (the app's chain with every Smogon call answered 404).
- * Rows: the twelve feedback fixtures (tracked, run in CI); the games of `fixtures/logged-move-corpus-ids.json` (local: they skip
- * without `.fit-corpus`): `core` always, the rest of the 300-game sample of the log scan with LOGGED_MOVE_SWEEP=full. Each family is
- * counted apart in the titles (singles, Doubles OU, VGC SV, Champions OU, Champions VGC).
- *
- * Gaps with an owner (the issues that fix them) stand in `OWNED`: each owner has one expected-fail row that passes while its gaps
- * exist and turns red once the fix leaves none, the moment to delete the row. Open gaps: a Zoroark's moves book on the body it
- * disguises as, and one finding without an issue (a gen 2 log whose four species share the nickname "???"). Any other gap is a red
- * row and a finding.
- */
+// Local: the games of `fixtures/logged-move-corpus-ids.json` skip without `.fit-corpus`; the twelve fixtures run in CI.
 
-/** The feedback fixtures' pinned Smogon data, as `forced-reconstruction-support.ts` reads it (the same files and key scheme). */
 const pinnedFetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
   const path = url.replace(/^https:\/\/(data\.pkmn\.cc|pkmn\.github\.io\/smogon\/data)/, '').replace(/\/{2,}/g, '/');
@@ -47,7 +31,6 @@ interface Found { game: string; family: string; type: string; path: Path; gap: G
 const found: Found[] = [];
 const totals = { games: 0, bodies: 0, moves: 0, held: 0 };
 
-/** The teams one build path makes for a replay. */
 async function teamsOf(replay: Replay, id: string, path: Path, fetcher: typeof fetch): Promise<{ p1Team: PokemonSet[]; p2Team: PokemonSet[] }> {
   const parsed = parseReplayLogWithObservations(replay.log);
   const formatId = replay.formatid ?? id;
@@ -56,7 +39,6 @@ async function teamsOf(replay: Replay, id: string, path: Path, fetcher: typeof f
   return built.teams;
 }
 
-/** One game on the three paths: no body without a set, no gap without an owner; the owned gaps go to the owners' rows. */
 async function sweepGame(id: string, file: string, fetcher: typeof fetch) {
   const replay = JSON.parse(readFileSync(file, 'utf-8')) as Replay;
   const formatid = replay.formatid ?? id;
@@ -78,7 +60,6 @@ const corpusFile = (id: string) => join('.fit-corpus', `${id}.json`);
 const hasCorpus = existsSync('.fit-corpus');
 const fixtureFile = (id: string) => join('test', 'e2e-feedback', 'fixtures', `${id}.json`);
 const corpusIds = [...games.core, ...(process.env.LOGGED_MOVE_SWEEP === 'full' ? games.full : [])];
-/** The games by family and game type, the titles' groups (the format id sits in the replay, else in the game's id). */
 const byFamily = (ids: string[], file: (id: string) => string) => {
   const groups = new Map<string, string[]>();
   for (const id of ids) {
@@ -166,13 +147,10 @@ describe.skipIf(!hasCorpus)('the corpus games hold every logged move on every bu
   }
 });
 
-/** The gaps of one owner over the games swept above (the rows run after them in file order). */
 const gapsOf = (owner: string) => found.filter(row => row.gap.owner === owner).map(row => `${row.type} ${row.family} ${row.game} (${row.path}): ${row.gap.side} ${row.gap.species} lacks ${row.gap.move}`);
 
 describe.skipIf(!hasCorpus)('the gaps with an owner (expected failures until the owner is fixed)', () => {
-  // A Pledge combination books the shown move, with no extra slot.
   test('no gap is left of a Pledge combination that books the partner\'s Pledge', () => expect(gapsOf('#140')).toEqual([]));
-  // A copy's move line books to the body it copied (the inference follows the client's Transform volatile).
   test('no gap is left of a transformed body\'s move that books to the body it copied', () => expect(gapsOf('#139')).toEqual([]));
   test.fails('finding, no issue yet: bodies that share a nickname (smogtours-gen2ou-349774, "???" for four species) book to one body', () => expect(gapsOf('shared-nickname')).toEqual([]));
   test.fails('a Zoroark\'s moves book on the Zoroark (milestone 1.3.0)', () => expect(gapsOf('#141')).toEqual([]));

@@ -45,8 +45,6 @@ import {
 
 describe('fit helpers', () => {
   const synth = (k0: number, k1: number, n = 400) => {
-    // Deterministic synthetic corpus: outcomes drawn by thresholding the
-    // model probability against an LCG — recoverable ground truth.
     let seed = 42;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
     return Array.from({ length: n }, (_, i) => {
@@ -66,13 +64,12 @@ describe('fit helpers', () => {
   test('recovers a phase slope and beats constant K on Brier', () => {
     const samples = synth(1.0, 3.0);
     const { k0, k1 } = fitPhaseK(samples);
-    expect(k1).toBeGreaterThan(1.0); // slope direction recovered
+    expect(k1).toBeGreaterThan(1.0);
     const constant = fitConstantK(samples);
     expect(brierScore(samples, k0, k1)).toBeLessThanOrEqual(brierScore(samples, constant) + 1e-9);
   });
 
-  // The phase fit runs to the maximum: the k1 column carries a tenth of k0's curvature, so 500 fixed gradient steps stop a fifth of
-  // the way along the slow direction and every K pin reads an intermediate state.
+  // 500 fixed gradient steps stop a fifth of the way along the slow direction (k1 carries a tenth of k0's curvature).
   test('the phase fit runs to the maximum: the gradient vanishes and long gradient descent agrees', () => {
     const samples = synth(1.0, 3.0);
     const { k0, k1 } = fitPhaseK(samples);
@@ -105,12 +102,10 @@ describe('fit helpers', () => {
   });
 
   test('the phase fit stays finite where the data carry no slope or no limit', () => {
-    // One phase only: no curvature along k1, the slope stays where it started.
     const flat = synth(2.0, 0).map(s => ({ ...s, faintedFraction: 0 }));
     const onePhase = fitPhaseK(flat);
     expect(onePhase.k1).toBe(0);
     expect(onePhase.k0).toBeCloseTo(fitConstantK(flat), 3);
-    // Perfectly separable outcomes push K up without bound: the fit stops finite.
     const separable = synth(2.0, 1.0).map(s => ({ ...s, won: s.score > 0 }));
     const { k0, k1 } = fitPhaseK(separable);
     expect(Number.isFinite(k0) && Number.isFinite(k1)).toBe(true);
@@ -181,8 +176,6 @@ describe('cv helpers', () => {
   });
 
   test('cross-validation prefers the causal basis under collinearity', () => {
-    // The outcome depends only on column 0 (A); column 1 (B) = A + noise. The basis with A (B masked) must beat the basis with B only
-    // out of fold: coefficient SEs could not decide that under collinearity, CV must.
     let seed = 42;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
     const samples: CvSample[] = [];
@@ -200,17 +193,10 @@ describe('cv helpers', () => {
   });
 });
 
-/**
- * The static's weights fitted in today's model form at the fixed K of winprob.ts, P = sigmoid(K(game type, phase) · tanh(Σ w·g)),
- * one weight per column shared by both game types, a doubles override where the doubles table differs, the columns at 0 in both
- * tables held.
- */
 describe('weights at a fixed K', () => {
   const K = { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } };
-  // Columns: 0 bodies-like, 1 boosts-like and 2 tailwind-like (both overridden in doubles), 3 a sweep cell at 0.
   const hand = layoutOf([1, 1, 1, 0], [1, 0.5, 2, 0]);
 
-  /** Games alternate singles and doubles, four positions each; singles never see column 2. */
   function corpus(singles: number[], doubles: number[], games: number, seed: number): AtKSample[] {
     const { layout } = layoutOf(singles, doubles);
     const theta = [...singles, ...layout.overrides.map(j => doubles[j])];
@@ -235,7 +221,6 @@ describe('weights at a fixed K', () => {
     expect(hand.layout.overrides).toEqual([1, 2]);
     expect([...hand.layout.held]).toEqual([3]);
     expect(hand.start).toEqual([1, 1, 1, 0, 0.5, 2]);
-    // A doubles sample reads its overrides, a singles sample the shared weights.
     const sample: AtKSample = { g: [0.1, 0.2, 0.3, 0.4], won: true, doubles: true, faintedFraction: 0, game: 'g' };
     expect(atKScore(sample, hand.start, hand.layout)).toBeCloseTo(Math.tanh(0.1 + 0.5 * 0.2 + 2 * 0.3), 12);
     expect(atKScore({ ...sample, doubles: false }, hand.start, hand.layout)).toBeCloseTo(Math.tanh(0.1 + 0.2 + 0.3), 12);
@@ -244,7 +229,6 @@ describe('weights at a fixed K', () => {
   test('the fit gives known weights back; a column without data and a held column keep their start', () => {
     const samples = corpus([1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], 3000, 11);
     const free = supportOf(samples, hand.layout, 20);
-    // The shared tailwind-like weight scores only singles, which never see the column.
     expect(free).toEqual([true, true, false, false, true, true]);
     const fit = fitWeightsAtK(samples, hand.start, hand.layout, K, free);
     expect(fit[0]).toBeCloseTo(1.6, 0);
@@ -294,12 +278,10 @@ describe('weights at a fixed K', () => {
     expect(report.proposed.doubles.boosts).toBe(report.weights[4].fit);
     expect(report.summary.pooled.logLossWins).toBe(3);
     expect(report.verdict.adopt).toBe(report.summary.pooled.meanBrierDelta <= 0);
-    // From the true weights the refit cannot win every seed, and the rule keeps them.
     const kept = refitAtKReport(samples, names, [1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], K, { seeds: 3, folds: 5, draws: 10, minGames: 20 });
     expect(kept.verdict.adopt).toBe(false);
   });
 
-  // The pre-registered holds (the two sign-unsure weights and the boost weights of variant E) are a report option.
   test('a held weight keeps its start in the fit, the bands and the proposal', () => {
     const samples = corpus([1.6, 0.6, 1, 0], [1.6, 1.2, 2.5, 0], 600, 5);
     const names = ['bodies', 'boosts', 'tailwind', 'sweep'];
@@ -424,10 +406,6 @@ describe('calibration lib', () => {
   });
 });
 
-/**
- * A paired verdict carries its error bar. One replay yields up to eight positions with ONE outcome, so the bootstrap resamples
- * replays, not positions, and a row reads as a verdict only when its band clears zero.
- */
 describe('paired bands', () => {
   interface BankSample extends Sample { quality: 'hq' | 'std'; luckAgainstFavored: boolean }
   interface BandRow {
@@ -435,7 +413,6 @@ describe('paired bands', () => {
     meanBp: number; loBp: number; hiBp: number; seBp: number; pBetter: number; reading: string;
   }
 
-  // 30 replays of four positions: every third replay doubles, every second hq, every fifth luck-flagged.
   const bank = (): BankSample[] => {
     let seed = 11;
     const rand = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
@@ -505,7 +482,6 @@ describe('paired bands', () => {
     const pooled = rowOf(result.rows, 'full', 'all', 'all');
     expect([pooled.n, pooled.games]).toEqual([120, 30]);
     expect(pooled.meanBp).toBeGreaterThan(0);
-    // A third of the draws leave the one moved replay out, so the low end stays at zero.
     expect(pooled.loBp).toBe(0);
     expect(pooled.reading).toBe('unresolved');
     expect([rowOf(result.rows, 'full', 'singles', 'all').games, rowOf(result.rows, 'full', 'doubles', 'all').games]).toEqual([20, 10]);
@@ -514,7 +490,6 @@ describe('paired bands', () => {
     expect(rowOf(result.rows, 'full', 'doubles', 'all').reading).toBe('unmoved');
   });
 
-  // A fix that moved 38 of 833 positions read +1 bp [+0, +2], resolved and irrelevant.
   test('harm and warnings need size: a resolved shift under 5 bp is a note', () => {
     const a = bank();
     const small = pairedBands(a, a.map(sample => against(sample, 0.0001)));
@@ -527,15 +502,9 @@ describe('paired bands', () => {
     const line = bandLines(small).at(-1);
     expect(line).toContain('no harm');
     expect(line).toContain('resolved under 5 bp: full all (+');
-    // The offset of the earlier test is far above the floor and stays harm.
     expect(bankVerdict(pairedBands(a, a.map(sample => against(sample, 0.3)))).notes).toHaveLength(0);
   });
 
-  /**
-   * Under one fixed K the bank pays for scale: a root that reads doubles early flatter and late steeper wins on the bank without a
-   * single better decision (doubles −35 bp from rescaling alone). The second table gives each side its own K per game type and
-   * phase, so only a better ordering of the positions reads as a gain.
-   */
   describe('own K per phase', () => {
     const scaled = (samples: BankSample[], gameType: string, phase: string, by: number) =>
       samples.map(sample => (sample.gameType === gameType && sample.phase === phase ? { ...sample, score: sample.score * by } : sample));
@@ -594,7 +563,6 @@ describe('paired bands', () => {
           expect(Math.abs(gradient)).toBeLessThan(1e-8);
         }
       }
-      // The fixture leans its late positions hard: both late cells carry no wrong sign.
       expect(capped).toEqual(['singles late', 'doubles late']);
     });
 

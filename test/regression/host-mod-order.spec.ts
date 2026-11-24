@@ -5,17 +5,7 @@ import { inferOpponentTeam, parseReplayLogWithObservations, type ReplayData } fr
 import { bankTeamsFor } from './bank-build';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 
-/**
- * The hosts load the Champions mod before the inference reads the resolver. A Pokémon Champions
- * game reads the registered Champions Dex (replay-core's rulesDex), which loads on demand; without it the inference throws
- * instead of reading Scarlet/Violet. Three things are held here:
- *  - the order itself: a Champions replay throws before the load and infers after it; a replay of any other format loads nothing
- *    (singles and doubles Champions fixtures, and a Scarlet/Violet one);
- *  - the bank's team build (bankTeamsFor) loads it on its own, because the calibration and holdout runs go through it;
- *  - every host that parses and infers a replay awaits the load first (the app's replay load, the bank's build, the two harnesses
- *    that build teams on their own); the feedback harness (test/e2e-feedback) infers in the app, through the replay load.
- * This spec runs in its own module registry, so the mod is unregistered at its start.
- */
+// A Champions game reads the registered Champions Dex, which loads on demand; without it the inference throws.
 const fixture = (path: string) => JSON.parse(readFileSync(path, 'utf8')) as ReplayData;
 const SINGLES = fixture('packages/eval-engine/test/fixtures/champions/gen9championsou-2693832490.json');
 const DOUBLES = fixture('packages/eval-engine/test/fixtures/champions/gen9championsvgc2026regmbbo3-2679053861.json');
@@ -44,7 +34,6 @@ describe('the load order', () => {
 
 describe('the bank\'s team build', () => {
   test('loads the mod itself: the build of a Champions replay needs no earlier load', async () => {
-    // The previous describe registered the mod in this realm; the throw test above already proved the unregistered case.
     const parsed = parseReplayLogWithObservations(DOUBLES.log);
     const built = await bankTeamsFor({ log: DOUBLES.log, formatId: DOUBLES.formatid ?? DOUBLES.id, parsed, fetcher: undefined });
     expect(built.reason).toBeNull();

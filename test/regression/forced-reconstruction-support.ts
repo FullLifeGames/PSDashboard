@@ -10,12 +10,8 @@ import { parseTurnBlocks } from '../../packages/eval-engine/src/branch/protocol-
 import { bankTeamsFor, bankWorldsFor } from './bank-build';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * The twelve feedback fixtures rebuilt the way the bank builds them (pinned Smogon data, `bankTeamsFor`) with the app's reconstruction,
- * with every turn's record, emitted block and boundary position kept for the rows of `forced-reconstruction.spec.ts`. The
- * reconstruction stops before each game's last block, as the feedback run's drift line counts it (356 turns).
- */
 
+// The reconstruction stops before each game's last block, as the feedback run's drift line counts it (356 turns).
 export const FIXTURES = [
   { id: 'smogtours-gen8ou-573756', type: 'singles' }, { id: 'smogtours-gen8ou-562428', type: 'singles' },
   { id: 'smogtours-gen6ou-648453', type: 'singles' }, { id: 'smogtours-gen6ou-649664', type: 'singles' },
@@ -41,24 +37,17 @@ export const pinnedFetcher = (async (input: string | URL | Request) => {
 
 export interface Rebuilt {
   replay: Fixture;
-  /** The record of every replayed turn, by turn. */
   records: Map<number, TurnAlignmentRecord>;
-  /** The serialized position at the start of every turn the reconstruction reached. */
   positions: Map<number, string>;
-  /** The reconstruction's battle log, whole. */
   battleLog: string[];
   snapshotFor(turn: number): ReturnType<typeof parseReplayLogWithObservations>['snapshots'][number] | null;
-  /** The log's lines of a turn (before and after the upkeep). */
   logBlock(turn: number): string[];
 }
 
-/** Rebuilds a fixture like the app: teams as the bank builds them, the 16-seed (or later the forced) reconstruction, boundaries captured. */
 export async function rebuild(id: string, options: { naked?: boolean; corpus?: boolean; through?: number; bare?: boolean } = {}): Promise<Rebuilt> {
-  // `corpus` reads a replay of the local fit corpus (the bank's replays) with the disk-cached Smogon data the bank pins
   const replay = JSON.parse(readFileSync(options.corpus ? join('.fit-corpus', `${id}.json`) : join('test', 'e2e-feedback', 'fixtures', `${id}.json`), 'utf-8')) as Fixture;
   await loadSimMods(getBranchSimulatorFormat(replay));
   const parsed = parseReplayLogWithObservations(replay.log);
-  // `naked` builds the teams from the log alone, with no Smogon data (the engine package's test helper does the same), so a species keeps its first ability
   const built = options.naked
     ? { teams: buildTeamsFromReplay(replay.log, { observations: parsed.observations, speedOrders: parsed.speedOrders }), usageStats: null, reason: 'no teams' }
     : await bankTeamsFor({ log: replay.log, formatId: replay.formatid ?? id, parsed, fetcher: options.corpus ? diskCachedSmogonFetcher() : pinnedFetcher });
@@ -67,14 +56,13 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
   const { snapshots, observations } = parsed;
   const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
   const blocks = parseTurnBlocks(replay.log).turns;
-  // `through`: the last turn whose boundary position the caller needs (the reconstruction captures a position when it reaches the next turn)
+  // `through`: the last turn whose boundary position the caller needs (captured on reaching the next turn).
   const lastTurn = options.through === undefined ? blocks[blocks.length - 1].turn : options.through + 1;
   const positions = new Map<number, string>();
   const runtime = await reconstructBranchRuntime({
     format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log, targetTurn: lastTurn,
     snapshot: snapshotFor(lastTurn), playerNames: [replay.players[0], replay.players[1]],
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
-    // The heaviest world, the one the app's main line stores; a pinned or bring-all game has the one world it had.
     bringOnly: bankWorldsFor(replay, parseReplayLog(replay.log), built.usageStats)[0].bringOnly,
     deadlineMs: 600_000,
     capturePositions: options.bare ? undefined : { snapshotFor, onPosition: (turn, battle) => { positions.set(turn, serializeLiveBattle(battle)); } },
@@ -87,7 +75,6 @@ export async function rebuild(id: string, options: { naked?: boolean; corpus?: b
   };
 }
 
-/** The lines a reconstruction emitted for a turn: between its `|turn|` line and the next, without the clock and the reseed message. */
 export function emittedBlock(battleLog: string[], turn: number): string[] {
   const from = battleLog.findIndex(line => line === `|turn|${turn}`);
   const to = battleLog.findIndex(line => line === `|turn|${turn + 1}`);
@@ -95,7 +82,6 @@ export function emittedBlock(battleLog: string[], turn: number): string[] {
   return battleLog.slice(from + 1, to >= 0 ? to + 1 : undefined).filter(line => !line.startsWith('|t:|') && !/^\|message\|The battle's RNG was reset/.test(line));
 }
 
-/** The channels and keys on which two blocks differ: the readable cause of an imperfect turn (the alignment score counts them). */
 export function diffChannels(expected: ProtocolEvents, got: ProtocolEvents): string[] {
   const out: string[] = [];
   for (const channel of ['misses', 'crits', 'secondaries', 'hitCounts', 'cants', 'confusionSelfHits'] as const) {
@@ -116,6 +102,5 @@ export function diffChannels(expected: ProtocolEvents, got: ProtocolEvents): str
   return out;
 }
 
-/** The diffs of a rebuilt turn's emitted block against the log. */
 export const diffsOf = (rebuilt: Rebuilt, turn: number): string[] =>
   diffChannels(extractProtocolEvents(rebuilt.logBlock(turn)), extractProtocolEvents(emittedBlock(rebuilt.battleLog, turn)));

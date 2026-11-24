@@ -6,21 +6,11 @@ import { fileURLToPath } from 'node:url';
 import namesPlugin from '../../eslint.names.mjs';
 import { censusOf, loadUniverse, ROOT } from '../../scripts/name-census.mjs';
 
-/**
- * The name ratchet. AGENTS.md says our code translates and reads library data and never writes species, move, item or ability names.
- * The rule names/no-new-dex-name counts a Dex name literal per file against scripts/name-baseline.json, which only shrinks: a pair
- * that is not in the baseline fails `npm run lint`, a pair that left the code does not.
- *
- * The rule reads names, not formats: a singles log and a doubles log reach it the same way, so there is no game-type case.
- * Its limit: it sees a new name per file (a second `reflect` in a file that has one passes); the twin detector
- * (test/regression/twin-lists.spec.ts) sees a new copy of a list across files.
- */
 
 const FILE = 'packages/eval-engine/src/zz-scratch.ts';
 const RULE = 'names/no-new-dex-name';
 const linter = new Linter();
 
-/** Lints a source text with the rule and an injected baseline; returns the rule's messages. */
 function lint(code: string, files: Record<string, string[]> = {}, filename = FILE): Linter.LintMessage[] {
   return linter.verify(
     code,
@@ -72,10 +62,10 @@ describe('names/no-new-dex-name', () => {
       "export * from 'metronome';",
       'const lazy = import(\'copycat\');',
       'const re = /copycat|metronome/;',
-      "const cut = 'Cut';", // three characters
-      "const word = 'status';", // not a Dex id
-      "const type = 'Psychic';", // a Dex move that is also a type
-      "const id = 'normal';", // a type id
+      "const cut = 'Cut';",
+      "const word = 'status';",
+      "const type = 'Psychic';",
+      "const id = 'normal';",
       "const stat = 'speed';",
       'const open = `copycat${cut}`;',
       "const nothing = 'Copy cat';",

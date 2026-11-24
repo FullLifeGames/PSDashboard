@@ -7,11 +7,6 @@ import {
   FRESH_FORMATS, appendFamily, checkReplay, drawCandidates, eligibleRows, idsIn, pairKey, takeChecked,
 } from '../../scripts/fresh-holdout.mjs';
 
-/**
- * scripts/fresh-holdout.mjs draws a holdout of rated ladder games that no tracked file, no local note and no .fit-corpus file names.
- * The rule is written and deterministic: per format by rating, one game per player pair over the whole draw. The fixture below stands
- * in for the public replay search, so no spec here touches the network.
- */
 
 type Row = { id: string; format: string; rating: number | null; players: string[] };
 const row = (format: string, n: number, rating: number | null, p1: string, p2: string): Row => ({

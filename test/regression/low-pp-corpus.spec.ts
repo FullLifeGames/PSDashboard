@@ -4,16 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { deserializeBattleExact } from '@fulllifegames/eval-engine';
 import { rebuild } from './forced-reconstruction-support';
 
-/**
- * The PP a move has left, on the corpus games where Revival Blessing (1 PP) was used and the same body moves again. The Evaluation
- * panel ranked the move first at the next boundary: the rebuilt slot read 1/1 where the game's read 0/1. Three scenes:
- * - cause A, singles: 2692599072 turn 5, Pawmot's built Leppa Berry eats in the rebuild and restores the move; the log shows no berry;
- * - cause B, doubles: 2695388932 turn 8, the rebuild knocks Rabsca out before it acts, so the move never runs there;
- * - the guard, singles: 2691485449 turns 13 and 14, the log shows the Leppa Berry, so the move reads 1/1 at turn 14 and stays on offer.
- * The games sit in the local fit corpus (`.fit-corpus`), which a clone lacks: the rows then skip.
- *
- * `through` stops the rebuild at the boundary, whose position is corrected from the snapshot like the position the app evaluates.
- */
+// Local: the rows skip without `.fit-corpus`.
 const CORPUS = (id: string): string => join('.fit-corpus', `${id}.json`);
 
 interface Row {
@@ -22,7 +13,6 @@ interface Row {
   side: 'p1' | 'p2';
   body: string;
   type: 'singles' | 'doubles';
-  /** The slot's PP at the boundary, and whether the ranking offers the move. */
   pp: number;
   offered: boolean;
 }
@@ -44,7 +34,6 @@ describe.each(ROWS)('$id turn $turn: $body at the boundary ($type)', row => {
     const slot = body.baseMoveSlots.find(entry => entry.id === 'revivalblessing')!;
     expect(slot.pp).toBe(row.pp);
     if (!side.active.includes(body)) return;
-    // The ranking lists what the side's request offers: the move is on offer when its entry in the request is enabled.
     const request = side.activeRequest;
     const entry = request && 'active' in request ? request.active?.[side.active.indexOf(body)]?.moves.find(move => move.id === 'revivalblessing') : undefined;
     expect(!!entry && !entry.disabled).toBe(row.offered);

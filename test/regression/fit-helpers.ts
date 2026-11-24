@@ -1,7 +1,4 @@
-/**
- * Shared probabilistic-scoring helpers for the fit (EVAL_FIT) and calibration (EVAL_CALIBRATION) harnesses. One logistic model
- * everywhere: P(p1 wins) = sigmoid((k0 + k1·faintedFraction) · score); k1 = 0 is the constant-K model.
- */
+/** One model everywhere: P(p1 wins) = sigmoid((k0 + k1·faintedFraction) · score); k1 = 0 is the constant-K model. */
 export interface OutcomeSample { score: number; faintedFraction: number; won: boolean }
 
 const sigmoid = (z: number) => 1 / (1 + Math.exp(-z));
@@ -20,10 +17,7 @@ export function logLossScore(samples: OutcomeSample[], k0: number, k1 = 0): numb
   }, 0) / samples.length;
 }
 
-/**
- * 500-iteration GD. One parameter, so the fixed step count does reach the maximum (K equal to four decimals against Newton, 0.0 bp
- * Brier apart, on the bank and six of its subsets). scripts/calibration-lib.mjs carries a copy that must stay equal to the last bit.
- */
+/** scripts/calibration-lib.mjs carries a copy of this fit that must stay equal to the last bit. */
 export function fitConstantK(samples: OutcomeSample[]): number {
   let k = 1.5;
   for (let iter = 0; iter < 500; iter++) {
@@ -34,11 +28,7 @@ export function fitConstantK(samples: OutcomeSample[]): number {
   return k;
 }
 
-/**
- * Newton on the log-likelihood, run to a standstill. Fixed gradient steps stop a fifth of the way along the slow direction (the k1
- * column carries a tenth of k0's curvature, about 8800 steps needed) and read an intermediate state (singles 2.51/1.18 where the
- * maximum is 1.86/3.73). The damping keeps a one-phase sample at k1 = 0, the step cap and the halving keep separable outcomes finite.
- */
+/** Run to a standstill: fixed gradient steps stop a fifth of the way along the slow direction. */
 export function fitPhaseK(samples: OutcomeSample[]): { k0: number; k1: number } {
   let k0 = 1.5;
   let k1 = 0;
@@ -83,7 +73,7 @@ export function fitPhaseK(samples: OutcomeSample[]): { k0: number; k1: number } 
 export interface PhaseKSpread {
   k0: { se: number; lo: number; hi: number };
   k1: { se: number; lo: number; hi: number };
-  /** K at faintedFraction 0, 1/3 and 2/3: k0 and k1 trade off against each other, the K they imply is the steadier reading. */
+  /** K at faintedFraction 0, 1/3 and 2/3: k0 and k1 trade off, so the K they imply is the steadier reading. */
   at: { ff: number; k: number; lo: number; hi: number }[];
 }
 
@@ -136,10 +126,6 @@ export function mulberry32(seed: number) {
 export interface LogisticSample { g: number[]; won: boolean }
 export interface CvSample extends LogisticSample { game: string }
 
-/**
- * Logistic regression on standardized features; deterministic fixed-iteration GD. The standardization keeps the problem well
- * conditioned: 500 steps, 5000 steps and Newton give the same implied weights to one decimal.
- */
 export function fitLogistic(samples: LogisticSample[]): {
   beta: number[]; intercept: number; sigma: number[]; mu: number[];
 } {
@@ -170,7 +156,6 @@ export function fitLogistic(samples: LogisticSample[]): {
   return { beta, intercept, sigma, mu };
 }
 
-/** Deterministic game-clustered fold assignment: sorted game list, seeded Fisher-Yates, round-robin over k folds, independent of caller order. */
 export function assignFolds(games: string[], k: number, seed: number): Map<string, number> {
   const order = [...games].sort();
   const rng = mulberry32(seed);
@@ -181,15 +166,12 @@ export function assignFolds(games: string[], k: number, seed: number): Map<strin
   return new Map(order.map((game, index) => [game, index % k]));
 }
 
-/**
- * Zeroes the dropped columns: for the standardized logistic fit this excludes the regressor (a constant-zero column keeps beta 0 via
- * the sigma||1 guard) and keeps the g-vector length.
- */
+/** A constant-zero column keeps beta 0 through the sigma||1 guard. */
 export function maskColumns(g: number[], drop: ReadonlySet<number>): number[] {
   return drop.size === 0 ? g : g.map((value, j) => (drop.has(j) ? 0 : value));
 }
 
-/** Game-clustered k-fold CV: fit on train folds, score out-of-fold with the TRAIN standardization (mu/sigma never leak from test). */
+/** Scores out-of-fold with the TRAIN standardization: mu and sigma never leak from the test fold. */
 export function crossValidate(
   samples: CvSample[], k: number, seed: number, drop: ReadonlySet<number>,
 ): { logLoss: number; brier: number } {
@@ -221,11 +203,7 @@ export interface GameTypeK { singles: PhaseK; doubles: PhaseK }
 
 export interface AtKSample { g: number[]; won: boolean; doubles: boolean; faintedFraction: number; game: string }
 
-/**
- * The weight layout of today's model. The parameters are the shared weights in column order, then the doubles overrides: a doubles
- * sample reads its override where the two tables differ and the shared weight elsewhere. Columns at 0 in both tables (the sweep
- * cells) are held there: the model form keeps them out.
- */
+/** Parameters: the shared weights in column order, then the doubles overrides; columns at 0 in both tables are held. */
 export interface WeightLayout { columns: number; overrides: number[]; held: ReadonlySet<number> }
 
 export function layoutOf(singles: number[], doubles: number[]): { layout: WeightLayout; start: number[] } {
@@ -259,7 +237,6 @@ const kOf = (sample: AtKSample, k: GameTypeK): number => {
   return phase.k0 + phase.k1 * sample.faintedFraction;
 };
 
-/** The parameters a fit may move: not held, and supported (their column is nonzero in at least `minGames` games among the samples they score). */
 export function supportOf(samples: AtKSample[], layout: WeightLayout, minGames: number): boolean[] {
   const params = columnParams(layout);
   const games = Array.from({ length: layout.columns + layout.overrides.length }, () => new Set<string>());
@@ -323,7 +300,6 @@ function solve(matrix: number[][], vector: number[]): number[] {
   return d;
 }
 
-/** Maximum likelihood of P = sigmoid(K · tanh(Σ w·g)) at the fixed K: Gauss-Newton with step halving, run to a standstill as fitPhaseK. */
 export function fitWeightsAtK(samples: AtKSample[], start: number[], layout: WeightLayout, k: GameTypeK, free: boolean[]): number[] {
   const theta = [...start];
   const moving = free.flatMap((isFree, m) => (isFree ? [m] : []));
@@ -424,13 +400,11 @@ export interface AtKReportOptions {
   folds: number;
   draws: number;
   minGames: number;
-  /** Weights that keep their start, by feature name, in the shared table or among the doubles overrides (the pre-registered holds). */
   hold?: { shared?: string[]; doubles?: string[] };
-  /** The only columns the fit moves, by name or `*@form` for every derived column of a model form: they leave the zero hold; a hold still wins. */
   only?: string[];
-  /** Start weights by column, in both tables (a REPLACEMENT starts the new column at the old one's weight and the old one at 0). */
+  /** Start weights by column in both tables; a replacement starts the new column at the old weight, the old at 0. */
   set?: Record<string, number>;
-  /** The weights a capture was made under where they differ from today's tables: only the identity check starts from them. */
+  /** The weights of the capture where they differ from today's tables; only the identity check starts from them. */
   captured?: Record<string, number>;
 }
 
@@ -446,11 +420,6 @@ function cvSummary(cv: { hand: AtKScores; fit: AtKScores }[]) {
   return { pooled: side(scores => scores), singles: side(scores => scores.singles), doubles: side(scores => scores.doubles) };
 }
 
-/**
- * The report of the refit at the fixed K: every weight's bootstrap band, the scores against the hand weights, the pre-registered
- * verdict and the weights.ts values it proposes. Rule (ii): adopt when the refit wins the pooled out-of-fold log-loss in every seed
- * and its mean Brier is not worse. Rule (iii): a weight that flips its sign or whose 90 % band is wider than twice its value is flagged.
- */
 export function refitAtKReport(
   samples: AtKSample[], names: string[], singles: number[], doubles: number[], k: GameTypeK, options: AtKReportOptions,
 ) {

@@ -11,13 +11,6 @@ import { gameAdoptSnapshot, gamePositions, gameStartParams, rebuildGame } from '
 import { leadHistoryEntry, replayHistoryEntry } from '../../src/hooks/branch/replay-entry';
 import type { BranchRuntime } from '@fulllifegames/eval-engine';
 
-/**
- * The invariant of a new game. The record is the truth and its log the replay: a game of eight turns, played two ways through the
- * calls the hooks make (a continuous runtime, and a runtime adopted from the stored position at the tip before every turn, as when
- * the user comes back from a variation), grows its record by promotion, and the log it grew equals the log the rebuild writes from
- * the record's entries, byte for byte. Every position serializes equal and the parser reads one snapshot per turn plus the tip. One
- * row per family, Scarlet/Violet and Champions; the Champions realm loads its mod first.
- */
 
 const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({
   name: species, species, item: '', ability: '', moves: ['Earthquake', 'Protect', 'Return', 'Substitute'], nature: '', gender: '',
@@ -27,7 +20,6 @@ const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snor
 const TURNS = 8;
 type Side = 'p1' | 'p2';
 
-/** The default picks of a side at a request: its forced replacements, else the first usable move of each live slot (the rotation varies the move). */
 function picks(state: BranchSimState, side: Side, rotate: number): (BranchSlotChoice | null)[] {
   const forced = state[`${side}ForceSwitches`];
   const actives = state[`${side}ActiveSlots`];
@@ -55,7 +47,6 @@ const bare = (turnNumber: number, extra: Partial<BranchHistoryEntry>): BranchHis
   turnNumber, p1Choice: '', p2Choice: '', p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [], ...extra,
 });
 
-/** The entry the next request asks for: the one side that must replace alone, else one turn (a replacement on both sides is one entry of kind turn). */
 function nextEntry(runtime: BranchRuntime, rotate: number): BranchHistoryEntry | null {
   const battle = runtime.battleStream.battle;
   if (!battle || battle.ended) return null;
@@ -90,11 +81,7 @@ async function startRecord(family: Family): Promise<NewGameRecord> {
   return { ...record, entries: [bare(0, { leadChoices: leadsOf(family) })] };
 }
 
-/**
- * The positions as the simulator holds them, without what only indexes or labels the log: the two cursors into it (`sentLogPos`,
- * `lastMoveLine`: an adopted battle counts the lines of its own clock-free log, a continuous one the clock lines too) and the
- * `formatid` an adopted battle's serialization adds. Everything else, the PRNG included, compares equal.
- */
+// Without the two cursors into the log (`sentLogPos`, `lastMoveLine`) and the `formatid` an adopted battle adds.
 const INERT = new Set(['sentLogPos', 'lastMoveLine', 'formatid']);
 const strip = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(strip);
@@ -107,7 +94,6 @@ const canonical = (positions: Map<number, string>) => [...positions].map(([turn,
 
 interface Played { record: NewGameRecord; positions: Map<number, string>; log: string[] }
 
-/** Plays the game the way the hooks do. `adopt`: before every turn the runtime is replaced by one adopted from the stored position. */
 async function play(family: Family, adopt: boolean): Promise<Played> {
   const seed = await startRecord(family);
   let record: NewGameRecord = { ...seed, entries: [] };
@@ -128,7 +114,6 @@ async function play(family: Family, adopt: boolean): Promise<Played> {
       });
       known = runtime.log.length;
     }
-    // one turn: its entry and the interludes that finish it
     const finished: BranchHistoryEntry[] = [];
     for (let step = 0; step < 4; step += 1) {
       const wanted = nextEntry(runtime, turn);

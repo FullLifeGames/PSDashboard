@@ -13,11 +13,6 @@ import { handleReplayJob } from '../../src/lib/replay-jobs/handlers';
 import type { ReplayJobResponse, RolledCopyJob } from '../../src/lib/replay-jobs/types';
 import { rebuild, type FixtureId, type Rebuilt } from './forced-reconstruction-support';
 
-/**
- * The replay jobs are the same computation the main thread ran, moved into a worker: the worker handler must hand out the
- * byte-identical positions and the identical solved spreads, or the exact-position store, the eval cache and the feedback corpus
- * would silently drift.
- */
 const TARGET = 20;
 
 function loadDraftReplay(): ReplayData {

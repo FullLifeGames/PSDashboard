@@ -4,11 +4,6 @@ import { FEEDBACK_CORPUS, FEEDBACK_REPLAYS, type FeedbackItem, type ReportClaim 
 import { evaluateItem, validateCorpus } from '../e2e-feedback/claims';
 import { renderReport } from '../e2e-feedback/report';
 
-/**
- * The claim evaluator is the drift harness's comparison brain, pinned with synthetic analyses so the browser run stays on demand.
- * Statuses: truth gives ok | drift | pending (unpinned); gap gives gap-open (the engine still says what the baseline observed) |
- * gap-moved | pending (no baseline yet). Warn only: statuses are report content, the evaluator itself never throws.
- */
 
 const side = (over: Record<string, unknown> = {}) => ({
   playedRaw: null, played: { choice: 'move x', label: 'Close Combat', ev: 0.5, worstCase: 0.1 },
@@ -105,13 +100,10 @@ describe('claim evaluator', () => {
 });
 
 describe('corpus validation', () => {
-  // Generous means above every fixture's real length: 573756 runs 139 turns and carries pins deep into its endgame (t138).
   const turns = Object.fromEntries(FEEDBACK_REPLAYS.map(id => [id, 150]));
 
   test('the shipped corpus is well-formed against generous turn counts', () => {
     expect(validateCorpus(FEEDBACK_CORPUS, turns, false)).toEqual([]);
-    // BASELINE_PINNED is on: the default validation additionally enforces
-    // that every truth item carries its approved pin.
     expect(validateCorpus(FEEDBACK_CORPUS, turns)).toEqual([]);
   });
 
@@ -182,7 +174,6 @@ describe('drift report rendering', () => {
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · faint');
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · fallback');
     expect(markdown).not.toContain('quiet-replay perfect 20/20 · soft 0 · seeded ');
-    // The turns that play under another seed than index 0 stand beside the fallback turns
     expect(markdown).toContain('seeded-replay perfect 11/12 · soft 1 · seeded 3 · fallback 1');
     expect(markdown).not.toContain('no-sweep');
   });

@@ -3,11 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * A link to the app posted on Discord, Reddit or X unfurls as a bare "PS Dashboard" unless the page carries preview tags. Crawlers
- * read the static HTML and run no script, so the tags live in index.html. The picture is an absolute address of a file the Pages
- * build publishes from public/, the one the README shows, and the description is the README's first sentence.
- */
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const PAGES = 'https://fulllifegames.github.io/PSDashboard/';
 const html = readFileSync(join(root, 'index.html'), 'utf8');
@@ -33,7 +28,7 @@ describe('link preview', () => {
     expect(readme).toContain(`](./public/${file})`);
   });
 
-  // A crawler lays out the card from the declared size before it fetches the file, so the size follows the PNG's own header.
+  // A crawler lays out the card from the declared size before it fetches the file.
   test('the declared size is the picture\'s own', () => {
     const file = meta('property', 'og:image')!.slice(PAGES.length);
     const png = readFileSync(join(root, 'public', file));

@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { describeMerged, mergeReports, testsOf } from '../../scripts/merge-playwright-reports.mjs';
 
-/**
- * The aggregate job "Browser flows" merges the JSON reports of its three parts with scripts/merge-playwright-reports.mjs and prints
- * each part's wall time, the slowest files and tests and every test that did not pass.
- */
 
 type Spec = { file: string; line: number; title: string; tests: { status: string; results: { duration: number }[] }[] };
 const spec = (file: string, line: number, title: string, status: string, ...durations: number[]): Spec => ({

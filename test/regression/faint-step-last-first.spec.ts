@@ -2,17 +2,7 @@ import { appendFileSync } from 'node:fs';
 import { describe, expect, test, vi } from 'vitest';
 import { FIXTURES, rebuild, type FixtureId, type GameType } from './forced-reconstruction-support';
 
-/**
- * The faint step plays the last roll step first. A roll step moves the hits on the bodies of the mismatch one place along their order;
- * the last step is the extreme of every order (the hardest hit of a body the log knocked out, the softest of a body it did not). If even
- * that step does not give the log's faints, no step between does, and the turn goes on to the seed search with one play of the steps
- * instead of up to fifteen. A step set that gives the faints is played in the usual order.
- *
- * The rows hold the twelve fixtures: the count of `playForcedTurn` calls one rebuild makes (`plays`; a trial is one or two calls, and a
- * fallback turn that plays forced with a stand-in counts only its forced plays) and the hash of the rebuild's battle log and of its
- * alignment records. The hashes are records, not verdicts. The app and the bank rebuild with the position correction, which this bare
- * rebuild leaves out.
- */
+// The hashes are records, not verdicts; the app rebuilds with the position correction, which this rebuild leaves out.
 
 const counter = vi.hoisted(() => ({ plays: 0 }));
 vi.mock('../../packages/eval-engine/src/dice/play.ts', async importOriginal => {
