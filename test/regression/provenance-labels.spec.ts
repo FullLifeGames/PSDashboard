@@ -17,7 +17,6 @@ import { sourceLabel } from '../../src/lib/provenance-labels';
 import { buildSensitivityTargets } from '../../src/lib/team-knowledge';
 import { spriteUrl } from '../../src/lib/sprite-url';
 
-/** The Choice Scarf the solver infers from a move order (or drops from a guessed set) reaches the built set and the stats panel overlay with the same value. */
 describe('Choice Scarf inference reaches the build and the panel', () => {
   const log = (extra: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|8', '|tier|[Gen 8] OU',
@@ -61,7 +60,6 @@ describe('Choice Scarf inference reaches the build and the panel', () => {
   });
 
   test('an unresolved drop never lets the usage Scarf back into the set', () => {
-    // The solver's raw '' (no builder pass resolved it): the set gets the next usage item, never the Scarf.
     const usage: SmogonUsageStats = {
       format: 'gen8ou', month: '2026-08', source: 'test',
       pokemon: {
@@ -80,9 +78,6 @@ describe('Choice Scarf inference reaches the build and the panel', () => {
   });
 
   test('the app path carries a Scarf decision the full solve forfeited on misfit damage', () => {
-    // 750540: Darkrai moved before Deoxys-Speed (impossible without a Scarf), and its damage lines contradict each
-    // other, so the full solve forfeits Darkrai back to the prior. The speed-only pre-solve decided the Scarf; the
-    // app's solved map must still say so, or the app builds Life Orb while the harness builds the Scarf.
     const raceLog = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU',
       '|poke|p1|Deoxys-Speed|', '|poke|p2|Darkrai|',
@@ -156,7 +151,6 @@ describe('provenance labels', () => {
     expect(sourceLabel('guessed')).toBe('guessed');
     expect(sourceLabel('revealed', undefined, INFERRED_SPREAD_DETAIL)).toBe('revealed');
   });
-  // The label names who checked the spread; fitted stays for damage lines only.
   test('a spread the move order or the HP of the log checked says so, and fitted stays with damage', () => {
     expect(sourceLabel('guessed', undefined, ORDER_SPREAD_DETAIL)).toBe('from move order');
     expect(sourceLabel('guessed', undefined, MEASURED_HP_SPREAD_DETAIL)).toBe('HP from log');

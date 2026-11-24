@@ -2,16 +2,7 @@ import { existsSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { CORPUS, rebuildThrough } from './rebuild-through';
 
-/**
- * A block that enters two bodies on one slot, the second a nicknamed Ditto that Imposter turned into a copy of the foe, must leave the
- * Ditto on the slot with its Transform. The correction must not look the Ditto line up by the species `Ditto` (the body carries the
- * copied species, its nickname `:)` has no letters): the repoint of the entry before it would take the simulator's Ditto off the field
- * and clear it, and the rebuilt Ditto would have only Transform, copy the foe's Lilligant-Hisui at turn 20 and play Close Combat at
- * turn 21, where the log has Tera Blast twice.
- *
- * Each row rebuilds the game through the turn, like the bank does, and reads the turn's entrances, faints and moves: the rebuild plays what
- * the log shows. The unit and sweep rows are in `packages/eval-engine/test/pass-through-entries.spec.ts`.
- */
+// The correction must not find the Ditto by species: the body carries the copied species, its nickname has no letters.
 const ID = 'smogtours-gen9ru-887325';
 const play = (lines: string[]) => lines.filter(line => /^\|(switch|drag|faint|move)\|/.test(line));
 

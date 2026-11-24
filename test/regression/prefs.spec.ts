@@ -8,7 +8,6 @@ import {
   serializedAutoRouting,
 } from '../../src/hooks/evaluation/prefs';
 
-/** After a matrix result of depth 2 or more, a sweep whose configured engine is the tree replaces it: the configured engine decides, no cross-engine exception. */
 afterEach(() => configureSearchBudget(null));
 
 const DEEP_MATRIX = { depth: 2, samples: 3, mode: 'matrix' } as const;
@@ -39,18 +38,14 @@ describe('auto routing per game type', () => {
     expect(resolveAutoLeadSettings()).toEqual(SKETCH);
     configureSearchBudget(parseSearchBudget('singles-early-samples=5,doubles-early-depth=2'));
     expect(resolveAutoLeadSettings()).toEqual(SKETCH);
-    // Only its own keys move it.
     configureSearchBudget(parseSearchBudget('lead-samples=3'));
     expect(resolveAutoLeadSettings()).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
   });
 
   test('the monotone merge resolves the configured engine per game type', () => {
     configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
-    // Early singles turn: auto's target is the matrix, so the sketch replaces a stored tree result.
     expect(supersedesStored(TREE, SKETCH, 'auto', 0.1, false)).toBe(true);
-    // Early doubles turn: auto's target is the tree, so the sketch never downgrades it.
     expect(supersedesStored(TREE, SKETCH, 'auto', 0.1, true)).toBe(false);
-    // Unknown fraction: fail closed in both game types.
     expect(supersedesStored(TREE, SKETCH, 'auto', null, false)).toBe(false);
     expect(supersedesStored(TREE, SKETCH, 'auto', null, true)).toBe(false);
   });
@@ -62,7 +57,6 @@ describe('auto routing per game type', () => {
     ];
     expect(serializedAutoRouting(JSON.stringify({ gameType: 'doubles', sides }))).toEqual({ faintedFraction: 2 / 6, doubles: true });
     expect(serializedAutoRouting(JSON.stringify({ gameType: 'singles', sides }))).toEqual({ faintedFraction: 2 / 6, doubles: false });
-    // A battle without a game type is singles, as the simulator's default.
     expect(serializedAutoRouting(JSON.stringify({ sides: [] }))).toEqual({ faintedFraction: 0, doubles: false });
   });
 });
@@ -74,7 +68,6 @@ describe('after depth 2 the configured engine decides', () => {
   });
 
   test('after depth 2 and Auto, singles from the tree threshold replace it, doubles on every turn', () => {
-    // Auto routing reads the game type only, so a VGC battle counts as doubles here.
     const { mode: atQuarter } = resolveAutoTurnSettings(0.25, false);
     expect(atQuarter).toBe('mcts');
     expect(supersedesStored(DEEP_MATRIX, TREE, 'auto', 0.25, false)).toBe(true);
@@ -89,11 +82,9 @@ describe('after depth 2 the configured engine decides', () => {
   });
 
   test('a matrix pass does not land on a stored tree result of a tree turn', () => {
-    // A deep matrix pass does not outrank the tree on its own turn.
     expect(supersedesStored(TREE, DEEP_MATRIX, 'mcts')).toBe(false);
     expect(supersedesStored(TREE, DEEP_MATRIX, 'auto', 0.5, false)).toBe(false);
     expect(supersedesStored(TREE, DEEP_MATRIX, 'auto', 0.1, true)).toBe(false);
-    // Where the matrix is the target it still lands, and the sketch of an early singles turn replaces a tree result.
     expect(supersedesStored(TREE, DEEP_MATRIX, 'matrix')).toBe(true);
     expect(supersedesStored(TREE, SKETCH, 'auto', 0.1, false)).toBe(true);
   });

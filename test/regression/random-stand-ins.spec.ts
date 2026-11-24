@@ -11,12 +11,6 @@ import { loadReplayMods } from '../../src/lib/replay-mods';
 import { fetchRandomSets } from '../../src/lib/random-sets';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 
-/**
- * The app side of the Random Battle fill. The data arrives through the set fetch (the published file, one request per format, cached with
- * the other set data), `buildAppTeams` (the bank's chain) hands it to `withStandIns`, and the build plays six against six. Rows: Gen 3
- * singles, Gen 9 Random Doubles and both Champions formats, logs the simulator played (packages/replay-core/test/fixtures/random-*.json,
- * with the file entries they read).
- */
 interface RandomFixture {
   id: string; formatid: string; log: string;
   teams: { species: string; level: number }[][];
@@ -30,7 +24,6 @@ const ROWS = [
   { label: 'Champions Random Doubles Battle', id: 'gen9championsrandomdoublesbattle-18', missing: 2 },
 ] as const;
 
-// The Champions formats read the Champions Dex: the mod registers before any log is read, as the app's replay load does.
 await Promise.all(ROWS.map(row => { const game = fixture(row.id); return loadReplayMods({ log: game.log, formatid: game.formatid }); }));
 
 function fakeFetch(game: RandomFixture, seen: string[] = []) {
@@ -111,7 +104,6 @@ describe.each(ROWS)('buildAppTeams: $label', ({ id, missing }) => {
       expect(set.moves.length).toBeGreaterThan(0);
       for (const move of set.moves) expect(pool, `${mon.species} ${move}`).toContain(move);
     }
-    // The shown bodies keep their places and the other side is the same object the inference built.
     const names = (info: OpponentTeamInfo) => info.pokemon.map(mon => mon.species);
     expect(names(app.p1Info).slice(0, 6 - missing)).toEqual(names(seed.rawInfos.p1));
     expect(app.p2Info.pokemon.filter(mon => mon.standIn)).toHaveLength(0);
@@ -146,7 +138,6 @@ describe.each(ROWS)('a Node caller of buildTeamsFromReplay: $label', ({ id, miss
   const game = fixture(id);
   const seed = appTeamSeed(game.log);
   const setAssumptions = { format: game.formatid, source: 'test', pokemon: {}, randomSets: game.randomSets };
-  /** What the stand-ins are: the body, its level and its set's moves, ability and item (the spreads come from the solver, which the Node call does not run here). */
   const bodies = (team: { species: string; level?: number; moves: string[]; ability: string; item: string }[]) =>
     team.map(set => ({ species: set.species, level: set.level, moves: set.moves, ability: set.ability, item: set.item }));
 

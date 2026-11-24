@@ -6,12 +6,6 @@ import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/ev
 import { playedFromLines } from '../../src/hooks/usePositionPicker';
 import type { PlayedAtPosition, PlayedPick } from '../../src/lib/played-pick';
 
-/**
- * The played record of real games carries what the dock seeds from: for every turn of the three committed fixtures (a Doubles OU game
- * with Tera and flinches, a Regulation I VGC game with Tera, a Champions VGC game with two Mega Evolutions) and of a sample of
- * .fit-corpus, the pick of each slot has the target the log names for a single-target move and the gimmick the log shows before the
- * move. The expectation is read from the raw lines, apart from the parser, so a field that fromAction drops shows as a difference.
- */
 const FIXTURES = [
   'test/e2e/fixtures/dock-doublesou-2662153814.json',
   'test/e2e/fixtures/dock-vgcregi-2573391549.json',
@@ -31,7 +25,6 @@ interface Expected {
 
 const SLOT = /^(p[12])([ab]): /;
 
-/** The pick the lines show for one slot (a doubles slot), or null when a |cant| or a faint came first. */
 function expectedPick(lines: string[], side: 'p1' | 'p2', slot: number): Expected | null {
   const ref = `${side}${'ab'[slot]}`;
   let modifier: Expected['modifier'];
@@ -96,9 +89,7 @@ describe('the played record of the committed dock fixtures', () => {
     const replay = read(FIXTURES[0]);
     const { turns, picks } = expectSlotsToMatch(replay);
     expect(turns).toBe(4);
-    // Peek-At-You terastallizes in turn 3 and faints before it moves: no move line, so no pick carries the Tera.
     expect(picks.filter(pick => pick.modifier === 'terastallize')).toHaveLength(0);
-    // Greninja's Rock Slide names the first foe it hits, though the move takes no target: the seed drops it (test/ui/lib/dock-seed.spec.ts).
     expect(picks.filter(pick => pick.name === 'Rock Slide').every(pick => pick.targetLoc === 1 || pick.targetLoc === 2)).toBe(true);
     const snapshots = parseReplayLog(replay.log);
     const turn2 = playedRecord(replay, 2, snapshots)!;
@@ -134,7 +125,6 @@ describe('the second Doubles OU fixture of the task e2e', () => {
     for (const side of [record.p1Slots!, record.p2Slots!]) for (const pick of side) expect(pick).not.toBeNull();
     expect(record.p1Slots!.map(pick => pick!.name)).toEqual(['Knock Off', 'Rock Slide']);
     expect(record.p1Slots![0]).toMatchObject({ kind: 'move', targetLoc: 1 });
-    // Rock Slide hits both foes: the seed drops the target the log names for the first (test/ui/lib/dock-seed.spec.ts).
     expect(record.p2Slots!.map(pick => pick!.name)).toEqual(['Trick Room', 'Sludge Bomb']);
   });
 });

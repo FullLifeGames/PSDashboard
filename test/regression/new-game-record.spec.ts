@@ -15,18 +15,11 @@ import {
   GAMES_INDEX_KEY, MAX_SAVED_GAMES, deleteGame, gameKey, listGames, loadGame, saveGame,
 } from '../../src/lib/new-game/store';
 
-/**
- * The game record and its log (app library). The record is the truth and the log its replay: header from the format's own battle,
- * body from the simulator, no clock lines; the replay data carries the explicit format so no helper infers it from the id; the store
- * keeps at most 20 games; the format list is the registry's playable formats.
- */
-
 const entry = (turnNumber: number, extra: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
   turnNumber, p1Choice: 'move 1', p2Choice: 'move 1', serializedPosition: '{"big":true}',
   p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [], ...extra,
 });
 
-/** Six bodies that exist in every generation of the sweep; the start reads the sets and validates none (the legal teams of every format are the engine spec's). */
 const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({
   name: species, species, item: '', ability: '', moves: ['Earthquake', 'Protect'], nature: '', gender: '',
   evs: { hp: 4, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
@@ -55,8 +48,7 @@ describe('the log of a game', () => {
     expect(assembleGameLog(['|t:|0', '|gametype|singles'], ['|start', '|t:|5', '|turn|1'])).toBe('|gametype|singles\n|start\n|turn|1');
   });
 
-  // The Champions formats play on a Custom Game stand-in, whose debug flag writes "|debug|" lines that Showdown prints only in a
-  // Custom Game. The frame shows what Showdown shows: the chosen format decides.
+  // Champions formats play on a Custom Game stand-in: its debug flag writes `|debug|` lines only a Custom Game shows.
   test.each([
     ['Gen 9 OU', 'gen9ou'], ['Doubles OU', 'gen9doublesou'], ['Scarlet/Violet VGC', 'gen9vgc2025regi'],
     ['Champions VGC', 'gen9championsvgc2026regmc'], ['Champions OU', 'gen9championsou'],
@@ -107,7 +99,6 @@ describe('the record', () => {
     expect(lead.createdAt).toBe('2026-11-12T10:00:00.000Z');
   });
 
-  // The tip turn that waits for its replacement rides in the record's optional `pending`.
   test('a pending tip turn is kept without positions, leaves the main line alone, and the finished turn takes it away', async () => {
     const record = await recordOf('gen9ou');
     const lead = appendTurn(record, { entries: [entry(0, { leadChoices: { p1: ['A'], p2: ['B'] } })], lines: ['|start', '|turn|1'] });
@@ -118,14 +109,11 @@ describe('the record', () => {
     expect(waiting.body).toEqual(lead.body);
     expect(waiting.turns).toBe(lead.turns);
     expect(waiting.updatedAt).toBe('2026-11-12T10:06:00.000Z');
-    // a second entry (the replacement of one side of a doubles turn) replaces the list as the live branch holds it
     expect(withPendingTurn(waiting, [entry(1), entry(1, { kind: 'forced', forcedSide: 'p2' })]).pending).toHaveLength(2);
-    // no entries: no key at all, as in an old record
     expect('pending' in withPendingTurn(waiting, [])).toBe(false);
     const joined = appendTurn(waiting, { entries: [entry(1), entry(1, { kind: 'forced', forcedSide: 'p2' })], lines: ['|faint|p2a: B', '|turn|2'] });
     expect('pending' in joined).toBe(false);
     expect(joined.turns).toBe(1);
-    // singles and doubles share the record: the entries differ only in their slot choices, which `withoutPosition` keeps
     const doubles = withPendingTurn(lead, [entry(1, { p1SlotChoices: [null, null], p2SlotChoices: [null, null] })]);
     expect(doubles.pending![0].p2SlotChoices).toEqual([null, null]);
   });
@@ -141,7 +129,6 @@ describe('the record', () => {
     expect(sameGameAsShare(lead, payload)).toBe(true);
   });
 
-  // Scene: id `newgame-x` with `gen9ou` plays as `gen9ou`, not as the rule-less custom game an unknown id falls back to.
   test.each(['gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9championsou', 'gen9championsvgc2026regmc', 'gen4ou'])(
     'the replay data of a %s game carries its explicit format and every format helper reads it',
     async format => {
@@ -153,7 +140,6 @@ describe('the record', () => {
       expect(data.log.startsWith('|')).toBe(true);
       const source = { id: data.id, log: data.log, format: data.format, formatid: data.formatid };
       const branch = getBranchSimulatorFormat(source);
-      // A format the app plays on its own id keeps it; doubles play Doubles OU, and Champions doubles its Custom Game (replay-core's rule).
       expect(branch).toBe(format.includes('championsvgc') ? 'gen9championsdoublescustomgame' : format.includes('doubles') || format.includes('vgc') ? 'gen9doublesou' : format);
       expect(getReplayGameType(data.log)).toBe(format.includes('doubles') || format.includes('vgc') ? 'doubles' : 'singles');
       expect(getReplayBringCount(source)).toBe(record.bringCount);

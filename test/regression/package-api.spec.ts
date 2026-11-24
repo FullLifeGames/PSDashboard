@@ -7,7 +7,6 @@ import * as replayCore from '@fulllifegames/replay-core';
 import * as evalEngine from '@fulllifegames/eval-engine';
 import { PKMN_EXACT } from '../../scripts/upgrade-pkmn.mjs';
 
-/** The public surface of each workspace package: the barrel's names the compiler sees against a committed snapshot, and the names Node sees at runtime against its value lines. */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PACKAGES = [
   { name: 'replay-core', runtime: replayCore },
@@ -61,30 +60,24 @@ describe('Package hygiene', () => {
     test(`${name}: the manifest is ready to publish`, () => {
       const manifest = readJson<Manifest>(resolve(dir, 'package.json'));
       expect(manifest.name).toBe(`@fulllifegames/${name}`);
-      // The manifest names the version the release publishes, the root's.
       expect(manifest.version, 'move all three: npm version <bump> --workspaces --include-workspace-root --no-git-tag-version')
         .toBe(rootVersion);
       expect(manifest.license).toBe('MIT');
       expect(manifest.type).toBe('module');
       expect(manifest.sideEffects).toBe(false);
       expect(manifest.publishConfig?.access).toBe('public');
-      // The types condition has to come first: consumers resolve conditions in order.
       expect(Object.keys(manifest.exports['.'])).toEqual(['types', 'default']);
-      // The engine package ships the check-engine command and its sample positions.
       if (name === 'eval-engine') {
         expect(manifest.files).toEqual(['dist', 'bin', 'samples', 'README.md']);
-        // The path as npm writes it (npm 12 drops the leading ./ and warns
-        // '"bin[eval-engine]" script name bin/eval-engine.mjs was invalid and removed', though it keeps the entry).
+        // The path as npm writes it: npm 12 drops the leading ./ and warns the entry invalid.
         expect((manifest as Manifest & { bin?: Record<string, string> }).bin).toEqual({ 'eval-engine': 'bin/eval-engine.mjs' });
       } else {
         expect(manifest.files).toEqual(['dist', 'README.md']);
       }
-      // Workspace references stay "*" in the tree; the publish script writes the caret range.
       for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
         expect(dep.startsWith('@fulllifegames/'), `${dep} is not a workspace package`).toBe(true);
         expect(range).toBe('*');
       }
-      // Peers float on a caret, except the simulator the speed layer copies (test/regression/pkmn-pins.spec.ts).
       for (const [dep, range] of Object.entries(manifest.peerDependencies ?? {})) {
         expect(range, dep).toMatch(PKMN_EXACT.includes(dep) ? /^\d+\.\d+\.\d+$/ : /^\^\d/);
       }

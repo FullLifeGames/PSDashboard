@@ -26,8 +26,7 @@ describe('sprite file names', () => {
   });
 
   test('checker: every species the simulator knows gets the simulator\'s sprite id', () => {
-    // Cosmetic formes are the one exception: the simulator's spriteid falls
-    // back to the base, while the sprite folder holds the forme (gastrodon-east).
+    // Cosmetic formes: spriteid falls back to the base, but the sprite folder holds the forme (gastrodon-east).
     const cosmetic = (name: string, base: string) => Dex.species.get(base).cosmeticFormes?.includes(name) ?? false;
     const mismatches = Dex.species.all()
       .filter(species => species.exists && !cosmetic(species.name, species.baseSpecies))

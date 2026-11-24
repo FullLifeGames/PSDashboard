@@ -3,7 +3,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Every source file the build, the tests and the scripts read is UTF-8: an ANSI-written em dash (byte 0x97) passes `tsc -b` and lint, and only the production build refuses it. */
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const FOLDERS = ['src', 'packages/eval-engine/src', 'packages/replay-core/src', 'packages/eval-engine/test', 'packages/replay-core/test', 'test', 'scripts'];
 const SOURCE = /\.(ts|tsx|mts|mjs|cjs|js|css|html|json|md)$/;

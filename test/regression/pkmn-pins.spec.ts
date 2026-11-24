@@ -2,8 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MANIFESTS, PKMN_EXACT, planPkmnUpgrade } from '../../scripts/upgrade-pkmn.mjs';
 
-/** eval-engine's speed layer copies classes of one @pkmn/sim version and checks no hash in the browser, so every manifest pins @pkmn/sim and @pkmn/mods to one exact version. */
-
 type Manifest = Record<string, Record<string, string> | undefined>;
 const read = (path: string): Manifest => JSON.parse(readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')) as Manifest;
 const specsOf = (manifest: Manifest, name: string): string[] =>

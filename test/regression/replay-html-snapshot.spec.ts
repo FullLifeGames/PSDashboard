@@ -7,9 +7,7 @@ interface ReplayHtmlSnapshot {
   out: Record<string, string>;
 }
 
-// The page must stay byte-identical for every option combination (no seek, a seek with autoplay and the p2 viewpoint, a turn-0 seek, a
-// log that needs the closing-tag escape, and the FontAwesome override). Change the template on purpose: rerun with
-// UPDATE_REPLAY_HTML_SNAPSHOT=1 and review the fixture diff.
+// Change the template on purpose: rerun with UPDATE_REPLAY_HTML_SNAPSHOT=1 and review the fixture diff.
 const fixtureUrl = new URL('./fixtures/replay-html.snapshot.json', import.meta.url);
 const snapshot = JSON.parse(readFileSync(fixtureUrl, 'utf8')) as ReplayHtmlSnapshot;
 

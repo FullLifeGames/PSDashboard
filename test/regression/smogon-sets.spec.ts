@@ -82,7 +82,6 @@ describe('Smogon set assumptions', () => {
   });
 
   test('calls fetch as a free function (window.fetch throws on a foreign this)', async () => {
-    // Mirrors the browser: a fetch that refuses a foreign `this`.
     const strictFetch = function (this: unknown) {
       if (this !== undefined && this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ Toxapex: { Wall: { nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Recover'] } } }) } as unknown as Response);
@@ -145,9 +144,6 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
-  // Every load of a VGC 2026 replay logged twelve 404s for sets/gen9vgc2026.json, one per species of both teams. @pkmn/smogon keeps a
-  // sets file only once its response arrived, and the species ask at the same time, so the species of one request share one fetch
-  // per file, the Doubles Ubers fallback of Doubles OU included.
   test('the species of one request share one fetch per sets file', async () => {
     const asked: string[] = [];
     const counting = (files: Record<string, unknown>) => {
@@ -168,9 +164,6 @@ describe('Smogon set assumptions', () => {
     expect(doubles?.pokemon.kyurem?.sourceDetail).toBe('Smogon sets gen9doublesubers');
   });
 
-  // WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message the error filter does not
-  // know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026) threw "Smogon sets unavailable" in
-  // Safari. A 404 sets file reads as an empty file before json() runs.
   test('a 404 sets file reads as no sets in every browser', async () => {
     const webkit404 = async () => ({
       ok: false, status: 404, json: async () => { throw new SyntaxError('The string did not match the expected pattern.'); },
@@ -178,9 +171,6 @@ describe('Smogon set assumptions', () => {
     await expect(fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: ['Kyurem', 'Toxapex'], fetcher: webkit404 as never })).resolves.toBeNull();
   });
 
-  // On 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
-  // and 82 % of the moves, the Doubles OU sets 48 % and 73 %; a year without a VGC set file guesses better from its
-  // usage file alone than from the Doubles OU sets (2026 Reg I items 77 % against 68 %, Champions VGC 56 % against 51 %).
   test('a VGC format reads the VGC set file of its year and never the Doubles OU analyses', async () => {
     const doublesOnly = { gen9doublesou: kyuremSet, gen9doublesubers: kyuremSet };
     const regH = await fetchSmogonSetAssumptions({
@@ -191,7 +181,6 @@ describe('Smogon set assumptions', () => {
     expect(regH?.formats).toEqual(['gen9vgc2025']);
     const regI = await fetchSmogonSetAssumptions({ formatId: 'gen9vgc2026regi', species: ['Kyurem'], fetcher: byUrl(doublesOnly) as never });
     expect(regI).toBeNull();
-    // @pkmn/smogon names Champions files without the generation (sets/championsvgc2026.json).
     const champions = await fetchSmogonSetAssumptions({
       formatId: 'gen9championsvgc2026regmc', species: ['Kyurem', 'Toxapex'], fetcher: byUrl({ ...doublesOnly, gen9vgc2026: toxapexSet, championsvgc2026: kyuremSet }) as never,
     });
@@ -199,9 +188,6 @@ describe('Smogon set assumptions', () => {
     expect(champions?.pokemon.toxapex).toBeUndefined();
   });
 
-  // Champions OU must not ask for sets/gen9championsou.json (a file that does not exist: @pkmn/smogon names Champions files without
-  // the generation) and fall back to the Scarlet/Violet Ubers analyses: Corviknight (39 % usage) would get Impish 252/160/96 with
-  // Tera instead of its Champions set with 32/32/2 Stat Points.
   test('Champions OU reads the Champions OU set file and no Scarlet/Violet file', async () => {
     const corviknightChampions = { Corviknight: { 'Iron Press': { nature: 'Impish', evs: { hp: 32, def: 32, spd: 2 }, moves: ['Iron Defense', 'Body Press', 'Roost', 'Brave Bird'] } } };
     const corviknightUbers = { Corviknight: { Defog: { nature: 'Impish', evs: { hp: 252, def: 160, spd: 96 }, moves: ['Defog', 'Brave Bird', 'Roost', 'U-turn'] } } };
@@ -213,7 +199,6 @@ describe('Smogon set assumptions', () => {
     });
     expect(assumptions?.pokemon.corviknight?.sourceDetail).toBe('Smogon sets championsou');
     expect(assumptions?.pokemon.corviknight?.spread?.evs).toEqual({ hp: 32, atk: 0, def: 32, spa: 0, spd: 2, spe: 0 });
-    // Kyurem has no Champions OU set: the guess goes to the usage file, never to a Scarlet/Violet analysis.
     expect(assumptions?.pokemon.kyurem).toBeUndefined();
     expect(assumptions?.formats).toEqual(['championsou']);
     expect(requested.length).toBeGreaterThan(0);
@@ -221,8 +206,6 @@ describe('Smogon set assumptions', () => {
   });
 
   test('keeps every option of a published move slot', async () => {
-    // @pkmn/smogon flattens a slot to its first option; the build must know
-    // Heat Wave and Hidden Power Ice share one slot while Knock Off is fixed.
     const pivot = { item: 'Assault Vest', nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Hurricane', ['Heat Wave', 'Hidden Power Ice'], 'Knock Off', 'U-turn'] };
     const assumptions = await fetchSmogonSetAssumptions({
       formatId: 'gen6ou', species: ['Tornadus-Therian'],

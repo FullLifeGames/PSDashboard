@@ -6,16 +6,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { groupsOf, nearPairs, newTwins, placesOf, twinsOf } from '../../scripts/twin-lists.mjs';
 
-/**
- * The twin detector. AGENTS.md says one rule lives in one module and a deliberate copy gets a spec that compares the two.
- * scripts/twin-lists.mjs finds a list of 3 or more string literals that stands in two or more files with the same
- * names (the stat names in four files, Reflect / Light Screen / Aurora Veil in five), and `npm run lint` fails on a pair
- * (list, file) that scripts/twin-baseline.json lacks. The baseline only shrinks.
- *
- * The cases run on a temporary tree. The detector reads names, not formats: a list for singles and a list for doubles are the same
- * kind of thing to it. Its limit: a copy with one more element is no twin (the report-only --near sees it).
- */
-
 const SCRIPT = fileURLToPath(new URL('../../scripts/twin-lists.mjs', import.meta.url));
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
 const made: string[] = [];
@@ -23,7 +13,6 @@ const made: string[] = [];
 let real: ReturnType<typeof placesOf> | undefined;
 const realPlaces = () => (real ??= placesOf(REPO));
 
-/** A tree with packages/a/src, packages/b/src and src, from `{ "<path>": "<text>" }`. */
 function tree(files: Record<string, string>): string {
   const root = mkdtempSync(path.join(tmpdir(), 'twin-lists-'));
   made.push(root);
@@ -157,8 +146,6 @@ describe('the command', () => {
   test('on the real tree the groups are the ones the baseline holds', () => {
     const baseline = JSON.parse(readFileSync(path.join(REPO, 'scripts', 'twin-baseline.json'), 'utf8')) as { groups: Record<string, string[]> };
     expect(Object.keys(groupsOf(realPlaces())).sort()).toEqual(Object.keys(baseline.groups).sort());
-    // The baseline only shrinks, so a floor on the twins would fail the day a lane
-    // removes one; the floor stays on the lists the detector reads, which keeps a blind detector red.
     expect(realPlaces().size).toBeGreaterThan(30);
   });
 });

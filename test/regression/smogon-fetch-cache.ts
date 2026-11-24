@@ -10,14 +10,8 @@ interface CacheEntry {
   payload?: unknown;
 }
 
-/**
- * Disk-caching fetch for the calibration harness's Smogon lever (EVAL_CALIBRATION_SMOGON): the first run pins every data.pkmn.cc payload
- * under .smogon-cache/ (gitignored), so paired engine runs see identical usage and set data with no network. Misses are cached too: a
- * format file that 404s must 404 for both engines. Only the surface the Smogon consumers touch is implemented (ok, status, json).
- * Parallel calibration slices share the directory, so an entry is published atomically and a half-written file reads as absent.
- */
+// Disk-caching fetch of the calibration's Smogon lever: the first run pins every payload, misses too.
 
-/** A complete cached entry, or null when the file is absent or still being written by a sibling process. */
 function readEntry(path: string): CacheEntry | null {
   if (!existsSync(path)) return null;
   try {
@@ -27,7 +21,7 @@ function readEntry(path: string): CacheEntry | null {
   }
 }
 
-/** Write to a temp file and rename it into place, so no reader ever sees a partial entry. */
+// Write to a temp file and rename it into place, so no reader ever sees a partial entry.
 function writeEntry(path: string, entry: CacheEntry): void {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, JSON.stringify(entry));

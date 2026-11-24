@@ -49,7 +49,6 @@ describe('sets import/export', () => {
     expect(text).toContain('EVs: 252 Atk / 4 SpD / 252 Spe');
     expect(text).toContain('Jolly Nature');
     expect(text).toContain('- Earthquake');
-    // Unknown fields stay out of the export entirely:
     expect(text).toContain('Kingambit (F)');
     expect(text).not.toContain('(has item)');
     expect(text).toContain('Level: 78');
@@ -93,7 +92,6 @@ describe('sets import/export', () => {
     const parsed = parseSetsImport(text);
     expect(parsed.p1[0].item).toBe('Heavy-Duty Boots');
   });
-  // The export carries the IVs the build plays (2663093831 Sinistcha: published IV 0 in Attack and Speed).
   for (const format of ['gen9ou', 'gen9doublesou']) {
     test(`exports the IVs of a published Trick Room set and round-trips them (${format})`, () => {
       const assumptions: SmogonSetAssumptions = {
@@ -117,8 +115,7 @@ describe('sets import/export', () => {
     });
   }
 
-  // The library's import gives a set with a typed Hidden Power the type's own IVs (Ice: 30 Atk, 30 Def) unless the
-  // text lists IVs, while the build plays a listed Hidden Power at the IVs it has. An export of IVs that are all 31 stays explicit.
+  // The library import gives a typed Hidden Power the type's own IVs (Ice: 30 Atk, 30 Def) unless the text lists IVs.
   test.each([
     ['singles', 'Tornadus-Therian', ['U-turn', 'Hidden Power Ice', 'Hurricane', 'Knock Off']],
     ['doubles', 'Incineroar', ['Fake Out', 'Hidden Power Ice', 'Parting Shot', 'Knock Off']],
@@ -181,7 +178,6 @@ describe.each([
     expect(errors.every(message => message.startsWith('P1 Corviknight'))).toBe(true);
   });
 
-  // A move or an ability the species cannot have imports: the Dex decides what exists.
   test('a move and an ability the species cannot have import; the editor marks them with a note', async () => {
     const text = textOf('Corviknight @ Leftovers\nAbility: Intimidate\n- Power Whip\n- Spore\n- Roost');
     expect(await check(format, 9, team(entry('Corviknight')), team(), text)).toEqual([]);
@@ -219,15 +215,11 @@ describe.each([
   });
 
   test('a value the panel shows from its solved sets passes, though the knowledge does not hold it', async () => {
-    // The export reads the stats view (the solved sets), not the knowledge. Champions VGC 2695803506: Basculegion's guessed Head Smash
-    // stands in the export, not in the knowledge, and the editor's pool lacks it, so the panel's own export imported nothing. Moon
-    // Landing stands in here.
     const shown = entry('Corviknight', { moves: [{ name: 'Moon Landing', source: 'guessed' }], ability: { value: 'Mummy', source: 'guessed' } });
     const text = textOf('Corviknight\nAbility: Mummy\n- Moon Landing\n- Roost');
     const pools = await loadImportPools(['Corviknight'], 9, format);
     const parsed = parseSetsImport(text);
     expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() })).toEqual([]);
-    // Without the shown sets the same text is refused, and a value neither view holds is refused with them.
     expect(validateSetsImport(parsed, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }).join('\n')).toMatch(/Moon Landing/);
     const other = parseSetsImport(textOf('Corviknight\n- Sky Cannon'));
     expect(validateSetsImport(other, { p1: team(entry('Corviknight')), p2: team() }, { gen: 9, pools }, { p1: team(shown), p2: team() }).join('\n'))
@@ -252,7 +244,6 @@ describe('sets import validation by generation', () => {
   });
 });
 
-// The sweep: every ability and a sample of the learnset of species of every generation passes, a made-up one fails.
 describe('sets import validation sweep over the generations', () => {
   const generations = [3, 4, 5, 6, 7, 8, 9] as const;
   test.each(generations)('generation %i: the species\' own abilities and moves pass, made-up ones fail', async gen => {

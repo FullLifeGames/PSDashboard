@@ -10,17 +10,7 @@ import {
 import { bankKeepPlayed, bankSettings } from './bank-search.ts';
 import { bankTeamsFor } from './bank-build.ts';
 
-/**
- * The boards of the verify-scenes rows (`packages/eval-engine/test/tree-orchestrator.verify-scenes.spec.ts`), built the way the app builds
- * a turn: `bankTeamsFor` (the bank's door to `buildAppTeams`) over the saved replay and the saved Smogon files of the feedback harness
- * (`test/e2e-feedback/fixtures/`), the replay rebuilt to the turn with the choice locks and the target corrections, the settings and the
- * played turn read as the sweep reads them (`bankSettings`, `bankKeepPlayed`), the sacks from the turn's own protocol (`detectSacks`).
- * It is the board the feedback dump of that turn read.
- *
- * `verify-scenes-boards.spec.ts` rebuilds the three and fails when a fixture differs; `UPDATE_VERIFY_SCENES=1` writes them again (then run
- * `tree-orchestrator.verify-scenes.spec.ts` and recompute the Monte-Carlo references of its rows). The fixtures live in `verify-scenes/`,
- * beside `positions/` and not in it: the speed-layer sweeps read every file of `positions/`.
- */
+// The fixtures live beside `positions/`, not in it: the speed-layer sweeps read every file of `positions/`.
 
 const REPO = new URL('../../', import.meta.url);
 const FEEDBACK = new URL('test/e2e-feedback/fixtures/', REPO);
@@ -31,7 +21,6 @@ export interface SceneBoard {
   turn: number;
 }
 
-/** The three rows of `tree-orchestrator.verify-scenes.spec.ts`; each fixture is `<id>-t<turn>-r89.json` in `BOARD_DIR`. */
 export const SCENE_BOARDS: SceneBoard[] = [
   { id: 'smogtours-gen6ou-648453', turn: 13 },
   { id: 'smogtours-gen8ou-573756', turn: 73 },
@@ -40,16 +29,12 @@ export const SCENE_BOARDS: SceneBoard[] = [
 
 export const boardFile = (scene: SceneBoard) => new URL(`${scene.id}-t${scene.turn}-r89.json`, BOARD_DIR);
 
-/**
- * The share of fainted bodies the app's dispatch reads (`battleFaintedFraction` in the engine's search, which the barrel does
- * not export). A deliberate copy: `tree-orchestrator.verify-scenes.spec.ts` compares it with the engine's on every board.
- */
+// A deliberate copy of `battleFaintedFraction` (not in the barrel); tree-orchestrator.verify-scenes.spec.ts compares.
 const faintedShare = (battle: { sides: { pokemon: { fainted: boolean; hp: number }[] }[] }) => {
   const bodies = battle.sides.flatMap(side => side.pokemon);
   return bodies.length > 0 ? bodies.filter(pokemon => pokemon.fainted || pokemon.hp <= 0).length / bodies.length : 0;
 };
 
-/** The harness's saved Smogon files (`smogon/<path>.json`), the same names `record-smogon-fixtures.mjs` writes. */
 const recordedSmogon = (): typeof fetch => (async (url: string | URL | Request) => {
   const raw = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
   const u = new URL(raw);
@@ -60,7 +45,6 @@ const recordedSmogon = (): typeof fetch => (async (url: string | URL | Request) 
   return { ok: true, status: 200, json: async () => JSON.parse(text) as unknown, text: async () => text };
 }) as unknown as typeof fetch;
 
-/** The fixture object of one scene: what `tree-orchestrator.verify-scenes.spec.ts` reads, plus the build's own `source`. */
 export async function buildBoard(scene: SceneBoard): Promise<Record<string, unknown>> {
   const replay = JSON.parse(readFileSync(new URL(`${scene.id}.json`, FEEDBACK), 'utf8')) as {
     log: string; id?: string; formatid?: string; players: [string, string];

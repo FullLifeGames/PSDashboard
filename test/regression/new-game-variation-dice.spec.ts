@@ -7,13 +7,6 @@ import type { BranchHistoryEntry } from '../../src/lib/branch-history';
 import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { FAMILIES, playRecord } from './new-game-play';
 
-/**
- * A variation of a game at a past turn starts from the stored position of the record's rebuild (the PRNG the game had, adopted as
- * `usePositionSource` adopts it, `gameAdoptSnapshot`), so the choices the user leaves as they were roll the game's rolls: the turn it plays
- * is the game's log for that turn, line for line. Re-seeding to the log's dice would put every roll the log does not show (damage rolls)
- * on another stream.
- */
-
 function turnLines(log: readonly string[], turn: number): string[] {
   const from = log.findIndex(line => line === `|turn|${turn}`);
   if (from < 0) return [];
@@ -24,7 +17,6 @@ function turnLines(log: readonly string[], turn: number): string[] {
 describe('a variation of a game at a past turn that repeats the game\'s choices rolls the game\'s dice', () => {
   for (const family of FAMILIES) {
     test(`${family.name}: turns 1 to 4 played again from their stored positions give the game's log, line for line`, async () => {
-      // five turns: the picks rotate through Earthquake, Protect, Return, Substitute, so turns 1 and 3 are damage turns
       const record = await playRecord(family, 5, '1111,2222,3333,4444');
       expect(record.turns).toBeGreaterThanOrEqual(4);
       const positions = new Map<number, string>();
@@ -37,7 +29,6 @@ describe('a variation of a game at a past turn that repeats the game\'s choices 
         const runtime = branchEngine.adoptSerializedRuntime({
           serialized: positions.get(turn)!, replayLog: text, targetTurn: turn, snapshot: gameAdoptSnapshot(),
         });
-        // the entries of this turn (the turn and the replacements that settle it), played as the user repeats them
         for (const entry of record.entries.filter(candidate => candidate.turnNumber === turn)) {
           const outcome = await replayHistoryEntry(runtime, branchEngine, entry);
           if (!outcome.ok) throw new Error(`turn ${turn}: ${outcome.error}`);
@@ -51,14 +42,8 @@ describe('a variation of a game at a past turn that repeats the game\'s choices 
   }
 });
 
-/**
- * A variation that changes a choice at turn N rolls the dice the seed's stream gives from that point, which a rebuild of the game from
- * its seed reaches too (the entries before turn N played again, then the changed turn): the two turns are the same lines.
- * The stored position carries the game's PRNG, so the variation and the reference cannot drift apart.
- */
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The turn's entry with side one's moves swapped for one that is not the played one (no target needed: Substitute, else Earthquake). */
 function changedEntry(entry: BranchHistoryEntry): BranchHistoryEntry {
   const swap = (choice: BranchSlotChoice | null): BranchSlotChoice | null => {
     if (!choice || choice.kind !== 'move') return choice;

@@ -4,15 +4,8 @@ import { contrastRatio } from '../../src/lib/type-colors';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * The dock in narrow windows. At 1050 px (where the layout stacks) the dock is fixed at the viewport's lower edge across the full width,
- * the page keeps a bottom padding of the dock's height (`--ps-dock-h`, written by `useDockHeight`), the tray opens from below as a sheet
- * of up to 70 % of the viewport, and Execute takes its own row under the chips. At 640 px the chips take one row each at the dock's
- * 46 px, with the app's 640 px sizes (40 px minimum for chips and Execute).
- */
 const css = readFileSync(new URL('../../src/styles/dock.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
-/** The body of the `@media (max-width: <px>px)` block, found by matching braces; null when the file has none. */
 function media(px: number): string | null {
   const start = css.indexOf(`@media (max-width: ${px}px) {`);
   if (start < 0) return null;
@@ -25,7 +18,6 @@ function media(px: number): string | null {
   return null;
 }
 
-/** The declarations of the rule whose selector list is exactly `selector` inside `block`, or null. */
 function rule(block: string, selector: string): string | null {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const match = new RegExp(String.raw`(?:^|\n)\s*${escaped}\s*\{([^}]*)\}`).exec(block);
@@ -55,7 +47,6 @@ describe('the dock at 1050 px and below', () => {
     expect(tray, 'a .ps-tray rule').not.toBeNull();
     expect(tray).toMatch(/position:\s*fixed/);
     expect(tray).toMatch(/bottom:\s*var\(--ps-dock-h/);
-    // The vh units divide by the root's scale (`--ps-vh`).
     expect(tray).toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
     expect(rule(block ?? '', '.ps-tray.ps-tray-roomy') ?? '').toMatch(/max-height:\s*calc\(70 \* var\(--ps-vh\)\)/);
   });
@@ -78,12 +69,9 @@ describe('the dock at 640 px and below', () => {
   });
 
   test('the chips take one row each at 46 px, and the tray spans the width', () => {
-    // Two chips a row cut the choice after about twelve letters at 390 px; one a row (doubles four rows,
-    // singles two) leaves the whole choice and the tag or sprite.
     const row = rule(block ?? '', '.ps-dock-row') ?? '';
     expect(row).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s*;/);
     expect(row).toMatch(/grid-auto-rows:\s*46px/);
-    // The rows' own track does not fix the height of a row that holds two chips.
     expect(rule(block ?? '', '.ps-dock-rows') ?? '').toMatch(/grid-auto-rows:\s*auto/);
     expect(rule(block ?? '', '.ps-tray') ?? '').toMatch(/width:\s*100%/);
   });
@@ -93,7 +81,6 @@ describe('the tray\'s tiles at 640 px and below', () => {
   const block = media(640);
 
   test('the move tiles stand two per row, so a name like "Rock Slide" is not cut at 390 px', () => {
-    // At 390 px a row of four tiles leaves about 80 px a tile; two per row leave about 170.
     const grid = rule(block ?? '', '.ps-tile-grid');
     expect(grid, 'a .ps-tile-grid rule in the 640 px block').not.toBeNull();
     expect(grid).toMatch(/grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
@@ -105,9 +92,6 @@ describe('the tray\'s tiles at 640 px and below', () => {
 });
 
 describe('the dock above 1050 px: the label of Execute never moves a chip', () => {
-  // The Execute column is a fixed width that fits every label ("Select all active choices", "Waits for engine…", "Execute Turn"); with
-  // `auto` the label sized it and the chip columns beside it changed width by a few pixels (P1A: 4.3 px). The button fills it and wraps
-  // a long label.
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
 
   test('the chips share the bar with a column of fixed width', () => {
@@ -132,8 +116,7 @@ describe('the dock above 1050 px: the label of Execute never moves a chip', () =
 });
 
 describe('the HP bar of a bench tile', () => {
-  // The fill is a span; without `display: block` it stays inline and its width does nothing, so every bench tile shows the bare grey
-  // track, at 15 % as at 100 %. The only users of `.ps-hpbar-fill` are the dock's bench tiles.
+  // The fill is a span: without `display: block` its width does nothing and bench tiles show the bare grey track.
   const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
   test('the fill is a block, so its inline width sets the bar', () => {
@@ -149,8 +132,6 @@ describe('the HP bar of a bench tile', () => {
 });
 
 describe('the engine badge of a tile', () => {
-  // The engine's held-back pick wears the played badge's face (same tokens, so the contrast spec covers it), shares the
-  // badge box rules, and sits in the tile's flag row beside the played and forced badges.
   const pickers = readFileSync(new URL('../../src/styles/pickers.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
   test('it takes the played badge\'s colors and the shared box of the badges', () => {
@@ -162,17 +143,13 @@ describe('the engine badge of a tile', () => {
     expect(css).toMatch(/\.ps-tile-flags \.ps-engine-badge,\n\.ps-tile-flags \.ps-guess-badge\s*\{[^}]*margin:\s*0/);
   });
 
-  // A stand-in's tile wears the forced badge's face (same tokens, so the contrast spec covers it) in the same box and
-  // the same flag row.
   test('the stand-in badge takes the forced badge\'s colors', () => {
     expect(pickers).toMatch(/\n\.ps-guess-badge \{ background: var\(--ps-badge-forced-bg\); color: var\(--ps-badge-forced-fg\); \}/);
   });
 });
 
 describe("the dock follows the column's content", () => {
-  // `.ps-dock-log { margin-top: auto }` would push the toggle and the dock to the foot of a tall column and open a gap of about 400 px
-  // under the timeline at 2560 x 1440. The dock stands directly under the last panel; it stays sticky at the column's foot when the
-  // content is longer than the window, and the tray stays absolute above the bar, so a tray moves no chip.
+  // `margin-top: auto` on `.ps-dock-log` would push the toggle and the dock to the foot of a tall column.
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
   const narrow = media(1050) ?? '';
 
@@ -311,7 +288,6 @@ describe('layout-css', () => {
     });
 
     test('the left column has no padding below the dock, so the shared row ends on the foot of the dock', () => {
-      // A padding-bottom of 12px makes the row 12px longer than the dock, and the right column reaches past it.
       expect(rule(base, '.ps-main-left')).not.toMatch(/padding-bottom:\s*[1-9]/);
     });
 
@@ -364,9 +340,6 @@ describe('layout-css', () => {
   });
 
   describe('the top bar above 640 px stays on one line with a long format name', () => {
-    // The match must not have `flex: 1 1 auto`: its basis would be its whole text and the support links would wrap before
-    // anything shrank. The match takes a zero basis and a floor; inside it the format tag shortens first (a shrink weight far above the
-    // names'), the names next; the bar wraps only where even that floor does not fit.
     test('the match has no content basis and a floor that wins over the stacked layout min-width: 0', () => {
       expect(rule(base, '.ps-topbar-match')).toMatch(/flex:\s*1 1 0/);
       const floor = rule(base, '.ps-topbar > .ps-topbar-match');
@@ -377,7 +350,6 @@ describe('layout-css', () => {
       const tag = rule(base, '.ps-topbar-match > .ps-format-tag');
       expect(tag).toMatch(/flex:\s*0 1000000 auto/);
       expect(tag).toMatch(/min-width:\s*\d/);
-      // Every span of the match (tag, names, notes) clips with an ellipsis.
       const clip = rule(base, '.ps-topbar-match > span');
       expect(clip).toMatch(/overflow:\s*hidden/);
       expect(clip).toMatch(/text-overflow:\s*ellipsis/);
@@ -388,7 +360,6 @@ describe('layout-css', () => {
   });
 
   describe('the top bar at 640 px and below', () => {
-    // The bar takes two lines at most (three would be 74 px at 390 px): the match, then the menus with the support links.
     const phone = media(layout, 640);
 
     test('the match takes the first line, the menus and the support links share the second', () => {
@@ -410,7 +381,6 @@ describe('layout-css', () => {
   });
 
   describe('the replay frame at 640 px and below', () => {
-    // The document shrinks its scene to the frame's width; the frame keeps no 640 px minimum and no sideways scroll.
     test('the frame has no minimum width and its wrapper no horizontal scroll', () => {
       expect(media(layout, 640)).not.toMatch(/min-width:\s*640px/);
       expect(media(layout, 640)).not.toMatch(/\.ps-iframe-wrap\s*\{[^}]*overflow-x:\s*auto/);
@@ -551,7 +521,6 @@ describe('css-audit', () => {
     join(root, 'index.html'),
   ];
 
-  /** Class names from every selector prelude (declarations and comments excluded). */
   function classSelectors(css: string): Set<string> {
     const text = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
     const classes = new Set<string>();
@@ -577,7 +546,6 @@ describe('css-audit', () => {
     return classes;
   }
 
-  /** Static fragments that may compose a class name at runtime. */
   function fragments(texts: string[]): { prefixes: Set<string>; suffixes: Set<string> } {
     const prefixes = new Set<string>();
     const suffixes = new Set<string>();

@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { compareCounts, countSpecs, SPEC_PROJECTS } from '../../scripts/spec-counts.mjs';
 
-/** The spec-count ratchet: spec files per test project only fall, or grow with a named new module (`--allow-raise` of scripts/update-lint-ratchet.mjs); game types do not enter. */
 describe('compareCounts', () => {
   test('a project above its baseline is listed, a project at or below it is not', () => {
     expect(compareCounts({ app: 10, ui: 5 }, { app: 11, ui: 5 })).toEqual([{ project: 'app', baseline: 10, count: 11 }]);

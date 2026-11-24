@@ -1,11 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { upgradeChecks } from '../../scripts/upgrade-pkmn.mjs';
 
-/**
- * A plain run plays a sample of the dice sweeps, so the checks a new simulator needs before it ships name the full ones
- * (`DICE_SWEEPS=full`), which read every move of every rule set. The other sweep specs run full in their own CI job, and the checks
- * name it too (`workflows.spec.ts` holds that job's list).
- */
+// A plain run plays a sample of the dice sweeps, so the checks name the full ones (`DICE_SWEEPS=full`).
 describe('the checks the upgrade script prints', () => {
   const text = upgradeChecks('0.10.9');
 

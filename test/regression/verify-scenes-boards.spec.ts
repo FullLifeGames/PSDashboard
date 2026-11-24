@@ -3,22 +3,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { BOARD_DIR, SCENE_BOARDS, boardFile, buildBoard, writeBoard } from './verify-scenes-boards.ts';
 
-/**
- * The fixtures of the verify-scenes rows are the boards the app builds, and this spec keeps them so: the app builds its sets again on
- * every analysis, so a fixture exported once would grade a board nobody sees (912045 t8's Ursaluna held a Life Orb that the log rules
- * out). Each row rebuilds its board through the app's path (`bankTeamsFor`, the saved replay and Smogon files of the feedback harness)
- * and compares it with the committed fixture. A change to the set build, the inference, the reconstruction or the simulator that moves
- * a board fails here first.
- *
- *   UPDATE_VERIFY_SCENES=1 npx vitest run --project app test/regression/verify-scenes-boards.spec.ts
- *
- * writes the fixtures again. Then run `tree-orchestrator.verify-scenes.spec.ts`, recompute the Monte-Carlo references of its rows (the
- * recipe is in EVALUATION.md, "Scene pins") and move the pins at the gate, as the rows' comments say.
- */
+// After UPDATE_VERIFY_SCENES=1, recompute the verify-scenes Monte-Carlo references (EVALUATION.md "Scene pins").
 
 const UPDATE = process.env.UPDATE_VERIFY_SCENES === '1';
 
-/** The first path at which two JSON values differ, so a failure names a Pokemon's field rather than 45 kB of text. */
 function firstDifference(a: unknown, b: unknown, path = ''): string | null {
   if (a === b) return null;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return `${path}: ${JSON.stringify(a)} against ${JSON.stringify(b)}`;

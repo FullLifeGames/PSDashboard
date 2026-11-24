@@ -5,22 +5,12 @@ import { CHAMPIONS_MOD, rulesDex, toId } from '@fulllifegames/replay-core';
 import { getAbilityPool, getEveryMovePool, getMovePool } from '../../src/lib/pokemon-options';
 import { canonicalMove } from '../../src/lib/team-editor';
 
-/**
- * A species the generation marks Past (or CAP, Future, LGPE, Custom) is no entry of the generation's standard Dex, and replay-core's
- * Generations hide it: the editor's pool for Dracovish was every standard move without Fishious Rend and its ability list was empty.
- * The battle's own rules decide: a species the format's simulator lets exist gets the simulator's pool (`species.getMovePool(id, natDex)`)
- * and the Dex entry's abilities; an id the simulator does not list (a draft league's) plays as the Custom Game of its generation.
- * The sweep compares, for every non-standard species of every generation (and the Champions mod), the reader with the simulator;
- * existence is the TeamValidator's verdict (as in custom-game-pools.spec.ts).
- */
-
 // A tier ban ("is tagged ND Uber, which is banned") answers after existence passed: it is no refusal of existence.
 const EXISTENCE_REFUSAL = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder|Legends|not in the list of allowed|is tagged (Past|Future|CAP|LGPE|Unobtainable|Custom|Nonexistent)\b/;
 
 const names = (dex: { moves: { get(id: string): { name: string } } }, ids: Iterable<string>) => [...ids].map(id => dex.moves.get(id).name);
 const ids = (list: string[]) => list.map(toId).sort();
 
-/** The simulator's pool of a species the battle plays; an empty pool offers the moves the battle plays (the editor never blocks). */
 const simulatorPool = (
   dex: { moves: { get(id: string): { name: string } }; species: { getMovePool(id: string, natDex: boolean): Set<string> } },
   species: { id: string }, natDex: boolean, everything: string[],
@@ -29,8 +19,7 @@ const simulatorPool = (
   return pool.length > 0 ? pool : ids(everything);
 };
 
-// A tag ban of a rule ("is tagged Restricted Legendary, which is banned by Flat Rules") answers before the existence rule is asked
-// (checkTagRules returns the first tag rule that matches): no verdict on existence, the row is masked and counted.
+// A tag ban of a rule answers before existence is asked (`checkTagRules`): no verdict, the row is masked and counted.
 const AMBIGUOUS = /, which is banned by /;
 const masked: string[] = [];
 const existsIn = (validator: TeamValidator, dex: { species: { get(name: string): never } }, species: { name: string }): boolean | null => {
@@ -98,7 +87,6 @@ describe('the reported rows: Dracovish and Zygarde under National Dex rules', ()
     const dracovish = await getMovePool('Dracovish', 9, format);
     const garchomp = await getMovePool('Garchomp', 9, format);
     expect(canonicalMove(dracovish, 'fishious rend', editorList, played)).toEqual({ canonical: 'Fishious Rend', outside: false });
-    // A species without it takes the battle's move as not learnable.
     expect(canonicalMove(garchomp, 'fishious rend', editorList, played)).toEqual({ canonical: 'Fishious Rend', outside: true });
     expect(canonicalMove(dracovish, 'Moon Landing', editorList, played)).toEqual({ unknown: true });
     expect(canonicalMove(garchomp, 'fishious rend', editorList)).toEqual({ unknown: true });
@@ -111,7 +99,6 @@ const RULE_FORMATS = (gen: number): [string, string][] => [
   ...['customgame', 'doublescustomgame', 'ou', 'doublesou', 'nationaldex', 'ubers']
     .filter(kind => Dex.formats.get(`gen${gen}${kind}`).exists)
     .map(kind => [`gen${gen}${kind}`, `gen${gen}${kind}`] as [string, string]),
-  // An unlisted id (singles and doubles draft leagues) plays as the Custom Game of its generation.
   [`gen${gen}natdexdraft`, `gen${gen}customgame`],
   [`gen${gen}doublesdraftleague`, `gen${gen}customgame`],
 ];
@@ -147,13 +134,11 @@ describe('every non-standard species: the own pool is the simulator\'s, the abil
         if (gen < 3 && abilities.length > 0) wrong.push(`${species.name}: abilities before Generation 3`);
       } else {
         refused++;
-        // A format that refuses the species keeps the reading of a call without a format.
         if (JSON.stringify(ids(pool)) !== JSON.stringify(ids(await getMovePool(species.name, gen)))) wrong.push(`${species.name}: refused, but its pool moved`);
         if (abilities.length > 0) wrong.push(`${species.name}: refused, but it has abilities`);
       }
     }
     expect(wrong.slice(0, 20)).toEqual([]);
-    // A Custom Game plays every one of them; the others refuse at least the CAP species.
     if (rules.endsWith('customgame')) expect(refused).toBe(0);
     expect(played + refused).toBeGreaterThan(0);
   }, 120_000);

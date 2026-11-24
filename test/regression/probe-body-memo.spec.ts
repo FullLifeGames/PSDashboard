@@ -1,6 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
 
-// Counts the battles the engine builds, so the spec can tell a probe that is asked again from one that is remembered.
 const built = vi.hoisted(() => ({ count: 0 }));
 vi.mock('@pkmn/sim', async importOriginal => {
   const actual = await importOriginal<typeof import('@pkmn/sim')>();
@@ -15,13 +14,8 @@ vi.mock('@pkmn/sim', async importOriginal => {
 
 const { loadSimMods, sightedHpAt, snapshotMoveTypes } = await import('@fulllifegames/eval-engine');
 
-/**
- * The quick picker reads the HP a percent stands for off a probe body (sightedHpAt), a one-Pokémon battle of the format. The Champions mod
- * loads on demand; before it registers, the format id is unknown to the simulator and a battle of it comes up on the base rules, without
- * an error (the base rounds the percent up, the mod down). So a missing mod answers null without building a battle and the next build asks
- * again; a body that was built is kept, and so is a generation that has no body. The picker's move types (snapshotMoveTypes) read the
- * same kind of twin and follow the same rule.
- */
+// Before the Champions mod registers, its format id plays on the base rules (percent rounds up, the mod down):
+// a missing mod answers null and builds nothing.
 const SIGHTING = { hp: 50, maxhp: 100 };
 const FLAMETHROWER = {
   gen: 9, champions: true, body: { species: 'Charizard' }, abilities: ['blaze'], field: { weather: '', terrain: '' }, clickTera: null, moves: ['Flamethrower'],
@@ -43,7 +37,6 @@ describe('the probe body of the HP display', () => {
     expect(sightedHpAt(9, true, SIGHTING, 250)).not.toBeNull();
     expect(built.count).toBe(1);
 
-    // The move types come from a twin of the body, built once and remembered.
     expect(snapshotMoveTypes(FLAMETHROWER)?.get('Flamethrower')).toEqual({ type: 'Fire' });
     expect(built.count).toBe(2);
     expect(snapshotMoveTypes(FLAMETHROWER)?.get('Flamethrower')).toEqual({ type: 'Fire' });

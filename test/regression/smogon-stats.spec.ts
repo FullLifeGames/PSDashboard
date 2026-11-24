@@ -87,7 +87,6 @@ describe('Smogon usage stat enrichment', () => {
   });
 
   test('Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
-    // data.pkmn.cc keeps gen9championsvgc2026 (megas, Champions items and EV scale) beside gen9vgc2026.
     for (const format of ['gen9championsvgc2026regmb', 'gen9championsvgc2026regmcbo3']) {
       expect(buildSmogonStatsUrls(format).map(candidate => candidate.format)).toEqual([
         'gen9championsvgc2026', 'gen9doublesou', 'gen9ou', 'gen9ubers',
@@ -144,10 +143,8 @@ describe('Smogon usage stat enrichment', () => {
       fetcher,
     });
 
-    // The format's own data wins for species it covers…
     expect(stats?.format).toBe('gen9vgc2026');
     expect(stats?.pokemon.incineroar.moves.map(move => move.value)).toEqual(['Fake Out']);
-    // …and species it lacks merge in from the fallback files.
     expect(stats?.pokemon.annihilape.moves.map(move => move.value)).toEqual(['Rage Fist', 'Close Combat']);
     expect(stats?.pokemon.annihilape.moves[0].sourceDetail).toBe('Smogon gen9ubers latest');
   });
@@ -280,10 +277,6 @@ describe('Smogon usage stat enrichment', () => {
   });
 });
 
-/**
- * The displayed set guesses are assembled by the same machinery the simulator's team builder uses (curated selection + coherence
- * vetoes): Cobalion must not show Body Press next to a revealed Swords Dance when the built team has vetoed it.
- */
 describe('coherent move enrichment', () => {
   const detail = 'Smogon gen9ou 2026-03';
   const monInfo = (species: string, moves: OpponentTeamInfo['pokemon'][number]['moves']) => ({
@@ -325,8 +318,7 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats).pokemon[0];
 
-    // Body Press scales with Defense and Swords Dance does not serve it; Iron Head duplicates the revealed Heavy Slam's Steel damage.
-    // Both drop and the usage tail refills the display, like the built team.
+    // Body Press scales with Defense, so Swords Dance does not serve it; Iron Head repeats Heavy Slam's Steel damage.
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Swords Dance', 'Heavy Slam', 'Stone Edge', 'Close Combat',
     ]);
@@ -349,8 +341,6 @@ describe('coherent move enrichment', () => {
   });
 
   test('revealed moves are immune however incoherent the pairing looks', () => {
-    // Revealed Body Press survives a pool whose boost serves Attack: proof is never second-guessed. (Stone Edge, not Close Combat:
-    // a Fighting fill would be same-type-redundant next to the revealed Body Press.)
     const info = monInfo('Cobalion', [{ name: 'Body Press', source: 'revealed' }]);
     const stats = statsFor('Cobalion', {
       moves: [['Swords Dance', 0.9], ['Stone Edge', 0.8]],
@@ -397,7 +387,6 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats, sets).pokemon[0];
 
-    // The alternative covers the revealed Super Fang: its moves and its item fill the display (the first set contradicts what we saw).
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Super Fang', 'Air Slash', 'U-turn', 'Roost',
     ]);

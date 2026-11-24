@@ -5,15 +5,7 @@ import { bankTeamsFor } from './bank-build';
 import { CORPUS, rebuildThrough, refusalsOfTurn } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * A Pledge combination or Round writes `|move|p1a: Primarina|Water Pledge|p2a: Torkoal|[from] move: Grass Pledge`.
- * Primarina used its own Water Pledge; the partner's Grass Pledge pulled it forward. The inference booked Grass Pledge on Primarina,
- * the build left Water Pledge out, and the simulator refused the rebuilt `move waterpledge`. Each row reads a corpus game (local: the
- * rows skip without `.fit-corpus`): the built Pokémon holds the move its line shows and not the move that pulled it forward, and the
- * turn adds no refusal. The unit and sweep rows are in `packages/replay-core/test/from-move-sweep.spec.ts`.
- *
- * Singles and Champions OU have no such line (a Pledge combination and Round's pull need an ally): 0 of 3,891 games of the log scan.
- */
+// Rows skip without `.fit-corpus`. Singles and Champions OU log no such line: a Pledge or Round pull needs an ally.
 
 interface Row { id: string; turn: number; type: string; what: string; side: 'p1' | 'p2'; body: string; shown: string; pulled: string }
 
@@ -43,7 +35,6 @@ describe('a Pledge combination and Round book the move the line shows', () => {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const moves = await builtMoves(row.id, row.side, row.body);
       expect(moves, `${row.body} holds ${row.shown}`).toContain(toId(row.shown));
-      // Round pulls Round: the shown move and the pulling move are one slot. A Pledge pulled by another Pledge leaves the partner's.
       if (row.pulled !== row.shown) expect(moves, `${row.body} lacks ${row.pulled}`).not.toContain(toId(row.pulled));
       expect(moves.filter(move => move === toId(row.shown)), `one slot for ${row.shown}`).toHaveLength(1);
       expect(await refusalsOfTurn(row.id, row.turn, (await rebuildThrough(row.id, row.turn)).refusals), 'refusals of the turn').toBe(0);

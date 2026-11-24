@@ -4,8 +4,6 @@ import type { PokemonSet } from '@pkmn/sim';
 import { readTeamPaste, seedProblem, startNewGame, startBlocks, startProblem, stopsStart } from '../../src/lib/new-game/start';
 import { newGameSeed } from '../../src/lib/new-game/record';
 
-/** The New game dialog: the paste is read as Showdown reads it, the seed is the simulator's PRNG format, Start returns the record at Team Preview. */
-
 const TEAM = `Garchomp @ Rocky Helmet
 Ability: Rough Skin
 EVs: 252 HP / 4 Def / 252 Spe
@@ -65,11 +63,7 @@ describe('the seed field', () => {
   });
 });
 
-/**
- * The ability a new game fills is the first slot (0, 1, H, S) the format's validator accepts, and slot 0 where none passes.
- * Oracle: a refused ability shows in `validateSet` as "ability <name> ..." (the sweep over every species is
- * packages/eval-engine/test/new-game-ability-fill.spec.ts).
- */
+// Oracle: a refused ability shows in `validateSet` as "ability <name> ...".
 function firstAllowedAbility(format: string, species: string): string {
   const dex = Dex.forFormat(Dex.formats.get(format));
   const slots = dex.species.get(species).abilities as Record<string, string | undefined>;
@@ -103,7 +97,6 @@ describe('Start', () => {
     expect(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }).teams).toEqual([null, refusal]);
     expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }))).toBe(true);
     expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], seed: '1,2,3,4' }))).toBe(false);
-    // the same rule feeds startProblem, which Start itself reads
     expect(startProblem({ texts: [TEAM, seven] })).toBe('A team holds at most 6 Pokémon.');
   });
 
@@ -146,7 +139,6 @@ describe('Start', () => {
     expect(record.body).toEqual([]);
   }, 60_000);
 
-  // a paste without an Ability line starts with the species' first ability written into the saved team (the simulator would play none)
   for (const [label, format, formatName, gen] of [
     ['singles', 'gen9ou', '[Gen 9] OU', 9], ['doubles', 'gen9doublesou', '[Gen 9] Doubles OU', 9], ['VGC', 'gen9vgc2025regi', '[Gen 9] VGC 2025 Reg I', 9],
     ['Champions', 'gen9championsou', '[Gen 9 Champions] OU', 9], ['a Custom Game', 'gen9customgame', '[Gen 9] Custom Game', 9], ['an older generation', 'gen4ou', '[Gen 4] OU', 4], ['a generation without abilities', 'gen2ou', '[Gen 2] OU', 2],
@@ -156,7 +148,6 @@ describe('Start', () => {
       for (const set of record.teams.p1) {
         expect(set.ability ?? '', `${set.species} in ${format}`).toBe(gen >= 3 ? firstAllowedAbility(format, set.species) : '');
       }
-      // the other side pasted its abilities: they stay
       expect(record.teams.p2.map(set => set.ability)).toEqual(readTeamPaste(TEAM).sets.map(set => set.ability));
     }, 60_000);
   }

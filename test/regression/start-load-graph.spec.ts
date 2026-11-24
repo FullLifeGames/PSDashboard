@@ -3,27 +3,14 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/**
- * The start load holds no simulator code (`test/e2e-build/build-smoke.spec.ts` reads the built chunks). This is its source-level twin,
- * which fails in seconds and names the file: a module of the app's start load (the static imports from src/main.tsx, no dynamic
- * `import()`) that takes a value from a workspace package's barrel must take it from a module that does not import the simulator's
- * battle classes. A module the New game dialog shares with the start page lands in a chunk of the start load together with every
- * export the lazy chunk uses of it: `DEFAULT_GAME_SEED` re-exported from `branch/new-game.ts` would put the whole battle runtime there.
- *
- * The rule reads imports, not formats: singles and doubles reach it the same way.
- */
-
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BARRELS: Record<string, string> = {
   '@fulllifegames/replay-core': 'packages/replay-core/src/index.ts',
   '@fulllifegames/eval-engine': 'packages/eval-engine/src/index.ts',
 };
-/** The simulator's classes whose module carries the battle runtime (the build smoke looks for `getFullDetails`, a Pokemon method). */
 const BATTLE_CLASSES = ['Battle', 'BattleStreams', 'Pokemon', 'Side'];
-/**
- * Names whose origin module reaches a battle class through a function the start load does not use: the bundler drops it, and the
- * build smoke (`getFullDetails` in no start chunk) is the judge. A name joins this list only after that row passed with it.
- */
+// Names whose origin module reaches a battle class only through a function the start load drops;
+// a name joins once the build smoke passed.
 const SHAKEN_OUT = new Set(['searchTreesOrchestrated']);
 const EXTENSIONS = ['', '.ts', '.tsx', '/index.ts', '/index.tsx'];
 
@@ -42,7 +29,6 @@ function resolveFile(from: string, spec: string): string | null {
 
 interface Import { names: string[]; spec: string }
 
-/** The value imports (and re-exports) of a file; `import type` and dynamic imports are no part of the start load. */
 function staticImports(source: string): Import[] {
   const found: Import[] = [];
   const pattern = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;'"]*?)\s+from\s+['"]([^'"]+)['"]|(?:^|\n)\s*import\s+['"]([^'"]+)['"]/g;
@@ -81,7 +67,6 @@ function startLoad(): { files: Set<string>; takes: { file: string; spec: string;
   return { files, takes };
 }
 
-/** The first module of a file's static closure (inside the packages) that imports a battle class of the simulator, else null. */
 function battleCarrier(origin: string): string | null {
   const seen = new Set([origin]);
   const queue = [origin];

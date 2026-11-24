@@ -36,10 +36,7 @@ const vgcReplay = {
 };
 
 describe('replay fetcher', () => {
-  // A private replay link carries a 31-character password as a `-{password}pw`
-  // suffix on the id. The suffix belongs in the fetched id and nowhere else:
-  // read as part of the format it produced `gen9ou2632003305e10u...pw`, so an
-  // ordinary private OU replay branched as a rule-less custom game (G22).
+  // A private link ends in a 31-character `-{password}pw`; the suffix belongs in the fetched id, never in the format.
   const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
   const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
 
@@ -57,7 +54,6 @@ describe('replay fetcher', () => {
   });
 
   test('parseReplayUrl accepts the psim.us short links', () => {
-    // Showdown shares replays as https://psim.us/r/<id>, which redirects to the replay server.
     expect(parseReplayUrl('https://psim.us/r/smogtours-gen8ou-562428')).toBe('smogtours-gen8ou-562428');
     expect(parseReplayUrl('psim.us/r/gen9ou-123?p2')).toBe('gen9ou-123');
     expect(parseReplayViewpoint('https://psim.us/r/gen9ou-123?p2')).toBe('p2');
@@ -72,7 +68,6 @@ describe('replay fetcher', () => {
 
     expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123')).toBe('p1');
     expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p1')).toBe('p1');
-    // The flag is the literal "p1"/"p2" query key, not any substring.
     expect(parseReplayViewpoint('https://replay.pokemonshowdown.com/gen9ou-123?p2x')).toBe('p1');
     expect(parseReplayViewpoint('gen9ou-p2-123')).toBe('p1');
   });
@@ -133,7 +128,6 @@ describe('replay fetcher', () => {
     try {
       const replay = await fetchReplay('https://replay.pokemonshowdown.com/gen9championsvgc2026regmb-2639020147');
       expect(replay.formatid).toBe('gen9championsvgc2026regmb');
-      // A Champions doubles replay branches on the Champions mod's Doubles Custom Game.
       expect(getBranchSimulatorFormat(replay)).toBe('gen9championsdoublescustomgame');
     } finally {
       globalThis.fetch = originalFetch;
@@ -150,8 +144,7 @@ describe('replay fetcher', () => {
     const asked: string[] = [];
     globalThis.fetch = (async (url: string) => {
       asked.push(String(url));
-      // The JSON route rejects at the network layer, exactly as a CORS-less
-      // 404 from the replay host does in a browser.
+      // The JSON route rejects at the network layer, as a CORS-less 404 does in a browser.
       if (String(url).endsWith('.json')) throw new TypeError('Failed to fetch');
       return new Response(`|player|p1|Alpha|\n|player|p2|Beta|\n${privateLog}`, { status: 200 });
     }) as unknown as typeof fetch;
