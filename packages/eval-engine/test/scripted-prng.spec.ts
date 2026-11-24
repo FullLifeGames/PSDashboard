@@ -7,6 +7,7 @@ import { ScriptedPRNG, type RollScript } from '../src/forward/scripted-prng';
 import { PairPRNG, type PairScript } from '../src/pair/prng';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
+import { stableLog } from './sim-fast-helpers';
 
 /** A scripted PRNG answers the accuracy roll, the crit roll, the damage roll and the speed-tie order of one named move; everything else rolls from the seed. */
 
@@ -106,7 +107,7 @@ describe('scripted PRNG (round 43)', () => {
     const plain = advancePositionWithLog(root, 'move thunder', 'move closecombat', '5,6,7,8');
     const empty = advancePositionWithLog(root, 'move thunder', 'move closecombat', '5,6,7,8', { scripts: new Map() });
     expect(empty.child.serialized).toBe(plain.child.serialized);
-    expect(empty.log).toEqual(plain.log);
+    expect(stableLog(empty.log)).toBe(stableLog(plain.log));
   });
 });
 
