@@ -12,7 +12,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const SPEC_COUNT_FILE = path.join(ROOT, 'spec-count-ratchet.json');
 
-/** The folder of each test project: the four Vitest projects of vitest.config.ts, then the three Playwright suites. */
+/** The folder of each test project: the four Vitest projects of vitest.config.ts, then the four Playwright suites. */
 export const SPEC_PROJECTS = {
   app: 'test/regression',
   'replay-core': 'packages/replay-core/test',
@@ -21,6 +21,7 @@ export const SPEC_PROJECTS = {
   e2e: 'test/e2e',
   'e2e-feedback': 'test/e2e-feedback',
   'e2e-build': 'test/e2e-build',
+  'e2e-capture': 'test/e2e-capture',
 };
 
 function specFiles(dir) {
