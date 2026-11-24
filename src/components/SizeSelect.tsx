@@ -3,12 +3,11 @@ import { useUiScale } from '../hooks/useUiScale';
 import { UI_SCALE_STEPS, scaleLabel, stepDisabledReason, type UiScaleSetting } from '../lib/ui-scale';
 import { setUiScaleSetting } from '../lib/ui-scale-store';
 
-/** The select's value of a setting: "auto" or the step as written in storage. */
 const valueOf = (setting: UiScaleSetting): string => String(setting);
 
 /**
- * The "Size" select of the Setup menu. Auto names the step it gives for this window; the five steps override it and persist per browser
- * (`ui-scale-store.ts`). A step that would leave the app less than 1050 px of width is disabled, and its label says how wide a window it needs.
+ * Auto names the step it gives for this window; the five steps override it and persist per browser (`ui-scale-store.ts`). A step that
+ * would leave the app less than 1050 px of width is disabled, and its label says how wide a window it needs.
  */
 export function SizeSelect() {
   const { setting, auto, width } = useUiScale();

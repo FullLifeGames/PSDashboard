@@ -22,7 +22,6 @@ interface EvalPanelProps {
   error: string | null;
   prefs: EvalPreferences;
   onPrefsChange: (prefs: EvalPreferences) => void;
-  /** Branch mode only — the replay view analyzes the selected turn automatically. */
   onEvaluate?: () => void;
   onCancel: () => void;
   /** Click on an engine line: plays it out in a branch (entering one first when needed), the other side answering with `reply`. */
@@ -30,39 +29,34 @@ interface EvalPanelProps {
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
   /** Replay view: the settings that produced the shown result (fast scan vs configured). */
   resultSettings?: TurnEvalSettings | null;
-  /** A gap turn's analysis at the panel's settings — selecting a turn never re-searches. */
   onAnalyzeTurn?: () => void;
-  /** The settings that analysis would run (null = the turn holds a result, or not applicable). */
   analyzeTarget?: TurnEvalSettings | { mode: 'auto' } | null;
   /** Smogon usage/sets still loading: a sweep started now would silently build teams without the guessed fills. */
   smogonPending?: boolean;
-  /** Branch mode: hides the auto checkbox on the replay view. */
   showAuto: boolean;
   /** Gen 9 only — other gens have no Tera to gate. */
   showTera: boolean;
   engines?: EngineChoice;
   graph: EvalGraphState;
-  /** Variation overlay for the game graph (unified timeline): the gold curve's scores, indexed like the main scores (scores[turn − 1]), and the fainted share of the variation's own board before each of them. */
+  /**
+   * Variation overlay for the game graph: the gold curve's scores (`scores[turn − 1]`) and the fainted share of the variation's own board
+   * before each.
+   */
   variation?: VariationSeries | null;
   currentLine?: 'main' | 'variation';
   onAnalyzeGame?: () => void;
   onSelectTurn?: (turn: number, line?: 'main' | 'variation') => void;
   currentTurn: number;
   analysis: TurnAnalysis | null;
-  /** The open tip of a new game, whose analysis names an open position instead of a played choice. */
   openTurn?: number | null;
-  /** With a variation open and a game report held, the way back to the main line (see GameGraphSection). */
   onBackToMain?: (cardTurn: number | null) => void;
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
-  /** The fainted share per swept turn as the card takes it (any engine mode): the graph tooltips print at it. */
   faintedShares?: (number | null)[];
   leadAnalysis?: LeadAnalysis | null;
   reportLeads?: LeadAnalysis | null;
   report?: GameReport | null;
   reviewAnalyses?: (TurnAnalysis | null)[] | null;
-  /** Doubles replay — selects the fitted win-probability curve for percents. */
   doubles?: boolean;
-  /** The host of the Lines section under a turn's rows (the game's rules, the turn's field, ▶ Play); absent: no section. */
   linesHost?: LinesHost;
   /** The user stopped the search and its partial result stands for the position: its depth. Null: no stopped run. */
   stoppedAt?: number | null;
@@ -70,12 +64,8 @@ interface EvalPanelProps {
   positionLabel?: string | null;
   /** The pointer sits on the finished end of a variation: there is nothing to evaluate, the panel says who won. */
   ended?: { winner: string | null } | null;
-  /** "Let it play out" is running: one steady progress block replaces the
-   *  per-turn result churn (the graph keeps growing underneath). */
   playOutProgress?: PlayOutProgress | null;
   graphMaxTurn?: number;
-  /** The turn whose analysis is selected (0 = leads). Changing it — slider,
-   *  arrows, graph, the T0 button — opens that turn's view. */
   analysisTurn?: number | null;
 }
 
@@ -98,9 +88,8 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
       setStartedFrom({ view, turn: analysisTurn ?? null });
     }
   }
-  // Same pattern for navigation: moving to another turn (slider, arrows,
-  // graph, the timeline's T0 button) IS the request to see that turn's
-  // evaluation — the report stays one click away via "← Game report".
+  // Same pattern for navigation: moving to another turn is the request to see its evaluation; the report stays one click away via "← Game
+  // report".
   const [seenAnalysisTurn, setSeenAnalysisTurn] = useState<number | null>(analysisTurn ?? null);
   if ((analysisTurn ?? null) !== seenAnalysisTurn) {
     setSeenAnalysisTurn(analysisTurn ?? null);
@@ -148,8 +137,7 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
 }
 
 /**
- * The fainted share of the board the shown result was searched on, so the panel prints the same percents the graph and the turn card
- * print for that position.
+ * The fainted share of the board the shown result was searched on, so the panel prints the same percents as the graph and the card.
  * - The graph's own result of the analyzed turn: the turn card's share.
  * - A branch result: the share of its own board. On the variation line that is the variation's board at the viewed turn (the share its
  *   gold tooltip prints at), never the main line's share of that turn number; on the main line (a branch that has not played a move

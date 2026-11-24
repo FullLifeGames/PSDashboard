@@ -65,8 +65,8 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
 }
 
 /**
- * What Analyze game does, with the configured mode; the heading's title. Auto reads the search budget; by default doubles run the tree on
- * every turn, singles the matrix until a quarter of all bodies fell. There is no deeper stage per turn.
+ * What Analyze game does, with the configured mode (the heading's title). Auto reads the search budget; by default doubles run the
+ * tree on every turn, singles the matrix until a quarter of all bodies fell.
  */
 function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
@@ -85,7 +85,7 @@ function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnaly
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
-  /** With a variation open the report is out of reach; this goes back to the main line, where it stands (the Line selector's "Main line"). Absent: nothing to return to. */
+  /** With a variation open the report is out of reach: this goes back to the main line; absent = nothing to return to. */
   onBackToMain?: () => void;
   result: EvalResult | null;
   currentTurn: number;
@@ -98,16 +98,12 @@ interface TurnViewProps {
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
-  /** What the Lines section under the turn's rows needs of its host (absent: no section). */
   linesHost?: LinesHost;
-  /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
   doubles?: boolean;
-  /** The open tip of a new game (nobody has played it yet), else null or absent. */
   openTurn?: number | null;
   opponentReads?: boolean;
 }
 
-/** The way back from a variation names the Game review only while that section exists. */
 const backToMainTitle = (): string =>
   `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
 
@@ -182,8 +178,8 @@ export interface GameGraphSectionProps extends TurnViewProps {
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
 /**
- * What the marks on the graph mean: a circle marks a graded turn (an inaccuracy, a mistake or a blunder, GLOSSARY.md) of player 1, a square
- * one of player 2, in the player's colour; the Game review lists the same turns. Only the sides that carry a mark are named.
+ * A circle marks a graded turn (GLOSSARY.md) of player 1, a square one of player 2, in the player's colour; the Game review lists
+ * the same turns. Only the sides that carry a mark are named.
  */
 function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
   const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));

@@ -14,7 +14,6 @@ function FieldCaption({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>{children}</div>;
 }
 
-/** The species' own abilities, the other abilities of the generation, and whether the user's pick lies outside the species' own. */
 function abilityChoices(entry: RevealedPokemonInfo, pools: EditorPools | null) {
   const own = pools?.abilitiesBySpecies[entry.species] ?? [];
   const ownIds = new Set(own.map(toId));
@@ -249,7 +248,6 @@ function MoveChips({ entry, index, pools, draft }: FieldProps) {
 
 function MoveAdder({ entry, index, pools, draft }: FieldProps) {
   const { moveDraft, setMoveDraft, addMove } = draft;
-  // The species' own moves first, then the rest of the generation; the dropdown lists what the set does not hold yet.
   const own = pools?.movesBySpecies[entry.species] ?? [];
   const ownIds = new Set(own.map(toId));
   const outside = own.length > 0 ? (pools?.allMoves ?? []).filter(name => !ownIds.has(toId(name))) : [];

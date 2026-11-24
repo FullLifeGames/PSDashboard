@@ -11,9 +11,8 @@ import { newGameSeed, type NewGameRecord } from '../lib/new-game/record';
 import { readTeamPaste, seedProblem, startBlocks, startNewGame, stopsStart } from '../lib/new-game/start';
 
 /**
- * The New game dialog: two team fields with the player names, the format list and the dice seed; Start starts the format's battle and hands
- * the record to `onStart`. The dialog stays mounted while closed, so the pasted teams survive a click beside it or Cancel. It knows only `open`
- * and `onOpenChange`; the saved games are listed in the menu and on the start page, never here.
+ * The dialog stays mounted while closed, so the pasted teams survive a click beside it or Cancel. It knows only `open` and
+ * `onOpenChange`; the saved games are listed in the menu and on the start page, never here.
  */
 
 interface Props {

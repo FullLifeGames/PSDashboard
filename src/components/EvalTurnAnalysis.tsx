@@ -21,7 +21,6 @@ interface EvalTurnAnalysisProps {
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onExplore?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
-  /** The turn's own result (its `lines`) and what the Lines section needs of the host; without them the section is absent. */
   result?: EvalResult | null;
   linesHost?: LinesHost;
   doubles?: boolean;
@@ -74,8 +73,8 @@ function SplitRow({ analysis, name }: { analysis: TurnAnalysis; name: string }) 
 }
 
 /**
- * The turn's summary sits closed under a one-line toggle, so the card opens on the verdict and both sides. Every turn starts closed
- * (the card keys it by turn), and the app remembers nothing; the Lines section and the win-path question fold the same way (`CardToggle`).
+ * The summary sits closed under a one-line toggle, so the card opens on the verdict and both sides; the card keys it by turn, so every turn
+ * starts closed (like `CardToggle`).
  */
 function TurnSummary({ text }: { text: string }) {
   return <CardToggle label="Explanation" bodyClassName="ps-eval-analysis-summary">{text}</CardToggle>;
@@ -165,7 +164,7 @@ function LeadGrade({ side }: { side: LeadSideAnalysis }) {
   );
 }
 
-/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. A doubles pair gets no tick either, only the engine's pick as a neutral line. */
+/** The lead verdict chips: agreement, the graded miss, the inaccuracy, or the engine's differing pick. */
 function LeadVerdict({ name, side }: { name: string; side: LeadSideAnalysis }) {
   const agrees = !!side.played && !!side.best && side.played.choice === side.best.choice;
   const pair = isPairLead(side);

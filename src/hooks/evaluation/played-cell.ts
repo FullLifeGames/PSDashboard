@@ -1,11 +1,10 @@
 import type { EvalResult } from '@fulllifegames/eval-engine';
 
 /**
- * The value the tree itself holds for the pair both sides clicked. The roots around a tree turn (`scoreBefore`, `scoreAfter`) are made of the
- * merged matrix's cells; a depth-1 sub-search of the played pair is another estimator, and the gap between the two leaked into the decision and
- * chance parts of the turn. Null where the matrix does not price the pair: no matrix or no cells, a choice that is no row or column, a cell no
- * tree visited and no verify step re-priced (the merge fills it with the root value, which says nothing about the pair). The values are
- * p1-perspective wp-units, the unit of a sub-search's score.
+ * The value the tree itself holds for the pair both sides clicked: the roots around a tree turn (`scoreBefore`, `scoreAfter`) are made
+ * of the merged matrix's cells, and a depth-1 sub-search of the played pair is another estimator whose gap leaked into the decision and
+ * chance parts. Null where the matrix does not price the pair: no matrix or cells, a choice that is no row or column, a cell no tree
+ * visited and no verify step re-priced (the merge fills it with the root value). p1-perspective wp-units.
  */
 export function playedCellValue(result: EvalResult, p1Choice: string, p2Choice: string): number | null {
   const matrix = result.matrix;

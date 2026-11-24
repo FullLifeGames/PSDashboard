@@ -5,7 +5,6 @@ import { baseSpriteUrl, spriteUrl } from '../lib/sprite-url';
 type Props = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'onError'> & {
   species: string;
   rules: GameRules;
-  /** The last miss hides the box (the empty image box and its alt text go). Default: it stays. */
   hideOnMiss?: boolean;
 };
 

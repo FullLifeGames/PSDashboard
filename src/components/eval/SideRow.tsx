@@ -12,7 +12,6 @@ interface RowProps {
   name: string;
   side: SideAnalysis;
   onExplore?: (choice: RankedChoice) => void;
-  /** The side lost ground on the turn (lostGround): its paid-off read shows no praise chip. */
   lostGround?: boolean;
   opponentReads?: boolean;
   rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
@@ -225,7 +224,6 @@ function ComparisonRows({ name, side, played, best, difference, onExplore, oppon
   );
 }
 
-/** The number against the reply the opponent really clicked, once the engine's gate let it through. */
 function HindsightRow({ line }: { line: string }) {
   return (
     <div className="ps-eval-analysis-row">

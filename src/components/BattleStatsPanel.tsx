@@ -28,7 +28,6 @@ function formatFieldValue(field: PokemonFieldInfo): string {
 
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' } as const;
 
-/** The tag for a spread nobody has revealed; it carries no source word, since "unknown" is the whole claim. */
 const EVS_UNKNOWN = 'EVs not yet known';
 
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
@@ -87,7 +86,6 @@ function MetaTag({
       <span
         style={{
           marginLeft: 6, color: sourceAccent(field.source), fontSize: 9, textTransform: 'uppercase',
-          // A Tera-colored pill needs a dark chip behind it to stay readable.
           ...(background ? { background: 'rgba(0,0,0,0.45)', padding: '0 3px', borderRadius: 2 } : {}),
         }}
       >
@@ -181,7 +179,10 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
   );
 }
 
-/** A side whose `|teamsize|` counts bodies the panel could not fill (no team preview, and no stats file or an unreachable one): the engine plays the bodies shown. */
+/**
+ * A side whose `|teamsize|` counts bodies the panel could not fill (no team preview, and no stats file or an unreachable one): the engine
+ * plays the bodies shown.
+ */
 function missingNotice(log: string, side: 'p1' | 'p2', built: number): string | null {
   const missing = missingBodies(log, built, side);
   const size = teamSizes(log)[side];

@@ -59,7 +59,7 @@ function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineContr
   );
 }
 
-/** The engine choice of the Evaluation panel: the dropdown shows once another engine is integrated; "+ engine" adds one by address in this browser. */
+/** The dropdown shows once another engine is integrated; "+ engine" adds one by address in this browser. */
 export function EngineControls({ engines, selected, running, note, onSelect, onAdd, onRemove }: EngineControlsProps) {
   const [adding, setAdding] = useState(false);
   return (

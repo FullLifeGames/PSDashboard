@@ -107,8 +107,8 @@ function useEvalViewLayer(
 }
 
 /**
- * The engine fill. At the live tip it reads the evaluation the view layer drives and writes into the branch's picks. At a replay turn it
- * works on the picker's effective choices (the logged seed under the user's picks), keeps what it writes in the view, and hands the dock the
+ * At the live tip the fill reads the evaluation the view layer drives and writes into the branch's picks. At a replay turn it works on
+ * the picker's effective choices (the logged seed under the user's picks), keeps what it writes in the view, and hands the dock the
  * state with that fill laid over the empty slots.
  */
 function useFillLayer(
@@ -179,7 +179,6 @@ function usePlayLayer(
   return { walk, playOutControls };
 }
 
-/** Engine layer: position acquisition, the evaluation view glue, the engine walk and the play-out loop. */
 export function useEngineController(ctx: ReplayContext, transients: Transients, board: BoardController) {
   const acquireLayer = useAcquireLayer(ctx, transients, board);
   const evalView = useEvalViewLayer(ctx, transients, board, acquireLayer);

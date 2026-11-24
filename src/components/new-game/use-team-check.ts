@@ -2,10 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { GameTeamProblems } from '@fulllifegames/eval-engine';
 
-/**
- * The simulator's check of the two pasted teams (`checkGameTeams`), run a moment after a paste, a format change or a click on Validate.
- * A newer input hides an older result at once, and a result that arrives late is dropped. The check informs; it never stops Start.
- */
+/** A newer input hides an older result at once, and a result that arrives late is dropped. The check informs; it never stops Start. */
 
 const DEBOUNCE_MS = 300;
 

@@ -39,8 +39,7 @@ function useReplaySurface() {
     openGame, extendGame, byLink,
   } = useReplay();
   const { embed, requestedReplay, requestedTurn, requestedGame } = useEmbedHost({ loadReplay, loadReplayFile });
-  // Canonical link of whatever is loaded — mirrored into the loader input,
-  // whichever path (typed URL, file, share link, embed message) loaded it.
+  // Canonical link of whatever is loaded, mirrored into the loader input whichever path loaded it.
   const loadedReplayUrl = replayData
     ? `https://replay.pokemonshowdown.com/${replayData.id}${replayData.viewpoint === 'p2' ? '?p2' : ''}`
     : null;
@@ -84,7 +83,6 @@ function useTeamRefreshQueue(
 
 function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[], usageStats: SmogonUsageStats | null, game: NewGameRecord | null) {
   const replayGen = useMemo(() => replayData ? getReplayGeneration(replayData) : 9, [replayData]);
-  /** Bring-limited team preview (VGC 4 of 6, BSS 3 of 6); null brings all. */
   const bringCount = useMemo(
     () => (replayData ? getReplayBringCount(replayData) : null),
     [replayData],
@@ -92,7 +90,8 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
   /**
    * The worlds of a game where a side brought more bodies than it fielded, the heaviest first (the guesses come from the side's team
    * preview, weighted by the format's usage counts). Null for every other game: a bring-all format and a game whose sides both fielded their
-   * whole selection (one pinned world) read through `replayBringOnly`. The weights follow the statistics when they arrive, so the memo reads them.
+   * whole selection (one pinned world) read through `replayBringOnly`. The weights follow the statistics when they arrive, so the memo
+   * reads them.
    */
   const bringWorldsOfGame = useMemo(() => {
     // A new game's log holds the bodies fielded so far only; its lists are the lead entry's, below.
@@ -100,15 +99,14 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
     if (!list || (list.p1.open === 0 && list.p2.open === 0)) return null;
     return bringWorlds(list, BRING_WORLD_CAP);
   }, [replayData, snapshots, usageStats, game]);
-  /** A new game's brought selection: the lead entry's lists when the lead pick carried the bring (VGC 4 of 6), else none. */
   const gameLists = useMemo(() => {
     const lead = game?.entries[0]?.leadChoices;
     return lead?.bring ? { p1: lead.p1, p2: lead.p2 } : null;
   }, [game]);
   /**
    * The bring lists the rebuild pins, from the protocol: null for a bring-all format. A game with a short side plays its heaviest world:
-   * the fielded bodies plus the guesses, which `guessed` counts at the end of each list (a short side otherwise left both teams at six, ADR 0010).
-   * Shared by every branch, sweep, and preview reconstruction.
+   * the fielded bodies plus the guesses, which `guessed` counts at the end of each list (a short side otherwise left both teams at six, ADR
+   * 0010). Shared by every branch, sweep, and preview reconstruction.
    */
   const bringOnlyLists = useMemo(() => {
     if (bringWorldsOfGame) {
@@ -119,7 +117,8 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
     return replayData ? replayBringOnly(replayData, snapshots) : null;
   }, [replayData, snapshots, bringWorldsOfGame, game, gameLists]);
   /**
-   * The bench the user sees, per side: the bodies the side fielded, and for a short side the heaviest world's guess besides. Null when no side has a list.
+   * The bench the user sees, per side: the bodies the side fielded, and for a short side the heaviest world's guess besides. Null when no
+   * side has a list.
    */
   const bench = useMemo(
     () => (replayData ? replayBench(replayData, snapshots, bringWorldsOfGame?.[0] ?? gameLists ?? undefined) : null),
@@ -164,7 +163,6 @@ function withPinnedTeams(knowledge: TeamKnowledge, pins: ReturnType<typeof usePi
 
 type PinnedKnowledge = ReturnType<typeof withPinnedTeams>;
 
-/** A replay loaded after a game ends the game (a failed load leaves it as it was). */
 function useLoadsThatEndTheGame(replay: ReturnType<typeof useReplaySurface>, setRecord: (record: null) => void) {
   const { loadReplay: loadRaw, loadReplayFile: loadFileRaw } = replay;
   const loadReplay = useCallback(async (urlOrId: string) => {
@@ -180,7 +178,6 @@ function useLoadsThatEndTheGame(replay: ReturnType<typeof useReplaySurface>, set
   return { loadReplay, loadReplayFile };
 }
 
-/** Foundation layer: the loaded replay, the branch simulator, the evaluation engine handle, Smogon knowledge, team knowledge, format metadata. */
 export function useReplayContext() {
   const replayWorker = useReplayWorker();
   const replay = useReplaySurface();
@@ -217,8 +214,7 @@ export function useReplayContext() {
     onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,
   }), pins);
   const teamSources = useTeamSources(knowledge, smogon, replay.hpEvidence);
-  // Every exact position (Evaluate, the sweep, the dwell, a branch start)
-  // comes from one source: the store, else the replay worker.
+  // Every exact position (Evaluate, the sweep, the dwell, a branch start) comes from one source: the store, else the replay worker.
   const positions = usePositionSource({
     replayData: replay.replayData, snapshots: replay.snapshots, observations: replay.observations,
     sources: teamSources, setsFingerprint: knowledge.setsFingerprint, bringOnlyLists: meta.bringOnlyLists, bringWorlds: meta.bringWorlds,
@@ -227,7 +223,6 @@ export function useReplayContext() {
   });
   const { newGame, landRef } = useNewGameAt({ state: gameState, replay, branch, positions, afterTurnRef });
   const { loadReplay, loadReplayFile } = useLoadsThatEndTheGame(replay, gameState.setRecord);
-  // The address names what is open, and a game it names opens at start.
   const address = useOpenAddress({
     embed: replay.embed, requestedGame: replay.requestedGame, replayId: replay.replayData?.id ?? null,
     viewpoint: replay.replayData?.viewpoint, byLink: replay.byLink, openRecord: newGame.openRecord,

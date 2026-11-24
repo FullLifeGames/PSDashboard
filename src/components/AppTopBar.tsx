@@ -21,9 +21,7 @@ interface AppTopBarProps {
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
   search?: Parameters<typeof SetupMenu>[0]['search'];
-  /** A host site frames the app: the creator link is left out. */
   embed: boolean;
-  /** The replay loader's props; the embedded view keeps no loader. */
   loader?: Parameters<typeof LoaderMenu>[0];
   onReportIssue: () => void;
   newGame?: boolean;

@@ -3,7 +3,6 @@ import { gameReviewEnabled, opponentReadsEnabled } from '../lib/feature-flags';
 import { SearchSelects, type SearchSelectsProps } from './SearchSelects';
 import { SizeSelect } from './SizeSelect';
 
-/** What the setting changes and where; the grades stay as they are. */
 const opponentReadsTitle = (): string => 'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
   + `when you click an engine move, in the turn dock, and in a turn's lines${gameReviewEnabled() ? ' and the Game review' : ''}. `
   + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.';
@@ -17,16 +16,15 @@ interface SetupMenuProps {
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
   /**
-   * The search's Depth and Samples. Left out, the menu draws neither (an embedded view); `external` is another engine than the built-in
-   * search, which decides its own depth.
+   * The search's Depth and Samples; left out, the menu draws neither (an embedded view). `external` is another engine, which decides its
+   * own depth.
    */
   search?: SearchSelectsProps & { external: boolean };
 }
 
 /**
- * The Setup menu: the animate toggle, the three team actions, Size, the "Opponent reads my move" box (drawn only with the flag
- * `opponentReadsEnabled`, src/lib/feature-flags.ts) and the Depth and Samples selects (`SearchSelects`). A pick closes the menu;
- * the toggle and the selects keep it open, and so do Escape and a click outside it.
+ * A pick closes the menu; the toggle and the selects keep it open, and so do Escape and a click outside it. The "Opponent reads my
+ * move" box is drawn only with the flag `opponentReadsEnabled` (src/lib/feature-flags.ts).
  */
 export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, onOpponentReadsChange, onEditSide, onOpenSets, search }: SetupMenuProps) {
   const [open, setOpen] = useState(false);

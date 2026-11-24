@@ -10,8 +10,8 @@ interface WinPathsEntryProps {
 }
 
 /**
- * The turn card of an endgame turn asks "How could <the player who lost> have won from here?": a toggle that starts closed on every turn.
- * It is open only while the open search is the card's own, for this turn (a search the Game review opened shows in the review).
+ * The turn card of an endgame turn asks "How could <the player who lost> have won from here?" in a toggle that starts closed on every
+ * turn; it is open only while the open search is the card's own, for this turn (a search the Game review opened shows in the review).
  */
 export function WinPathsEntry({ turn, host, playerNames, doubles }: WinPathsEntryProps) {
   const { winPaths } = host;

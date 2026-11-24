@@ -1,9 +1,8 @@
 import type { TurnEvalSettings } from '../../hooks/useEvaluation';
 
 /**
- * A gap turn's first analysis: a turn the line has not reached yet searches itself and its follow-up turn at the panel's current
- * settings. The acquire runs through the healed single-turn reconstruction (per-turn snapshot corrections, with the reached guard as
- * the loud-failure backstop). An analyzed turn offers nothing: the deeper stage is "Think deeper".
+ * A gap turn's first analysis: a turn the line has not reached yet searches itself and its follow-up turn at the panel's settings.
+ * An analyzed turn offers nothing: the deeper stage is "Think deeper".
  */
 export function AnalyzePositionButton({ onAnalyze, target, disabled, smogonPending }: {
   onAnalyze?: () => void;

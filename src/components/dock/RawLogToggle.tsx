@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-/** The Raw Protocol Log toggle; it stays above the dock at every position. */
 export function RawLogToggle({ log }: { log: string[] }) {
   const [showLog, setShowLog] = useState(false);
   return (

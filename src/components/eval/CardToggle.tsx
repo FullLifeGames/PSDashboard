@@ -4,11 +4,11 @@ interface CardToggleProps {
   label: ReactNode;
   children: ReactNode;
   /**
-   * The body is built only while the toggle is open. A closed view then does none of the work its content does when it renders
-   * (the Lines section reads the result's lines, a panel reads a search); the Explanation keeps its text in the page, hidden.
+   * The body is built only while the toggle is open, so a closed view skips the work its content does on render (the Lines section
+   * reads the result's lines, a panel reads a search); the Explanation keeps its text in the page, hidden.
    */
   lazy?: boolean;
-  /** Controlled use: the parent owns the state (a win-path search is open or not for the turn). Without `open` the toggle keeps its own, closed at first. */
+  /** Controlled use: the parent owns the state. Without `open` the toggle keeps its own, closed at first. */
   open?: boolean;
   onToggle?: (next: boolean) => void;
   disabled?: boolean;
@@ -16,10 +16,7 @@ interface CardToggleProps {
   bodyClassName?: string;
 }
 
-/**
- * The one fold of the turn card: the Explanation, the Lines section and the win-path question sit under a toggle line that starts
- * closed; the card keys each by its turn, so every turn starts closed and the app remembers nothing.
- */
+/** The one fold of the turn card, closed at first; the card keys each by its turn, so every turn starts closed. */
 export function CardToggle({ label, children, lazy = false, open: controlled, onToggle, disabled, title, bodyClassName }: CardToggleProps) {
   const [kept, setKept] = useState(false);
   const id = useId();

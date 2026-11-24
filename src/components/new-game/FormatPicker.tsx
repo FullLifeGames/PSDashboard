@@ -2,8 +2,6 @@ import { useId, useMemo, useRef, useState } from 'react';
 import { formatNote, searchGroups } from '../../lib/new-game/format-list';
 import type { FormatGroup, FormatOption } from '../../lib/new-game/format-options';
 
-/** The format list of the New game dialog: the simulator's whole list in Showdown's groups, with a search field and the ComboBox's keys. */
-
 interface Props {
   groups: readonly FormatGroup[];
   value: string;

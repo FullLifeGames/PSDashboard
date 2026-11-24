@@ -160,7 +160,6 @@ function ReadChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameR
 function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
   const denied = report.deniedEnd;
   if (!denied) return null;
-  // A sure KO has no roll that could fail; it never came.
   const sure = denied.odds >= 1;
   return (
     <div className="ps-eval-report-moments">

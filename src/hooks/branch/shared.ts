@@ -15,9 +15,8 @@ export type BranchEngineModule = typeof import('../../lib/lazy/branch-engine');
 export type LiveBattle = NonNullable<BattleStream['battle']>;
 
 export interface BranchRefs {
-  // Concurrent sim writes commit unintended extra turns and desync the UI
-  // from the battle (double clicks, rapid forced-switch clicks) — one execute
-  // may run at a time.
+  // Concurrent sim writes commit unintended extra turns and desync the UI from the battle (double clicks, rapid forced-switch clicks):
+  // one execute may run at a time.
   executingRef: React.RefObject<boolean>;
   branchEngineRef: React.RefObject<BranchEngineModule | null>;
   streamsRef: React.RefObject<PlayerStreams | null>;
@@ -26,9 +25,7 @@ export interface BranchRefs {
   choiceErrorsRef: React.RefObject<BranchChoiceErrorLog | null>;
   p1ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
   p2ChoicesRef: React.RefObject<(BranchSlotChoice | null)[]>;
-  /** The length of the runtime's log when the branch stood at its start; a new game's promotion reads the lines after it. */
   startLogLengthRef: React.RefObject<number>;
-  /** Called once an entry has landed in the history (a turn, or a replacement that finishes one); a new game promotes its tip turn there. */
   afterTurnRef?: React.RefObject<(() => Promise<void>) | null>;
 }
 

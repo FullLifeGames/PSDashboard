@@ -14,22 +14,14 @@ const PROGRESS_INTERVAL_MS = 100;
 const PARTIAL_INTERVAL_MS = 250;
 
 export interface EvaluateParams {
-  /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
   tera: TeraAllowance;
   sleepClause?: boolean;
-  /** The rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
-  /**
-   * Produces the serialized position; a reconstruction-based acquire calls reportReconstruct(turn, target) as it replays turns, and the hook
-   * surfaces it as reconstructProgress.
-   */
   acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
   /**
-   * Identity of the position this run evaluates (unified timeline). Exposed
-   * back as resultTag so consumers can tell whether the shown result still
-   * belongs to the position on screen — a run finishing AFTER the user
-   * navigated away must not display (or be recorded) as the new position's.
+   * Identity of the position this run evaluates, exposed as resultTag: a run finishing after the user navigated away must not display (or
+   * be recorded) as the new position's.
    */
   tag?: string;
   /**
@@ -85,7 +77,6 @@ interface SingleEvalIO {
   setError: (value: string | null) => void;
   setProgress: (value: SearchProgress | null) => void;
   setReconstructProgress: (value: { turn: number; target: number } | null) => void;
-  /** Stops the sweep's painting; `superseded` keeps where it stopped for its status line. */
   stopGraphPaint: (superseded?: boolean) => void;
 }
 
@@ -105,7 +96,6 @@ async function resolveEngineAndStored(
       if (io.runRef.current === runId) io.setReconstructProgress({ turn, target });
     });
     if (io.runRef.current !== runId) return 'aborted';
-    // The position carries both routing signals, its fainted fraction and its game type.
     const { faintedFraction, doubles } = serializedAutoRouting(serialized);
     resolved = resolveAutoTurnSettings(faintedFraction, doubles);
   } else {
@@ -244,7 +234,8 @@ function useEvaluateAction(
 /**
  * The user's Cancel. Like `cancel`, and a run that streamed a partial result keeps it as its answer (`stopped`): the engine's own stop leaves
  * the quick estimate, and the app reads it the same way. Every other cancel (the game analysis taking over, a changed engine) leaves the partial
- * as a stale result and no answer. A stop before any partial result (a tree before its first interim result) keeps nothing and says so (`empty`).
+ * as a stale result and no answer. A stop before any partial result (a tree before its first interim result) keeps nothing and says so
+ * (`empty`).
  */
 function useStop(
   cancel: () => void, resultRef: React.RefObject<EvalResult | null>, resultTagRef: React.RefObject<string | null>,
@@ -265,7 +256,6 @@ export function useSingleEval(env: {
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
   prefsRef: React.RefObject<EvalPreferences>;
-  /** A concrete engine pinned for the single path (null = the prefs decide). */
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>;
   stopGraphPaint: (superseded?: boolean) => void;
 }) {
@@ -279,7 +269,6 @@ export function useSingleEval(env: {
     setStatusState(value);
   }, []);
   const [result, setResultState] = useState<EvalResult | null>(null);
-  /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
   const [resultTag, setResultTagState] = useState<string | null>(null);
   const resultTagRef = useRef<string | null>(null);
   const setResultTag = useCallback((value: string | null) => {

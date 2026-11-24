@@ -7,8 +7,8 @@ import { replayHistoryEntry, leadHistoryEntry } from './replay-entry';
 import type { BranchEngineModule, BranchHistoryEntry, BranchRefs, BranchSetters, BattleStream } from './shared';
 
 /**
- * Where the branch's runtime comes from: the app hands in the position source, which adopts a stored position or reconstructs in the worker;
- * without it the runtime is reconstructed here on the main thread.
+ * The app hands in the position source, which adopts a stored position or reconstructs in the worker; without it the runtime is
+ * reconstructed here on the main thread.
  */
 export type AcquireRuntime = (params: ReconstructParams, plan: { isT0: boolean }) => Promise<BranchRuntime>;
 
@@ -21,24 +21,20 @@ interface StartBranchOptions {
   onProgress?: (turn: number, targetTurn: number) => void;
   abort?: AbortSignal;
   /**
-   * Per-turn snapshots for boundary correction during the replay — without
-   * them a long reconstruction drifts (guessed sets force different replays)
-   * and the branch can open with the wrong Pokémon on the field.
+   * Per-turn snapshots for boundary correction during the replay; without them a long reconstruction drifts (guessed sets force different
+   * replays) and the branch can open with the wrong Pokémon on the field.
    */
   snapshotFor?: (turn: number) => TurnSnapshot | null;
   choiceLocks?: ChoiceLockContext;
   /**
-   * Turn-0 branching (targetTurn 0): start a FRESH game with these leads
-   * (one per side in singles, two in doubles, slot order preserved). With
-   * `bring` the lists are the whole brought selection (VGC 4 of 6) and the
-   * teams trim to them. The runtime rebuilds to turn 1 without snapshot
-   * corrections, and the lead decision is history entry 0 (turnNumber 0).
+   * Turn-0 branching (targetTurn 0): start a FRESH game with these leads (one per side in singles, two in doubles, slot order
+   * preserved). With `bring` the lists are the whole brought selection (VGC 4 of 6) and the teams trim to them. The runtime rebuilds
+   * to turn 1 without snapshot corrections; the lead decision is history entry 0 (turnNumber 0).
    */
   leadOverride?: { p1: string[]; p2: string[]; bring?: boolean };
   /**
-   * Bring-limited formats (VGC 4 of 6): field only the species the real
-   * game brought — on any branch turn, so evaluations and play-outs on the
-   * live battle can never switch into a never-brought Pokémon.
+   * Bring-limited formats (VGC 4 of 6): field only the species the real game brought, on any branch turn, so evaluations and play-outs on
+   * the live battle never switch into a never-brought Pokémon.
    */
   bringOnly?: { p1: string[]; p2: string[] };
   /** The dice seed of a new game's lead start; a replay's branch never sets it. */
@@ -46,12 +42,9 @@ interface StartBranchOptions {
 }
 
 /**
- * Turn-0 lead branch: a FRESH game (no replayed blocks, no snapshot
- * corrections — they would put the original leads right back) rebuilt to
- * the start of turn 1 with the chosen leads first in the team order. The
- * leads come from the caller or — on a rebuild of an existing turn-0
- * variation (team edit, truncation) — from the recorded lead entry,
- * which is re-seeded here instead of replaying through the sim.
+ * Turn-0 lead branch: a FRESH game (no replayed blocks, no snapshot corrections: they would put the original leads right back)
+ * rebuilt to the start of turn 1 with the chosen leads first in the team order. The leads come from the caller or, on a rebuild of an
+ * existing turn-0 variation (team edit, truncation), from the recorded lead entry, re-seeded here instead of replayed through the sim.
  */
 function resolveLeadPlan(isT0: boolean, options: StartBranchOptions | undefined) {
   const historyLead = isT0 ? options?.replayHistory?.[0]?.leadChoices : undefined;
@@ -110,9 +103,8 @@ function reconstructForStart(branchEngine: BranchEngineModule, args: StartArgs, 
 }
 
 /**
- * The start's runtime, or null when the preparation was cancelled on the
- * way: an aborted main-thread reconstruction returns early, a terminated
- * worker job throws — both end the start quietly.
+ * The start's runtime, or null when the preparation was cancelled: an aborted main-thread reconstruction returns early, a terminated worker
+ * job throws; both end the start quietly.
  */
 async function reconstructOrAbort(branchEngine: BranchEngineModule, args: StartArgs, plan: StartPlan): Promise<BranchRuntime | null> {
   const aborted = () => args.options?.abort?.aborted === true;
@@ -137,14 +129,9 @@ async function replayKeptHistory(
   return null;
 }
 
-/** What a rebuild reports: `endedNotice` names the variation that was lost when the rebuild kept no turn. */
 export interface StartOutcome { endedNotice: string | null }
 
 
-/**
- * The text for a variation that a rebuild could not keep at all: the first recorded move no longer applies, so no turn survives and no
- * variation stays behind.
- */
 function endedNoticeFor(startTurn: number, recorded: BranchHistoryEntry[], reason: string): string {
   const turns = turnEntryCount(recorded);
   return `The variation from turn ${startTurn} (${turns} ${turns === 1 ? 'turn' : 'turns'}) ended: ${reason}`;
@@ -259,7 +246,6 @@ export function useBranchSession(
 
   const startBranch = useStartBranch(refs, setters, clearChoices, loadBranchEngine, updateState, stopBranch);
 
-  /** Live sim battle of the current branch (null outside an active branch). */
   const getBattle = useCallback(() => battleStreamRef.current?.battle ?? null, [battleStreamRef]);
 
   return { startBranch, getBattle, stopBranch };

@@ -3,10 +3,9 @@ import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 
 /**
- * Every displayed value is a win probability for the named player ("52%" absolutes, "+8%" deltas): raw wp-units never said whose position
- * they helped. The played chip shows the row's EV, the same quantity as the engine chip and the regret grading. The floor appears only as
- * a labeled risk clause, and only when the row gave up mistake-sized safety (a genuine gamble): the floor beside the engine's EV made a
- * co-optimal switch look ranked very low.
+ * Every displayed value is a win probability for the named player ("52%" absolutes, "+8%" deltas). The played chip shows the row's EV,
+ * the same quantity as the engine chip and the regret grading. The floor appears only as a labeled risk clause, and only when the row
+ * gave up mistake-sized safety (a genuine gamble).
  */
 export const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
 export const evTitle = (name: string) =>
@@ -45,10 +44,6 @@ function playedSlotsLabel(side: SideAnalysis): string | undefined {
  */
 export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
 
-/**
- * A body knocked out before it moved has no choice in the log; the engine stands a stay-in in for it. The card says so, with the
- * stand-in's chance, as the win-path panel does ("knocked out before it moved, so the log shows no choice").
- */
 export function neverActedText(side: { played: { ev: number } | null; faintedFraction?: number }): string {
   return `${NEVER_ACTED_WORDS}${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
 }
@@ -75,13 +70,10 @@ export function playedTextFor(side: SideAnalysis): { acted: boolean; playedText:
 }
 
 /**
- * The reference line a regretful row compares against. For a read, the
- * reference is the SAFE line (max floor) shown at its guarantee — calling
- * the ev-best "better" would credit what the read outperformed. Red
- * misplays compare against the ev-best at its equilibrium value. A
- * mechanically null best displays as its co-optimal alternative (same
- * swap the summary makes); punisher/PV belong to the true best, so they
- * drop, and explore stays off the substitute.
+ * The reference line a regretful row compares against. For a read it is the SAFE line (max floor) at its guarantee: calling the
+ * ev-best "better" would credit what the read outperformed. Red misplays compare against the ev-best at its equilibrium value. A
+ * mechanically null best displays as its co-optimal alternative (the swap the summary makes); punisher/PV belong to the true best
+ * and drop, and explore stays off the substitute.
  */
 export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
   const asSafe = side.riskUnpunished || side.riskPaidOff;
@@ -92,9 +84,9 @@ export function comparisonTarget(side: SideAnalysis, best: RankedChoice) {
 }
 
 /**
- * The engine's choice of a side as the turn card names it, and the one place that says so: a graded mistake or blunder shows its
- * reference line (`comparisonTarget`), every other row its best row at the row's own value. The Game review reads the same choice,
- * value and word, and takes as the engine's line only the line of this choice.
+ * The engine's choice of a side as the turn card names it, the one place that says so: a graded mistake or blunder shows its
+ * reference line (`comparisonTarget`), every other row its best row at the row's own value. The Game review reads the same choice
+ * and takes as the engine's line only the line of this choice.
  */
 export function engineChoice(side: SideAnalysis): { label: string; value: number; word: 'engine' | 'safe' } | null {
   const best = side.best;
@@ -119,7 +111,6 @@ export function cardLines(lines: readonly EvalLine[], analysis: Pick<TurnAnalysi
   });
 }
 
-/** The percentages the card's rows print for each side (the engine's row, the played row): the Lines section and the Game review read their numbers here. */
 export function rowValueTexts(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1?: RowValues; p2?: RowValues } | undefined {
   if (!analysis) return undefined;
   const of = (side: SideAnalysis): RowValues => {
@@ -145,7 +136,7 @@ export function resultPositionLabel(
   return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
 }
 
-/** The regret as its chip shows it: over 1 it reads as the two win chances it spans (regretText), and the title keeps the real number on the score scale. */
+/** The regret as its chip shows it: over 1 it reads as the two win chances it spans, and the title keeps the real number on the score scale. */
 export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
   const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
   const to = side.played?.ev;

@@ -9,7 +9,6 @@ interface Props {
   playerNames: [string, string];
   p1Options: LeadOption[];
   p2Options: LeadOption[];
-  /** 1 in singles, 2 in doubles; the selection order is the slot order (a, b). */
   leadsPerSide: number;
   /** Bring-limited formats (VGC 4 of 6, BSS 3 of 6): total picks per side. Null brings the whole team, so only the leads are picked. */
   bringCount: number | null;
@@ -19,9 +18,12 @@ interface Props {
   onStart: (leads: { p1: string[]; p2: string[] }) => void;
   /** The complete selection on screen, null while it is unfinished or the panel leaves (the play-out starts from it). */
   onPicksChange?: (leads: { p1: string[]; p2: string[] } | null) => void;
-  /** The side the replay frame shows near comes first, as in the turn dock's rows. P1 until the frame is switched. */
+  /** The near side comes first, as in the turn dock's rows; P1 until the frame is switched. */
   nearSide?: Side;
-  /** False for a game whose format has no Team Preview (Gen 1 to 4): the pick is the app's tool, and the words say so. A replay keeps the default. */
+  /**
+   * False for a game whose format has no Team Preview (Gen 1 to 4): the pick is the app's tool, and the words say so. A replay keeps the
+   * default.
+   */
   teamPreview?: boolean;
 }
 
@@ -45,7 +47,6 @@ function startLabel({ executing, ready, maxPicks, p1Picked, p2Picked }: { execut
   return `Pick ${maxPicks - (p1Picked < maxPicks ? p1Picked : p2Picked)} more for ${p1Picked < maxPicks ? 'P1' : 'P2'}`;
 }
 
-/** Turn 0 of the timeline: the team-preview pick, shown in the turn dock's place while the pointer sits on T0. */
 export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange, nearSide = 'p1', teamPreview = true }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
   const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });

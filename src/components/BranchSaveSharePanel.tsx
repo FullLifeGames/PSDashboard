@@ -1,7 +1,5 @@
 import { savedBranchChoices, type SavedBranch } from '../lib/branch-share';
 
-/** The parts of the save and share logic that draw something; `useBranchSaveShare` wires them to the history panel. */
-
 export function ShareLinkField({ link, label = 'Branch share link' }: { link: string; label?: string }) {
   return (
     <input

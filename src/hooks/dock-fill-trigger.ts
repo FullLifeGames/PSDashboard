@@ -7,7 +7,7 @@ type Evaluation = ReturnType<typeof useEvaluation>;
 /**
  * Helpers of the dock fill's trigger (`useDockFill.ts`): the fill key a user's stop belongs to. A stop marks its position by the view's tag;
  * the fill key also carries the history length, so the next request of the same turn (a replacement answered) is a position of its own. The key
- * is read when the mark first shows, which is the commit of the stop itself. The callback answers whether the stop belongs to `key`.
+ * is read when the mark first shows, which is the commit of the stop itself.
  */
 export function useStoppedKey(evaluation: Pick<Evaluation, 'stopped'>, evalViewKey: string) {
   const seen = useRef<{ mark: Evaluation['stopped']; key: string | null }>({ mark: null, key: null });

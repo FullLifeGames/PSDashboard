@@ -19,7 +19,8 @@ function loadPrefs(): EvalPreferences {
       auto: !!parsed.auto,
       autoAnalyze: !!parsed.autoAnalyze,
       tera: parsed.tera === 'on' || parsed.tera === 'off' || parsed.tera === 'revealed' ? parsed.tera : 'auto',
-      // Hard mode restores only from a stored true. With the flag of Opponent reads my move off, a stored true reads as unset (see `storedHardMode`).
+      // Hard mode restores only from a stored true. With the flag of Opponent reads my move off, a stored true reads as unset (see
+      // `storedHardMode`).
       ...(parsed.hardMode === true && opponentReadsEnabled() ? { hardMode: true } : {}),
     };
   } catch {
@@ -38,8 +39,8 @@ function storedHardMode(): true | undefined {
 
 /**
  * The panel preferences with their synchronous ref (evaluate and the sweep are stable callbacks and read the CURRENT prefs through it) and the
- * localStorage persistence. `persistPrefs` returns whether an engine-relevant setting changed: the caller marks a done result stale. Hard mode is
- * not one of them: no search reads it.
+ * localStorage persistence. `persistPrefs` returns whether an engine-relevant setting changed: the caller marks a done result stale. Hard
+ * mode is not one of them: no search reads it.
  */
 export function usePrefsState() {
   const [prefs, setPrefsState] = useState<EvalPreferences>(loadPrefs);
@@ -62,10 +63,8 @@ export function usePrefsState() {
   return { prefs, prefsRef, persistPrefs };
 }
 
-/** A concrete engine — what actually runs and what stored results carry ('auto' resolves before dispatch). */
 export type EngineMode = NonNullable<EvalSettings['mode']>;
 
-/** The engine settings that produced a stored per-turn result (always concrete — never 'auto'). */
 export interface TurnEvalSettings {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
@@ -73,17 +72,18 @@ export interface TurnEvalSettings {
 }
 
 /**
- * Resolve the auto mode at one position: the VERIFIED line configuration from the search budget (search/budget.ts). Each game type has its own
- * split: below its tree threshold auto runs its early matrix, at or above it the DUCT tree. Auto is a complete engine spec, independent of the
- * depth prefs, which apply to the explicit matrix modes only.
+ * Resolve the auto mode at one position: the VERIFIED line configuration from the search budget. Each game type has its own split:
+ * below its tree threshold auto runs its early matrix, at or above it the DUCT tree. Auto is a complete engine spec, independent of
+ * the depth prefs, which apply to the explicit matrix modes only.
  */
 export function resolveAutoTurnSettings(faintedFraction: number, doubles: boolean): TurnEvalSettings {
   return autoTurnSettings(faintedFraction, doubles);
 }
 
 /**
- * The team-preview lead under auto: the budget's lead matrix in both game types, whatever the early splits. Measured on the 128 bank games with a
- * team preview (gen 5 on): the tree read doubles previews worse (hq +267 bp [+20, +534]) and singles no differently (-9 bp, unresolved).
+ * The team-preview lead under auto: the budget's lead matrix in both game types, whatever the early splits. Measured on the 128 bank games
+ * with a team preview (gen 5 on): the tree read doubles previews worse (hq +267 bp [+20, +534]) and singles no differently (-9 bp,
+ * unresolved).
  */
 export function resolveAutoLeadSettings(): TurnEvalSettings {
   const { depth, samples } = searchBudget().lead;
@@ -91,9 +91,8 @@ export function resolveAutoLeadSettings(): TurnEvalSettings {
 }
 
 /**
- * Auto's two routing signals on a serialized battle (sim-free for the UI
- * chunk): the engine's battleFaintedFraction and the game type (a battle
- * without one is singles, the simulator's default).
+ * Auto's two routing signals on a serialized battle (sim-free for the UI chunk): the engine's battleFaintedFraction and the game type
+ * (singles when the battle names none).
  */
 export function serializedAutoRouting(serialized: string): { faintedFraction: number; doubles: boolean } {
   const battle = JSON.parse(serialized) as { gameType?: string; sides?: { pokemon?: { hp?: number; fainted?: boolean }[] }[] };
@@ -108,7 +107,6 @@ export function serializedAutoRouting(serialized: string): { faintedFraction: nu
   return { faintedFraction: total > 0 ? fainted / total : 0, doubles: battle.gameType === 'doubles' };
 }
 
-/** Mirror of the engine's battleFaintedFraction on a serialized battle. */
 export function serializedFaintedFraction(serialized: string): number {
   return serializedAutoRouting(serialized).faintedFraction;
 }

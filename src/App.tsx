@@ -96,7 +96,8 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            // A game's sets belong to its record: the import plays it again on them (editTeams) and the panel closes when the edit applies, not at the click.
+            // A game's sets belong to its record: the import plays it again on them (editTeams) and the panel closes when the edit applies,
+            // not at the click.
             const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
             if (!importError && !record) setSetsPanelOpen(false);
             return importError;

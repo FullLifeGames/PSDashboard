@@ -17,8 +17,8 @@ export type { GraphSweepParams } from './sweep-types';
 export { coverageNotice };
 
 /**
- * The ⚠ line's second half: acquisition gaps keep coverageNotice's wording, eval-layer gaps (live position, throwing evaluation) append their
- * count and the first reason; without them a game that lost 16 of 26 turns showed a notice that stayed null.
+ * The ⚠ line's second half: acquisition gaps keep coverageNotice's wording; eval-layer gaps (live position, throwing evaluation) append
+ * their count and the first reason.
  */
 export function withEvalGapNotice(
   acquisition: string | null, evalErrors: (string | null)[],
@@ -43,9 +43,8 @@ export interface EvalGraphState {
   /** Item-sensitivity probes per turn (null = nothing to probe / not run). */
   sensitivity: (TurnSensitivity | null)[];
   /**
-   * Per-turn eval-layer failure: the position existed but its evaluation
-   * threw (evalErrors[t-1] = message). Acquisition gaps stay in `notice` —
-   * a turn never carries both. Cleared the moment any pass scores the turn.
+   * Per-turn eval-layer failure (evalErrors[t-1] = message): the position existed but its evaluation threw. Acquisition gaps stay in
+   * `notice`; a turn never carries both. Cleared the moment any pass scores the turn.
    */
   evalErrors: (string | null)[];
   /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
@@ -60,10 +59,7 @@ export interface EvalGraphState {
    * named roll or no copy; absent = no full sweep ran.
    */
   rollFlip?: RollFlip | null;
-  /**
-   * Why the line is short, when it is: the single-pass acquisition only reached part of the game (a diverging reconstruction); without it
-   * the panel showed an unexplained empty graph.
-   */
+  /** Why the line is short, when it is: the single-pass acquisition only reached part of the game (a diverging reconstruction). */
   notice: string | null;
   running: boolean;
   progress: { done: number; total: number } | null;
@@ -180,7 +176,8 @@ async function evaluateEnd(
 }
 
 /**
- * One store read for the whole run (every persisted eval of this replay) instead of one per turn. false = the run changed hands during the read.
+ * One store read for the whole run (every persisted eval of this replay) instead of one per turn; false = the run changed hands during the
+ * read.
  */
 async function prefetchStore(env: SweepEnv): Promise<boolean> {
   const { storePrefix } = env.params;
@@ -189,10 +186,9 @@ async function prefetchStore(env: SweepEnv): Promise<boolean> {
 }
 
 /**
- * Three-pass sweep: a fast depth-1 pass shapes the whole graph in seconds, the configured settings then deepen the report-worthy swings (both
- * sides of each: analysis compares across them), and finally every remaining turn converges to the configured settings too: the settings ARE
- * the line, the fast pass is only the sketch. Badges track the convergence; the monotone merge makes each pass safe. Short ranges (on-demand
- * turn analysis) go straight to full settings.
+ * Three passes: a fast depth-1 pass shapes the whole graph in seconds, the configured settings then deepen the report-worthy swings
+ * (both sides of each: analysis compares across them), then every remaining turn converges to the configured settings too. The
+ * monotone merge makes each pass safe. Short ranges (on-demand turn analysis) go straight to full settings.
  */
 async function runSweep(env: SweepEnv, opts: {
   from: number; to: number;
@@ -262,7 +258,6 @@ export function useGraphState() {
   return { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom };
 }
 
-/** Sequential background sweep of the game graph: the whole game by default, or a sub-range (on-demand turn analysis) that merges into the graph. */
 export function useGraphSweepRunner(env: {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
@@ -295,12 +290,8 @@ export function useGraphSweepRunner(env: {
     };
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total }, stopped: null });
-    // Painting (snapshot + setGraph) is presentation only — the sweep's
-    // own logic reads the local arrays, and every result also lands in the
-    // caches. Per-turn painting made a long sweep pay a fresh copy of ten
-    // whole-game arrays plus a React re-render for every single turn, so
-    // routine paints are throttled; forced paints keep pass boundaries and
-    // the final state exact.
+    // Painting (snapshot + setGraph) is presentation only: per-turn painting made a long sweep copy ten whole-game arrays and re-render
+    // for every turn, so routine paints are throttled and forced paints keep pass boundaries and the final state exact.
     let lastPaintAt = 0;
     const paint = (progress: { done: number; total: number } | null, force = false) => {
       // A lane can finish a turn after this run was superseded — a stale

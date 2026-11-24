@@ -179,7 +179,6 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
       <TeamPasteDetails teamStatus={teamStatus} teamError={teamError} onTeamLoad={onTeamLoad} />
     </>
   );
-  // In the top bar's panel the page takes the drop (LoaderMenu), so the body has no frame of its own.
   if (inMenu) return <div className="ps-loader-body">{body}</div>;
   return (
     <div

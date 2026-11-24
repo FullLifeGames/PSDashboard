@@ -5,12 +5,11 @@ import type { StepDamage } from '../../lib/branch-rolls';
 import { DieRow, StrayDice } from '../branch/DiceChips';
 
 /**
- * The dice of a slot's chosen move: a column is a target, a row a kind of die, so a spread move reads the same die across its targets.
- * A set die the move no longer offers stays below the table, one click from clear.
+ * A column is a target, a row a kind of die, so a spread move reads the same die across its targets. A set die the move no longer
+ * offers stays below the table, one click from clear.
  */
 
 export interface DiceTableProps {
-  /** The dice the engine offers for the slot's chosen move; null while the dock asks. */
   offers: DieOffer[] | null;
   dice: readonly ForcedDie[];
   /** What the log shows for this turn (first turn of a branch). */

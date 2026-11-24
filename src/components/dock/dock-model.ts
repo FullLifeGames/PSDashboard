@@ -12,8 +12,6 @@ import {
   EMPTY_MODIFIERS, EMPTY_MOVES, EMPTY_SWITCHES, blockedSwitchKeys, panelFlags, playedOfSlot, slotIdentity,
 } from '../../lib/dock-panel';
 
-/** Everything the chip and the tray of one slot read, built once per render. */
-
 export type Side = 'p1' | 'p2';
 
 export interface DockSlotModel {
@@ -28,7 +26,6 @@ export interface DockSlotModel {
   moves: BranchMoveOption[];
   switches: BranchSwitchOption[];
   forceSwitch: boolean;
-  /** The slot has no choice to make: a fainted body nobody replaces. */
   nobodyLeft: boolean;
   /** The other side replaces a body and this side has nothing to choose until it has. */
   waits: boolean;
@@ -57,7 +54,6 @@ export interface DockModel {
   p2: DockSlotModel[];
   hpByLabel: Record<string, number>;
   flags: ReturnType<typeof panelFlags>;
-  /** What Execute sends: the effective choices, the engine's deferred picks counted in. */
   sendChoices: SideChoices;
 }
 
@@ -82,7 +78,10 @@ function engineWait(fill: DockFillView | null | undefined): EngineWait | null {
   return fill?.busy ? 'busy' : null;
 }
 
-/** The engine's state for one slot: none for the side that waits and for a slot the position asks nothing of (the partner of a forced replacement). */
+/**
+ * The engine's state for one slot: none for the side that waits and for a slot the position asks nothing of (the partner of a forced
+ * replacement).
+ */
 function slotEngine(fill: DockFillView | null | undefined, view: Pick<SideView, 'waits' | 'required'>, slot: number): EngineWait | null {
   return view.waits || !view.required[slot] ? null : engineWait(fill);
 }
@@ -196,7 +195,6 @@ function sideSlots(side: Side, args: DockModelArgs, flags: DockModel['flags']): 
 
 export function buildDockModel(args: DockModelArgs): DockModel {
   const { simState, slots } = args;
-  // Execute counts the engine's deferred pick of an open slot as chosen.
   const effective = withDeferred(simState, args.fill?.deferred);
   const flags = panelFlags(effective, slots.p1ActiveSlots, slots.p2ActiveSlots);
   const p1 = sideSlots('p1', args, flags);

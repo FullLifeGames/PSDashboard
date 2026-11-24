@@ -6,7 +6,6 @@ import { SwitchRow } from './SwitchRow';
 import { TrayHeader } from './TrayHeader';
 import { TrayMore } from './TrayMore';
 
-/** The tray of one slot, above the dock; a slot that must replace a body shows only the bench. */
 export function SlotTray({ slot, hpByLabel, gen, format, moreOpen, diceViews, onChoice, onHypotheticalMove, onMore, onBackToEngine, onDone }: {
   slot: DockSlotModel;
   hpByLabel: Record<string, number>;

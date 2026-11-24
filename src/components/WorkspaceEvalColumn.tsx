@@ -32,8 +32,8 @@ function analysisPropsFor(liveEvalView: boolean, analysisTurn: number | null, an
 }
 
 /**
- * A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the
- * lines stay readable and stop being buttons until the position on screen has its own result.
+ * A live result that still streams in for a position the pointer left maps its choices onto the wrong position: the lines stay
+ * readable and stop being buttons until the position on screen has its own result.
  */
 const linesClickable = (liveEvalView: boolean, evalResultMatchesView: boolean) => !liveEvalView || evalResultMatchesView;
 
@@ -47,17 +47,14 @@ function idleReads(app: AppController, viewingVariation: boolean, resultTag: str
 }
 
 /**
- * The gold points and the panel's bar print at the share of the variation's own board, read from the rosters the branch recorded after
- * each executed turn; the main line's share of the same turn number is another board.
+ * The gold points and the panel's bar print at the share of the variation's own board, read from the rosters recorded after each
+ * executed turn; the main line's share of the same turn number is another board.
  */
 function useVariationShares(history: AppController['ctx']['branch']['history'], variationSpan: { startTurn: number } | null) {
   return useMemo(() => (variationSpan ? variationBoardShares(history, variationSpan.startTurn) : []), [history, variationSpan]);
 }
 
-/**
- * With a variation open and a game report held, the way back to the report, as "Main line" of the Line selector. A line started from a turn
- * card (`cardTurn`) goes back to that turn, whichever turn the variation reached.
- */
+/** A line started from a turn card (`cardTurn`) goes back to that turn, whichever turn the variation reached. */
 function backToMain(app: AppController, viewingVariation: boolean): ((cardTurn: number | null) => void) | undefined {
   if (!viewingVariation || !app.analysis.gameReport) return undefined;
   const { viewTurn, maxTurn, navigateTo } = app.board.timeline;

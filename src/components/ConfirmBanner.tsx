@@ -9,10 +9,7 @@ interface ConfirmBannerProps {
 
 const KEEP_WORDS = { whiteSpace: 'nowrap', flexShrink: 0 } as const;
 
-/**
- * Inline confirm before a main-line deviation replaces the variation, a team edit cuts played turns, or a load closes an unsaved
- * variation. It scrolls into view when it appears: the question may stand below the part of the page the user is looking at.
- */
+/** Inline confirm before an action that discards work. It scrolls into view: the question may stand below the part the user is looking at. */
 export function ConfirmBanner({ message, onProceed, onCancel, proceedLabel = 'Replace' }: ConfirmBannerProps) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.scrollIntoView?.({ block: 'nearest' }); }, []);

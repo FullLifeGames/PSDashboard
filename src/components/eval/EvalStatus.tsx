@@ -59,7 +59,6 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
   reconstructProgress: { turn: number; target: number } | null;
   progress: SearchProgress | null;
   error: string | null;
-  /** The depth of the partial result a user stop kept; null when the stale result is no stopped run. */
   stoppedAt?: number | null;
   stoppedEmpty?: boolean;
 }) {

@@ -4,9 +4,8 @@ import type { DockModel, DockSlotModel, Side } from './dock-model';
 import { SlotChip } from './SlotChip';
 
 /**
- * The chips in rows: singles put both sides' chip in one row, doubles and VGC put one side's slots in the upper row and the other's in
- * the lower, so a slot keeps its column. The side the replay frame shows near comes first (left chip, upper row); it is P1 until the
- * frame is switched or opened with ?p2.
+ * Singles put both sides' chip in one row; doubles and VGC put one side's slots in the upper row and the other's in the lower, so a
+ * slot keeps its column. The near side comes first (left chip, upper row): P1 until the frame is switched or opened with ?p2.
  */
 export function DockRows({ model, open, onToggle, nearSide = 'p1' }: {
   model: DockModel;

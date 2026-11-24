@@ -2,11 +2,6 @@ import { useRef, useState } from 'react';
 import { deleteGame, listGames, loadGame, type SavedGameRow } from '../lib/new-game/store';
 import type { NewGameRecord } from '../lib/new-game/record';
 
-/**
- * The saved games as rows with Open and Delete, in the Game menu and on the start page: the three newest show, "Show all N saved games"
- * unfolds the rest (the store keeps 20). Delete asks once in the row; the open game cannot be deleted from under itself.
- */
-
 const SHOWN = 3;
 
 /**

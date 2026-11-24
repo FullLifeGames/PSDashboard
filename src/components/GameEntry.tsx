@@ -3,8 +3,6 @@ import { SavedGamesList } from './SavedGamesList';
 import { ShareLinkField } from './BranchSaveSharePanel';
 import type { NewGameRecord } from '../lib/new-game/record';
 
-/** The ways into a game besides a replay: New game and Saved games, in the Game menu and on the start page. */
-
 export interface GameEntryProps {
   onNewGame: () => void;
   onOpenGame: (record: NewGameRecord) => Promise<unknown> | void;
@@ -22,7 +20,6 @@ function NewGameRow({ onNewGame, text }: { onNewGame: () => void; text: string }
   );
 }
 
-/** Copy Share Link for the open game at every position: Team Preview, the main line, the tip, the end. */
 function GameShareRow({ onShare }: { onShare: () => string | null }) {
   const [link, setLink] = useState('');
   const [copied, setCopied] = useState(false);

@@ -46,8 +46,7 @@ async function backfillPlayedOutcome(
   return { value: outcome };
 }
 
-/** Verification backfill: cached entries from before the pass (or
- *  written by single evaluations) never verified their flags. */
+/** Cached entries written before the pass (or by single evaluations) never verified their flags. */
 async function backfillVerification(
   env: SweepEnv, args: TurnStageArgs, outcome: number | null, verify: boolean,
 ): Promise<'abort' | { value: TurnVerification | null | undefined }> {

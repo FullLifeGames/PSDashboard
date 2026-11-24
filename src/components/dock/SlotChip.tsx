@@ -8,8 +8,8 @@ import type { DockSlotModel } from './dock-model';
 import { TypeTag } from './TypeTag';
 
 /**
- * One slot's chip. It keeps its box: the text clips, never wraps. The type edge on its left is the tile's (`typeTileVars` of the type the
- * tile shows); at its right stand the move's type tag or the sprite of the body that comes in; an empty chip has neither.
+ * The chip keeps its box: the text clips, never wraps. The type edge on its left is the tile's (`typeTileVars`); at its right stand
+ * the move's type tag or the sprite of the body that comes in; an empty chip has neither.
  */
 export function SlotChip({ slot, open, onToggle }: { slot: DockSlotModel; open: boolean; onToggle: () => void }) {
   const { pending, origin } = slot;

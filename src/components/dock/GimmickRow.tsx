@@ -1,7 +1,6 @@
 import type { BranchMoveModifier, BranchSlotModifiers } from '@fulllifegames/eval-engine';
 import type { Gimmick } from '../../hooks/useSideControlsState';
 
-/** What the partner holding a gimmick does this turn, for the blocked toggle's title. */
 const HELD_ACTION: Record<BranchMoveModifier, string> = {
   terastallize: 'terastallizes',
   mega: 'mega evolves',
@@ -27,7 +26,7 @@ function ModifierToggle({ label, kind, gimmick }: { label: string; kind: BranchM
   );
 }
 
-/** The gimmick toggles of a slot: a toggle edits the slot's pending move, a slot with no move pick arms the next pick instead. */
+/** A toggle edits the slot's pending move; a slot with no move pick arms the next pick instead. */
 export function ModifierRow({ label, modifiers, gimmick }: { label: string; modifiers: BranchSlotModifiers; gimmick: Gimmick }) {
   return (
     <div className="ps-modifier-row" role="group" aria-label={`Battle gimmicks for ${label}`}>

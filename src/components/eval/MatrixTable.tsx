@@ -11,7 +11,6 @@ export interface MatrixTableProps {
   faintedFraction?: number | null;
   /** Cells play their pair out (a handler, and choice ids on both axes: results cached before the ids existed stay read-only). */
   clickable: boolean;
-  /** The dialog's view: bigger text, labels that wrap, sticky headers, every weight, and these marks. The overview passes neither. */
   dialog?: boolean;
   marks?: MatrixMarks;
 }
@@ -28,7 +27,7 @@ const inlineHeaderStyle: React.CSSProperties = {
   maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 
-/** The dialog's header cells hold the dialog's own background so the cells that scroll under them do not show through. */
+/** The dialog's header cells hold its background so the cells that scroll under them do not show through. */
 const DIALOG_BACKGROUND = '#2a3a5c';
 const dialogHeaderStyle: React.CSSProperties = {
   padding: '3px 6px', fontWeight: 'normal', color: '#cde', textAlign: 'left', verticalAlign: 'top',
@@ -161,7 +160,6 @@ function RowHeader({ matrix, playerNames, i, marks, dialog }: Pick<MatrixTablePr
   );
 }
 
-/** The payoff table of the overview (10 px) and of the dialog: every (own choice × opposing reply) pair at its win probability for the first player, equilibrium weights on the headers. */
 export function MatrixTable(props: MatrixTableProps) {
   const { matrix, playerNames, marks, dialog } = props;
   return (

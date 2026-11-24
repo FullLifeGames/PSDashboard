@@ -7,8 +7,8 @@ import { leadHistoryEntry, replayHistoryEntry } from './replay-entry';
 import type { BranchEngineModule, BranchHistoryEntry } from './shared';
 
 /**
- * The runtime of a new game, from its record: the lead entry starts a fresh game on the record's seed, and each later entry plays through
- * `replayHistoryEntry`. The simulator is deterministic on its seed, so the rebuilt runtime stands where the game stood when the record was saved.
+ * The runtime of a new game, from its record: the lead entry starts a fresh game on the record's seed, each later entry plays through
+ * `replayHistoryEntry`. The simulator is deterministic on its seed, so the rebuilt runtime stands where the game stood when saved.
  */
 
 export function gameStartParams(record: NewGameRecord): ReconstructParams | null {
@@ -18,7 +18,6 @@ export function gameStartParams(record: NewGameRecord): ReconstructParams | null
     format: getBranchSimulatorFormat(gameReplayData(record)),
     p1Team: record.teams.p1,
     p2Team: record.teams.p2,
-    // the header alone: the lead start plays no block of the log
     replayLog: assembleGameLog(record.header, []),
     targetTurn: 1,
     snapshot: null,

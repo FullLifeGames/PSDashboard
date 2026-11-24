@@ -23,7 +23,6 @@ interface Props {
    */
   openAtTurn?: number | null;
   reloadKey?: string;
-  /** Viewer perspective: 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
   /** The frame reports the side it shows near (Switch sides, the ?p2 flag); the dock puts that side on top. */

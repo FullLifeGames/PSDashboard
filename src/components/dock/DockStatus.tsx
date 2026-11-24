@@ -3,9 +3,7 @@ import { opponentReadsEnabled } from '../../lib/feature-flags';
 import { DICE_WAIT_NOTE } from '../branch/DiceChips';
 import type { DockModel, DockSlotModel } from './dock-model';
 
-/** The end of a game's main line is the game's end, not a variation's: `game` names it that way. */
 export function EndedNotice({ winner, game = false, battle = false }: { winner: string | null; game?: boolean; battle?: boolean }) {
-  // a replay's end speaks as Showdown's battle log does: "<winner> won the battle!"
   const text = battle
     ? (winner ? `${winner} won the battle!` : 'The battle ended in a tie.')
     : game
@@ -31,7 +29,6 @@ export function DockStatus({ source, acquiringExact, executeError, model, diceOp
   model: DockModel;
   diceOpen: boolean;
   game?: boolean;
-  /** The Setup setting "Opponent reads my move" is on: the strip opens with a note and a button that turns it off. */
   opponentReads?: boolean;
   onOpponentReadsChange?: (value: boolean) => void;
 }) {

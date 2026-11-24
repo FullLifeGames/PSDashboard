@@ -20,7 +20,7 @@ type LiveBattle = LiveHit['battle'];
 
 export interface TurnDockProps {
   simState: BranchSimState | null;
-  /** The position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of offering a turn. */
+  /** The position is the end of a game's main line (the winner's name, null when the log names none): the dock says so instead of a turn. */
   endOfGame?: MainLineEnd;
   isGame?: boolean;
   /** The state shown is the last resolved position's while the viewed one resolves: the dock keeps its height and takes no input. */
@@ -30,11 +30,8 @@ export interface TurnDockProps {
   /** The app is reconstructing this position's exact choices right now; the snapshot approximation upgrades in place when it lands. */
   acquiringExact?: boolean;
   executeError: string | null;
-  /** True while a turn is being written to the sim: blocks double executes. */
   executing: boolean;
-  /** Generation of the loaded replay: keeps the damage calc on the sim's generation. */
   gen: number;
-  /** The game's format id ('' when unknown): the tray's What if list reads its move pool by it. */
   format?: string;
   onSetChoice: (side: Side, choice: BranchSlotChoice, activeSlot?: number) => void;
   /** Stores a pick without sending anything (the live tip only). Without it every pick goes through `onSetChoice`. */
@@ -42,7 +39,6 @@ export interface TurnDockProps {
   onHypotheticalMove: (side: Side, activeSlot: number, params: { species: string; move: string; replace: string | null }) => void;
   onExecuteTurn: (choices: SideChoices) => void;
   played?: PlayedAtPosition | null;
-  /** Names the viewed position: the open tray and the armed gimmick toggles belong to it. */
   positionKey?: string;
   /** The live battle, handed over only while the viewed position is the branch tip: the preview prices hits the calc cannot. */
   getBattle?: () => LiveBattle | null;
@@ -97,7 +93,6 @@ function useDockElement(attachRoot: (element: HTMLElement | null) => void) {
   }, [attachRoot, reportHeight]);
 }
 
-/** Execute: locked until every slot holds a choice, except while the engine's fill is pending: then a press queues behind it. A forced replacement shows it only with a pick or a pending run. */
 function DockExecute({ model, fill, executing, onRun, onClose }: {
   model: ReturnType<typeof buildDockModel>;
   fill: DockFillView | null | undefined;
@@ -106,7 +101,8 @@ function DockExecute({ model, fill, executing, onRun, onClose }: {
   onClose: () => void;
 }) {
   const waitsForFill = !!fill?.pending && !model.flags.bothChosen;
-  // A forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench click sends the body in at once.
+  // A forced replacement shows Execute once the engine's pick stands (or its run is pending); with no pick a bench click sends the body in
+  // at once.
   if (model.flags.isForceSwitch && !model.flags.bothChosen && !waitsForFill) return null;
   return (
     <ExecuteButton

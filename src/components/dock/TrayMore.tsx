@@ -9,11 +9,9 @@ import { DiceTable } from './DiceTable';
 import type { DockSlotModel } from './dock-model';
 import { ChoicePicker, WhatIfRow, type WhatIfState } from './WhatIfSection';
 
-/** The part of the tray behind "Dice · What if". The pool of moves loads when this section opens. */
 export function TrayMore({ slot, gen, format, diceViews, onChoice, onHypotheticalMove }: {
   slot: DockSlotModel;
   gen: number;
-  /** The game's format id: the What if list offers what the format's own rules allow. */
   format: string;
   diceViews: DiceViews;
   onChoice: (choice: BranchSlotChoice) => void;

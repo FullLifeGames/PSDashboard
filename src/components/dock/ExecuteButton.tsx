@@ -1,4 +1,4 @@
-/** Execute, at the right of the chips; with `waits` a press is queued behind the engine's fill and runs the turn once it landed. */
+/** With `waits` a press is queued behind the engine's fill and runs the turn once it landed. */
 export function ExecuteButton({ ready, executing, waits = false, label, onClick }: {
   ready: boolean;
   executing: boolean;

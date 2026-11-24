@@ -25,9 +25,8 @@ interface TrackedHandles {
 }
 
 /**
- * What a new game reads and does at the branch: the history, the runtime's log with the length it had when the branch started or was last
- * rebased, the start turn, the stream, and `rebaseAtTip`: the live runtime stays and becomes the start of a new branch at `startTurn` with no
- * entry of its own (the turns it played joined the game's main line), the state `requestDeviation(null)` leaves at a turn, so the tip is live.
+ * What a new game reads and does at the branch. `rebaseAtTip`: the live runtime stays and becomes the start of a new branch at `startTurn`
+ * with no entry of its own (the turns it played joined the game's main line), the state `requestDeviation(null)` leaves at a turn.
  */
 export function useNewGameAccess(refs: BranchRefs, handles: TrackedHandles) {
   const { logRef, startLogLengthRef, battleStreamRef } = refs;
@@ -45,7 +44,6 @@ export function useNewGameAccess(refs: BranchRefs, handles: TrackedHandles) {
   return { getHistory, getLog, getStartTurn, getStream, rebaseAtTip };
 }
 
-/** A lead start is the first turn of a new game's main line: the game takes it in as soon as the start resolves. */
 export function useLeadPromotion<Start extends (...args: never[]) => Promise<{ endedNotice: string | null } | void>>(
   start: Start, afterTurnRef?: RefObject<(() => Promise<void>) | null>,
 ): Start {

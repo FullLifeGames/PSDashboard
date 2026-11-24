@@ -3,10 +3,7 @@ import { TURN_KINDS, captionOf, heldHits, isCountDie, resultWord, targetHeading 
 import type { StepDamage } from '../../lib/branch-rolls';
 import { RollSelect } from './RollSelect';
 
-/**
- * A chip is one result of one die; a click forces it, a second click gives the die back to the seed. A chip carries no chance:
- * the result line after Execute names the chance the simulator used.
- */
+/** One result of one die: a click forces it, a second click gives the die back to the seed; the chance shows after Execute. */
 
 const sameResult = (a: ForcedDie['result'], b: ForcedDie['result']): boolean => JSON.stringify(a) === JSON.stringify(b);
 
@@ -18,7 +15,6 @@ export interface DieRowProps {
   target?: string;
   withMove?: boolean;
   rollsOf?: (name: DieName) => StepDamage | undefined;
-  /** The row stands in a cell of the dice table, whose row label is the caption; `shared` spans the columns. */
   cell?: 'cell' | 'shared';
   onToggle: (die: ForcedDie) => void;
 }
@@ -97,7 +93,6 @@ export interface TurnDiceProps {
 
 const END = 'end-of-turn';
 
-/** Shown in the tray's dice section while the position is only approximated: the offers need the simulator's battle, which the exact position brings. */
 export const DICE_WAIT_NOTE = 'Dice need the exact position. They appear once it is ready.';
 
 const SHARED_ROLL_NOTE = 'The game draws this die once per turn for every holder on the field, so a chip here applies to all of them.';

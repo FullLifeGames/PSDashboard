@@ -7,10 +7,6 @@ import { activeSummary, alignHistoryRows, branchSummary, type SideSummary } from
 import { markText, turnDiceMarks, type DiceMarks } from '../lib/branch-dice-marks';
 import { turnEntryCount } from '../lib/variation-turns';
 
-/**
- * What the caller hands the panel: `actions` at the right end of the toggle line, `status` under the line (it learns whether the body
- * is open), `saved` in the body under the moves; `onOpenChange` hears each toggle.
- */
 export interface BranchHistorySlots {
   actions: ReactNode;
   status: (open: boolean) => ReactNode;
@@ -24,7 +20,6 @@ interface Props {
   snapshots: TurnSnapshot[];
   currentPosition?: TimelinePosition;
   onNavigate?: (position: TimelinePosition) => void;
-  /** The live sim has a winner: the tip is an end, not a place to play on. */
   ended?: boolean;
   slots?: BranchHistorySlots;
 }
@@ -59,7 +54,10 @@ function ForcedRow({ entry }: { entry: BranchHistoryEntry }) {
   );
 }
 
-/** The dice the user forced in the row's turn, each with its side, and "(no effect)" on a die the simulator did not use (the reason sits in the title). */
+/**
+ * The dice the user forced in the row's turn, each with its side; "(no effect)" marks a die the simulator did not use (the title gives the
+ * reason).
+ */
 function DiceMarksLine({ marks }: { marks: DiceMarks }) {
   const sides = (['p1', 'p2'] as const).flatMap(side => marks[side].map((mark, index) => ({ side, mark, key: `${side}-${index}` })));
   return (
@@ -198,8 +196,8 @@ function HistoryList({ branchStartTurn, history, snapshots, currentPosition, onN
 }
 
 /**
- * The panel sits closed under a one-line toggle. The caller keys it by the variation's start turn: it starts closed in every
- * variation and keeps the user's setting while that variation lives; the app stores nothing.
+ * Closed under a one-line toggle; the caller keys it by the variation's start turn, so each variation starts closed and keeps the user's
+ * setting.
  */
 export function BranchHistoryPanel({ ended = false, slots, ...props }: Props) {
   const [open, setOpen] = useState(false);

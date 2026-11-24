@@ -5,11 +5,6 @@ import {
   type BranchEngineModule, type BranchHistoryEntry, type BattleStream, type SideId,
 } from './shared';
 
-/**
- * Re-applying a recorded history entry to a runtime, and the lead entry of a turn-0 start: the session's rebuild and a new game's rebuild
- * (`game-rebuild.ts`) both play entries through these.
- */
-
 export type ReplayEntryOutcome =
   | { ok: true; entry: BranchHistoryEntry }
   | { ok: false; error: string };
@@ -90,8 +85,7 @@ export async function replayHistoryEntry(
     p1Choices: [],
     p2Choices: [],
   });
-  // The rebuild's own position replaces whatever the replayed entry carried —
-  // after a team edit the old capture no longer describes this battle.
+  // The rebuild's own position replaces the entry's: after a team edit the old capture no longer describes this battle.
   const serializedPosition = branchEngine.captureSerializedPosition(runtime.battleStream.battle);
   return {
     ok: true,
@@ -107,8 +101,7 @@ export async function replayHistoryEntry(
   };
 }
 
-/** The lead decision IS the variation's first entry: entry 0 plays
- *  "turn 0" and the position after it is the start of turn 1. */
+/** The lead decision is the variation's first entry: entry 0 plays "turn 0" and the position after it is the start of turn 1. */
 export function leadHistoryEntry(
   branchEngine: BranchEngineModule, runtime: BranchRuntime,
   leadOverride: { p1: string[]; p2: string[]; bring?: boolean }, startPosition: string | null,

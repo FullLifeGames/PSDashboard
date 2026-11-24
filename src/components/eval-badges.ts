@@ -1,8 +1,8 @@
 import { chanceRolled, quietVoice, shownAttribution, type LeadSideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 
 /**
- * The team-preview verdict a side's lead may carry. A doubles lead (a led pair) sits close to a coin flip: matrix and tree name a
- * different best lead on 76 of 92 sides, so a doubles lead gets no mistake or inaccuracy, only the engine's pick.
+ * The team-preview verdict a side's lead may carry. A doubles lead sits close to a coin flip: matrix and tree name a different best
+ * lead on 76 of 92 sides, so a doubles lead gets no mistake or inaccuracy, only the engine's pick.
  */
 export function leadTier(side: LeadSideAnalysis): LeadSideAnalysis['tier'] {
   return isPairLead(side) ? undefined : side.tier;
@@ -33,7 +33,7 @@ function quietBadge(voice: ReturnType<typeof quietVoice>): Badge {
   }
 }
 
-/** The shared attribution label and color for analysis and report views: the attribution as shown, so a read whose side lost ground shows the turn's movement, never "read paid off". */
+/** The attribution as shown, so a read whose side lost ground shows the turn's movement, never "read paid off". */
 export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, string]): Badge {
   switch (shownAttribution(analysis)) {
     case 'p1-decision': return decisionBadge(analysis.p1, playerNames[0]);
@@ -44,7 +44,6 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
     case 'p1-read': return { text: `${playerNames[0]}'s read paid off`, color: '#8c8' };
     case 'p2-read': return { text: `${playerNames[1]}'s read paid off`, color: '#8c8' };
     case 'both-read': return { text: 'both sides\' reads paid off', color: '#8c8' };
-    // Without a roll in the swing's direction the estimate moved on its own.
     case 'chance': return chanceRolled(analysis) === false
       ? { text: 'estimate moved (no roll behind it)', color: '#b6a46a' }
       : { text: 'chance swing (rolls, crits, reveals)', color: '#b6a46a' };
@@ -53,7 +52,7 @@ export function attributionBadge(analysis: TurnAnalysis, playerNames: [string, s
         ? { text: 'advantage shifted', color: '#b6a46a' }
         : { text: 'advantage shifted (no blunder)', color: '#b6a46a' };
     case 'unclear': return { text: 'unclear (a choice never surfaced)', color: '#778' };
-    // "quiet turn" stands only where the card highlights nothing else; a card that names an unpunished risk or an inaccuracy says so on the badge, never "no mistake".
+    // "quiet turn" stands only where the card highlights nothing else; a card that names an unpunished risk or inaccuracy says so.
     default: return quietBadge(quietVoice(analysis, playerNames));
   }
 }

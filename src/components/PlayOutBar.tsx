@@ -8,10 +8,8 @@ interface PlayOutBarProps {
   hasVariation: boolean;
   ended?: boolean;
   viewTurn: number;
-  /** The turn 0 view is open: the run starts from the leads the picker shows. */
   atTurnZero?: boolean;
   startDisabled: boolean;
-  /** The session option: depth-1 matrix on every turn of the run. */
   fastPlayOut: boolean;
   onStartPlayOut: () => void;
   onStopPlayOut: () => void;
@@ -19,7 +17,6 @@ interface PlayOutBarProps {
   onFastPlayOutChange: (fast: boolean) => void;
 }
 
-/** Where the fast run saves time, per game type, read from the search budget. */
 function fastTitle(budget: SearchBudget): string {
   const where = (split: SearchBudget['singles']) => {
     const threshold = treeThresholdText(split);
@@ -79,7 +76,6 @@ function StartRow({ viewTurn, atTurnZero, startDisabled, fastPlayOut, onStartPla
   );
 }
 
-/** "Let it play out" launcher, the fast option, the running notice, and the finished-line watch entry. */
 export function PlayOutBar({
   playOut, playOutNotice, hasVariation, ended = false, viewTurn, atTurnZero = false, startDisabled, fastPlayOut,
   onStartPlayOut, onStopPlayOut, onWatchFrom, onFastPlayOutChange,

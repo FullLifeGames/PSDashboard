@@ -9,9 +9,7 @@ interface WinPathsPanelProps {
   host: LinesHost;
   playerNames: [string, string];
   doubles: boolean;
-  /** The turn picker of the endgame's turns (the Game review's); the turn card searches its own turn and has none. */
   picker?: boolean;
-  /** The place the panel stands in: it shows only a run that place opened (the Game review's panel by default). */
   from?: WinPathsFrom;
 }
 
@@ -47,9 +45,8 @@ function statusLine(status: 'positioning' | 'searching' | 'done' | 'failed', tur
 }
 
 /**
- * "How could <player> have won?", under the Endgame row of the Game review and under the turn card of an endgame turn. The steps appear
- * one by one (a stronger play, luck, a mistake by the opponent); a step without a find says so in one sentence. ▶ Play opens the line as
- * a variation, with the dice it forces (the replace question stands under the step that was clicked).
+ * The steps appear one by one (a stronger play, luck, a mistake by the opponent); a step without a find says so in one sentence.
+ * ▶ Play opens the line as a variation, with the dice it forces (the replace question stands under the step that was clicked).
  */
 export function WinPathsPanel({ host, playerNames, doubles, picker = true, from = 'review' }: WinPathsPanelProps) {
   const { winPaths } = host;

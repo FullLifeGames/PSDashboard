@@ -7,7 +7,6 @@ import { endgameRow, gameReview, reviewBlocks, type EndgameRowView, type ReviewG
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
-  /** The sweep's result of every turn (`graph.results`): the lines of a row come from its turn's result. */
   results: readonly (EvalResult | null | undefined)[];
   playerNames: [string, string];
   doubles: boolean;

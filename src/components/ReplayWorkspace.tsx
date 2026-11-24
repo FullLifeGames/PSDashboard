@@ -44,18 +44,15 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       branchDivergence={branchDivergence}
       onCancelPreparation={cancelPreparation}
       onAnimateChange={app.ctx.setAnimateBranchTurns}
-      // The stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
       opponentReads={!!prefs.hardMode}
       onOpponentReadsChange={value => setPrefs({ ...prefs, hardMode: value })}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
-      // Another engine decides its own depth.
       search={{
         prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin',
         running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
       }}
       embed={embed}
-      // With a replay loaded the loader is the top bar's Load button; the embedded view keeps none.
       loader={embed ? undefined : {
         onLoad: loadReplay,
         onLoadFile: loadReplayFile,
@@ -78,8 +75,8 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
 }
 
 /**
- * Names the frame the workspace shows: the main line's frame, or the branch's for one session of the variation. The replay's id and
- * viewpoint are part of it, so a new document of the same replay (a link with ?p2) starts a new report.
+ * Names the frame the workspace shows (the main line's, or the branch's for one session of the variation); the replay's id and
+ * viewpoint belong to it, so a new document of the same replay (a link with ?p2) starts a new report.
  */
 function frameIdentity(app: AppController, replayData: ReplayData): string {
   const base = `${replayData.id}:${replayData.viewpoint ?? 'p1'}`;
@@ -150,7 +147,10 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   );
 }
 
-/** The main frame's document key. A new game's log grows with every promoted turn, so its frame opens again on the longer log; a replay's log never changes. */
+/**
+ * The main frame's document key. A new game's log grows with every promoted turn, so its frame opens again on the longer log; a replay's
+ * log never changes.
+ */
 const mainFrameKey = (replayData: { id: string; log: string }) =>
   isGameId(replayData.id) ? `${replayData.id}:original:${replayData.log.length}` : `${replayData.id}:original`;
 
@@ -179,7 +179,6 @@ function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: 
   );
 }
 
-/** The lead picker of turn 0 and the confirm banner above it, in the dock's place; the dock region takes over everywhere else. */
 function LeadSlot({ app, replayData, nearSide }: WorkspaceProps & { nearSide: FrameSide }) {
   const { pendingConfirm, setPendingConfirm, playOut } = app.transients;
   if (!app.board.timeline.viewT0 || playOut?.active) return null;
@@ -202,7 +201,6 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
   const { history } = app.ctx.branch;
   const { snapshots } = app.ctx.replay;
   const branchStartTurn = variationSpan?.startTurn ?? viewTurn;
-  // A game shares as a game, with the turn the user stands on.
   const record = app.ctx.newGame.record;
   const game = record ? { record, view: { turn: viewTurn, line: viewingVariation ? 'variation' as const : 'main' as const, ...(viewT0 ? { t0: true } : {}) } } : null;
   const slots = useBranchSaveShare({ replayData, branchTurn: branchStartTurn, history, finalLog: app.analysis.simLog, game });

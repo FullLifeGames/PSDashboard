@@ -4,10 +4,9 @@ import { gradedSides } from './game-review';
 import { engineChoice } from './turn-copy';
 
 /**
- * Which graded turns get the line pass and what the search is told; the hook `useEarlyLines` runs it. The depth-1 matrix of the early
- * singles turns keeps no lines, so those turns are searched once more with the trees (in Auto the stage covers every graded turn). The
- * pass (`LINE_PASS` extra iterations per tree, aimed at the rows the card shows) gives the second turn of a line its visits without moving
- * a score; a turn is done when its result carries it (`linePass`).
+ * Which graded turns get the line pass. The depth-1 matrix of the early singles turns keeps no lines, so those turns are searched
+ * once more with the trees (in Auto the stage covers every graded turn). The pass (`LINE_PASS` extra iterations per tree, aimed at the
+ * rows the card shows) gives the second turn of a line its visits without moving a score; a turn is done when its result carries it.
  */
 
 export const LINE_PASS = 300;
@@ -51,9 +50,9 @@ export function earlyLineProgress({ analyses, results, settings }: GameInputs): 
 }
 
 /**
- * The tree search of one turn: depth 1, the line pass asked for, the played pair kept (`keepPlayed`, as the sweep passes it), the rows
- * whose lines the card shows named by the card (its engine choice per side, `lineRows`), and the answer its ranking puts first named as
- * the one the lines meet (`lineReplies`). The prover stays on: the search hands its lines out after it. The host keeps `lines` only.
+ * The tree search of one turn: depth 1, the line pass asked for, the played pair kept (`keepPlayed`), the rows the card shows named
+ * by the card (`lineRows`) and the answer its ranking puts first named as the one the lines meet (`lineReplies`). The prover stays
+ * on; the host keeps `lines` only.
  */
 export function earlyLineSettings(
   job: EarlyLineJob,

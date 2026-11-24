@@ -11,7 +11,6 @@ interface TimelineBarProps {
   endSnapshotTurn: number | null;
   atEndPosition: boolean;
   viewingVariation: boolean;
-  /** The variation's live sim has a winner: its tip reads End and the total counts played turns. */
   variationEnded?: boolean;
   branching: boolean;
   /** A new game's tip turn that is no variation (waiting for its replacement): the slider counts it, the variation's chrome stays away. */
@@ -22,7 +21,6 @@ interface TimelineBarProps {
 }
 
 function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationSpan; maxTurn: number }) {
-  // Gold stripe under the slider marking where the variation lives.
   const max = sliderMax(maxTurn, variationSpan);
   const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
   // A turn-0 variation starts left of the slider's domain.

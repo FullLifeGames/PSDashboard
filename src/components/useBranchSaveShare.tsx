@@ -29,10 +29,9 @@ export function shareUrl(encoded: string): string {
 }
 
 /**
- * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: when the inputs
- * change (`build` is a new function), the link is built again during render, and a "Copied" belongs to the build it copied, so a changed
- * variation shows none until the next copy. The link in the field is the one the click built, so the clipboard and the field carry one
- * timestamp, and nothing is built before the first click (a game's link packs both teams).
+ * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: when
+ * `build` changes the link is built again during render, and a "Copied" belongs to the build it copied. Nothing is built before the
+ * first click (a game's link packs both teams), so the clipboard and the field carry one timestamp.
  */
 function useShareLink(build: () => SavedBranch) {
   const [built, setBuilt] = useState<{ build: () => SavedBranch; link: string } | null>(null);
@@ -60,7 +59,6 @@ const SAVED_NOTICE = 'Saved. The saved branches are listed under Variation moves
 
 const buttonStyle = { padding: '3px 8px', fontSize: 10 };
 
-/** The save and share logic of a branch, handed to the history panel as slots; the panel imports no branch-share module. */
 export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, game = null }: Props): BranchHistorySlots {
   const [saved, setSaved] = useState<SavedBranch[]>(() => loadSavedBranches(replayData.id));
   const [justSaved, setJustSaved] = useState(false);
@@ -110,7 +108,6 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
       </>
     ),
     saved: <SavedList saved={saved} onOpen={openSaved} onRemove={removeSaved} />,
-    // The saved rows show once the body opens, so the line about the save has done its work.
     onOpenChange: open => { if (open) setJustSaved(false); },
   };
 }

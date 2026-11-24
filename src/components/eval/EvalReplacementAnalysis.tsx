@@ -3,10 +3,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import { evTitle } from './turn-copy';
 
-/**
- * The replacement after a knockout, as a note on the card of the turn that follows it: what the player sent in with its win chance,
- * then the engine's pick. Nothing is graded: no tier, no mark, no input to the report.
- */
+/** A note on the card of the turn after a knockout: what the player sent in with its win chance, then the engine's pick. Nothing is graded. */
 
 const joined = (species: string[]) => species.join(' and ');
 

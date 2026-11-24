@@ -7,9 +7,8 @@ import type { EvalGraphState, GraphData } from './graph-sweep';
 import type { CachedEval } from './single-eval';
 
 /**
- * The two calls of the early-lines stage (`useEarlyLines`) on the evaluation's own pieces: a tree search for the lines of a graded turn runs on the
- * shared pool without cancelling anything (`exclusive: false`), and its lines are written into that turn's stored result with the mark that the
- * line pass ran: the graph, the memory cache and the store entry, so a reload reads them back and searches nothing again.
+ * A tree search for the lines of a graded turn runs on the shared pool without cancelling anything (`exclusive: false`); its lines are
+ * written into that turn's stored result with the line-pass mark (graph, memory cache, store entry), so a reload searches nothing again.
  */
 export function useEarlyLinesIO(env: {
   clientRef: React.RefObject<EvalWorkerClient | null>;

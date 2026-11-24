@@ -11,7 +11,6 @@ const runAfterTurn = async (refs: BranchRefs): Promise<void> => {
   await refs.afterTurnRef?.current?.();
 };
 
-/** Resolve both sides' pending choices against the live request; an error string on the first miss. */
 function resolveBothSides(
   branchEngine: BranchEngineModule, battle: LiveBattle, refs: BranchRefs,
 ): { ok: true; p1: string; p2: string } | { ok: false; error: string } {
@@ -87,7 +86,6 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
     p1ChoicesRef, p2ChoicesRef, setExecuting, setExecuteError, setHistory, setSimState]);
 }
 
-/** Executes one side's forced replacement as a 'forced' interlude entry. */
 function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
   const { streamsRef, battleStreamRef, branchEngineRef, choiceErrorsRef, executingRef, logRef, p1ChoicesRef, p2ChoicesRef } = refs;
   const { setExecuting, setExecuteError, setHistory, setSimState } = setters;
@@ -231,15 +229,16 @@ function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: S
     recordSlotChoice(refs, side, activeSlot, choice);
     setExecuteError(null);
     if (!refs.battleStreamRef.current?.battle || !refs.branchEngineRef.current) return;
-    // The pick is published before the send goes out, so the chip shows the clicked body and Execute "Executing..." while the replacement plays. The updater is queued ahead of the send's own `setSimState(nextState)`, which wins.
+    // The pick is published before the send goes out, so the chip shows the clicked body and Execute "Executing..." while the replacement
+    // plays. The updater is queued ahead of the send's own `setSimState(nextState)`, which wins.
     publishChoices(refs, setters);
     settle(side);
   }, [settle, refs, setters, executingRef, setExecuteError]);
 }
 
 /**
- * Records a pick and sends nothing, the way the engine's fill writes a forced replacement the user has not confirmed. A click on the bench
- * uses `setChoice`, which sends the replacement at once.
+ * Records a pick and sends nothing, as the engine's fill writes a forced replacement the user has not confirmed; a bench click uses
+ * `setChoice`, which sends at once.
  */
 function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
   const { executingRef } = refs;
@@ -252,9 +251,6 @@ function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
   }, [refs, setters, executingRef, setExecuteError]);
 }
 
-/**
- * Execute for whatever the position is waiting for: at a forced replacement it sends the picks the dock holds, otherwise it runs the turn.
- */
 function useExecutePending(refs: BranchRefs, executeTurn: () => Promise<void>, settle: (side: SideId) => boolean) {
   const { battleStreamRef, executingRef } = refs;
   return useCallback(async () => {
@@ -262,7 +258,6 @@ function useExecutePending(refs: BranchRefs, executeTurn: () => Promise<void>, s
     if (!battle || executingRef.current) return;
     const forced = (['p1', 'p2'] as const).filter(side => forceSwitches(battle, side).some(Boolean));
     if (forced.length === 0) { await executeTurn(); return; }
-    // The side that replaces first: for a lone side its command, for two sides the turn once both are complete.
     settle(forced[0]);
   }, [battleStreamRef, executingRef, executeTurn, settle]);
 }

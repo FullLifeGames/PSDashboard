@@ -11,7 +11,6 @@ interface Props {
   placeholder?: string;
   ariaLabel?: string;
   disabled?: boolean;
-  /** A short note shown beside an option (the editor marks a move the species cannot learn). */
   optionNote?: (option: string) => string | undefined;
   inputStyle?: React.CSSProperties;
 }
@@ -94,8 +93,7 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, optionNote, onCommi
             role="option"
             aria-selected={index === highlight}
             className={`ps-combobox-option${index === highlight ? ' ps-combobox-option-active' : ''}`}
-            // preventDefault keeps the input focused so blur cannot close
-            // the popup before the click lands.
+            // preventDefault keeps the input focused, so blur cannot close the popup before the click lands.
             onMouseDown={event => event.preventDefault()}
             onClick={() => onCommit(option)}
             onMouseEnter={() => onHighlight(index)}
@@ -124,7 +122,7 @@ function useScrollToHighlight(open: boolean, idBase: string, highlight: number) 
   }, [highlight, open, idBase]);
 }
 
-/** A filterable single-select dropdown that commits on a click or on arrows plus Enter; it has no <datalist>, whose behavior differs by browser. */
+/** A filterable single-select dropdown with no <datalist>, whose behavior differs by browser. */
 export function ComboBox({
   options,
   value,

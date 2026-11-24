@@ -21,7 +21,6 @@ function autoTitle(budget: SearchBudget): string {
     `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
 }
 
-/** The search's own preferences, Depth and, under a matrix depth, Samples, as rows of the Setup menu (`.ps-setup-row` in layout.css). */
 export function SearchSelects({ prefs, onPrefsChange, running }: SearchSelectsProps) {
   const depthId = useId();
   const samplesId = useId();

@@ -15,30 +15,28 @@ interface EvalGraphProps {
   currentLine?: 'main' | 'variation';
   onSelectTurn?: (turn: number, line?: 'main' | 'variation') => void;
   /**
-   * Variation overlay (unified timeline): gold curve anchored at the branch point's main value; scores indexed like the main array
-   * (scores[t-1]), filled only for played variation positions. Gaps stay gaps, no invented values. Its points print at `shares`, the
-   * fainted share of the variation's own board, never at the main line's share.
+   * Variation overlay: gold curve anchored at the branch point's main value, indexed like `scores`, filled only for played variation
+   * positions (gaps stay gaps). Its points print at `shares`, the fainted share of the variation's own board, never the main line's.
    */
   variation?: VariationSeries | null;
   leadScore?: number | null;
   leadDetail?: LeadAnalysis | null;
-  /** evalErrors[t-1] = why turn t has no point (eval-layer failure). */
   evalErrors?: (string | null)[];
   /** faintedFractions[t-1] = the main line turn's fainted share (graph.faintedFractions): a main-line tooltip prints at it, like the bar. */
   faintedFractions?: (number | null)[];
   /**
-   * decided[t-1] = the turn's decided-sweep state: the board is practically over for `side`. Rendered as a thin strip on that side's
-   * edge (top = p1, bottom = p2) plus a node-label note; the calibrated line itself stays honest.
+   * decided[t-1] = the turn's decided-sweep state: the board is practically over for `side`; a thin strip on that side's edge (top = p1,
+   * bottom = p2) plus a node-label note.
    */
   decided?: DecidedSignal[];
   /**
-   * Full main-line length. Keeps the x-domain honest when nothing has been analyzed yet: without it a lone variation collapses the axis
-   * to its own few turns and renders at the far right of an empty box.
+   * Full main-line length: without it a lone variation collapses the x-axis to its own few turns and renders at the far right of an empty
+   * box.
    */
   maxTurn?: number;
   /**
-   * The turns the Game review lists. A circle marks a graded turn of player 1 and a square one of player 2, in the player's colour,
-   * around the turn's point; a turn graded on both sides carries both.
+   * The turns the Game review lists: a circle marks a graded turn of player 1, a square one of player 2, in the player's colour; both when
+   * both sides are graded.
    */
   reviewMarks?: ReviewMark[];
 }
@@ -49,8 +47,8 @@ const VARIATION_COLOR = '#f0c76b';
 type SelectTurn = EvalGraphProps['onSelectTurn'];
 
 /**
- * The viewBox tracks the rendered width 1:1 (ResizeObserver): a fixed viewBox stretched with preserveAspectRatio="none" turned every
- * circle into a viewport-dependent ellipse, so markers looked different on desktop and mobile.
+ * The viewBox tracks the rendered width 1:1 (ResizeObserver): a fixed viewBox stretched with preserveAspectRatio="none" made every circle
+ * an ellipse.
  */
 function useMeasuredWidth() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -222,7 +220,6 @@ function ReviewMarks({ marks, scores, scales: { x, y } }: { marks: ReviewMark[];
 
 function MainHits({ scores, hitWidth, x, bands, onSelectTurn, titleArgs }: {
   scores: (number | null)[]; hitWidth: number; x: GraphScales['x']; onSelectTurn: SelectTurn;
-  /** Turns where a variation point shares the column: the band of the column the main point owns. */
   bands: Map<number, HitBand>;
   titleArgs: {
     evalErrors: (string | null)[] | undefined; blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined;
@@ -280,8 +277,8 @@ function VariationHits({ points, hitWidth, playerNames, bands, onSelectTurn }: {
 }
 
 /**
- * Chess-style evaluation line over the whole game: one series, point color carries the polarity via the app's player colors; blunder
- * markers add a shape ring plus tooltip text, never color alone.
+ * Chess-style evaluation line over the game: point color carries the polarity; blunder markers add a shape ring plus tooltip text, never
+ * color alone.
  */
 export function EvalGraph({ scores, playerNames, currentTurn, currentLine, onSelectTurn, leadScore, leadDetail, evalErrors, faintedFractions, decided, variation, maxTurn, reviewMarks }: EvalGraphProps) {
   const { svgRef, width } = useMeasuredWidth();

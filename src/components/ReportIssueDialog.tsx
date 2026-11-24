@@ -4,10 +4,8 @@ import type { IssueReport } from '../lib/support-state';
 const STEP_STYLE = { fontSize: 12, color: '#cdd', margin: '0 0 8px' } as const;
 const ACTION_STYLE = { display: 'inline-block', textDecoration: 'none', marginBottom: 14 } as const;
 
-/** The dialog of Report issue: the user downloads the state file and opens the filled issue form, each with one click. */
 export function ReportIssueDialog({ report, game = false, onDownload, onClose }: {
   report: IssueReport;
-  /** A new game has no Showdown replay; the file holds the game. */
   game?: boolean;
   onDownload: () => void;
   onClose: () => void;

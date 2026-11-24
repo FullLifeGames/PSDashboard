@@ -6,8 +6,8 @@ import { TEAM_SIZE, type TeamRead } from '../../lib/new-game/start';
 import type { TeamCheck } from './use-team-check';
 
 /**
- * One player's side of the New game dialog: name, Validate, paste field, the sets read, and the simulator's check. The check shows the
- * problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the box that causes it.
+ * The check shows the problems and leaves Start possible; what does stop Start (no set, more than six, an unknown species) stands under the
+ * box that causes it.
  */
 
 interface Props {

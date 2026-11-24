@@ -12,7 +12,6 @@ interface LinesSectionProps {
   playerNames: [string, string];
   doubles: boolean;
   host: LinesHost;
-  /** The turn card's analysis: the engine's line is the line of the engine choice the card names. */
   analysis?: Pick<TurnAnalysis, 'p1' | 'p2'> | null;
 }
 
@@ -25,7 +24,6 @@ function SideText({ view }: { view: LineSideView }) {
   );
 }
 
-/** The numbered rows of a line with their chips (the Lines section's and the win-path panel's). */
 export function LineRows({ block }: { block: LineBlockView }) {
   return (
     <>

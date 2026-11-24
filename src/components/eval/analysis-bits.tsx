@@ -17,7 +17,6 @@ export function ExplorableLabel({ label, color = '#cde', onClick, opponentReads 
   );
 }
 
-/** A centered gauge on [−1, +1] for the score gap. */
 export function MiniBar({ value }: { value: number }) {
   const pct = 50 + 50 * Math.max(-1, Math.min(1, value));
   const positive = value >= 0;
@@ -44,7 +43,6 @@ export function MiniBar({ value }: { value: number }) {
 /** Untracked (doubles): only the engine's preferred line, no played/blame. */
 export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
   name: string; side: SideAnalysis; onExplore?: (choice: RankedChoice) => void; opponentReads?: boolean;
-  /** The turn's result and this row's side: the follow-up reads the line the Lines section shows. */
   rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
 }) {
   if (!side.best) return null;
@@ -65,7 +63,10 @@ export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
   );
 }
 
-/** The analytic-odds suffix of a ranked row ("· 43% KO"), with the accuracy × kill-roll decomposition in the tooltip; hidden when the product rounds to nothing or to certainty. */
+/**
+ * The analytic-odds suffix ("· 43% KO"), with the accuracy × kill-roll decomposition in the tooltip; hidden when the product rounds to
+ * nothing or certainty.
+ */
 export function KoSuffix({ odds }: { odds?: { accuracy: number; killFraction: number } }) {
   if (!odds) return null;
   const pct = Math.round(odds.accuracy * odds.killFraction * 100);

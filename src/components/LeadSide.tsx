@@ -29,7 +29,6 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   const rules = useReplayRules();
   // A body the log never showed (a stand-in) wears the stats panel's marker, as on the dock's switch tiles.
   const guessed = useIsGuessed()(side, option.species);
-  // The switch tiles of the turn dock read this same label.
   const label = displayName(option.name, option.species);
   const picked = slot >= 0;
   const order = picked && showOrder ? (slot < leadsPerSide ? slotLetter(slot) : String(slot + 1)) : null;

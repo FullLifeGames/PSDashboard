@@ -36,7 +36,10 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   );
 }
 
-/** The equilibrium value in the eval bar's own language: the win odds this choice is worth against balanced play. The guaranteed floor and the punishing reply live in the tooltip. */
+/**
+ * The equilibrium value in the eval bar's language: the win odds this choice is worth against balanced play; the floor and the punishing
+ * reply live in the tooltip.
+ */
 function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null, opponentReads = false): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +

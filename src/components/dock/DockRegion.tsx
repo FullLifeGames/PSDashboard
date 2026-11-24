@@ -8,7 +8,6 @@ import { TurnDock, type TurnDockProps } from './TurnDock';
 
 const isGame = (app: AppController): boolean => app.ctx.newGame.record !== null;
 
-/** What the dock reads from the app: the live branch at its tip, the resolved picker (with its seed) at every other position. */
 function dockProps(app: AppController, replayId: string): TurnDockProps {
   const { viewTurn, liveTip, evalViewKey } = app.board.timeline;
   const { simState, executing, executeError } = app.ctx.branch;
@@ -29,18 +28,16 @@ function dockProps(app: AppController, replayId: string): TurnDockProps {
     gen: app.ctx.meta.replayGen,
     format: replayFormatId(app.ctx.replay.replayData),
     onSetChoice: handleSetChoice,
-    // The live tip can hold a forced replacement back for Execute; a replay turn has none.
     onRecordChoice: liveTip ? app.ctx.branch.recordChoice : undefined,
     onHypotheticalMove: app.handleHypotheticalMove,
     // The tip executes its own pending choices; off the tip the effective choices (the played seed under the picks) go along.
     onExecuteTurn: choices => (liveTip ? void app.handleExecuteTurn() : handleExecuteDraft(choices)),
     played: playedAtView,
-    // The step within the turn counts: a forced replacement and the choice after it share the turn, and the tray and the armed gimmicks of the one are not the other's.
+    // A forced replacement and the choice after it share the turn, but not the tray and the armed gimmicks: the step within the turn counts.
     positionKey: `${replayId}:${evalViewKey}:${liveTip ? app.ctx.branch.history.length : 0}`,
     getBattle: liveTip ? app.ctx.branch.getBattle : getPickerBattle,
     replayLog: pickerReplayLog,
     seed: liveTip ? null : pickerSeed,
-    // The first chip click at a replay turn starts the fill for its empty slots; the tip fills at once.
     fill: app.engine.dockFill,
     // The stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
     opponentReads: !!app.ctx.evaluation.prefs.hardMode,
@@ -58,10 +55,6 @@ function PlayOutStandIn() {
   );
 }
 
-/**
- * The last child of the replay column: the confirm banner, the Raw Protocol Log toggle and the dock. `nearSide` is the side the replay frame
- * shows near; the dock puts its chips first.
- */
 export function DockRegion({ app, replayId, nearSide }: { app: AppController; replayId: string; nearSide?: Side }) {
   const { playOut, pendingConfirm, setPendingConfirm } = app.transients;
   if (app.board.timeline.viewT0 && !playOut?.active) return null;
