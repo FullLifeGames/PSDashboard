@@ -4,7 +4,7 @@ import { TERA_FORME_SPECIES } from '../src/branch/tera-restore';
 import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan row 19: `TERA_FORME_SPECIES` in branch/tera-restore.ts names the species whose Terastallization leaves
+ * `TERA_FORME_SPECIES` in branch/tera-restore.ts names the species whose Terastallization leaves
  * more behind than the marker, so restoring the bare marker on a revived body would leave half a Tera there:
  *  - Ogerpon: the click turns it into its Tera forme and gives it Embody Aspect;
  *  - Terapagos: the click turns it into the Terastal forme (a different ability and maximum HP);
@@ -29,7 +29,6 @@ function afterTurn(view: SimView, species: string, ability: string, click: boole
   return { forme: lead.species.name, ability: lead.ability, maxhp: lead.maxhp };
 }
 
-/** One entry per base species of the view's Dex that can be a lead, with its first listed ability. */
 function leads(view: SimView): { species: string; ability: string }[] {
   return view.dex.species.all()
     .filter(species => species.exists && !species.isNonstandard && species.name === species.baseSpecies && !species.battleOnly)

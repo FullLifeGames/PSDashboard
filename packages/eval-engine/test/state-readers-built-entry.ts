@@ -3,10 +3,8 @@ import * as champions from '@pkmn/mods/champions';
 import { entryReads, methodsOf, tokensOf, type Consumer, type Methods } from '../src/dex-facts/state-readers';
 
 /**
- * Round 89 (#149): the entry of packages/eval-engine/test/state-readers-built.spec.ts. The spec bundles this file with the app's own
- * Vite configuration (its minifier, its target, its resolve rules) and runs the bundle next to the source in Node: the scan of
- * `dex-facts/state-readers.ts` reads `String(handler)` of the simulator's Dex, and a build that rewrites a handler's source
- * (renamed or removed properties, folded branches) would change what the memos key in the browser and not in Node.
+ * The entry of state-readers-built.spec.ts, bundled with the app's Vite configuration: the scan of `dex-facts/state-readers.ts` reads `String(handler)` of the
+ * simulator's Dex, and a build that rewrites a handler's source (renamed or removed properties, folded branches) would change what the memos key in the browser and not in Node.
  */
 
 /** What the scan finds in each Dex entry of every generation and the Champions mod: keyed `<dex>|<kind>|<id>|<consumer or event>`, the values sorted. */

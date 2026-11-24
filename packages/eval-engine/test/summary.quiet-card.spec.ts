@@ -7,11 +7,10 @@ import type { EvalResult, RankedChoice, KoOddsInfo } from '../src/types';
 import { deniedEndSentence } from '../src/denied-end';
 
 /**
- * Round 89 (user ruling B8a, wording G-Q3 option 2 of the plan): "A quiet turn." stands only on a card that highlights nothing
- * else. Beside another sentence (a risk sentence, an equilibrium switch, an unanswered entry, a decided or predictive sentence,
- * an inaccuracy note) or a shown hindsight hint on a side row, the card says "Neither side made a mistake." and the badge reads
- * "no mistake". A side with a mistake or blunder tier makes that sentence false: the card then writes no sentence. Singles and
- * doubles share every rule; the labels come from the shared builder (read-against-click-builder.ts).
+ * "A quiet turn." stands only on a card that highlights nothing else. Beside another sentence (a risk sentence, an equilibrium switch, an unanswered entry, a decided
+ * or predictive sentence, an inaccuracy note) or a shown hindsight hint on a side row, the card says "Neither side made a mistake." and the badge reads "no mistake".
+ * A side with a mistake or blunder tier makes that sentence false: the card then writes no sentence. Singles and doubles share every rule; the labels come from the
+ * shared builder (read-against-click-builder.ts).
  */
 
 const NEITHER = 'Neither side made a mistake.';
@@ -21,8 +20,8 @@ const HINT = 'Against the Protect actually clicked, Earthquake was worth +20% mo
 describe.each(GAMES)('%s', (_game, make) => {
   describe.each(READERS)('read by %s', reader => {
     /**
-     * A quiet card with nothing else on it: an inaccuracy risk whose side lost ground keeps today's silent card (D-Q2 a). The
-     * builder's lost-ground side also carries a shown hindsight hint (2663093831 t1), which the bare card does without.
+     * A quiet card with nothing else on it: an inaccuracy risk whose side lost ground keeps the silent card. The builder's lost-ground side also carries a shown
+     * hindsight hint (2663093831 t1), which the bare card does without.
      */
     const bare = () => {
       const built = buildScene(make, { reader, kind: 'inaccuracy', playedCell: 0.325, safeCell: 0.454, lostGround: 0.1 });
@@ -86,7 +85,7 @@ describe.each(GAMES)('%s', (_game, make) => {
       const side = analysis[reader];
       const patched: TurnAnalysis = { ...analysis, [reader]: { ...side, safeAgainstClick: undefined, riskPaidOff: undefined, tier: 'inaccuracy' } };
       const text = summarizeTurn(patched, names);
-      // Round 89 (FT-1, ruling 43 FT4a): the card names the inaccuracy, so it starts with that sentence and never claims that no one erred.
+      // The card names the inaccuracy, so it starts with that sentence and never claims that no one erred.
       expect(text).toContain('was an inaccuracy');
       expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
@@ -98,7 +97,7 @@ describe.each(GAMES)('%s', (_game, make) => {
       const { analysis, names } = buildScene(make, { reader, kind: 'gamble', playedCell: 0.189, safeCell: 0.19 });
       expect(analysis.attribution).toBe('quiet');
       const text = summarizeTurn(analysis, names);
-      // Round 89 (FT-1, ruling 43 FT4a): the card names the risk; "Neither side made a mistake." gives way (2663093831 t6).
+      // The card names the risk; "Neither side made a mistake." gives way (2663093831 t6).
       expect(text).toContain('a risk that went unpunished');
       expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
@@ -158,7 +157,6 @@ interface Words {
   punisher: string;
   click: string;
   safe: string;
-  /** The verb phrase the card uses after the name: "played" plus the played label. */
   verbPlayed: string;
 }
 
@@ -311,12 +309,9 @@ const ranked = (choice: string, label: string, worstCase: number, expected: numb
   ({ choice, label, worstCase, expected, ev, punishedBy });
 
 /**
- * Round 77 (user report 28.10.2026, the expert pin smogtours-gen8ou-562428 t12): LordEnz's Tapu Bulu at 45% clicks Close
- * Combat into Dflo's Blacephalon, which outspeeds and takes it with Shadow Ball; Dflo switches to Weavile instead, and Close
- * Combat knocks it out on entry. The safe line is the switch to Mandibuzz. Since T249 (round 73) the regret is 0.159, an
- * inaccuracy, and the floor given up is 0.159: under the mistake band, which books its risk, and under the gamble's bound of a
- * mistake-sized floor. The read fell through every rule and the turn read as a plain shift. The numbers are the round 76
- * feedback dump's.
+ * Expert pin smogtours-gen8ou-562428 turn 12: LordEnz's Tapu Bulu at 45% clicks Close Combat into Dflo's Blacephalon, which outspeeds and takes it with Shadow Ball;
+ * Dflo switches to Weavile instead, and Close Combat knocks it out on entry. The safe line is the switch to Mandibuzz. The regret is 0.159, an inaccuracy, and the
+ * floor given up is 0.159: under the mistake band, which books its risk, and under the gamble's bound of a mistake-sized floor.
  */
 describe('an inaccuracy that paid off as a read (562428 t12)', () => {
   const t12 = (overrides: Partial<AnalyzeTurnParams> = {}, closeCombatFloor = 0.014) => {
@@ -377,7 +372,6 @@ describe('luck-cards', () => {
 
   const quiet = playing(null);
 
-  /** A hand-built turn for the card sentences: the deltas, the attribution, the sides and (optionally) the turn's rolls. */
   const turnWith = (over: Partial<TurnAnalysis>): TurnAnalysis => ({
     turn: 12, scoreBefore: 0, scoreAfter: 0.24, swing: 0.24, playedOutcome: 0, decisionDelta: 0, chanceDelta: 0.24,
     attribution: 'chance', p1: quiet, p2: quiet, playedTracking: true, ...over,
@@ -393,7 +387,6 @@ describe('luck-cards', () => {
       expect(summarizeTurn(turnWith({ rolledFor: { p1: true, p2: false } }), names)).toContain('how the turn rolled (+12%)');
       // A roll the other way does not explain a swing toward BKC.
       expect(summarizeTurn(turnWith({ rolledFor: { p1: false, p2: true } }), names)).not.toContain('how the turn rolled');
-      // Without the turn's dice the card keeps its old wording.
       expect(summarizeTurn(turnWith({}), names)).toContain('how the turn rolled (+12%)');
     });
 
@@ -420,7 +413,7 @@ describe('luck-cards', () => {
         ...playing(ranked('switch 4', '→ Cofagrigus', 0.2)), safe: ranked('switch 3', '→ Volcanion', 0.1),
         readCredit: { payoff: 0.31 },
       };
-      // The side holds its ground (−0.05): a credit on a lost turn stays silent (T59).
+      // The side holds its ground (−0.05): a credit on a lost turn stays silent.
       const turn = (rolledFor: { p1: boolean; p2: boolean }) =>
         turnWith({ attribution: 'quiet', p1: credit, chanceDelta: -0.15, swing: -0.05, scoreAfter: -0.05, rolledFor });
       expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the estimate moved −8% for BKC with no roll behind it.');

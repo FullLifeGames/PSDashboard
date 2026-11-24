@@ -37,7 +37,7 @@ interface Fixture { serialized: string; tera?: EvalSettings['tera']; sleepClause
 const fixture = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Fixture;
 const position = (name: string) => fixture(name).serialized;
-/** Round 65: a fixture's rule set, named from its replay id as the hosts name it (useEvalView, bankSettings). */
+/** A fixture's rule set, named from its replay id as the hosts name it (useEvalView, bankSettings). */
 const rulesetOf = (name: string): StaticRuleset => replayRuleset({ id: name.replace(/-t\d+$/, ''), log: '' });
 const CASES = ['smogtours-gen9ou-749828-t23', 'gen9ou-2658658993-t2', 'gen9doublesou-2663093831-t12'];
 /** Positions whose search runs a verify round (the doubles one after the pair plan's check round). */
@@ -86,13 +86,11 @@ function recordingExecutor(serialized: string, lastFirst = false, ruleset: Stati
 }
 
 /**
- * Round 67 (T128), changed in round 69 (T149): the verify round is the first cells round whose jobs all deepen. The pair
- * plan's boundary round before it deepens nothing, the answer round's detection after it is plain, its extension mixes
- * plain and deepened jobs and its re-check deepens again.
+ * The verify round is the first cells round whose jobs all deepen. The pair plan's boundary round before it deepens nothing, the answer round's detection after it is plain,
+ * its extension mixes plain and deepened jobs and its re-check deepens again.
  */
 const verifyRound = (record: Recording) => record.rounds.find(round => round.jobs.length > 0 && round.jobs.every(job => job.deepen !== undefined && !job.plain));
 
-/** Runs `run` with the answer round in the given form (EVAL_DOUBLES_ANSWERS), restoring the variable after. */
 async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promise<T>): Promise<T> {
   const saved = process.env.EVAL_DOUBLES_ANSWERS;
   process.env.EVAL_DOUBLES_ANSWERS = mode;
@@ -115,14 +113,11 @@ const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): Eval
 };
 
 /**
- * Round 64 (T126): the real orchestrator, read through what it asks of its executor. Before, the test
- * compared it with a hand copy of itself that round 63 changed in the same commit, on cases without
- * keepPlayed and without a sleep clause, so dropping the played row, the sleep clause of the verify
- * step, the tree order or the verified input of the prover all passed (counter-probes in the lane C
- * ledger of round 64).
+ * The real orchestrator, read through what it asks of its executor (not through a hand copy of itself): the cases carry keepPlayed and a sleep clause, so dropping the
+ * played row, the sleep clause of the verify step, the tree order or the verified input of the prover turns a row red.
  */
 describe('tree orchestration (round 61; read through the executor since round 64)', () => {
-  // Round 67 (T128): a doubles root asks for plain cells after the verify round, and the prover proves the answered ranking.
+  // A doubles root asks for plain cells after the verify round, and the prover proves the answered ranking.
   test('the answer round follows the verify round with plain cells, and the prover proves its ranking', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2630685175-t7-played';
     const played = fixture(name);
@@ -132,15 +127,14 @@ describe('tree orchestration (round 61; read through the executor since round 64
     const verifyAt = record.rounds.indexOf(verifyRound(record)!);
     const answers = record.rounds.slice(verifyAt + 1);
     expect(answers.length).toBeGreaterThan(0);
-    // The detection is one plain draw per cell; the extension prices the rows that can decide the ranking as verify cells (T149).
+    // The detection is one plain draw per cell; the extension prices the rows that can decide the ranking as verify cells.
     expect(answers[0].jobs.every(job => job.plain && job.deepen === undefined)).toBe(true);
     expect(answers.every(round => round.jobs.every(job => job.plain || job.deepen !== undefined))).toBe(true);
-    // The prover reads the answered ranking (its near ties by label since round 67, T134).
+    // The prover reads the answered ranking (its near ties by label).
     expect(record.proofs[0].input.rootOrder).toEqual(forcedWinInput(result, settings).rootOrder);
   });
 
-  // Round 67 (T111 point 3): the tests count the trees the budget in force runs; with a constant beside the budget
-  // the late-finishing run below waited for trees a smaller budget never starts.
+  // The tests count the trees the budget in force runs; with a constant beside the budget the late-finishing run below would wait for trees a smaller budget never starts.
   test('a budget of three trees runs three offsets, whatever order they finish in', { timeout: 120_000 }, async () => {
     configureSearchBudget(parseSearchBudget('trees=3'));
     onTestFinished(() => configureSearchBudget(null));
@@ -163,8 +157,7 @@ describe('tree orchestration (round 61; read through the executor since round 64
   });
 
   test('verifies one ply deeper with the search\'s own Tera and sleep clause; doubles asks the pair plan first', { timeout: 600_000 }, async () => {
-    // Round 70 (batch gate): the answer round adds its own rounds where it finds an answer (2663093831 t12 since the
-    // Protect tempo), so the contract runs with the answer round off; its rounds have their own tests.
+    // The answer round adds its own rounds where it finds an answer (2663093831 turn 12), so the contract runs with the answer round off; its rounds have their own tests.
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
       const { executor, record } = recordingExecutor(position(name));
@@ -207,26 +200,21 @@ describe('tree orchestration (round 61; read through the executor since round 64
   test('the played row joins the verify set (doubles: VGC 2630685175 t7, p1 U-turn + Tera Starstorm)', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2630685175-t7-played';
     const keepPlayed = fixture(name).keepPlayed!;
-    // Round 65 gate (2b): a VGC position, searched under the VGC rule set (the hand doubles table) as the app searches it.
+    // A VGC position, searched under the VGC rule set (the hand doubles table) as the app searches it.
     expect(rulesetOf(name)).toBe('vgc');
     const { executor, record } = recordingExecutor(position(name), false, rulesetOf(name));
     await searchTreesOrchestrated(executor, settingsOf(name, keepPlayed));
     const merged = mergeMctsTrees(record.trees);
     const played = playedIndices(record.trees, merged, keepPlayed);
     expect(played.p1).toBeDefined();
-    // Round 73 (user gate 22.10.2026, 2a): the new static (T248 race flip and pair value, T249) moves the trees' visits, so
-    // their own support now holds the played row (it left it out before); the played option still brings it into the
-    // verify round. The singles scene above is the one that proves the played option adds a row the trees leave out.
-    // Round 86 (T323, hashed tree seeds): the trees' dice now follow the Dex, their visits move again, and the trees' own support no
-    // longer holds the played row on this scene (it did at c104389); the played option brings it into the verify round all the same.
+    // The trees' own support does not hold the played row on this scene; the played option brings it into the verify round all the same. The singles scene above is the one
+    // that proves the played option adds a row the trees leave out.
     expect(verifyRound(record)!.jobs.some(job => job.i === played.p1)).toBe(true);
   });
 
   test('the matrix reads the verified values and the prover proves the verified result', { timeout: 600_000 }, async () => {
-    // The verify-to-prover contract, with the doubles answer round off (it re-ranks after verify; its own test follows).
-    // Round 69 (lane B, S15): the verify round no longer moves what the prover reads on every scene (648453 t13 keeps its
-    // ranking), so the contract runs on every scene and the shift is required of one scene per game type; a gen 6 OU
-    // position where it still shifts joins the singles side.
+    // The verify-to-prover contract, with the doubles answer round off (it re-ranks after verify; its own test follows). The contract runs on every scene; the shift of the
+    // prover's input is required of one scene per game type.
     const shifted: string[] = [];
     for (const name of [...VERIFYING, 'smogtours-gen6ou-649664-t14-g1']) {
       const settings = settingsOf(name);
@@ -240,19 +228,11 @@ describe('tree orchestration (round 61; read through the executor since round 64
       expect(record.proofs[0].input, name).toEqual(forcedWinInput(verified, settings));
       if (JSON.stringify(forcedWinInput(verified, settings)) !== JSON.stringify(forcedWinInput(unverified, settings))) shifted.push(name);
       applyForcedWin(verified, record.proofs[0].outcome);
-      // Round 89 (#104): the lines of the turn come after the prover and nothing reads them to score or rank.
+      // The lines of the turn come after the prover and nothing reads them to score or rank.
       expect(withoutLines(result), name).toEqual(verified);
     }
-    // Round 76 (user gate 24.10.2026, 1a): T258 (the simulator's heal rate of a pinned healer) moved the static, and the
-    // verified ranking of 649664 t14 g1 (Excadrill over Scald, unverified Scald over Excadrill) now feeds the prover the
-    // same root order as the unverified one, so that scene stays in the loop as a contract-only row and 648453 t13 is the
-    // required singles shift (it shifts at every commit measured, c308fc3 to a3b65ab). The fresh Monte-Carlo reference
-    // (24 draws, seed blocks 1001 and 5001, answers off) carries the 648453 t13 and 2663093831 t12 shifts on both
-    // blocks; on g1 it still shifts the prover input by one swap in the tail of p2's bench switches (switch 2 before
-    // switch 3), which the engine no longer shows. Nothing in the engine is wrong that the reference proves.
-    // Round 86 (T323, hashed tree seeds): the trees' dice follow the Dex, 648453 t13's verified ranking now feeds the prover the
-    // unverified root order, and 649664 t14 g1 (the swap in the tail of p2's bench switches that the reference shows, see above)
-    // is the required singles shift. 648453 t13 shifts on both blocks of the reference; the gate list names the distance.
+    // Required shifts: 649664 t14 g1 for singles (the swap in the tail of p2's bench switches, switch 2 before switch 3, that the Monte-Carlo reference shows: 24 draws, seed
+    // blocks 1001 and 5001, answers off) and 2663093831 t12 for doubles. 648453 t13 shifts on both blocks of the reference, but its verified ranking feeds the prover the unverified root order.
     expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-649664-t14-g1');
     expect(shifted, 'the verified ranking reaches the prover (doubles)').toContain('gen9doublesou-2663093831-t12');
   });
@@ -451,9 +431,8 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
 });
 
 /**
- * Round 89 (#153, Hard mode): a turn holds, beside a row's usual line, the line against the reply that hurts the row most
- * (`versus: 'worst'`) where a tree holds one. Its first answer is the row's `worstAnswer` of the result, it belongs to a row that also
- * has its usual line (same side, label and roles), and the result outside `lines` equals the run without the job.
+ * A turn holds, beside a row's usual line, the line against the reply that hurts the row most (`versus: 'worst'`) where a tree holds one. Its first answer is the row's
+ * `worstAnswer` of the result, it belongs to a row that also has its usual line (same side, label and roles), and the result outside `lines` equals the run without the job.
  */
 describe.each(SCENES)('the line against the reply that hurts most: $name', scene => {
   test.each(['lines', 'pass'] as const)('a worst line meets the row\'s worst answer and sits beside the row\'s usual line (%s)', async kind => {
@@ -472,7 +451,7 @@ describe.each(SCENES)('the line against the reply that hurts most: $name', scene
       expect(usual, `${line.side} ${line.label}: the usual line stands beside it`).toBeDefined();
       expect(usual!.steps[0][other].label, 'the worst line is asked for only when the usual one meets another answer').not.toBe(answer!.label);
     }
-    // the usual lines are exactly the lines the job made before the setting existed: one per row and role, none of them marked
+    // the usual lines are the lines the job makes without the setting: one per row and role, none of them marked
     const usual = lines!.filter(line => !line.versus);
     expect(new Set(usual.map(line => `${line.side}|${line.label}|${line.for.join()}`)).size).toBe(usual.length);
   }, 120_000);

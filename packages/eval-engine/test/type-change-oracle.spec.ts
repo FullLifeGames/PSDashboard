@@ -4,7 +4,7 @@ import { CONTEXT_MOVES, NO_ATE, NO_NORMALIZE, RULE_MOVES, moveAtUse, type MoveLi
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * Round 72 (T235), plan rows 11 and 12: move-use.ts keeps three lists of move ids by hand, because it imports nothing (the
+ * move-use.ts keeps three lists of move ids by hand, because it imports nothing (the
  * app's main bundle reads it): the moves the -ate abilities leave alone (NO_ATE), the moves Normalize leaves alone (NO_NORMALIZE)
  * and the moves whose type or power reads a fact the matchup memo's key does not carry (CONTEXT_MOVES). The simulator is the
  * oracle for all three, in every view the corpus plays:
@@ -40,7 +40,6 @@ function resolvedType(battle: Battle, user: Pokemon, target: Pokemon, moveId: st
   return move.type;
 }
 
-/** A Blissey (Normal) or another `species` with `ability` against a Snorlax, as the first of two in every view. */
 function users(view: SimView, ability: string, species = 'Blissey') {
   const battle = battleIn(view, [mon(species, ['splash'], { ability }), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
   return { battle, user: battle.sides[0].active[0], target: battle.sides[1].active[0] };
@@ -85,7 +84,7 @@ describe('the type lists of move-use.ts are held to the simulator (round 72)', (
         .map(move => move.id)
         .sort();
       // Generations 3 and 4 turn everything but Struggle Normal (onModifyMove); Generations 5 and 6 turn every move whose Dex type is
-      // not Normal (Hidden Power keeps its IV type: FINDING W7, the sweep above holds move-use.ts to it); from 7 the noModifyType list stays.
+      // not Normal (Hidden Power keeps its IV type: the sweep above holds move-use.ts to it); from 7 the noModifyType list stays.
       const named = gen >= 7 ? [...NO_NORMALIZE] : gen >= 5 ? ['struggle', 'hiddenpower'] : ['struggle'];
       const expected = named.filter(id => isReal(view, 'moves', id) && resolvedType(own.battle, own.user, own.target, id) !== 'Normal').sort();
       expect(stays).toEqual(expected);

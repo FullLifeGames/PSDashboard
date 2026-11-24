@@ -5,12 +5,10 @@ import { SWEEP_CASES } from './dice-sweep-support';
 import { boardFor } from './board-key-support';
 
 /**
- * Round 89 (#149, step A8-7): a handler that asks the battle for the turn count (`this.getOverflowedTurnCount()`: the Future Sight
- * and the Wish of every generation that has them) reads the battle's `turn`. The method table holds the `Battle` methods that never
- * reach the event dispatch, so the end of the turn is keyed by the turn where such a handler is on the board; the methods that do
- * reach it (`runEvent`, `damage`, `heal`) stay out, because with their reads (`event`, `effect`, `activeMove`) every board would read the
- * whole battle. The cost probe's third singles search (gen9ou-2658660641#44, turn 47) answered a board whose Future Sight lands from
- * the entry of the turn before; test/residuals.spec.ts holds the memo to the simulator on it.
+ * A handler that asks the battle for the turn count (`this.getOverflowedTurnCount()`: the Future Sight and the Wish of every generation that has them) reads the
+ * battle's `turn`. The method table holds the `Battle` methods that never reach the event dispatch, so the end of the turn is keyed by the turn where such a handler
+ * is on the board; `runEvent`, `damage` and `heal` stay out, because with their reads (`event`, `effect`, `activeMove`) every board would read the whole battle.
+ * Scene: gen9ou-2658660641#44 (turn 47), a Future Sight that lands from the entry of the turn before; test/residuals.spec.ts holds the memo to the simulator on it.
  */
 
 await loadSimMods('gen9championscustomgame');

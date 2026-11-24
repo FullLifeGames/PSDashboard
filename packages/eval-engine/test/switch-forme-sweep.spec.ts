@@ -9,24 +9,21 @@ import { battleOf } from './power-oracle';
 import { RULESETS, become, forcedBoard, fingerprint, mon } from './forme-boards';
 
 /**
- * Round 88 (#103): a body keeps its identity across an in-battle forme change. The switch resolver once cut a suffix list ('tera',
- * 'stellar', 'terastal') off the bench body's id and compared the rest with the choice's id raw: an Ogerpon that had terastallized
- * (Ogerpon-Teal-Tera on the bench) could not be switched back in by the chip the app builds from the body it holds (`ogerpontealtera`),
- * and neither could a Terapagos that had stood on the field (Terapagos-Terastal, Terapagos-Stellar). The rule now comes from the
- * battle's Dex: two species are one body when their `battleOnly` families meet.
+ * A body keeps its identity across an in-battle forme change: two species are one body when their `battleOnly` families meet in the battle's Dex. An Ogerpon that had
+ * terastallized (Ogerpon-Teal-Tera on the bench) can be switched back in by the chip the app builds from the body it holds (`ogerpontealtera`), and so can a Terapagos
+ * that had stood on the field (Terapagos-Terastal, Terapagos-Stellar).
  *
  * Held here against the simulator, in every generation and mod the corpus plays (gen 3 to 9 and the Champions mod), singles and doubles,
  * for every species the Dex gives a `battleOnly` origin: the benched body takes the forme with the simulator's own `formeChange`, and the
  * resolver reads three choices (the chip of the body now, a choice recorded on the origin before the change, a choice recorded on the
  * forme once the body is back on the origin), with and without a nickname. Each resolves to the body's own bench position and leaves
- * the battle as it found it. The scene of #103 and the Terapagos scene are rows of their own, played through real choices.
+ * the battle as it found it. The Ogerpon and Terapagos scenes are rows of their own, played through real choices.
  */
 
 /** The slot's chip as the app builds it (state.ts, SwitchRow.tsx): the species the body holds now, its name. */
 const chipOf = (body: Pokemon): Extract<BranchSlotChoice, { kind: 'switch' }> =>
   ({ kind: 'switch', speciesId: toId(body.species.name), pokemonName: body.name });
 
-/** The forced slots of the side: the actives that fainted. */
 const forcedSlots = (battle: Battle): boolean[] => battle.sides[0].active.map(body => !!body && body.fainted);
 
 /** Resolves `choice` on every forced slot and returns the command, or the error. The battle is proven unchanged. */

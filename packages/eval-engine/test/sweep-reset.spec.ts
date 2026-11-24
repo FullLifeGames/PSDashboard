@@ -6,12 +6,9 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 64 (T125, point 3): a sweep cell counts a pair the mon's stages flip,
- * won with them and lost without them. "Without them" reset only Attack and
- * Special Attack, so a Calm Mind kept its Special Defense stage in the
- * comparison: the foe's race against it stayed slow and the pair never
- * flipped. The comparison now reads the mon on no stages at all. The cells
- * carry weight 0, so this moves only what the fit sees.
+ * A sweep cell counts a pair the mon's stages flip, won with them and lost without them. "Without them" reads the mon on no stages at all: with only Attack and
+ * Special Attack reset, a Calm Mind kept its Special Defense stage, the foe's race against it stayed slow and the pair never flipped. The cells carry weight 0, so
+ * this moves only what the fit sees.
  */
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);

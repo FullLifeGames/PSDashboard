@@ -19,14 +19,12 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 70: the horizon-trend probe reads a decisive cell from its base draws. The probe used to advance the
- * cell's FIRST-seed child, search it one ply, and subtract the cell's MEAN over all draws: one outcome against the
- * mean of all outcomes (GPL DzBQ5azlO5l turn 13: the first seed was a flinch, the trend +0.54, and the shift of two
- * tied rows put an untied row in front). The probe now runs from each base draw of the cell, the seeds the matrix
- * priced it with, and subtracts each child's own leaf; the trend is the mean over the draws.
+ * The horizon-trend probe reads a decisive cell from its base draws: from each base draw of the cell, the seeds the matrix priced it with, it searches the child one ply and
+ * subtracts the child's own leaf; the trend is the mean over the draws. Reading only the FIRST-seed child against the cell's MEAN compares one outcome with the mean of all
+ * outcomes (GPL DzBQ5azlO5l turn 13: the first seed was a flinch, the trend +0.54, and the shift of two tied rows put an untied row in front).
  *
- * The scenes are singles with p2's two benched Skarmory identical, so their switch rows tie exactly and the trend
- * layers run on their decisive cells. Gengar's Focus Blast (70 %) is a rolling cell, Shadow Ball (sure) is not.
+ * The scenes are singles with p2's two benched Skarmory identical, so their switch rows tie exactly and the trend layers run on their decisive cells. Gengar's Focus Blast (70 %) is
+ * a rolling cell, Shadow Ball (sure) is not.
  */
 
 const SETTINGS: EvalSettings = { depth: 1, samples: 3, tera: false, prove: false };
@@ -42,11 +40,11 @@ const SURE = scene(['shadowball', 'substitute']);
 
 type Trend = (ctx: { root: ReturnType<typeof createRootPosition>; cache: ReturnType<typeof createMatchupCache>; p1Choice: string; p2Choice: string; value: number; first: ReturnType<typeof createRootPosition> }) => number;
 
-/** The first-seed child searched one ply, against the cell's mean (the probe until round 69). */
+/** The first-seed child searched one ply, against the cell's mean (the reading the probe does not make). */
 const todaysProbe: Trend = ({ cache, value, first }) => subSearchDepth1(first.serialized, PROBE_SETTINGS, cache).score - value;
 /** The mean over the cell's first three search seeds of (the child searched one ply) - (the child's own leaf). */
 const drawsProbe: Trend = ({ root, cache, p1Choice, p2Choice }) => {
-  // r89 A5 gate: the cell's first three seeds (T324), where it read the first three of the old fixed list.
+  // The cell's first three search seeds.
   const trends = cellSeeds(root, p1Choice, p2Choice).slice(0, 3).map(seed => {
     const child = advancePosition(root, p1Choice, p2Choice, seed);
     return subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
@@ -83,7 +81,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     const searched = evs(searchPosition(ROLLING, SETTINGS));
     expect(searched).toHaveLength(reference.after.length);
     searched.forEach((ev, index) => expect(ev).toBeCloseTo(reference.after[index], 9));
-    // The layers did run on the rolling cell, and the probe of round 69 would have booked another trend there.
+    // The layers did run on the rolling cell, and the first-seed reading would have booked another trend there.
     expect(reference.probes).toEqual(['Focus Blast x → Skarmory', 'Focus Blast x → Skarmory']);
     expect(reference.after[0]).not.toBeCloseTo(reference.before[0], 2);
     const old = byHand(ROLLING, todaysProbe);
@@ -160,7 +158,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     });
     const trends: number[] = [];
     for (const index of [0, 1, 2]) {
-      const child = advancePosition(root, 'move focusblast', 'move splash', cellSeeds(root, 'move focusblast', 'move splash')[index]); // r89 A5 gate: the cell's slot
+      const child = advancePosition(root, 'move focusblast', 'move splash', cellSeeds(root, 'move focusblast', 'move splash')[index]); // the cell's slot
       const expected = subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
       const answer = await executor.subSearch(job(index));
       expect(answer.trend, `draw ${index}`).toBeCloseTo(expected, 12);

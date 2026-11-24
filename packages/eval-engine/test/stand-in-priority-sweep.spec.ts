@@ -12,23 +12,14 @@ import { battleOf } from './power-oracle';
 import { rulesDex } from '@fulllifegames/replay-core';
 
 /**
- * Round 89 (#111), lane C, step C2: the stand-in move and the cant order read the simulator's priority, not the Dex's. A body
- * whose ability, item or move changes its action's priority (Prankster, Gale Wings, Triage and Grassy Glide through ModifyPriority;
- * Stall, Lagging Tail, Full Incense, Custap Berry, Quick Claw, Quick Draw and Mycelium Might through FractionalPriority; a Generation 4
- * Quick Claw through its `onBeforeTurn` event and a Generation 3 one through the battle's speed roll) moves its stand-in ahead of or behind a
- * foe's logged action in the simulator, where the Dex bracket says it stays. The census finds every such entry in the Dex of each rule
- * set the corpus plays (Gens 1 to 9 and the Champions mod); no name stands in this file. The oracle is the simulator: one turn played on
- * a copy with the dice answering the chance (no, or yes when the log shows the activation), singles and doubles in every rule set
- * (VGC plays the doubles rows, its bench of four does not reach the queue; the reported rows below run it apart):
- * - `actionPriority` and `queuePlace` equal the simulator's order of a move against a foe at each priority bracket, for every entry,
- *   every probe move (a plain move of each category, flying, draining or healing group of the Dex), and both answers of the dice; and the
- *   live battle comes out of every question as it went in (`fingerprint`, with the ask check on);
- * - `activated` reads the chance answer from the lines and the Dex entry, and answers no without an activation of the body's own item or ability;
- * - the stand-in of a body whose log shows no action takes the move that is last in the simulator's order, with no cut at 0 (a body of
- *   priority moves only takes its slowest of them), whichever side holds the entry; the Encore stand-in keeps its cut at 0 by the simulator's
- *   priority; the cant stand-in stays ahead of every logged action after the line and behind those before it, by the simulator's order,
- *   with the entry on the body or on the foe whose action the log shows.
- * A plain run plays every entry; the probe moves and the Dex census of moves read a fixed sample, `DICE_SWEEPS=full` every one.
+ * The stand-in move and the cant order read the simulator's priority, not the Dex's. A body whose ability, item or move changes its action's priority
+ * (Prankster, Gale Wings, Triage and Grassy Glide through ModifyPriority; Stall, Lagging Tail, Full Incense, Custap Berry, Quick Claw, Quick Draw and
+ * Mycelium Might through FractionalPriority; a Generation 4 Quick Claw through its `onBeforeTurn` event and a Generation 3 one through the battle's speed
+ * roll) moves its stand-in ahead of or behind a foe's logged action in the simulator, where the Dex bracket says it stays. The census finds every such
+ * entry in the Dex of each rule set the corpus plays (Gens 1 to 9 and the Champions mod). The oracle is one turn played on a copy with the dice answering
+ * the chance (no, or yes when the log shows the activation), singles and doubles in every rule set (VGC plays the doubles rows, its bench of four does not
+ * reach the queue; the reported rows run it apart). A plain run plays every entry; the probe moves and the Dex census of moves read a fixed sample,
+ * `DICE_SWEEPS=full` every one.
  */
 await loadSimMods('gen9championsou');
 vi.setConfig({ testTimeout: 600_000 });
@@ -87,10 +78,7 @@ const clickable = (dex: Dex): DexMove[] => dex.moves.all().filter((move: DexMove
   && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past')
   && CLICKABLE.has(move.target) && !move.flags.charge && !move.flags.futuremove);
 
-/**
- * The board: Snorlax (or `bodySpecies`) with `moves` against Pikachu (or `foeSpecies`) with `foeMoves`; the scene's entry sits on the holder;
- * doubles add two splashers. Round 89 (#111): a row that names a species whose own abilities carry the entry (Comfey and Triage) passes it.
- */
+/** The board: Snorlax (or `bodySpecies`) against Pikachu (or `foeSpecies`); a species whose own abilities carry the entry (Comfey and Triage) is passed by the row. */
 function boardOf(c: Case, moves: string[], foeMoves: string[], scene: Scene, foeSpecies = 'Pikachu', bodySpecies = 'Snorlax'): Battle {
   const splash = (species: string) => mon(c.rules, { species, moves: ['splash'] });
   const worn = (holder: Holder): { ability?: string; item?: string } => {
@@ -117,10 +105,7 @@ function playsAs(board: Battle, chance: boolean): Battle {
   return copy;
 }
 
-/**
- * One turn on a copy under the answer of the dice: whether the body's action line (its move, or the `|cant|` that stops it) stands before
- * the foe's in the log, and whether the scene's holder shows an activation of its item or ability (`|-activate|` with `item:` or `ability:`).
- */
+/** One turn on a copy: whether the body's action line (its move, or the `|cant|` that stops it) stands before the foe's, and whether the holder shows `|-activate|` with `item:` or `ability:`. */
 function playedTurn(c: Case, scene: Scene, bodyMove: string, foeMove: string, chance: boolean, foeSpecies = 'Pikachu'): { before: boolean; activation: boolean } {
   const board = boardOf(c, [bodyMove], [foeMove], scene, foeSpecies);
   const copy = playsAs(board, chance);
@@ -134,7 +119,6 @@ function playedTurn(c: Case, scene: Scene, bodyMove: string, foeMove: string, ch
   return { before: own >= 0 && (foe < 0 || own < foe), activation: lines.some(line => line.startsWith(`|-activate|${side}:`) && /\|(item|ability): /.test(line)) };
 }
 
-/** Whether the simulator takes the move as the body's click. */
 function accepted(c: Case, move: DexMove): boolean {
   const board = boardOf(c, [move.id], ['splash'], { entry: null, holder: 'body', variant: 'plain' });
   const probe = copyOf(board);
@@ -144,7 +128,6 @@ function accepted(c: Case, move: DexMove): boolean {
   return probe.choose('p1', clickOf(c, move.target, 1)) && probe.choose('p2', c.mode === 'singles' ? 'move 1' : 'move 1, move 1');
 }
 
-/** The first move of each Dex priority bracket of the rule set that the simulator takes as a click. */
 function bracketsOf(c: Case): Map<number, string> {
   const out = new Map<number, string>();
   for (const move of clickable(dexOfRules(c.rules))) {
@@ -153,10 +136,7 @@ function bracketsOf(c: Case): Map<number, string> {
   return out;
 }
 
-/**
- * The probe moves: the first move at priority 0 that the simulator takes, of each group of category, flying type and drain or heal.
- * The groups are the Dex's own: Prankster reaches the status group, Gale Wings the flying group, Triage the draining and healing ones.
- */
+/** The probe moves: the first move at priority 0 that the simulator takes, per group of category, flying type and drain or heal (Prankster reaches the status group, Gale Wings the flying, Triage the draining and healing). */
 function probesOf(c: Case): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -195,13 +175,11 @@ describe.each(CASES)('the priority a stand-in reads: $name', c => {
     if (!table.has(key)) table.set(key, playedTurn(c, scene, bodyMove, foeMove, chance, foeSpecies));
     return table.get(key)!;
   };
-  /** Does the body's `bodyMove` stand before the foe's `foeMove` in the simulator's turn (the scene's entry on its holder, the dice answering `chance`)? */
   const before = (scene: Scene, bodyMove: string, foeMove: string, chance: boolean, foeSpecies = 'Pikachu'): boolean =>
     played(scene, bodyMove, foeMove, chance, foeSpecies).before;
   /**
-   * Can a log show this answer? The activation lines of the log are the simulator's own: a turn with the answer yes shows an activation of the holder's
-   * item or ability (a Quick Claw, a Quick Draw, a Custap Berry, which fires by the holder's HP and not by the dice), a turn with the answer no shows none.
-   * Generation 3's Quick Claw writes no line in the simulator (the speed roll sits in `getActionSpeed`; the game's log shows one), so both answers stand.
+   * A turn with the answer yes shows an activation of the holder's item or ability (a Quick Claw, a Quick Draw, a Custap Berry, which fires by the holder's HP and
+   * not by the dice), a turn with the answer no shows none. Generation 3's Quick Claw writes no line (the speed roll sits in `getActionSpeed`), so both answers stand.
    */
   const consistent = (scene: Scene, bodyMove: string, foeMove: string, chance: boolean, foeSpecies = 'Pikachu'): boolean =>
     c.rules.generation === 3 || played(scene, bodyMove, foeMove, chance, foeSpecies).activation === chance;
@@ -343,9 +321,8 @@ describe.each(CASES)('the priority a stand-in reads: $name', c => {
   });
 
   /**
-   * The cant stand-in: a body whose line is `|cant|` takes the slowest move that stays ahead of the action the log shows after it, by the
-   * simulator's order, with the entry on the body (its own activation line before the cant when the dice answer yes) or on the foe whose
-   * action the log shows (its line before the move).
+   * The cant stand-in: a body whose line is `|cant|` takes the slowest move that stays ahead of the action the log shows after it, with the entry on the body
+   * (its own activation line before the cant when the dice answer yes) or on the foe whose action the log shows (its line before the move).
    */
   interface CantRow { entry: Entry; label: string; scene: Scene; body: string[]; foeMove: string; species: string; chance: boolean; holder: Holder }
 
@@ -366,7 +343,6 @@ describe.each(CASES)('the priority a stand-in reads: $name', c => {
     }
   }
 
-  /** The activation line the log shows when the dice answer yes. */
   const shownLines = (row: CantRow): string[] =>
     row.chance ? [activation(row.holder === 'body' ? 'p1a' : 'p2a', row.holder === 'body' ? 'Snorlax' : row.species, row.entry)] : [];
 
@@ -375,7 +351,6 @@ describe.each(CASES)('the priority a stand-in reads: $name', c => {
     return row.holder === 'body' ? [...shownLines(row), CANT, foe] : [CANT, ...shownLines(row), foe];
   };
 
-  /** Can a log show the row: the line is one `activated` reads, and the simulator's own activation agrees with the answer. */
   function cantLogged(row: CantRow): boolean {
     const board = boardOf(c, row.body, [row.foeMove], row.scene, row.species);
     if (row.chance && !activated(board, board.sides[row.holder === 'body' ? 0 : 1].active[0], shownLines(row))) return false;
@@ -458,12 +433,11 @@ describe('the reported rows', () => {
     expect(carriers(CHAMPIONS)).toEqual([]);
   });
 
-  // a Prankster body whose stand-in is a status move moves ahead of a foe at priority 0 that the log shows first
   test.each(REPORTED)('Prankster: the status move is no stand-in behind a foe the log shows first ($name)', ({ c }) => {
     expect(standIn(c, worn('ability', 'prankster'), ['thunderwave', 'tackle'], [foeLine('Pikachu', 'Quick Attack'), ...unseen(c)], ['quickattack'])).toBe('tackle');
   });
 
-  // a body that knows only moves above 0 takes the slowest of them (the old rule kept its first move)
+  // a body that knows only moves above 0 takes the slowest of them
   test.each(REPORTED)('a body of priority moves only takes the slowest of them ($name)', ({ c }) => {
     expect(standIn(c, { entry: null, holder: 'body', variant: 'plain' }, ['fakeout', 'protect', 'quickattack'], [foeLine('Pikachu', 'Quick Attack'), ...unseen(c)], ['quickattack'])).toBe('quickattack');
   });

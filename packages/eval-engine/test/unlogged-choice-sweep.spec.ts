@@ -9,23 +9,20 @@ import { dexOfRules, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 88 (T325, #61), lane D, step D3: the stand-in for a slot whose action the log never shows. The log of such a turn says the
- * body fainted before it moved or flinched, so the foe's action came first; the click that rebuilds the turn must keep that order.
- * The rebuild fills the click in with the enabled move of the lowest priority (round 89, #111: no cut at 0). The oracle
- * is the simulator, on a copy, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles everywhere, doubles from
- * Gen 3, VGC (a team of six) in Scarlet/Violet and Champions:
- * - the Dex's priority brackets: each bracket of the rule set's own Dex gets a move the simulator takes as a click; the simulator
- *   plays every pair (the body's move, the faster foe's move) and the table must follow the Dex priority (a lower bracket moves
- *   after a higher one, a higher before, a tie goes to the faster foe), the rule the stand-in reads;
- * - the bodies: every body of one move per bracket, in pairs of brackets with the highest and the lowest bracket behind them, and the
- *   bodies of positive brackets only, in both orders, get a stand-in; against every foe bracket the stand-in moves behind the foe
- *   whenever any move of the body would, and it is the lowest bracket (round 89, #111: there is no cut at 0, a body of priority moves only
- *   takes the slowest of them; before, it kept its first move);
+ * The stand-in for a slot whose action the log never shows. The log of such a turn says the body fainted before it moved or flinched, so the foe's action came first; the
+ * click that rebuilds the turn must keep that order. The rebuild fills the click in with the enabled move of the lowest priority (no cut at 0). The oracle is the
+ * simulator, on a copy, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles everywhere, doubles from Gen 3, VGC (a team of six) in Scarlet/Violet
+ * and Champions:
+ * - the Dex's priority brackets: each bracket of the rule set's own Dex gets a move the simulator takes as a click; the simulator plays every pair (the body's move, the
+ *   faster foe's move) and the table must follow the Dex priority (a lower bracket moves after a higher one, a higher before, a tie goes to the faster foe), the rule the
+ *   stand-in reads;
+ * - the bodies: every body of one move per bracket, in pairs of brackets with the highest and the lowest bracket behind them, and the bodies of positive brackets only, in
+ *   both orders, get a stand-in; against every foe bracket the stand-in moves behind the foe whenever any move of the body would, and it is the lowest bracket (a body of
+ *   priority moves only takes the slowest of them);
  * - the reported rows: Fake Out and Protect filled in for a body that never acted, the Assault Vest that disables the status moves.
- * Round 88 (X2): a body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order. Its stand-in is
- * the slowest move that keeps it ahead of every action the log shows after the cant line (and behind those before it); the
- * simulator's own order, on a copy, decides which moves do, against a faster and a slower foe. No move that does both keeps the
- * slowest stand-in; a cant line with no action after it changes nothing (2663093831 t9: Sinistcha's flinch stood before the Shadow Ball).
+ * A body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order. Its stand-in is the slowest move that keeps it ahead of every action
+ * the log shows after the cant line (and behind those before it); the simulator's own order, on a copy, decides which moves do, against a faster and a slower foe. No move
+ * that does both keeps the slowest stand-in; a cant line with no action after it changes nothing (2663093831 t9: Sinistcha's flinch stood before the Shadow Ball).
  * A plain run plays the whole bracket sweep; the Dex census of every move reads a fixed sample, `DICE_SWEEPS=full` every move.
  */
 await loadSimMods('gen9championsou');
@@ -62,7 +59,6 @@ function boardOf(c: Case, moves: string[], foeMoves: string[], item = '', foeSpe
 const clickOf = (c: Case, target: string, aim: number): string =>
   c.mode === 'singles' ? 'move 1' : `move 1${AIMED.has(target) ? ` ${aim}` : ''}, move 1`;
 
-/** Whether the body's action line (its move, or the `|cant|` that stops it) stands before the foe's in the log of one turn, on a copy. */
 function movedBefore(c: Case, bodyMove: string, foeMove: string, foeSpecies = 'Pikachu'): boolean {
   const board = boardOf(c, [bodyMove], [foeMove], '', foeSpecies);
   const copy = copyOf(board);
@@ -88,7 +84,6 @@ function accepted(c: Case, move: DexMove): boolean {
   return probe.choose('p1', clickOf(c, move.target, 1)) && probe.choose('p2', c.mode === 'singles' ? 'move 1' : 'move 1, move 1');
 }
 
-/** The first move of each Dex priority bracket of a rule set that the simulator takes as a click. */
 function bracketsOf(c: Case): Map<number, string> {
   const out = new Map<number, string>();
   for (const move of clickable(dexOfRules(c.rules))) {
@@ -257,7 +252,7 @@ describe('the reported rows', () => {
     expect(standInOf(c, ['shadowsneak', 'protect', 'earthquake', 'uturn'], 'shadowsneak').id).toBe('earthquake');
   });
 
-  // Round 89 (#111): the cut at 0 is gone; a body of priority moves only takes the slowest of them (it kept Fake Out before)
+  // A body of priority moves only takes the slowest of them.
   test.each(REPORTED)('a body of priority moves only takes the slowest of them ($name)', ({ c }) => {
     expect(standInOf(c, ['fakeout', 'protect', 'quickattack'], 'quickattack').id).toBe('quickattack');
   });
@@ -266,7 +261,7 @@ describe('the reported rows', () => {
     expect(standInOf(c, ['earthquake', 'avalanche', 'counter', 'protect'], 'earthquake').id).toBe('counter');
   });
 
-  // Round 88 (X2): 2663093831 t9. p1's Sinistcha flinches before p2's Shadow Ball; the slowest stand-in (Trick Room, -7) put it behind.
+  // 2663093831 t9. p1's Sinistcha flinches before p2's Shadow Ball; the slowest stand-in (Trick Room, -7) put it behind.
   test.each(REPORTED)('the flinch stands before a Shadow Ball of a slower body: Trick Room is not the click ($name)', ({ c }) => {
     expect(standInForEvents(c, ['trickroom', 'earthquake'], [CANT, foeLine('Shuckle', 'Shadow Ball')], 'Shuckle').id).toBe('earthquake');
   });

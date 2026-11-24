@@ -40,12 +40,9 @@ import { SEARCH_SEEDS } from './seed-streams';
 import { VERIFY_SAMPLES } from '../src/verify-select';
 
 /**
- * Round 63 (T16): the verify step prices a cell at one depth. A blend cell
- * deepens one child per open class and mixes the classes with the plan
- * weights; a cell without a plan draws VERIFY_PLAIN_DRAWS natural seeds,
- * groups them by outcome and deepens one child per group. Before, only the
- * first draw went one ply deeper (the second fixed seed misses in 21 of 22
- * cells with a miss chance, round 62), so the first draw decided the note.
+ * The verify step prices a cell at one depth. A blend cell deepens one child per open class and mixes the classes with the plan weights; a cell without a plan draws
+ * VERIFY_PLAIN_DRAWS natural seeds, groups them by outcome and deepens one child per group (a single deepened first draw would decide the note: the second fixed seed
+ * misses in 21 of 22 cells with a miss chance).
  */
 
 const SUB: EvalSettings = { depth: 1, samples: 1, tera: false };
@@ -74,7 +71,7 @@ const FOCUS = ['move focusblast', 'move curse'] as const;
 const deepened = (root: ReturnType<typeof createRootPosition>, child: ReturnType<typeof advancePosition>) =>
   (positionBattle(child).ended ? leafValue(positionBattle(child), createMatchupCache()) : subSearchDepth1(child.serialized, SUB, createMatchupCache()).score);
 
-/** Round 69 (T148): the light price the executor gives an outcome beyond the cover, as the game type's VERIFY_CHEAP rule sets it. */
+/** The light price the executor gives an outcome beyond the cover, as the game type's VERIFY_CHEAP rule sets it. */
 const cheapFor = (root: ReturnType<typeof createRootPosition>): CheapDeepening | undefined => {
   const mode = VERIFY_CHEAP[positionBattle(root).gameType === 'doubles' ? 'doubles' : 'singles'];
   return mode === 'off' ? undefined : {
@@ -139,7 +136,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
   });
 
   test('in an endgame a rich, agreeing pool keeps its depth below the floor (round 77, T267)', () => {
-    // User report 28.10.2026: draft 2058494320, variation turn 63, Mienshao (Scarf, locked into Close Combat) and Kyurem
+    // Draft 2058494320, variation turn 63, Mienshao (Scarf, locked into Close Combat) and Kyurem
     // against Dragapult and Muk-Alola. The trees played Kyurem's switch into a Specs attack out to about −0.7 over 400
     // to 650 visits; the one-ply sampler read +0.75, the 0.9 floor gave the sampler the cells, and the ranking advised
     // U-turn beside a score that saw the other side winning. With at most two Pokémon left on each side the trees reach
@@ -160,9 +157,9 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     ).matrix!.values[0][0];
     // Two against two: the hit class keeps the trees' −0.70; the thin miss class takes its deepened 0.5.
     expect(atLiving(2, 2)).toBeCloseTo(0.9 * -0.703 + 0.1 * 0.5, 2);
-    // A side with three left is no endgame: the sampler keeps the cell, as before.
+    // A side with three left is no endgame: the sampler keeps the cell.
     expect(atLiving(3, 2)).toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
-    // Without the count (a cached tree from before), nothing changes either.
+    // Without the count (a cached tree without the field), nothing changes either.
     expect(mergeMctsTrees(cells.map(cell => ({ ...mk(), cells: [cell] })), new Map([[cellKey(0, 0), value]])).matrix!.values[0][0])
       .toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
   });
@@ -181,7 +178,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
   test('in an endgame a thin pool below the floor leaves the cell to the sampler (round 77, T267)', () => {
     // Champions VGC 2628166702 turn 7, the last pair: the trees visited Dark Pulse into Protect 24 times (8, 6, 5, 5)
     // and read about 0.1, the sampler one ply deeper read the win the prover proves. A value short of a decided game
-    // needs a pool that played the cell out (T63: 400 to 650 visits); 24 visits stay with the sampler.
+    // needs a pool that played the cell out (400 to 650 visits); 24 visits stay with the sampler.
     const plain = (visits: number, mean: number) => ({ key: cellKey(0, 0), visits, total: mean * (visits + 1) - 0.4, value: 0.4, ended: false });
     const value: EvalCellValue = { i: 0, j: 0, value: 0.9, ended: false, deepened: 1 };
     const merged = mergeMctsTrees(
@@ -244,10 +241,8 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
     if (plan.kind !== 'events') return;
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: FOCUS[0], p2Choice: FOCUS[1], samples: 3, deepen: SUB }]);
     const classes = value.blend!.classes;
-    // Round 86 (T305): Focus Blast's 10 % Special Defense drop is an outcome class of its own. Old expectation: the classes were
-    // `hit-nokill` and `miss`, and the hit class mixed the dropped and the undropped state by share (round 64, T119). New: the
-    // drop is the class `hit-nokill+boosts:spd`, the sampler forces it by script when the base draws miss it, and each class holds
-    // one state.
+    // Focus Blast's 10 % Special Defense drop is an outcome class of its own, `hit-nokill+boosts:spd`: the sampler forces it by script when the base draws miss it,
+    // and each class holds one state.
     expect(classes.map(cls => cls.key).sort()).toEqual(['hit-nokill', 'hit-nokill+boosts:spd', 'miss']);
     // The class's representative is its first draw in the sampler's seed order; 0.63 and 0.3 both go deeper. The class of the drop
     // (weight 0.07) lies beyond the cover: it takes its leaf shifted by their step, as every class beyond the cover does.
@@ -268,31 +263,29 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
         position => deepened(root, position), VERIFY_STATE_RULE.singles.cover, VERIFY_STATE_RULE.singles.cap);
       expect(cls.deepened, cls.key).toBeCloseTo(states.reduce((sum, state, index) => sum + state.share * values[index], 0), 12);
     }
-    // the drop that mixed two states inside one class is a class now: no class of this cell leaves several states
+    // no class of this cell leaves several states
     expect(sample.classGroups?.size ?? 0).toBe(0);
-    // The one-ply blend itself is today's.
     const plain = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true);
     expect(value.value).toBe(plain.value);
     expect(value.deepened).toBeUndefined();
   });
 
   test('a doubles pair-plan cell: the heaviest open class goes one ply deeper through its states, the rest take the light price', { timeout: 120_000 }, async () => {
-    // r89 A5 gate: the executor reads the root through `benchOrder`, and a cell's seeds (T324) key the saved position, so the spec reads it
-    // the same way (the raw anchor and its canonical bench are two keys, two sets of draws). Samples was 3: the played cell with three base draws of its
-    // own seeds covers under 0.8 of its classes in eight draws and falls back (low-cover), so the plan reads from one base draw.
+    // The executor reads the root through `benchOrder`, and a cell's seeds key the saved position, so the spec reads it the same way (the raw anchor and its canonical
+    // bench are two keys, two sets of draws). One base draw: the played cell with three base draws of its own seeds covers under 0.8 of its classes in eight draws and
+    // falls back (low-cover).
     const order = benchOrder(anchorRoot().serialized);
     const root = createRootPosition(order ? order.serialized : anchorRoot().serialized);
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: PLAYED[0], p2Choice: PLAYED[1], samples: 1, deepen: SUB }]);
     const open = value.blend!.classes.filter(cls => !cls.ended);
     expect(open.length).toBeGreaterThan(1);
     const sample = sampleCell(root, countFainted(positionBattle(root)), ...PLAYED, 1, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
-    // Round 64 (T119): a class whose draws leave several states goes deeper through each of them.
+    // A class whose draws leave several states goes deeper through each of them.
     const expected = deeperValues(open.map(cls => ({
       weight: cls.weight, child: sample.classChildren!.get(cls.key)!, leaf: cls.leafSum / cls.count, ended: false,
       ...(sample.classGroups?.get(cls.key) ? { groups: sample.classGroups.get(cls.key) } : {}),
     })), position => deepened(root, position), VERIFY_DEEPEN_COVER.doubles, Number.POSITIVE_INFINITY, VERIFY_STATE_RULE.doubles, cheapFor(root));
     open.forEach((cls, index) => expect(cls.deepened, cls.key).toBeCloseTo(expected[index], 12));
-    // The first natural draw's class deepens the same child the old verify step deepened.
     const first = open.find(cls => cls.hasFirst)!;
     expect(sample.classChildren!.get(first.key)!.serialized).toBe(advancePosition(root, ...PLAYED, cellSeeds(root, ...PLAYED)[0]).serialized);
   });
@@ -333,7 +326,7 @@ describe('a cell without a plan draws more and deepens each outcome (round 63, T
     const root = focusBlastRoot(true);
     const [value] = await createLocalExecutor(root.serialized).evalCells([{ i: 0, j: 0, p1Choice: FOCUS[0], p2Choice: FOCUS[1], samples: 3 }]);
     const plain = sampleCell(root, countFainted(positionBattle(root)), ...FOCUS, 3, createMatchupCache(), true);
-    // Round 70: a matrix cell reports the base draws the trend probe replays; it still carries no depth.
+    // A matrix cell reports the base draws the trend probe replays; it still carries no depth.
     expect(value).toEqual({ i: 0, j: 0, value: plain.value, ended: plain.ended, baseDraws: plain.baseDraws });
   });
 });
@@ -520,12 +513,10 @@ describe('verify-spread', () => {
     DOUBLES_P2(),
   );
 
-  /** The target's sleep counter (0 when awake) and whether it burns, read off a child. */
   const target = (child: SimPosition) => positionBattle(child).sides[1].active[0]!;
   const wakesNextTurn = (child: SimPosition) => (target(child).status === 'slp' && target(child).statusState.time === 1 ? 1 : 0);
   const burned = (child: SimPosition) => (target(child).status === 'brn' ? 1 : 0);
 
-  /** The verify step's deepening of one cell with a stand-in for the sub-search. */
   function deepenWith(root: SimPosition, p1: string, p2: string, deeper: (child: SimPosition) => number): EvalCellValue {
     const sample = sampleCell(root, countFainted(positionBattle(root)), p1, p2, VERIFY_SAMPLES, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     const value: EvalCellValue = { i: 0, j: 0, value: sample.value, ended: sample.ended, ...(sample.blend ? { blend: structuredClone(sample.blend) } : {}) };
@@ -536,7 +527,6 @@ describe('verify-spread', () => {
 
   /** The natural verify draws of the game type's pool (singles sixteen fixed seeds, doubles eight) that pass `keep`. */
   const naturalDraws = (root: SimPosition, p1: string, p2: string, keep: (log: string[]) => boolean = () => true) =>
-    // r89 A5 gate: the cell's own seeds (T324), where the pool read VERIFY_PLAIN_SEEDS.
     cellSeeds(root, p1, p2).slice(0, stateRuleFor(root).pool).map(seed => advancePositionWithLog(root, p1, p2, seed)).filter(draw => keep(draw.log));
   const shareOf = (children: SimPosition[], f: (child: SimPosition) => number) =>
     children.reduce((sum, child) => sum + f(child), 0) / children.length;
@@ -604,9 +594,7 @@ describe('verify-spread', () => {
   });
 
   describe('secondary effects inside a class (round 64, T119)', () => {
-    // Round 86 (T305): the 30 percent burn of Steam Eruption is an outcome class of its own (`hit-nokill+brn`), so the hit no longer
-    // mixes burned and unburned draws in one class. Old expectation: the class `hit-nokill` went deeper at the burned share of its draws
-    // (0.3125 of the sixteen verify seeds). New: the class of the unburned hit goes deeper unburned and the burned hit burned.
+    // The 30 percent burn of Steam Eruption is an outcome class of its own (`hit-nokill+brn`): the class of the unburned hit goes deeper unburned and the burned hit burned.
     test('singles: the burn of Steam Eruption is a class of its own, so the unburned hit goes deeper unburned and the burned hit burned', () => {
       const root = steamRoot();
       const plan = planCellEvents(positionBattle(root), 'move steameruption', 'move curse');
@@ -621,7 +609,7 @@ describe('verify-spread', () => {
 
     test("doubles reads only the counts: a burn inside the heaviest class keeps the class's first draw", () => {
       // Doubles splits only the counts the simulator keeps (the +10 % tree-time bound); a burn the leaf reads
-      // goes deeper through the class's own first draw, as before.
+      // goes deeper through the class's own first draw.
       const root = doublesSteamRoot();
       const [p1, p2] = ['move steameruption 1, move softboiled', 'move curse, move curse'];
       const value = deepenWith(root, p1, p2, burned);

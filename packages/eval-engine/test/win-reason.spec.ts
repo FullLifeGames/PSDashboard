@@ -114,7 +114,7 @@ describe('win-reason detection', () => {
     ], names, 'p2');
     expect(report.summary).not.toContain('forced');
     expect(report.conversion).toBeUndefined();
-    // With the conversion muted nothing else explains this game — the
+    // With the conversion muted nothing else explains this game: the
     // close-game fallback takes over.
     expect(report.summary).toContain('No single edge decided it');
   });
@@ -173,14 +173,13 @@ describe('win-reason detection', () => {
       mk(3, -0.35, -0.6),
       mk(4, -0.6, -0.85),
     ], names, 'p2');
-    // t2's roll is past the favor boundary (resolution) — only t1 is luck.
+    // t2's roll is past the favor boundary (resolution): only t1 is luck.
     expect(report.summary).toContain('The rolls decided it: luck ran Beta\'s way overall (+15%).');
     expect(report.summary).not.toContain('Luck ran');
     expect(report.winPath).toEqual({ factor: 'variance', size: 0.3 });
   });
 
-  // Characterization pin: this scenario must stay EXACTLY as before the
-  // win-reason round — seeds tell the decisions story, the luck line stays
+  // Characterization pin: seeds tell the decisions story, the luck line stays
   // p1-framed (luck ran toward the loser), and no new sentence fires.
   test('luck toward the loser keeps the plain luck line and seeds mute the giveaway sentence', () => {
     const report = buildGameReport([
@@ -241,7 +240,7 @@ describe('win-reason detection', () => {
   });
 
   test('a steady decision-led climb reads as the winner building it, hard-to-spot plays named', () => {
-    // Scores stay clear of 0 mid-slide — a float-exact zero crossing would
+    // Scores stay clear of 0 mid-slide: a float-exact zero crossing would
     // move the favor boundary a turn early and shrink the window.
     const step = (turn: number, before: number): TurnAnalysis => mk(turn, before, before - 0.05, {
       decisionDelta: -0.04,
@@ -339,7 +338,7 @@ describe('win-reason detection', () => {
 describe('dice-anchored luck claims', () => {
   // Winner p2; diceTurns marks turns whose protocol carries a visible dice
   // event. The gate is asymmetric: only an actively CONTRADICTING dice
-  // ledger (≥ an inaccuracy the other way) demotes the luck claims —
+  // ledger (≥ an inaccuracy the other way) demotes the luck claims;
   // damage-roll games without visible events keep their luck story.
 
   test('the variance claim needs the visible dice to agree', () => {
@@ -354,7 +353,7 @@ describe('dice-anchored luck claims', () => {
     expect(report.summary).not.toContain('The rolls decided it');
     expect(report.summary).toContain('Chance swings favored Beta overall (+24%), while the visible dice favored Alpha.');
     expect(report.summary).not.toContain('Luck ran');
-    // With variance gated off, nothing else explains this tipped game — the
+    // With variance gated off, nothing else explains this tipped game: the
     // close-game fallback takes over.
     expect(report.winPath).toEqual({ factor: 'close', size: 0 });
   });
@@ -402,7 +401,7 @@ describe('dice-anchored luck claims', () => {
 
   test('the tip\'s roll clause needs a visible dice event on the tip turn', () => {
     // 573756 t70: a chance-attributed tip whose ledger entry is the engine
-    // disagreeing with itself across two evaluations — no die fell.
+    // disagreeing with itself across two evaluations: no die fell.
     const analyses = [
       mk(1, 0.1, 0.05),
       mk(2, 0.05, -0.3, { attribution: 'chance', chanceDelta: -0.35 }),
@@ -504,7 +503,7 @@ describe('denied early end', () => {
       names, 'p2', true, new Set([3]));
     expect(otherOdds.summary).toContain('but the roll failed, and the win waited another 9 turns.');
     expect(otherOdds.deniedEnd?.move).toBeUndefined();
-    // Round 80 (T292): without a played choice no click is proven, so the claim stays unmade.
+    // Without a played choice no click is proven, so the claim stays unmade.
     const noPlayed = buildGameReport(
       deniedAnalyses(12, { p2: nearSide(null) }),
       names, 'p2', true, new Set([3]));
@@ -535,7 +534,7 @@ describe('denied early end', () => {
   });
 
   test('labeled doubles odds never name the move (final review, finding 3)', () => {
-    // Round 56: the headline odds of a doubles option may be the partner slot's; "X missed" would name
+    // The headline odds of a doubles option may be the partner slot's; "X missed" would name
     // a roll the near-decided body did not take.
     const labeled = buildGameReport(
       deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.95, killFraction: 1, label: 'Heat Wave→Corviknight' } }) }),

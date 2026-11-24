@@ -5,12 +5,9 @@ import { STANDOFF_MIN_TURNS, standoffsOf } from '../src/standoff';
 import type { RankedChoice } from '../src/types';
 
 /**
- * Round 79 (T285): a standoff is a run of at least STANDOFF_MIN_TURNS consecutive analyzed turns in which nobody fainted and
- * nobody switched (573756 turns 79 to 137: two burned Toxapex, p2's PP running out). Inside it the swing is the HP and PP
- * cycle of one position, so shifts, rolls and reads stay out of the key moments and the reads list; graded decisions (a
- * misplay, a decision moment) stay. The window comes from the analyses alone. Singles read playedRaw, doubles the slot
- * lists (a doubles label can carry a switch after another action); without played tracking a switch cannot be seen and
- * the rule stays closed.
+ * A standoff is a run of at least STANDOFF_MIN_TURNS consecutive analyzed turns in which nobody fainted and nobody switched (573756 turns 79 to 137: two burned
+ * Toxapex, p2's PP running out). Inside it shifts, rolls and reads stay out of the key moments and the reads list; graded decisions stay. Singles read playedRaw,
+ * doubles the slot lists (a doubles label can carry a switch after another action); without played tracking a switch cannot be seen and the rule stays closed.
  */
 
 const names: [string, string] = ['Alpha', 'Beta'];
@@ -22,14 +19,12 @@ const sw = { kind: 'switch' as const, name: 'Zapdos', species: 'Zapdos' };
 const sideOf = (extra: Partial<SideAnalysis> = {}): SideAnalysis =>
   ({ playedRaw: move, played: choice('Recover'), best: choice('Recover'), safe: null, regret: 0, ...extra });
 
-/** One turn at a constant fainted share (no faint inside it unless `after` differs). */
 const mk = (turn: number, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
   turn, scoreBefore: -0.5, scoreAfter: -0.5, swing: 0, playedOutcome: null, decisionDelta: null, chanceDelta: null,
   attribution: 'quiet', playedTracking: true, faintedFraction: 0.75, faintedFractionAfter: 0.75,
   p1: sideOf(), p2: sideOf(), ...over,
 } as TurnAnalysis);
 
-/** A shift: a swing of 0.4 with no single culprit. */
 const shift = (turn: number): TurnAnalysis => mk(turn, { scoreBefore: -0.5, scoreAfter: -0.1, swing: 0.4, attribution: 'shift' });
 /** A paid-off read by p1 (a gain, so it stays on the list outside a standoff). */
 const readOf = (turn: number): TurnAnalysis => mk(turn, {
@@ -40,7 +35,6 @@ const misplayOf = (turn: number): TurnAnalysis => mk(turn, {
   p2: sideOf({ regret: 0.3, tier: 'blunder', played: choice('Recover'), best: choice('Scald') }),
 });
 
-/** Twelve quiet turns (1..12) with `edits` replacing single turns. */
 const game = (edits: TurnAnalysis[], count = 12): TurnAnalysis[] => {
   const byTurn = new Map(edits.map(analysis => [analysis.turn, analysis]));
   return Array.from({ length: count }, (_, i) => byTurn.get(i + 1) ?? mk(i + 1));

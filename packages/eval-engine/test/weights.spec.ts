@@ -27,10 +27,8 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 65: the static weighs its features with the table of the replay's
- * rule set (Pokémon Champions or standard) and game type; the host names
- * the rule set (EvalSettings.ruleset), every search carries it to its
- * leaves through the matchup cache, and executors are bound to one.
+ * The static weighs its features with the table of the replay's rule set (Pokémon Champions or standard) and game type; the host names the rule set
+ * (EvalSettings.ruleset), every search carries it to its leaves through the matchup cache, and executors are bound to one.
  */
 
 const position = (name: string) =>
@@ -50,7 +48,6 @@ function withChampionsMatchup<T>(value: number, run: () => T): T {
   }
 }
 
-/** The Champions tables with some weights of their own for one call (both game types). */
 function withChampionsTables<T>(weights: Partial<typeof FEATURE_WEIGHTS>, run: () => T): T {
   const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
   Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);
@@ -87,7 +84,7 @@ describe('static rule set', () => {
     expect(featureWeights(false, 'vgc')).toBe(FEATURE_WEIGHTS);
   });
 
-  // Round 65 gate (2b): VGC keeps the hand doubles table while Doubles OU takes its fit; a VGC singles game reads the singles table.
+  // VGC keeps the hand doubles table while Doubles OU takes its fit; a VGC singles game reads the singles table.
   test('a VGC cache weighs doubles by the VGC table and singles by the singles table', () => {
     const doubles = positionBattle(createRootPosition(position(DOUBLES)));
     expect(evaluatePosition(doubles, createMatchupCache('vgc'))).not.toBe(evaluatePosition(doubles, createMatchupCache('standard')));
@@ -118,8 +115,8 @@ describe('static rule set', () => {
         expect(matrix('standard')).toBe(matrixStandard);
       });
     }
-    // Round 78: three matrix searches and two trees per game type take 25 s with the speed layer forced off on a quiet
-    // machine (11 s with it on) and ran past the default 60 s in the full EVAL_SIM_FAST=0 suite.
+    // Three matrix searches and two trees per game type take 25 s with the speed layer forced off on a quiet
+    // machine (11 s with it on) and run past the default 60 s in the full EVAL_SIM_FAST=0 suite.
   }, 180_000);
 
   test('a local executor serves its cells under the rule set it is bound to', async () => {
@@ -139,10 +136,10 @@ describe('static rule set', () => {
     const standard = (await run('standard')).score;
     const champions = await withChampionsMatchupAsync(FEATURE_WEIGHTS.matchup + 400, async () => (await run('champions')).score);
     expect(champions).not.toBe(standard);
-    // Two orchestrated trees took 80 to 108 s with the speed layer forced off on devbox (round 89, the merge's slow-mode timeouts); 180 s is its neighbour's bound since round 78.
+    // Two orchestrated trees take 80 to 108 s with the speed layer forced off on devbox; 180 s is its neighbour's bound.
   }, 180_000);
 
-  // Review fix: the greedy replacement after a knock-out (matrix cells, a pivot without a follow-up, prover cells, the repair on deserialization) weighs by the rule set the position carries from its root.
+  // The greedy replacement after a knock-out (matrix cells, a pivot without a follow-up, prover cells, the repair on deserialization) weighs by the rule set the position carries from its root.
   test('the greedy replacement after a knock-out reads the rule set of its position', () => {
     const serialized = position('gen9ou-2658663776-t2');
     const replacement = (ruleset: StaticRuleset) => {
@@ -169,7 +166,6 @@ describe('static rule set', () => {
 const FORMAT = 'gen9doublescustomgame';
 const KEYS = Object.keys(VGC_DOUBLES_FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 
-/** The static of a board: tanh of the weighted feature sum on the table's scale, as evaluatePosition. */
 const scoreOf = (battle: Battle, weights: Record<keyof EvalFeatures, number>): number => {
   const features = evalFeatures(battle, createMatchupCache('vgc'));
   const diff = KEYS.reduce((sum, key) => sum + weights[key] * features[key], 0);
@@ -190,10 +186,9 @@ describe('the SV VGC table (round 69, T144)', () => {
     const w = VGC_DOUBLES_FEATURE_WEIGHTS;
     expect([w.tailwind, w.coverage]).toEqual([0, 0]);
     expect([w.bodies, w.screens, w.matchup, w.trickRoom]).toEqual([177, 48, 169, 54]);
-    // Held at the hand values: hazards (R2 flagged), choice mismatch (hold). The S7 pair cell is 0 since the user gate of
-    // 13.10. (6b): its 0/1 gate made the VGC score fall as a foe took damage in 24 of 103 HP series (T199 builds a ramp).
+    // Held at the hand values: hazards (R2 flagged), choice mismatch (hold). The pair cell is 0: its 0/1 gate made the VGC score fall as a foe took damage in 24 of 103 HP series.
     expect([w.hazards, w.choiceMismatch, w.pairFocus]).toEqual([0.75, 40, 0]);
-    // Round 69 (S17, T49): the damped boost column replaces the flat one (REPLACEMENT, 20 of 20 seeds once drops count).
+    // The damped boost column replaces the flat one (REPLACEMENT, 20 of 20 seeds once drops count).
     expect([w.boosts, w.boostsBiting]).toEqual([0, 16]);
     expect([w.sweepFastKo, w.sweepFastChip, w.sweepSlowKo, w.sweepSlowChip, w.pairRedirect, w.statusFix]).toEqual([0, 0, 0, 0, 0, 0]);
   });
@@ -227,7 +222,7 @@ describe('the SV VGC table (round 69, T144)', () => {
     expect(on.matchup).toBeGreaterThan(off.matchup);
     // The score is the weighted sum at the table, where the flag has no weight.
     expect(evaluatePosition(fast, cache())).toBeCloseTo(scoreOf(fast, VGC_DOUBLES_FEATURE_WEIGHTS), 12);
-    // With the August flag weight the same board would read higher (the flag priced the speed twice).
+    // With a flag weight the same board would read higher (the flag priced the speed twice).
     expect(scoreOf(fast, { ...VGC_DOUBLES_FEATURE_WEIGHTS, tailwind: 68 })).toBeGreaterThan(evaluatePosition(fast, cache()));
     expect(VGC_DOUBLES_FEATURE_WEIGHTS.tailwind).toBe(0);
   });

@@ -7,15 +7,10 @@ import {
 } from '../src/branch-engine';
 
 /**
- * The sweep's single-pass acquisition stores the reconstruction's FINAL
- * battle as the last analyzable turn's position. That is only honest when
- * the replay actually GOT there: a diverged choice replay can cascade a
- * side into a wipe (the premature-end family — gen9draft-2058494320 from
- * turn 56 without per-turn healing), and `validateBranchRuntime` passes an
- * ended battle deliberately (it is a legal branch state). Storing that
- * battle as the final turn hands the graph one phantom ±1.00 point at the
- * far right while every other turn stays a gap — the "Analyze game
- * produced an empty graph" report (2026-08-12).
+ * The sweep's single-pass acquisition stores the reconstruction's FINAL battle as the last analyzable turn's position. That is only honest when the replay actually
+ * GOT there: a diverged choice replay can cascade a side into a wipe (the premature-end family: gen9draft-2058494320 from turn 56 without per-turn healing), and
+ * `validateBranchRuntime` passes an ended battle deliberately (it is a legal branch state). Storing that battle as the final turn hands the graph one phantom ±1.00
+ * point at the far right while every other turn stays a gap.
  */
 
 const stub = (battle: unknown, timedOut = false) =>
@@ -44,8 +39,7 @@ describe('sweep end-position guard', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
     const turns = snapshots.length;
 
-    // No capturePositions => no per-turn snapshot healing, the same
-    // single-shot route the premature-end cascade was diagnosed on.
+    // No capturePositions => no per-turn snapshot healing, the single-shot route the premature-end cascade dies on.
     const runtime = await reconstructBranchRuntime({
       format: getBranchSimulatorFormat(replay),
       p1Team, p2Team,
@@ -55,27 +49,22 @@ describe('sweep end-position guard', () => {
     });
     const battle = runtime.battleStream.battle!;
     expect(battle.ended).toBe(true);
-    // The validator deliberately accepts an ended battle — which is exactly
-    // why the sweep needed its own guard.
+    // The validator deliberately accepts an ended battle, which is why the sweep needs its own guard.
     expect(validateBranchRuntime(runtime)).toBeNull();
     expect(reconstructionReached(runtime, turns)).toBe(false);
   });
 
   test('the sweep counts played turns, not the post-game end snapshot', () => {
-    // The parser stamps the trailing end-block (lines after the final
-    // |turn| marker — the post-game state) as lastTurn + 1. Counting that
-    // entry as an analyzable turn manufactured a phantom final turn that
-    // can never have a live position: the draft replay plays 67 turns,
-    // carries 68 snapshots, and the sweep reported "67 of 68 turns" on a
-    // perfectly reconstructed game (2026-08-13 report). The branch slider
-    // already used the end entry as its "End" sentinel, one past the max.
+    // The parser stamps the trailing end-block (lines after the final |turn| marker, the post-game state) as lastTurn + 1. Counting that entry as an analyzable turn
+    // would make a phantom final turn that can never have a live position: the draft replay plays 67 turns, carries 68 snapshots, and the sweep would report "67 of 68
+    // turns" on a perfectly reconstructed game. The branch slider uses the end entry as its "End" sentinel, one past the max.
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as { log: string };
     const { snapshots } = parseReplayLogWithObservations(replay.log);
     expect(snapshots.length).toBe(68);
     expect(snapshots[snapshots.length - 1].turn).toBe(68);
     expect(finalPlayedTurn(snapshots)).toBe(67);
 
-    // A log that ends exactly ON a |turn| marker has no end entry — every
+    // A log that ends exactly ON a |turn| marker has no end entry: every
     // snapshot is a real turn and the last one counts.
     const truncated = snapshots.slice(0, 67);
     expect(truncated[truncated.length - 1].log.some(line => line.startsWith('|turn|'))).toBe(true);
@@ -91,11 +80,8 @@ describe('sweep end-position guard', () => {
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
 
-    // Exactly makeReplayAcquire's arrangement after the healing fix: the
-    // arrival snapshot PLUS per-turn boundary corrections en route. Turn 56
-    // is where the unhealed cascade dies; healed, it must arrive live and
-    // pass the reached guard — that pair is what justifies un-hiding the
-    // think-deeper button.
+    // makeReplayAcquire's arrangement: the arrival snapshot PLUS per-turn boundary corrections en route. Turn 56 is where the unhealed cascade dies; healed, it must
+    // arrive live and pass the reached guard.
     const turn = 56;
     const runtime = await reconstructBranchRuntime({
       format: getBranchSimulatorFormat(replay),

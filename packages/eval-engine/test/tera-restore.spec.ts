@@ -5,12 +5,9 @@ import { reconstructBranchRuntime } from '../src/branch-engine';
 import { correctBattleFromSnapshot } from '../src/branch/corrections';
 
 /**
- * Round 54 (T57): the sim deletes `terastallized` in its faint block. A body
- * that faints only in the reconstruction (a guessed spread, a damage roll)
- * and is revived by the HP correction came back without the marker, while
- * its side had already spent the Tera: 17 of 833 bank positions stood one
- * Tera body short, none over. The snapshot carries the marker per body at
- * every boundary and drops it on a real faint, so it alone decides.
+ * The sim deletes `terastallized` in its faint block. A body that faints only in the reconstruction (a guessed spread, a damage roll) and is revived by the HP
+ * correction would come back without the marker, while its side had already spent the Tera (17 of 833 bank positions stood one Tera body short, none over). The
+ * snapshot carries the marker per body at every boundary and drops it on a real faint, so it alone decides.
  */
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };

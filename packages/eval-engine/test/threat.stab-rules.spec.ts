@@ -9,12 +9,8 @@ import { createMatchupCache, evaluatePosition, type StaticRuleset, pairThreat, u
 import { loadSimMods } from '../src/forward/sim-mods';
 
 /**
- * Round 63 (T81 step 4, T71): STAB by the game's rules after a Tera click,
- * held against the damage the simulator deals (modifyDamage: an old type or
- * the Tera type 1.5, both 2.0, Stellar 2.0 on an old type and 1.2 elsewhere
- * on the first use of a type, Adaptability through its own handler; getDamage:
- * a Tera-typed move under 60 power hits as 60). The rule was built in round
- * 54 (d8eb0a3) and parked; it lands with T81 without a refit (decision 4).
+ * STAB by the game's rules after a Tera click, held against the damage the simulator deals (modifyDamage: an old type or the Tera type 1.5, both 2.0, Stellar 2.0 on an
+ * old type and 1.2 elsewhere on the first use of a type, Adaptability through its own handler; getDamage: a Tera-typed move under 60 power hits as 60).
  */
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
@@ -145,10 +141,7 @@ function board(mode: Mode, foeMoves: string[]): Board {
   return { battle, holder: battle.sides[0].active[0]!, foe: battle.sides[1].active[0]! };
 }
 
-/**
- * The largest step the wrong way when the body goes down one HP point at a time from its maximum: the score of p1 rises
- * as p1's body loses HP (`own`), or falls as p2's body loses HP.
- */
+/** The largest step the wrong way when the body goes down one HP point at a time from its maximum: p1's score rises as p1's body loses HP (`own`), or falls as p2's body loses HP. */
 function worstStep(mode: Mode, battle: Battle, body: Pokemon, own: boolean): { size: number; at: number } {
   const scoreAt = (hp: number): number => {
     body.sethp(hp);
@@ -241,10 +234,7 @@ describe('matchup-helpless-healer', () => {
     return made;
   }
 
-  /**
-   * The largest step the wrong way when the body goes down one HP point at a time from its maximum to a fifth of it: the
-   * score of p1 rises as p1's body loses HP (`own`), or falls as p2's body loses HP.
-   */
+  /** The largest step the wrong way when the body goes down one HP point at a time from its maximum to a fifth of it: p1's score rises as p1's body loses HP (`own`), or falls as p2's body loses HP. */
   function worstStep(mode: Mode, battle: Battle, body: Pokemon, own: boolean): number {
     const scoreAt = (hp: number): number => {
       body.sethp(hp);
@@ -286,7 +276,7 @@ describe('matchup-helpless-healer', () => {
 
 await loadSimMods('gen9championsou');
 
-// Round 79 (T283 sweep): every generation the profile reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
+// Every generation the profile reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
 const RULES = [
   { name: 'Generation 3', format: 'gen3customgame' },
   { name: 'Generation 4', format: 'gen4customgame' },

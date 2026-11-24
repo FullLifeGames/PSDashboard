@@ -16,7 +16,7 @@ import {
 import { entriesOf, FAST, liveOf, rootOf, toleranceOf } from './secondary-classes-support';
 
 /**
- * Round 89 (#59, T322 block 1), A3 stage 1: the sweep of the root quantiles over the Dex. Every move with an accuracy, a secondary
+ * The sweep of the root quantiles over the Dex. Every move with an accuracy, a secondary
  * chance, a hit count or a status and duration die, read from the Dex of the rule set (never by name), in every generation 1 to 9 and
  * the Champions mod, singles and from Gen 3 doubles, also with Serene Grace and Sheer Force on the attacker. Per move, case and
  * outfit: 16 roots times the 4 trees of a search draw the move's turn under the quantiles through the singles path
@@ -46,7 +46,6 @@ const chanceEntry = (move: DexMove): boolean => entriesOf(move).some(entry => en
 /** An entry whose effect the protocol shows by a standard line, and which the move draws once. */
 const witnessed = (entry: SecondaryEntry): boolean => entry.chance !== undefined && entry.chance < 100 && !entry.self && !!(entry.status || entry.volatileStatus === 'flinch' || entry.boosts);
 
-/** The quantiles under test with a record of the dice they answered. */
 class Spy implements DieQuantiles {
   readonly answered: { name: DieName; draw: Draw }[] = [];
   private readonly inner: RootQuantiles;
@@ -92,7 +91,6 @@ const chanceOfDraw = (draw: Draw): number | null =>
 
 interface Fork { log: string[]; spy: Spy }
 
-/** One root draw of a cell under the quantiles of tree `offset` of root `root`, through the PRNG of the case's game type. */
 function fork(mode: Mode, position: ReturnType<typeof rootOf>, clicks: { p1: string; p2: string }, root: number, offset: number): Fork {
   const spy = new Spy(new RootQuantiles(cellHash(root, clicks.p1, clicks.p2), offset, TREES));
   const seed = seedOf(root) as never;
@@ -111,7 +109,6 @@ function plainLog(mode: Mode, position: ReturnType<typeof rootOf>, clicks: { p1:
 const stampless = (log: readonly string[]): string[] => log.filter(line => !line.startsWith('|t:|'));
 const asBattle = (log: string[]): Battle => ({ log }) as unknown as Battle;
 
-/** (b4) The dice the quantiles answered for the first target, against what the battle shows of them. */
 function pool(tally: Tally, { log, spy }: Fork, entries: SecondaryEntry[]): void {
   const first = (kind: DieName['kind']) => spy.answered.find(({ name, draw }) => name.kind === kind && name.effectId === undefined && name.targetSlot === 'p2a'
     && draw.call === 'chance' && (draw.numerator ?? 0) < (draw.from ?? 0));
@@ -126,7 +123,6 @@ function pool(tally: Tally, { log, spy }: Fork, entries: SecondaryEntry[]): void
   }
 }
 
-/** The pooled facts one move's forks give the case's tally, and the problems of (b1) and (b2). */
 function playMove(mode: Mode, live: Battle, move: DexMove, clicks: { p1: string; p2: string }, tally: Tally, sheerForce = false): string[] {
   const problems: string[] = [];
   const before = standing(live);
@@ -147,7 +143,6 @@ function playMove(mode: Mode, live: Battle, move: DexMove, clicks: { p1: string;
       const { log, spy } = drawn;
       if (log.some(line => line.startsWith('|error|'))) problems.push(`${move.id} root ${index} tree ${offset}: an |error| line`);
       secondaryAsked += spy.answered.filter(({ name }) => name.kind === 'secondary').length;
-      // (b1) no die answered: the plain draw of the seed
       if (spy.answered.length === 0 && offset === 0 && stampless(log).join('\n') !== stampless(plainLog(mode, position, clicks, root)).join('\n')) {
         problems.push(`${move.id} root ${index}: no die answered, and the log is not the plain draw`);
       }
@@ -155,7 +150,6 @@ function playMove(mode: Mode, live: Battle, move: DexMove, clicks: { p1: string;
     }
   }
   if (sheerForce && chanceEntry(move) && secondaryAsked > 0) problems.push(`${move.id}: Sheer Force left ${secondaryAsked} secondary dice for the quantiles`);
-  // (b3) the live board
   if (standing(live) !== before) problems.push(`${move.id}: the live board changed`);
   return problems;
 }
@@ -184,7 +178,6 @@ describe.each(SWEEP_CASES)('the root quantiles over the Dex: $name', ({ rules, m
         problems.push(...playMove(mode, live, move, clicks, tally, outfit.label === 'Sheer Force'));
       }
       expect(problems.join(' | ')).toBe('');
-      // a case with moves to play plays at least one
       expect(played).toBeGreaterThan(0);
       if (process.env.DICE_SWEEP_LOG) {
         appendFileSync(process.env.DICE_SWEEP_LOG, `${name}, ${outfit.label}: ${played} of ${moves.length} moves played; ${[...tally.pools].map(([key, pool]) => `${key}: ${pool.came}/${pool.n} (${pool.chances.toFixed(1)})`).join('; ')}\n`);
@@ -193,7 +186,6 @@ describe.each(SWEEP_CASES)('the root quantiles over the Dex: $name', ({ rules, m
     }, 600_000);
   }
 
-  // a move with a flinch of 30 percent, read from the Dex of the rule set
   const flinch = (move: DexMove) => entriesOf(move).some(entry => entry.volatileStatus === 'flinch' && entry.chance === 30) && move.accuracy === 100 && !move.multihit && move.priority === 0;
 
   test(`${name}: a flinch of 30 percent comes true in one or two of the four trees`, () => {

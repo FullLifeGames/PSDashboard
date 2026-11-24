@@ -12,11 +12,7 @@ import { pairKoOdds } from '../src/pair/odds';
 import { drawTurn, rollSet as setFromTeraClickField, rootOf } from './calc-roll-oracle';
 import { simDamages, killing, type SimDamages } from './sim-rolls';
 
-/**
- * Round 67, lane A (T100, T84): the body a Tera click makes comes from the
- * simulator. teraClicked must equal what the simulator's own terastallize
- * leaves on a twin of the battle: forme, ability, stages and HP.
- */
+/** teraClicked must equal what the simulator's own terastallize leaves on a twin of the battle: forme, ability, stages and HP. */
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
 /** The first p1 active of a fresh twin, clicked by the simulator itself, read as a body. */
@@ -27,7 +23,6 @@ function simClicked(make: () => Battle) {
   return bodyOf(twin, mon);
 }
 
-/** The first p1 active of the battle, read as a body that clicks its Tera type. */
 function armed(battle: Battle) {
   const mon = battle.sides[0].active[0];
   return { ...bodyOf(battle, mon), tera: mon.teraType };
@@ -96,13 +91,11 @@ describe('tera-click-field', () => {
     ['Electric Terrain', { terrain: 'electricterrain' }],
   ];
 
-  /** The first p1 active of a battle, read as a body that clicks its Tera type. */
   function armed(battle: Battle) {
     const mon = battle.sides[0].active[0];
     return { ...bodyOf(battle, mon), tera: mon.teraType };
   }
 
-  /** Did the simulator's own click clear a field that stood? */
   function simCleared(root: SimPosition): boolean {
     const twin = positionBattle(createRootPosition(root.serialized));
     const had = !!(twin.field.weather || twin.field.terrain);

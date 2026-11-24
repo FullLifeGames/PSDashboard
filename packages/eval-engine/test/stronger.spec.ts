@@ -10,10 +10,9 @@ import { searchPosition } from '../src/search/position';
 import { reconstruct } from './arrival-turn';
 
 /**
- * Round 89 (#130), step G7a: a stronger play. The side that lost may pick any choice at the turn; the opponent answers with its best
- * reply (every legal choice). The step reads the mass the prover proves for each own choice (the share of the dice that win within
- * the turns asked, whatever the opponent answers), against the mass of the choice that was played. Boards are small custom games:
- * every number is one the simulator shows there.
+ * A stronger play: the side that lost may pick any choice at the turn; the opponent answers with its best reply (every legal choice). The step reads the mass the prover
+ * proves for each own choice (the share of the dice that win within the turns asked, whatever the opponent answers), against the mass of the choice that was played.
+ * Boards are small custom games: every number is one the simulator shows there.
  */
 
 /**
@@ -29,10 +28,9 @@ const FOURTH: Board = {
 const RANKING = ['move splash', 'move growl', 'move harden', 'move seismictoss'];
 
 /**
- * FOURTH with a second Snorlax at 30 HP behind the first. Round 89 (P3): a foe with one standing body that cannot move before the
- * strike gives the prover a sure strike, which it tries before the ranking, so FOURTH itself reads the win at once. The second body
- * takes the strike away (D2 a: only a last standing body), so the ranking's first three candidates decide again: only Seismic Toss
- * wins, this turn and again after the replacement.
+ * FOURTH with a second Snorlax at 30 HP behind the first. A foe with one standing body that cannot move before the strike gives the prover a sure strike, which it tries
+ * before the ranking, so FOURTH itself reads the win at once. The second body takes the strike away (only a last standing body gets it), so the ranking's first
+ * three candidates decide again: only Seismic Toss wins, this turn and again after the replacement.
  */
 const FOURTH_WITH_BENCH: Board = {
   format: 'gen9customgame',
@@ -103,9 +101,8 @@ describe('a stronger play, singles', () => {
 
 describe('a stronger play, doubles', () => {
   /**
-   * Earthquake (spread) against two Pikachu at 1 HP that may Splash or Growl: the proof answers every legal reply of the foe (four pairs),
-   * and the winner is the one choice that damages. (A board with Protect proves less than it should in doubles: the prover reads a
-   * repeated Protect as unpriced there, a rest of lane A's prover, not of this step.)
+   * Earthquake (spread) against two Pikachu at 1 HP that may Splash or Growl: the proof answers every legal reply of the foe (four pairs), and the winner is the one
+   * choice that damages. (A board with Protect proves less than it should in doubles: the prover reads a repeated Protect as unpriced there.)
    */
   const DOUBLES: Board = {
     format: 'gen9doublescustomgame',
@@ -162,7 +159,7 @@ describe('a stronger play on the corpus', () => {
     const rootOrder = ranking.perSide.p2.map(row => row.choice);
     const step = strongerStep(serialized, REQUEST('p2', { rootOrder, tera: true, ruleset: 'champions' }));
     // no own choice of the burned Kingambit wins within three turns against every reply (Protect, then the burn): the production
-    // prover at 100 and 400 cells read mass 0 on this board as well (probe G5), and the step answers every reply inside its budget
+    // prover at 100 and 400 cells read mass 0 on this board as well, and the step answers every reply inside its budget
     expect(step.status).toBe('none');
     expect(step.chance).toBeUndefined();
     expect(step.line).toBeUndefined();

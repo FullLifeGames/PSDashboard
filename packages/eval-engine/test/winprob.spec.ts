@@ -17,10 +17,8 @@ import {
 import type { StaticRuleset } from '../src/score/weights';
 
 /**
- * Round 69 (T51, decisions 21 and 22): the percent display grows surer with the game. The map is
- * sigmoid(K(share) * score) with K = 1.85 up to a fainted share of 0.25, rising by 5 per share to 3.10 at 0.5
- * (probe P1, displayk-offline.mjs). The expected values below are written out from that formula, not read back
- * from the function under test.
+ * The percent display grows surer with the game. The map is sigmoid(K(share) * score) with K = 1.85 up to a fainted share of 0.25, rising by 5 per share to 3.10 at 0.5.
+ * The expected values below are written out from that formula, not read back from the function under test.
  */
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const expected = (score: number, share: number) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
@@ -181,13 +179,13 @@ describe('win probability mapping', () => {
     // Adopted k1 > 0: the same score claims more late than early.
     if (WINPROB_K.singles.k1 > 0) expect(late).toBeGreaterThan(early);
     expect(winProbability(0, true, 0.5)).toBeCloseTo(0.5, 10);
-    // Corpus-fitted 2026-08-09 (phase-K): confidence per point stays >1 at
+    // Corpus-fitted: confidence per point stays >1 at
     // every phase in both gametypes.
     expect(WINPROB_K.singles.k0).toBeGreaterThan(1);
     expect(WINPROB_K.doubles.k0).toBeGreaterThan(1);
   });
 
-  // Round 67 (T138): Pokémon Champions doubles prices its own scale, fitted on its corpus games in the app's build on
+  // Pokémon Champions doubles prices its own scale, fitted on its corpus games in the app's build on
   // the Champions mod (1.86 + 4.17 × the fainted share). Champions singles keeps the singles K: its fit (1.64 + 4.41)
   // read the mid game of the Champions OU holdout worse in both tables. Every other rule set keeps the K of its game
   // type.
@@ -205,9 +203,8 @@ describe('win probability mapping', () => {
     }
   });
 
-  // Round 74 (T163): every family resolves its own K entry, so a fit moves one family and no other. The five values
-  // are today's (lossless): VGC doubles equals standard doubles, Champions singles equals standard singles, and none
-  // of them shares an object with another.
+  // Every family resolves its own K entry, so a fit moves one family and no other. The values: VGC doubles equals
+  // standard doubles, Champions singles equals standard singles, and none of them shares an object with another.
   test('round 74 (T163): the five families hold today\'s K, each in its own entry', () => {
     const today = {
       'standard-singles': { k0: 2.28, k1: 1.49 },
@@ -244,13 +241,12 @@ describe('win probability mapping', () => {
     // static evals into leaf win-probs; averaging plus equilibrium
     // selection re-inflates the aggregated ROOT score, and DISPLAY_K
     // (fit-corpus-trained, grand-bed-graded) prices that back out at the
-    // display boundary. The old linear display was overconfident
-    // out-of-sample in every bucket.
+    // display boundary.
     expect(winPercent(0)).toBe(50);
     expect(winPercent(0.5)).toBe(Math.round(100 / (1 + Math.exp(-DISPLAY_K * 0.5))));
     expect(winPercent(0.5)).toBeLessThan(75);
     expect(winPercent(-0.5)).toBe(100 - winPercent(0.5));
-    // Exact ±1 is an ENDED evaluation — a finished game displays finished.
+    // Exact ±1 is an ENDED evaluation: a finished game displays finished.
     expect(winPercent(1)).toBe(100);
     expect(winPercent(-1)).toBe(0);
     // An ended row weighted by an equilibrium mix keeps a one-bit rounding

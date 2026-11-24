@@ -8,12 +8,10 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 72 (T239): targetAtUse asks the move's onModifyMove from the Dex through the module's handler call. A sweep over
- * every move of the Dex that has one, in every generation and the Champions mod, in singles and doubles, on three
- * fields, with and without the Tera click: the answer is the one the hand-written stand-in it replaced gave (played on a
- * copy), it is the real copy's answer or the Dex target (never a third value), and the live battle is unchanged (the
- * development check of the module fingerprints it around every call). Gens 3 and 4 Beat Up added its volatile to the
- * live attacker through the old stand-in; the view keeps it off.
+ * targetAtUse asks the move's onModifyMove from the Dex through the module's handler call. A sweep over every move of the Dex that has one, in every generation and
+ * the Champions mod, in singles and doubles, on three fields, with and without the Tera click: the answer is the one the hand-written stand-in gives (played on a copy),
+ * it is the real copy's answer or the Dex target (never a third value), and the live battle is unchanged (the development check of the module fingerprints it around
+ * every call). Gens 3 and 4 Beat Up add their volatile to the live attacker through a stand-in; the view keeps it off.
  */
 
 await loadSimMods('gen9championsou');
@@ -29,8 +27,8 @@ const RULE_SETS = [
 ];
 
 /**
- * The stand-ins targetAtUse had before the module (the handler on `{ field, debug }`, the attacker as a prototype view),
- * played on a copy of the board, since they wrote the live attacker in Gens 3 and 4.
+ * The hand-written stand-ins (the handler on `{ field, debug }`, the attacker as a prototype view), played on a copy of the board, since they wrote the live
+ * attacker in Gens 3 and 4.
  */
 function byHand(live: Battle, moveId: string, tera: boolean): string {
   return playOnCopy(live, new PRNG('1,2,3,4'), battle => {

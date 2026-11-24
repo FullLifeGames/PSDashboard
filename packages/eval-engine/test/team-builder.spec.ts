@@ -3,7 +3,7 @@ import { test, expect, describe } from 'vitest';
 describe('species-shaped default spreads', () => {
   test('the last-resort spread follows base stats, not a flat physical template', () => {
     // No usage stats, no sheets, no damage observations: the default must
-    // still make species sense — special attackers get SpA, fast species
+    // still make species sense: special attackers get SpA, fast species
     // get Speed (base-123 Noivern was outsped by everything on 0 EVs), and
     // slow bulky species keep HP.
     const log = [
@@ -56,7 +56,7 @@ import { buildTeamsFromReplay, inferOpponentTeam, parseReplayLogWithObservations
 import { createBranchState, reconstructBranchRuntime } from '../src/branch-engine';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
+// A Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
 await loadSimMods('gen9championsou');
 
 const fixtureReplay = JSON.parse(
@@ -132,7 +132,7 @@ describe('team builder edited assumptions', () => {
   });
 
   test('a ruled-out slot-0 ability falls to the next species slot', () => {
-    // Bronzong's slot 0 IS Levitate — a landed Earthquake must walk past it.
+    // Bronzong's slot 0 IS Levitate: a landed Earthquake must walk past it.
     const log = [
       '|player|p1|Alice|', '|gen|9', '|tier|[Gen 9] Custom Game',
       '|poke|p1|Garchomp, M|', '|poke|p2|Bronzong|',
@@ -147,8 +147,7 @@ describe('team builder edited assumptions', () => {
   });
 
   test('defaults an unrevealed ability to the species slot-0 ability', () => {
-    // A packed set with an empty ability gives the sim Pokémon NO ability at
-    // all (custom games skip validation) — the GPL reconstruction's Uxie
+    // A packed set with an empty ability gives the sim Pokémon NO ability at all (custom games skip validation): the GPL reconstruction's Uxie
     // died to an Earthquake it should have been immune to.
     const log = [
       '|player|p1|Alice|',
@@ -202,21 +201,20 @@ describe('team builder edited assumptions', () => {
     const uxie = teams.p1Team.find(set => set.species === 'Uxie');
     // The solver recovers Uxie's HP investment (its real 182 max HP). With
     // one observation per direction, "bulkier defender" vs "weaker attacker"
-    // is underdetermined — but the PAIR becomes replay-consistent either way:
+    // is underdetermined, but the PAIR becomes replay-consistent either way:
     // the eval's branches stop killing Uxie with hits it visibly survived.
     expect(uxie).toBeTruthy();
     expect(uxie!.evs.hp).toBe(252);
     const lando = teams.p2Team.find(set => set.species === 'Landorus-Therian')!;
     const landoAtk = lando.evs.atk ?? 0;
     const uxieBulk = (uxie!.evs.hp ?? 0) + (uxie!.evs.def ?? 0);
-    // At least one side of the U-turn pair moved to explain the observed 31%. Round 69 (T132): the species-shaped
-    // guesses carry 252 Spe on both and no order measures Uxie's, so the budget holds it beside the 252 HP and the
-    // pair explains the line with Landorus's Attack at 80 instead of 0 (it was 0 when the Speed gave way).
+    // At least one side of the U-turn pair moved to explain the observed 31%. The species-shaped guesses carry 252 Spe on both and no order measures Uxie's,
+    // so the budget holds it beside the 252 HP and the pair explains the line with Landorus's Attack at 80 instead of 0.
     expect(landoAtk < 252 || uxieBulk > 252).toBe(true);
   });
 
   test('coherence vetoes drop a boost-contradicting usage fill and refill from the pool', () => {
-    // GPL finding: SD Cobalion assembled with Body Press — marginally popular,
+    // GPL finding: SD Cobalion assembled with Body Press, marginally popular,
     // jointly incoherent. The veto drops it and the NEXT usage move fills in.
     const p1Info = {
       pokemon: [{
@@ -253,8 +251,7 @@ describe('team builder edited assumptions', () => {
   });
 
   test('the displayed enrichment and the built set agree on the guessed moves', () => {
-    // The app builds teams from ENRICHED infos — what the stats panel shows
-    // must be what the simulator plays (the GPL Body Press split).
+    // The app builds teams from ENRICHED infos: what the stats panel shows must be what the simulator plays (the GPL Body Press split).
     const p1Info = {
       pokemon: [{
         species: 'Cobalion',
@@ -325,7 +322,7 @@ describe('team builder edited assumptions', () => {
 
     const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, setAssumptions });
 
-    // The revealed Super Fang contradicts the Specs set — the Boots set wins
+    // The revealed Super Fang contradicts the Specs set, the Boots set wins
     // and fills item + unrevealed moves as one coherent unit.
     expect(p1Team[0].moves).toEqual(['Super Fang', 'Taunt', 'Roost', 'Hurricane']);
     expect(p1Team[0].item).toBe('Heavy-Duty Boots');
@@ -356,9 +353,7 @@ describe('team builder edited assumptions', () => {
 
     const { p1Team } = buildTeamsFromReplay(baseLog, { p1Info, setAssumptions });
 
-    // Below the floor: the set is not adopted as a unit — revealed moves lead
-    // and its moves serve only as ordinary marginal fills (today's assembly),
-    // exactly the pre-selection behavior.
+    // Below the floor: the set is not adopted as a unit; revealed moves lead and its moves serve only as ordinary marginal fills.
     expect(p1Team[0].moves).toEqual(['Boomburst', 'Shadow Ball', 'Draco Meteor', 'Hurricane']);
   });
 
@@ -511,9 +506,8 @@ describe('team sheet display overlay', () => {
   });
 
   test('chat-posted sheets feed the BUILT teams, not just the display', () => {
-    // Draft T14 root cause: Talonflame's Heavy-Duty Boots (and Defog) sat in
-    // the chat-posted sheet, but the builder only consumed |showteam| embeds
-    // — the simulated Talonflame paid Stealth Rock entries it never takes.
+    // A Talonflame with Heavy-Duty Boots (and Defog) sat in the chat-posted sheet, but the builder only consumed |showteam| embeds: the simulated Talonflame
+    // paid Stealth Rock entries it never takes.
     const log = [
       '|player|p1|Alice|1|',
       '|player|p2|Bob|2|',
@@ -566,10 +560,8 @@ describe('team sheet display overlay', () => {
 });
 
 describe('happiness assumption for guessed sets', () => {
-  // Showdown's teambuilder assumption: Frustration users run 0 happiness
-  // (BP 102). Nothing set `happiness` at all, so the sim default 255 made
-  // every guessed Frustration hit at BP 1. Return needs no action — the
-  // default 255 IS max happiness (BP 102).
+  // Showdown's teambuilder assumption: Frustration users run 0 happiness (BP 102). A set without `happiness` leaves the sim default 255, which made every
+  // guessed Frustration hit at BP 1. Return needs no action: the default 255 IS max happiness (BP 102).
   const gen6Log = (moveLine: string) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|6', '|tier|[Gen 6] OU',
     '|poke|p1|Lopunny, F|', '|poke|p2|Chansey, F|',
@@ -650,8 +642,7 @@ describe('hidden-power substitution in built teams', () => {
     const manectric = enriched.pokemon.find(mon => mon.species === 'Manectric')!;
     const hpMove = manectric.moves.find(move => move.name === 'Hidden Power Ice');
     expect(hpMove).toBeTruthy();
-    // The generic reveal stays a reveal — only the displayed name is typed,
-    // and the detail names the source of the typing.
+    // The generic reveal stays a reveal: only the displayed name is typed, and the detail names the source of the typing.
     expect(hpMove!.source).toBe('revealed');
     expect(hpMove!.sourceDetail).toBe('HP type via evidence/usage');
   });

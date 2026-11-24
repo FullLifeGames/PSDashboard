@@ -3,7 +3,7 @@ import { worstAnswer } from '../src/turn-analysis/worst-answer';
 import type { EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../src/types';
 
 /**
- * Round 89 (#153): the reply that hurts a row most. The lowest cell of the row among the cells the result trusts (verified, or the
+ * The reply that hurts a row most. The lowest cell of the row among the cells the result trusts (verified, or the
  * visits the hindsight read asks for, or every cell when the result carries no cell statistics), else the row's own floor
  * (`punishedBy`), else none. Singles and doubles boards read the same matrix.
  */

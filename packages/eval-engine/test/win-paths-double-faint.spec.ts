@@ -5,7 +5,7 @@ import { luckPath } from '../src/endgame/win-paths/luck';
 import { mon, REQUEST, serializedBoard, type Board } from './win-paths-support';
 
 /**
- * Round 89 (#130), G13b (the tester's question 11): a luck path or a mistake path may end with both last bodies fainting in one turn.
+ * A luck path or a mistake path may end with both last bodies fainting in one turn.
  * Who wins then is the simulator's call and varies by generation and by what caused it; this file holds no rule of its own. Each row
  * plays one 1 v 1 turn on a fresh battle of a generation (every body at 1 HP, so the move that lands also takes its user down) and
  * compares what the simulator says (`battle.winner`, the order of the `|faint|` lines) with `wonBy`, the reading the win paths use.

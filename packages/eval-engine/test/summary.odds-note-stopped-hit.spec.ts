@@ -5,14 +5,12 @@ import type { PlayedTurn } from '../src/played';
 import type { EvalMatrix, EvalResult, KoOddsInfo, RankedChoice } from '../src/types';
 
 /**
- * Round 70 (gate of 13.10.2026 20:26, 4a): the "True odds" note quotes reply-independent KO odds of a line ("Tera Starstorm
- * kills ~4% of the time"), priced on the board before the turn. When the opponent's actual pair stops that hit (Wide Guard turns
- * Tera Starstorm away, a Protect turns a single hit away) the note quotes a roll that never happened. VGC 2630685175 turn 7 in
- * the full answer form said it twice. The stop is read from the cell of the line against the click, which the search priced
- * from the simulator's own turn: a cell the planner finds plain (no accuracy roll and no kill range in it) holds no roll of any
- * hit, and a doubles cell lists its events with the move that makes each (`p1b:terastarstorm>p2b=hit-nokill`), so a claim whose
- * attacker slot and move have no event there never landed. A cell the search did not plan, a failed plan, and a claim the cell
- * still lists keep the note, and so does a singles cell holding a roll (its classes name no move).
+ * The "True odds" note quotes reply-independent KO odds of a line ("Tera Starstorm kills ~4% of the time"), priced on the board before the turn. When the
+ * opponent's actual pair stops that hit (Wide Guard turns Tera Starstorm away, a Protect turns a single hit away) the note must not quote a roll that never
+ * happened (VGC 2630685175 turn 7 said it twice). The stop is read from the cell of the line against the click, which the search priced from the simulator's own
+ * turn: a cell the planner finds plain (no accuracy roll and no kill range in it) holds no roll of any hit, and a doubles cell lists its events with the move that
+ * makes each (`p1b:terastarstorm>p2b=hit-nokill`), so a claim whose attacker slot and move have no event there never landed. A cell the search did not plan, a
+ * failed plan, and a claim the cell still lists keep the note, and so does a singles cell holding a roll (its classes name no move).
  */
 
 type Cell = NonNullable<EvalMatrix['cells']>[number][number];
@@ -38,7 +36,6 @@ interface Scene {
   /** The own side's lines: the engine's best (rank 0) and the played one (regret 0.12, an inaccuracy). */
   best: Line;
   played: Line;
-  /** The opponent's clicked line and one more. */
   click: Line;
   other: Line;
   ownPlayed: Played;
@@ -210,12 +207,7 @@ describe('the paid-off read quotes the click\'s odds the same way', () => {
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
-/**
- * Round 63 (T19, decision 15): a proof under the spoken mass still speaks on
- * the card when the bar sits at least 0.1 under the proven win — the open
- * event is why the number is lower. A proof whose open branch wins anyway
- * keeps the bar near the win and stays quiet.
- */
+/** A proof under the spoken mass still speaks on the card when the bar sits at least 0.1 under the proven win; a proof whose open branch wins anyway keeps the bar near the win and stays quiet. */
 describe('the open event of a forced win under 0.9', () => {
   const resultWith = (score: number, forcedWin: EvalResult['forcedWin'], extra: Partial<EvalResult> = {}): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
@@ -401,7 +393,7 @@ describe('predictive-read', () => {
   });
 
   describe('the hindsight read and the likeliest click', () => {
-    // The round-13 shape: a wide board on both sides, a shift without a culprit.
+    // A wide board on both sides, a shift without a culprit.
     const wide: EvalResult = {
       score: 0.0, interval: 0.3, depthCompleted: 1,
       perSide: {
@@ -457,7 +449,6 @@ describe('predictive-read', () => {
   });
 });
 
-/** Round 63 (T18): the small sentences of the turn card and the game report. */
 describe('T18 point 6: the read clause names the click with a verb that fits the odds', () => {
   /** A gamble that paid off (Hydro Pump gave up a mistake-sized floor and landed), with the given odds on the click. */
   const paidRead = (koOdds: KoOddsInfo): string => {
@@ -523,7 +514,7 @@ describe('T18 point 1: the near sentence waits for a quarter of the bodies to fa
     expect(summarizeTurn(early, names)).not.toContain('from clearing the rest');
     expect(summarizeTurn(at(result, 0.25), names))
       .toContain('Medicham-Mega is one 90% roll from clearing the rest; removing Keldeo leaves no answer behind.');
-    // Without a known share the gate stays off (the card of a caller that passes none reads as before).
+    // Without a known share the gate stays off.
     expect(at(result).p2.nearDecided?.announce).toBe(true);
   });
 
@@ -575,7 +566,6 @@ describe('T18 point 2: a side is called practically decided once, and never afte
     const t37 = at(decidedResult('p2', 'Lopunny-Mega', -0.85, { species: 'Ferrothorn', removes: 'Tornadus-Therian' }), proven);
     expect(t37.p2.nearDecided?.announce).toBe(false);
     expect(summarizeTurn(t37, names)).not.toContain('from clearing the rest');
-    // The other side's stages are its own.
     expect(at(decidedResult('p1', 'Keldeo', 0.9), proven).p1.decided?.announce).toBe(true);
   });
 });

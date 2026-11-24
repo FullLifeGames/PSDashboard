@@ -9,12 +9,9 @@ import type { EvalCellJob, EvalSettings, MctsTreeStats } from '../src/types';
 import type { PlayedAction } from '../src/played';
 
 /**
- * Round 63 (T78): the verify step checks the played row and column in both
- * game types, and a doubles tree's boundary cells come from the pair plan.
- * Before, the verify set was support × support plus the ranked top three,
- * and a doubles tree flagged no boundary cell (planCellEvents gives up on
- * comma choices), so VGC 2629703929 t13 never priced Flare Blitz's 58 %
- * kill on Solgaleo and p2's winning Psychic Fangs read as an inaccuracy.
+ * The verify step checks the played row and column in both game types, and a doubles tree's boundary cells come from the pair plan: a doubles tree flags no boundary cell
+ * on its own (planCellEvents gives up on comma choices), so VGC 2629703929 t13 would never price Flare Blitz's 58 % kill on Solgaleo and p2's winning Psychic Fangs would
+ * read as an inaccuracy.
  */
 
 const position = (name: string) =>
@@ -44,7 +41,7 @@ describe('the played row and column join the verify set (round 63, T78)', () => 
       const trees = [mk([...p1], [...p2]), mk([...p1], [...p2]), mk([...p1], [...p2])];
       const merged = mergeMctsTrees(trees);
       const pairs = (jobs: EvalCellJob[]) => jobs.map(job => cellKey(job.i, job.j));
-      // E is neither support nor among the ranked top three: today it is never checked.
+      // E is neither support nor among the ranked top three: the starved-support cells do not reach it without the played focus.
       expect(pairs(starvedSupportCells(trees, merged))).not.toContain(cellKey(4, 0));
       const focus = { played: { p1: 4 } };
       const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus);

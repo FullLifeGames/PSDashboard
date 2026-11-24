@@ -6,7 +6,7 @@ import { WinMeter } from '../src/endgame/win-paths/budget';
 import { mon, serializedBoard, type Board } from './win-paths-support';
 
 /**
- * Round 89 (#130, D1): the engine's first choice past the root is the best row of the one-turn matrix. The matrix is the solver at one
+ * The engine's first choice past the root is the best row of the one-turn matrix. The matrix is the solver at one
  * turn (`solveEndgame` with `turns: 1`), so its value must equal the solver's; the first choice takes the damaging move over a Splash,
  * for both sides, singles and doubles, and a position is priced once.
  */

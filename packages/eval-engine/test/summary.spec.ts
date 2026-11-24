@@ -15,11 +15,7 @@ const names: [string, string] = ['Alpha', 'Beta'];
 const ranked = (choice: string, label: string, worstCase: number, expected: number, ev: number, punishedBy: string | null): RankedChoice =>
   ({ choice, label, worstCase, expected, ev, punishedBy });
 
-/**
- * Round 63 (T17, decision 17): praise without a verdict band. Only sides
- * the regret leaves untiered get the new forms; every tiered turn keeps
- * today's sack logic to the letter.
- */
+/** Praise without a verdict band: only sides the regret leaves untiered get the new forms; every tiered turn keeps the sack logic to the letter. */
 describe('the stayed feed without a band (573756 t68)', () => {
   /** p2 leaves Weavile in to die to Body Press: the floor it priced is what came, and the sweep follows. */
   const t68 = (overrides: Partial<AnalyzeTurnParams> = {}, sack: SackInfo = { name: 'Weavile', hpFraction: 0.6, stayed: true }) => {
@@ -219,7 +215,7 @@ describe('the read credit on a doubles pair', () => {
     expect(analysis.p1.tier).toBeUndefined();
     expect(analysis.p1.readCredit).toEqual({ payoff: expect.closeTo(0.6, 6), payoffTurn: 2 });
     expect(analysis.p1.riskPaidOff).toBeUndefined();
-    // Round 63 fix: measured before the rolls; a roll that moved the side gets its luck tail (2629703929 t1: −7%).
+    // Measured before the rolls; a roll that moved the side gets its luck tail (2629703929 t1: −7%).
     const rolled = { ...analysis, scoreAfter: -0.03, chanceDelta: -0.13 };
     const summary = summarizeTurn(rolled, names);
     expect(summary).toContain('Alpha played Tailwind and Solar Beam→Groudon, a read the engine gave no weight: 2 turns later, before the rolls,');
@@ -228,10 +224,8 @@ describe('the read credit on a doubles pair', () => {
 });
 
 /**
- * Round 63 fix: a body the opponent's near-decided click removes is the
- * opponent's way into its sweep, so letting it fall is no win-condition
- * sacrifice (649664 t20: "Medicham-Mega is one sure KO from clearing the
- * rest — removing Lopunny-Mega …", then "BKC fed Lopunny … verified").
+ * A body the opponent's near-decided click removes is the opponent's way into its sweep, so letting it fall is no win-condition sacrifice (649664 t20:
+ * "Medicham-Mega is one sure KO from clearing the rest — removing Lopunny-Mega …", then "BKC fed Lopunny … verified").
  */
 describe('no praise for feeding the body the opponent\'s near sweep removes', () => {
   const stayedFeed = (args: {
@@ -294,10 +288,8 @@ describe('no praise for feeding the body the opponent\'s near sweep removes', ()
 });
 
 /**
- * Round 63 fix: the read credit's gates read the pair's value before the
- * rolls, so its sentence says so, and it names the turn's own luck when the
- * rolls moved the side by an inaccuracy or more (649664 t15: "+16% over the
- * safe Hydro Pump (47% guaranteed)" while devin's bar ended on the floor).
+ * The read credit's gates read the pair's value before the rolls, so its sentence says so, and it names the turn's own luck when the rolls moved the side by an
+ * inaccuracy or more (649664 t15: "+16% over the safe Hydro Pump (47% guaranteed)" while devin's bar ended on the floor).
  */
 describe('the read credit says it is measured before the rolls', () => {
   const t13Shape = (scoreAfter: number) => {
@@ -334,7 +326,7 @@ describe('the read credit says it is measured before the rolls', () => {
   });
 
   test('singles, 649664 t15 shape: when the rolls took the gain back, the luck tail says so for the side', () => {
-    // Round 67 (T59): the side holds its ground here (−0.09); 649664 t15 itself moved +0.016 for devin on the base.
+    // The side holds its ground here (−0.09); 649664 t15 itself moved +0.016 for devin.
     expect(t13Shape(0.15)).toContain('On top of that, luck contributed −7% for Beta.');
     // A turn that cost the side at least 0.1 gets no credit at all.
     expect(t13Shape(0.3)).not.toContain('a read the engine gave no weight');
@@ -351,7 +343,6 @@ const SEEN = { visits: 20, verified: false };
 interface Shape {
   p1Choices: string[]; p1Labels: string[]; p1Ev: number[];
   p2Choices: string[]; p2Labels: string[];
-  /** p1-perspective cell values. */
   values: number[][];
   played: PlayedTurn;
 }
@@ -516,7 +507,7 @@ describe('the card sentences quote a read only where its cell holds (gate of 12.
       expect(readOf(make, cellsWith({ visits: 7, verified: false }))?.thin).toBe(true);
       expect(readOf(make, cellsWith({ visits: 8, verified: false }))?.thin).toBeUndefined();
       expect(readOf(make, cellsWith({ visits: 2, verified: true }))?.thin).toBeUndefined();
-      // No cells (matrix mode, a result from before the field) is matrix grade: it passes.
+      // No cells (matrix mode, a result without the field) is matrix grade: it passes.
       expect(readOf(make)?.thin).toBeUndefined();
     });
 
@@ -565,7 +556,6 @@ describe('the merge writes the visits and the verified flag of every cell', () =
     // Index-aligned with the values the equilibrium was solved over.
     expect(merged.matrix!.cells!.length).toBe(merged.matrix!.values.length);
     expect(merged.matrix!.cells![0].length).toBe(merged.matrix!.values[0].length);
-    // Without verification nothing is verified.
     expect(mergeMctsTrees([t1, t2]).matrix!.cells!.flat().some(entry => entry.verified)).toBe(false);
   });
 });

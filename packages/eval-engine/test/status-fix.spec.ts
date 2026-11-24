@@ -9,13 +9,9 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 69 (T102, decision 17): statusFix, the part of the status multiplier of
- * `bodies` that is wrong for a body whose ability changes what the status
- * costs. The right multiplier is played in the simulator (score/status-factor.ts).
- * This spec holds it to a second reading of the simulator, whole turns of real
- * battles (HP over a turn, damage dealt and taken, speed) for every ability
- * under every status, on the singles format, the doubles format and the
- * Champions mod, and then checks the feature on boards of both game types.
+ * statusFix is the part of the status multiplier of `bodies` that is wrong for a body whose ability changes what the status costs; the right multiplier is played
+ * in the simulator (score/status-factor.ts). This spec holds it to whole turns of real battles (HP over a turn, damage dealt and taken, speed) for every ability under
+ * every status, on singles, doubles and the Champions mod, and checks the feature on boards of both game types.
  */
 await loadSimMods('gen9championscustomgame');
 
@@ -39,7 +35,6 @@ const body = (species: string, ability: string, moves: string[], champions: bool
 const isDoubles = (format: string) => format === DOUBLES || format === CHAMPIONS_DOUBLES;
 const isChampions = (format: string) => format === CHAMPIONS || format === CHAMPIONS_DOUBLES;
 
-/** One whole turn on a fresh battle of the format: the first mon of p1 (with the status) against a plain Snorlax. */
 function turnOn(format: string, ability: string, status: string | null, choice: { mine: string; foe: string }, seed: number[]): { mine: number; foe: number; speed: number } | null {
   const doubles = isDoubles(format);
   const champions = isChampions(format);
@@ -64,9 +59,8 @@ function turnOn(format: string, ability: string, status: string | null, choice: 
 }
 
 /**
- * The seeds of a status's turns: up to three where a plain mon with the status is not stopped by the dice, the same
- * for every ability so the rolls match. An ability can move the draws of a turn (Prankster moves first, Shed Skin
- * rolls at the end), so a channel is read as the median over the seeds, which drops a critical hit of one of them.
+ * The seeds of a status's turns: up to three where a plain mon with the status is not stopped by the dice, the same for every ability so the rolls match. An ability
+ * can move the draws of a turn (Prankster moves first, Shed Skin rolls at the end), so a channel is read as the median over the seeds, which drops a critical hit of one of them.
  */
 const seeds = new Map<string, number[][]>();
 function seedsOf(format: string, status: string | null): number[][] {
@@ -115,7 +109,6 @@ function readingOn(format: string, ability: string, status: string | null, seed:
 // Whole turns carry the damage rolls (the dice move with the order of the moves and the draws of an ability), up to 15 % of a hit; the abilities move a channel by a third or more.
 const tolerance = (value: number) => Math.max(0.18 * Math.abs(value), 3);
 
-/** The right multiplier from the readings: 1 where the status turns into a gain, else the cost recovered. */
 function playedRight(format: string, ability: string, status: string, applied: number): number {
   const baseHealthy = playedReading(format, 'noability', null, status)!;
   const baseStatused = playedReading(format, 'noability', status, status)!;
@@ -134,10 +127,9 @@ function playedRight(format: string, ability: string, status: string, applied: n
 const appliedOf = (status: string) => EVAL_WEIGHTS.status[status] ?? 1;
 
 /**
- * The full sweep plays every gen 9 ability under four statuses on four formats and takes about six minutes
- * (EVAL_CHECK_FULL=1). The default run plays a subset that still reaches every rule the checker has:
- * the abilities that change what a status costs, the ones that cut or turn it aside, the dice abilities,
- * every ability the Champions mod changes (read from the two Dex, not listed), and every 16th ability of the Dex as a sample of the plain rest.
+ * The full sweep (EVAL_CHECK_FULL=1) plays every gen 9 ability under four statuses on four formats and takes about six minutes. The default run plays the abilities
+ * that change what a status costs, the ones that cut or turn it aside, the dice abilities, every ability the Champions mod changes (read from the two Dex, not
+ * listed), and every 16th ability of the Dex as a sample of the plain rest.
  */
 const FULL = !!process.env.EVAL_CHECK_FULL;
 const NAMED = [
@@ -152,7 +144,6 @@ const serialised = (ability: object) => JSON.stringify(ability, (_key, value) =>
 type AbilityDex = { abilities: { get(id: string): object } };
 type AbilityEntry = { id: string };
 
-/** The abilities one format plays: all of them in the full sweep, else the subset above. */
 function sweptAbilities(all: AbilityEntry[], dex: AbilityDex, baseDex: AbilityDex): AbilityEntry[] {
   if (FULL) return all;
   const ids = new Set(all.map(ability => ability.id));
@@ -289,7 +280,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
     expect({ ...skipped, statusFix: all.statusFix }).toEqual(all);
   });
 
-  // Round 69 (S9, T102): the fold. Standard singles prices statusFix at the weight of bodies; the other tables hold it at 0.
+  // Standard singles prices statusFix at the weight of bodies; the other tables hold it at 0.
   test('the score is the sum over every key with a statused Poison Heal body, and only the singles table prices the fix', () => {
     const battle = board(format, 'Poison Heal', 'tox');
     const ruleset = isChampions(format) ? 'champions' : 'standard';
@@ -306,7 +297,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
       const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
       return Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
     };
-    // The sum is the table's: the singles phase form (S9) is off here and pinned in phase-form.spec.ts.
+    // The sum is the table's: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     expect(evaluatePosition(battle, cache)).toBe(scoreOf(false));
     if (priced) expect(evaluatePosition(battle, cache)).toBeGreaterThan(scoreOf(true));

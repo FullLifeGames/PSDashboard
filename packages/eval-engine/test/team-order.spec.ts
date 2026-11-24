@@ -21,20 +21,16 @@ import { extractLeads, findPokemonOnSide } from '../src/branch/protocol-choices'
 import { set } from './named-games-support';
 
 /**
- * Round 88 (T327, #63): a body the log never shows stays on the field after a simulator-only faint. In VGC 2565721987 the simulator
- * knocks out Iron Bundle at turn 5 and Miraidon at turn 6, where the log leaves them at 1 and 23 hit points. The replacement round
- * sends Kyogre and Archaludon in, who never come out in the log, and the guard of `retireUnshownBench` refuses (the simulator forces a
- * slot the log did not faint). The boundary correction revives the two bodies from the snapshot, which moves Kyogre back to the bench,
- * and Archaludon stays on p1b. At turn 7 the log has one living body of p1 (Miraidon, with p1b empty after Iron Bundle's faint) and
- * the position had three.
+ * A body the log never shows stays on the field after a simulator-only faint. In VGC 2565721987 the simulator knocks out Iron Bundle at turn 5 and Miraidon at turn 6,
+ * where the log leaves them at 1 and 23 hit points. The replacement round sends Kyogre and Archaludon in, who never come out in the log, and the guard of
+ * `retireUnshownBench` refuses (the simulator forces a slot the log did not faint). The boundary correction revives the two bodies from the snapshot, which moves Kyogre
+ * back to the bench, and Archaludon stays on p1b. At turn 7 the log has one living body of p1 (Miraidon, with p1b empty after Iron Bundle's faint) and the position had three.
  *
- * The replay is a fixture copy (`fixtures/gen9vgc2026regi-2565721987.json`, the log of the VGC holdout's game, ruling 8 of round 88),
- * rebuilt with the teams the log alone gives, as the engine package's other replay rows do: the scene reproduces without Smogon data.
- * The sweep over the abilities with an End handler is `unshown-body-sweep.spec.ts`.
+ * The replay is a fixture copy (`fixtures/gen9vgc2026regi-2565721987.json`, the log of the VGC holdout's game), rebuilt with the teams the log alone gives, as the
+ * engine package's other replay rows do: the scene reproduces without Smogon data. The sweep over the abilities with an End handler is `unshown-body-sweep.spec.ts`.
  *
- * Round 89 (#116): the bring list names the Ditto's own species now, so the rebuild of 2565721987 fields the four bodies the log
- * shows and Kyogre and Archaludon no longer enter the battle: the scene above needs the six-body team, and this describe rebuilds
- * without `bringOnly` (the other describes keep the app's own reading).
+ * The bring list names the Ditto's own species, so the rebuild of 2565721987 fields the four bodies the log shows and Kyogre and Archaludon never enter the battle:
+ * the scene above needs the six-body team, and this describe rebuilds without `bringOnly` (the other describes keep the app's own reading).
  */
 
 const replayOf = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;

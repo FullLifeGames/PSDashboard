@@ -12,7 +12,7 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
 /**
- * Round 88 (T327, #63): the sweep of the body the log never shows. The simulator's own replacement round can send a bench body onto
+ * The sweep of the body the log never shows. The simulator's own replacement round can send a bench body onto
  * a slot that the log leaves empty (VGC 2565721987: the simulator knocks out a body at 1 hit point that the log keeps alive, so it
  * forces a replacement the log does not have, and the unshown body stays on the field after the correction revived the log's own).
  * `retireUnshownActives` takes such a body out the way the simulator takes a fainted body out (`takeBodyOut`: the End events of its
@@ -57,7 +57,6 @@ const plain = (rules: Rules, species: string): PokemonSet => mon(rules, { specie
 const foes = (rules: Rules, mode: Mode) =>
   mode === 'singles' ? [witness(rules), plain(rules, 'Blissey')] : [witness(rules), plain(rules, 'Chansey'), plain(rules, 'Blissey')];
 
-/** The log of a battle's first turn, as the snapshot reader takes it (no split lines). */
 function startLog(battle: Battle): string {
   const lines = battle.log;
   return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
@@ -88,7 +87,6 @@ function doublesScene(rules: Rules, ability: string, bench: Bench): Scene {
   return { battle: battle as unknown as SimBattle, snapshot, stranger: battle.sides[0].pokemon[1] };
 }
 
-/** The scene in singles: the log has the witness on the field, the board has the stranger there and the witness behind it. */
 function singlesScene(rules: Rules, ability: string): Scene {
   const game = battleOf(rules.singles, [witness(rules), plain(rules, 'Blissey')], foes(rules, 'singles'));
   const battle = battleOf(rules.singles, [stranger(rules, ability), witness(rules)], foes(rules, 'singles'));

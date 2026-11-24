@@ -12,12 +12,9 @@ import { hazardEntryFraction } from '../src/score/hazards';
 import { evalFeatures } from '../src/score/features';
 
 /**
- * Round 49: the matchup memo must be a function of its key. Super Fang,
- * Nature's Madness and Ruination deal half the target's CURRENT HP, the one
- * live-state read inside the memoized threat, and the key did not carry it:
- * the first forked position to ask froze its HP into the memo for the whole
- * search. The bank read stale values in a fixed order; the app, where a
- * worker pool splits one matrix, read a different value run to run.
+ * The matchup memo must be a function of its key. Super Fang, Nature's Madness and Ruination deal half the target's CURRENT HP, the one live-state read inside the
+ * memoized threat: a key without it lets the first forked position to ask freeze its HP into the memo for the whole search (the bank would read stale values in a
+ * fixed order; the app, where a worker pool splits one matrix, would read a different value run to run).
  */
 
 const makeSet = (species: string, moves: string[]): PokemonSet => ({
@@ -63,9 +60,7 @@ describe('matchup memo (round 49)', () => {
     });
   }
 
-  // The review of the HP fix found the same leak on the types and the stored
-  // stats: both are live reads of the memoized function that a turn can change
-  // without touching species, item, ability or the slots.
+  // The types and the stored stats are live reads of the memoized function too: a turn can change them without touching species, item, ability or the slots.
   test('a type change on either side reaches the memo (Protean, Soak)', () => {
     const battle = makeBattle(makeSet('Meowscarada', ['knockoff', 'flowertrick']), makeSet('Gholdengo', ['shadowball']));
     const attacker = battle.sides[0].active[0];
@@ -83,10 +78,8 @@ describe('matchup memo (round 49)', () => {
     expect(cached(attacker, defender).physical).not.toBe(grass.physical);
   });
 
-  // Round 54: a Tera click changes nothing the key carried. The sim keeps
-  // `types` at the old types and holds the new one in `terastallized`, so the
-  // body before and after the click shared one entry, in both directions.
-  // Under `tera: 'auto'` the app searches both bodies in one tree.
+  // A Tera click changes nothing the key carried: the sim keeps `types` at the old types and holds the new one in `terastallized`, so the body before and after
+  // the click would share one entry, in both directions. Under `tera: 'auto'` the app searches both bodies in one tree.
   test('a Tera click reaches the memo, as attacker and as defender', () => {
     const battle = makeBattle(
       { ...makeSet('Ceruledge', ['splash', 'bitterblade']), teraType: 'Fighting' },
@@ -259,12 +252,9 @@ describe('the memo keys the power at use (round 63, T81)', () => {
 });
 
 /**
- * Round 64 (T125, point 1): Body Press reads the user's Defense and Foul Play
- * the target's Attack (the Dex's overrideOffensiveStat and
- * overrideOffensivePokemon), and the key carried neither. Guard Split and
- * Power Split write those stored stats without touching the four the key
- * did carry, so a pair asked before the split kept its old answer for the
- * whole search. The splits run in the simulator here.
+ * Body Press reads the user's Defense and Foul Play the target's Attack (the Dex's overrideOffensiveStat and overrideOffensivePokemon), and the key must carry both:
+ * Guard Split and Power Split write those stored stats without touching species, item, ability or the slots, so a pair asked before the split would keep its old
+ * answer for the whole search. The splits run in the simulator here.
  */
 describe('the memo keys the stats a move reads off its axis (round 64, T125)', () => {
   /** The pair is asked before the turn; after it the memo must answer like a fresh reading, and the answer must have moved. */
@@ -479,7 +469,7 @@ describe('tera-statics', () => {
       const [gholdengo, dragonite] = [battle.sides[0].active[0], battle.sides[1].active[0]];
       const steelBefore = singleMoveFraction(dragonite, gholdengo, 'ironhead', battle);
       clickTera(battle);
-      // Dragon into Fairy is an immunity, Steel into Fairy is super effective (was resisted).
+      // Dragon into Fairy is an immunity, Steel into Fairy is super effective.
       expect(singleMoveFraction(dragonite, gholdengo, 'outrage', battle)).toBe(0);
       expect(singleMoveFraction(dragonite, gholdengo, 'ironhead', battle)).toBeCloseTo(steelBefore * 4, 6);
     });
@@ -505,8 +495,7 @@ describe('tera-statics', () => {
       expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
       clickTera(battle);
       expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
-      // Body Press deals damage off the user's Defense (the Dex's overrideOffensiveStat), so since round 63
-      // (T81) it keeps its own entry in PairThreat.axes instead of the physical bucket.
+      // Body Press deals damage off the user's Defense (the Dex's overrideOffensiveStat), so it keeps its own entry in PairThreat.axes instead of the physical bucket.
       expect(cached(zamazenta, ceruledge).axes?.find(axis => axis.offense === 'def')?.fraction).toBeGreaterThan(0.3);
     });
 
@@ -532,7 +521,7 @@ describe('tera-statics', () => {
         expect(after).toBe(0);
       });
 
-      // Grounding goes through the sim's isGrounded(), which saw Tera before this round.
+      // Grounding goes through the sim's isGrounded(), which sees Tera.
       test('Spikes already follow the grounding in both directions', () => {
         expect(entryAcrossTheClick('Garchomp', 'Flying', 'spikes')).toEqual({ before: 0.125, after: 0 });
         expect(entryAcrossTheClick('Corviknight', 'Steel', 'spikes')).toEqual({ before: 0, after: 0.125 });
@@ -551,11 +540,8 @@ describe('tera-statics', () => {
     });
   });
 
-  // STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0, Stellar
-  // 2.0 and 1.2 on the first use of a type) was built and parked in round 54
-  // (T71) and lands with T81 in round 63; test/threat.stab-rules.spec.ts holds it
-  // against the damage the simulator deals. Blissey takes Ground and Fire
-  // neutrally, so the ratio across the click is the STAB ratio.
+  // STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0, Stellar 2.0 and 1.2 on the first use of a type); test/threat.stab-rules.spec.ts holds it
+  // against the damage the simulator deals. Blissey takes Ground and Fire neutrally, so the ratio across the click is the STAB ratio.
   describe('STAB follows the Tera click (round 63, T81)', () => {
     test.each([['Ground', 'earthquake', 2 / 1.5], ['Fire', 'firefang', 1.5], ['Stellar', 'earthquake', 2 / 1.5]])(
       'Tera %s moves %s by x%f', (teraType, move, ratio) => {
@@ -593,7 +579,7 @@ describe('tera-statics', () => {
       return singleMoveFraction(battle.sides[0].active[0], battle.sides[1].active[0], move, battle);
     };
 
-    // gen9doublesou-2660822493 t2: Hurricane into Shiftry priced 277 % of its HP, the calc 0.
+    // gen9doublesou-2660822493 turn 2: Hurricane into Shiftry priced 277 % of its HP, the calc 0.
     test('Wind Rider takes no wind move; Wind Power still does', () => {
       const tornadus = makeSet('Tornadus', ['hurricane']);
       expect(fraction(tornadus, makeSet('Shiftry', ['splash'], { ability: 'Wind Rider' }), 'hurricane')).toBe(0);
