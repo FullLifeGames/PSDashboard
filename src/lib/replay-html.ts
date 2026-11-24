@@ -116,7 +116,7 @@ const REPLAY_BRIDGE_BODY = `
     setTimeout(function() { waitSeekEnd(battle); }, 100);
   }
 
-  // Ids of the play seeks already run: the app sends one request with retries, all under one id (round 88, T347).
+  // Ids of the play seeks already run: the app sends one request with retries, all under one id.
   var lastPlaySeekId = null;
 
   function applySeek() {
