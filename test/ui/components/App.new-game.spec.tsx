@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
-import { deleteGame, listGames, saveGame } from '../../../src/lib/new-game/store';
+import { deleteGame, listGames, loadGame, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
 import { encodeBranchShare, encodeShareJson, readShare } from '../../../src/lib/branch-share';
@@ -394,6 +394,22 @@ describe('the replay loader in the app', () => {
     await userEvent.click(toggle());
     expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(second.id);
   });
+
+  test('Load with the Smogon hosts down names both notices in the top bar', async () => {
+    // The VGC fixture: the Smogon modules cache an earlier answer per format and species, and no other row loads it.
+    const replay = replayData('vgc');
+    const fetchMock = stubReplayFetch([replay]);
+    const served = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => (String(input).includes('replay.pokemonshowdown.com')
+      ? served(input, init)
+      : Promise.reject(new TypeError('Failed to fetch'))));
+    render(<App />);
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    await userEvent.clear(input);
+    await userEvent.type(input, `${replay.id}{Enter}`);
+    await screen.findByText('Smogon sets unavailable', undefined, { timeout: 30_000 });
+    expect(await screen.findByText('Smogon stats unavailable', undefined, { timeout: 30_000 })).toBeInTheDocument();
+  }, 90_000);
 });
 
 /** Text and state of the app's own markup: no replay iframe, so they run here. */
@@ -447,4 +463,53 @@ describe('the start page and the Load panel', () => {
     expect(panel()).toBeNull();
     await act(async () => {});
   }, 60_000);
+});
+
+async function openGame(turns: number) {
+  const record = await playedRecord(turns);
+  window.history.replaceState(null, '', `/?game=${record.id}`);
+  render(<App />);
+  await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+  return record;
+}
+
+/** Setup, Import/Export Sets: every Protect becomes Rest, so the second turn (both sides played Protect) no longer plays. */
+async function importWithoutProtect(): Promise<string> {
+  await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Import / Export Sets' }, { timeout: 60_000 });
+  const field = dialog.querySelector('textarea') as HTMLTextAreaElement;
+  const typed = field.value.replace(/- Protect/g, '- Rest');
+  fireEvent.change(field, { target: { value: typed } });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
+  return typed;
+}
+
+/** The hook specs (`useGameTeamEdit.spec.tsx`, `useNewGame.spec.tsx`) hold the question for singles and doubles; these rows run it through the app. */
+describe('a team edit that cuts played turns asks first (H14a)', () => {
+  beforeEach(() => { stubReplayFetch([]); });
+
+  test('Cancel leaves the game and its saved record as they were; Apply edit cuts it and says where the line ends', async () => {
+    const record = await openGame(3);
+    expect(record.turns).toBe(3);
+    const typed = await importWithoutProtect();
+    const question = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
+    expect(question).toHaveTextContent(/This edit makes \d+ played turns? invalid\./);
+    expect(question).toHaveTextContent('the game keeps its first turn');
+    expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
+    expect(loadGame(record.id)!.turns).toBe(3);
+    await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(loadGame(record.id)!.turns).toBe(3);
+    expect(listGames()[0].turns).toBe(3);
+    expect(loadGame(record.id)!.teams).toEqual(record.teams);
+    const back = screen.getByRole('dialog', { name: 'Import / Export Sets' });
+    expect((back.querySelector('textarea') as HTMLTextAreaElement).value).toBe(typed);
+    await userEvent.click(within(back).getByRole('button', { name: 'Import' }));
+    const again = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
+    await userEvent.click(within(again).getByRole('button', { name: 'Apply edit' }));
+    await waitFor(() => expect(loadGame(record.id)!.turns).toBe(1), { timeout: 120_000 });
+    expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
+    await waitFor(() => expect(screen.getByText(/The edited team cannot play every turn\. The game keeps its first turn/)).toBeInTheDocument());
+  }, 360_000);
 });
