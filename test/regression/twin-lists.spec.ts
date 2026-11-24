@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { nearPairs, newTwins, placesOf, twinsOf } from '../../scripts/twin-lists.mjs';
+import { groupsOf, nearPairs, newTwins, placesOf, twinsOf } from '../../scripts/twin-lists.mjs';
 
 /**
  * The twin detector. AGENTS.md says one rule lives in one module and a deliberate copy gets a spec that compares the two.
@@ -19,6 +19,9 @@ import { nearPairs, newTwins, placesOf, twinsOf } from '../../scripts/twin-lists
 const SCRIPT = fileURLToPath(new URL('../../scripts/twin-lists.mjs', import.meta.url));
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
 const made: string[] = [];
+
+let real: ReturnType<typeof placesOf> | undefined;
+const realPlaces = () => (real ??= placesOf(REPO));
 
 /** A tree with packages/a/src, packages/b/src and src, from `{ "<path>": "<text>" }`. */
 function tree(files: Record<string, string>): string {
@@ -115,8 +118,8 @@ describe('the cheap test before the parser', () => {
   });
 
   test('on the real tree the parser sees no list the cheap test dropped', () => {
-    const keys = (prefilter: boolean) => [...placesOf(REPO, undefined, { prefilter }).keys()].sort();
-    expect(keys(true)).toEqual(keys(false));
+    const keys = (places: ReturnType<typeof placesOf>) => [...places.keys()].sort();
+    expect(keys(realPlaces())).toEqual(keys(placesOf(REPO, undefined, { prefilter: false })));
   });
 });
 
@@ -146,17 +149,17 @@ describe('the command', () => {
     expect(failing.stderr + failing.stdout).toContain(`${B}:1`);
     writeFileSync(path.join(root, 'twin-baseline.json'), JSON.stringify({ groups: { [KEY]: [A, B] } }));
     expect(run('--root', root, '--baseline', path.join(root, 'twin-baseline.json')).status).toBe(0);
+    const json = run('--root', root, '--json');
+    expect(json.status).toBe(0);
+    expect(JSON.parse(json.stdout)).toEqual({ groups: { [KEY]: [A, B] } });
   });
 
-  test('on the real tree it exits 0 and finds the groups the baseline holds', () => {
+  test('on the real tree the groups are the ones the baseline holds', () => {
     const baseline = JSON.parse(readFileSync(path.join(REPO, 'scripts', 'twin-baseline.json'), 'utf8')) as { groups: Record<string, string[]> };
-    const result = run('--json');
-    expect(result.status).toBe(0);
-    const found = JSON.parse(result.stdout) as { groups: Record<string, string[]> };
-    expect(Object.keys(found.groups).sort()).toEqual(Object.keys(baseline.groups).sort());
+    expect(Object.keys(groupsOf(realPlaces())).sort()).toEqual(Object.keys(baseline.groups).sort());
     // The baseline only shrinks, so a floor on the twins would fail the day a lane
     // removes one; the floor stays on the lists the detector reads, which keeps a blind detector red.
-    expect(placesOf(REPO).size).toBeGreaterThan(30);
+    expect(realPlaces().size).toBeGreaterThan(30);
   });
 });
 
@@ -167,6 +170,6 @@ describe('scripts/update-name-baseline.mjs, the twin half', () => {
     expect(diff.added).toEqual(['a,b,c: w.ts']);
     expect(diff.removed).toEqual(['a,b,c: y.ts', 'a,b,c: z.ts']);
     const shipped = JSON.parse(readFileSync(path.join(REPO, 'scripts', 'twin-baseline.json'), 'utf8')) as { groups: Record<string, string[]> };
-    expect(diffTwins(shipped.groups, twinsOf(REPO)).added).toEqual([]);
+    expect(diffTwins(shipped.groups, groupsOf(realPlaces())).added).toEqual([]);
   });
 });

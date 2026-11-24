@@ -104,14 +104,18 @@ export function placesOf(root, folders = TWIN_FOLDERS, { prefilter = true } = {}
 
 const filesOf = spots => [...new Set(spots.map(spot => spot.file))].sort();
 
-/** `{ "<key>": ["<file>", ...] }` for every list that stands in 2 or more files. */
-export function twinsOf(root, folders = TWIN_FOLDERS) {
+/** `{ "<key>": ["<file>", ...] }` for every list of `places` (`placesOf`) that stands in 2 or more files; `twinsOf` reads the places itself. */
+export function groupsOf(places) {
   const groups = {};
-  for (const [key, spots] of [...placesOf(root, folders)].sort(([a], [b]) => (a < b ? -1 : 1))) {
+  for (const [key, spots] of [...places].sort(([a], [b]) => (a < b ? -1 : 1))) {
     const files = filesOf(spots);
     if (files.length >= 2) groups[key] = files;
   }
   return groups;
+}
+
+export function twinsOf(root, folders = TWIN_FOLDERS) {
+  return groupsOf(placesOf(root, folders));
 }
 
 /** The messages for every pair (list, file) of a group of 2 or more files that the baseline lacks. */
