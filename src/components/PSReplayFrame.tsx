@@ -36,12 +36,12 @@ interface Props {
   seekRequest?: SeekRequest | null;
 }
 
-/** A Showdown replay viewer in an iframe (replay-embed.js); `seekTurn` seeks in place by postMessage, so a turn change keeps the iframe. */
 interface DocumentProps extends Props {
   documentLog: string;
   documentSeekTurn?: number;
 }
 
+/** A Showdown replay viewer in an iframe (replay-embed.js); `seekTurn` seeks in place by postMessage, so a turn change keeps the iframe. */
 export function PSReplayFrame(props: Props) {
   const generation = useLiveDocumentGeneration(props.log, !!props.liveUpdates);
   const key = props.liveUpdates

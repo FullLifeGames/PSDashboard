@@ -13,7 +13,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
  * calcMove for a body of the Champions mod, has the mod's base power (a power callback excepted), type, category, hit count and the
  * contact, punch, bite, sound and slicing flags. Negative priority is left out: the calculator reads priority only as "greater than
  * zero", so it has no damage effect. A move's data does not depend on the game type, so one run covers singles and doubles. The moves the
- * engine's override layer touches in legal Champions play go to steps/champions-override-moves.json.
+ * engine's override layer touches in legal Champions play are recorded by the last row.
  */
 await loadSimMods('gen9championsou');
 

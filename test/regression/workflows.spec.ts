@@ -76,7 +76,7 @@ describe('the bank workflow', () => {
 
   test('the site build skips a data release of the bank, whose tag may not deploy to github-pages', () => {
     const pages = readFileSync(fileURLToPath(new URL('../../.github/workflows/pages.yml', import.meta.url)), 'utf8').replace(/\r\n/g, '\n');
-    // The condition also waits for the Tests run of a push (release-workflow.spec.ts); the bank's clause leads it.
+    // The condition also waits for the Tests run of a push (the describe 'the nightly deploys a push of master only after its tests passed' above); the bank's clause leads it.
     expect(pages).toMatch(/ {2}build:\n(?: {4}.*\n)*? {4}if: \$\{\{ \(github\.event_name != 'release' \|\| !startsWith\(github\.event\.release\.tag_name, 'bank-data-'\)\) && .* \}\}\n/);
   });
 
@@ -470,7 +470,7 @@ describe('the job names that branch protection reads', () => {
 
   // GitHub matches a check by its whole name, so a matrix job gives one context per entry. The three full-sweep parts are
   // required, the engine job's two entries and the aggregate "Browser flows" stay; the browser parts are no required checks
-  // (browser-flows-parts.spec.ts holds the aggregate).
+  // (the describe 'browser-flows-parts' below holds the aggregate).
   test('the jobs in parts and the required checks keep their names', () => {
     expect(names.filter(name => name === 'Browser flows, part ${{ matrix.part }} of 3')).toHaveLength(1);
     expect(names.filter(name => name !== 'Browser flows, part ${{ matrix.part }} of 3')).toEqual([

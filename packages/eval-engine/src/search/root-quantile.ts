@@ -52,6 +52,7 @@ export function positionKey(position: SimPosition): number {
 export const cellHash = (salt: number, p1Choice: string, p2Choice: string): number =>
   hash32((salt ^ Math.imul(hashText(p1Choice), 0x9e3779b1) ^ Math.imul(hashText(p2Choice) ^ 0x5bd1e995, 0x85ebca6b)) >>> 0);
 
+/** Slots of a cell's seed list: the matrix's five base seeds and eleven probe seeds; the verify round draws all sixteen (`VERIFY_PLAIN_DRAWS`). */
 export const CELL_SEED_SLOTS = 16;
 
 /** The seed list of a root cell, shared by every path; a tied cell's two move orders keep one list (scripts stay out of the key). */

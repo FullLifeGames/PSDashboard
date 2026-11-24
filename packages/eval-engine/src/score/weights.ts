@@ -175,10 +175,11 @@ export const DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
 };
 
 /**
- * VGC outside Champions (doubles; bring six, pick four, level 50): the hand doubles table with a few fitted weights. Written out
- * in full, so a refit of Doubles OU never moves it. Tailwind and coverage stay 0: the matchup term already reads the doubled
- * speed of a Tailwind and coverage grows with the same margins, so a weight would price them twice. pairFocus stays 0: the cell
- * is a 0/1 gate, and a negative weight made the score fall as a foe took damage. `boostsBiting` replaces `boosts`.
+ * VGC outside Champions (doubles; bring six, pick four, level 50): the hand values of the Scarlet/Violet doubles table with bodies,
+ * screens, matchup and Trick Room fitted on VGC games (hazards and choice mismatch held). Written out in full, so a refit of Doubles OU
+ * never moves it. Tailwind and coverage stay 0: the matchup term already reads the doubled speed of a Tailwind and coverage grows
+ * with the same margins, so a weight would price them twice. pairFocus stays 0: the cell is a 0/1 gate, and a negative weight made
+ * the score fall as a foe took damage. `boostsBiting` replaces `boosts`.
  */
 export const VGC_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 177,
@@ -230,8 +231,9 @@ export const CHAMPIONS_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
 };
 
 /**
- * Champions doubles: every Champions doubles format reads this table, fitted on Champions VGC games. Held at the hand doubles
- * table: coverage, hazards, tailwind, Trick Room, choice mismatch. `boostsBiting` replaces `boosts`. Written out in full.
+ * Champions doubles: every Champions doubles format reads this table. Fitted on Champions VGC games: bodies 196, screens 83, matchup 96.
+ * Held at the hand values of the Scarlet/Violet doubles table from before the Doubles OU refit (coverage 40, hazards 0.75, tailwind 68,
+ * Trick Room 87, choice mismatch 40), which is not `DOUBLES_FEATURE_WEIGHTS` today. `boostsBiting` replaces `boosts`. Written out in full.
  */
 export const CHAMPIONS_DOUBLES_FEATURE_WEIGHTS: Record<keyof EvalFeatures, number> = {
   bodies: 196,

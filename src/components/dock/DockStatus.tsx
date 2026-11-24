@@ -29,6 +29,7 @@ export function DockStatus({ source, acquiringExact, executeError, model, diceOp
   model: DockModel;
   diceOpen: boolean;
   game?: boolean;
+  /** The Setup setting "Opponent reads my move" is on: the strip opens with a note and a button that turns it off. */
   opponentReads?: boolean;
   onOpponentReadsChange?: (value: boolean) => void;
 }) {

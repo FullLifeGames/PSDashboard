@@ -20,7 +20,7 @@ export const VERIFY_PLAIN_DRAWS = 16;
  * Outcomes go deeper by descending weight until this share of the cell's open weight is covered; the rarer rest takes its one-ply
  * value shifted by the deepened outcomes' weighted mean step, so no cell mixes depths. A doubles sub-search costs about three
  * singles ones, so doubles goes deeper through the heaviest outcome only; singles keeps 90 %, since the heaviest outcome alone
- * brings back a full-paralysis note the reference does not carry.
+ * brings back a full-paralysis note that the Monte-Carlo reference of the verify scene pins does not carry.
  */
 export const VERIFY_DEEPEN_COVER = { singles: 0.9, doubles: 0 } as const;
 

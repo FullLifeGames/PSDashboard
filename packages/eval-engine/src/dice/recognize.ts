@@ -61,6 +61,7 @@ const inHandler = (battle: Battle): boolean => HANDLERS.has((battle.effect as { 
 /** Gens 2 and 3 draw the die that lets a holder act first at the start of every turn and keep it in `battle.quickClawRoll`. */
 export const rollsAtTurnStart = (gen: number): boolean => gen === 2 || gen === 3;
 
+// The numbers of both rules live in this module; test/dice-recognize.spec.ts holds them to the simulator in every generation and the Champions mod.
 export function genShape(gen: number): GenShape {
   if (gen === 1) return { critHook: false, critCall: 'chance', roll: ROLL_RANGE };
   if (gen === 2) return { critHook: true, critCall: 'random', roll: ROLL_RANGE };

@@ -19,7 +19,9 @@ interface EvalGraphProps {
    * positions (gaps stay gaps). Its points print at `shares`, the fainted share of the variation's own board, never the main line's.
    */
   variation?: VariationSeries | null;
+  /** The game value at team preview; it adds the turn-0 point before turn 1. */
   leadScore?: number | null;
+  /** The best and the played lead per side; the turn-0 diamond's tooltip names them. */
   leadDetail?: LeadAnalysis | null;
   evalErrors?: (string | null)[];
   /** faintedFractions[t-1] = the main line turn's fainted share (graph.faintedFractions): a main-line tooltip prints at it, like the bar. */
@@ -29,10 +31,7 @@ interface EvalGraphProps {
    * bottom = p2) plus a node-label note.
    */
   decided?: DecidedSignal[];
-  /**
-   * Full main-line length: without it a lone variation collapses the x-axis to its own few turns and renders at the far right of an empty
-   * box.
-   */
+  /** Full main-line length: without it a lone variation collapses the x-axis to its few turns and sits at the far right of an empty box. */
   maxTurn?: number;
   /**
    * The turns the Game review lists: a circle marks a graded turn of player 1, a square one of player 2, in the player's colour; both when

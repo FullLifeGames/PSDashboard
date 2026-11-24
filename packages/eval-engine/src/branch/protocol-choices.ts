@@ -83,7 +83,8 @@ export function findSpeciesSlot(battle: SimBattle, sideIdx: number, species: str
   // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
   if (toId(species) === '') return null;
 
-  // The Dex only: a shared prefix of the ids would tie Mew to Mewtwo and Porygon to Porygon2.
+  // The Dex only: a shared prefix of the ids would tie Mew to Mewtwo and Porygon to Porygon2. A Greninja-Ash against a 'Greninja' slot is
+  // `formeFamily`'s tie (branch/body-forme.ts), through the Dex.
   const index = side.pokemon.findIndex((pokemon, at) => !pokemon.isActive && !pokemon.fainted && !taken?.has(at + 1) && isSpeciesBody(pokemon, species));
   return index >= 0 ? index + 1 : null;
 }

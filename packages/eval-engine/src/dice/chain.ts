@@ -19,10 +19,7 @@ export function hitsIn(dex: ChainDex): (moveId: string) => number | undefined {
 /** The accuracy result of one later hit (`hit` 2 and up) of a multi-accuracy move: it lands or it misses. */
 export interface HitResult { hit: number; happens: boolean }
 
-/**
- * The accuracy results a count of landed hits stands for: hits 2 to the count landing and, when the move has a next hit, that hit missing
- * (the first hit has its own plain die). A count above the hits reads as the full chain, a count below one as no chain.
- */
+/** The accuracy results a count of landed hits stands for: hits 2 to the count landing, then the next hit missing; above the hits is the full chain, below one none. */
 export function chainResults(count: number, hits: number): HitResult[] {
   if (!(count >= 1)) return [];
   const landed = Math.min(Math.floor(count), hits);

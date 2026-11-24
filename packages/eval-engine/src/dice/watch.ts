@@ -74,7 +74,7 @@ export interface BattleWatch {
   uninstall(): void;
 }
 
-/** The script calls of the battle's actions that name a draw (p1-hooks.md, exceptions 1, 3 and 5): absent in a generation that lacks them. */
+/** The script calls of the battle's actions that name a draw (docs/adr/0002): absent in a generation that lacks them. */
 const ACTION_SCOPES = ['getDamage', 'tryMoveHit', 'hitStepMoveHitLoop', 'secondaries', 'selfDrops'] as const;
 
 type AnyFn = (this: unknown, ...args: unknown[]) => unknown;

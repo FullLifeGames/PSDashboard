@@ -3,7 +3,7 @@ import { randomCallMoves } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
 /**
- * `RANDOM_CALL_MOVES` in ko-odds.ts (read by search/leaf.ts, cell-blend.ts and pair/guards.ts) holds the moves whose result depends on a
+ * `randomCallMoves` in ko-odds.ts (read by search/leaf.ts, cell-blend.ts and pair/guards.ts) holds the moves whose result depends on a
  * move chosen elsewhere, so the one-turn model refuses to price them. The Dex marks them with `callsMove`: seven moves (Sleep Talk,
  * Metronome, Assist, Copycat, Mirror Move, Me First and Nature Power; Nature Power is Past in Generation 9, live in Generations 3 to 7).
  * In every view the corpus plays:

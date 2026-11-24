@@ -40,7 +40,7 @@ function playedSlotsLabel(side: SideAnalysis): string | undefined {
 
 /**
  * The engine's sentences (`NEVER_ACTED_WORDS` in `prose/phrases.ts`) and this row use the same words. A package reaches the other only
- * through its barrel, so the words are a deliberate copy; `test/regression/never-acted-words.spec.ts` compares the two.
+ * through its barrel, so the words are a deliberate copy; `test/regression/copies.spec.ts` compares the two.
  */
 export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
 

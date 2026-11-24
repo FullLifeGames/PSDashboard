@@ -1,4 +1,4 @@
-/** The base power a move takes from the battle's history (Last Respects, Rage Fist): a Dex `basePowerCallback` that reads only these two counts is a history power. */
+/** The base power from the battle's history (Last Respects, Rage Fist): a Dex `basePowerCallback` reading only these two counts; other callbacks stay with the calculator. */
 
 export interface HistoryFacts {
   fainted: number;

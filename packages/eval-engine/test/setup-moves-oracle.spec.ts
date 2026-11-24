@@ -5,8 +5,8 @@ import { setupMoveClicked, setupMovesOf } from '../src/turn-analysis/played-matc
 import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
 
 /**
- * `SETUP_MOVES` in turn-analysis/played-match.ts names the pure self-boosting moves, for the sentence "a setup move the engine may
- * undervalue". The simulator is the oracle: every status move of a view is played once (twice for a move with a charge turn) by a
+ * `setupMoves` in dex-facts/setup.ts (read through `setupMovesOf` in turn-analysis/played-match.ts) names the pure self-boosting
+ * moves, for the sentence "a setup move the engine may undervalue". The simulator is the oracle: every status move of a view is played once (twice for a move with a charge turn) by a
  * Blissey against a Snorlax that splashes, and a move is a setup move when it leaves its user at least two stages up in all stats
  * together, evasion left out. Over the twelve views the corpus plays (singles Generations 1 to 9 and Champions, the two doubles rule
  * sets):

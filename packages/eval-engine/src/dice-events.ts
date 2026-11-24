@@ -83,6 +83,7 @@ export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], 
   return turns;
 }
 
+/** One hit of a move on an opposing body, as the protocol shows it. */
 export interface RolledHit {
   side: SideId;
   /** The move's id, as the |move| line names it. */
@@ -97,12 +98,9 @@ export interface RolledHit {
   ko: boolean;
 }
 
-/**
- * What one turn's protocol shows of its rolls. `favored` marks the side each dice marker went for: the side opposing the body the dice
- * went against (the crit's target, the missing attacker, the body a dice |cant| held, the body a rolled status landed on; every marker
- * names that body first). `hits` keeps every hit of a move on an opposing body (read by turn-analysis/luck.ts).
- */
+/** What one turn's protocol shows of its rolls: the side each dice marker favored and every hit on an opposing body. */
 export interface TurnRolls {
+  /** The side opposing the body each dice marker went against (the crit's target, the missing attacker, a dice |cant| holder, a rolled status's body). */
   favored: { p1: boolean; p2: boolean };
   hits: RolledHit[];
 }
