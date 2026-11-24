@@ -13,16 +13,7 @@ import { dexOfRules, SWEEP_CASES, sweepMoves, type DexMove } from './dice-sweep-
 import { battleOf } from './power-oracle';
 import { sweepSelection } from './dice-fixtures';
 
-/**
- * The forced answers read the log's slot and the log's revive line: `collectForcedSwitchSpecies` on written lines, then two sweeps over
- * the rule sets the corpus plays (Gens 1 to 9 and the Champions mod), singles and doubles:
- *   1. every Dex move with a `slotCondition`: exactly the moves whose request carries `reviving` write a `-heal ... [from] move:` line on
- *      a fainted body; the answer names the log's second fainted body and `buildForcedSwitchChoice` sends its slot (the simulator's own
- *      `default` would revive the first);
- *   2. doubles: the log writes the replacement of slot b before slot a (the faster body first), and the answer puts each body on the
- *      slot the log names, in both orders; the abilities whose switch-in output depends on the slot (Imposter) play the answer built from
- *      the log. Disguising abilities (Illusion) show an open fault on the forced path, as a `test.fails` row.
- */
+// The simulator's `default` revives the first fainted body; the log's `-heal ... [from] move:` line names the one.
 await loadSimMods('gen9championsou');
 
 const DEX = rulesDex(9);
@@ -76,7 +67,6 @@ describe('the forced list: slots and revives', () => {
   });
 });
 
-/** The public half of the simulator's log: the third line of each `|split|` triple. */
 function publicLog(battle: Battle): string[] {
   const out: string[] = [];
   for (let index = 0; index < battle.log.length; index++) {
@@ -85,7 +75,6 @@ function publicLog(battle: Battle): string[] {
   return out;
 }
 
-/** The log with its turns, as `parseTurnBlocks` reads a replay: closed by a turn line so the last block is kept. */
 const blocksOf = (battle: Battle) => {
   const lines = publicLog(battle);
   if (!/^\|turn\|/.test(lines[lines.length - 1])) lines.push(`|turn|${battle.turn + 1}`);
@@ -97,7 +86,6 @@ const ALLY = new Set(['adjacentAlly', 'adjacentAllyOrSelf']);
 
 interface ReviveBoard { battle: Battle; party: string[]; click: string }
 
-/** Snorlax with the move leads p1; the bench holds two fainted bodies and one living body (a fifth body in doubles). The foes splash. */
 function reviveBoard(rules: Rules, mode: Mode, move: DexMove): ReviveBoard {
   const body = (species: string, moves: string[]) => mon(rules, { species, moves, gender: 'M' });
   const user = body('Snorlax', [move.id, 'splash']);
@@ -107,7 +95,6 @@ function reviveBoard(rules: Rules, mode: Mode, move: DexMove): ReviveBoard {
   const foes = mode === 'singles' ? [body('Vaporeon', ['splash'])] : [body('Vaporeon', ['splash']), body('Vaporeon', ['splash'])];
   const battle = battleOf(mode === 'singles' ? rules.singles : rules.doubles!, p1, foes);
   const side = battle.sides[0];
-  // two fainted bodies on the bench, the first and the last of the bench; the living one stays between them
   const bench = side.pokemon.slice(side.active.length);
   const fainted = [bench[0], bench[bench.length - 1]];
   for (const pokemon of fainted) { pokemon.hp = 0; pokemon.faint(); }
@@ -118,7 +105,6 @@ function reviveBoard(rules: Rules, mode: Mode, move: DexMove): ReviveBoard {
 
 const foeClick = (mode: Mode) => (mode === 'singles' ? 'move 1' : 'move 1, move 1');
 
-/** One turn of the board: both sides click; a p1 request that revives takes `target` (1-based party slot) when given. Returns whether the request revived. */
 function playTurn(board: ReviveBoard, mode: Mode, target?: number): { revived: boolean; answer: string | null } {
   const { battle } = board;
   expect(battle.choose('p1', board.click)).toBe(true);
@@ -144,7 +130,6 @@ function playTurn(board: ReviveBoard, mode: Mode, target?: number): { revived: b
   return { revived, answer };
 }
 
-/** The request of the board's turn, stopped where the revive prompt is open (no answer given). */
 function stopAtPrompt(board: ReviveBoard, mode: Mode): boolean {
   const { battle } = board;
   battle.choose('p1', board.click);
@@ -170,21 +155,18 @@ describe('the revive answer, every Dex move with a slot condition', () => {
         expect(benchHeals.length > 0, `${name} ${move.id}: a heal line on a bench body iff the request carried reviving`).toBe(revived);
         if (!revived) continue;
         revivers++;
-        // the log names the last body of the party, the second of the two fainted ones
         expect(benchHeals[0]).toContain(`p1: ${board.party[lastSlot - 1]}|`);
         const list = lists.find(entry => forcedAnswersOf(entry)?.some(item => item.revive))!;
         expect(list).toEqual([board.party[lastSlot - 1]]);
         const fresh = reviveBoard(rules, mode, move);
         expect(stopAtPrompt(fresh, mode)).toBe(true);
         expect(buildForcedSwitchChoice(simOf(fresh.battle), 0, list, { current: 0 })).toBe(answer);
-        // without the log's line the answer is the body the simulator's own `default` revives (the first fainted one), never a living body
         const blind = reviveBoard(rules, mode, move);
         stopAtPrompt(blind, mode);
         const first = blind.battle.sides[0].active.length + 1;
         const shape = forceSwitches(simOf(blind.battle), 0).map(need => (need ? `switch ${first}` : 'pass')).join(', ');
         expect(buildForcedSwitchChoice(simOf(blind.battle), 0, [], { current: 0 })).toBe(shape);
       }
-      // Revival Blessing exists from Gen 9 on; every older rule set finds none, and says so
       expect(revivers > 0).toBe(rules.generation === 9);
     }, 120_000);
   }
@@ -200,7 +182,6 @@ describe('a replacement request is not a revive request', () => {
     battle.choose('p2', 'move 1');
     expect(battle.sides[0].requestState).toBe('switch');
     expect(revivingSlots(simOf(battle).sides[0])).toEqual([false]);
-    // the revive line of an earlier request that the rebuild never asked (it drifted), then the replacement the log sends
     const list = collectForcedSwitchSpecies(['|-heal|p1: Pikachu|49/100|[from] move: Revival Blessing'], ['|switch|p1a: Chansey|Chansey, F|100/100'], 'p1', DEX);
     expect(list).toEqual(['Pikachu', 'Chansey']);
     const cursor = { current: 0 };
@@ -211,10 +192,6 @@ describe('a replacement request is not a revive request', () => {
 
 interface SlotBoard { battle: Battle; holder: string }
 
-/**
- * Doubles. p1 Snorlax (Earthquake) and Blissey lead against Snorlax (slot a, slow) and Pikachu (slot b, fast), both at 1 HP: the Earthquake
- * knocks out both, and the log writes the faster body's replacement (slot b) first. The bench of p2 is the holder, a Vaporeon and a Raichu.
- */
 function slotBoard(rules: Rules, ability: string): SlotBoard {
   const body = (species: string, moves: string[], extra: Record<string, string> = {}) => ({ ...mon(rules, { species, moves, gender: 'M' }), ...extra });
   const p1 = [body('Snorlax', ['earthquake']), body('Blissey', ['splash'])];
@@ -231,10 +208,7 @@ function slotBoard(rules: Rules, ability: string): SlotBoard {
 
 const ORDERS = { 'holder in a': 'switch 3, switch 4', 'holder in b': 'switch 4, switch 3' } as const;
 
-/**
- * The lines the replacements wrote, with the slot letters of the sides removed: what each body did on entering, however the slots were filled.
- * The window starts at the first `|switch|p2` line after the last faint of p2, so a disguise line (a name that is neither body's) is compared too.
- */
+// The window starts at the first `|switch|p2` line after the last faint of p2, so a disguise line is compared too.
 const enteringLines = (battle: Battle): string[] => {
   const lines = publicLog(battle);
   const lastFaint = lines.reduce((last, line, index) => (line.startsWith('|faint|p2') ? index : last), -1);
@@ -265,7 +239,7 @@ function slotCase(rules: Rules, ability: string, order: keyof typeof ORDERS): vo
 }
 
 describe('a forced replacement enters the slot the log names', () => {
-  // Gens 3 and 4 ask one slot per request (the simulator replaces a fainted body before the next action), so they have no pair to order.
+  // Gens 3 and 4 ask one slot per request (the simulator replaces a fainted body first): no pair to order.
   for (const rules of RULES.filter(entry => entry.doubles && entry.generation >= 5)) {
     test(`${rules.name}: both orders of the two bodies`, () => {
       for (const order of Object.keys(ORDERS) as (keyof typeof ORDERS)[]) slotCase(rules, 'noability', order);
@@ -286,7 +260,6 @@ describe('a forced replacement enters the slot the log names', () => {
     for (const rules of RULES.filter(entry => entry.doubles && entry.generation >= 5)) {
       for (const slot of [0, 1]) {
         const fresh = slotBoard(rules, 'noability');
-        // a log that names slot `slot` only; the rebuild asks for both
         const line = `|switch|p2${'ab'[slot]}: Vaporeon|Vaporeon, M|100/100`;
         const choice = buildForcedSwitchChoice(simOf(fresh.battle), 1, collectForcedSwitchSpecies([], [line], 'p2', DEX), { current: 0 })!;
         const slots = choice.split(', ').map(part => part.replace('switch ', ''));
@@ -305,7 +278,7 @@ describe('a forced replacement enters the slot the log names', () => {
   });
 });
 
-/** The abilities whose Dex entry disguises the holder on entry: a BeforeSwitchIn handler (the read `mayDisguise` makes in `team-order.ts`). */
+// The abilities whose Dex entry disguises the holder on entry: a BeforeSwitchIn handler.
 const disguisesOf = (abilities: readonly { id: string }[]): string[] =>
   abilities.filter(ability => typeof (ability as { onBeforeSwitchIn?: unknown }).onBeforeSwitchIn === 'function').map(ability => ability.id);
 
@@ -319,7 +292,6 @@ const SLOT_RULES = RULES.filter(entry => entry.doubles && entry.generation >= 5)
 describe('the abilities whose switch-in depends on the slot', () => {
   test.each(SLOT_RULES)('%s', (_, rules) => {
     const { dex, abilities, disguises } = slotAbilities(rules);
-    // a disguising ability seats the wrong body (an open fault), and has its own rows below
     const rest = abilities.filter(ability => !disguises.includes(ability.id));
     const sample = new Set(sweepSelection(rest, 'moves').map(ability => ability.id));
     if (dex.abilities.get('imposter').exists) sample.add('imposter');
@@ -337,13 +309,8 @@ describe('the abilities whose switch-in depends on the slot', () => {
   }, 300_000);
 });
 
-/**
- * The forced replacement path with a disguise: the log writes the disguise (`|switch|p2a: Raichu|Raichu, M|`, the last living body to the
- * holder's right), the list holds the disguise's species, and `findSpeciesSlot` seats the body of that species: the real Raichu takes the
- * slot where the game had the holder. The answer should seat the holder where the log shows its disguise. Both disguising abilities of the
- * Dex play in every run, in both orders, in every rule set that has them. The first row pins what the path does; the `test.fails` row holds
- * the demand and turns red when the fault is fixed (then the `fails` goes).
- */
+// The log writes the disguise, so `findSpeciesSlot` seats the real Raichu where the game had the holder;
+// the `test.fails` row holds the demand and turns red when the fault is fixed.
 describe('a disguised holder takes its slot', () => {
   test.each(SLOT_RULES)('%s: today the forced path seats the body whose species the log shows', (_, rules) => {
     const { disguises } = slotAbilities(rules);

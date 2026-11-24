@@ -10,20 +10,11 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * A move whose `basePowerCallback` reads the battle's history (the fallen of the user's side, the hits the user
- * took: Last Respects and Rage Fist) is priced at the power the simulator's own callback gives on those facts by
- * every path that prices a move: the calculator's move (calc/move.ts, which the kill table and the KO odds read) and the static
- * (score/move-facts.ts). The moves are found by `historyPower` of replay-core, the one rule that classifies them, in every
- * generation and mod the corpus plays, singles and doubles. The scene: an Annihilape that took two hits plays Rage Fist at 150
- * in the game; the calculator read 50 (it counts no hits) and the static read the handler's placeholder.
- */
-
 await loadSimMods('gen9championsou');
 
 const FORMATS = [3, 4, 5, 6, 7, 8, 9].flatMap(gen => [`gen${gen}customgame`, `gen${gen}doublescustomgame`])
   .concat('gen9championscustomgame', 'gen9championsdoublescustomgame');
-/** [fallen of the user's side, hits the user took] */
+// [fallen of the user's side, hits the user took]
 const FACTS: [number, number][] = [[0, 0], [2, 0], [0, 2], [3, 5], [1, 9], [5, 12]];
 
 const tally = { moves: new Set<string>(), checked: 0 };

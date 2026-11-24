@@ -32,7 +32,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
     p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
     p2: { name: 'Beta', team: Teams.pack(p2Sets) },
   });
-  // Custom Game opens at team preview: commit the default order so the leads are on the field.
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
@@ -74,8 +73,6 @@ describe('full-HP matchup damping', () => {
 });
 
 describe('stranded bench pricing', () => {
-  // p1: active Snorlax (full HP, bodies 1.0) + bench Charizard (4x rock weak, rocks entry fraction 0.5). p2: lone Snorlax
-  // (bodies 1.0). features.bodies = p1 - p2 = the Charizard contribution alone.
   const battleAt = (
     hpFrac: number,
     extras: { item?: string; ability?: string } = {},
@@ -133,11 +130,6 @@ describe('stranded bench pricing', () => {
 
 describe('win-condition sweep cells', () => {
   test('a fast non-OHKO flip lands in fastChip alone', () => {
-    // +2 Dragapult vs Talonflame + Weavile. Dragon Darts hits a lone foe twice (simulator multihit 2), so both foes stand at
-    // +2 Defense, which halves the pair again. Darts->Talon 0.3534 (+2: 0.7067), Darts->Weavile 0.3942 (+2: 0.7884),
-    // Flare Blitz->Pult 0.292, Night Slash->Pult 0.8887; speeds 162/146/145. Only the Weavile pair flips: unboosted Pult
-    // loses the 3v2 race, at +2 the race ties 2-2 and speed decides. (The Talonflame pair never flips: unboosted Pult
-    // already wins 3v4.) Boosted Darts (0.7884) do not reach full-HP Weavile, so the flip is fast but not in KO range:
     // fastChip = 1 flip / 2 targets * hp 1.0 = 0.5, every other cell 0.
     const sweepy = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
@@ -153,10 +145,6 @@ describe('win-condition sweep cells', () => {
   });
 
   test('an Iron Ball moves the flips into the slow cells', () => {
-    // An Iron Ball (speed 162 to 81, now slowest) breaks the tie-win the fast flip rode on, so the full-HP board prices at
-    // zero: slow flips need strict turn wins. Two boards produce them (fractions as above, the foes at +2 Defense):
-    // slowChip: Pult chipped to 136/195 (0.6974). Flare Blitz now 3HKOs it, boosted Darts win 2v3 strictly, unboosted 3v3
-    //   ties and the slower side loses, so the Talonflame pair flips, no KO range (0.7067 < 1.0).
     //   slowChip = 1/2 * 0.6974 = 0.3487. (Weavile 1HKOs the chipped Pult, so that pair stops flipping.)
     const chipped = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'], 50, { item: 'ironball' })],
@@ -172,8 +160,7 @@ describe('win-condition sweep cells', () => {
     expect(chippedCells.sweepFastChip).toBeCloseTo(0, 5);
     expect(chippedCells.sweepFastKo).toBeCloseTo(0, 5);
     expect(chippedCells.sweepSlowKo).toBeCloseTo(0, 5);
-    // slowKo: full-HP Pult, targets at 0.6. Boosted Darts (0.7884) cover Weavile's 0.5989, unboosted ties 2-2 and the
-    //   slower side loses, so the Weavile flip lands in slowKo = 1/2 * hp 1.0 = 0.5.
+    // slowKo = 1/2 * hp 1.0 = 0.5 (the Weavile flip).
     const koBoard = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'], 50, { item: 'ironball' })],
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
@@ -188,11 +175,7 @@ describe('win-condition sweep cells', () => {
   });
 
   test('a target inside boosted KO range moves its flip into a Ko cell', () => {
-    // fastKo is the glass-cannon race won purely by moving first: the target must OHKO the sweeper back (else the unboosted
-    // 2HKO still wins the pair and the flip dies). Pult at 156/195 (0.8, inside Night Slash's 0.8887), Weavile at 106/177
-    // (0.5989, inside boosted Darts' 0.7884 but above unboosted 0.3942): boosted races 1-1 and speed decides, unboosted
-    // needs 2 turns and loses. fastKo = 1 flip / 2 targets * hp 0.8 = 0.4. (Talonflame's pair: unboosted Pult wins 2v3
-    // outright, no flip.) The foes stand at +2 Defense, as above.
+    // fastKo = 1 flip / 2 targets * hp 0.8 = 0.4.
     const sweepy = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
       [makeSet('A', 'Talonflame', ['Flare Blitz']), makeSet('B', 'Weavile', ['Night Slash'])],
@@ -209,9 +192,8 @@ describe('win-condition sweep cells', () => {
   test('a walled boost prices at zero in every cell, weights stay 0', () => {
     const walled = makeBattle(
       [makeSet('Pult', 'Dragapult', ['Dragon Darts', 'Dragon Dance'])],
-      [makeSet('Wall', 'Clefable', ['Moonblast', 'Moonlight'])], // Fairy: immune to Dragon Darts
+      [makeSet('Wall', 'Clefable', ['Moonblast', 'Moonlight'])],
     );
-    // Without a positive offensive stage every cell is 0.
     const unboosted = evalFeatures(walled);
     expect(unboosted.sweepFastKo + unboosted.sweepFastChip +
       unboosted.sweepSlowKo + unboosted.sweepSlowChip).toBeCloseTo(0, 5);
@@ -232,7 +214,6 @@ describe('evaluatePosition', () => {
   afterEach(() => setStaticForm(null));
 
   test('doubles positions score with the doubles-fitted weights', () => {
-    // Speed control is worth far more in doubles; the score must use the doubles table, checked against a hand-computed value.
     expect(featureWeights(true)).toEqual(DOUBLES_FEATURE_WEIGHTS);
     expect(featureWeights(false)).toEqual(FEATURE_WEIGHTS);
     expect(DOUBLES_FEATURE_WEIGHTS.tailwind).toBeGreaterThan(FEATURE_WEIGHTS.tailwind);
@@ -252,7 +233,6 @@ describe('evaluatePosition', () => {
   });
 
   test('pinned scores survive the feature-vector refactor', () => {
-    // The pins are the table's scores: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     const hazardous = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA), makeSet('A2', 'Charizard', VANILLA)],
@@ -270,10 +250,7 @@ describe('evaluatePosition', () => {
     const trickroom = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Dragapult', VANILLA)]);
     trickroom.field.addPseudoWeather('trickroom', trickroom.sides[0].active[0]!);
 
-    // The singles table prices a standing stage through boostsBiting: Snorlax's +2 Attack bites its Dragapult foe less
-    // than a flat boosts weight.
     expect(evaluatePosition(hazardous)).toBeCloseTo(0.7446947493564187, 6);
-    // Clefable's Moonlight wall is finite, so the Salazzle side gains.
     expect(evaluatePosition(races)).toBeCloseTo(0.9722131704913529, 6);
     expect(evaluatePosition(trickroom)).toBeCloseTo(0.1243530017715962, 6);
   });
@@ -320,8 +297,6 @@ describe('evaluatePosition', () => {
   });
 
   test('an attack boost flips the matchup term, not just the flat bonus', () => {
-    // A Tackle mirror is a dead-even 7-turn race and +2 Atk halves it one way: the flat boost weight alone is worth about 0.10,
-    // winning every pair through the matchup term far more.
     const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
     expect(evaluatePosition(battle)).toBe(0);
     battle.sides[0].active[0]!.boostBy({ atk: 2 });
@@ -341,8 +316,7 @@ describe('evaluatePosition', () => {
   });
 
   test('the flat boost term applies the schedule (accuracy stages, matchup-invisible)', () => {
-    // Accuracy stages never touch the matchup term, so the mirror isolates the flat term: the +2/+1 ratio is the schedule's
-    // 2.0, read on the boosts column.
+    // The +2/+1 ratio is the schedule's 2.0, read on the boosts column.
     const at = (stage: number) => {
       const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)]);
       battle.sides[0].active[0]!.boostBy({ accuracy: stage as 1 | 2 | 6 });
@@ -357,8 +331,6 @@ describe('evaluatePosition', () => {
   });
 
   test('the same teams score better with the favorable matchup active', () => {
-    // Machamp wins its pairs, Pikachu (Growl only) loses its own. The teams are identical; only who stands on the field
-    // differs, which the team-wide matchup term alone scores identically.
     const machampActive = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Karate Chop']), makeSet('Pikachu', 'Pikachu', ['Growl'])],
       [makeSet('Chansey', 'Chansey', ['Tackle']), makeSet('Snorlax', 'Snorlax', ['Tackle'])],
@@ -374,7 +346,6 @@ describe('evaluatePosition', () => {
     const battle = makeBattle([makeSet('A', 'Snorlax', ['Tackle'])], [makeSet('B', 'Snorlax', ['Tackle'])]);
     const cache = createMatchupCache();
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
-    // The memo covers only the boost-independent part: after stages change, the cached path must track a fresh computation.
     battle.sides[0].active[0]!.boostBy({ atk: 2 });
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
   });
@@ -393,7 +364,6 @@ describe('evaluatePosition', () => {
       );
       return evaluatePosition(battle);
     };
-    // Black Sludge hurts a non-Poison holder; on a Poison type it heals.
     expect(withItem('Black Sludge')).toBeLessThan(withItem());
     expect(withItem('Sticky Barb')).toBeLessThan(withItem());
     expect(withItem('Leftovers')).toBeGreaterThan(withItem());
@@ -439,9 +409,8 @@ describe('evaluatePosition', () => {
     const defender = () => battle.sides[1].active[0]!;
 
     const before = pairThreat(attacker(), defender(), battle);
-    expect(before.special).toBeGreaterThan(0); // Flamethrower threatens Skarmory
+    expect(before.special).toBeGreaterThan(0);
 
-    // Prime the cache with the unlocked threat, then lock into Earth Power (Skarmory is immune): the cache must not serve it stale.
     const scoreBefore = evaluatePosition(battle, cache);
     battle.choose('p1', 'move earthpower');
     battle.choose('p2', 'move protect');
@@ -461,7 +430,6 @@ describe('evaluatePosition', () => {
       );
       return evaluatePosition(battle);
     };
-    // Itemless baseline isolates the mismatch penalty from item multipliers.
     expect(clefWith('Choice Scarf')).toBeLessThan(clefWith());
 
     const pultWith = (item?: string) => {
@@ -471,7 +439,6 @@ describe('evaluatePosition', () => {
       );
       return evaluatePosition(battle);
     };
-    // Four attacks: the Choice item costs nothing.
     expect(pultWith('Choice Specs')).toBeGreaterThanOrEqual(pultWith());
   });
 
@@ -489,7 +456,6 @@ describe('evaluatePosition', () => {
     expect(covUnanswered).toBeGreaterThan(covAnswered);
     expect(covUnanswered).toBeGreaterThan(0);
 
-    // A second copy of my mon changes nothing: the enemy's best answer margin is a max, not a sum over my team.
     const dupSala = makeBattle(
       [
         makeSet('Sala', 'Salazzle', ['Sludge Wave', 'Flamethrower']),
@@ -511,7 +477,6 @@ describe('evaluatePosition', () => {
     );
     weak.sides[1].addSideCondition('stealthrock', weak.sides[0].active[0]!);
     resist.sides[1].addSideCondition('stealthrock', resist.sides[0].active[0]!);
-    // Mirrors have base score 0, so the whole score is the hazard delta.
     expect(evaluatePosition(weak)).toBeGreaterThan(evaluatePosition(resist));
     expect(evaluatePosition(resist)).toBeGreaterThan(0);
   });
@@ -528,7 +493,7 @@ describe('evaluatePosition', () => {
     grounded.sides[1].addSideCondition('spikes', grounded.sides[0].active[0]!);
     grounded.field.addPseudoWeather('gravity', grounded.sides[0].active[0]!);
     expect(hazardCost(grounded.sides[1], grounded)).toBeGreaterThan(0);
-    // A benched Levitate mon still prices as airborne: its ability applies on entry, though the sim ignores inactive abilities.
+    // A benched Levitate mon still prices as airborne: its ability applies on entry, though the sim ignores it.
     const bench = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA)],
       [makeSet('B', 'Snorlax', VANILLA), makeSet('C', 'Rotom-Heat', VANILLA, 50, { ability: 'Levitate' })],
@@ -542,7 +507,6 @@ describe('evaluatePosition', () => {
     withoutLevitate.sides[1].addSideCondition('spikes', withoutLevitate.sides[0].active[0]!);
     expect(spikesCost).toBeLessThan(hazardCost(withoutLevitate.sides[1], withoutLevitate));
 
-    // Toxic Spikes: Poison and Steel types are immune by the type chart; everything else grounded pays.
     const toxicCost = (species: string) => {
       const battle = makeBattle([makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', species, VANILLA)]);
       battle.sides[1].addSideCondition('toxicspikes', battle.sides[0].active[0]!);
@@ -554,7 +518,6 @@ describe('evaluatePosition', () => {
   });
 
   test('entry cost discounts a benched mon\'s matchup pressure; Boots negate it', () => {
-    // Volcarona dominates its pairs from the bench, but with rocks up it enters at half HP, so its pressure must read weaker.
     const board = (item = '') => makeBattle(
       [makeSet('A', 'Snorlax', VANILLA), makeSet('Volc', 'Volcarona', ['Flamethrower', 'Quiver Dance'], 50, item ? { item } : {})],
       [makeSet('B', 'Scizor', ['Bullet Punch', 'Swords Dance']), makeSet('C', 'Ferrothorn', ['Power Whip'])],
@@ -567,9 +530,7 @@ describe('evaluatePosition', () => {
 
     const matchupOf = (battle: Battle) => matchupTerms(battle).matchup;
     expect(matchupOf(rocked)).toBeLessThan(matchupOf(clean));
-    // Heavy-Duty Boots restore it exactly (no entry cost).
     expect(matchupOf(booted)).toBeCloseTo(matchupOf(clean), 8);
-    // Active mons pay no entry cost.
     const activesOnly = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA)],
       [makeSet('B', 'Scizor', ['Bullet Punch'])],
@@ -583,8 +544,6 @@ describe('evaluatePosition', () => {
   });
 
   test('hazard removal is an OPTION on the net board state', () => {
-    // A Defogger on the suffering side: the option to clear is worth the discounted net relief, so the switch into the
-    // Defogger must not read as walking deeper into the hazard cost (Talonflame).
     const board = (mon: ReturnType<typeof makeSet>) => makeBattle(
       [makeSet('A', 'Snorlax', VANILLA)],
       [makeSet('B', 'Volcarona', VANILLA), mon],
@@ -596,9 +555,6 @@ describe('evaluatePosition', () => {
     expect(hazardRemovalEquity(withDefog.sides[1], withDefog))
       .toBeCloseTo(cost * EVAL_WEIGHTS.hazardRemovalDiscount, 8);
 
-    // Defog is double-edged: when the side's own hazards on the opponent's board are worth more than its suffering, the
-    // option is never exercised (equity 0, full price stands). Snorlax suffers cheap neutral rocks; the opposing board
-    // holds rocks that bleed 4x-weak Volcarona.
     const doubleEdged = makeBattle(
       [makeSet('A', 'Snorlax', ['Defog', 'Protect'])],
       [makeSet('B', 'Volcarona', VANILLA), makeSet('C', 'Talonflame', VANILLA)],
@@ -609,7 +565,6 @@ describe('evaluatePosition', () => {
       .toBeLessThan(hazardCost(doubleEdged.sides[1], doubleEdged));
     expect(hazardRemovalEquity(doubleEdged.sides[0], doubleEdged)).toBe(0);
 
-    // Rapid Spin only clears the spinner's own side, so the same board grants full (discounted) relief: nothing of value is lost.
     const spinner = makeBattle(
       [makeSet('A', 'Snorlax', ['Rapid Spin', 'Protect'])],
       [makeSet('B', 'Volcarona', VANILLA), makeSet('C', 'Talonflame', VANILLA)],
@@ -667,7 +622,6 @@ describe('evaluatePosition', () => {
   });
 
   test('type dominance shows before any damage is dealt', () => {
-    // Flamethrower hits Venusaur for 2x with STAB; Vine Whip is resisted to 0.25x by Charizard.
     const battle = makeBattle(
       [makeSet('A', 'Charizard', ['Flamethrower']), makeSet('B', 'Charizard', ['Flamethrower'])],
       [makeSet('C', 'Venusaur', ['Vine Whip']), makeSet('D', 'Venusaur', ['Vine Whip'])],
@@ -701,7 +655,6 @@ describe('evaluatePosition', () => {
   });
 
   test('a Choice Band flips an otherwise dead-even race', () => {
-    // A Tackle mirror is a perfectly even 7-turn race; the band turns one side's 7HKO into a 5HKO.
     const plain = makeBattle(
       [makeSet('A', 'Snorlax', ['Tackle'])],
       [makeSet('B', 'Snorlax', ['Tackle'])],
@@ -715,7 +668,6 @@ describe('evaluatePosition', () => {
   });
 
   test('Eviolite bulk flips a dead-even race toward the NFE holder', () => {
-    // A Chansey Swift mirror is perfectly even; the Eviolite's 1.5x special bulk stretches the race against its holder.
     const plain = makeBattle(
       [makeSet('A', 'Chansey', ['Swift'])],
       [makeSet('B', 'Chansey', ['Swift'])],
@@ -741,7 +693,6 @@ describe('evaluatePosition', () => {
   });
 
   test('priority breaks an otherwise even race', () => {
-    // Same species, base power (40) and speed: Quick Attack's priority is the only difference.
     const battle = makeBattle(
       [makeSet('A', 'Pikachu', ['Quick Attack'])],
       [makeSet('B', 'Pikachu', ['Tackle'])],
@@ -750,7 +701,6 @@ describe('evaluatePosition', () => {
   });
 
   test('a healer walls an attacker that cannot 2HKO', () => {
-    // The weak attacker 5HKOs at best; Soft-Boiled outheals that.
     const attacker = makeSet('A', 'Pikachu', ['Tackle'], 30);
     const noHeal = makeBattle([attacker], [makeSet('B', 'Blissey', ['Protect'], 100)]);
     const healer = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
@@ -765,7 +715,6 @@ describe('evaluatePosition', () => {
     const cache = createMatchupCache();
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
 
-    // The memo covers only the HP-independent part: after damage, the cached path must track a fresh computation.
     const active = battle.sides[1].active[0]!;
     active.hp = Math.floor(active.maxhp / 2);
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
@@ -785,8 +734,6 @@ describe('evaluatePosition', () => {
 
 describe('effective speed in the eval', () => {
   test('a Scarf breaks a mirror matchup tie', () => {
-    // Identical Talonflame mirror: the pair sign is decided by speed alone. A bare mirror ties (sign 0, matchup 0); a Scarf on
-    // p2 makes p2 faster (matchup < 0).
     const tie = makeBattle(
       [makeSet('T1', 'Talonflame', ['Flare Blitz'])],
       [makeSet('T2', 'Talonflame', ['Flare Blitz'])],
@@ -800,8 +747,6 @@ describe('effective speed in the eval', () => {
   });
 
   test('the Trick Room sign reads effective speed', () => {
-    // Snorlax mirror under Trick Room: a bare mirror ties (<= keeps +1 for p1); an Iron Ball on p2 makes p2 the slower side,
-    // so Trick Room favors p2 (-1).
     const mirror = makeBattle(
       [makeSet('A', 'Snorlax', VANILLA)], [makeSet('B', 'Snorlax', VANILLA)],
     );
@@ -817,8 +762,7 @@ describe('effective speed in the eval', () => {
 });
 
 describe('PP truth in the threat model', () => {
-  // PP comes from the sim's move slots, not the Dex base PP: pools differ across rule sets (Showdown runs maxed PP Ups,
-  // Pokémon Champions other counts).
+  // PP comes from the sim's move slots, not the Dex base PP: Showdown runs maxed PP Ups, Champions other counts.
   test('pairThreat ignores move slots with no PP left', () => {
     const battle = makeBattle(
       [makeSet('A', 'Golem', ['Earthquake', 'Protect'])],
@@ -832,7 +776,6 @@ describe('PP truth in the threat model', () => {
   });
 
   test('a drained healer no longer walls', () => {
-    // 573756 t134-139: p2's Toxapex played its whole set to 0 PP and could only Struggle, yet priced as a full healer wall.
     const attacker = makeSet('A', 'Pikachu', ['Tackle'], 30);
     const walled = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
     const drained = makeBattle([attacker], [makeSet('B', 'Blissey', ['Soft-Boiled'], 100)]);
@@ -853,13 +796,10 @@ describe('PP truth in the threat model', () => {
 
   describe('unanswered mons', () => {
     test('a mon no living enemy out-races is unanswered', () => {
-      // A level-100 Mewtwo one-shots both bodies; their Tackles never win a race against it (648453 t13: any entry of an
-      // unanswered mon turns profit, the opponent can only sacrifice).
       const battle = makeBattle(
         [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
         [makeSet('Rattata', 'Rattata', ['Tackle']), makeSet('Raticate', 'Raticate', ['Tackle'])],
       );
-      // Clearing both bodies in sequence costs Mewtwo nothing: the same board is also a decided sweep.
       expect(unansweredMons(battle)).toEqual({
         p1: ['Mewtwo'], p2: [],
         decided: { side: 'p1', species: 'Mewtwo' },
@@ -867,7 +807,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a dead-even mirror names nobody — a wall that holds the pair is an answer', () => {
-      // The Snorlax Tackle mirror is a 7-turn race both ways: neither mon beats the other, and holding the pair is an answer.
       const battle = makeBattle(
         [makeSet('A', 'Snorlax', ['Tackle'])],
         [makeSet('B', 'Snorlax', ['Tackle'])],
@@ -876,16 +815,12 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a benched answer pays the entry toll; the same answer active stands', () => {
-      // 648453 t13: a benched twin would hold the standing mirror, but it answers by switching in, eats one free hit on the
-      // way and loses the race from tolled HP. The same twin already active pays no toll.
       const benched = makeBattle(
         [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
         [makeSet('Rattata', 'Rattata', ['Tackle']), makeSet('Twin', 'Mewtwo', ['Psystrike'], 100)],
       );
       expect(unansweredMons(benched)).toEqual({ p1: ['Mewtwo'], p2: [] });
 
-      // Every benched answer (Rattata) dies on arrival, only the standing twin holds the pair. The full list stays empty; the
-      // entry stage names the holder.
       const active = makeBattle(
         [makeSet('Mewtwo', 'Mewtwo', ['Psystrike'], 100)],
         [makeSet('Twin', 'Mewtwo', ['Psystrike'], 100), makeSet('Rattata', 'Rattata', ['Tackle'])],
@@ -898,35 +833,27 @@ describe('PP truth in the threat model', () => {
   });
 
   describe('the switch-in stage and the coin-flip check', () => {
-    // 648453 t13: the race model called the active Tornadus-T an answer to Lopunny-Mega on a full-hit Hurricane clock while
-    // every benched answer died on arrival; the real game answered with a pure Weavile sacrifice.
     test('pairThreat carries the accuracy of its category-max move', () => {
       const battle = makeBattle(
         [makeSet('A', 'Machamp', ['Dynamic Punch', 'Tackle'])],
         [makeSet('B', 'Snorlax', ['Tackle'])],
       );
       const chancy = pairThreat(battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle);
-      // Dynamic Punch (100 BP, 50% accuracy) is the physical max; its accuracy rides along, the raw fraction and score path stay.
       expect(chancy.physicalAcc).toBeCloseTo(0.5, 5);
       const plain = pairThreat(battle.sides[1].active[0]!, battle.sides[0].active[0]!, battle);
       expect(plain.physicalAcc).toBe(1);
     });
 
     test('a coin-flip nuke is no answer; the sure nuke still holds the pair', () => {
-      // Tauros two-shots Machamp (Double-Edge, clock 2). Dynamic Punch's raw fraction is a one-turn kill, but at 50% accuracy
-      // the expected rate halves to a two-turn clock: a tie the faster Tauros takes.
       const flip = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
       );
-      // One expected coin-flip punch is all the return fire the series carries: the two-body board is also a decided sweep.
       expect(unansweredMons(flip)).toEqual({
         p1: ['Tauros'], p2: [],
         decided: { side: 'p1', species: 'Tauros' },
       });
 
-      // Close Combat carries the same punch at 100% accuracy: the standing Machamp answers in one turn, Tauros drops to the
-      // switch-in stage (the bench still dies on arrival) and Machamp wins its own race.
       const sure = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Close Combat']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
@@ -939,9 +866,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test("the fresh entry's Fake Out chips the standing answer for free", () => {
-      // Without Fake Out the standing Snorlax out-races Lopunny 3 clicks to 4 and holds the pair (switch-in stage). The
-      // first-turn flinch chip pulls Lopunny to a 3-3 tie the faster mon takes. Fake Out speaks only in Lopunny's own entry
-      // scenario: Snorlax's side of the profile still reads Lopunny as a standing 4-click answer.
       const plain = makeBattle(
         [makeSet('X', 'Lopunny', ['Body Slam'])],
         [makeSet('A', 'Snorlax', ['Strength']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
@@ -956,8 +880,6 @@ describe('PP truth in the threat model', () => {
         [makeSet('X', 'Lopunny', ['Fake Out', 'Body Slam'])],
         [makeSet('A', 'Snorlax', ['Strength']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
       );
-      // The series still belongs to Snorlax: the Fake Out chip is entry economy (one flinch on the first field turn) and the
-      // sweep bookkeeping leaves it out of the running race.
       expect(unansweredMons(flinch)).toEqual({
         p1: ['Lopunny'], p2: ['Snorlax'],
         decided: { side: 'p2', species: 'Snorlax' },
@@ -966,14 +888,7 @@ describe('PP truth in the threat model', () => {
   });
 
   describe('the decided sweep and the near-decided roll', () => {
-    // 573756 t134–138: a locked endgame read +0.2 instead of decided; the
-    // series bookkeeping is what separates a cleanup from a mere threat —
-    // a mon that wins every FRESH pair can still die to the accumulated
-    // return fire of clearing the whole team in sequence (648453 t13).
     test('winning every fresh pair is not a decided sweep', () => {
-      // Tauros beats each Machamp pair (expected-rate 2-2 tie, faster mon
-      // takes it) — but each pair costs an expected Dynamic Punch, and two
-      // of them add up past Tauros's bar. Unanswered: yes; decided: no.
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
@@ -984,8 +899,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test('clearing the rest in sequence while surviving is decided', () => {
-      // Two level-5 fodder mons: every kill is one click and Tauros moves
-      // first, so the series costs nothing — the game is practically over.
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Caterpie', ['Tackle'], 5), makeSet('B', 'Caterpie', ['Tackle'], 5)],
@@ -994,10 +907,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a slow grind is not decided even when every pair is won', () => {
-      // Three resistant, harmless walls: Tauros wins every pair but needs
-      // ~3 clicks each — past DECIDED_MAX_TURNS the opponent still has a
-      // game's worth of turns to play (573756 priced its whole enemy team
-      // as pinned healers and read decided from turn 1 without this cap).
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [
@@ -1010,7 +919,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a 1v1 endgame is decided for the clear pair winner', () => {
-      // 573756 t138: the last pair's table is one-sided. Tauros takes the expected-rate race; the coin-flip Machamp does not.
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Dynamic Punch'])],
@@ -1019,15 +927,12 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a pinned healer does not block the sweep; a two-wall standoff stays open', () => {
-      // A healer whose sustain is beaten (Earthquake outdamages the outleveled Toxapex's heal rate) must heal on the turns it
-      // survives, so its return fire prices at the spare-turn rate and the sweeper's bar stays intact.
       const cracked = makeBattle(
         [makeSet('X', 'Garchomp', ['Earthquake'])],
         [makeSet('A', 'Toxapex', ['Recover', 'Scald'], 30), makeSet('F', 'Caterpie', ['Tackle'], 5)],
       );
       expect(unansweredMons(cracked).decided).toEqual({ side: 'p1', species: 'Garchomp' });
 
-      // Two full-strength healers neither side can out-race: heal PP absorb every clock past the attackers' PP budgets.
       const walled = makeBattle(
         [makeSet('X', 'Chansey', ['Soft-Boiled', 'Tackle'])],
         [makeSet('A', 'Toxapex', ['Recover', 'Scald']), makeSet('F', 'Caterpie', ['Tackle'], 5)],
@@ -1036,9 +941,7 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a high-odds kill that unlocks the sweep reads as near-decided', () => {
-      // 573756 t73: the full board is not sweepable (the standing glass cannon strikes first once, and with the benched
-      // puncher's expected hits that out-chips the sweeper), but one sure roll removes the active and the rest clears. The
-      // odds are the boundary event: accuracy * kill share.
+      // The odds are the boundary event: accuracy * kill share.
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'], 50, { item: 'choiceband' })],
         [makeSet('A', 'Alakazam', ['Psychic']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
@@ -1052,7 +955,6 @@ describe('PP truth in the threat model', () => {
     });
 
     test('a coin-flip kill is no near-decided', () => {
-      // The active is sturdy: no removal of 90% or more in one click exists, so the near stage stays silent (fails closed).
       const battle = makeBattle(
         [makeSet('X', 'Tauros', ['Double-Edge'])],
         [makeSet('A', 'Machamp', ['Dynamic Punch']), makeSet('B', 'Machamp', ['Dynamic Punch'])],
@@ -1098,7 +1000,6 @@ describe('the healer wall is a finite race', () => {
   });
 
   test('heal rates are per move, read from the dex ratio', () => {
-    // A weaker heal move (Life-Dew-class 1/4) walls less than Recover: 0.4 pressure leaves spare turns at rate 1/2 but pins at 1/4.
     const attacker = side({ frac: 0.4 });
     const strong = side({ frac: 0.2, healRate: 1 / 2, healAbsorb: 8, ppBudget: 60 });
     const weak = side({ frac: 0.2, healRate: 1 / 4, healAbsorb: 4, ppBudget: 60 });
@@ -1107,17 +1008,11 @@ describe('the healer wall is a finite race', () => {
   });
 
   test('held heal PP realizes only at the pin efficiency — healing now beats holding', () => {
-    // Under 1.0 incoming a rate-1/2 healer heals at a net loss: its held PP realize at healRate/incoming = 1/2 efficiency,
-    // while HP already on the body counts in full. Same hp + absorb total (3.0 bars), but the body that already healed
-    // survives longer (655336 t26: Slack Off priced a mere 0.041 over a free-turn Protect).
     const attacker = side({ frac: 1.0 });
     const held = side({ frac: 0.2, healRate: 0.5, healAbsorb: 2 });
     const healed = side({ hp: 1.5, frac: 0.2, healRate: 0.5, healAbsorb: 1.5 });
-    // The simulator's sequence (hit, heal, hit) prices the clock: a 100% hit takes the 100% body in one turn, the body that
-    // already healed in two. The body that healed outlasts the one that holds.
     expect(raceClocks(attacker, held).turnsA).toBe(1);
     expect(raceClocks(attacker, healed).turnsA).toBe(2);
-    // Below the heal rate there is no pin and the absorb realizes in full.
     const gentle = side({ frac: 0.4 });
     expect(raceClocks(gentle, held).turnsA).toBe(8);
   });
@@ -1136,9 +1031,7 @@ describe('the healer wall is a finite race', () => {
       pex.moveSlots[0].pp = recoverPP;
       return evalFeatures(battle).matchup;
     };
-    // Fresh PP and no burn: the wall holds and the chip race favors Toxapex.
     expect(endgame(false, 16)).toBeGreaterThan(0);
-    // Burn breaks the sustain and 3 Recover PP cannot absorb 2HKO-class pressure: the last pair belongs to the attacker.
     expect(endgame(true, 3)).toBeLessThan(0);
   });
 });

@@ -26,7 +26,6 @@ describe('lead (turn 0) analysis', () => {
   test('lead labels parse and match as unordered sets', () => {
     expect(leadSpeciesOf('Lead Scizor + Sneasler')).toEqual(['Scizor', 'Sneasler']);
     expect(leadSpeciesOf('Lead Heatran')).toEqual(['Heatran']);
-    // The replay may show the pair in the other slot order.
     expect(matchLeadOption(leadResult.perSide.p1, ['Sneasler', 'Scizor'])?.choice).toBe('team 12');
     expect(matchLeadOption(leadResult.perSide.p1, ['Scizor', 'Politoed'])).toBeNull();
     expect(matchLeadOption(leadResult.perSide.p1, null)).toBeNull();
@@ -75,8 +74,7 @@ describe('lead (turn 0) analysis', () => {
   });
 
   test('clause-suffixed singles formats keep their team preview (draft replays)', async () => {
-    // Draft replays branch as "gen9customgame@@@Sleep Clause Mod"; running the format string through toID mangles the custom
-    // rules into an unknown format with no preview, and the game loses its turn-0 evaluation.
+    // Draft replays branch as "gen9customgame@@@Sleep Clause Mod": toID on that string mangles the rules.
     const { serializePreviewPosition } = await import('../src/branch-engine');
     const { createRootPosition, legalChoices } = await import('../src/forward-model');
     const set = (species: string): PokemonSet => ({

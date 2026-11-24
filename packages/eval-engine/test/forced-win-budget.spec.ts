@@ -11,13 +11,7 @@ import type { ForcedWinInput, TeraAllowance } from '../src/types';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The root candidates do not share one cell budget through their turned dice. Every cell of a failing candidate also draws the cells of
- * its dice (a 5 % miss and what follows it), so the first two candidates of Doubles OU 2695084835 turn 8 spent 98 of the shared 100 cells
- * before the third one, which wins on the spot in 95 of 100 games, found a cell left. Each candidate runs a lazy pass first, with the
- * turned dice left aside (the children `turned` marks), and only a candidate that passes it gets the full proof. The lazy mass is a lower
- * bound of the full mass without a game rule: a child left aside counts mass 0.
- */
+// The lazy mass is a lower bound of the full mass: a child left aside counts mass 0.
 interface BudgetScene {
   id: string;
   turn: number;
@@ -42,8 +36,6 @@ const rankedScene = (name: string) => JSON.parse(readFileSync(new URL(`./fixture
 const modOf = (ruleset: StaticRuleset | undefined) => (ruleset === 'champions' ? 'gen9championsdoublescustomgame' : 'gen9doublescustomgame');
 
 describe('the budget scenes: the third root candidate finds its cells again', () => {
-  // All four games were won by the side that proves. The mass is the proven share of the classes along every reply; the cells are
-  // those the two sides' attempts spend together (the second side starts with what the first one left).
   test.each([
     ['Doubles OU 2695084835 turn 8 (the trace scene)', 'gen9doublesou-2695084835-t8'],
     ['VGC 2400507766 turn 7', 'gen9vgc2025regi-2400507766-t7'],
@@ -103,11 +95,7 @@ describe('a die turned for the price marks its child (singles and doubles)', () 
 });
 
 describe('the lazy pass is a lower bound of the full proof (candidate by candidate, on the doubles scenes of the forced-win specs)', () => {
-  // Both passes on one prover, as the root loop runs them: the lazy mass never exceeds the full mass. A candidate counts only where
-  // both finish: a prover that came within `CUT_MARGIN` cells of its limit may have refused the full pass a reply batch the lazy pass
-  // still had, and the row leaves it out. The scenes are the budget scenes (the winning side's ranking), the plain-dice scenes and the
-  // four scout-miss scenes; the three that need more than the limit (VGC 2400507766 t7, 2468711188 t7, 2532538236 t7) run in the
-  // budget rows above only.
+  // A candidate counts only where both passes finish: a prover near its `CUT_MARGIN` limit may refuse the full pass.
   const LIMIT = 300;
   const CUT_MARGIN = 60;
   const scenes: Array<[string, () => RankedScene]> = [

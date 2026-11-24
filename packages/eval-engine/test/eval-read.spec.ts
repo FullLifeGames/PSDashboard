@@ -2,18 +2,14 @@ import { test, expect, describe } from 'vitest';
 import { rankFromMatrix, toResult, type ValueMatrix } from '../src/rank';
 import { computeRead, modelOpponent, parseTendencies, READ_CONFIDENCE, READ_LAMBDA } from '../src/opponent-model';
 
-/** The Read lens: a softmax opponent model (RNR-mixed with the equilibrium) and a best response over the solved matrix, in wp-units (p1 perspective). */
-
 const option = (choice: string, label: string) => ({ choice, label });
 
-// The Flying-switch shape: p2 very likely clicks Earthquake (their high-EV column); p1's exploit row (switch Noivern) crushes
-// Earthquake but loses to the rarely-clicked Ice Beam. Equilibrium prefers the safe row.
 const matrix: ValueMatrix = {
   p1Options: [option('move stay', 'Stay'), option('switch 3', '→ Noivern')],
   p2Options: [option('move earthquake', 'Earthquake'), option('move icebeam', 'Ice Beam')],
   values: [
-    [-0.20, -0.02], // Stay: EQ chips it hard, Ice Beam barely — EQ is p2's obvious click
-    [0.60, -0.50],  // Noivern: wins big vs EQ, loses big vs Ice Beam
+    [-0.20, -0.02],
+    [0.60, -0.50],
   ],
   ended: [[false, false], [false, false]],
 };
@@ -69,12 +65,11 @@ describe('opponent model and read solve', () => {
     const tendencies = parseTendencies(log, 'p2');
     expect(tendencies.attackRate).toBeCloseTo(0.75, 8);
     expect(tendencies.switchRate).toBeCloseTo(0.25, 8);
-    // Earthquake repeated once in three move turns' two repeat chances.
     expect(tendencies.repeatBias).toBeGreaterThan(0);
   });
 
   test('parseTendencies ignores forced replacement switches after a faint', () => {
-    // p2 never chooses to switch: B faints before acting and C is the forced replacement, which would fabricate a tendency.
+    // p2 never chooses to switch: C is the forced replacement of the fainted B, which would fabricate a tendency.
     const log = [
       '|start',
       '|switch|p1a: A|Snorlax, M|100/100', '|switch|p2a: B|Garchomp, F|100/100',
@@ -98,7 +93,6 @@ describe('opponent model and read solve', () => {
     expect(READ_LAMBDA).toBeLessThan(1);
     const ranked = rankFromMatrix(matrix, 0);
     const model = modelOpponent(toResult(ranked, 1).matrix!, 'p1');
-    // No probability collapses fully to zero while lambda > 0.
     for (const p of model.probs) expect(p).toBeGreaterThan(0);
   });
 });

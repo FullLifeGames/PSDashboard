@@ -24,7 +24,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
     p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
     p2: { name: 'Beta', team: Teams.pack(p2Sets) },
   });
-  // Custom Game opens at team preview: commit the default order so the leads are on the field.
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
@@ -61,7 +60,6 @@ const doublesRoot = () => serialize(makeDoublesBattle(
   ],
 ));
 
-// Level-100 Machamp: Seismic Toss does a flat 100. Level-30 Pikachu has < 100 max HP.
 describe('depth-1 search', () => {
   test('a guaranteed KO into a win ranks first with a winning score', () => {
     const root = serialize(makeBattle(
@@ -77,7 +75,6 @@ describe('depth-1 search', () => {
   });
 
   test('when staying in dies, the saving switch ranks first', () => {
-    // p1 active: level-30 Pikachu (dies to the toss); bench: level-100 Blissey (survives it). p2: level-100 Machamp, Seismic Toss only.
     const battle = makeBattle(
       [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Blissey', 'Blissey', ['Protect'], 100)],
       [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
@@ -114,10 +111,7 @@ describe('depth-1 search', () => {
   });
 
   test('the score-focused depth-1 sub-search matches the full search exactly', () => {
-    // Boost-free fixtures: with the fitted boost weight a Growl row's ev-vs-floor gap flips top picks between the ev-sorted
-    // full search and the floor-sorted sub-search, and this parity is about intervals and floors. Tie-free tops too: the
-    // full search corrects EV-tied leading rows by their probe trends, which the pruned path lacks, so a tied fixture (two
-    // fixed-damage moves) would measure that layer, not the pruning.
+    // Boost-free, tie-free fixtures: the full search corrects EV-tied rows by probe trends, the pruned path does not.
     const fixtures = [
       serialize(makeBattle(
         [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
@@ -131,8 +125,7 @@ describe('depth-1 search', () => {
     for (const root of fixtures) {
       const full = searchPosition(root, { depth: 1, samples: 1, tera: false });
       const focused = subSearchDepth1(root, { depth: 1, samples: 1, tera: false });
-      // The full search scores at the solved game value, the pruned sub-search at the maximin midpoint: both live inside the
-      // same [v1, v2] interval. The focused sub-search never runs the prover; compare the engine's own score.
+      // The full search scores at the solved value, the focused sub-search at the maximin midpoint, without the prover.
       expect(Math.abs(focused.score - (full.forcedWin?.engineScore ?? full.score))).toBeLessThanOrEqual(full.interval + 1e-9);
       expect(focused.interval).toBe(full.interval);
       expect(focused.perSide.p1[0].choice).toBe(full.perSide.p1[0].choice);
@@ -153,13 +146,11 @@ describe('depth-1 search', () => {
       [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle'], 30)],
     );
     const root = serialize(battle);
-    // Unrestricted: 4 moves + 4 tera variants + 2 switches = 10 p1 options.
     const full = searchPosition(root, { depth: 1, samples: 1 });
     expect(full.perSide.p1.length).toBeGreaterThan(8);
 
     const restricted = searchPosition(root, { depth: 1, samples: 1 }, undefined, undefined, true);
     expect(restricted.perSide.p1.length).toBeLessThanOrEqual(8);
-    // Restriction only trims tera variants and switches.
     for (const move of ['move seismictoss', 'move closecombat', 'move protect', 'move growl']) {
       expect(restricted.perSide.p1.map(choice => choice.choice)).toContain(move);
     }
@@ -182,7 +173,6 @@ describe('depth-1 search', () => {
 });
 
 describe('iterative deepening', () => {
-  // p2 has two level-30 Pokémon, each KO'd by one level-100 Seismic Toss: depth 1 sees one KO, depth 2 the full win.
   const twoTurnWin = () => serialize(makeBattle(
     [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
     [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
@@ -192,7 +182,6 @@ describe('iterative deepening', () => {
     const depth1 = searchPosition(twoTurnWin(), { depth: 1, samples: 1 });
     const depth2 = searchPosition(twoTurnWin(), { depth: 2, samples: 1 });
     expect(depth2.depthCompleted).toBe(2);
-    // Both depths carry the forced-win bar; the engine's own score still deepens.
     expect(depth2.forcedWin?.engineScore ?? depth2.score).toBeGreaterThan(depth1.forcedWin?.engineScore ?? depth1.score);
     expect(depth2.perSide.p1[0].choice).toBe('move seismictoss');
   });
@@ -212,7 +201,6 @@ describe('iterative deepening', () => {
     expect(result.perSide.p1.length).toBeGreaterThan(0);
   });
 
-  // Three fodder mons: the win is three tosses deep, so followup lines extend beyond one step without a terminal child.
   const threeTurnWin = () => serialize(makeBattle(
     [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
     [
@@ -223,8 +211,7 @@ describe('iterative deepening', () => {
   ));
 
   test('followup lines surface on expanded top choices', () => {
-    // tera:false keeps each row narrow enough for the expansion budget to chase the shifting worst-case cell to convergence
-    // (the draft-league shape).
+    // tera:false keeps rows narrow enough for the expansion budget to converge (the draft-league shape).
     const depth1 = searchPosition(threeTurnWin(), { depth: 1, samples: 1, tera: false });
     expect(depth1.perSide.p1[0].line).toBeUndefined();
 
@@ -243,11 +230,10 @@ describe('doubles search', () => {
   test('the root is restricted to a tractable option list and stays deterministic', () => {
     const root = doublesRoot();
     const result = searchPosition(root, { depth: 1, samples: 1, tera: false });
-    // Doubles restricts to at most 16 combined options per side.
     expect(result.perSide.p1.length).toBeLessThanOrEqual(16);
     expect(result.perSide.p2.length).toBeLessThanOrEqual(16);
-    expect(result.perSide.p1[0].choice).toContain(','); // combined two-slot choice
-    expect(result.score).toBeGreaterThan(0); // the level-50 side bullies the level-30s
+    expect(result.perSide.p1[0].choice).toContain(',');
+    expect(result.score).toBeGreaterThan(0);
     expect(searchPosition(root, { depth: 1, samples: 1, tera: false })).toEqual(result);
   });
 
@@ -266,8 +252,6 @@ describe('doubles candidate hints', () => {
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: 50, gender: '',
   });
-  // A realistic VGC turn 1: about 180 legal combos per side, far over the cap, so only hint-favored combos survive. Setup,
-  // Protect, Fake Out and spread moves must stay recommendable.
   const vgcRoot = () => createRootPosition(serialize(makeDoublesBattle(
     [
       vgcSet('Scizor', ['Swords Dance', 'Bullet Punch', 'Bug Bite', 'Protect'], 'Life Orb'),
@@ -312,7 +296,6 @@ describe('doubles candidate hints', () => {
     const kept = searchOptions(vgcRoot(), 'p1', { tera: true, keep });
     const choices = kept.map(option => option.choice);
     expect(choices).toContain('move swordsdance, move fakeout 1');
-    // "Played, but with Tera" comparisons need the same core with the gimmick attached.
     expect(choices).toContain('move swordsdance terastallize, move fakeout 1');
   });
 
@@ -341,7 +324,6 @@ describe('mcts hint-ordered expansion with progressive widening', () => {
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
     level: 50, gender: '',
   });
-  // The VGC restriction fixture's shape: a wide combined root where the 16-option cap binds.
   const wideSerialized = () => serialize(makeDoublesBattle(
     [
       wideSet('Scizor', ['Swords Dance', 'Bullet Punch', 'Bug Bite', 'Protect'], 'Life Orb'),
@@ -385,10 +367,7 @@ describe('mcts hint-ordered expansion with progressive widening', () => {
       shouldStop: () => done >= 30,
     });
     expect(stats.p1Options.length).toBeGreaterThan(WIDENING_BASE);
-    // Weak options stay closed: after 30 iterations on a 16-wide root some are still unvisited.
     expect(stats.p1N.filter(n => n === 0).length).toBeGreaterThan(0);
-    // Every opened option sits inside the hint-order window the visits reach. The node's options come from the same
-    // searchOptions call, so the index spaces align.
     expect(stats.p1Options.length).toBe(options.length);
     const hints = optionHints(root, 'p1', options);
     const order = hints.map((value, index) => ({ value, index }))
@@ -408,9 +387,6 @@ describe('mcts hint-ordered expansion with progressive widening', () => {
   });
 
   test('rankings come from the equilibrium over tree-informed cells, not visit order', () => {
-    // Visit counts allocate search effort; they are not the verdict. A hint-anchored move can stay most-visited while the
-    // tree's own cell values refute it (draft t58: Knock Off most-visited, a switch to Kyurem better), so the published
-    // ranking is the same equilibrium solve the matrix mode runs, over cells informed by the tree's backed-up means.
     const result = mctsSearch(wideSerialized(), { depth: 1, samples: 1, tera: false });
     expect(result.matrix).toBeTruthy();
     const matrix = result.matrix!;
@@ -422,7 +398,6 @@ describe('mcts hint-ordered expansion with progressive widening', () => {
     const sorted = [...result.perSide.p1].every((choice, index, list) =>
       index === 0 || list[index - 1].ev >= choice.ev - 1e-12);
     expect(sorted).toBe(true);
-    // Every root option is ranked: visit starvation hides no rows.
     expect(result.perSide.p1.length).toBe(matrix.p1Labels.length);
     // The score stays the visit-mean formulation (bit-comparable with saved records) although the rankings are solved.
     const stats = mctsTreeSearch(wideSerialized(), { depth: 1, samples: 1, tera: false }, 0);
@@ -439,8 +414,6 @@ describe('mcts hint-ordered expansion with progressive widening', () => {
 
 describe('team preview search (turn 0)', () => {
   test('the engine ranks lead pairs and favors the pressuring lead', () => {
-    // Machamp is the only mon that wins pairs and cells where it leads score higher, so every top lead includes it. Passive
-    // mons carry Growl only.
     const preview = new Battle({
       formatid: toID('gen9doublescustomgame'),
       seed: '1,2,3,4',
@@ -474,7 +447,6 @@ describe('team preview search (turn 0)', () => {
 
 describe('no-op candidate filter', () => {
   test('guaranteed-failing field moves are dropped from the option list', () => {
-    // GPL turn 25: Stealth Rock with rocks already up is a guaranteed |-fail|, its cell equals a pass.
     const battle = makeBattle(
       [makeSet('U', 'Uxie', ['Stealth Rock', 'Tackle', 'Reflect'], 100)],
       [makeSet('S', 'Snorlax', ['Protect', 'Tackle'], 100)],
@@ -506,13 +478,12 @@ describe('no-op candidate filter', () => {
       return serialize(battle);
     };
 
-    // Clause flagged (custom-game reconstructions lose the rule in serialization): re-sleeping is a no-op and is dropped.
+    // Custom-game reconstructions lose the clause in serialization, so the row flags it.
     const clause = searchOptions(createRootPosition(sleeping()), 'p1', { tera: false, sleepClause: true })
       .map(option => option.choice);
     expect(clause).not.toContain('move sleeppowder');
     expect(clause).toContain('move gigadrain');
 
-    // No clause: double sleep is legal.
     const noClause = searchOptions(createRootPosition(sleeping()), 'p1', { tera: false })
       .map(option => option.choice);
     expect(noClause).toContain('move sleeppowder');
@@ -529,14 +500,11 @@ describe('no-op candidate filter', () => {
 
 describe('accuracy and random-call roll sensitivity', () => {
   test('a game-ending cell behind an accuracy roll is never priced as certain (draft t64)', () => {
-    // Machamp's Dynamic Punch (50%) KOs the last foe when it hits: one seed that hit prices the win as a certain +1.00; the
-    // seed spread prices the miss even in single-sample sweeps.
     const risky = makeBattle(
       [makeSet('M', 'Machamp', ['Dynamic Punch'], 100)],
       [makeSet('P', 'Pikachu', ['Growl'], 5)],
     );
     const result = searchPosition(serialize(risky), { depth: 1, samples: 1, tera: false });
-    // The prover bars the win (Pikachu cannot hurt Machamp); the cell pricing must still price the miss.
     expect(result.forcedWin?.engineScore ?? result.score).toBeGreaterThan(0.2);
     expect(result.forcedWin?.engineScore ?? result.score).toBeLessThan(0.999);
 
@@ -572,9 +540,7 @@ describe('doubles keepPlayed', () => {
     };
     const without = searchPosition(doublesRoot(), { depth: 1, samples: 1, tera: false });
     const withKeep = searchPosition(doublesRoot(), { depth: 1, samples: 1, tera: false, keepPlayed });
-    // The restriction drops the zero-hint combo.
     expect(without.perSide.p1.some(option => option.choice === 'switch 3, move protect')).toBe(false);
-    // keepPlayed forces it back in, ranked like any option.
     const kept = withKeep.perSide.p1.find(option => option.choice === 'switch 3, move protect');
     expect(kept).toBeTruthy();
     expect(Number.isFinite(kept!.worstCase)).toBe(true);
@@ -589,19 +555,15 @@ describe('pivot pairs', () => {
       makeSet('Clef', 'Clefable', ['Moonblast']),
       makeSet('Tran', 'Heatran', ['Lava Plume']),
     ],
-    // Seismic Toss cannot KO the incoming mon, so the child position shows the pair's follow-up (an Earthquake foe that KOs the
-    // entering Heatran would let the greedy replacement mask it).
     [makeSet('Bliss', 'Blissey', ['Seismic Toss'])],
   );
 
   test('the root matrix enumerates the pivot over the live bench', () => {
     const result = searchPosition(serialize(pivotBattle()), { depth: 1, samples: 1, tera: false });
     const choices = result.perSide.p1.map(option => option.choice);
-    // The bare row is replaced by one pair per healthy bench mon,
     expect(choices).not.toContain('move uturn');
     expect(choices).toContain('move uturn > switch 2');
     expect(choices).toContain('move uturn > switch 3');
-    // with labels naming the incoming Pokémon; plain moves stay plain.
     const pair = result.perSide.p1.find(option => option.choice === 'move uturn > switch 2')!;
     expect(pair.label).toBe('U-turn → Clefable');
     expect(choices).toContain('move closecombat');
@@ -618,7 +580,6 @@ describe('pivot pairs', () => {
     const root = createRootPosition(serialize(battle));
     const child = advancePosition(root, 'move uturn > switch 3', 'move seismictoss', '1,2,3,4');
     const after = positionBattle(child);
-    // Mienshao pivoted and Heatran (slot 3) came in, not the greedy pick.
     expect(after.sides[0].active[0]?.species.name).toBe('Heatran');
   });
 
@@ -630,14 +591,12 @@ describe('pivot pairs', () => {
     const root = createRootPosition(serialize(battle));
     const child = advancePosition(root, 'move uturn > switch 2', 'move seismictoss', '1,2,3,4');
     const after = positionBattle(child);
-    // Slot 2 (Clefable) is gone: the greedy resolver brings in the only healthy bench mon.
     expect(after.sides[0].active[0]?.species.name).toBe('Heatran');
   });
 });
 
 describe('hidden-disable candidate filter', () => {
   test('Taunt-disabled moves stay out of the candidates (visible-disable family)', () => {
-    // Taunt, Encore, Disable and choice locks disable visibly (the request carries the flag); Imprison is the concealed case.
     const battle = makeBattle(
       [makeSet('Mew', 'Mew', ['Taunt', 'Confusion'])],
       [makeSet('Rat', 'Raticate', ['Toxic', 'Quick Attack'])],
@@ -666,8 +625,7 @@ describe('hidden-disable candidate filter', () => {
   });
 
   test('an Imprison-concealed move never enters the candidate list', () => {
-    // The request reports Imprison-disabled foe moves as enabled (the sim hides them until the click bounces), and offering
-    // one guarantees a choice reject that aborts the whole search (gen9doublesou-2660802611 turn 2).
+    // The request shows Imprison-disabled foe moves as enabled; offering one aborts the search with a choice reject.
     const battle = makeBattle(
       [makeSet('Mew', 'Mew', ['Imprison', 'Confusion'])],
       [makeSet('Rat', 'Raticate', ['Confusion', 'Quick Attack'])],
@@ -686,9 +644,7 @@ describe('hidden-disable candidate filter', () => {
 
 describe('serialized-state round-trip repair', () => {
   test('a transformed mon with fewer copied moves than base moves still deserializes', () => {
-    // Transform copies the target's moveSlots; a reconstructed target with only 2 revealed moves leaves the transformed mon
-    // with moveSlots shorter than its baseMoveSlots, a legal state that @pkmn/sim's deserializer crashes on ("reading 'id'";
-    // Imprison-Transform Mew, gen9doublesou-2660802611 turns 4-10).
+    // Transform copies the target's moveSlots: moveSlots shorter than baseMoveSlots crash the sim's deserializer.
     const battle = makeBattle(
       [makeSet('Mew', 'Mew', ['Imprison', 'Knock Off', 'Transform', 'Ice Beam'])],
       [makeSet('Blissey', 'Blissey', ['Seismic Toss'])],
@@ -697,7 +653,7 @@ describe('serialized-state round-trip repair', () => {
       sides: { pokemon: { moveSlots: unknown[]; baseMoveSlots?: unknown[] }[] }[];
     };
     const mew = state.sides[0].pokemon[0];
-    // The sim omits baseMoveSlots when identical to moveSlots: restore the transform shape (full base, shortened copied slots).
+    // The sim omits baseMoveSlots when identical to moveSlots: restore the transform shape (full base, shorter copy).
     mew.baseMoveSlots = mew.moveSlots;
     mew.moveSlots = mew.moveSlots.slice(0, 2);
 
@@ -723,8 +679,7 @@ describe('mid-charge candidates', () => {
   });
 
   test('a doubles mid-charge release carries a target the deserialized sim accepts', () => {
-    // gen9doublesou-2660809089 t6/t8: serialization drops the locked-request shape and the round-tripped sim demands a target
-    // for the release, so every bare "move phantomforce" candidate is a guaranteed reject.
+    // Serialization drops the locked-request shape, so a bare "move phantomforce" is a guaranteed reject.
     const battle = makeDoublesBattle(
       [
         makeSet('Ghost', 'Dragapult', ['Phantom Force', 'Dragon Darts'], 100),
@@ -782,12 +737,10 @@ describe('side-invariant repair on deserialize', () => {
     const state = JSON.parse(serialize(battle)) as {
       sides: { pokemonLeft: number; pokemon: { isActive: boolean }[] }[];
     };
-    // Correction drift: the win-check counter reads high and the active's flag reads false.
     state.sides[1].pokemonLeft = 3;
     state.sides[1].pokemon[0].isActive = false;
     const position = createRootPosition(JSON.stringify(state));
     expect(legalChoices(position, 'p2').some(choice => choice.choice.startsWith('switch'))).toBe(false);
-    // The KO of the last body ends the game: a wiped side never plays on behind a stale request.
     const child = advancePosition(position, 'move seismictoss', 'move tackle', [1, 2, 3, 4]);
     expect(positionBattle(child).ended).toBe(true);
   });

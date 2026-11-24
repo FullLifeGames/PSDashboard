@@ -7,17 +7,8 @@ import { CHAMPIONS, mon, type Mode, type Rules } from './dice-fixtures';
 import { dexOfRules, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * A screen of a Light Clay holder keeps its eight turns in a variation. The simulator sets a condition with the duration its own
- * rule gives (Light Clay: eight turns for Reflect, Light Screen and Aurora Veil); the turn boundary syncs the field with the
- * client's snapshot, which counts five turns because the log never shows the item. The main line syncs every turn, but a
- * variation stops syncing (gen9terapreviewdraft-2182991758: Latias with Light Clay, Light Screen on turn 34 and Reflect on turn 35,
- * the variation from turn 38).
- *
- * The sweep: every move that sets a side condition or a pseudo weather, in every rule set and game type the corpus plays, by a
- * holder of no item and by a holder of every item and every ability that changes the condition's duration; after one turn the
- * turn boundary keeps the simulator's duration.
- */
+// A Light Clay screen lasts eight turns; the client's snapshot counts five because the log never shows the item,
+// and a variation stops syncing: the turn boundary must keep the simulator's duration.
 await loadSimMods('gen9championsou');
 
 type Table = Record<string, { duration?: number } | undefined>;
@@ -27,7 +18,6 @@ interface Row { move: string; holder: Holder; label: string }
 const standard = (entry: { exists: boolean; gen: number; isNonstandard?: string | null }, gen: number): boolean =>
   entry.exists && entry.gen <= gen && (entry.isNonstandard === null || entry.isNonstandard === undefined || entry.isNonstandard === 'Past');
 
-/** The moves of a rule set that set a side condition or a pseudo weather (no Z or Max moves). */
 function conditionMoves(rules: Rules): DexMove[] {
   const dex = dexOfRules(rules);
   return dex.moves.all().filter(move => standard(move, dex.gen) && !move.isZ && !move.isMax && !!(move.sideCondition || move.pseudoWeather));
@@ -35,7 +25,6 @@ function conditionMoves(rules: Rules): DexMove[] {
 
 const conditionOf = (move: DexMove): string => (move.sideCondition ?? move.pseudoWeather)!;
 
-/** The board: Snorlax sets the condition for side p1, a Vaporeon faces it; in doubles a Blissey and a second Vaporeon stand beside them. */
 function board(rules: Rules, mode: Mode, move: string, holder: Holder): Battle {
   const setter: PokemonSet = { ...mon(rules, { species: 'Snorlax', moves: [move, 'splash'] }), ...holder };
   const foe = mon(rules, { species: 'Vaporeon', moves: ['splash'] });
@@ -43,16 +32,11 @@ function board(rules: Rules, mode: Mode, move: string, holder: Holder): Battle {
   return battleOf(rules.doubles!, [setter, mon(rules, { species: 'Blissey', moves: ['splash'] })], [foe, mon(rules, { species: 'Vaporeon', moves: ['splash'] })]);
 }
 
-/** The table a move's condition lives in: the field's pseudo weather, the foe's side for a foe-side move, else the setter's side. */
 function tableOf(battle: Battle, move: DexMove): Table {
   if (move.pseudoWeather) return battle.field.pseudoWeather as unknown as Table;
   return battle.sides[move.target === 'foeSide' ? 1 : 0].sideConditions as unknown as Table;
 }
 
-/**
- * The holders whose condition lasts another number of turns, asked of the condition's own rule (its durationCallback) with the
- * setter holding each item or having each ability of the rule set. A condition without such a rule gives no holder.
- */
 function durationHolders(rules: Rules, mode: Mode, move: DexMove): Row[] {
   const dex = dexOfRules(rules);
   const condition = dex.conditions.get(conditionOf(move)) as unknown as { durationCallback?: (...args: unknown[]) => number };
@@ -85,14 +69,8 @@ function rowsOf(rules: Rules, mode: Mode): Row[] {
   ]);
 }
 
-/** The spectator's view of the simulator's log: what a replay shows, the lines the client reads. */
 const replayLines = (battle: Battle): string => extractChannelMessages(battle.log.join('\n'), [0])[0].join('\n');
 
-/**
- * One row: the setter adds the condition the way its move does (the move's own call, so a move that needs a weather or a
- * partner still gives its condition), both sides splash through turn 1, and the turn boundary of turn 2 syncs the field with the
- * client's snapshot of the simulator's own log.
- */
 function playRow(rules: Rules, mode: Mode, row: Row): { simulator: number | undefined; synced: number | undefined } | null {
   const move = dexOfRules(rules).moves.get(row.move);
   const battle = board(rules, mode, row.move, row.holder);
@@ -112,11 +90,8 @@ function playRow(rules: Rules, mode: Mode, row: Row): { simulator: number | unde
   return { simulator, synced: tableOf(battle, move)[id]?.duration };
 }
 
-/**
- * The sync deletes a condition the client's snapshot does not hold. The client shows Fairy Lock only as `-fieldactivate` (Gens 6
- * on), and the client of Gens 8 and 9 does not know the Past moves Lucky Chant, Mud Sport and Water Sport; the simulator keeps
- * them, the turn boundary takes them away. These rows are `test.fails` and turn red once the sync keeps them.
- */
+// The client shows Fairy Lock only as `-fieldactivate` and lacks Lucky Chant, Mud Sport, Water Sport (Gens 8, 9);
+// the sync deletes them, so these rows are `test.fails` until the sync keeps them.
 const clientBlind = (rules: Rules, move: string): boolean =>
   (move === 'fairylock' && rules.generation >= 6)
   || (['luckychant', 'mudsport', 'watersport'].includes(move) && rules !== CHAMPIONS && rules.generation >= 8);
@@ -129,7 +104,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 2))('the tur
   for (const row of rowsOf(rules, mode)) {
     (clientBlind(rules, row.move) ? test.fails : test)(row.label, () => {
       const played = playRow(rules, mode, row);
-      // a condition the rule set does not keep for a turn (a guard of one turn ends before the boundary) has nothing to keep
       if (played === null) return;
       expect(played.synced, row.label).toBe(played.simulator);
     });
@@ -143,14 +117,12 @@ describe('the reported scene: a Light Clay screen in a variation (gen9teraprevie
     const battle = battleOf(gen9.singles, [latias], [mon(gen9, { species: 'Vaporeon', moves: ['splash'] })]);
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');
-    // the main line: the turn boundaries of turns 2 to 4 sync the field with the client's snapshot
     for (let turn = 2; turn <= 4; turn++) {
       const snapshot = parseReplayLogWithObservations(replayLines(battle)).snapshots.find(entry => entry.turn === turn)!;
       correctFieldFromSnapshot(battle as never, snapshot);
       battle.choose('p1', 'move 2');
       battle.choose('p2', 'move 1');
     }
-    // the variation from turn 5: no more syncing; the screen set on turn 1 ends at the end of turn 8
     let ended = 0;
     for (let turn = 5; turn <= 10 && !ended; turn++) {
       battle.choose('p1', 'move 2');

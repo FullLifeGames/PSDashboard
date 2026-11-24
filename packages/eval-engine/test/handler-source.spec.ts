@@ -2,11 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { idsOfStrings, lex, readsOfCode } from '../src/dex-facts/handler-source';
 import { tokensOf } from '../src/dex-facts/state-readers';
 
-/**
- * The five ways a scan of a handler's source can read what the handler does not read, each found by `state-readers-built.spec.ts` (the Dex
- * built with the app's Vite settings against the Dex in Node: 5,547 rows differed). The rows pin each one on its own source, and on the
- * same source written the way a production build writes it.
- */
 const reads = (source: string): string[] => [...tokensOf(source)].sort();
 
 describe('the scan reads the code of a handler and nothing else', () => {

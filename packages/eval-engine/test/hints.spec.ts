@@ -7,15 +7,8 @@ import { singleMoveFraction } from '../src/score/threat';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * A Tera option is hinted on the body the
- * simulator makes at the click, not on the body with a Tera type set.
- * Terapagos-Terastal clicks into Terapagos-Stellar (other stats, other HP,
- * Tera Starstorm turns Stellar and, in doubles, hits both foes) and Ogerpon
- * into its -Tera forme with Embody Aspect. The oracle is a battle in which
- * the simulator ran the click (choose with 'terastallize'), as
- * the tera-hints rows below do.
- */
+// A Tera option is hinted on the body the click makes (Terapagos-Terastal becomes Terapagos-Stellar),
+// not on the body with a Tera type set.
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
@@ -64,7 +57,6 @@ describe('Tera hints read the clicked body', () => {
     clicked.choose('p2', 'move 1, move 1');
     const mon = clicked.sides[0].active[0];
     expect(mon.species.name).toBe('Terapagos-Stellar');
-    // The clicked body's move hits both foes: the target is the simulator's, read from the clicked Terapagos-Stellar.
     const spread = clicked.sides[1].active.reduce((sum, foe) => sum + singleMoveFraction(mon, foe!, 'terastarstorm', clicked), 0) * SPREAD_FACTOR;
     expect(tera - SUPPORT_FLOOR).toBeCloseTo(spread, 10);
     expect(tera).toBeGreaterThan(plain);
@@ -137,7 +129,6 @@ describe('Tera options hinted on the terastallized body', () => {
     const root = rootOf(battleOf('gen9customgame', [set('Garchomp', ['earthquake', 'terablast'], { teraType: 'Ground' })], [splash('Blissey')]));
     const [quake, teraQuake] = singlesOptionHints(root, 'p1', [option('move earthquake'), option('move earthquake terastallize')]);
     expect(teraQuake / quake).toBeCloseTo(2 / 1.5, 10);
-    // Tera Blast after the click: Fairy, physical on Garchomp's Attack, with Tera STAB, as the clicked body prices it.
     const fairyBattle = () => battleOf('gen9customgame', [set('Garchomp', ['terablast'], { teraType: 'Fairy' })], [splash('Dragonite')]);
     const [blast, teraBlast] = singlesOptionHints(rootOf(fairyBattle()), 'p1', [option('move terablast'), option('move terablast terastallize')]);
     const clicked = fairyBattle();
@@ -149,9 +140,7 @@ describe('Tera options hinted on the terastallized body', () => {
     expect(teraBlast).toBeGreaterThan(2 * blast);
   });
 
-  // Each Tera part is held against the static of a body the simulator terastallized
-  // (a STAB constant would pass whether or not the part was hinted on the clicked
-  // body); the Tera Blast row moves type and category under any STAB rule.
+  // Each Tera part is held against the static of a simulator-terastallized body: a STAB constant would pass either way.
   test('doubles: the Tera part of a combined option is hinted on the terastallized body', () => {
     // Tera Blast turns Fairy and physical under any STAB rule; High Horsepower moves with the STAB rule only.
     const rows = [['Ground', 'highhorsepower', 'Blissey', false], ['Fairy', 'terablast', 'Dragonite', true]] as const;

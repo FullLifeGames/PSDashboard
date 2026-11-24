@@ -11,8 +11,7 @@ import { configureSimFast, resetSimFastForTests } from '../src/forward/sim-fast/
 
 type DeserializeFn = typeof State.deserializeBattle;
 
-// Forks are counted as State.deserializeBattle calls, which only the standard path makes (lever clone copies a template), so
-// these rows pin the standard path whatever EVAL_SIM_FAST says.
+// Forks count State.deserializeBattle calls, only the standard path makes them: whatever EVAL_SIM_FAST says.
 beforeEach(() => configureSimFast([]));
 afterEach(() => resetSimFastForTests());
 
@@ -33,7 +32,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
     p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
     p2: { name: 'Beta', team: Teams.pack(p2Sets) },
   });
-  // Custom Game opens at team preview: commit the default order so the leads are on the field.
   if (battle.sides.some(side => side.requestState === 'teampreview')) {
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
@@ -54,7 +52,6 @@ describe('fork counts on the standard path', () => {
     // A zero prover budget keeps this count about the matrix sampler.
     const proverStates = PROVER_BUDGET.states; PROVER_BUDGET.states = 0;
     try {
-      // 2x2 all-quiet matrix (Protect/Substitute): every cell needs one sim.
       const quiet = serialize(makeBattle(
         [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
         [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
@@ -63,13 +60,11 @@ describe('fork counts on the standard path', () => {
       searchPosition(quiet, { depth: 1, samples: 3, tera: false });
       expect(forks).toBe(1 + 4); // root + 4 cells x 1 draw
 
-      // Toss KOs Pikachu (bench Eevee continues the game): those cells are roll-sensitive and take the full spread; quiet
-      // cells still take one. The trend tiebreak probes a cell from each of its draws, so its forks grow with the draws too.
       const violent = createRootPosition(serialize(makeBattle(
         [makeSet('Machamp', 'Machamp', ['Seismic Toss', 'Protect'], 100)],
         [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30), makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
       )));
-      positionBattle(violent); // the root's own deserialization is no part of the sampling
+      positionBattle(violent);
       const p1 = searchOptions(violent, 'p1', { tera: false });
       const p2 = searchOptions(violent, 'p2', { tera: false });
       const matrixForks = (samples: 1 | 3) => {
@@ -79,9 +74,9 @@ describe('fork counts on the standard path', () => {
       };
       const forksSingle = matrixForks(1);
       const extraDraws = matrixForks(3) - forksSingle;
-      const cells = 2 * 3; // 2 p1 options x 3 p2 options
-      expect(extraDraws).toBeGreaterThan(0);           // some cells multi-sampled
-      expect(extraDraws).toBeLessThan(cells * 2);      // but not all of them
+      const cells = 2 * 3;
+      expect(extraDraws).toBeGreaterThan(0);
+      expect(extraDraws).toBeLessThan(cells * 2);
     } finally {
       State.deserializeBattle = original;
       PROVER_BUDGET.states = proverStates;
@@ -119,7 +114,6 @@ describe('fork counts on the standard path', () => {
       return original.call(State, serialized);
     }) as DeserializeFn;
     try {
-      // A sleeping Sleep Talker: which move comes out is pure seed, so the cell must not be judged off a single called move.
       const sleeper = () => {
         const battle = makeBattle(
           [makeSet('S', 'Snorlax', ['Sleep Talk', 'Protect'], 100)],

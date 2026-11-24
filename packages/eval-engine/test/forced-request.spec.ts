@@ -7,13 +7,8 @@ import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { rulesDex } from '@fulllifegames/replay-core';
 
-/**
- * Every switch the protocol shows that answers a forced request goes to the sim as that answer. Older logs (gen 6 and 8, 2022) write a
- * U-turn's, Volt Switch's or Flip Turn's switch without `[from]`, after the slot's own move; gens 1 to 4 replace a fainted body before
- * upkeep. A forced list that skips both makes the sim bring its first free body (653785 t5: Weavile instead of Excadrill, so Bisharp's
- * Knock Off took Weavile's Choice Band), and a body knocked out before it acted has its replacement sent as the turn's choice (gen 3:
- * Gengar came in at turn start and took the Hidden Power meant for Blastoise).
- */
+// Older logs (gens 6 and 8, 2022) write a pivot's switch without `[from]`, after the slot's own move;
+// gens 1 to 4 replace a fainted body before upkeep.
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
@@ -51,7 +46,6 @@ describe('the forced list reads every answered request', () => {
   });
 });
 
-/** The sim's own public log of the block that ends at `|turn|boundary`. */
 function simBlock(battle: Battle, boundary: number): string[] {
   const log = battle.log;
   const end = log.lastIndexOf(`|turn|${boundary}`);
@@ -101,8 +95,6 @@ describe('the sim brings the body the protocol shows', () => {
   });
 
   test('gen 3: a body knocked out before it acts is replaced before upkeep, not at turn start', { timeout: 240000 }, async () => {
-    // Turn 4: Hidden Power knocks Blastoise out, Gengar replaces it. Turn 8:
-    // Explosion takes both actives, Charizard and Electabuzz replace them.
     const replay = fixture('gen3customgame-2115579570.json');
     const { seen } = await boundaries(replay, builtTeams(replay), [5, 9], battle => {
       const lines = simBlock(battle, battle.turn);

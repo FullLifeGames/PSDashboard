@@ -13,17 +13,8 @@ import { summarizeTurn } from '../src/summary';
 import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
 import { resolveTeraPreference } from '../src/tera';
 
-/**
- * A nickname or a shiny flag never reaches the engine's words or its numbers. The built sets carry the replay's names,
- * so every `name` the simulator holds can be a nickname. The turn analysis of a position (the search, the played
- * actions, the tiers, the sentence) must read the same when every name is the species and no body is shiny. The
- * position comes from one reconstruction; the second reading rewrites it, text for text, to species names (the name of
- * each nicknamed body becomes its base species, `shiny` goes), so the two readings differ in nothing but the names. The
- * failure names the first differing path: the reader of it is the file to name.
- *
- * The regular spec (`identity-blind.spec.ts`) reads four fixture replays; a run over every fixture replay with a
- * nicknamed or shiny body takes about 80 s.
- */
+// The second reading rewrites the position to species names (a nicknamed body becomes its base species, `shiny` goes),
+// so the two readings differ only in the names.
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURES = ['packages/eval-engine/test/fixtures', 'packages/eval-engine/test/fixtures/champions', 'packages/replay-core/test/fixtures'];
@@ -59,7 +50,6 @@ export async function expectNameBlind(replay: ReplayData, shares: readonly numbe
   const format = getBranchSimulatorFormat(replay);
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-  // Each nicknamed body's name becomes the base species the simulator gave an unnamed body; a shiny flag goes.
   const renames = [...p1Team, ...p2Team].flatMap(set => {
     const base = Dex.species.get(set.species).baseSpecies;
     return set.name && set.name !== set.species && set.name !== base ? [[set.name, base] as const] : [];

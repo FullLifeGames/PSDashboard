@@ -43,7 +43,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
   return battle;
 }
 
-/** Sets every listed body to `hp` (slot order per side) and serializes. */
 function serializeAt(battle: Battle, hp: { p1?: number[]; p2?: number[] }): string {
   for (const side of ['p1', 'p2'] as const) {
     (hp[side] ?? []).forEach((value, index) => { battle.sides[side === 'p1' ? 0 : 1].pokemon[index].hp = value; });
@@ -60,7 +59,6 @@ const resultWith = (score: number, p1: string[], p2: string[], extra: Partial<Ev
 
 describe('forced-win trigger and bar', () => {
   test('forcedWinInput carries score, profile, ranking order and the search allowance', () => {
-    // Rows a band apart keep the ranking's order; a near tie goes by label (the prover-near-tie rows below).
     const result = resultWith(0.3, ['move seismictoss', 'move protect'], ['move softboiled'], {
       unanswered: { p1: [], p2: [], decided: { side: 'p1', species: 'Machamp' } },
     });
@@ -90,7 +88,6 @@ describe('forced-win trigger and bar', () => {
       score: -0.7, rootOrder: { p1: [], p2: [] },
       unanswered: { p1: [], p2: [], decided: { side: 'p2', species: 'Machamp' } },
     })).toEqual(['p2']);
-    // A named side with a lukewarm score stays out on a full board: no bank proof ever stood there.
     expect(forcedWinSides(full, {
       score: -0.5, rootOrder: { p1: [], p2: [] },
       unanswered: { p1: [], p2: [], decided: { side: 'p2', species: 'Machamp' } },
@@ -131,8 +128,6 @@ describe('forced-win trigger and bar', () => {
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
     ), { p2: [1] });
     const result = resultWith(0.4, ['move seismictoss', 'move protect'], ['move softboiled']);
-    // A band apart keeps Seismic Toss first. Equal rows order by label, Protect would lead, and the full proof (no greedy scout names
-    // the winning line first) reads that stalling line's win in 11 turns instead of the Toss's one.
     result.perSide.p1[1] = row('move protect', 0.2);
     const outcome = forcedWinFor(createRootPosition(serialized), forcedWinInput(result, { depth: 1, samples: 1, tera: false }));
     expect(outcome?.side).toBe('p1');
@@ -193,7 +188,6 @@ const asProof = (serialized: string, ruleset: StaticRuleset | undefined, rootOrd
   proveForcedWin(createRootPosition(serialized, ruleset), { side, rootOrder, tera: false, ruleset });
 const sceneProof = (board: Scene): ForcedWinProof => asProof(board.serialized, board.ruleset, board.rootOrder, board.side);
 
-/** A board of a custom format whose bodies the spec sets, serialized as the app serializes a live battle. */
 function boardOf(format: string, p1: ReturnType<typeof set>[], p2: ReturnType<typeof set>[], prepare: (battle: Battle) => void): string {
   const battle = battleOf(format, p1, p2);
   prepare(battle);
@@ -257,8 +251,7 @@ describe('the margin and the held turns that matter: no delay pricing', () => {
     expect(proof.mass).toBe(0);
   });
 
-  // singles: a repeated Protect is an unpriced split of the end, and only the delay rule reads such a split, so a held turn that matters leaves
-  // the cell at mass 0; the game's own bound is 2/3 (the failed repeat wins, the held one heals or hurts), which no proof may pass
+  // A held repeated Protect is an unpriced split only the delay rule reads; the game's bound is 2/3.
   test('Leftovers: each held Protect heals the foe, so the hold counts: no delay, and no mass above 2/3', () => {
     const proof = asProof(protectBoard({ item: 'Leftovers' }), 'standard', ['move tackle']);
     expect(proof.delay).toBeUndefined();
@@ -298,7 +291,6 @@ describe('the margin and the held turns that matter: no delay pricing', () => {
 
 describe('a held child that is no delay refuses the delay pricing for the whole cell', () => {
   test('a second held child with another HP: readDelay answers null, the plain split answers a delay', () => {
-    // the position after the foe's first Protect (sure): its stall volatile stands, the second Protect is the die
     const battle = battleOf(SINGLES, [set('Pikachu', ['Tackle'])], [set('Snorlax', ['Protect', 'Splash'])]);
     playClicks(battle, { p1: 'move 1', p2: 'move 1' });
     battle.sides[1].active[0]!.hp = 1;
@@ -315,8 +307,6 @@ describe('a held child that is no delay refuses the delay pricing for the whole 
 });
 
 describe('a failed repeat that missed is a delay too (the stall is reset)', () => {
-  // Pikachu's attack is blocked by the second Protect when it holds, and when the repeat fails and the attack misses the board is the parent's
-  // with one PP less and the stall volatile gone: the next Protect is sure, and the chain goes on until the foe's PP end
   test('readDelay marks the child of the missed attack and the child of the held repeat, and leaves the knock-out alone', () => {
     const battle = battleOf(SINGLES, [set('Pikachu', ['Tackle', 'Splash'])], [set('Snorlax', ['Protect', 'Splash'])]);
     playClicks(battle, { p1: 'move 2', p2: 'move 1' });
@@ -359,8 +349,6 @@ describe('the four Champions scenes the user reported', () => {
     expect(proof.mass).toBe(0);
   });
 
-  // the ranking's three root candidates and the sure strike before them, as the app asks: each repeated Protect is a delay, and Aqua Jet knocks
-  // Raichu out before Zap Cannon lands, so the proof reads mass 1 in 2 turns (the first Protect is sure, the second can hold, then Aqua Jet).
   // Without the strike these two boards read 0.765625, 7/8 of 7/8 (Volcarona's paralysis die at each of two levels).
   test.each([
     ['the fixture', 'forced-win/scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6'],
@@ -412,7 +400,6 @@ describe('Champions VGC 2682637901 turn 6: Aqua Jet knocks Raichu out before it 
     expect(proof.turns).toBe(2);
     expect(proof.delay).toBe('protect');
     expect(proof.cells).toBeLessThanOrEqual(20);
-    // the search's own list holds Aqua Jet only beside Quiver Dance: the strike with Heat Wave comes from the legal choices
     expect(proof.choice).toBe(WINNING_CHOICE);
   });
 
@@ -424,8 +411,6 @@ describe('Champions VGC 2682637901 turn 6: Aqua Jet knocks Raichu out before it 
     expect(candidates.slice(1, 4)).toEqual(board.rootOrder.slice(0, 3));
   });
 
-  // the foe's first Protect is sure and Volcarona's paralysis die is a turned child in that root cell (the board stays, only a PP count and the last
-  // move differ): the lazy pass leaves it aside and reads 7/8, the full pass reads the child and proves the whole share
   test('the strike by itself: the lazy pass reads 7/8 (the paralysis die left aside, the ended failed repeat read), the full pass reads 1', () => {
     const board = scene(SCENE_1);
     const root = createRootPosition(board.serialized, board.ruleset);
@@ -439,9 +424,6 @@ describe('Champions VGC 2682637901 turn 6: Aqua Jet knocks Raichu out before it 
 });
 
 describe('a strike that does not end the root runs on cells of its own', () => {
-  // VGC 2470704517 turn 6: the strike (Stomping Tantrum with Knock Off) proves 2/3 on 35 cells; the ranking's third candidate proves the win
-  // on 98 of the 100. Inside the shared budget the strike left 65 and the proof fell to 2/3; on cells of its own the ranking's
-  // candidates keep their budget (the strike's partial proof is the 0.963 of a longer line).
   test('the ranking\'s proving candidate keeps its cells: mass 0.96 or more, at most 100 cells', () => {
     const proof = proofOf(scene('forced-win-delay/vgc-2470704517-t6'));
     expect(proof.mass).toBeGreaterThanOrEqual(0.96);
@@ -461,7 +443,6 @@ const strikeOn = (battle: Battle, side: 'p1' | 'p2' = 'p1'): string | null => {
 };
 
 describe('singles: a sure kill that moves before the foe', () => {
-  // Pikachu outruns Snorlax: Tackle kills Pikachu at 1 HP in every roll but Pikachu moves first; Quick Attack goes first
   const board = (prepare: (battle: Battle) => void = oneHp) => {
     const battle = battleOf(SINGLES, [set('Snorlax', ['Tackle', 'Quick Attack'])], [set('Pikachu', ['Tackle', 'Splash'])]);
     prepare(battle);
@@ -484,8 +465,6 @@ describe('singles: a sure kill that moves before the foe', () => {
     expect(strikeOn(slowOnly)).toBe('move tackle');
   });
 
-  // the strike takes none of the candidates' places: with the strike among the engine's own options and named first in the root's list,
-  // an order that reads it twice drops the ranking's third candidate (the proving one in three corpus rows)
   test('the root tries the strike and the ranking\'s first three: four candidates, none displaced (the strike is also an option of the engine\'s list)', () => {
     const battle = battleOf(SINGLES, [set('Snorlax', ['Tackle', 'Quick Attack', 'Body Slam', 'Splash'])], [set('Pikachu', ['Tackle', 'Splash'])]);
     oneHp(battle);
@@ -558,8 +537,6 @@ describe('prover-near-tie', () => {
 
   describe('the prover’s root order across near ties', () => {
     test('two rankings that differ only inside a near tie give the prover one root order (653785 t24)', () => {
-      // The ranking of 653785 t24: U-turn and Hidden Power Ice stand 0.0017 apart. The second ranking is a noise-sized estimate of
-      // the same root with the two swapped (every value moved by less than 0.016).
       const official = result([
         row('Hurricane', 'move hurricane', 0.1764), row('U-turn', 'move uturn', -0.0136), row('Hidden Power Ice', 'move hiddenpower', -0.0153),
         row('→ Cofagrigus', 'switch 4', -0.0329), row('Knock Off', 'move knockoff', -0.0359), row('→ Volcanion', 'switch 3', -0.1073),
@@ -581,7 +558,6 @@ describe('prover-near-tie', () => {
         row('Z', 'move z', 0.1), row('Y', 'move y', 0.1 - PROVER_NEAR_TIE / 2), row('X', 'move x', 0.1 - 0.9 * PROVER_NEAR_TIE),
         row('W', 'move w', 0.1 - 1.4 * PROVER_NEAR_TIE),
       ]);
-      // W sits within one band of X but more than one band below the group's top Z: it starts a group of its own.
       expect(forcedWinInput(ranked, settings).rootOrder.p1).toEqual(['move x', 'move y', 'move z', 'move w']);
     });
   });

@@ -33,7 +33,6 @@ export const SCENES: Scene[] = [
   },
 ];
 
-/** A doubles battle with the first foe alone (`alone`) or beside a second one, and `screen` up on the foes' side. */
 export function doubles(scene: Scene, screen: string | null, alone: boolean): SimPosition {
   return rootOf('gen9doublescustomgame', [scene.attacker(), wall('Snorlax')], [wall(), wall('Chansey')], battle => {
     if (alone) {

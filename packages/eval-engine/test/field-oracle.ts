@@ -3,12 +3,8 @@ import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog, toId, t
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { terrainIdFromSnapshot, weatherIdFromSnapshot } from '../src/branch/field-ids';
 
-/**
- * Where the rebuild created a condition itself and the snapshot knows it too, the snapshot's numbers must fit the sim's: layers
- * match, a duration lies between the client's remaining minimum and maximum (an extending item such as Damp Rock only the sim
- * knows). Read at the raw boundary (onRawBoundary), before the correction of that boundary. Only conditions the sim's dex knows
- * count: the client also files Future Sight as a side condition, which the sim keeps as a slot condition under another id.
- */
+// A duration lies between the client's remaining min and max (Damp Rock extends it only in the sim); layers match.
+// Only Dex conditions count: the client files Future Sight as a side condition, the sim as a slot condition.
 
 type Turns = { minDuration?: number; maxDuration?: number } | undefined;
 
@@ -44,7 +40,6 @@ function mismatches(battle: Battle, snapshot: TurnSnapshot): string[] {
   return out;
 }
 
-/** Every raw boundary of one replay against its snapshot; the live correction keeps the rebuild in lockstep. */
 export async function fieldMismatches(replay: { log: string; formatid?: string; id?: string }): Promise<{ checked: number; found: string[] }> {
   const snapshots = parseReplayLog(replay.log);
   const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;

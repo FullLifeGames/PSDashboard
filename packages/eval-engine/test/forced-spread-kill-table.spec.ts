@@ -2,13 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { checkedRolls, drawTurn } from './calc-roll-oracle';
 import { doubles, IDLE, IDLE_ALONE, SCENES, SCREENS } from './forced-spread-scenes';
 
-/**
- * The calculator forces the spread target for Tera Starstorm of Terapagos-Stellar and Expanding Force in Psychic Terrain; against a lone
- * foe the simulator plays one target. The Singles game type holds the spread factor and the screen factor right only without a screen: a
- * screen is 2732/4096 in Doubles and 2048/4096 in Singles, and neither field prices the hit of a lone foe behind one. The kill table
- * answers null there, so the pair plan samples the simulator itself, and the preview prices the hit on a copy of the live battle. The
- * oracle is the simulator's own damage.
- */
+// A screen is 2732/4096 in Doubles, 2048/4096 in Singles: neither prices a lone foe's spread hit (kill table null).
 
 describe('the kill table of a forced spread behind a screen (doubles)', () => {
   for (const scene of SCENES) {

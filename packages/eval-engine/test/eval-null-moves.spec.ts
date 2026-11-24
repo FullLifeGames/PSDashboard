@@ -1,8 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { nullMoveReason } from '../src/null-moves';
 
-/** The null-move guard fires on definite type-chart nulls (653785 t19: Will-O-Wisp into a Fire-type) and stays silent on anything uncertain. */
-
 const reason = (choice: string, defenderSpecies: string, gen = 6, attackerSpecies: string | null = null) =>
   nullMoveReason({ choice, gen, attackerSpecies, defenderSpecies });
 
@@ -22,7 +20,6 @@ describe('nullMoveReason', () => {
 
   test('Thunder Wave cannot paralyze Electric-types from gen 6 on', () => {
     expect(reason('move thunderwave', 'Rotom-Wash', 6)).toContain('cannot be paralyzed');
-    // Gen 5: Electric-types could still be paralyzed.
     expect(reason('move thunderwave', 'Rotom-Wash', 5)).toBeNull();
   });
 
@@ -45,13 +42,11 @@ describe('nullMoveReason', () => {
     expect(reason('move shadowball', 'Blissey')).toContain('immune to Ghost-type moves');
   });
 
-  // A terastallized defender defends with its Tera type: the immunity can go, and a new one can come.
   test('a terastallized defender is read by its Tera type', () => {
     const live = (choice: string, defenderSpecies: string, defenderTera: string | null) =>
       nullMoveReason({ choice, gen: 9, attackerSpecies: null, defenderSpecies, defenderTera });
     expect(live('move closecombat', 'Gholdengo', null)).toContain('immune to Fighting-type moves');
     expect(live('move closecombat', 'Gholdengo', 'Normal')).toBeNull();
-    // The sentence names the Tera type; Snorlax the species is no Ghost.
     expect(live('move closecombat', 'Snorlax', 'Ghost')).toBe('Snorlax (Tera Ghost) is immune to Fighting-type moves');
     expect(live('move willowisp', 'Garchomp', 'Fire')).toBe('Garchomp (Tera Fire) cannot be burned (Fire-type)');
     expect(live('move spore', 'Garchomp', 'Grass')).toBe('powder moves do not affect Grass-types like Garchomp (Tera Grass)');
@@ -60,8 +55,7 @@ describe('nullMoveReason', () => {
     // A Stellar Tera keeps the old types for defense.
     expect(live('move closecombat', 'Gholdengo', 'Stellar')).toContain('immune to Fighting-type moves');
   });
-  // The sim retypes these at use time (the user's Tera type, weather, a held
-  // plate): the dex type decides nothing, so the guard stays silent.
+  // The sim retypes these at use time (Tera type, weather, held plate): the Dex type decides nothing.
   test('a move retyped on use is never called null', () => {
     const immuneTo: Record<string, string> = {
       terablast: 'Gengar', terastarstorm: 'Gengar', revelationdance: 'Gengar', judgment: 'Gengar',
@@ -102,9 +96,7 @@ describe('the null-move sentence asks the move table', () => {
   });
 
   test('a Mega choice reads the Mega forme abilities', () => {
-    // Lopunny-Mega carries Scrappy: Return into a Ghost is no definite null.
     expect(reason('move return mega', 'Gengar', 6, 'Lopunny')).toBeNull();
-    // Without the Mega click Lopunny has no Scrappy, and Return stays Normal (its power rule never blocks the type).
     expect(reason('move return', 'Gengar', 6, 'Lopunny')).toContain('immune to Normal-type moves');
   });
 

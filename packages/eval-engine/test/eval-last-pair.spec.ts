@@ -38,14 +38,11 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
   return battle;
 }
 
-/** The material static in win-prob units, without the last-pair race. */
 const staticLeaf = (battle: Battle) =>
   wpUnits(evaluatePosition(battle, createMatchupCache()), battle.gameType === 'doubles', battleFaintedFraction(battle));
 
 describe('last-pair race static', () => {
   test('the race winner reads the base plus the clock margin, capped', () => {
-    // A burned Toxapex with no damaging move (Recover, Haze) against a Choice Band Zapdos-Galar: the Band breaks the heal
-    // economy and the loser clock is infinite, so the full margin applies.
     const battle = makeBattle(
       [makeSet('Pex', 'Toxapex', ['Recover', 'Haze'])],
       [makeSet('Zap', 'Zapdos-Galar', ['Stomping Tantrum', 'Close Combat'], 100, { item: 'Choice Band' })],
@@ -54,7 +51,6 @@ describe('last-pair race static', () => {
     const race = lastPairRace(battle, createMatchupCache());
     expect(race).toEqual({ winner: 1, margin: 3 });
     expect(leafValue(battle, createMatchupCache())).toBeCloseTo(-LAST_PAIR_CAP, 10);
-    // 573756 t135-t137: the material static had this Toxapex ahead on HP.
     expect(staticLeaf(battle)).toBeGreaterThan(-LAST_PAIR_CAP);
   });
 
@@ -80,7 +76,7 @@ describe('last-pair race static', () => {
   });
 
   test('fixed-damage attackers race too: a Seismic Toss user is not a wall', () => {
-    // Seismic Toss has no base power; priced at 0, the race read a level-100 Machamp as never landing against a level-30 Eevee.
+    // Seismic Toss has no base power: priced at 0 it never lands in the race.
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Protect'])],
       [makeSet('Eevee', 'Eevee', ['Tackle', 'Growl'], 30)],
@@ -88,7 +84,6 @@ describe('last-pair race static', () => {
     const machamp = battle.sides[0].active[0]!;
     const eevee = battle.sides[1].active[0]!;
     expect(singleMoveFraction(machamp, eevee, 'seismictoss', battle)).toBeCloseTo(100 / eevee.maxhp, 10);
-    // Fighting-type fixed damage still respects the Ghost immunity.
     const ghost = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Protect'])],
       [makeSet('Gengar', 'Gengar', ['Shadow Ball'], 30)],
@@ -133,8 +128,6 @@ describe('last-pair race static', () => {
   });
 
   test('the sweep variant fires only behind the flag when a decided sweeper stands', () => {
-    // A level-100 Machamp against two level-5 Pikachu: the decided-sweep profile sees it clearing both; with two bodies
-    // alive on p2 the strict last-pair rule stays out.
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Close Combat', 'Protect'])],
       [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 5), makeSet('Chu', 'Pikachu', ['Tackle', 'Growl'], 5)],

@@ -7,13 +7,7 @@ import { setStaticForm } from '../src/score/phase-form';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The field pair as two features at weight 0. pairFocus: a foe on the field that neither of the side's two actives KOs alone but
- * both KO together, valued by the second attacker's marginal share of the foe's HP, over the foes on the field. pairRedirect: a
- * living Follow Me or Rage Powder user next to a partner with damage, valued by the partner's best share of a foe's HP it
- * covers, at the redirector's HP. Both are p1-positive differences and 0 in singles. The premises (who KOs, who is hit) are
- * played in the simulator.
- */
+// pairFocus and pairRedirect are p1-positive differences and 0 in singles; their premises are played in the simulator.
 
 const FORMAT = 'gen9doublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
@@ -23,7 +17,6 @@ const OLD_KEYS = ['bodies', 'boosts', 'hazards', 'screens', 'tailwind', 'trickRo
   'sweepFastKo', 'sweepFastChip', 'sweepSlowKo', 'sweepSlowChip'] as const;
 const RULESETS: StaticRuleset[] = ['standard', 'vgc', 'champions'];
 
-/** Foe slot-1 HP lost when p1's two Pikachu both use Thunderbolt on it. */
 function hitOf(build: () => Battle): number {
   const battle = build();
   const mon = battle.sides[1].active[0]!;
@@ -33,7 +26,6 @@ function hitOf(build: () => Battle): number {
   return before - mon.hp;
 }
 
-/** Whether p1's choice faints foe slot 1 in the simulator. */
 function faintsFoe(build: () => Battle, choice: string): boolean {
   const battle = build();
   battle.choose('p1', choice);
@@ -95,7 +87,6 @@ describe('pairFocus', () => {
   });
 });
 
-/** The simulator's own answer to "does this move turn a foe's single-target hit away from the partner". */
 function redirectedInSim(moveId: string): boolean {
   const build = () => battleOf(FORMAT,
     [set('Blissey', [moveId, 'splash'], { ability: 'No Ability' }), set('Blissey', ['splash'])],
@@ -176,7 +167,6 @@ describe('singles and the inert weights', () => {
   test.each([false, true])('the tables carry the cells at weight 0 (doubles %s)', doubles => {
     for (const ruleset of RULESETS) {
       const weights = featureWeights(doubles, ruleset);
-      // A 0/1 gate on pairFocus made the VGC score fall as a foe took damage, so both weights stay 0.
       expect(weights.pairFocus).toBe(0);
       expect(weights.pairRedirect).toBe(0);
     }
@@ -197,7 +187,6 @@ describe('singles and the inert weights', () => {
     const cache = createMatchupCache(ruleset);
     const features = evalFeatures(battle, cache);
     const weights = featureWeights(doubles, ruleset);
-    // The sum is the table's: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     let diff = 0;
     for (const key of OLD_KEYS) diff += weights[key] * (features as EvalFeatures)[key];

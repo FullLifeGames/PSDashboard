@@ -7,24 +7,15 @@ import { dexOfRules, SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 import { delayBoard, foeClick, ownClick, proofOf, strikeOf } from './forced-win-delay-support';
 
-/**
- * The delay rule of the forced-win prover against the simulator, in every rule set the corpus plays (Gens 2 to
- * 9 and the Champions mod; Gen 1 has no stalling move), singles and doubles. A foe at 1 HP behind a stalling move that rolls
- * (`rollsStall`) and a Splash, against a side whose move cannot miss and knocks it out: the repeat only delays the knock-out, so the
- * proof reads mass 1 in 2 turns (the first use is sure, the repeat is the delay) and names the stalling move. Each kind of stall that
- * matters (see forced-win-delay-support.ts) gets no delay, and no mass above what the simulator's rollouts (300 seeds, the foe stalling
- * every turn or never) reach. `DICE_SWEEPS=full` plays every stalling move of a rule set; a plain run plays the sample of `sweepSelection`.
- */
+// `DICE_SWEEPS=full` plays every stalling move of a rule set; a plain run plays the sample of `sweepSelection`.
 await loadSimMods('gen9championsou');
 
 const WITH_STALL = SWEEP_CASES.filter(({ rules }) => rules.generation >= 2);
 const SEEDS = 300;
 const TURNS = 12;
 
-/** A board that the rule set can build, or null when its Dex lacks a move of it. */
 const has = (rules: Rules, ids: string[]): boolean => ids.every(id => dexOfRules(rules).moves.get(id).exists || dexOfRules(rules).items.get(id).exists);
 
-/** The share of the games in which side p1 wins within `TURNS` turns when it clicks `own` every turn and the foe clicks `foe` every turn. */
 function winRate(build: (seed: string) => Battle, own: string, foe: string): number {
   let wins = 0;
   for (let index = 0; index < SEEDS; index++) {
@@ -95,7 +86,6 @@ describe.each(WITH_STALL)('a repeated stall is a delay, $name', ({ rules, mode }
     expect(proof.turns).toBe(2);
   });
 
-  // the card says "a repeated <name> only delays it"; the name is the Dex's, never a name of our code
   test.each(moves.map(move => move.id))('%s: the proof names the stall as the Dex does', stall => {
     const proof = proofOf(delayBoard(rules, mode, strike!.id, { stall }), rules);
     expect(proof.delayName).toBe(dex.moves.get(stall).name);

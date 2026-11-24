@@ -7,8 +7,6 @@ import { advancePositionWithLog, createRootPosition } from '../src/forward-model
 import { serializeBattleStable } from '../src/forward/serialize';
 import { SEEDS, stableLog, withSimFast } from './sim-fast-helpers';
 
-/** The snapshot correction writes side conditions with their layers, weather with its duration and terrain with its state. */
-
 const mon = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy', gender: '',
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
@@ -46,7 +44,6 @@ describe('field correction', () => {
     const chomp = battle.sides[0].active[0]!;
     expect(chomp.species.name).toBe('Garchomp');
     expect(chomp.status).toBe('tox');
-    // A quarter from three layers of Spikes plus the first Toxic tick.
     expect((chomp.maxhp - chomp.hp) / chomp.maxhp).toBeGreaterThan(0.29);
   });
 

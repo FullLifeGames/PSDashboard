@@ -6,8 +6,6 @@ import { evalFeatures, evaluatePosition } from '../src/eval-function';
 import { readFileSync } from 'node:fs';
 import { buildTeamsFromReplay, type SmogonUsageStats } from '@fulllifegames/replay-core';
 
-/** Intimidate drops, Dragon Dance boosts, Regenerator, Rocky Helmet and hazard re-entry through the search's own advance path (655336 t23/t24). */
-
 function makeSet(name: string, species: string, moves: string[], extra?: Partial<PokemonSet>): PokemonSet {
   return {
     name, species, item: '', ability: 'No Ability', moves,
@@ -55,8 +53,6 @@ describe('searched mechanics stay honest', () => {
     const ddBattle = positionBattle(afterDD);
     expect(ddBattle.sides[0].active[0]!.boosts.atk).toBe(1);
     expect(ddBattle.sides[0].active[0]!.boosts.spe).toBe(1);
-    // Directional guard on the boosts column, so weight tuning cannot break it: a Dragonite with no attack in its set has no
-    // move that reads the stage, and the singles table prices boostsBiting.
     const afterNoop = advancePosition(mkRoot(), 'move splash', 'move protect', '1,2,3,4');
     expect(evalFeatures(positionBattle(afterDD)).boosts).toBeGreaterThan(evalFeatures(positionBattle(afterNoop)).boosts);
   });
@@ -90,8 +86,6 @@ describe('searched mechanics stay honest', () => {
   });
 
   test('a benched mon below hazard-entry HP stops counting (effHp 0)', () => {
-    // SR+Spikes set up for real; the benched Lopunny at 10% sits below its entry damage, so the wincon-vs-hazards rule prices
-    // it as disabled (about 0.44 toward p1; directional guard only).
     const build = () => {
       const battle = makeBattle(
         [makeSet('Skarmory', 'Skarmory', ['Stealth Rock', 'Spikes'])],
@@ -114,7 +108,6 @@ describe('searched mechanics stay honest', () => {
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/regression/fixtures/${name}.json`, import.meta.url), 'utf-8'));
 const SCENE: string = fixture('smogtours-gen4ou-544639').log;
 
-/** The statistics fixture as the parsed shape the builder reads: the species, their counts and their teammate rows. */
 function gen4Stats(): SmogonUsageStats {
   const payload = fixture('stats-gen4ou-trimmed') as { pokemon: Record<string, { count: number; teammates: Record<string, number> }> };
   const pokemon: SmogonUsageStats['pokemon'] = {};

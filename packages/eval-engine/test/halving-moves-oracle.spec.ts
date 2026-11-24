@@ -2,13 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { HALVING_MOVES } from '../src/score/threat';
 import { ALL_VIEWS, battleIn, mon } from './sim-views';
 
-/**
- * `HALVING_MOVES` in score/threat.ts names the moves that deal half the target's current HP (the threat prices them from the
- * defender's live HP). The Dex marks ten moves with a `damageCallback`; halving is one of its results, so a field cannot say it.
- * This spec plays every damaging move that has a damage callback in every view the corpus plays, against a target at two HP
- * values and an attacker at a third, and keeps the moves whose damage is half the target's HP (rounded down) at both. A new Dex
- * move that halves, or a listed move the simulator stops halving, fails with its id.
- */
+// The Dex marks ten moves with a `damageCallback`; halving is one of its results, so no field says it.
 
 describe('HALVING_MOVES is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
@@ -16,7 +10,6 @@ describe('HALVING_MOVES is held to the simulator', () => {
       .filter(move => move.exists && move.category !== 'Status' && (move as unknown as { damageCallback?: unknown }).damageCallback)
       .map(move => move.id);
 
-    /** The damage the simulator gives `moveId` when the target stands at `targetHp` and the user at 300. */
     function damageAt(moveId: string, targetHp: number): unknown {
       const battle = battleIn(view, [mon('Blissey', ['splash']), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
       const user = battle.sides[0].active[0];

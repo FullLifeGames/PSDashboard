@@ -53,7 +53,6 @@ describe('sensitivity probe plumbing', () => {
       [makeSet('A', 'Garchomp', ['Earthquake'])],
       [makeSet('Tran', 'Heatran', ['Magma Storm'], 'choicespecs'), makeSet('Clef', 'Clefable', ['Moonblast'], 'leftovers')],
     ));
-    // Active Heatran is involved; benched Clefable only via a switch label.
     const targets = [
       { species: 'Heatran', items: ['Leftovers', 'Air Balloon'] },
       { species: 'Clefable', items: ['Sticky Barb'] },

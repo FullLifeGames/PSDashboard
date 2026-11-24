@@ -272,7 +272,6 @@ describe('error message nickname annotation', () => {
     }
     expect(annotateNicknames("Can't switch: Sludge Shadow is already in.", battle))
       .toBe("Can't switch: Sludge Shadow (Muk-Alola) is already in.");
-    // Non-nicknamed Pokémon and already-annotated messages pass through.
     expect(annotateNicknames('Bulbasaur is trapped.', battle)).toBe('Bulbasaur is trapped.');
     expect(annotateNicknames('Sludge Shadow (Muk-Alola) fainted.', battle))
       .toBe('Sludge Shadow (Muk-Alola) fainted.');
@@ -283,9 +282,7 @@ interface Row {
   name: string;
   victim: { moves: string[]; item?: string };
   source: { moves: string[] };
-  /** What the victim and the source click on turn 1 (move names). */
   turn1: { victim: string; source: string };
-  /** The move ids the simulator disables at the second request. */
   disabled: string[];
   /** Runs after turn 1, before the second request is read (a state the sim reaches only by PP loss). */
   after?: (battle: SimBattle, victimSide: number) => void;
@@ -337,10 +334,7 @@ function build(row: Row, format: typeof FORMATS[number], victimSide: number): Si
 type RequestMove = { id: string; disabled?: unknown };
 const requestMoves = (battle: SimBattle, side: number): RequestMove[] =>
   (battle.sides[side].activeRequest as unknown as { active: { moves: RequestMove[] }[] }).active[0].moves;
-/**
- * The moves the player cannot click: the request's flag, or the slot's own (a hidden disable such as Imprison's
- * stays out of a singles request, which hides what the player cannot know; the omniscient picker still shows it).
- */
+// A hidden disable such as Imprison's stays out of a singles request; the omniscient picker still shows it.
 const unavailable = (battle: SimBattle, side: number): Map<string, boolean> => {
   const slots = battle.sides[side].active[0].moveSlots;
   return new Map(requestMoves(battle, side).map(move => [move.id, !!move.disabled || !!slots.find(slot => slot.id === move.id)?.disabled]));
@@ -357,12 +351,9 @@ describe('A-1 every move button agrees with the simulator request', () => {
         test(`${format.name}, ${sideId(victimSide)}: ${row.name}`, () => {
           const battle = build(row, format, victimSide);
           const expected = unavailable(battle, victimSide);
-          // The row is real: the simulator disables exactly the expected moves.
           expect([...expected].filter(([, disabled]) => disabled).map(([id]) => id).sort()).toEqual([...row.disabled].sort());
-          // The picker shows the same flag on every button.
           const picker = pickerMoves(battle, victimSide);
           expect(picker.map(move => move.disabled)).toEqual([...expected.values()]);
-          // And a disabled button never reaches Execute as a command the simulator would refuse.
           const disabledButton = picker.find(move => move.disabled)!;
           const resolved = resolveSideChoices(battle, sideId(victimSide), [{ kind: 'move', moveId: disabledButton.name.toLowerCase().replace(/[^a-z0-9]/g, ''), moveName: disabledButton.name }], [true]);
           expect(resolved.ok).toBe(false);
@@ -410,7 +401,6 @@ type Commands = { side: 'p1' | 'p2'; command: string }[];
 type Copy = (battle: SimBattle & Battle, commands: Commands) => void;
 const copies: [string, Copy][] = [['branch/execute.ts', branchCopy as Copy], ['dice/logged-block.ts', diceCopy as Copy]];
 
-/** What a copy does to one battle: the log it leaves, or the message it throws. */
 function outcome(copy: Copy, doubles: boolean, commands: Commands): { log: string[]; thrown: string | null } {
   const battle = board(doubles);
   let thrown: string | null = null;
@@ -431,7 +421,6 @@ describe('the two chooseOnCopy functions answer alike', () => {
       test(`${game}: ${label}`, () => {
         const [branch, dice] = copies.map(([, copy]) => outcome(copy, doubles, commands));
         expect(branch).toEqual(dice);
-        // The rows have teeth: a refusal throws, an accepted pair writes the turn.
         expect(branch.thrown !== null).toBe(label !== 'both sides choose');
         if (branch.thrown === null) expect(branch.log.some(line => line.startsWith('|move|'))).toBe(true);
       });
@@ -521,7 +510,6 @@ describe('followup-fixes', () => {
         value: 'Heavy-Duty Boots',
         source: 'guessed',
       }));
-      // Garchomp took the rocks damage, so no boots inference.
       expect(garchomp?.item.value).not.toBe('Heavy-Duty Boots');
     });
   });
@@ -584,7 +572,6 @@ describe('followup-fixes', () => {
       ]);
 
       expect(first.ok || second.ok).toBe(true);
-      // Without a guard the battle advances past turn 2.
       expect(battle.turn).toBeGreaterThanOrEqual(2);
     });
   });

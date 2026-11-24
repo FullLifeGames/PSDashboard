@@ -6,12 +6,6 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 import { chancesCalled, liveState, turnOf } from './flip-turn-support';
 
-/**
- * The tie path of the plain endgame children plays each speed-tie order apart. `recordTurn` and `flipTurn` take the ties a turn
- * is held to (`FlipTurn.ties`, the forcing PRNG's tie die by pair), and `recordTurn` lists the pairs the natural turn tied
- * (`ties`, the slots of every shuffle that held two move actions). Held to an order, the turn plays that order in the recording
- * and in every flip, and the live board stays as it was.
- */
 await loadSimMods('gen9championsou');
 
 const tied = () => battleOf(
@@ -24,7 +18,6 @@ const clicks = { p1: 'move 1 1, move 1', p2: 'move 1 1, move 1' };
 const firstMover = (battle: ReturnType<typeof tied>, start: number): string =>
   battle.log.slice(start).find(line => line.startsWith('|move|') && !line.includes('Splash'))!.split('|')[2].slice(0, 3);
 
-/** The tie of the leading pair, held to one side going first. */
 const heldTo = (first: 'p1a' | 'p2a'): ForcedDie[] => [{ name: tieName('p1a', 'p2a'), result: { first } }];
 
 describe('a recorded turn lists the speed ties it drew', () => {
