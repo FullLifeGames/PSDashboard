@@ -5,9 +5,6 @@ import {
 } from '@fulllifegames/eval-engine';
 import { pickFill, slotChoicesOf } from '../../src/lib/dock-fill';
 
-// The engine fills a forced replacement like any slot: the evaluation ranks the replacement at a forced position (the dock serializes
-// the live battle at its open request, as the sweep does for a knockout), and `pickFill` maps the best line onto the forced slot, in
-// singles and in doubles, with one side or both replacing. Memento faints its user at once, so the turn ends in the open request.
 const EVS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const IVS = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const mon = (species: string, moves: string[]): PokemonSet => ({
@@ -18,13 +15,11 @@ const LEAVERS = ['Rillaboom', 'Parasect'];
 const STAYERS = ['Snorlax', 'Corviknight'];
 const BENCH = ['Pikachu', 'Eevee'];
 
-/** One side's team: `leaving` bodies that Memento away, the rest of the field on Splash, then two on the bench. */
 function team(active: number, leaving: number): PokemonSet[] {
   const front = (leaving > 0 ? LEAVERS : STAYERS).slice(0, active).map(species => mon(species, ['Memento', 'Splash']));
   return [...front, ...BENCH.map(species => mon(species, ['Splash']))];
 }
 
-/** The position after one turn in which `p1Leaving` bodies of P1 and `p2Leaving` bodies of P2 faint. */
 function forcedPosition(format: string, active: number, p1Leaving: number, p2Leaving: number): Battle {
   const battle = new Battle({
     formatid: toID(format) as never, seed: [1, 2, 3, 4],
@@ -34,7 +29,6 @@ function forcedPosition(format: string, active: number, p1Leaving: number, p2Lea
     battle.choose('p1', 'default');
     battle.choose('p2', 'default');
   }
-  // Memento aims at a foe in doubles; every other body plays Splash.
   const command = (leaving: number) => Array.from({ length: active }, (_, slot) => (slot < leaving ? `move 1${active > 1 ? ' 1' : ''}` : 'move 2')).join(', ');
   battle.choose('p1', command(p1Leaving));
   battle.choose('p2', command(p2Leaving));
@@ -60,7 +54,6 @@ describe('the evaluation at a forced replacement', () => {
         const forced = side === 'p1' ? state.p1ForceSwitches : state.p2ForceSwitches;
         const ranked = result.perSide[side];
         if (!forced.some(Boolean)) {
-          // The side that waits is ranked as a wait, which the fill skips: its slots stay empty.
           expect(pickFill(side, ranked, state, forced.map(() => null)).every(choice => choice === null)).toBe(true);
           continue;
         }
@@ -78,7 +71,6 @@ describe('the evaluation at a forced replacement', () => {
 });
 
 describe('the single evaluation of the app at a forced replacement', () => {
-  // The dock's run is the app's single evaluation: the DUCT trees, the verify round and the forced-win prover, on the live battle.
   for (const row of [ROWS[0], ROWS[2]]) {
     test(`${row.name}: the orchestrated tree search with the prover returns the ranked bench`, { timeout: 300_000 }, async () => {
       const battle = forcedPosition(row.format, row.active, row.p1, row.p2);

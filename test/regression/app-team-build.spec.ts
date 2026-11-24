@@ -26,7 +26,6 @@ import type { SolveSpreadsJob } from '../../src/lib/replay-jobs/types';
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { bankTeamsFor } from './bank-build';
 
-// Scene: smogtours-gen4ou-544639, where P1 shows 3 of 6 bodies in twelve turns; without stand-ins the engine read it as a loss at turn 1.
 const fixture = (name: string) => JSON.parse(readFileSync(`test/regression/fixtures/${name}.json`, 'utf-8')) as { log: string };
 const SCENE = fixture('smogtours-gen4ou-544639').log;
 const GEN4 = parseSmogonChaosStats(fixture('stats-gen4ou-trimmed'), { format: 'gen4ou', month: 'latest' }) as SmogonUsageStats;
@@ -34,7 +33,6 @@ const GEN4 = parseSmogonChaosStats(fixture('stats-gen4ou-trimmed'), { format: 'g
 const speciesOf = (info: OpponentTeamInfo) => info.pokemon.map(mon => mon.species);
 const standIns = (info: OpponentTeamInfo) => info.pokemon.filter(mon => mon.standIn);
 
-/** A simulator-made log of a game that nobody played far: both sides have six bodies, two of them shown. */
 function simulatorLog(formatid: string, teams: string[]): string {
   const set = (species: string) => ({
     name: species, species, item: '', ability: '', moves: ['tackle'], nature: '', gender: '',
@@ -60,9 +58,7 @@ describe('the scene: P1 shows 3 of 6 in a Gen 4 OU game', () => {
     expect(guessed).toHaveLength(3);
     const base = guessed.map(mon => mon.species.split('-')[0]);
     expect(new Set([...base, 'Azelf', 'Gyarados', 'Metagross']).size).toBe(6);
-    // The greedy sum names bodies the format's statistics list.
     for (const mon of guessed) expect(GEN4.pokemon[mon.species.toLowerCase().replace(/[^a-z0-9]/g, '')]).toBeDefined();
-    // P2 showed all six: nothing changes.
     expect(filled.p2).toEqual(seed.rawInfos.p2);
     expect(standIns(filled.p2)).toHaveLength(0);
   });
@@ -204,7 +200,6 @@ describe('app-build-parity', () => {
   const SINGLES = 'smogtours-gen6ou-648453';
   const DOUBLES = 'smogtours-gen9doublesou-912045';
 
-  /** Every Smogon URL a build asks for, and whether the harness pins it. */
   const unpinned: string[] = [];
   const pinnedFetcher = (async (input: string | URL | Request) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -284,12 +279,8 @@ describe('app-build-parity', () => {
       const { parsed, seed, usageStats, setAssumptions } = await knowledgeFor(replay);
       const app = buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
       const old = await withRawBuild(() => bankTeams(replay, parsed));
-      // Both builds read the published move slots, so the old build picks Volcanion's Leftovers set too; the move orders keep
-      // p1 Tornadus-Therian's Speed (Timid 252 Spe), so p2 Ferrothorn solves to the old build's Relaxed 88 Def / 168 SpD. The solve
-      // refills open EV budgets toward the prior, so p2 Keldeo's spread differs between the builds.
       expect(moved(rows(old), rows(app)))
         .toEqual(['p1:Tornadus-Therian', 'p2:Keldeo', 'p2:Landorus-Therian']);
-      // The old build explains the move order with speed EVs.
       expect(itemOf(old, 'p2', 'Landorus-Therian')).toBe('Rocky Helmet');
       expect(itemOf(app, 'p2', 'Landorus-Therian')).toBe('Choice Scarf');
       expect(itemOf(app, 'p1', 'Volcanion')).not.toBe('Choice Scarf');
@@ -299,7 +290,7 @@ describe('app-build-parity', () => {
     test.each([SINGLES, DOUBLES])('buildAppTeams matches the app entry points on %s', async id => {
       const replay = fixture(id);
       const { seed, usageStats, setAssumptions } = await knowledgeFor(replay);
-      // The enrich memo of useTeamKnowledge, settled: the lazy hidden-power resolver has landed and the Smogon data is in.
+      // The enrich memo of useTeamKnowledge, settled: the lazy hidden-power resolver and the Smogon data are in.
       const hp = (side: 'p1' | 'p2') => (species: string) => resolveHiddenPowerType(
         seed.hpEvidence.filter(entry => entry.attackerSide === side), usageStats, species, logRules(replay.log));
       const { p1: effectiveP1Info, p2: effectiveP2Info } = enrichTeamInfos(seed.rawInfos, usageStats, setAssumptions,
@@ -329,7 +320,6 @@ describe('app-build-parity', () => {
     }, 120_000);
   });
 
-  /** The solve as the app runs it: the worker's job handler, on this thread. */
   async function solveInWorker(job: SolveSpreadsJob): Promise<Map<string, SpreadCandidate>> {
     let entries: [string, SpreadCandidate][] | null = null;
     let failure: string | null = null;

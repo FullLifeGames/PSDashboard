@@ -6,13 +6,8 @@ import { deserializeBattleExact } from '../../packages/eval-engine/src/forward-m
 import { isPerfectAlignment } from '../../packages/eval-engine/src/hax-alignment';
 import { rebuild, type Rebuilt } from './forced-reconstruction-support';
 
-// Scenes of the VGC holdout where the rebuild with the log's dice read worse than the sixteen-seed search. The replays are bank replays of
-// the local fit corpus (`.fit-corpus`), so the rows skip where the corpus is absent (a clone, CI without the bank data).
-// 2243810213 (Regulation H) turn 6: the log has Jet Punch knock out Annihilape; the turn has a soft mismatch no die mends.
-// 2243810213 turn 7 and 2159578969 turn 5: a body the log faints and the turn leaves standing; the correction must retire the unshown bench
-// of p2 (Typhlosion and Farigiraf never came out) and end Weezing's Neutralizing Gas so Slow Start starts on Regigigas.
+// The rows skip where the local fit corpus (`.fit-corpus`) is absent (a clone, CI without the bank data).
 
-/** The position the bank scores: the boundary position of the rebuild with the snapshot's corrections (`applyTargetCorrections`). */
 const bankPosition = (rebuilt: Rebuilt, turn: number): SimBattle => {
   const battle = deserializeBattleExact(rebuilt.positions.get(turn)!) as SimBattle;
   applyTargetCorrections(battle, rebuilt.snapshotFor(turn));
@@ -39,7 +34,6 @@ describe.skipIf(!present(SCENE_C1))('the faint step takes a step set that gives 
   });
 });
 
-/** The raw boundary position of a turn with the snapshot of a later turn applied: a body the log faints in between, the simulator's turn never did. */
 const correctedWith = (rebuilt: Rebuilt, turn: number, snapshotTurn: number): SimBattle => {
   const battle = deserializeBattleExact(rebuilt.positions.get(turn)!) as SimBattle;
   applyTargetCorrections(battle, rebuilt.snapshotFor(snapshotTurn));
@@ -54,8 +48,6 @@ describe.skipIf(!present(SCENE_C1))('a body the correction faints leaves the gam
     expect(living(bankPosition(rebuilt, 7), 1), 'living bodies of p2').toBe(1);
   });
 
-  // The log's turn 6 knocks out Annihilape and sends nobody in; the position at turn 6 still has it at 138 of 186, and the correction is all that
-  // faints it. Typhlosion and Farigiraf never come out of the bag (the log shows four bodies of p2): they leave with it.
   test('the correction that faints the last shown body of p2 retires the unshown bench', () => {
     const battle = correctedWith(rebuilt, 6, 7);
     const names = battle.sides[1].pokemon.filter(body => !body.fainted && body.hp > 0).map(body => body.name);
@@ -68,19 +60,14 @@ describe.skipIf(!present(SCENE_C3B))('the end of Neutralizing Gas starts what th
   let rebuilt: Rebuilt;
   beforeAll(async () => { rebuilt = await rebuild(SCENE_C3B, { corpus: true, through: 5 }); }, 300_000);
 
-  // The log's turn 2: Earth Power knocks out Weezing, `-end Neutralizing Gas`, `-start Slow Start` on Regigigas. The position at turn 2 has Weezing
-  // alive (gas on, Slow Start held back); the correction to the log's turn 3 takes Weezing out through its End event.
   test('turn 2 with the snapshot of turn 3: Weezing stands at 0 and Slow Start runs on Regigigas', () => {
     const battle = correctedWith(rebuilt, 2, 3);
     const bodies = battle.sides.flatMap(side => side.pokemon);
     const regigigas = bodies.find(body => body.species.id === 'regigigas')!;
     const weezing = bodies.find(body => body.name === 'Weezing')!;
-    // Slow Start keeps its counter in the ability's state (the log's `-start` line)
     expect({ slowStart: (regigigas.abilityState as { counter?: number }).counter, weezing: weezing.hp }).toEqual({ slowStart: 5, weezing: 0 });
   });
 
-  // The whole rebuild meets that faint in `faintThePredecessor` (branch/entry-effects.ts: Grafaiai takes Weezing's slot while the
-  // simulator's Weezing still stands); the predecessor leaves through `takeBodyOut` on the field, so the gas ends and Slow Start starts.
   test('the whole rebuild: the position at turn 5 has Slow Start running on Regigigas', () => {
     const battle = bankPosition(rebuilt, 5);
     const regigigas = battle.sides.flatMap(side => side.pokemon).find(body => body.species.id === 'regigigas')!;

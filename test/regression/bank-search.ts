@@ -5,24 +5,19 @@ import {
 } from '@fulllifegames/eval-engine';
 import { formatEnforcesSleepClause, getBranchSimulatorFormat, inferReplayFormatId, replayRuleset, type GameRules } from '@fulllifegames/replay-core';
 
-// The bank's search, the app's dispatch: below the auto threshold the sync matrix search (parity with the app's orchestrated matrix is
-// pinned by eval-orchestrator.spec.ts); at or above it the app's tree search (searchTreesOrchestrated) over an in-process executor.
 export interface BankSearchInput {
   serialized: string;
   faintedFraction: number;
   depth: 1 | 2 | 3;
   samples: 1 | 3 | 5;
-  /** EVAL_CALIBRATION_MODE: 'auto' mirrors the app, 'mcts' forces the tree, anything else the matrix. */
   mode: string | undefined;
   settings: Omit<EvalSettings, 'depth' | 'samples' | 'mode'>;
 }
 
-/** The position's game type, as the app sweep reads it off the replay (the simulator serializes gameType). */
 const isDoubles = (serialized: string) => (JSON.parse(serialized) as { gameType?: string }).gameType === 'doubles';
 
 export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   const { serialized, faintedFraction, mode, settings } = input;
-  // Auto reads the search budget per game type (early depth and draws, tree threshold); the depth and draw levers apply outside auto.
   const resolved = mode === 'auto'
     ? autoTurnSettings(faintedFraction, isDoubles(serialized))
     : { depth: input.depth, samples: input.samples, mode: mode === 'mcts' ? 'mcts' as const : 'matrix' as const };
@@ -32,17 +27,15 @@ export function bankSearch(input: BankSearchInput): Promise<EvalResult> {
   return Promise.resolve(searchPosition(serialized, { ...settings, depth: resolved.depth, samples: resolved.samples }));
 }
 
-/** The app's format switches for one replay (useEvalFormat): Tera by the 'auto' preference, Sleep Clause from the branch format. */
 export function bankSettings(replay: { id?: string; formatid?: string; log: string }): { tera: TeraAllowance; sleepClause: boolean; ruleset: StaticRuleset } {
   return {
     tera: resolveTeraPreference('auto', inferReplayFormatId(replay), replay.log),
     sleepClause: formatEnforcesSleepClause(getBranchSimulatorFormat(replay)),
-    // The rule set comes from the replay's own format, as the app resolves it.
     ruleset: replayRuleset(replay),
   };
 }
 
-/** The app sweep's keepPlayed (sweep-core.ts with useEvalView playedFor): the actions in snapshot[turn]'s log, kept when a slot or a singles action was played. */
+/** Mirrors the app sweep's keepPlayed (sweep-core.ts, useEvalView playedFor). */
 export function bankKeepPlayed(snapshotLogs: (string[] | undefined)[], turn: number, doubles: boolean, rules: GameRules): EvalSettings['keepPlayed'] {
   const lines = snapshotLogs[turn] ?? [];
   const played = doubles ? parsePlayedActionsDoubles(lines) : parsePlayedActions(lines, rules);

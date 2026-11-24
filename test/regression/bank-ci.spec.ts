@@ -72,7 +72,6 @@ describe('finding the run of a pushed commit', () => {
 });
 
 describe('the secret check before a push', () => {
-  // A diff past 1 MB exceeds Node's default output limit of execFileSync ("spawnSync git ENOBUFS").
   test('reads a git output larger than 1 MB', () => {
     const root = fileURLToPath(new URL('../..', import.meta.url));
     const text = gitText(root, ['show', 'HEAD:test/e2e-feedback/fixtures/smogon/_stats_gen9ou.json.json']);
@@ -118,7 +117,7 @@ describe('the reuse of a downloaded CI run', () => {
   });
 });
 describe('waiting for the CI run', () => {
-  // `gh run watch` also ends on an API error (HTTP 504), which must not read as a finished run: the run's own status decides.
+  // `gh run watch` also ends on an API error (HTTP 504), which is no finished run: the run's own status decides.
   const scripted = (watches: (Error | null)[], views: (Error | { status: string; conclusion?: string })[]) => {
     const calls = { watch: 0, view: 0 };
     const watch = () => {
@@ -152,8 +151,6 @@ describe('waiting for the CI run', () => {
 });
 
 describe('a finished run that GitHub holds open', () => {
-  // GitHub can keep a run "in_progress" for about an hour after its 16 jobs and its merge finished: the run's jobs and its merged
-  // artifact decide, after a grace period.
   const JOBS = 4;
   const MERGE = 'Merge the jobs';
   type Job = { name: string; status: string; conclusion?: string };
@@ -162,7 +159,6 @@ describe('a finished run that GitHub holds open', () => {
     done('Read the run'), ...Array.from({ length: JOBS }, (_, index) => done(`Job ${index}`)), done(MERGE),
   ].map(job => overrides[job.name] ?? job);
 
-  /** A clock that only the waits move; every view and artifact list is the scripted answer at that time. */
   function held(stateAt: (seconds: number) => { status: string; conclusion?: string; jobs?: Job[] }, artifactsAt: (seconds: number) => string[]) {
     const clock = { ms: 0 };
     const calls = { views: 0, waits: 0 };

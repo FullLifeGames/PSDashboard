@@ -6,8 +6,6 @@ import { Dex, TeamValidator } from '@pkmn/sim';
 import { parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { bankTeamsFor } from './bank-build';
 
-// Every set the bank build makes for the feedback games passes the simulator's own team validator in the classes ability, item and
-// Tera type (gen<N>ou, custom games skipped).
 const FIXTURES = new URL('../e2e-feedback/fixtures/', import.meta.url);
 const CHECKED = /is an invalid ability|can't have [A-Z]|needs to have an ability|please fix its ability|please fix its item|needs to hold |Terastal type/;
 

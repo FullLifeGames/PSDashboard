@@ -6,10 +6,6 @@ import {
   type EvalStoreFile,
 } from '../e2e/eval-store';
 
-/**
- * The saved engine results that browser specs seed instead of searching. The helper rewrites the cache version of a saved record to
- * the current one and fails fast, naming the capture command, when a record does not fit or the page starts a search anyway.
- */
 const record = (key: string, extra: Record<string, unknown> = {}) => ({
   key, result: { score: 0.5, rows: [] }, depth: 1, samples: 1, mode: 'mcts', tera: 'auto', savedAt: 0, ...extra,
 });

@@ -6,15 +6,6 @@ import path from 'node:path';
 import { commentBaseline, commentLineCount, filesUnder, historyCounts, lineCounts, overBaseline, overLines, ROOT, shapeReport, shapeSources, workflowHistoryCounts } from '../../scripts/comment-counts.mjs';
 import { historyLinesOf } from '../../scripts/comment-lib.mjs';
 
-/**
- * The comment ratchets (scripts/comment-counts.mjs, scripts/comment-lib.mjs, AGENTS.md "Rules for the code", comments): the baselines
- * in comment-ratchet.json only fall. `npm run lint` holds the history baseline through the rule comments/no-history (its rows are in
- * lint-rules.spec.ts); `node scripts/update-lint-ratchet.mjs` lowers the baselines after a clean-up and `--allow-raise` raises one.
- * The line ratchet counts the lines that hold only a comment per project; `npm run lint` runs `node scripts/comment-counts.mjs`.
- * The tools read syntax, so no game type enters.
- */
-
-/** A scratch repository layout with the given files (path from the root to text). */
 function tree(files: Record<string, string>): string {
   const root = mkdtempSync(path.join(tmpdir(), 'comment-counts-'));
   for (const [file, text] of Object.entries(files)) {

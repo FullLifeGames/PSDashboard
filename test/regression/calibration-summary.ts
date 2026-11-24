@@ -11,7 +11,6 @@ export interface SummarySample {
   p1Won: boolean;
   quality: 'hq' | 'std';
   luckAgainstFavored: boolean;
-  /** The root's decided-sweep side, and the side the bar holds it for (heldDecided). */
   decided?: 'p1' | 'p2' | null;
   decidedHeld?: 'p1' | 'p2' | null;
 }
@@ -21,7 +20,6 @@ const right = (s: SummarySample): boolean => (s.score > 0) === s.p1Won;
 const asOutcome = (s: SummarySample): OutcomeSample => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won });
 const pct = (subset: SummarySample[]): string => (100 * subset.filter(right).length / subset.length).toFixed(0);
 
-/** Brier per phase under a pooled K, '-' for an empty phase. */
 function phaseBriers(samples: SummarySample[], pooledK: number): string {
   return PHASES.map(phase => {
     const subset = samples.filter(s => s.phase === phase).map(asOutcome);
@@ -45,7 +43,6 @@ function phaseLines(samples: SummarySample[]): string[] {
   return lines;
 }
 
-/** How often the side the decided sweep names wins, over every sweep and over the sweeps the bar holds (a dump without the held field: first half only). */
 function decidedLines(samples: SummarySample[]): string[] {
   const share = (key: 'decided' | 'decidedHeld'): string => {
     const named = samples.filter(sample => sample[key]);
@@ -82,8 +79,6 @@ export function summaryLines(samples: SummarySample[]): string[] {
     if (subset.length === 0) continue;
     lines.push(`${phase} brier=${brierScore(subset, pooledK).toFixed(4)}`);
   }
-  // The hq tranche (smogtours or rating >= 1700) and the view without luck against the favored side, both under the pooled K so the
-  // lines stay comparable with the full bank.
   const hq = samples.filter(sample => sample.quality === 'hq');
   if (hq.length > 0) lines.push(`hq: n=${hq.length} sign-accuracy=${pct(hq)}% brier early/mid/late=${phaseBriers(hq, pooledK)}`);
   const clean = samples.filter(sample => !sample.luckAgainstFavored);

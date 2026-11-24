@@ -3,9 +3,6 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { calcSingleDamageRange, createBranchStateFromBattle, type DamageResult } from '@fulllifegames/eval-engine';
 import { computePreviewDamage } from '../../src/lib/branch-damage';
 
-// The picker's damage preview reads the body the simulator holds. The preview is read the way BranchPanel reads it
-// (createBranchStateFromBattle, computePreviewDamage), then the simulator plays the move and the HP it took must lie inside the
-// previewed range (the harness of damage-preview-landing.spec.ts).
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -17,7 +14,6 @@ function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}):
   };
 }
 
-/** A bulky target that takes the hit standing and never takes a crit. */
 const armored = (species: string) => set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252, spd: 252 }, ability: 'Battle Armor' });
 
 function battle(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen7customgame' | 'gen7doublescustomgame', p1: PokemonSet[], p2: PokemonSet[], seed: number): Battle {
@@ -32,7 +28,6 @@ function battle(format: 'gen9customgame' | 'gen9doublescustomgame' | 'gen7custom
   return created;
 }
 
-/** The picker's preview at this position, both sides, with the armed Tera toggles. */
 function preview(current: Battle, teraBySlot?: { p1: (string | null)[]; p2: (string | null)[] }) {
   const state = createBranchStateFromBattle(current as never, [], {});
   return computePreviewDamage({
@@ -42,7 +37,6 @@ function preview(current: Battle, teraBySlot?: { p1: (string | null)[]; p2: (str
   } as Parameters<typeof computePreviewDamage>[0], calcSingleDamageRange);
 }
 
-/** Plays one turn and returns the HP each side's slots lost, with the turn's log. */
 function play(current: Battle, p1: string, p2: string) {
   const before = current.sides.map(side => side.active.map(mon => mon?.hp ?? 0));
   const start = current.log.length;
@@ -54,8 +48,6 @@ function play(current: Battle, p1: string, p2: string) {
 
 const percentOf = (lost: number, maxhp: number) => Math.round(lost / maxhp * 1000) / 10;
 
-// Plays the turn and checks the damage lies in the preview row; a seed whose hit crits or misses is skipped (the range covers the roll
-// only). At least one seed must count.
 function expectRowsHold(scene: (seed: number) => { current: Battle; rows: { row: DamageResult | undefined; side: 0 | 1; slot: number }[]; p1: string; p2: string }) {
   let counted = 0;
   for (const seed of SEEDS) {
@@ -219,7 +211,6 @@ describe('damage-preview-live-hit', () => {
     evs: { ...STATS, hp: 252, atk: 252, spa: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50, gender: '', ...extra,
   });
 
-  /** A doubles battle in which the first foe stands alone behind the screens. */
   function loneFoe(attacker: PokemonSet, psychicTerrain: boolean, screens: string[]): Battle {
     const p1 = [attacker, set('Snorlax', ['Splash'])];
     const p2 = [set('Blissey', ['Splash']), set('Chansey', ['Splash'])];
@@ -233,7 +224,6 @@ describe('damage-preview-live-hit', () => {
     return battle;
   }
 
-  /** The first move's preview into the first foe, with the live battle handed over or not. */
   function previewed(battle: Battle, live: boolean, tera: string | null): DamageResult {
     const state = createBranchStateFromBattle(battle as never, [], {});
     const result = computePreviewDamage({
@@ -244,7 +234,6 @@ describe('damage-preview-live-hit', () => {
     return result.p1.targets[0]['1:1'] ?? result.p1.default[0][0];
   }
 
-  /** The HP the first foe loses when the simulator plays the move. */
   function lost(battle: Battle, choice: string): number {
     const foe = battle.sides[1].active[0]!;
     const before = foe.hp;

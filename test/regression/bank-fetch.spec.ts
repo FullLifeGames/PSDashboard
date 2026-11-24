@@ -4,7 +4,6 @@ import { fetchBankReplay } from './bank-fetch';
 
 type Step = Error | { status: number; body?: unknown; brokenBody?: boolean };
 
-/** A fetch that answers the scripted steps in order and counts its calls. */
 function scripted(steps: Step[]) {
   let calls = 0;
   const fetcher = async () => {

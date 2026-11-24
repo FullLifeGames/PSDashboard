@@ -7,9 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { Dex } from '@pkmn/dex';
 import { bankIds, bankLogs, coverageOf, fixtureLogs } from '../../scripts/corpus-coverage.mjs';
 
-// The cases run the counter on small written logs (one singles, one doubles, one VGC, one Z-move, one CRLF) and on a real fixture,
-// and the CLI once on the fixtures column.
-
 const SCRIPT = fileURLToPath(new URL('../../scripts/corpus-coverage.mjs', import.meta.url));
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
 const read = (file: string) => (JSON.parse(readFileSync(path.join(REPO, file), 'utf8')) as { log: string }).log;
@@ -44,14 +41,12 @@ describe('coverageOf', () => {
   test('move classes come from Dex properties through the move lines, singles and doubles', () => {
     const { groups } = coverageOf([SINGLES, DOUBLES]);
     const classes = groups['move class'];
-    // Protect (singles) is a stalling move; Wide Guard (doubles) sets a side condition; Metronome calls a move; U-turn switches out.
     expect(classes['stalling move (Protect family)']).toBe(1);
     expect(classes['sets a side condition (screens, hazards, ...)']).toBe(1);
     expect(classes['calls another move']).toBe(1);
     expect(classes['switches the user out']).toBe(1);
     expect(classes['has a priority other than 0']).toBe(2);
     expect(classes['is a Z-move']).toBe(0);
-    // The expectations rest on the Dex properties the script reads.
     expect(Dex.moves.get('metronome').callsMove).toBeTruthy();
     expect(Dex.moves.get('wideguard').sideCondition).toBeTruthy();
     expect(Dex.moves.get('protect').stallingMove).toBeTruthy();

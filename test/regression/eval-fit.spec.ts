@@ -22,38 +22,18 @@ import {
 import { holdoutSets } from './bank-universe';
 import { loadReplayMods } from '../../src/lib/replay-mods';
 
-/**
- * Weight-fitting harness: fits the static eval's linear feature weights by logistic regression on the manifest-pinned corpus
- * (positions to game outcomes), clustered by game. REPORTS ONLY: adopting a fitted weight means editing EVAL_WEIGHTS by hand and
- * passing the calibration gate.
- *
- * Corpus: node scripts/build-fit-corpus.mjs (manifest committed, logs cached in .fit-corpus/). Run:
- * EVAL_FIT=1 npx vitest run --project app test/regression/eval-fit.spec.ts
- *
- * The effective sample size is the number of GAMES (positions share their game's outcome label), hence the cluster bootstrap for
- * standard errors and the tournament-vs-ladder comparison (tournament outcomes carry cleaner labels).
- */
+// REPORTS ONLY: adopting a fitted weight means editing EVAL_WEIGHTS by hand and passing the calibration gate.
 
 const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
 const CACHE_DIR = '.fit-corpus';
-/**
- * Captured samples are cached so fit-side iterations skip the hour-long reconstruction pass. The stamp covers the feature keys, every
- * weight value and the manifest's replay list; a change to any of them invalidates it. A changed feature DEFINITION (same keys, same
- * weights) still needs the file deleted by hand.
- */
+// The stamp covers the feature keys, the weights and the manifest's replays; a changed feature DEFINITION (same keys,
+// same weights) still needs the file deleted by hand.
 const SAMPLES_CACHE = join(CACHE_DIR, 'samples-cache.json');
 
-/**
- * A capture into its own folder, never into the shared cache above (`EVAL_FIT_SAMPLES=<dir>`), sliced over the manifest so parallel
- * processes split it (`EVAL_FIT_SLICE=k/n` captures every n-th replay from the k-th and stops; without it the fit reads every
- * `samples-<k>of<n>.json` of the folder and writes `EVAL_FIT_OUT`, default `<dir>/fit-report.json`). `EVAL_FIT_LEGACY=0` skips the
- * older reports.
- */
 const SAMPLES_DIR = process.env.EVAL_FIT_SAMPLES;
 const SLICE = (process.env.EVAL_FIT_SLICE ?? '').match(/^(\d+)\/(\d+)$/);
 const slicePart = SLICE ? { k: Number(SLICE[1]), n: Number(SLICE[2]) } : null;
 
-/** The brought species per side, or undefined where the format brings the whole team. */
 const bringOnlyFor = (...args: Parameters<typeof replayBringOnly>) => replayBringOnly(...args) ?? undefined;
 const FEATURE_KEYS = Object.keys(FEATURE_WEIGHTS) as (keyof EvalFeatures)[];
 const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
@@ -65,11 +45,7 @@ const cacheStamp = (manifest: { replays: { id: string }[] }) => JSON.stringify({
 
 type Manifest = { replays: { id: string; format: string; source: 'tournament' | 'ladder' }[] };
 
-/**
- * The cached samples under the current stamp: every slice of the folder, or
- * the shared cache. An empty folder means capture; a folder with missing or
- * stale slices stops the run instead of recapturing the whole corpus.
- */
+// An empty folder means capture; a folder with missing or stale slices stops the run instead of recapturing the corpus.
 function cachedSamples(manifest: Manifest): FitSample[] {
   const stamp = cacheStamp(manifest);
   const read = (path: string) => JSON.parse(readFileSync(path, 'utf-8')) as { stamp?: string; samples: FitSample[] };
@@ -87,7 +63,6 @@ function cachedSamples(manifest: Manifest): FitSample[] {
   return parts.flatMap(part => part.samples);
 }
 
-/** Writes a fresh capture to the slice file (or the shared cache without a folder). */
 function writeSamples(manifest: Manifest, samples: FitSample[]): string {
   if (!SAMPLES_DIR) {
     writeFileSync(SAMPLES_CACHE, JSON.stringify({ stamp: cacheStamp(manifest), samples }));
@@ -99,11 +74,9 @@ function writeSamples(manifest: Manifest, samples: FitSample[]): string {
   return path;
 }
 
-/** A family's start tables, feature order. */
 const tables = (singles: Record<keyof EvalFeatures, number>, doubles: Record<keyof EvalFeatures, number>) =>
   ({ singles: FEATURE_KEYS.map(key => singles[key]), doubles: FEATURE_KEYS.map(key => doubles[key]) });
 
-/** The families the static weighs apart (rule set × game type, score/weights.ts), each refit on its own games. */
 const FAMILIES = [
   { name: 'standard-singles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
   { name: 'standard-doubles', ...tables(FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS) },
@@ -112,28 +85,16 @@ const FAMILIES = [
   { name: 'champions-doubles', ...tables(CHAMPIONS_FEATURE_WEIGHTS, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS) },
 ];
 
-/** `EVAL_FIT_FAMILIES=<name>,<name>` refits only these families; without it every family. */
 const familiesToFit = () => {
   const names = (process.env.EVAL_FIT_FAMILIES ?? '').split(',').map(name => name.trim()).filter(Boolean);
   return names.length === 0 ? FAMILIES : FAMILIES.filter(family => names.includes(family.name));
 };
 
-/** The pre-registered holds: the weights whose free fit flips its sign inside a band over nought (shared Trick Room, choice mismatch) and both boost weights. */
 const HOLD = { shared: ['trickRoom', 'choiceMismatch', 'boosts'], doubles: ['boosts'] };
 
-/**
- * New columns fit one at a time on one shared capture, the rest of the table at hand. EVAL_FIT_ONLY=<names> moves only these columns
- * (a column at 0 in both tables is free then; `*@phase` names every phase column), EVAL_FIT_LIFT=<names> takes names off HOLD,
- * EVAL_FIT_SET=<name=weight,...> starts columns elsewhere (a REPLACEMENT: boosts=0,boostsBiting=<its weight>),
- * EVAL_FIT_FORMS=<phase:bodies,root:matchup> adds model-form columns (fit-families.ts withModelForms), EVAL_FIT_CAPTURED=<name=weight,...>
- * names the weights a capture was made under where a table has moved since (the identity check starts from them; the fit stays at the
- * current tables).
- */
 const listOf = (name: string) => (process.env[name] ?? '').split(',').map(part => part.trim()).filter(Boolean);
 
-// The refit: the static's weights at the fixed K of winprob.ts, every family on its own games, clustered by set. First the identity:
-// the start tables must give back every captured score, or the fit refuses.
-/** The leaf's phase K of a family's rule set (Pokémon Champions and VGC price their own scale: one table per rule set). */
+// The start tables must give back every captured score, or the fit refuses.
 const kOf = (ruleset: Ruleset) => WINPROB_K_OF[ruleset];
 
 const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sample => ({
@@ -142,7 +103,6 @@ const familySamplesOf = (samples: FitSample[]): FamilySample[] => samples.map(sa
   search: sample.search,
 }));
 
-/** `EVAL_FIT_PHASE_K=1` writes the phase K of every family (fit-families.ts phaseKReports) to `EVAL_FIT_K_OUT`, default `<dir>/phase-k-report.json`. */
 function writePhaseKReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
   const report = phaseKReports(familySamplesOf(samples), familiesToFit(), kOf, draws);
@@ -154,12 +114,6 @@ function writePhaseKReport(samples: FitSample[]) {
   console.log(`-> ${out}`);
 }
 
-/**
- * `EVAL_FIT_ROOT_SCALE=1` writes the scale of the search's logit per family (fit-families.ts rootScaleReports) from captures WITH
- * search (EVAL_CALIBRATION_FAMILY and EVAL_CALIBRATION_TURNS=thirds, EVAL_CALIBRATION_FEATURES=1 for the feature vector the loader
- * wants), to `EVAL_FIT_K_OUT`, default `<dir>/root-scale-report.json`. `EVAL_FIT_ROOT_K=<stamp file>` names the K table the capture
- * ran under; without it the capture is taken to have run under the current table (fit at the capture's commit).
- */
 function writeRootScaleReport(samples: FitSample[]) {
   const draws = Number(process.env.EVAL_FIT_DRAWS ?? 200);
   const names = familiesToFit().map(family => family.name);
@@ -176,7 +130,6 @@ function writeRootScaleReport(samples: FitSample[]) {
   console.log(`-> ${out}`);
 }
 
-/** The phase K or the root scale of every family, when the run asks for one (EVAL_FIT_PHASE_K, EVAL_FIT_ROOT_SCALE); false when it asks for neither. */
 function writeKReport(samples: FitSample[]): boolean {
   if (process.env.EVAL_FIT_ROOT_SCALE === '1') writeRootScaleReport(samples);
   else if (process.env.EVAL_FIT_PHASE_K === '1') writePhaseKReport(samples);
@@ -204,13 +157,6 @@ function writeRefitReport(samples: FitSample[]) {
   console.log(`-> ${out}`);
 }
 
-/**
- * The corpus measured like the app (EVAL_FIT_DUMP=<bank dumps>, from EVAL_CALIBRATION_SOURCE=fit with EVAL_CALIBRATION_STATIC=1 and
- * EVAL_CALIBRATION_FEATURES=1: the app's team build and the bank's reconstruction) instead of this spec's own capture, whose naked
- * teams leave a Doubles OU mon 1.9 moves. Sets are keyed by the corpus cache's players. A dump from a capture with search (no
- * EVAL_CALIBRATION_STATIC) feeds the same fit; its score is the search's root value, so the identity check leaves its samples out
- * (fit-families.ts dumpSamples reads the root fields of a search) and the fit runs on the features, the outcome and the start tables.
- */
 function samplesOf(manifest: Manifest): FitSample[] {
   if (!process.env.EVAL_FIT_DUMP) return cachedSamples(manifest);
   const fromDumps = dumpSamplesOf(process.env.EVAL_FIT_DUMP);
@@ -219,7 +165,6 @@ function samplesOf(manifest: Manifest): FitSample[] {
   return fromDumps;
 }
 
-/** Dump samples leave out ladder games without a rating (played after their format left the ladder; fit-families.ts), unless EVAL_FIT_UNRATED=1 keeps them. */
 function dumpSamplesOf(paths: string): FitSample[] {
   const playersOf = (id: string) => (JSON.parse(readFileSync(join(CACHE_DIR, `${id}.json`), 'utf-8')) as { players?: string[] }).players ?? [];
   const genClass = (id: string): FitSample['genClass'] => (/^(smogtours-)?gen9/.test(id) ? 'gen9' : 'old');
@@ -229,7 +174,7 @@ function dumpSamplesOf(paths: string): FitSample[] {
   return kept.map(sample => ({ ...sample, source: sample.source ?? 'ladder', genClass: genClass(sample.game) }));
 }
 
-/** No fit ever trains on the holdout (scripts/build-fit-holdout.mjs). */
+// No fit ever trains on the holdout (scripts/build-fit-holdout.mjs).
 function fitSamples(samples: FitSample[]): FitSample[] {
   const holdout = new Set(holdoutSets().flatMap(set => set.ids));
   const { kept, dropped } = withoutHoldout(samples, holdout);
@@ -245,7 +190,6 @@ interface FitSample {
   /** Features scaled by scale/normalizer — the tanh argument's addends. */
   g: number[];
   score: number;
-  /** Fainted bodies / total bodies at capture time — the phase covariate. */
   faintedFraction: number;
   p1Won: boolean;
   /** From bank dumps: the cluster key, the rule set, a score in wp-units, the last pair (no identity check). */
@@ -253,11 +197,9 @@ interface FitSample {
   ruleset?: Ruleset;
   wp?: boolean;
   lastPair?: boolean;
-  /** The dump came from a search; the score is its root value (no identity check, fit-families.ts). */
   search?: boolean;
 }
 
-/** One manifest replay's sampled positions, captured in a single reconstruction pass. */
 async function captureEntry(entry: Manifest['replays'][number], samples: FitSample[]): Promise<void> {
   const cachePath = join(CACHE_DIR, `${entry.id}.json`);
   if (!existsSync(cachePath)) return;
@@ -285,12 +227,9 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
     const wanted = new Set<number>();
     for (let turn = 2; turn < maxTurn; turn += step) wanted.add(turn);
 
-    // Bring-limited replays (VGC: four of six) reconstruct with the brought species only, the trim the app and the bank apply.
-    // Per-side fail-open, null for bring-all formats.
     const replayMeta = { id: entry.id, format: replay.format ?? entry.format, formatid: replay.formatid, log: replay.log };
     const bringOnly = bringOnlyFor(replayMeta as Parameters<typeof replayBringOnly>[0], snapshots);
 
-    // Single-pass capture: one reconstruction yields every sampled turn.
     await reconstructBranchRuntime({
       format: getBranchSimulatorFormat(replayMeta as Parameters<typeof getBranchSimulatorFormat>[0]),
       p1Team, p2Team,
@@ -302,7 +241,6 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
         snapshotFor: turn => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null,
         onPosition: (turn, battle) => {
           if (!wanted.has(turn) || battle.ended) return;
-          // The score under the replay's rule set, as the families check it.
           const cache = createMatchupCache(ruleset);
           const features = evalFeatures(battle, cache);
           const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
@@ -323,7 +261,6 @@ async function captureEntry(entry: Manifest['replays'][number], samples: FitSamp
   }
 }
 
-/** Implied point-scale weights, normalized so `bodies` matches its hand weight. */
 function impliedWeights(fit: { beta: number[]; sigma: number[] }): number[] {
   const perUnit = fit.beta.map((value, j) => value / fit.sigma[j]);
   const bodiesIndex = FEATURE_KEYS.indexOf('bodies');
@@ -372,7 +309,6 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       return implied;
     };
 
-    // Cluster bootstrap by GAME for a subset's implied-weight standard errors.
     const bootstrap = (label: string, subset: FitSample[]) => {
       const subsetGames = [...new Set(subset.map(sample => sample.game))];
       if (subsetGames.length < 20) {
@@ -405,16 +341,12 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     report('ALL', samples);
     report('TOURNAMENT-ONLY', samples.filter(sample => sample.source === 'tournament'));
     report('LADDER-ONLY', samples.filter(sample => sample.source === 'ladder'));
-    // Per-gametype fits: the pooled fit is singles-dominated, so a weight it favors can hurt doubles; these ask whether the doubles
-    // data itself supports different weights.
     report('SINGLES-ONLY', singles);
     report('DOUBLES-ONLY', doubles);
 
-    // Gen-class tranches answer: is the singles weakness a corpus artifact?
     report('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
     report('OLDGEN-ONLY', samples.filter(s => s.genClass === 'old'));
 
-    // Sweep-vs-boosts variant: with the flat boosts column zeroed, does the sweep feature absorb the boost signal on its own?
     const boostsIndex = FEATURE_KEYS.indexOf('boosts' as keyof EvalFeatures);
     const noBoosts = samples.map(s => ({ ...s, g: s.g.map((value, j) => (j === boostsIndex ? 0 : value)) }));
     report('ALL-NO-BOOSTS', noBoosts);
@@ -425,12 +357,6 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
     bootstrap('DOUBLES-ONLY', doubles);
     bootstrap('GEN9-ONLY', samples.filter(s => s.genClass === 'gen9'));
 
-    // Sweep cells: each flipped pair splits into 2×2 cells (acts-first × in-KO-range); each training fold prices the cells itself,
-    // with no guessed factors. PRE-REGISTERED hierarchy, decision tranche SINGLES-ONLY, criterion per branch: mean OOF logloss Δ < 0
-    // AND wins ≥ 16/20 seeds AND mean OOF brier ≤ base.
-    //   1. REPLACEMENT: M1 (cells, no boosts) beats M0 (boosts, no cells).
-    //   2. ADDITIVE: else M2 (both) beats M0.
-    //   3. Otherwise STATUS QUO — cells stay weight 0.
     const cellKeys = ['sweepFastKo', 'sweepFastChip', 'sweepSlowKo', 'sweepSlowChip'] as const;
     const cellIndices = new Set(cellKeys.map(key => FEATURE_KEYS.indexOf(key)));
     const cvModels = [
@@ -482,7 +408,6 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
         `M2 meanΔ=${singlesCv.m2.meanDelta.toFixed(6)} wins=${singlesCv.m2.wins}/20 brierOk=${singlesCv.m2.brierOk})`);
     }
 
-    // Probabilistic scoring of the winprob mapping, per gametype and phase.
     for (const gameType of ['singles', 'doubles'] as const) {
       const subset = samples.filter(s => s.gameType === gameType)
         .map(s => ({ score: s.score, faintedFraction: s.faintedFraction, won: s.p1Won, game: s.game }));
@@ -491,7 +416,6 @@ describe('eval weight fitting (EVAL_FIT=1)', () => {
       const phase = fitPhaseK(subset);
       console.log(`\nwinprob ${gameType}: constant K=${constant.toFixed(2)} ` +
         `phase k0=${phase.k0.toFixed(2)} k1=${phase.k1.toFixed(2)} (n=${subset.length})`);
-      // The phase fit is the maximum; its spread over games says how far a pin may sit from it.
       const spread = bootstrapPhaseK(subset, 200, 48);
       console.log(`  bootstrap over games: k0 ±${spread.k0.se.toFixed(2)} [${spread.k0.lo.toFixed(2)}, ${spread.k0.hi.toFixed(2)}] ` +
         `k1 ±${spread.k1.se.toFixed(2)} [${spread.k1.lo.toFixed(2)}, ${spread.k1.hi.toFixed(2)}] · K at fainted ` +

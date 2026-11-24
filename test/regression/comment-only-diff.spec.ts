@@ -6,12 +6,6 @@ import path from 'node:path';
 import { commentOnlyDiff, compareSource } from '../../scripts/comment-only-diff.mjs';
 import { readByCode } from '../../scripts/comment-lib.mjs';
 
-/**
- * The checker that proves a comment edit moved no code (scripts/comment-only-diff.mjs, its reader scripts/comment-lib.mjs): the token
- * streams of both texts match, and the comments that code reads stay byte for byte. The rows run on source text; one row runs the
- * git side in a scratch repository. No game type enters: the tool reads syntax.
- */
-
 const ts = (before: string, after: string, file = 'x.ts') => compareSource(before, after, file) as { ok: boolean; reason?: string; detail?: string };
 
 describe('a comment-only edit passes', () => {

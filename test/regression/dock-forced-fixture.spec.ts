@@ -2,9 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { parseReplayLog } from '@fulllifegames/replay-core';
 import { doublesForcedReplay, doublesReplay } from '../e2e/fixtures/doubles-replay';
 
-// The hand-written replay of the e2e case "two forced slots of one side". The replacements in the log are string replacements, so each
-// one is pinned here: a replacement that matches nothing would leave the plain doubles game and the e2e case would wait two minutes
-// for a scene that never arises.
+// The log's replacements are plain string replacements; one that matches nothing leaves the plain doubles game
+// and the e2e case waits for a scene that never arises.
 describe('the forced doubles fixture', () => {
   const sheet = (log: string, name: string) => log.split('\n').find(line => line.includes('View team') && line.startsWith(`|c| ${name}`)) ?? '';
   const alice = sheet(doublesForcedReplay.log, 'Alice');

@@ -7,7 +7,6 @@ import { loadSimMods, reconstructBranchRuntime, serializeLiveBattle } from '@ful
 import { bankSearch } from './bank-search';
 import { bankWorldsFor, blendReadings, type WorldReading } from './bank-build';
 
-// Doubles (Champions VGC 2625939941, Doubles OU style pinned VGC) and singles (the draft fixture, bring-all).
 const fixture = (path: string) => JSON.parse(readFileSync(path, 'utf-8')) as ReplayData;
 const SHORT = 'packages/eval-engine/test/fixtures/gen9championsvgc2026regma-2625939941.json';
 
@@ -53,7 +52,6 @@ describe('bankWorldsFor', () => {
     expect(worlds.every(world => world.bringOnly!.guessed!.p1 === 1 && world.bringOnly!.guessed!.p2 === 0)).toBe(true);
     expect(worlds.reduce((sum, world) => sum + world.weight, 0)).toBeCloseTo(1, 12);
     expect(worlds[0].weight).toBeGreaterThan(worlds[1].weight);
-    // The naked build holds no stats: equal weights.
     const naked = bankWorldsFor(replay, parseReplayLog(replay.log), null);
     expect(naked.map(world => world.weight)).toEqual(Array(3).fill(expect.closeTo(1 / 3, 12)));
   });

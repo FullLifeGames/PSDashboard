@@ -8,9 +8,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FINGERPRINT_PATHS } from '../../scripts/calibration-fingerprint.mjs';
 
-// Slices are independent, so the merged rows of the CI jobs (--slice-range a..b of --slices N, joined by --merge) equal a run of all
-// slices in one process. The specs run the runner in small git repositories against a stand-in for the slices; no bank runs.
-
 const SCRIPTS = fileURLToPath(new URL('../../scripts/', import.meta.url));
 const RUNNER = ['run-calibration.mjs', 'calibration-lib.mjs', 'calibration-fingerprint.mjs', 'calibration-jobs.mjs'];
 const made: string[] = [];
@@ -26,7 +23,6 @@ const commit = (root: string) => {
   git(root, 'commit', '-q', '--allow-empty', '-m', 'step');
 };
 
-// The stand-in takes the place of vitest: it writes two rows for its slice and logs its call.
 const STAND_IN = `
 import { appendFileSync, writeFileSync } from 'node:fs';
 const slice = process.env.EVAL_CALIBRATION_SLICE;
@@ -78,7 +74,6 @@ const calls = (root: string) => (existsSync(join(root, 'calls.log')) ? readFileS
 const read = (root: string, run: string, file: string) => readFileSync(join(root, '.calibration', run, file), 'utf8');
 const json = (root: string, run: string, file: string) => JSON.parse(read(root, run, file));
 
-/** Runs the two jobs of a four-slice run the way CI does: slices 0 and 1, then 2 and 3, each into its own folder. */
 function twoJobs(root: string, ...extra: string[]) {
   const first = cli(root, '--slices', '4', '--slice-range', '0..1', '--out', '.calibration/job-a', ...extra);
   const second = cli(root, '--slices', '4', '--slice-range', '2..3', '--out', '.calibration/job-b', ...extra);
@@ -91,7 +86,6 @@ describe('a CI job runs a range of the slices', () => {
     const root = repo();
     const result = cli(root, '--slices', '4', '--slice-range', '2..3', '--out', '.calibration/job-b');
     expect(result.status, result.stderr).toBe(0);
-    // The slices run side by side and log in the order they finish.
     expect(calls(root).sort()).toEqual(['2/4', '3/4']);
     expect(readdirSync(join(root, '.calibration', 'job-b')).sort()).toEqual(['job.json', 'slice-2.jsonl', 'slice-2.log', 'slice-3.jsonl', 'slice-3.log']);
     const job = json(root, 'job-b', 'job.json');
@@ -127,7 +121,6 @@ describe('--merge joins the jobs of one run', () => {
     expect(run).toMatchObject({ slices: 4, samples: 8, complete: true, httpSkips: 0, fraction: 1, mergedSha256: whole.mergedSha256, mergedFrom: ['job-a', 'job-b'] });
     expect(run.fingerprint).toMatchObject({ value: whole.fingerprint.value, dirty: false, stable: true });
     expect(run.results.map((entry: { index: number }) => entry.index)).toEqual([0, 1, 2, 3]);
-    // The merged folder is a base like a local run: --reuse with the same inputs finds a run with this fingerprint.
     const reuse = cli(root, '--reuse', '--dry-run', '--slices', '4');
     expect(reuse.status, reuse.stdout).toBe(0);
   });

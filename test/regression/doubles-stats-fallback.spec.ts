@@ -2,8 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { Dex } from '@pkmn/sim';
 import { buildSmogonStatsUrls, getSmogonStatsFormat } from '../../src/lib/smogon-stats';
 
-// The usage file of a format keeps the format's generation: a Gen 4 Doubles OU game must not read Gen 9 usage (`ouFallbackFormat`), or
-// the stand-ins for its unshown bodies would come from Gen 9 species. The sweep plays every format of the Dex; the scene is one row of it.
+// A Gen 4 Doubles OU game must not read Gen 9 usage (`ouFallbackFormat`), or its unshown bodies would be Gen 9 species.
 const genOf = (id: string) => id.match(/^gen\d+/)?.[0];
 
 describe('the stats file of a doubles format', () => {

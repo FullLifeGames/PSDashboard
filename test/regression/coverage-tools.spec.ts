@@ -7,10 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { applyTable } from '../../scripts/rows-compare.mjs';
 import { countPerProject, listArgs, rowsOfList } from '../../scripts/rows-collect.mjs';
 
-/**
- * The tools that prove a test cut (`npm run test:coverage`, scripts/cov-compare.mjs, rows-collect.mjs, rows-compare.mjs):
- * coverage may not lose a statement, a branch path or a function, and the rows by project and full name stay equal.
- */
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'cov-tools-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -27,7 +23,6 @@ const write = (name: string, value: unknown) => {
 
 const at = (line: number) => ({ start: { line, column: 0 }, end: { line, column: 10 } });
 type Hits = { s: number[]; f: number[]; b: number[][] };
-/** One file of istanbul's coverage-final.json with three statements, one function and one if with two paths. */
 const entry = (path: string, hits: Hits, lines = [1, 2, 3]) => ({
   path,
   statementMap: Object.fromEntries(lines.map((line, id) => [String(id), at(line)])),

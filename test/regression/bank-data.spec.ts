@@ -33,7 +33,6 @@ function dataRoot(): string {
   return root;
 }
 
-/** A gzipped tar with one entry, built from the same header writer the pack uses. */
 const archiveWith = (name: string, options: { type?: string; linkName?: string } = {}) =>
   gzipSync(Buffer.concat([tarEntry(name, Buffer.from('payload\n'), options), tarEnd()]));
 
@@ -111,10 +110,8 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
     }
     return root;
   };
-  /** The holdout sets of the temp checkout: the tarball takes these replays of .fit-corpus. */
   const holdout = (root: string, ids: string[]) =>
     put(root, 'test/regression/fixtures/fit-holdout-manifest.json', JSON.stringify({ sets: [{ key: 'doublesou|a|b', family: 'doublesou', ids }] }));
-  /** The fit corpus manifest of the temp checkout (read by bank-universe.ts). */
   const fitManifest = (root: string, ids: string[]) =>
     put(root, 'test/regression/fixtures/fit-corpus-manifest.json', JSON.stringify({ replays: ids.map(id => ({ id, format: id.split('-')[0], source: 'tournament' })) }));
   const run = (root: string, ...args: string[]) =>
@@ -137,7 +134,6 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
     expect(fetched.status, fetched.stderr).toBe(0);
     expect(hashDirectory(join(ci, '.fit-corpus'))).toEqual(fixture.dirs['.fit-corpus']);
     expect(hashDirectory(join(ci, '.smogon-cache'))).toEqual(fixture.dirs['.smogon-cache']);
-    // A replay that neither the fit manifest nor the holdout names stays here.
     expect(existsSync(join(ci, '.fit-corpus', 'gen9vgc2025regg-2.json'))).toBe(false);
   });
 
@@ -200,7 +196,6 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
 });
 
 describe('the download of the data release', () => {
-  // A CI job that meets HTTP 504 on the release asset must try again, or the run's merge loses its slices.
   type Step = Error | number;
   const scripted = (steps: Step[]) => {
     let calls = 0;

@@ -5,14 +5,8 @@ import { toId, type OpponentTeamInfo, type RevealedPokemonInfo } from '@fulllife
 import { getEveryAbilityPool, getEveryMovePool, getItemPool, type PoolUse } from '../../src/lib/pokemon-options';
 import { loadImportPools, parseSetsImport, validateSetsImport } from '../../src/lib/sets-io';
 
-// The pools of the editor and the sets import follow what the format's simulator lets exist. A Custom Game has no `-Nonexistent`
-// rule, so it plays every Past, Future, Unobtainable, CAP, Legends and LGPE entry; a standard format (`gen9ou`) refuses them; National
-// Dex lifts the rule for what its own rule table names. An id the simulator does not list (a draft league's, and every Scarlet/Violet
-// VGC regulation but 2024 Reg G and 2025 Reg I in @pkmn/sim 0.10.15) keeps the standard pools in the editor's lists, and the import
-// accepts what the Custom Game of its generation plays. Scene: P2 Landorus-Therian "Flying Gem", P2 Banette "Spectral Thief" and P2
-// Infernape "Fire Mane" were refused by the import, and the simulator plays all three in `gen9customgame`.
-// The sweep compares the existence verdict of the simulator's own TeamValidator with the pools, per kind. Its other refusals
-// ("can't learn", "can't have") are no part of it: the app accepts those.
+// A Custom Game has no `-Nonexistent` rule, so it plays Past, Future, Unobtainable, CAP, Legends and LGPE entries;
+// a standard format refuses them, and National Dex lifts the rule for what its rule table names.
 
 const unknown = { value: '', source: 'unknown' as const };
 const entry = (species: string): RevealedPokemonInfo => ({
@@ -78,7 +72,6 @@ describe('a Custom Game imports the entries its simulator plays', () => {
   });
 });
 
-// A branch battle of a Custom Game plays the three once imported.
 describe('a branch battle of a Custom Game plays the three entries', () => {
   test.each([['singles', 'gen9customgame'], ['doubles', 'gen9doublescustomgame']])('%s: %s', (_kind, format) => {
     const sets = Teams.import([
@@ -90,7 +83,6 @@ describe('a branch battle of a Custom Game plays the three entries', () => {
     const battle = new Battle({ formatid: format as never, seed: [1, 2, 3, 4] });
     battle.setPlayer('p1', { name: 'A', team: Teams.pack(sets) });
     battle.setPlayer('p2', { name: 'B', team: Teams.pack(sets) });
-    // Team preview: lead with the first two (doubles) or the first one (singles).
     battle.makeChoices('team 1234', 'team 1234');
     const turn = format.includes('doubles') ? 'move 1, move 1 1' : 'move 1';
     battle.makeChoices(turn, turn);
@@ -102,7 +94,6 @@ describe('a branch battle of a Custom Game plays the three entries', () => {
   });
 });
 
-// The sweep: the pools hold exactly what the simulator's TeamValidator lets exist, kind by kind.
 const EXISTENCE_REFUSAL = /does not exist|not obtainable|Smogon CAP|Let's Go|placeholder|is tagged|Legends|not in the list of allowed/;
 
 const KINDS = {
@@ -143,7 +134,7 @@ describe('the pools hold what the simulator lets exist (sweep over every non-sta
       for (const thing of spec.all(gen)) {
         if (!thing.exists || !thing.isNonstandard || thing.id === 'noability') continue;
         const problems = validator.validateTeam([setOf(kind, thing.name, gen) as never]) ?? [];
-        // A ban of the entry itself (Evasion Moves Clause, Moody Clause) answers before the existence rule is asked: no verdict.
+        // A ban of the entry itself (Evasion Moves Clause, Moody Clause) answers before the existence rule: no verdict.
         if (problems.some(problem => problem.includes(thing.name) && /banned/.test(problem))) { masked++; continue; }
         const exists = !problems.some(problem => problem.includes(thing.name) && EXISTENCE_REFUSAL.test(problem));
         if (pool.has(thing.id) !== exists) wrong.push(`${kind} ${thing.name} (${thing.isNonstandard}): pool ${pool.has(thing.id)}, validator ${exists}`);
@@ -173,7 +164,6 @@ describe('the pools hold what the simulator lets exist (sweep over every non-sta
       expect(getEveryMovePool(9, format)).not.toContain('Spectral Thief');
       expect(getEveryAbilityPool(9, format)).not.toContain('Fire Mane');
     }
-    // National Dex lifts the existence rule for moves (its rule table says +Past) and keeps refusing the Past items.
     expect(getEveryMovePool(9, 'gen9nationaldex')).toContain('Spectral Thief');
     expect(getItemPool(9, 'gen9nationaldex')).not.toContain('Flying Gem');
   });

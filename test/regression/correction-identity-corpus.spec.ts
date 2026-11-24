@@ -9,12 +9,6 @@ vi.mock('../../packages/eval-engine/src/branch/corrections.ts', async importOrig
   return { ...original, correctActivesFromProtocol: observed(original.correctActivesFromProtocol as never) as never };
 });
 
-// The correction of a block's actives changes nothing on a battle that already stands where the log stands. The census is the 265
-// blocks of 234 games in which a slot has two entry lines and its final entrant gains state after its entry (a Transform of Imposter,
-// a start, a boost): singles 162, Doubles OU 31, VGC SV 36, Champions OU 30, Champions VGC 6. This spec rebuilds a fixed sample of each
-// family through the block's turn, the way the bank does, and reads every block whose slots the simulator already held as the log's
-// last entrants: the board before the correction equals the board after it, a volatile the block's start adds apart.
-// The first row is the scene: Gen 6 Ubers 902024 turn 23, where Ho-Oh falls on arrival and Ditto's Imposter copies Darkrai.
 interface Row { family: string; id: string; turn: number; what: string }
 const ROWS: Row[] = [
   { family: 'singles', id: 'smogtours-gen6ubers-902024', turn: 23, what: 'Ditto copies Darkrai behind a Ho-Oh that falls on arrival' },

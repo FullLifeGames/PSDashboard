@@ -2,28 +2,21 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { FAMILY_NAMES, familyOfFormat, type FamilyName } from './fit-families';
 
-// The replays a calibration bank run samples: the bank's own tranches, the weight-fitting corpus, or the corpus's holdout.
-
-/** The holdout of the fit corpus (scripts/build-fit-holdout.mjs): a test bank that no current fit trains on. */
 export const HOLDOUT_MANIFEST = 'test/regression/fixtures/fit-holdout-manifest.json';
 export const FIT_MANIFEST = 'test/regression/fixtures/fit-corpus-manifest.json';
 
 export interface BankUniverse {
   ids: string[];
   trancheOf: Map<string, string>;
-  /** The replays come from the fit corpus's disk cache (.fit-corpus/), not from the network. */
   cached: boolean;
-  /** The sampled turns of a replay with maxTurn snapshots. */
   sampleTurns(maxTurn: number): number[];
 }
 
-/** The phase of a sampled turn: the third of the game it falls in (turn / maxTurn). */
 export function phaseOf(turn: number, maxTurn: number): 'early' | 'mid' | 'late' {
   const fraction = turn / maxTurn;
   return fraction < 1 / 3 ? 'early' : fraction < 2 / 3 ? 'mid' : 'late';
 }
 
-/** The bank's standing rule: every ceil(maxTurn / 8)-th turn from turn 2. */
 export function bankTurns(maxTurn: number): number[] {
   const step = Math.max(1, Math.ceil(maxTurn / 8));
   const turns: number[] = [];
@@ -31,11 +24,6 @@ export function bankTurns(maxTurn: number): number[] {
   return turns;
 }
 
-/**
- * Three turns per holdout game, one in each third (the bank's phases): positions of one game share their outcome, so more games buy
- * more power than a fourth position. Each turn is the sampleable one (from turn 2) nearest the middle of its third; a short game drops
- * the thirds it has no such turn in.
- */
 export function holdoutTurns(maxTurn: number): number[] {
   const turns: number[] = [];
   (['early', 'mid', 'late'] as const).forEach((phase, third) => {
@@ -54,21 +42,15 @@ export function cachedRating(id: string): number | null | undefined {
   return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf-8')) as { rating?: number | null }).rating ?? null : undefined;
 }
 
-/** The holdout's sets as written by scripts/build-fit-holdout.mjs. */
 export function holdoutSets(): { key: string; family: string; ids: string[] }[] {
   return (JSON.parse(readFileSync(HOLDOUT_MANIFEST, 'utf-8')) as { sets: { key: string; family: string; ids: string[] }[] }).sets;
 }
 
-/** A ladder game a fit reads: it has a rating, or the cache lacks it (the run skips that game). */
 const ratedOrUncached = (id: string): boolean => {
   const rating = cachedRating(id);
   return rating === undefined || (rating ?? 0) > 0;
 };
 
-/**
- * EVAL_CALIBRATION_FAMILY=<family> narrows the fit corpus to one family of fit-families.ts and leaves out what a fit leaves out, the
- * holdout and the ladder games without a rating.
- */
 function familyUniverse(family: string, replays: { id: string; format: string; source: 'tournament' | 'ladder' }[]) {
   if (!(FAMILY_NAMES as readonly string[]).includes(family)) {
     throw new Error(`unknown EVAL_CALIBRATION_FAMILY ${family} (${FAMILY_NAMES.join(', ')})`);
@@ -78,7 +60,6 @@ function familyUniverse(family: string, replays: { id: string; format: string; s
     && (entry.source === 'tournament' || ratedOrUncached(entry.id)));
 }
 
-/** EVAL_CALIBRATION_TURNS=thirds samples a game at the holdout's turns on any source; without it every source keeps its own rule. */
 function turnRule(own: (maxTurn: number) => number[]): (maxTurn: number) => number[] {
   const rule = process.env.EVAL_CALIBRATION_TURNS;
   if (rule === undefined || rule === '') return own;
@@ -86,7 +67,6 @@ function turnRule(own: (maxTurn: number) => number[]): (maxTurn: number) => numb
   return holdoutTurns;
 }
 
-/** The quick tier's share, EVAL_CALIBRATION_FRACTION: unset, empty and 1 mean the whole universe; anything else must be above 0 and at most 1. */
 export function quickFraction(raw: string | undefined = process.env.EVAL_CALIBRATION_FRACTION): number {
   if (raw === undefined || raw.trim() === '') return 1;
   const fraction = Number(raw);
@@ -96,15 +76,8 @@ export function quickFraction(raw: string | undefined = process.env.EVAL_CALIBRA
   return fraction;
 }
 
-/** What a stratum of `size` replays keeps at `fraction`: the nearest whole number (halves up), at least one. */
 const quickKeep = (size: number, fraction: number): number => Math.min(size, Math.max(1, Math.floor(size * fraction + 0.5 + 1e-9)));
 
-/**
- * The quick tier: every tranche and family (familyOfFormat reads the format from the id) keeps quickKeep of its replays, the ones whose
- * sha256 of the id sorts first. The same fraction picks the same replays whatever the input order, and a smaller fraction picks a
- * subset of a larger one. The result keeps the order of `ids`. Each replay is scored on its own (the slice merge relies on that), so a
- * kept replay gives the rows it gives in a full run.
- */
 export function quickSubset(ids: readonly string[], trancheOf: ReadonlyMap<string, string>, fraction: number): string[] {
   if (fraction >= 1) return [...ids];
   const strata = new Map<string, string[]>();
@@ -126,7 +99,6 @@ export function quickSubset(ids: readonly string[], trancheOf: ReadonlyMap<strin
   return ids.filter(id => kept.has(id));
 }
 
-/** The universe under EVAL_CALIBRATION_FRACTION: the whole one at 1, else its quick subset. */
 function thinned(universe: BankUniverse, fraction: number): BankUniverse {
   if (fraction >= 1) return universe;
   const ids = quickSubset(universe.ids, universe.trancheOf, fraction);
@@ -134,16 +106,7 @@ function thinned(universe: BankUniverse, fraction: number): BankUniverse {
   return { ...universe, ids, trancheOf: new Map([...universe.trancheOf].filter(([id]) => kept.has(id))) };
 }
 
-/**
- * The universe of a run. Default: the bank's tranches (`bank`), fetched from the network. EVAL_CALIBRATION_SOURCE=fit reads the
- * manifest-pinned weight-fitting corpus from its disk cache: FIT-SIDE DUMPS ONLY, since those games trained the winprob K and the
- * feature weights, so their numbers must never be quoted as calibration records (hence the dump-path guard and the tranche labels
- * fit-tournament / fit-ladder). EVAL_CALIBRATION_SOURCE=holdout reads the corpus's holdout, the sets that every fit drops
- * (eval-fit.spec.ts), tranche holdout-<family>, up to three positions per game (holdoutTurns). The universes never mix ids.
- * EVAL_CALIBRATION_FAMILY and EVAL_CALIBRATION_TURNS narrow the fit corpus to one family and thin the turns to one per third.
- * EVAL_CALIBRATION_FRACTION=0.25 then keeps a quarter of what is left on any source (quickSubset), the same replays every time, each
- * tranche and family in proportion. The harness filters by tranche and slices the thinned list.
- */
+/** Source `fit` reads the games that trained the weights: its numbers are never calibration records. */
 export function bankUniverse(bank: { ids: string[]; trancheOf: Map<string, string> }): BankUniverse {
   const fraction = quickFraction();
   return thinned(wholeUniverse(bank), fraction);

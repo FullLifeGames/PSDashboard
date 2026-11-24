@@ -46,9 +46,7 @@ test('played combo like the app sweep: the log of snapshot[turn], kept when a sl
   const doublesTurn = ['|move|p1a: Pelipper|Hurricane|p2a: Wall', '|move|p2a: Wall|Protect|p2a: Wall', '|turn|3'];
   const kept = bankKeepPlayed([undefined, undefined, doublesTurn], 2, true, logRules(''));
   expect(kept?.p1Slots?.[0]).toMatchObject({ kind: 'move' });
-  // Like sweep-core: the doubles parser always returns slot lists, so a turn without actions passes [null, null] on.
   expect(bankKeepPlayed([undefined, undefined, ['|turn|3']], 2, true, logRules(''))).toEqual(parsePlayedActionsDoubles(['|turn|3']));
-  // A singles action is kept, so the verify step joins the played row and column.
   const singles = bankKeepPlayed([undefined, undefined, ['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|3']], 2, false, logRules(''));
   expect(singles?.p1).toMatchObject({ kind: 'move' });
   expect(singles?.p1Slots).toBeUndefined();
@@ -74,7 +72,6 @@ test('auto at the default: an early singles position runs the matrix with three 
 });
 
 test('auto reads the game type off the position: each game type follows its own split', { timeout: 120_000 }, async () => {
-  // A cheap tree form: singles below their own threshold, doubles at theirs.
   configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1,doubles-tree-from=0,trees=1,iterations=50'));
   try {
     const singles = fixture('gen9ou-2658658993-t2');

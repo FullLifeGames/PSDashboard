@@ -1,5 +1,5 @@
-// The bank's replay fetch: retries a network error, a server error or a rate limit; a client error returns at once. A replay that never
-// arrives comes back as its status (0 for a network error); the harness logs it as `skipping <id>: HTTP <status>`, which run-calibration.mjs counts.
+// A replay that never arrives returns its status (0 for a network error); the harness logs
+// `skipping <id>: HTTP <status>`, which run-calibration.mjs counts.
 
 export type FetchOutcome<T> = { replay: T } | { status: number };
 
@@ -12,7 +12,6 @@ export interface FetchOptions {
 
 const pause = (ms: number) => new Promise(done => setTimeout(done, ms));
 
-/** A status that a later attempt can heal: a rate limit or a server error. */
 const transient = (status: number) => status === 429 || status >= 500;
 
 export async function fetchBankReplay<T>(id: string, { attempts = 4, pauses = [2000, 5000, 10000], fetcher = fetch }: FetchOptions = {}): Promise<FetchOutcome<T>> {
@@ -25,7 +24,6 @@ export async function fetchBankReplay<T>(id: string, { attempts = 4, pauses = [2
       status = response.status;
       if (!transient(status)) return { status };
     } catch {
-      // The network failed, or the body broke off while it was read: try again.
       status = 0;
     }
   }

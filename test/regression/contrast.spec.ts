@@ -2,9 +2,6 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { contrastRatio, TYPE_BG, typeTileVars } from '../../src/lib/type-colors';
 
-// Every gradient stop of .ps-btn, .ps-btn-red, the dock's Execute and Start (the class ps-execute-btn-ready) and the numbered
-// circles of the loader's guide holds white to 4.5 : 1 (WCAG AA for small text), at rest and at the hover brightness of the
-// button's own rule.
 const read = (file: string): string => readFileSync(new URL(`../../src/styles/${file}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const formsCss = read('forms.css');
 const dockCss = read('dock.css');
@@ -13,7 +10,6 @@ const loaderCss = read('loader.css');
 const AA = 4.5;
 const WHITE = '#ffffff';
 
-/** The declarations of the rule whose selector list starts with `selector` (at the start of a line). */
 function ruleOf(source: string, file: string, selector: string): string {
   const start = source.indexOf(`\n${selector}`);
   if (start < 0) throw new Error(`${file} has no rule starting ${selector}`);
@@ -21,21 +17,18 @@ function ruleOf(source: string, file: string, selector: string): string {
   return source.slice(open + 1, source.indexOf('}', open));
 }
 
-/** The two hex stops of the rule's `linear-gradient(180deg, #top 0%, #bottom 100%)`. */
 function stopsOf(source: string, file: string, selector: string): [string, string] {
   const match = /linear-gradient\(180deg,\s*(#[0-9a-fA-F]{6}) 0%,\s*(#[0-9a-fA-F]{6}) 100%\)/.exec(ruleOf(source, file, selector));
   if (!match) throw new Error(`${file} ${selector} has no two-stop hex gradient`);
   return [match[1], match[2]];
 }
 
-/** The factor of the `filter: brightness(f)` in a rule's declarations. */
 function brightnessOf(source: string, file: string, selector: string): number {
   const match = /filter:\s*brightness\(([\d.]+)\)/.exec(ruleOf(source, file, selector));
   if (!match) throw new Error(`${file} ${selector} has no brightness filter`);
   return Number(match[1]);
 }
 
-/** What `filter: brightness(f)` does to a color: every sRGB channel times f, clamped at 255. */
 function brightened(color: string, factor: number): string {
   const channels = [1, 3, 5].map(index => Math.min(255, Math.round(parseInt(color.slice(index, index + 2), 16) * factor)));
   return `#${channels.map(value => value.toString(16).padStart(2, '0')).join('')}`;
@@ -116,7 +109,6 @@ describe('move-tile-contrast', () => {
   describe('every text of a move tile reads on every type color', () => {
     test.each(Object.keys(TYPE_BG))('%s', type => {
       const vars = typeTileVars(type);
-      // the tint is lightest at the top of its gradient
       for (const name of ['ps-tile-text', 'ps-tile-sub', 'ps-tile-dmg', 'ps-tile-ko']) {
         expect(contrastRatio(token(name), vars['--tint']), `${name} on the ${type} tint`).toBeGreaterThanOrEqual(AA);
       }
@@ -137,7 +129,6 @@ describe('move-tile-contrast', () => {
     expect(contrastRatio('#ffffff', '#F8D030')).toBeLessThan(AA);
   });
 
-  /** The declarations of the rule in dock.css whose selector list starts with `selector`. */
   const ruleOf = (selector: string): string => {
     const start = dockCss.indexOf(`\n${selector}`);
     if (start < 0) throw new Error(`dock.css has no rule starting ${selector}`);
@@ -145,7 +136,6 @@ describe('move-tile-contrast', () => {
     return dockCss.slice(open + 1, dockCss.indexOf('}', open));
   };
 
-  /** The two hex stops of a rule's `background: linear-gradient(180deg, #top 0%, #bottom 100%)`. */
   function stopsOf(selector: string): [string, string] {
     const match = /linear-gradient\(180deg,\s*(#[0-9a-fA-F]{6}) 0%,\s*(#[0-9a-fA-F]{6}) 100%\)/.exec(ruleOf(selector));
     if (!match) throw new Error(`${selector} has no two-stop hex gradient`);
@@ -154,7 +144,6 @@ describe('move-tile-contrast', () => {
 
   const hex = (value: number): string => Math.round(value).toString(16).padStart(2, '0');
 
-  /** An `rgba(r, g, b, a)` color laid over an opaque hex color. */
   function over(rgba: string, base: string): string {
     const match = /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(rgba);
     if (!match) throw new Error(`not an rgba color: ${rgba}`);
@@ -163,7 +152,6 @@ describe('move-tile-contrast', () => {
     return `#${[0, 1, 2].map(index => hex(Number(match[index + 1]) * alpha + channels[index] * (1 - alpha))).join('')}`;
   }
 
-  /** The `rgba(...)` of the first stop of a gradient declared in a rule. */
   const firstRgba = (selector: string): string => {
     const match = /linear-gradient\(180deg,\s*(rgba\([^)]*\))/.exec(ruleOf(selector));
     if (!match) throw new Error(`${selector} has no rgba gradient`);

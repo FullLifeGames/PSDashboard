@@ -12,16 +12,8 @@ import { autoTurnSettings } from '../../packages/eval-engine/src/search/budget';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../../packages/eval-engine/src/tree-orchestrator';
 import { loadSimModsFor } from '../../packages/eval-engine/src/forward/sim-mods';
 
-/**
- * The endgame truth bench: every estimator against the solver on the bank's exported endgame positions and the synthetic fixtures.
- * EVAL_ENDGAME_TRUTH=1 runs it. EVAL_ENDGAME_POSITIONS names the export directory (default .calibration/base-20260918-live/positions,
- * written by the bank run's EVAL_CALIBRATION_POSITIONS). EVAL_ENDGAME_SLICE i/N splits the items; EVAL_ENDGAME_DUMP appends one JSONL
- * line per item; EVAL_ENDGAME_LIMIT caps the item count for dry runs. EVAL_ENDGAME_CAPS widens the solver's caps for this bench only
- * ("states=200000,wallMs=1200000,turns=60"; the production default stays 20000 states, 120 s, 30 turns). EVAL_ENDGAME_SOURCE=bank
- * leaves the synthetic fixtures out. EVAL_ENDGAME_SOLVED names earlier dumps (comma separated JSONL paths) whose solver rows are looked
- * up by item name instead of solved again: exact values end in won or lost games and do not depend on K or the weights, while capped
- * rows carry the leaf values of the run that solved them.
- */
+// EVAL_ENDGAME_TRUTH=1 runs it; EVAL_ENDGAME_CAPS widens the solver's caps here only (production: 20000 states, 120 s).
+// EVAL_ENDGAME_SOLVED reuses earlier solver rows by item name: exact values do not depend on K or the weights.
 interface BankPosition {
   id: string; turn: number; serialized: string; gameType: 'singles' | 'doubles';
   tranche: string; quality: string; p1Won: boolean; score: number; decided: 'p1' | 'p2' | null; lastPair: boolean;
@@ -30,14 +22,11 @@ interface BankPosition {
 }
 interface Item {
   name: string; source: 'bank' | 'synthetic'; gameType: 'singles' | 'doubles'; decided: 'p1' | 'p2' | null; serialized: string;
-  /** The tables the solver and every estimator weigh this position with. */
   ruleset: StaticRuleset;
 }
 interface Estimates {
   static: number; staticB: number; d1: number; d2: number; d3: number;
-  /** The app's tree (searchTreesOrchestrated: four trees, verify, answers, prover), its score and its game value. */
   mcts: number; mctsGameValue: number | null;
-  /** The sweep's auto mode with the forced-win bar (the app's dispatch per game type), and the proven mass behind it. */
   prover: number; proverMass: number | null;
 }
 
@@ -70,8 +59,7 @@ async function estimate(serialized: string, ruleset: StaticRuleset): Promise<Est
   setLastPairSweep(true);
   const staticB = leafValue(battle, createMatchupCache(ruleset));
   setLastPairSweep(false);
-  // The tree the app computes, not one bare tree (mctsSearch read 0.999 at doubles-spread-2v1 where the app read 0.355); the auto
-  // column takes the app's dispatch per game type.
+  // The tree the app computes, not one bare tree (mctsSearch read 0.999 where the app read 0.355).
   const tree = await searchTreesOrchestrated(createLocalTreeExecutor(serialized, ruleset), { depth: 1, samples: 1, mode: 'mcts', tera: false, ruleset });
   const auto = autoTurnSettings(battleFaintedFraction(battle), battle.gameType === 'doubles');
   const proverScore = auto.mode === 'mcts' ? tree : searchPosition(serialized, { depth: auto.depth, samples: auto.samples, tera: false, ruleset });
@@ -88,10 +76,8 @@ async function estimate(serialized: string, ruleset: StaticRuleset): Promise<Est
   };
 }
 
-/** The solver on one item with this run's caps. */
 const solveItem = (item: Item, caps: Partial<EndgameCaps>): EndgameResult => solveEndgame(item.serialized, caps, item.ruleset);
 
-/** EVAL_ENDGAME_CAPS as partial solver caps; unknown keys and non-numbers are dropped. */
 function capsFromEnv(): Partial<EndgameCaps> {
   const caps: Partial<EndgameCaps> = {};
   for (const part of (process.env.EVAL_ENDGAME_CAPS ?? '').split(',')) {
@@ -102,7 +88,6 @@ function capsFromEnv(): Partial<EndgameCaps> {
   return caps;
 }
 
-/** Solver rows of earlier dumps by item name (EVAL_ENDGAME_SOLVED), with the wall clock they took. */
 async function solvedRows(): Promise<Map<string, EndgameResult & { ms: number }>> {
   const rows = new Map<string, EndgameResult & { ms: number }>();
   const paths = (process.env.EVAL_ENDGAME_SOLVED ?? '').split(',').filter(Boolean);
@@ -135,7 +120,6 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench', (
     const solved = await solvedRows();
     if (solved.size > 0) console.log(`solver rows looked up from earlier dumps: ${solved.size}`);
     for (const item of items) {
-      // An export of a Champions game revives only on the Champions mod.
       await loadSimModsFor(item.serialized);
       const started = Date.now();
       const earlier = solved.get(item.name);
@@ -155,7 +139,6 @@ describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench', (
   });
 });
 
-/** The Champions tables with some weights of their own for one run (both game types), as weights.spec.ts does. */
 async function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_WEIGHTS>, run: () => Promise<T>): Promise<T> {
   const saved = [{ ...CHAMPIONS_FEATURE_WEIGHTS }, { ...CHAMPIONS_DOUBLES_FEATURE_WEIGHTS }];
   Object.assign(CHAMPIONS_FEATURE_WEIGHTS, weights);
@@ -168,7 +151,6 @@ async function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_
   }
 }
 
-// The bench computes every position with the tables of its own rule set.
 describe('the endgame bench reads the rule set of each position', () => {
   test('an exported position brings its rule set; an export without one reads it off the replay id', async () => {
     const fs = await import('node:fs');

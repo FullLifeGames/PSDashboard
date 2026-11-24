@@ -13,8 +13,6 @@ import {
   quickTierLines, runFraction,
 } from '../../scripts/calibration-fingerprint.mjs';
 
-// The specs build small git repositories in temporary folders and run the runner against a stand-in for the slices; no bank runs.
-
 const SCRIPTS = fileURLToPath(new URL('../../scripts/', import.meta.url));
 const made: string[] = [];
 let template = '';
@@ -30,7 +28,6 @@ const commit = (root: string) => {
   git(root, 'add', '-A');
   git(root, 'commit', '-q', '--allow-empty', '-m', 'step');
 };
-/** The file a test edits for an input path: the path itself for a root file, file.txt inside a folder. */
 const fileOf = (path: string) => (path.includes('.') ? path : `${path}/file.txt`);
 
 beforeAll(() => {
@@ -59,7 +56,6 @@ afterAll(() => {
   }
 });
 
-/** A fresh checkout of the template: same files, same history, its own folder. */
 function repo(): string {
   const root = mkdtempSync(join(tmpdir(), 'fingerprint-'));
   made.push(root);
@@ -126,7 +122,6 @@ describe('fingerprint of a run', () => {
     put(untracked, 'test/regression/new.spec.ts', 'export {};\n');
     put(untracked, 'package.json.bak', 'stray\n');
     expect(fp(untracked)).toMatchObject({ dirty: true, dirtyPaths: ['test/regression/new.spec.ts'] });
-    // The value still names HEAD's inputs; the dirty flag is what keeps the run from serving as a base.
     expect(fp(untracked).value).toBe(fp(template).value);
   });
 
@@ -147,7 +142,6 @@ describe('fingerprint of a run', () => {
     expect(fp(root, { ambient: { PATH: '/bin', USERNAME: 'someone', FOO: 'bar' } }).value).toBe(base);
     expect(fp(root, { ambient: { EVAL_CALIBRATION_SLICE: '1/4', EVAL_CALIBRATION_DUMP: 'x.jsonl' } }).value).toBe(base);
     expect(fp(root, { env: { EVAL_CALIBRATION_MODE: 'auto', EVAL_CALIBRATION_SLICE: '3/6' } }).value).toBe(base);
-    // The order of the keys does not matter.
     expect(fp(root, { env: { B_KEY: '1', A_KEY: '2' } }).value).toBe(fp(root, { env: { A_KEY: '2', B_KEY: '1' } }).value);
   });
 
@@ -174,7 +168,6 @@ describe('fingerprint of a run', () => {
     const nested = repo();
     put(nested, '.fit-corpus/sub/3.json', '{}\n');
     expect(fp(nested).value).not.toBe(base);
-    // The caches are ignored by git: editing them leaves the tree clean.
     expect(fp(sameSize).dirty).toBe(false);
   });
 
@@ -260,7 +253,6 @@ describe('fraction of a run', () => {
 
 const ROWS = Array.from({ length: 3 }, (_, turn) => JSON.stringify({ id: 'gen9ou-1', turn: turn + 2, score: 0.1, p1Won: true })).join('\n') + '\n';
 
-/** A folder under .calibration/ the way run-calibration.mjs leaves it, with `over` laid on top of run.json. */
 function finishedRun(root: string, name: string, record: unknown, over: Record<string, unknown> = {}, rows = ROWS) {
   put(root, `.calibration/${name}/merged.jsonl`, rows);
   put(root, `.calibration/${name}/summary.txt`, 'early: n=3\n');
@@ -331,7 +323,6 @@ describe('reuse of a finished run', () => {
     expect(decideReuse({ fingerprint: now, calibrationDir })).toMatchObject({ action: 'run', reason: 'no-match' });
     put(root, '.calibration/hollow/summary.txt', 'back\n');
     expect(decideReuse({ fingerprint: now, calibrationDir })).toMatchObject({ action: 'reuse' });
-    // Same row count, other bytes: a re-run into the folder that has not written its run.json yet.
     put(root, '.calibration/hollow/merged.jsonl', ROWS.replace('0.1', '0.2'));
     expect(decideReuse({ fingerprint: now, calibrationDir })).toMatchObject({ action: 'run', reason: 'no-match' });
     put(root, '.calibration/hollow/merged.jsonl', ROWS);
@@ -443,8 +434,6 @@ describe('quick tier in the paired header', () => {
 });
 
 describe('run-calibration.mjs against a stand-in for the slices', () => {
-  // The stand-in takes the place of vitest: it writes the dump of its slice and counts its calls, so the runner's own
-  // work (fingerprint, reuse, merge, run.json) runs for real and no bank starts.
   const STAND_IN = `
 import { appendFileSync, writeFileSync } from 'node:fs';
 const slice = process.env.EVAL_CALIBRATION_SLICE;
@@ -470,7 +459,7 @@ console.log('stand-in done');
   const calls = (root: string) => (existsSync(join(root, 'calls.log')) ? readFileSync(join(root, 'calls.log'), 'utf8').split(/\r?\n/).filter(Boolean).length : 0);
   const recordOf = (root: string, name: string) => JSON.parse(readFileSync(join(root, '.calibration', name, 'run.json'), 'utf8'));
   const lastLine = (text: string) => text.trim().split(/\r?\n/).at(-1) ?? '';
-  /** The folder a run printed and the folder a test expects, compared by their real paths (a temp folder may have two spellings). */
+  /** Compared by real path: a temp folder may have two spellings. */
   const printed = (text: string) => realpathSync.native(lastLine(text));
   const folder = (root: string, name: string) => realpathSync.native(join(root, '.calibration', name));
 
@@ -486,7 +475,6 @@ console.log('stand-in done');
     expect(record.env).toEqual({ EVAL_CALIBRATION_MODE: 'auto', EVAL_CALIBRATION_SMOGON: '1' });
     expect(result.stdout).toMatch(/fingerprint [0-9a-f]{12} \(clean tree at/);
     expect(result.stdout).toMatch(/fingerprint [0-9a-f]{12} recorded in run\.json; --reuse finds this run/);
-    // The recorded hash is the hash of the merged dump on disk.
     const merged = readFileSync(join(root, '.calibration', 'first', 'merged.jsonl'));
     expect(record).toMatchObject({ httpSkips: 0, mergedSha256: createHash('sha256').update(merged).digest('hex') });
   });
@@ -511,7 +499,6 @@ console.log('stand-in done');
     expect(again.stdout).toMatch(/reuse: .*first.* carries fingerprint [0-9a-f]{12}/);
     expect(calls(root)).toBe(2);
     expect(existsSync(join(root, '.calibration', 'second'))).toBe(false);
-    // Another slice count is another run: no pair of runs has shown that the rows ignore it.
     const other = cli(root, '--reuse', '--dry-run', '--slices', '3');
     expect(other.status, other.stderr).toBe(3);
     expect(other.stdout).toMatch(/differs in slices \(3 here, 2 there\)/);
@@ -529,7 +516,6 @@ console.log('stand-in done');
     expect(recordOf(root, 'quick')).toMatchObject({ fraction: 0.25, complete: true });
     expect(readFileSync(join(root, 'calls.log'), 'utf8')).toContain('fraction=0.25');
 
-    // The quick run is a base for the same fraction only.
     const quickAgain = cli(root, '--reuse', '--slices', '2', '--env', 'EVAL_CALIBRATION_FRACTION=0.25');
     expect(printed(quickAgain.stdout)).toBe(folder(root, 'quick'));
 
@@ -555,7 +541,6 @@ console.log('stand-in done');
     expect(clean.status, clean.stderr).toBe(0);
     expect(calls(root)).toBe(4);
     expect(recordOf(root, 'clean').fingerprint.dirty).toBe(false);
-    // Now the clean run is the base.
     expect(printed(cli(root, '--reuse', '--dry-run', '--slices', '2').stdout)).toBe(folder(root, 'clean'));
   });
 

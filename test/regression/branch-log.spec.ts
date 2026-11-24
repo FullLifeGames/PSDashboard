@@ -12,18 +12,11 @@ import {
 import { branchFrameLog } from '../../src/lib/branch-log';
 import { decodeBranchShare, encodeBranchShare, makeBranchSharePayload } from '../../src/lib/branch-share';
 
-// The replay iframe's sidebar icons in a branch. The embed keeps one roster entry per Pokémon and finds it again by ident
-// (`p1: <name>`) plus details (`Landorus-Therian, M, shiny`). The built sets carry the replay's nickname, level, gender and shiny
-// flags, so the simulator writes the replay's own switch lines; a switch-in that met no roster entry became a second entry, and the
-// sidebar (one icon per species, the first entry wins) kept showing the first one alive.
-// Scene: smogtours-gen7ou-450650, branch at turn 17 with Stone Edge for Landorus-Therian, played to the end.
-
 const fixture = (path: string) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf-8')) as ReplayData;
 
 type LiveBattle = NonNullable<BranchRuntime['battleStream']['battle']>;
 type BranchSide = 'p1' | 'p2';
 
-/** One side's plain choices: a forced replacement takes the next healthy bench body, else the strongest enabled move. */
 function sideCommand(battle: LiveBattle, side: BranchSide, opening: BranchSlotChoice | null): string | null {
   const state = battle.sides[side === 'p1' ? 0 : 1];
   const forced = state.active.map((_, slot) => state.activeRequest?.forceSwitch?.[slot] ?? false);
@@ -55,17 +48,14 @@ function sideCommand(battle: LiveBattle, side: BranchSide, opening: BranchSlotCh
 
 interface PlayedBranch {
   frameLog: string;
-  /** The simulator's bodies at the end of the line, as the pickers read them. */
   bodies: Record<BranchSide, { name: string; species: string; fainted: boolean }[]>;
   fainted: { atStart: number; atEnd: number };
 }
 
-/** The app's branch path in Node: reconstruct to the turn, play both sides with a plain policy, hand the log to the frame. */
 async function playBranch(
   replay: ReplayData, branchTurn: number,
   options: { edit?: (p1Team: ReturnType<typeof buildTeamsFromReplay>['p1Team']) => void; opening?: BranchSlotChoice } = {},
 ): Promise<PlayedBranch> {
-  // The Champions mod registers before the inference reads the Champions Dex, as the app's replay load does.
   await loadSimMods(getBranchSimulatorFormat(replay));
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
@@ -82,7 +72,6 @@ async function playBranch(
   const faintedCount = () => battle.sides.reduce((sum, side) => sum + side.pokemon.filter(body => body.fainted).length, 0);
   const atStart = faintedCount();
   for (let executed = 0; !battle.ended && executed < 80; executed++) {
-    // A forced replacement is answered alone (the app's forced interlude); otherwise both sides move.
     const replacing = (['p1', 'p2'] as const).filter(side =>
       battle.sides[side === 'p1' ? 0 : 1].activeRequest?.forceSwitch?.some(Boolean));
     const commands = (replacing.length > 0 ? replacing : (['p1', 'p2'] as const)).flatMap(side => {
@@ -101,7 +90,6 @@ async function playBranch(
   };
 }
 
-/** The embed's roster per side after it has read the log (@pkmn/client ports the embed's Side and Pokemon). */
 function embedRoster(replay: ReplayData, frameLog: string) {
   const battle = new Battle(generationsFor(replay.format));
   for (const line of frameLog.split('\n')) battle.add(line);
@@ -110,7 +98,6 @@ function embedRoster(replay: ReplayData, frameLog: string) {
   })));
 }
 
-/** One roster entry per species, and every body the line fainted is fainted in the roster. */
 function expectRosterMatchesLine(replay: ReplayData, played: PlayedBranch) {
   const rosters = embedRoster(replay, played.frameLog);
   (['p1', 'p2'] as const).forEach((side, index) => {
@@ -128,14 +115,12 @@ describe('the sidebar of a played-out branch', () => {
   test('450650 turn 17, Stone Edge for Landorus-Therian (the report): every fainted body is fainted in the roster', { timeout: 120000 }, async () => {
     const replay = fixture('./fixtures/smogtours-gen7ou-450650.json');
     const played = await playBranch(replay, 17, {
-      // The guessed fourth move (Stealth Rock) makes room for the user's Stone Edge.
       edit: p1Team => {
         const lando = p1Team.find(set => set.species === 'Landorus-Therian')!;
         lando.moves = [...lando.moves.filter(move => move !== 'Stealth Rock').slice(0, 3), 'Stone Edge'];
       },
       opening: { kind: 'move', moveId: 'stoneedge', moveName: 'Stone Edge' },
     });
-    // The scene needs bodies that fainted in the branch, nicknamed ones among them.
     expect(played.fainted.atEnd - played.fainted.atStart).toBeGreaterThanOrEqual(3);
     expectRosterMatchesLine(replay, played);
   });

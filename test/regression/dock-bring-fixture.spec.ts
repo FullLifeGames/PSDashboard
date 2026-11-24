@@ -5,11 +5,7 @@ import { replayBench } from '../../src/lib/bench';
 import { dockReplays } from '../e2e/helpers';
 import { loggedTurn } from '../e2e/dock-helpers';
 
-// The Champions VGC scene that proves a bring-limited bench. `replayBringOnly` pins the bring lists only when BOTH sides fielded all
-// four bodies, and returns null otherwise. The first fixture (2625939941) is such a game: P1 fielded three, P2 four, so `replayBench`
-// lists P2's four and leaves P1's list empty when it reads the log without a world (the app passes the heaviest world; this spec reads
-// the lists of the log alone). The second fixture (2623421463) pins both sides, so the bench of P2A lists the two brought bodies and
-// leaves the two that stayed home out.
+// `replayBringOnly` pins the bring lists only when BOTH sides fielded all four bodies, and returns null otherwise.
 const byId = (id: string) => dockReplays.find(replay => replay.id === id)!;
 const OPEN = byId('gen9championsvgc2026regma-2625939941');
 const PINNED = byId('gen9championsvgc2026regma-2623421463');
@@ -34,7 +30,6 @@ describe('the Champions VGC fixtures and the bring lists', () => {
     expect(pinned).not.toBeNull();
     expect([...pinned!.p2].sort()).toEqual(['Basculegion', 'Blastoise', 'Pelipper', 'Vivillon-Pokeball']);
     expect(pinned!.p1).toHaveLength(4);
-    // P2 has six bodies in the team preview; Sneasler and Sinistcha-Masterpiece stay home, so a bench that lists them is wrong.
     const team = [...PINNED.log.matchAll(/^\|poke\|p2\|([^,|]+)/gm)].map(match => match[1]);
     expect(team).toHaveLength(6);
     expect(team.filter(name => !pinned!.p2.includes(name)).sort()).toEqual(['Sinistcha-Masterpiece', 'Sneasler']);

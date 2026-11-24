@@ -4,9 +4,7 @@ import { NEVER_ACTED_WORDS as ROW_WORDS, neverActedText } from '../../src/compon
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-// The card's row and the engine's sentences ("..., but Beta was knocked out before it moved, so the log shows no choice") say the same
-// words for a body that fell before it moved. The app keeps a copy of the engine's phrase (it reaches the package through its barrel
-// only); this spec reads the engine's constant from its source and holds the two equal.
+// The app copies the engine's phrase (barrel access only); this spec reads the engine's source and holds the two equal.
 const phrases = readFileSync(new URL('../../packages/eval-engine/src/prose/phrases.ts', import.meta.url), 'utf-8');
 const engineWords = /export const NEVER_ACTED_WORDS =\s*'([^']+)'/.exec(phrases)?.[1];
 
@@ -21,7 +19,6 @@ const read = (relative: string) => readFileSync(fileURLToPath(new URL(`../../${r
 const ENGINE = 'packages/eval-engine/src/line-endings.ts';
 const CORE = 'packages/replay-core/src/line-endings.ts';
 
-/** The text of `export function <name>(...) { ... }`, from its signature to the closing brace at the start of a line. */
 function functionText(source: string, name: string): string {
   const start = source.indexOf(`export function ${name}(`);
   if (start < 0) throw new Error(`no export function ${name}`);
@@ -30,7 +27,6 @@ function functionText(source: string, name: string): string {
   return source.slice(start, end + 2);
 }
 
-/** Null when the two copies read the same, otherwise what differs. Whitespace at line ends and CRLF checkouts do not count. */
 function copyDifference(a: string, b: string): string | null {
   const lines = (text: string) => text.split(/\r?\n/).map(line => line.trimEnd());
   const left = lines(a);
@@ -41,7 +37,6 @@ function copyDifference(a: string, b: string): string | null {
   return null;
 }
 
-/** Runs the exported function of a TypeScript source text: the same transpile for both copies. */
 function compile(text: string, name: string): (input: string) => string {
   const js = ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const exports: Record<string, unknown> = {};
@@ -76,12 +71,10 @@ describe('the two line-endings.ts copies', () => {
   });
 
   test('the comparison sees a planted difference', () => {
-    // The mutation the spec exists for: a copy that drops the lone CR.
     const mutated = coreText.replace('/\\r\\n?/g', '/\\r\\n/g');
     expect(mutated).not.toBe(coreText);
     expect(copyDifference(engineText, mutated)).toMatch(/^line \d+: /);
     expect(copyDifference(engineText, coreText.replace("'\\n'", "'\\r\\n'"))).not.toBeNull();
-    // A line missing at the end counts as well.
     expect(copyDifference(engineText, `${coreText}\n// more`)).not.toBeNull();
   });
 
@@ -93,7 +86,6 @@ describe('the two line-endings.ts copies', () => {
       expect(core(text), name).toBe(answer);
       expect(answer, name).not.toContain('\r');
     }
-    // CRLF and LF forms of one log read the same.
     expect(engine(SINGLES_LOG.replace(/\n/g, '\r\n'))).toBe(engine(SINGLES_LOG));
     expect(core(DOUBLES_LOG.replace(/\n/g, '\r\n'))).toBe(core(DOUBLES_LOG));
   });
