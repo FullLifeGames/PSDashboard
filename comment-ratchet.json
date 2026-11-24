@@ -3,7 +3,7 @@
   "lines": {
     "source:eval-engine": 7266,
     "source:replay-core": 2120,
-    "source:app": 3137,
+    "source:app": 2925,
     "source:app-css": 97,
     "test:app": 1771,
     "test:replay-core": 1250,
