@@ -55,7 +55,7 @@ const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE
 interface Residual extends Row { cause: string; /** The diff of the emitted block against the log that the base and the forced turn share. */ stays: string | null }
 const RESIDUALS: Residual[] = [
   { id: 'smogtours-gen6ou-648453', turn: 4, cause: 'damage model: the simulator keeps Rotom alive that the log\'s hit knocked out (no step of the roll kills it)', stays: null },
-  { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (round 88, T325: no unlogged choice, the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
+  { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (no unlogged choice: the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
   { id: 'smogtours-gen9doublesou-912045', turn: 9, cause: 'build: an item (Throat Spray) the log disproves', stays: 'secondaries p1:ursaluna:boost:spa:1 log=0 sim=1' },
   { id: 'smogtours-gen9doublesou-912045', turn: 1, cause: 'damage model: the simulator deals half of the log\'s damage to Rillaboom', stays: 'faint log-only p2:rillaboom' },
   { id: 'gen9vgc2026regi-2630685175', turn: 3, cause: 'unlogged aim: a charge move\'s |move| line names no target (the aim sits in |-anim|)', stays: null },
@@ -96,7 +96,7 @@ const shown = (row: Row): string => {
 };
 
 describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays the turn the log shows: %s', type => {
-  describe('resolved by forcing the logged dice (B3)', () => {
+  describe('resolved by forcing the logged dice', () => {
     for (const row of BY_FORCING.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -104,7 +104,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_FAINT_STEP.some(entry => typeOf(entry.id) === type))('resolved by the faint step (B4)', () => {
+  describe.skipIf(!BY_FAINT_STEP.some(entry => typeOf(entry.id) === type))('resolved by the faint step', () => {
     for (const row of BY_FAINT_STEP.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -112,7 +112,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_STAND_IN.some(entry => typeOf(entry.id) === type))('resolved by the slowest stand-in (T325)', () => {
+  describe.skipIf(!BY_STAND_IN.some(entry => typeOf(entry.id) === type))('resolved by the slowest stand-in', () => {
     for (const row of BY_STAND_IN.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -120,7 +120,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_HIT_DIE.some(entry => typeOf(entry.id) === type))('resolved by the accuracy of one hit (T337)', () => {
+  describe.skipIf(!BY_HIT_DIE.some(entry => typeOf(entry.id) === type))('resolved by the accuracy of one hit', () => {
     for (const row of BY_HIT_DIE.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -128,7 +128,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_BUILD.some(entry => typeOf(entry.id) === type))('resolved by the build (#110, #75)', () => {
+  describe.skipIf(!BY_BUILD.some(entry => typeOf(entry.id) === type))('resolved by the build', () => {
     for (const row of BY_BUILD.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -162,7 +162,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 });
 
 describe('the counts of the drift line', () => {
-  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2 after #110)', () => {
+  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
     expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 2, vgc: 2, total: 6 });

@@ -77,7 +77,7 @@ const REASONS: Record<string, { dice: boolean; why: string }> = {
   'ability: Damp': { dice: false, why: 'a self-destructing move while a Damp holder is on the field' },
 };
 
-describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
+describe('the |cant| reasons of the simulator, scanned', () => {
   const found = scan();
 
   test('every write has a plain reason, and the census names exactly the reasons the simulator writes', () => {
@@ -200,7 +200,7 @@ const RULE_SETS: { rules: Rules; reasons: string[] }[] = [
   { rules: CHAMPIONS, reasons: Object.keys(SCENES) },
 ];
 
-describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds (round 70, N1)', ({ rules, reasons }) => {
+describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds', ({ rules, reasons }) => {
   test.each(reasons)('%s', reason => {
     const kind = REASONS[reason];
     const battles = SEEDS.map(seed => SCENES[reason](rules, seed));
@@ -214,7 +214,7 @@ describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds (round 
   });
 });
 
-describe('Gen 1, the one reason the doubles generations never write (round 70, N1)', () => {
+describe('Gen 1, the one reason the doubles generations never write', () => {
   test('partiallytrapped shows on every seed where the Wrap landed, and randomDeviation reads it as fixed', () => {
     const landed = SEEDS.map(seed => {
       const battle = battleOf('gen1customgame', [set('Snorlax', ['tackle'])], [set('Pikachu', ['wrap'])], seed);

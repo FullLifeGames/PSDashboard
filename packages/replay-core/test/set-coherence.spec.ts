@@ -123,28 +123,28 @@ describe('set-coherence vetoes', () => {
   // that the Specs strike anyway still "served" Attack and vetoed every special move.
   const fromSet = (name: string): MoveCandidate => ({ name, guessed: true, fromSet: true });
 
-  test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs, T28)', () => {
+  test('a guessed boost the Choice item strikes serves nothing (Kyurem with Specs)', () => {
     const kept = applyCoherenceVetoes([
       guessed('Earth Power'), guessed('Draco Meteor'), guessed('Dragon Dance'), guessed('Icicle Spear'),
     ], { dex: rulesDex(9), itemId: 'choicespecs' });
     expect(names(kept)).toEqual(['Earth Power', 'Draco Meteor', 'Icicle Spear']);
   });
 
-  test('a guessed boost the Vest strikes serves nothing (T28)', () => {
+  test('a guessed boost the Vest strikes serves nothing', () => {
     const kept = applyCoherenceVetoes([
       guessed('Calm Mind'), guessed('Close Combat'), guessed('Moonblast'),
     ], { dex: rulesDex(9), itemId: 'assaultvest' });
     expect(names(kept)).toEqual(['Close Combat', 'Moonblast']);
   });
 
-  test('a revealed boost still serves under a guessed Choice item (T28)', () => {
+  test('a revealed boost still serves under a guessed Choice item', () => {
     const kept = applyCoherenceVetoes([
       revealed('Dragon Dance'), guessed('Earth Power'), guessed('Icicle Spear'),
     ], { dex: rulesDex(9), itemId: 'choicespecs' });
     expect(names(kept)).toEqual(['Dragon Dance', 'Icicle Spear']);
   });
 
-  test('row 2 spares a priority move, and a priority move blocks no main attack (Weavile, T28)', () => {
+  test('row 2 spares a priority move, and a priority move blocks no main attack (Weavile)', () => {
     expect(names(applyCoherenceVetoes([
       revealed('Triple Axel'), guessed('Ice Shard'), guessed('Icicle Crash'),
     ], { dex: rulesDex(9), itemId: 'choiceband' }))).toEqual(['Triple Axel', 'Ice Shard']);
@@ -153,7 +153,7 @@ describe('set-coherence vetoes', () => {
     ], { dex: rulesDex(9), itemId: 'choiceband' }))).toEqual(['Ice Shard', 'Icicle Crash', 'Knock Off']);
   });
 
-  test('rows 1 and 2 spare the chosen set\'s own moves (Samurott-Hisui with the Vest, T28)', () => {
+  test('rows 1 and 2 spare the chosen set\'s own moves (Samurott-Hisui with the Vest)', () => {
     const kept = applyCoherenceVetoes([
       revealed('Ceaseless Edge'), fromSet('Razor Shell'), fromSet('Sucker Punch'), fromSet('Knock Off'), guessed('Night Slash'),
     ], { dex: rulesDex(9), itemId: 'assaultvest' });
@@ -162,7 +162,7 @@ describe('set-coherence vetoes', () => {
       .toEqual(['Swords Dance', 'Body Press']);
   });
 
-  test('a revealed same-type pair is never vetoed, and the chosen set keeps its own pair (round 63)', () => {
+  test('a revealed same-type pair is never vetoed, and the chosen set keeps its own pair', () => {
     // A published set is read as published: row 2 spares the chosen set's moves.
     expect(names(applyCoherenceVetoes([
       revealed('Headlong Rush'), revealed('Earthquake'), fromSet('Stomping Tantrum'),
@@ -172,7 +172,7 @@ describe('set-coherence vetoes', () => {
     ], { dex: rulesDex(9), itemId: '' }))).toEqual(['Headlong Rush', 'Earthquake']);
   });
 
-  test('a boost from the usage tail serves nothing (Kingdra with Life Orb, review of round 63)', () => {
+  test('a boost from the usage tail serves nothing (Kingdra with Life Orb)', () => {
     // The tail past the top ten usage moves only refills slots; a Dragon
     // Dance at 0.1 % must not decide what the set's attacks scale with.
     const kept = applyCoherenceVetoes([
@@ -182,7 +182,7 @@ describe('set-coherence vetoes', () => {
     expect(names(kept)).toEqual(['Hydro Pump', 'Draco Meteor', 'Weather Ball', 'Hurricane', 'Dragon Dance']);
   });
 
-  test('the item rows still strike a chosen-set status move (an inferred Scarf, T28)', () => {
+  test('the item rows still strike a chosen-set status move (an inferred Scarf)', () => {
     expect(names(applyCoherenceVetoes([fromSet('Volt Switch'), fromSet('Toxic')], { dex: rulesDex(9), itemId: 'choicescarf' })))
       .toEqual(['Volt Switch']);
   });
@@ -250,29 +250,29 @@ describe('coherent-set selection', () => {
   const pivot = () => slotted(['Hurricane', ['Heat Wave', 'Hidden Power Ice'], 'Knock Off', 'U-turn'], 'Assault Vest');
   const values = (picked: PokemonSetAssumption | null) => picked?.moves.map(move => move.value);
 
-  test('a revealed option fills its slot: the fixed Knock Off stays, Heat Wave goes (T89)', () => {
+  test('a revealed option fills its slot: the fixed Knock Off stays, Heat Wave goes', () => {
     const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['uturn', 'hiddenpowerice', 'hurricane'] }));
     expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn']);
   });
 
-  test('a revealed second option counts toward the fit like a first option (T89)', () => {
+  test('a revealed second option counts toward the fit like a first option', () => {
     const scarf = slotted(['Hurricane', 'U-turn', 'Taunt', 'Superpower'], 'Choice Scarf');
     const picked = selectCuratedSet([scarf, pivot()], evidence({ revealedMoves: ['uturn', 'hiddenpowerice', 'hurricane'] }));
     expect(picked?.item?.value).toBe('Assault Vest');
   });
 
-  test('a revealed typeless Hidden Power fills a typed Hidden Power option (T89)', () => {
+  test('a revealed typeless Hidden Power fills a typed Hidden Power option', () => {
     // Logs before gen 8 show "Hidden Power" without its type.
     const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['hiddenpower'] }));
     expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn']);
   });
 
-  test('fixed moves come before the open slots, first options before the others (T89)', () => {
+  test('fixed moves come before the open slots, first options before the others', () => {
     const picked = selectCuratedSet([pivot()], evidence({ revealedMoves: ['hurricane'] }));
     expect(values(picked)).toEqual(['Hurricane', 'Knock Off', 'U-turn', 'Heat Wave', 'Hidden Power Ice']);
   });
 
-  test('two revealed options of one slot fill it once (573756 Toxapex: "The Pex" cannot hold both Toxic and Haze, T89)', () => {
+  test('two revealed options of one slot fill it once (573756 Toxapex: "The Pex" cannot hold both Toxic and Haze)', () => {
     const toxapex = (moves: (string | string[])[], item: string) => ({ ...slotted(moves, item), species: 'Toxapex' });
     const pex = toxapex([['Light Screen', 'Knock Off', 'Scald'], ['Knock Off', 'Scald', 'Poison Jab'], ['Toxic', 'Haze'], 'Recover'], 'Shed Shell');
     const spdef = toxapex([['Knock Off', 'Scald', 'Poison Jab'], ['Toxic', 'Knock Off'], ['Haze', 'Light Screen'], 'Recover'], 'Black Sludge');
@@ -284,7 +284,7 @@ describe('coherent-set selection', () => {
       .toEqual(['Recover', 'Scald', 'Toxic', 'Poison Jab', 'Haze']);
   });
 
-  test('a set without slot options comes back as published (T89)', () => {
+  test('a set without slot options comes back as published', () => {
     const boots = utility();
     expect(selectCuratedSet([boots], evidence({ revealedMoves: ['roost'] }))).toBe(boots);
   });
@@ -441,7 +441,7 @@ describe('set-provenance', () => {
     '|turn|2', '|move|p2a: Jirachi|Iron Head|p1a: Blissey', '|-damage|p1a: Blissey|60/100', '|turn|3',
   ].join('\n');
 
-  describe('build and panel pass the item\'s provenance (T131)', () => {
+  describe('build and panel pass the item\'s provenance', () => {
     const sets = (item: string): SmogonSetAssumptions => ({
       format: 'gen6ou', source: 's', pokemon: { jirachi: published('Jirachi', item, ['Iron Head', 'U-turn', 'Healing Wish', 'Trick']) },
     });

@@ -138,7 +138,7 @@ describe('the baseline against the tree', () => {
     expect(files.every(file => /^packages\/[^/]+\/src\//.test(file))).toBe(true);
   });
 
-  test('the census leaves out the lines a reviewed exception covers, as the rule does (round 72 merge)', async () => {
+  test('the census leaves out the lines a reviewed exception covers, as the rule does', async () => {
     const { filePairs } = await import('../../scripts/name-census.mjs');
     const text = [
       '// eslint-disable-next-line names/no-new-dex-name -- held by a spec',

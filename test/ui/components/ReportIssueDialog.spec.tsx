@@ -8,7 +8,7 @@ const report = {
   downloaded: false,
 };
 
-describe('ReportIssueDialog (round 77, user request 28.10.2026)', () => {
+describe('ReportIssueDialog', () => {
   test('offers the state file as a download and the issue form as a link, and starts neither by itself', () => {
     const onDownload = vi.fn();
     const onClose = vi.fn();

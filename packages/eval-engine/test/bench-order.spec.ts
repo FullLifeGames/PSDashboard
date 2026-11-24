@@ -82,7 +82,7 @@ function expectSlotsNameTheirSpecies(result: EvalResult, serialized: string): vo
   });
 }
 
-describe('the canonical bench (round 67, T129)', () => {
+describe('the canonical bench', () => {
   test('two bench orders of one board give one canonical board; a canonical board is searched as given', () => {
     for (const name of ['smogtours-gen6ou-649664-t14-g1', 'gen9vgc2026regi-2629703929-t6']) {
       const { serialized } = fixture(name);
@@ -116,8 +116,8 @@ describe('the canonical bench (round 67, T129)', () => {
   });
 });
 
-describe('one board in two bench orders (round 67, T129)', () => {
-  test('649664 t14 (singles tree): the two boards of round 64 read the same ranking', { timeout: 120_000 }, async () => {
+describe('one board in two bench orders', () => {
+  test('649664 t14 (singles tree): its two boards read the same ranking', { timeout: 120_000 }, async () => {
     const g1 = fixture('smogtours-gen6ou-649664-t14-g1');
     const g2 = fixture('smogtours-gen6ou-649664-t14-g2');
     expect(ranking(await tree(g2.serialized, g2))).toEqual(ranking(await tree(g1.serialized, g1)));

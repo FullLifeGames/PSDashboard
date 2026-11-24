@@ -29,7 +29,7 @@ function sends(view: SimView, item: string, move: string, filler: string): boole
   return consumed && (dragged || waiting);
 }
 
-describe('SENDERS is held to the simulator (round 72)', () => {
+describe('SENDERS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('the items that send a Pokémon out are the listed ones', () => {
       const candidates = realItems(view)

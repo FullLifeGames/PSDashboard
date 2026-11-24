@@ -61,7 +61,7 @@ describe('the simulator: with the stage the Rhydon never KOs Clefable, without i
   });
 });
 
-describe('the stage bites a foe it takes the win from (T288)', () => {
+describe('the stage bites a foe it takes the win from', () => {
   test('Clefable at +1 Defense and +1 Special Defense against an awake Rhydon: both stages count (before: 0)', () => {
     const battle = shielded(BRUISER());
     expect(sideValue(battle)).toBeGreaterThan(0);
@@ -92,7 +92,7 @@ describe('the stage bites a foe it takes the win from (T288)', () => {
   });
 });
 
-describe('doubles and the other families (T288)', () => {
+describe('doubles and the other families', () => {
   const DOUBLES = 'gen9doublescustomgame';
   const CHAMPIONS = 'gen9championscustomgame';
   // Stat points of the mode: a bulky Rhydon whose Earthquake the holder needs three turns to answer, so the foe wins the fresh race.

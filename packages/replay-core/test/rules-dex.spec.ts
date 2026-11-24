@@ -118,7 +118,7 @@ describe('row 4: pairs the Dex calls contradicting', () => {
   });
 });
 
-describe('row 2 runs on usage fillers only (decision 16)', () => {
+describe('row 2 runs on usage fillers only', () => {
   test('two usage fillers Close Combat and Body Press keep the first', () => {
     expect(names(applyCoherenceVetoes([guessed('Close Combat'), guessed('Body Press')], { dex: rulesDex(9), itemId: '' })))
       .toEqual(['Close Combat']);
@@ -182,7 +182,7 @@ describe('the panel and the build drop the same contradicting guess', () => {
   });
 });
 
-describe('the veto rows read their lists from the Dex (decision 17)', () => {
+describe('the veto rows read their lists from the Dex', () => {
   test('a Choice item is what the Dex marks isChoice', () => {
     for (const itemId of ['choiceband', 'choicespecs', 'choicescarf']) {
       expect(names(applyCoherenceVetoes([guessed('Volt Switch'), guessed('Toxic')], { dex: rulesDex(9), itemId }))).toEqual(['Volt Switch']);
@@ -216,7 +216,7 @@ describe('the veto rows read their lists from the Dex (decision 17)', () => {
   });
 });
 
-describe('row 3 spares the chosen set as published (review of round 64)', () => {
+describe('row 3 spares the chosen set as published', () => {
   const storedPower = ['Cosmic Power', 'Stored Power', 'Recover', 'Taunt'];
 
   test('the chosen set keeps its Cosmic Power without a Defense-scaling attack (gen 9 Ubers Arceus-Psychic "Stored Power")', () => {

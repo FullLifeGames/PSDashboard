@@ -33,7 +33,7 @@ const singles = snapshot(
   [mon('Medicham', 'Medicham-Mega', true), mon('Rotom', 'Rotom-Wash', false)],
 );
 
-describe('T22 detection: the sides the protocol dice favored', () => {
+describe('detection: the sides the protocol dice favored', () => {
   test('singles: a crit favors the attacker, a miss and a dice cant favor the other side', () => {
     expect(detectRolls(['|move|p1a: Keldeo|Scald|p2a: Medicham', '|-crit|p2a: Medicham', '|-damage|p2a: Medicham|40/100'], singles).favored)
       .toEqual({ p1: true, p2: false });
@@ -59,7 +59,7 @@ describe('T22 detection: the sides the protocol dice favored', () => {
   });
 });
 
-describe('T22 detection: the hits a move put on an opposing body', () => {
+describe('detection: the hits a move put on an opposing body', () => {
   test('singles: the target comes from the pre-turn snapshot, a hit to 0 HP is a knock-out', () => {
     const rolls = detectRolls([
       '|move|p1a: Keldeo|Hydro Pump|p2a: Medicham',
@@ -136,7 +136,7 @@ const playing = (played: RankedChoice | null): SideAnalysis =>
 const quiet = playing(null);
 const actives = { p1: 'Ferrothorn', p2: 'Medicham-Mega', gen: 6 };
 
-describe('T22 classification: the sides a turn rolled for', () => {
+describe('classification: the sides a turn rolled for', () => {
   test('singles (649664 t12 shape): the odds priced the pre-turn active, the move hit the switch-in, so no roll', () => {
     const rolls = detectRolls([
       '|switch|p1a: Tyranitar|Tyranitar, F|168/404',

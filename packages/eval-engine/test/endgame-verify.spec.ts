@@ -41,7 +41,7 @@ async function turn63(): Promise<string> {
   return serializeLiveBattle(battle);
 }
 
-describe('an endgame keeps the trees\' verdict (round 77, T267)', () => {
+describe('an endgame keeps the trees\' verdict', () => {
   test('draft 2058494320, variation turn 63: the lines agree with the score, and the advice is an attack, not U-turn', { timeout: 300_000 }, async () => {
     // A user's state file: Mienshao (Choice Scarf, locked into Close Combat) and Kyurem at 48 % against Dragapult at
     // 45 % (Choice Specs) and Muk-Alola. The panel read "puffelmaedchen 15 % · Bene 85 %" above lines that advised

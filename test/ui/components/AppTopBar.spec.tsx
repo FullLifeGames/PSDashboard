@@ -21,7 +21,7 @@ function props(overrides: Partial<Props> = {}): Props {
 beforeEach(() => localStorage.clear());
 
 describe('AppTopBar', () => {
-  test('with a replay loaded the bar ends with the name, Beta, Report issue and the creator link (round 77)', async () => {
+  test('with a replay loaded the bar ends with the name, Beta, Report issue and the creator link', async () => {
     const wired = props();
     const { rerender } = render(<AppTopBar {...wired} />);
     const links = document.querySelector('.ps-topbar > .ps-support-links') as HTMLElement;

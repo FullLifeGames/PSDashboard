@@ -181,7 +181,7 @@ function board(tailwindOnP1: boolean): Battle {
   return battle;
 }
 
-describe('the SV VGC table (round 69, T144)', () => {
+describe('the SV VGC table', () => {
   test('tailwind and coverage are 0, the refit columns carry the fit, the rest stays', () => {
     const w = VGC_DOUBLES_FEATURE_WEIGHTS;
     expect([w.tailwind, w.coverage]).toEqual([0, 0]);

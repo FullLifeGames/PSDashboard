@@ -41,7 +41,7 @@ function faintsFoe(build: () => Battle, choice: string): boolean {
   return battle.sides[1].active[0]!.fainted;
 }
 
-describe('pairFocus (round 69, T42)', () => {
+describe('pairFocus', () => {
   const plain = () => battleOf(FORMAT, [PIKACHU(), PIKACHU()], snorlaxes());
   const hurt = (hp: number) => () => {
     const battle = plain();
@@ -112,7 +112,7 @@ function redirectedInSim(moveId: string): boolean {
   return aimed.partner === aimed.partnerMax && aimed.user < control.user;
 }
 
-describe('pairRedirect (round 69, T42)', () => {
+describe('pairRedirect', () => {
   const CLEFAIRY = (move: string) => set('Clefairy', [move, 'splash'], { ability: 'Magic Guard' });
   const GARCHOMP = () => set('Garchomp', ['splash', 'dragonclaw'], { ability: 'Sand Veil' });
   const pikachus = () => [splash('Pikachu'), splash('Pikachu')];
@@ -161,7 +161,7 @@ describe('pairRedirect (round 69, T42)', () => {
   });
 });
 
-describe('singles and the inert weights (round 69, T42)', () => {
+describe('singles and the inert weights', () => {
   afterEach(() => setStaticForm(null));
 
   test('singles boards read 0 in both cells, whatever sits on the field', () => {

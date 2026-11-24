@@ -6,7 +6,7 @@ import { spriteUrl } from '../../src/lib/sprite-url';
 const file = (species: string) => spriteUrl(species, logRules('')).replace('https://play.pokemonshowdown.com/sprites/gen5/', '');
 
 describe('sprite file names', () => {
-  test('a hyphen inside the forme goes, as Showdown names the file (T96 point 2)', () => {
+  test('a hyphen inside the forme goes, as Showdown names the file', () => {
     expect(file('Urshifu-Rapid-Strike')).toBe('urshifu-rapidstrike.png');
     expect(file('Alcremie-Ruby-Swirl')).toBe('alcremie-rubyswirl.png');
   });

@@ -125,7 +125,7 @@ describe('switch-forme-replay', () => {
     live: { p1: BranchSlotChoice[]; p2: BranchSlotChoice[] };
   }>('issue-103-variation.json');
 
-  describe('#103 gen9ou-2710066092: the variation from turn 21 and the replacement of Ogerpon', () => {
+  describe('gen9ou-2710066092: the variation from turn 21 and the replacement of Ogerpon', () => {
     test('the history replays and the live choice switches Ogerpon-Teal-Tera in', async () => {
       const runtime = await reconstructBranchRuntime({
         format: variation.formatid,

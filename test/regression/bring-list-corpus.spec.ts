@@ -34,7 +34,7 @@ function bringLimitedGames(): Game[] {
 const SIDES = ['p1', 'p2'] as const;
 const previewOf = (log: string, side: string) => [...log.matchAll(new RegExp(`^\\|poke\\|${side}\\|([^|,]+)`, 'gm'))].map(match => match[1]);
 
-describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus (#116)', () => {
+describe.skipIf(!HAVE_CORPUS)('the bring lists of the corpus', () => {
   test('no list holds a base species outside its side\'s preview', async () => {
     await loadSimMods('gen9championsvgc2026regmbbo3');
     const games = bringLimitedGames();

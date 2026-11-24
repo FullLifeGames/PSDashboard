@@ -41,7 +41,7 @@ const miniSweep = (from: number, to: number) => ({
   cacheKeyFor: (turn: number) => `replay:${turn}:fp`, acquireFor: () => async () => position, playedFor: () => null,
 });
 
-describe('a single evaluation and a running sweep (C1)', () => {
+describe('a single evaluation and a running sweep', () => {
   test('a manual Evaluate stops the sweep and the graph says where it stopped; the Analyze buttons come back at once', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
@@ -89,7 +89,7 @@ describe('a single evaluation and a running sweep (C1)', () => {
   });
 });
 
-describe('the auto re-evaluation waits for a running sweep (C1)', () => {
+describe('the auto re-evaluation waits for a running sweep', () => {
   const { replayData, snapshots } = replayFixture('singles');
   const sources = { teamText: '', effectiveP1Info: null, effectiveP2Info: null, usageStats: { stats: null }, setAssumptions: { assumptions: null }, hpEvidence: [], getInferredSpreads: async () => undefined } as never;
   const viewInputs = (evaluation: ReturnType<typeof useEvaluation>) => ({

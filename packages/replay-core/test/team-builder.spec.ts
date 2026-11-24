@@ -199,7 +199,7 @@ const showteamLog = [
   '|turn|1',
 ].join('\n');
 
-describe('open team sheets (|showteam|) parsing (B3)', () => {
+describe('open team sheets (|showteam|) parsing', () => {
   test('parseShowteamSheet extracts sets with readable names', () => {
     const sheet = parseShowteamSheet(showteamLog, 'p2');
     expect(sheet).not.toBeNull();
@@ -384,7 +384,7 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect(find(preSolved.p1Team, 'Garchomp').evs.hp).toBe(252);
   });
 
-  test('the two chains agree on the settled Garchomp (round 63 path pin, T122): HP 60 both ways', () => {
+  test('the two chains agree on the settled Garchomp: HP 60 both ways', () => {
     // The species-shaped guesses run Garchomp (303) over Gliscor (289), which moved first. The settling frees only 60 Speed EVs
     // (Garchomp 288); the pre-solve tops them up into HP, and the full solve keeps that HP because the damage lines fit it as well
     // as none, so both chains land on HP 60.

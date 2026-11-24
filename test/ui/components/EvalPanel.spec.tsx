@@ -180,7 +180,7 @@ describe('EvalPanel', () => {
     });
   });
 
-  test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card (H4h)', () => {
+  test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card', () => {
     const graph = evalGraph();
     const base = props({ graph, analysis: turnAnalysis(4), result: graph.results[3], resultSettings: graph.settings[3], currentTurn: 4, analysisTurn: 4, graphMaxTurn: 12, onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn() });
     const { rerender } = render(<EvalPanel {...base} />);

@@ -45,7 +45,7 @@ function simEats(format: string, dex: RulesDex, itemName: string, doubles: boole
   return slot.used && slot.pp > 0;
 }
 
-describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => {
+describe('the items that eat at 0 PP, stand-in against simulator', () => {
   // What the Dex holds: Leppa Berry from Generation 3, Mystery Berry from Generation 2 (its Dex entry keeps the handler in later generations, as a past item).
   const PINNED: Record<string, string[]> = {
     'Generation 1': [], 'Generation 2': ['mysteryberry'], 'Generation 3': ['leppaberry', 'mysteryberry'], 'Generation 4': ['leppaberry', 'mysteryberry'],
@@ -86,7 +86,7 @@ describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => 
   });
 });
 
-describe('the maximum PP of a move, twin against a battle of the realm\'s tiers (#132)', () => {
+describe('the maximum PP of a move, twin against a battle of the realm\'s tiers', () => {
   test.each(REALMS.map(realm => [realm.name, realm] as const))('%s: every move of the Dex', (_name, realm) => {
     const dex = dexOf(realm);
     const moves = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen);

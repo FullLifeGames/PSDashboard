@@ -208,7 +208,7 @@ test('390 px: the top bar keeps its lines with Game, the menu fits the screen, t
  * stays in view while two long problem lists scroll the dialog, the menu of 20 saved games scrolls inside the window, and the
  * title's "New game" tag keeps its words at 390 px while the format tag gives way.
  */
-test('the Game menu copies a game\'s link at Team Preview and on the main line; a knockout turn waiting for its replacement is no variation (H7)', async ({ page, browser }) => {
+test('the Game menu copies a game\'s link at Team Preview and on the main line; a knockout turn waiting for its replacement is no variation', async ({ page, browser }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   // P2's bodies are level 1: P1's first move knocks out its lead, and the replacement is asked for before the turn is finished

@@ -116,7 +116,7 @@ const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): Eval
  * The real orchestrator, read through what it asks of its executor (not through a hand copy of itself): the cases carry keepPlayed and a sleep clause, so dropping the
  * played row, the sleep clause of the verify step, the tree order or the verified input of the prover turns a row red.
  */
-describe('tree orchestration (round 61; read through the executor since round 64)', () => {
+describe('tree orchestration through the executor', () => {
   // A doubles root asks for plain cells after the verify round, and the prover proves the answered ranking.
   test('the answer round follows the verify round with plain cells, and the prover proves its ranking', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2630685175-t7-played';
@@ -377,7 +377,7 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
     }
   }, 120_000);
 
-  test('the line pass (G14b) changes no score, rank or grade, and the lines hold at least the turns they held', async () => {
+  test('the line pass changes no score, rank or grade, and the lines hold at least the turns they held', async () => {
     const passed = await search(scene, 'pass');
     const plain = await search(scene, 'plain');
     const lined = await search(scene, 'lines');
@@ -401,7 +401,7 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
     }
   }, 120_000);
 
-  test('an engine line meets the answer that the merged ranking puts first, as far as a tree holds a line against it (G12)', async () => {
+  test('an engine line meets the answer that the merged ranking puts first, as far as a tree holds a line against it', async () => {
     const result = await search(scene, 'lines');
     for (const line of result.lines!.filter(entry => entry.for.includes('engine') && !entry.versus)) {
       const other = line.side === 'p1' ? 'p2' : 'p1';

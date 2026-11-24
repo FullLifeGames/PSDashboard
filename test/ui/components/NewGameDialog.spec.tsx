@@ -75,7 +75,7 @@ describe('the dialog', () => {
 });
 
 describe('the format list', () => {
-  test('the open list scrolls into the dialog, so its footnote is not cut by the dialog\'s bottom edge (H4h)', async () => {
+  test('the open list scrolls into the dialog, so its footnote is not cut by the dialog\'s bottom edge', async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
     try {
@@ -145,7 +145,7 @@ describe('the format list', () => {
 });
 
 describe('a team box', () => {
-  test('a sprite that does not load (a species no sprite sheet holds) drops out instead of showing its alt text (H4h)', () => {
+  test('a sprite that does not load (a species no sprite sheet holds) drops out instead of showing its alt text', () => {
     render(<NewGameDialog {...props()} />);
     paste(1, `Zzqxvwk\n- Tackle\n\n${GOOD}`);
     const read = document.querySelectorAll('.ps-newgame-read')[0] as HTMLElement;
@@ -179,7 +179,7 @@ describe('a team box', () => {
 
   const SEVEN = [...FOUR.split('\n\n'), 'Dragonite\n- Protect'].join('\n\n');
 
-  test('seven sets block Start: the reason stands under that box and the "plays as pasted" note goes (NG-2)', async () => {
+  test('seven sets block Start: the reason stands under that box and the "plays as pasted" note goes', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, SEVEN);
@@ -194,7 +194,7 @@ describe('a team box', () => {
     expect((await screen.findAllByText(NOTE, undefined, { timeout: 30_000 })).length).toBeGreaterThan(0);
   }, 60_000);
 
-  test('a side with no readable set blocks Start: its box says so, the note goes (NG-2)', async () => {
+  test('a side with no readable set blocks Start: its box says so, the note goes', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, 'Garchomp\nAbility: Rough Skin\n\nGliscor\nAbility: Poison Heal');
@@ -205,7 +205,7 @@ describe('a team box', () => {
     expect(screen.queryByText(NOTE)).toBeNull();
   }, 60_000);
 
-  test('a refused seed blocks Start under the seed field and the note goes; the simulator\'s problems alone do not block (NG-2)', async () => {
+  test('a refused seed blocks Start under the seed field and the note goes; the simulator\'s problems alone do not block', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, GOOD);
@@ -218,7 +218,7 @@ describe('a team box', () => {
     expect(screen.queryByText(NOTE)).toBeNull();
   }, 60_000);
 
-  test('a VGC team of six with a bring of four is no block: the six limit counts the pasted sets (NG-2)', async () => {
+  test('a VGC team of six with a bring of four is no block: the six limit counts the pasted sets', async () => {
     render(<NewGameDialog {...props()} />);
     await pickFormat('vgc 2025', '[Gen 9] VGC 2025 Reg I');
     paste(1, FOUR);
@@ -284,7 +284,7 @@ describe('Start', () => {
     expect(box(1)).toHaveValue(GOOD);
   }, 60_000);
 
-  test('a species the format\'s Dex does not know is a problem under its box, and once the check has read it Start waits and says why (H4h, NG-2)', async () => {
+  test('a species the format\'s Dex does not know is a problem under its box, and once the check has read it Start waits and says why', async () => {
     const wired = props();
     render(<NewGameDialog {...wired} />);
     paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
@@ -344,7 +344,7 @@ describe('Start', () => {
 });
 
 describe('the saved games', () => {
-  test('the dialog holds only the new game: saved games are listed in the Game menu and on the start page, never here (H11a)', async () => {
+  test('the dialog holds only the new game: saved games are listed in the Game menu and on the start page, never here', async () => {
     await savedRecord();
     render(<NewGameDialog {...props()} />);
     expect(screen.getByRole('dialog', { name: 'New game' })).toBeInTheDocument();
@@ -357,7 +357,7 @@ describe('the saved games', () => {
  * Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is modal), keeps the pasted teams, and
  * Cancel starts nothing. Singles and doubles start through the same line.
  */
-describe('Start with an unsaved variation open (H16a)', () => {
+describe('Start with an unsaved variation open', () => {
   for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
     test(`${label}: the question comes before Start; Cancel starts nothing and keeps the teams, Discard variation starts the game`, async () => {
       const wired = props({ unsavedVariation: () => true });
@@ -410,7 +410,7 @@ describe('Start with an unsaved variation open (H16a)', () => {
  * An empty seed field means a fresh seed, and the placeholder says so. A pasted set without an ability starts with the species' first
  * ability, written into the saved team; the team check names it before Start. Singles and doubles run both.
  */
-describe('an empty seed field (H18a)', () => {
+describe('an empty seed field', () => {
   test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
     const wired = props();
     render(<NewGameDialog {...wired} />);
@@ -427,7 +427,7 @@ describe('an empty seed field (H18a)', () => {
   }, 60_000);
 });
 
-describe('a pasted set without an ability (H20a)', () => {
+describe('a pasted set without an ability', () => {
   const NO_ABILITY = 'Gengar\n- Shadow Ball\n\nGarchomp\n- Earthquake';
   for (const [label, search, name, id] of [['singles', 'gen9ou', '[Gen 9] OU', 'gen9ou'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU', 'gen9doublesou']]) {
     test(`${label}: the check says which ability each set plays, and Start writes it into the saved team`, async () => {

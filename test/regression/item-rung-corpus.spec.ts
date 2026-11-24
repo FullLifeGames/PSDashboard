@@ -38,7 +38,7 @@ type Replay = ReplayData & { formatid?: string };
 const hooks = ['onModifyAtk', 'onModifySpA', 'onBasePower', 'onModifyDamage'];
 const boosts = (name: string) => hooks.some(hook => typeof (Dex.items.get(name) as unknown as Record<string, unknown>)[hook] === 'function');
 
-describe('a knockout no spread reaches gives the attacker a usage-listed boost item (#75)', () => {
+describe('a knockout no spread reaches gives the attacker a usage-listed boost item', () => {
   for (const row of ROWS) {
     const path = row.fixture ? join('test', 'e2e-feedback', 'fixtures', `${row.id}.json`) : CORPUS(row.id);
     test.skipIf(!existsSync(path))(`${row.family} ${row.id}: ${row.species} holds ${row.item || 'its guessed item'}`, async () => {

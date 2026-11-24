@@ -54,7 +54,7 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-describe('a knockout the game refutes opens the attacker\'s offense; one it allows stays (#75)', () => {
+describe('a knockout the game refutes opens the attacker\'s offense; one it allows stays', () => {
   for (const row of ROWS) {
     const path = row.fixture ? join('test', 'e2e-feedback', 'fixtures', `${row.id}.json`) : CORPUS(row.id);
     test.skipIf(!existsSync(path))(`${row.family} ${row.id}: ${row.attacker}'s ${row.move} on ${row.defender} shown at ${row.shown.hp}/${row.shown.maxhp}`, async () => {
@@ -89,7 +89,7 @@ describe('a knockout the game refutes opens the attacker\'s offense; one it allo
  * fit worse than the cheapest spread that reaches every knockout") puts the built spread on the reach: it reaches the knockout and
  * sits where the clean line still fits.
  */
-describe('the offense of a mon with a knockout and a clean line sits where both fit (D9)', () => {
+describe('the offense of a mon with a knockout and a clean line sits where both fit', () => {
   const FILE = join('test', 'regression', 'fixtures', 'bank-games', 'gen9ou-2658671254.json');
   test.skipIf(!existsSync(FILE) || !existsSync('.smogon-cache'))('gen9ou-2658671254: Iron Valiant\'s Moonblast on Ogerpon (100/100) and on Moltres (100 to 74)', async () => {
     const replay = JSON.parse(readFileSync(FILE, 'utf-8')) as Replay;

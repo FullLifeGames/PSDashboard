@@ -15,7 +15,7 @@ const RECHARGE_MOVES = (() => {
     .map(move => move.name);
 })();
 
-describe('a recharge turn can be played by hand (round 77)', () => {
+describe('a recharge turn can be played by hand', () => {
   test('the Dex has recharge moves to sweep', () => {
     expect(RECHARGE_MOVES).toEqual(expect.arrayContaining(['Hyper Beam', 'Giga Impact']));
   });

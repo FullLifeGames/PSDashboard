@@ -530,7 +530,7 @@ describe('spread-fit-field', () => {
     FLASH_FIRE, HELPING_HAND, BEADS_OF_RUIN,
   ];
 
-  describe('the rolls of a hit contain the simulator\'s damage with the field the log shows (T86)', () => {
+  describe('the rolls of a hit contain the simulator\'s damage with the field the log shows', () => {
     for (const scene of FIELD_SCENES) {
       for (const kind of scene.kinds) {
         test(`${kind}: ${scene.title}`, () => {
@@ -555,7 +555,7 @@ describe('spread-fit-field', () => {
     }
   });
 
-  describe('a hit on a plain field reads as it did (T86)', () => {
+  describe('a hit on a plain field reads as it did', () => {
     for (const kind of BOOSTED_HIT.kinds) {
       test(`${kind}: a boosted hit has the same rolls with and without the new fields`, () => {
         for (const played of scenesOf(kind, BOOSTED_HIT, 3)) {
@@ -573,7 +573,7 @@ describe('spread-fit-field', () => {
     }
   });
 
-  describe('the observation names the field at the hit (T86)', () => {
+  describe('the observation names the field at the hit', () => {
     const observationsOf = (scene: FieldScene, kind: Kind) => {
       const [played] = scenesOf(kind, scene, 1);
       return hitsOf(scene, played);

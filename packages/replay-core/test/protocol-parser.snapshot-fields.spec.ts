@@ -115,7 +115,7 @@ function playSteps(format: string, p1: PokemonSet[], p2: PokemonSet[], steps: [s
 const withAbility = (species: string, ability: string, moves: string[], level = 100): PokemonSet => ({ ...set(species, moves), ability, level });
 const lastSnapshot = (log: string) => parseReplayLogWithObservations(log).snapshots.at(-1)!;
 
-describe.each([['singles', 'gen9customgame', ''], ['doubles', 'gen9doublescustomgame', ', move 1']] as const)('T158 snapshot facts (%s)', (label, format, partner) => {
+describe.each([['singles', 'gen9customgame', ''], ['doubles', 'gen9doublescustomgame', ', move 1']] as const)('snapshot facts (%s)', (label, format, partner) => {
   const filler = label === 'singles' ? [] : [set('Gliscor', ['Splash'])];
   const foeFiller = label === 'singles' ? [] : [set('Corviknight', ['Splash'])];
 
@@ -249,7 +249,7 @@ describe('the mod\'s Swift Swim Mega', () => {
   }
 });
 
-describe('field durations in the snapshot (round 60, T92)', () => {
+describe('field durations in the snapshot', () => {
   test('weather and terrain carry the client\'s remaining turns', () => {
     const log = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|1', '|teamsize|p2|1', '|gen|9',

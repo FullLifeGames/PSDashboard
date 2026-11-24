@@ -56,7 +56,7 @@ function switchOut(battle: Battle, kind: Kind, leaving: Pokemon) {
 
 const bench = (battle: Battle, side: 0 | 1, index: number) => battle.sides[side].pokemon[index];
 
-describe('an entry stage the simulator no longer gives is not priced (T156)', () => {
+describe('an entry stage the simulator no longer gives is not priced', () => {
   for (const kind of KINDS) {
     test(`${kind}, Gen 9: a Zacian-Crowned that already used Intrepid Sword gets no second stage`, () => {
       const sword = { ability: 'Intrepid Sword', item: 'Rusted Sword' };
@@ -128,7 +128,7 @@ describe('an entry stage the simulator no longer gives is not priced (T156)', ()
   });
 });
 
-describe('an ability the simulator suppresses reaches the calc as No Ability (T156)', () => {
+describe('an ability the simulator suppresses reaches the calc as No Ability', () => {
   for (const kind of KINDS) {
     const choices = kind === 'singles'
       ? ['move dragonclaw', 'move splash'] as const
@@ -243,7 +243,7 @@ function check(drawn: ReturnType<typeof drawTurn>) {
 
 const draw = drawTurn;
 
-describe('entry boosts count once in the odds (T100)', () => {
+describe('entry boosts count once in the odds', () => {
   test('singles: Zacian-Crowned\'s Intrepid Sword stage reaches the kill odds once', () => {
     const battle = battleOf('gen9customgame',
       [set('Zacian-Crowned', ['ironhead'], { ability: 'Intrepid Sword', item: 'Rusted Sword' })],
@@ -305,7 +305,7 @@ describe('entry boosts count once in the odds (T100)', () => {
   });
 });
 
-describe('the abilities the calc boosts by itself are read from the calc (T100)', () => {
+describe('the abilities the calc boosts by itself are read from the calc', () => {
   test('per gen: Download from gen 4, Dauntless Shield and Intrepid Sword in gen 8, the four Embody Aspects in gen 9', () => {
     const found = (gen: number) => [...Generations.get(gen as 9).abilities].map(ability => ability.name).filter(name => calcAddsStages(gen, name)).sort();
     expect(found(3)).toEqual([]);
@@ -335,7 +335,7 @@ function team(ev: number): PokemonSet[] {
   }));
 }
 
-describe('a Gen 1 and Gen 2 body prices the simulator\'s stats at every EV (decision 6)', () => {
+describe('a Gen 1 and Gen 2 body prices the simulator\'s stats at every EV', () => {
   for (const formatid of ['gen1customgame', 'gen2customgame']) {
     test(`${formatid}: calcPokemon on bodyOf gives the stored stats and the maximum HP at EVs ${EVS.join(', ')}`, () => {
       const wrong: string[] = [];
@@ -365,7 +365,7 @@ const BODY: CalcBody = {
   boosts: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, tera: null, onField: false,
 };
 
-describe('the entry stages of 0.12 (decision 5)', () => {
+describe('the entry stages of 0.12', () => {
   test('the calc adds a stage of its own for Download, the Embody Aspects and, in Gen 8, Sword and Shield', () => {
     const found = (gen: number) => [...Generations.get(gen as 9).abilities].map(ability => ability.name).filter(name => calcAddsStages(gen, name)).sort();
     expect(found(3)).toEqual([]);
@@ -436,7 +436,7 @@ function play(format: Format, scene: typeof CASES[number]): Hit {
 
 await loadSimMods('gen9championsou');
 
-describe('Protect reaches the calculator as the simulator plays it (decision 4)', () => {
+describe('Protect reaches the calculator as the simulator plays it', () => {
   for (const format of FORMATS) {
     test(`${format}: the simulator's loss of a Protecting target lies in the range of the engine's field`, () => {
       const hits = CASES.map(scene => ({ scene, ...play(format, scene) }));

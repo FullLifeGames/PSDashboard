@@ -32,7 +32,7 @@ function setup(storage: Storage | null, start = 1_000_000) {
   return { reload, fail, advance: (ms: number) => { clock += ms; } };
 }
 
-describe('a lazy chunk that fails to load after a deploy (T298)', () => {
+describe('a lazy chunk that fails to load after a deploy', () => {
   test('reloads the page once and keeps the error from surfacing', () => {
     const storage = memoryStorage();
     const { reload, fail } = setup(storage);

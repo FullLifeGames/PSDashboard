@@ -596,7 +596,7 @@ describe('a single tree writes its own cells (no merge happens for one tree)', (
 const choice = (choiceStr: string, label: string, ev: number, worstCase = ev): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: ev, ev, punishedBy: 'Reply' });
 
-describe('point 2: the forced win names its unit', () => {
+describe('the forced win names its unit', () => {
   const forcedSummary = (forcedWin: NonNullable<EvalResult['forcedWin']>, score: number, doubles = false) => summarizeTurn(analyzeTurn({
     turn: 24,
     result: {

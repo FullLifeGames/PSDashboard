@@ -137,7 +137,7 @@ const CASES: [string, 'p1' | 'p2', string][] = [
   ['smogtours-gen9doublesou-938281-t8-played', 'p2', 'U-turn into the partner, the other slot hidden'],
 ];
 
-describe('moves onto the partner at the root (round 67, T113)', () => {
+describe('moves onto the partner at the root', () => {
   test.each(CASES)('%s %s: the played partner move is a root option (%s)', (name, side) => {
     const position = fixture(name);
     const root = createRootPosition(position.serialized, position.ruleset);

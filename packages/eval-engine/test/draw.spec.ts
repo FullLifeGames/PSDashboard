@@ -399,7 +399,7 @@ describe('(f) a real search draws its root cells by quantile: a die of chance p 
   });
 });
 
-describe('(g) a root row reads the same through its marginals and through its cells (round 89, T322, #59)', () => {
+describe('(g) a root row reads the same through its marginals and through its cells', () => {
   // The merge corrects the visit mean of the top row and column by the cells of a keyed class mix: that holds only while
   // the row's visits and totals ARE the sums of its cells.
   const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
@@ -433,7 +433,7 @@ const withoutTimestamps = (log: string[]) => log.filter(line => !line.startsWith
 const rolls = (records: readonly { kind: string }[]) =>
   records.filter((record): record is RollRecord => record.kind === 'roll').map(record => record.key);
 
-describe('the recording dice (round 56)', () => {
+describe('the recording dice', () => {
   test('without scripts a draw is the plain advance: same log, same child', () => {
     const root = anchorRoot();
     const cache = createMatchupCache();

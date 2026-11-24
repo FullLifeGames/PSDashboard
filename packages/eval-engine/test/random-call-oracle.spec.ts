@@ -36,7 +36,7 @@ function calls(view: SimView, id: string): boolean {
   return false;
 }
 
-describe('randomCallMoves is held to the simulator (round 72)', () => {
+describe('randomCallMoves is held to the simulator', () => {
   test('the sets are every move the Dex marks callsMove, over all views', () => {
     const marked = [...new Set(ALL_VIEWS.flatMap(callers))].sort();
     expect([...new Set(ALL_VIEWS.flatMap(view => [...randomCallMoves(view.dex)]))].sort()).toEqual(marked);

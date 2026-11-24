@@ -41,7 +41,7 @@ async function builtMoves(row: Row): Promise<string[]> {
   return set.moves.map(move => toId(String(move)));
 }
 
-describe('a copy\'s move books to the body it copied, and the copy plays it (#139)', () => {
+describe('a copy\'s move books to the body it copied, and the copy plays it', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       expect(await builtMoves(row), `${row.target.name} holds ${row.copy.move}`).toContain(toId(row.copy.move));

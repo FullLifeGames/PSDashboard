@@ -78,7 +78,7 @@ function scene(format: string, doubles: boolean, p1Lead: PokemonSet, p2Lead: Pok
   return { p1, p2, battle, simulated: simState(battle) };
 }
 
-describe.each(SHAPES)('T215 the plain label is the simulator\'s type ($label)', ({ format, doubles }) => {
+describe.each(SHAPES)('the plain label is the simulator\'s type ($label)', ({ format, doubles }) => {
   describe('Weather Ball and Terrain Pulse follow the field the snapshot shows', () => {
     const users = ['Weather Ball', 'Terrain Pulse', 'Splash'];
     test.each([
@@ -141,7 +141,7 @@ describe.each(SHAPES)('T215 the plain label is the simulator\'s type ($label)', 
   });
 });
 
-describe('T215 older generations and the Champions mod', () => {
+describe('older generations and the Champions mod', () => {
   test.each([4, 6, 7])('gen %s: Weather Ball under rain is the simulator\'s type (singles)', gen => {
     const format = `gen${gen}customgame`;
     const { p1, p2, battle, simulated } = scene(format, false, set('Ninetales', ['Weather Ball', 'Splash']), set('Politoed', ['Splash'], { ability: 'Drizzle' }));
@@ -180,7 +180,7 @@ describe('T215 older generations and the Champions mod', () => {
   }, 60_000);
 });
 
-describe('T215 what the picker does not know it leaves at the catalog type', () => {
+describe('what the picker does not know it leaves at the catalog type', () => {
   test('a body whose set names no ability and whose species may have two that disagree keeps the catalog type', () => {
     const format = 'gen9customgame';
     const { p1, p2, battle } = scene(format, false, set('Sylveon', ['Hyper Voice', 'Swift'], { ability: 'Pixilate' }), set('Snorlax', ['Splash']));
@@ -368,7 +368,7 @@ describe('picker-state-sim-facts', () => {
     { label: 'doubles', format: 'gen9doublescustomgame', doubles: true },
   ] as const;
 
-  describe.each(SHAPES)('T158 the picker carries the simulator facts ($label)', ({ format, doubles }) => {
+  describe.each(SHAPES)('the picker carries the simulator facts ($label)', ({ format, doubles }) => {
     const filler = (species: string) => (doubles ? [set(species, ['Splash'])] : []);
     const together = (choice: string, partner = 'move 1') => (doubles ? `${choice}, ${partner}` : choice);
 
@@ -401,7 +401,7 @@ describe('picker-state-sim-facts', () => {
     });
   });
 
-  describe('T158 Hidden Power in the picker', () => {
+  describe('Hidden Power in the picker', () => {
     const generations = [
       { gen: 7, format: 'gen7customgame' },
       { gen: 6, format: 'gen6customgame' },
@@ -440,7 +440,7 @@ describe('picker-state-sim-facts', () => {
 
   type LabelledMove = BranchMoveOption & { typeUnderTera?: string };
 
-  describe.each(SHAPES)('T158 the picker labels a move with the type after the Tera click ($label)', ({ format, doubles }) => {
+  describe.each(SHAPES)('the picker labels a move with the type after the Tera click ($label)', ({ format, doubles }) => {
     const splash = (species: string) => set(species, ['Splash']);
     const ogerpon = (teraType: string) => set('Ogerpon-Wellspring', ['Splash', 'Ivy Cudgel', 'Tera Blast'], { item: 'Wellspring Mask', teraType });
     const terapagos = () => set('Terapagos', ['Splash', 'Tera Starstorm', 'Tera Blast'], { ability: 'Tera Shift', teraType: 'Stellar' });

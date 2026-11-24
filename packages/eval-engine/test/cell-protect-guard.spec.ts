@@ -30,7 +30,7 @@ const RULES = [
   { name: 'Pokémon Champions singles', format: 'gen9championscustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 } },
 ];
 
-describe.each(RULES)('$name: the protect guard of the cell planner reads the Dex (round 70)', rules => {
+describe.each(RULES)('$name: the protect guard of the cell planner reads the Dex', rules => {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   const board = (moveId: string, probe: string, seed: string): Battle =>
     battleOf(rules.format, [mon('Blissey', [moveId, 'splash']), mon('Blissey', ['splash'])], [mon('Shuckle', [probe, 'splash']), mon('Shuckle', ['splash'])], seed);
@@ -75,7 +75,7 @@ describe.each(RULES)('$name: the protect guard of the cell planner reads the Dex
     }
   });
 
-  test('against the thirteen names of round 69 the rule gains Mat Block and loses nothing', () => {
+  test('against the thirteen listed names the rule gains Mat Block and loses nothing', () => {
     const statusMoves = dex.moves.all().filter(move => move.exists && move.category === 'Status');
     const read = statusMoves.filter(move => guardFires(move.id)).map(move => move.id).sort();
     expect(read.filter(id => !NAMES_UNTIL_ROUND_69.includes(id))).toEqual(['matblock']);

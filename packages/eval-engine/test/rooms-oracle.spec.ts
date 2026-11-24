@@ -45,7 +45,7 @@ function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType
   return battle.actions.getDamage(user, target, move);
 }
 
-describe('ROOMS is held to the simulator (round 72)', () => {
+describe('ROOMS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const pseudoWeathers = [...new Set(view.dex.moves.all()
       .filter(move => isReal(view, 'moves', move.id) && move.pseudoWeather)

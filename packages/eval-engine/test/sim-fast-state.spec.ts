@@ -422,7 +422,7 @@ describe('sim-fast-champions', () => {
     return lines.join('\n');
   }
 
-  describe('the speed layer on Champions battles (T145)', () => {
+  describe('the speed layer on Champions battles', () => {
     for (const [kind, serialized] of Object.entries(CASES)) {
       test(`two turns under both seeds play as with the layer off (${kind})`, () => {
         SEEDS.forEach((seed, index) => {

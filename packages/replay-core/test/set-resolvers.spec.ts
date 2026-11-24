@@ -82,7 +82,7 @@ describe('the chosen set\'s published IVs reach the build', () => {
   });
 });
 
-describe('resolveSpread takes the IVs edited, then solved, then published, then 31 (lane H interface)', () => {
+describe('resolveSpread takes the IVs edited, then solved, then published, then 31', () => {
   const info = inferOpponentTeam(singles(9, 'Sinistcha', ['Trick Room']), 'p2').pokemon[0];
   const chosen = curated('Sinistcha', ['Trick Room'], { atk: 0, spe: 0 });
 

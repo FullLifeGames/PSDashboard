@@ -167,7 +167,7 @@ test.describe('PS Dashboard', () => {
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 2', { timeout: 60_000 });
     });
 
-    test('a move past the variation\'s tip plays on the main line there, after the replace confirm (round 77)', async ({ page }) => {
+    test('a move past the variation\'s tip plays on the main line there, after the replace confirm', async ({ page }) => {
       // Scene: a one-turn variation at turn 5, then ▶ to turn 28 and Brave Bird there. The line stayed
       // "variation" across the uncovered turns, the move extended the variation instead, ran at its tip against Kyurem
       // ("no longer knows Brave Bird") and pulled the pointer back. Here: a one-turn variation at turn 1, ▶ to turn 3.

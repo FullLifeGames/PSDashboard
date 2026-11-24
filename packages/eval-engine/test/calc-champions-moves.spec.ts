@@ -31,7 +31,7 @@ function plain(name: string): Move | null {
   }
 }
 
-describe('every damaging move of the Champions mod reads the mod\'s data through calcMove (decision 2)', () => {
+describe('every damaging move of the Champions mod reads the mod\'s data through calcMove', () => {
   test('power, type, category, hits and flags equal the mod\'s', () => {
     const wrong: string[] = [];
     for (const move of legalDamaging()) {

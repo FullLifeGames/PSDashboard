@@ -349,7 +349,7 @@ describe('usePositionSource for a new game', () => {
   }
 
   for (const format of ['gen9ou', 'gen9vgc2025regi']) {
-    test(`${format}: the store swaps to an empty one (a new sets fingerprint) and Analyze game still gets every turn, with no notice (NG-1 B)`, async () => {
+    test(`${format}: the store swaps to an empty one (a new sets fingerprint) and Analyze game still gets every turn, with no notice`, async () => {
       const record = await twoTurnGame(format);
       const { result, rerender, requests } = sourceOf(record);
       await result.current.acquireExact(3, () => {});

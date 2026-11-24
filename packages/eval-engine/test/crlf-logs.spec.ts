@@ -35,7 +35,7 @@ const FIXTURES = {
   'doubles: VGC with Tera (Regulation I)': 'gen9vgc2026regi-2630181744.json',
 } as const;
 
-describe('the readers of a log read a CRLF log like the LF log (T206)', () => {
+describe('the readers of a log read a CRLF log like the LF log', () => {
   for (const [name, file] of Object.entries(FIXTURES)) {
     const replay = replayOf(file);
     const lf = lfOf(replay.log);
@@ -86,7 +86,7 @@ describe('the readers of a log read a CRLF log like the LF log (T206)', () => {
  * hit and a dice marker, parsePlayedActions printed the reason "flinch\r", and diceEventTurns dropped turns. The app never hands a '\r'
  * in (allTurnEvents and the snapshots cut their lines from a normalized log); a library user can. Each reader settles the line endings at its own door.
  */
-describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on each line (T206)', () => {
+describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on each line', () => {
   for (const [name, file] of Object.entries(FIXTURES)) {
     const lf = lfOf(replayOf(file).log);
     const turns = allTurnEvents(lf);
@@ -124,7 +124,7 @@ describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on
   });
 });
 
-describe('normalizeLines, the door of those readers (T206)', () => {
+describe('normalizeLines, the door of those readers', () => {
   test('lines without a "\\r" come back as the same array, so an LF log reads exactly as before', () => {
     const lines = ['|move|p1a: A|Tackle|p2a: B', '|-damage|p2a: B|50/100', ''];
     expect(normalizeLines(lines)).toBe(lines);
@@ -204,7 +204,7 @@ function rebuild(scene: Scene, log: string) {
   }).then(runtime => ({ runtime, snapshot }));
 }
 
-describe('reconstructBranchRuntime and adoptSerializedRuntime read a CRLF replay log like the LF log (T206)', () => {
+describe('reconstructBranchRuntime and adoptSerializedRuntime read a CRLF replay log like the LF log', () => {
   test.each(SCENES)('$name: the same battle, the same protocol log, the same click behind the Encore', { timeout: 240000 }, async scene => {
     const lf = await rebuild(scene, scene.log);
     const crlf = await rebuild(scene, crlfOf(scene.log));

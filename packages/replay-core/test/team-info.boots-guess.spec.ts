@@ -108,7 +108,7 @@ function panelAndBuild(log: string, usageStats: SmogonUsageStats, sets: SmogonSe
   };
 }
 
-describe('no Boots guess while an ability the Pokémon may have keeps the rocks off (T130)', () => {
+describe('no Boots guess while an ability the Pokémon may have keeps the rocks off', () => {
   test('singles: the simulator keeps the rock damage off a Magic Guard Clefable, and the inference guesses nothing', () => {
     const log = singlesEntry(clefable());
     expect(log).toMatch(/\|switch\|p2a: Clefable/);
@@ -178,7 +178,7 @@ describe('the guess stands where no possible ability keeps the rocks off (guards
  * abilities. Noivern (Frisk, Infiltrator, Telepathy) can never have Magic Guard, and an entry on Stealth Rock without damage reads
  * as Heavy-Duty Boots there too (the GPL report's Noivern).
  */
-describe('a custom game keeps each species to its own abilities (round 67 gate)', () => {
+describe('a custom game keeps each species to its own abilities', () => {
   test('a Noivern on Stealth Rock without damage reads as Heavy-Duty Boots in a custom game', () => {
     const noivern = mon('Noivern', 'Heavy-Duty Boots', 'Infiltrator', ['Draco Meteor', 'Hurricane']);
     const log = play([rocks()], [mon('Chansey', '', 'Natural Cure', ['Soft-Boiled']), noivern],
@@ -278,7 +278,7 @@ describe('consumed-item', () => {
 
   const tyranitarUsage = stats(usage('Tyranitar', [['Tyranitarite', 0.5], ['Chople Berry', 0.2], ['Leftovers', 0.1]]));
 
-  describe('a consumed item behind the preview marker (T108 point 1)', () => {
+  describe('a consumed item behind the preview marker', () => {
     test.each([['singles', singles], ['doubles', doubles]])('%s: the inference records the eaten Chople Berry, and panel and build play it, not Tyranitarite', (_, log) => {
       const raw = inferOpponentTeam(log, 'p1');
       expect(raw.pokemon.find(mon => mon.species === 'Tyranitar')!.item).toEqual({ value: 'Chople Berry (consumed)', source: 'revealed' });
@@ -313,7 +313,7 @@ const speedOf = (set: { nature?: string; evs: PokemonEvs; ivs: PokemonEvs }) => 
   return Math.floor(nature.plus === 'spe' ? base * 1.1 : nature.minus === 'spe' ? base * 0.9 : base);
 };
 
-describe('a body with set EVs plays the nature its info shows (claim 1 of issue 150)', () => {
+describe('a body with set EVs plays the nature its info shows', () => {
   test.each(['manual', 'revealed'] as const)('the solver\'s Hardy never replaces the shown Jolly (%s EVs)', source => {
     const set = quaquaval(editedInfo(source, guessedField('Jolly', undefined, 'fits observed damage')), solved('Hardy'));
     expect(set.nature).toBe('Jolly');
@@ -415,7 +415,7 @@ describe('logged-entry-stage', () => {
   });
   const teamsOf = () => ({ p1: { pokemon: [] as RevealedPokemonInfo[] }, p2: { pokemon: [zamazentaInfo()] } });
 
-  describe('a Dauntless Shield stage the log shows is priced once (T186 guard)', () => {
+  describe('a Dauntless Shield stage the log shows is priced once', () => {
     for (const kind of ['singles', 'doubles'] as const) {
       test(`${kind}: the log shows the entry stage once`, () => {
         const scene = scenesOf(kind, 1)[0];
@@ -589,11 +589,11 @@ describe('parsePastedTeam reads like the hand parser did, through Teams.import',
     expect(sets.map(set => set.moves[0])).toEqual(['Hidden Power Fire', 'Hidden Power Ice']);
   });
 
-  test('F4: an IVs line with no stat reads as the default spread', () => {
+  test('an IVs line with no stat reads as the default spread', () => {
     expect(parsePastedTeam('Gengar\nIVs: x\n- Shadow Ball')[0].ivs).toEqual({ hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 });
   });
 
-  test('F3: a species the Dex does not know reads as its id', () => {
+  test('a species the Dex does not know reads as its id', () => {
     expect(parsePastedTeam('Species Only (M)\n- Tackle').map(set => set.species)).toEqual(['speciesonly']);
   });
 });

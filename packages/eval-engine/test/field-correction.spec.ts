@@ -33,7 +33,7 @@ function snapshotOf(battle: Battle, field: Partial<TurnSnapshot['field']>, p1Con
   } as TurnSnapshot;
 }
 
-describe('field correction (round 60, T92)', () => {
+describe('field correction', () => {
   test('inserted Spikes (3) and Toxic Spikes (2) hit the next switch-in', () => {
     const battle = battleOf([mon('Blissey', ['Splash']), mon('Garchomp', ['Splash'])], [mon('Blissey', ['Splash'])]);
     correctBattleFromSnapshot(battle, snapshotOf(battle, {}, {
@@ -73,7 +73,7 @@ describe('field correction (round 60, T92)', () => {
     expect(battle.field.terrainState.duration).toBeUndefined();
   });
 
-  test('a snapshot from before round 60 (no weatherState) corrects weather as before', () => {
+  test('a snapshot without weatherState still corrects the weather', () => {
     const battle = battleOf([mon('Blissey', ['Splash'])], [mon('Blissey', ['Splash'])]);
     expect(() => correctBattleFromSnapshot(battle, snapshotOf(battle, { weather: 'Sun' }))).not.toThrow();
     expect(battle.field.weather).toBe('sunnyday');

@@ -99,7 +99,7 @@ describe('multi-hit moves in the damage preview', () => {
  * A move whose hit count the simulator draws (2 to 5 hits, or Population Bomb under Loaded Dice) shows every count it can land, each priced
  * by the calc; the counts and their chances are the simulator's (35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10).
  */
-describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
+describe('multi-hit moves with a drawn hit count', () => {
   const breloom = mon('Breloom');
   const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
   const spanOf = (attacker: SimPokemonInfo, defender: SimPokemonInfo, name: string, fewest: number, most: number) =>
@@ -138,7 +138,7 @@ describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
     expect(calcSingleDamageRange(breloom, { ...blissey, hp: 1 }, move('Bullet Seed')).koChance).toBe('guaranteed OHKO');
   });
 
-  test("an ability that fixes the count wins over the draw: Battle Bond's Water Shuriken shows its three hits (review of wave 1.5)", () => {
+  test("an ability that fixes the count wins over the draw: Battle Bond's Water Shuriken shows its three hits", () => {
     const gen7 = Generations.get(7);
     const ash = mon('Greninja-Ash', { ability: 'Battle Bond' }, gen7);
     const snorlax = mon('Snorlax', { evs: { ...STATS, hp: 252, def: 252 } }, gen7);
@@ -158,7 +158,7 @@ describe('multi-hit moves with a drawn hit count (T124 point 3)', () => {
 });
 
 /** The result carries the distribution per hit count, each count with the simulator's chance and its own calc range. */
-describe('the per-count distribution of a drawn hit count (T136 point 1)', () => {
+describe('the per-count distribution of a drawn hit count', () => {
   const breloom = mon('Breloom');
   const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
   const countRange = (attacker: SimPokemonInfo, hits: number) => {
@@ -192,7 +192,7 @@ describe('the per-count distribution of a drawn hit count (T136 point 1)', () =>
 const option = (name: string): BranchMoveOption =>
   ({ name, activeSlot: 0, slot: 1, pp: 15, maxpp: 15, disabled: false, type: 'Normal', targetType: 'normal', requiresTarget: false, targetOptions: [] });
 
-describe('Hidden Power goes to the calc typed (T83)', () => {
+describe('Hidden Power goes to the calc typed', () => {
   test('singles gen 6: Hidden Power Ice into Landorus-Therian at 83 HP is the sure KO the simulator deals', () => {
     const root = rootOf('gen6customgame', [set('Starmie', ['Hidden Power Ice'])],
       [set('Landorus-Therian', ['Splash'], { ability: 'Battle Armor' })], battle => { battle.sides[1].active[0].sethp(83); });
@@ -418,7 +418,7 @@ describe('damage-gen', () => {
     };
   }
 
-  describe('damage calc follows the replay generation (B5)', () => {
+  describe('damage calc follows the replay generation', () => {
     test('gen 3 Explosion halves defense while gen 9 does not', () => {
       const registeel = mon({ species: 'Registeel', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, nature: 'Adamant' });
       const swampert = mon({ species: 'Swampert', evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 } });
@@ -443,7 +443,7 @@ describe('damage-gen', () => {
     });
   });
 
-  describe('damage calc applies the sim set modifiers (B6)', () => {
+  describe('damage calc applies the sim set modifiers', () => {
     test('Technician boosts low-power moves by 1.5x', () => {
       const base = { species: 'Scizor', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 }, nature: 'Adamant' } as const;
       const garchomp = mon({ species: 'Garchomp' });

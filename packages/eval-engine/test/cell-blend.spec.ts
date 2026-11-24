@@ -222,7 +222,7 @@ describe('root-cell blend integration', () => {
     [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],
   ));
 
-  test('the blend classes carry the fold keys (round 33)', () => {
+  test('the blend classes carry the fold keys', () => {
     const battle = makeBattle(
       [makeSet('Deo', 'Deoxys-Speed', ['Hydro Pump', 'Seismic Toss'], 100)],
       [makeSet('Pika', 'Pikachu', ['Tackle', 'Growl'], 30)],
@@ -499,7 +499,7 @@ function drawnKeys(root: SimPosition, p1: string, p2: string, offset: number): S
   return keys;
 }
 
-describe('tree class keys of a tied cell (T146 c5)', () => {
+describe('tree class keys of a tied cell', () => {
   test('singles: a tree names the order it drew, and the key is one of the sampler classes', () => {
     const root = thunderTie();
     const [p1, p2] = ['move thunder', 'move thunder'];
@@ -546,7 +546,7 @@ describe('tree class keys of a tied cell (T146 c5)', () => {
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
-describe('kill odds for doubles options (round 56)', () => {
+describe('kill odds for doubles options', () => {
   test('the played pair names its slot: Play Rough on Incineroar, a 90 % roll that kills', () => {
     const [odds] = koOddsForOptions(positionBattle(anchorRoot()), 'p1', [PLAYED[0]]);
     expect(odds).toEqual({ accuracy: 0.9, killFraction: 1, label: 'Play Rough→Incineroar', attacker: expect.any(Object) });
@@ -564,7 +564,7 @@ describe('kill odds for doubles options (round 56)', () => {
     expect(split).toEqual({ accuracy: 1, killFraction: expect.closeTo(1 / 24, 12), label: 'Tackle→Eevee', attacker: expect.any(Object) });
   });
 
-  test('Earthquake beside a living partner is a spread hit even against one foe (final review, finding 2)', () => {
+  test('Earthquake beside a living partner is a spread hit even against one foe', () => {
     // The sim counts Zapdos among Earthquake's targets at the start (spreadHit, 0.75): 91 to 108 against
     // Snorlax's 114 HP, only a crit (136 to 162) kills. Priced single-target, every roll (121 to 144) would.
     const root = doublesRoot(

@@ -29,7 +29,7 @@ const outcome = (serialized: string): ReconstructOutcome => ({
   serialized, log: [], invalid: null, reached: true, ended: false, turn: 3, timedOut: false, haxAlignment: [], choiceErrors: { count: 0, last: null },
 });
 
-describe('the main thread loads the Champions mod before a Champions battle (T145)', () => {
+describe('the main thread loads the Champions mod before a Champions battle', () => {
   test('the branch view adopts a worker\'s Champions position on the Champions mod', async () => {
     const { client } = fakeReplayWorkerClient(request => (request.type === 'reconstruct'
       ? [{ type: 'reconstructResult', id: request.id, outcome: outcome(stored) }]

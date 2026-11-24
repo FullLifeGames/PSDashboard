@@ -41,7 +41,7 @@ function shown(species: string, item: string): Record<'p1' | 'p2', OpponentTeamI
   return { p1: { pokemon: [] }, p2: { pokemon: [mon] } };
 }
 
-describe('a battle forme reaches the Choice item check through its base species (lane A request)', () => {
+describe('a battle forme reaches the Choice item check through its base species', () => {
   for (const format of ['gen9customgame', 'gen9doublescustomgame']) {
     const kind = format.includes('doubles') ? 'doubles' : 'singles';
     const target = format.includes('doubles') ? ' 1' : '';

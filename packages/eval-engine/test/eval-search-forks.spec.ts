@@ -111,7 +111,7 @@ describe('fork counts on the standard path', () => {
     }
   });
 
-  test('Sleep Talk cells take the seed spread even without a KO (GPL T25)', () => {
+  test('Sleep Talk cells take the seed spread even without a KO (GPL t25)', () => {
     const original = State.deserializeBattle;
     let forks = 0;
     State.deserializeBattle = ((serialized: Parameters<DeserializeFn>[0]) => {

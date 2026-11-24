@@ -56,7 +56,7 @@ const [ferrothorn] = singlesBase.p2ActiveSlots as SimPokemonInfo[];
 const earthquake = singlesBase.p1MovesBySlot[0][0];
 const groundTera = () => simState('singles', { p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Ground' }] });
 
-describe('the Tera toggle reaches the damage preview (T20, decision 18)', () => {
+describe('the Tera toggle reaches the damage preview', () => {
   test('singles: pressing the attacker Tera toggle moves the number to the calc after the click, and back', async () => {
     render(<TurnDock {...props({ simState: groundTera() })} />);
     await userEvent.click(chip('P1'));
@@ -118,7 +118,7 @@ describe('the Tera toggle reaches the damage preview (T20, decision 18)', () => 
   });
 });
 
-describe('armed toggles belong to one position (T124 point 2)', () => {
+describe('armed toggles belong to one position', () => {
   test('singles: a new position releases the armed Tera, and the number falls back to the plain attacker', async () => {
     const at = (positionKey: string) => props({ positionKey, simState: groundTera() });
     const { rerender } = render(<TurnDock {...at('r1:main:2')} />);
@@ -151,7 +151,7 @@ describe('armed toggles belong to one position (T124 point 2)', () => {
   });
 });
 
-describe('one Tera per side in doubles (T124 point 1)', () => {
+describe('one Tera per side in doubles', () => {
   const doubles = (overrides: Partial<BranchSimState> = {}) => simState('doubles', {
     p1ModifiersBySlot: [{ ...NO_MODIFIERS, teraType: 'Fire' }, { ...NO_MODIFIERS, teraType: 'Bug' }], ...overrides,
   });
@@ -185,7 +185,7 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     expect(toggle('Tera (Bug)')).toBeEnabled();
   });
 
-  test('a switch picked after arming frees the Tera: the partner takes it, and the first slot gives way (review of wave 1.5)', async () => {
+  test('a switch picked after arming frees the Tera: the partner takes it, and the first slot gives way', async () => {
     const switchPick = { kind: 'switch' as const, speciesId: 'flutter mane', pokemonName: 'Flutter Mane' };
     const { rerender } = render(<TurnDock {...props({ simState: fixture })} />);
     await userEvent.click(chip('P1A'));
@@ -212,7 +212,7 @@ describe('one Tera per side in doubles (T124 point 1)', () => {
     expect(toggle('Tera (Fire)')).toBeEnabled();
   });
 
-  test('the preview reads the picks: Protect on Rillaboom\'s partner lands both Dragon Darts on Rillaboom (T124 point 4)', async () => {
+  test('the preview reads the picks: Protect on Rillaboom\'s partner lands both Dragon Darts on Rillaboom', async () => {
     const dragapult = pokemon('Dragapult', { isActive: true, activeSlot: 0, ability: 'Clear Body', item: '', moves: [{ name: 'Dragon Darts', type: 'Dragon' }] });
     const darts = moveOption('Dragon Darts', { type: 'Dragon', requiresTarget: true, targetOptions: [targetOption('p2', 0, 'Rillaboom', 1), targetOption('p2', 1, 'Tornadus', 2)] });
     const protect = { kind: 'move' as const, moveId: 'protect', moveName: 'Protect' };

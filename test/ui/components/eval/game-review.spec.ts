@@ -44,7 +44,7 @@ describe('gradedTier: the turn card\'s own reading of "graded"', () => {
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true, sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBe('inaccuracy');
   });
 
-  test('a read that paid off speaks for an inaccuracy too, unless the side lost ground (round 89, G4d: the report lists the read)', () => {
+  test('a read that paid off speaks for an inaccuracy too, unless the side lost ground (the report lists the read)', () => {
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }))).toBeNull();
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }), true)).toBe('inaccuracy');
     expect(gradedTier(gradedP2('inaccuracy'), true)).toBe('inaccuracy');
@@ -104,7 +104,7 @@ describe('gameReview, singles', () => {
     expect(view[1].rows[1].grade).toBe('blunder');
   });
 
-  test('a row reads "played" for a choice and says no choice was shown for a body knocked out before it moved (round 89, X1a part 1)', () => {
+  test('a row reads "played" for a choice and says no choice was shown for a body knocked out before it moved', () => {
     expect(view[1].rows[0].playedText).toBe(`played Hyper Voice ${winPctText(0.06)}`);
     const standIn = rankedChoice('move 2', 'stayed in (KO’d before acting)', -0.24);
     const knockedOut = gameReview({
@@ -132,7 +132,7 @@ describe('gameReview, singles', () => {
   });
 });
 
-describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line (G4b)', () => {
+describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line', () => {
   const rowOf = (side: SideAnalysis, lines: EvalLine[], swing = 0.05) => {
     const analyses: (TurnAnalysis | null)[] = [turnAnalysis(1, { p2: side, swing })];
     const view = gameReview({ analyses, results: [withLines(lines)], playerNames: SINGLES_NAMES, doubles: false, host });
@@ -236,7 +236,7 @@ describe('the review and the report list one verdict per side', () => {
   });
 });
 
-describe('gameReview: the end of each line beside its row (G10)', () => {
+describe('gameReview: the end of each line beside its row', () => {
   test('singles: each line ends at its own value and knows whether it differs from the row the head prints', () => {
     const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
     analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
@@ -281,7 +281,7 @@ describe('gameReview: the end of each line beside its row (G10)', () => {
   });
 });
 
-describe('gameReview: the answer of each line (G11)', () => {
+describe('gameReview: the answer of each line', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
 
   test('singles: the first answer carries its rank in the result\'s ranking, a later answer does not', () => {
@@ -311,7 +311,7 @@ describe('gameReview: the answer of each line (G11)', () => {
   });
 });
 
-describe('gameReview: Hard mode (round 89, #153)', () => {
+describe('gameReview: Hard mode', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
   const hard: LinesHost = { ...host, hardMode: true };
   const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };

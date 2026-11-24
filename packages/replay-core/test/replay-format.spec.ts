@@ -68,7 +68,7 @@ describe('replay format inference', () => {
     expect(getReplayGameType(vgcReplay.log)).toBe('doubles');
   });
 
-  test('normalizes smogtours replay ids to real format ids (B13)', () => {
+  test('normalizes smogtours replay ids to real format ids', () => {
     expect(inferReplayFormatId({
       id: 'smogtours-gen3ou-56583',
       log: '|gen|3\n|tier|[Gen 3] OU',
@@ -94,7 +94,7 @@ describe('replay format inference', () => {
   // Champions branches on the Champions mod of @pkmn/mods. Singles play the mod's OU, doubles its Doubles Custom Game, which brings the
   // whole team as Doubles OU does (the reconstruction trims to the brought Pokémon itself; a VGC format's team preview would keep the
   // first four). The regulation (M-A, M-B, M-C) changes only legality, and a mod format takes no custom-rule suffix.
-  test('round 67 (T145): Champions replays branch on the Champions mod\'s formats', () => {
+  test('Champions replays branch on the Champions mod\'s formats', () => {
     expect(getBranchSimulatorFormat(vgcReplay)).toBe('gen9championsdoublescustomgame');
     for (const id of ['gen9championsvgc2026regma-2604410427', 'gen9championsvgc2026regmabo3-2603652560', 'gen9championsvgc2026regmc-2695803506',
       'gen9championsvgc2026regmbbo3-2634199230']) {
@@ -177,7 +177,7 @@ describe('replay format inference', () => {
   // A draft game that declares "Terastal Clause" ran as a Custom Game that offered Tera (gen9natdexdraft-2713067801: "Tera (Psychic)"
   // in the tray, Execute Turn terastallized). The clause rides the branch format like Sleep Clause, in singles and in doubles; the
   // simulator is the oracle for what the format then offers.
-  describe('Terastal Clause from the log (round 89, FB-1)', () => {
+  describe('Terastal Clause from the log', () => {
     const rules = '|rule|Sleep Clause Mod: Limit one foe put to sleep\n|rule|Terastal Clause: You cannot Terastallize';
     const mon = {
       name: 'Garchomp', species: 'Garchomp', item: '', ability: 'Rough Skin', moves: ['Earthquake'], nature: 'Hardy', gender: '', level: 50,
@@ -239,14 +239,14 @@ describe('replay format inference', () => {
   const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
   const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
 
-  test('splitReplayPassword parses the private-replay suffix (G22)', () => {
+  test('splitReplayPassword parses the private-replay suffix', () => {
     expect(splitReplayPassword(privateId))
       .toEqual(['gen9ou-2632003305', 'e10u50b7xrkmn0w7j5q2bac68relhlw']);
     expect(splitReplayPassword('gen9ou-2632003305')).toEqual(['gen9ou-2632003305', null]);
     expect(splitReplayPassword('smogtours-gen3ou-56583')).toEqual(['smogtours-gen3ou-56583', null]);
   });
 
-  test('a private replay id infers its real format, not its password (G22)', () => {
+  test('a private replay id infers its real format, not its password', () => {
     expect(inferReplayFormatId({ id: privateId, log: privateLog })).toBe('gen9ou');
     expect(getBranchSimulatorFormat({ id: privateId, log: privateLog })).toBe('gen9ou');
   });
@@ -338,7 +338,7 @@ function formatReaders(source: { id?: string; formatid?: string; log: string }) 
   };
 }
 
-describe('a log with Windows line endings reads like the same log with LF (T206)', () => {
+describe('a log with Windows line endings reads like the same log with LF', () => {
   test('the CRLF twin differs from the LF log in every line ending and in nothing else', () => {
     for (const log of Object.values(LOGS)) {
       const lf = lfOf(log);

@@ -188,7 +188,7 @@ describe('drift report rendering', () => {
   });
 });
 
-describe('narrative pins (round 5)', () => {
+describe('narrative pins', () => {
   test('summaryIncludes renders the summary and requires every fragment', () => {
     const a = analysis(12, 'shift');
     const ok = evaluateItem(

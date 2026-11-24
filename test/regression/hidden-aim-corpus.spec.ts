@@ -18,7 +18,7 @@ const ROWS: Row[] = [
   { id: 'gen9vgc2024regg-2154103243', turn: 2, type: 'VGC', line: /^\|move\|p2a: Iron Valiant\|Disable\|\|\[still\]/, victim: 'Farigiraf', volatile: 'disable' },
 ];
 
-describe('a failed move whose target the protocol hides lands on no one (#136)', () => {
+describe('a failed move whose target the protocol hides lands on no one', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.victim} keeps its moves`, async () => {
       const { logged, emitted, battle } = await rebuildThrough(row.id, row.turn);

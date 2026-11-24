@@ -146,7 +146,7 @@ function offersDisabled(truth: Battle, moveIds: string[]): string[] {
   return moveIds.filter(id => disabled.has(id) && choices.some(choice => choice.split(/[ ,]+/).includes(id)));
 }
 
-describe.each(SWEEP_CASES)('#106 low-PP moves, spent PP read from the log ($name)', ({ rules, mode }) => {
+describe.each(SWEEP_CASES)('low-PP moves, spent PP read from the log ($name)', ({ rules, mode }) => {
   test('the log count, the correction of a drifted rebuild and the ranking agree with the simulator', () => {
     const { moves } = sweepMoves(rules, lowPp, false);
     expect(moves.length).toBeGreaterThan(0);
@@ -170,7 +170,7 @@ describe.each(SWEEP_CASES)('#106 low-PP moves, spent PP read from the log ($name
 const GEN9: Rules = RULES.find(rules => rules.generation === 9 && rules !== CHAMPIONS)!;
 const MODS: [string, Rules][] = [['Generation 9', GEN9], ['Champions', CHAMPIONS]];
 
-describe.each(MODS)('#106 the reported scenes (%s)', (_label, rules) => {
+describe.each(MODS)('the reported scenes (%s)', (_label, rules) => {
   describe.each(['singles', 'doubles'] as const)('%s', mode => {
     test('Revival Blessing, used once, is a move at 0 PP: the rebuild that kept it at 1 loses it, and the ranking does not offer it', () => {
       const board = boardFor({ rules, mode, moves: ['revivalblessing', 'splash'] });
@@ -217,7 +217,7 @@ describe.each(MODS)('#106 the reported scenes (%s)', (_label, rules) => {
   });
 });
 
-describe.each(MODS)('#106 Pressure, Spite and Eerie Spell (%s)', (_label, rules) => {
+describe.each(MODS)('Pressure, Spite and Eerie Spell (%s)', (_label, rules) => {
   describe.each(['singles', 'doubles'] as const)('%s', mode => {
     test('Pressure charges two PP per use against its holder', () => {
       const board = boardFor({ rules, mode, moves: ['overheat', 'splash'], foe: { species: 'Zapdos', moves: ['splash'], ability: 'pressure' } });
@@ -273,7 +273,7 @@ const PRESSURE_FOES: { label: string; species: string; ability: string; perUse: 
   { label: 'a species with Pressure or Rock Head, holding Rock Head', species: 'Aerodactyl', ability: 'rockhead', perUse: 1, exact: false },
 ];
 
-describe.each(['singles', 'doubles'] as const)('#106 Pressure in Generation 3, %s', mode => {
+describe.each(['singles', 'doubles'] as const)('Pressure in Generation 3, %s', mode => {
   test.each(PRESSURE_FOES)('$label: the log\'s count holds the simulator\'s PP', ({ species, ability, perUse, exact }) => {
     const board = boardFor({ rules: GEN3, mode, moves: ['overheat', 'splash'], foe: { species, moves: ['splash'], ability } });
     expect(play(board, [1, 2].map(() => ({ p1: clickOf(mode, 1, 'normal'), p2: splashClick(mode) })))).toBe(2);
@@ -288,8 +288,8 @@ describe.each(['singles', 'doubles'] as const)('#106 Pressure in Generation 3, %
   });
 });
 
-describe('#106 a snapshot without the count changes nothing', () => {
-  test('a snapshot written before round 89 leaves the slots alone', () => {
+describe('a snapshot without the count changes nothing', () => {
+  test('a snapshot without ppUsed leaves the slots alone', () => {
     const board = boardFor({ rules: GEN9, mode: 'singles', moves: ['revivalblessing', 'splash'] });
     play(board, [{ p1: 'move 1', p2: 'move 1' }]);
     const snapshot = snapshotOf(board.battle);

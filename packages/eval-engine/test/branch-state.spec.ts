@@ -39,7 +39,7 @@ const ogerpon = (teraType: string) =>
 const terapagos = () => set('Terapagos', ['splash', 'terastarstorm', 'terablast'], { ability: 'Tera Shift', teraType: 'Stellar' });
 const garchomp = () => set('Garchomp', ['splash', 'terablast', 'earthquake'], { teraType: 'Fairy' });
 
-describe('typeUnderTera labels a move with the type after the Tera click (T182)', () => {
+describe('typeUnderTera labels a move with the type after the Tera click', () => {
   test('singles: Ogerpon-Wellspring follows the simulator\'s queue for Ivy Cudgel and Tera Blast', () => {
     const lead = [ogerpon('Water')];
     const before = movesOf(singles(SINGLES, lead, [splash('Snorlax')]));
@@ -161,7 +161,7 @@ async function liveSingles(p1: PokemonSet[], p2: PokemonSet[]): Promise<BattleSt
   return stream;
 }
 
-describe('move buttons show the type at use (T85)', () => {
+describe('move buttons show the type at use', () => {
   test('singles: Ivy Cudgel follows the mask; Pixilate and Liquid Voice follow the ability', () => {
     const battle = singles('gen9customgame',
       [set('Ogerpon-Wellspring', ['ivycudgel', 'hornleech'], { item: 'Wellspring Mask' })],
@@ -372,7 +372,7 @@ describe('singles: nothing spreads, the calc prices a screen exactly and needs n
 
 const stellar = () => set('Garchomp', ['earthquake', 'stoneedge'], { teraType: 'Stellar' });
 
-describe('the picker state carries the spent Stellar types (T124 point 5)', () => {
+describe('the picker state carries the spent Stellar types', () => {
   test('singles: none before the Tera turn, the move\'s type after it', () => {
     const battle = battleOf('gen9customgame', [stellar()], [splash('Snorlax')]);
     expect(createBranchStateFromBattle(battle, [], {}).p1ActiveSlots[0]?.stellarBoostedTypes).toEqual([]);

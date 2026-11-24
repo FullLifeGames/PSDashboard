@@ -100,7 +100,7 @@ const settled = (app: () => AppController) => {
   return !!sim && !sim.p1ForceSwitches.some(Boolean) && !app().ctx.branch.executing;
 };
 
-describe('an engine line with a pivot (C3)', () => {
+describe('an engine line with a pivot', () => {
   test('at the tip the click plays the pivot and its replacement', async () => {
     const { app } = await variationWithPivot();
     act(() => app().engine.evalView.handleEvaluate());

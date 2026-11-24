@@ -177,7 +177,7 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
     expect(problems.slice(0, 12)).toEqual([]);
   });
 
-  test('a body whose cant line stands before the foe\'s action takes the slowest move that stays ahead of it (X2)', () => {
+  test('a body whose cant line stands before the foe\'s action takes the slowest move that stays ahead of it', () => {
     const problems: string[] = [];
     let rows = 0;
     let moved = 0;
@@ -204,7 +204,7 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
     expect(problems.slice(0, 12)).toEqual([]);
   });
 
-  test('a cant line after the foe\'s action keeps the slowest stand-in, and so does a cant line with no action after it (X2)', () => {
+  test('a cant line after the foe\'s action keeps the slowest stand-in, and so does a cant line with no action after it', () => {
     const problems: string[] = [];
     for (const body of bodies()) {
       const slow = body.map(id => dex.moves.get(id).priority);

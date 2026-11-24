@@ -46,7 +46,7 @@ function ask(battle: Battle): void {
   }
 }
 
-describe.each(SCENES)('questions to the simulator leave no heap behind (round 72, T256): %s', id => {
+describe.each(SCENES)('questions to the simulator leave no heap behind: %s', id => {
   const position = loadPositions().find(candidate => candidate.id === id);
 
   test('the scene is in the fixtures', () => {
@@ -67,7 +67,7 @@ describe.each(SCENES)('questions to the simulator leave no heap behind (round 72
   }, 120_000);
 });
 
-describe('a view keeps game data as itself (round 72, T256)', () => {
+describe('a view keeps game data as itself', () => {
   const position = loadPositions().find(candidate => candidate.id === 'gen9doublesou-2660802611#2')!;
 
   test('species, format, ability and item come through the view unchanged; bodies, sides and moves do not', () => {
@@ -100,7 +100,7 @@ function entriesOf(dex: Battle['dex']): { kind: string; entry: object }[] {
   return rows;
 }
 
-describe('every Dex entry reaches a handler as itself, every copy of one as a view (round 72, T256)', () => {
+describe('every Dex entry reaches a handler as itself, every copy of one as a view', () => {
   const position = loadPositions().find(candidate => candidate.id === 'gen9doublesou-2660802611#2')!;
   const champions = loadPositions().find(candidate => candidate.id === 'gen9championsvgc2026regmbbo3-2634199230#5')!;
 

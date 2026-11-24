@@ -24,7 +24,7 @@ describe('seedChoices, doubles', () => {
     expect(seed.p1[1].choice).toEqual({ kind: 'move', moveId: 'spore', moveName: 'Spore', targetLoc: 1 });
   });
 
-  test('a move that takes no target seeds without one, whatever the log named (C3)', () => {
+  test('a move that takes no target seeds without one, whatever the log named', () => {
     // Protect lists no targets in the fixture; the log names the first foe for a spread move too.
     expect(seedChoices(doublesAt([move('Protect', { targetLoc: 1 }), null]), state).p1[0].choice)
       .toEqual({ kind: 'move', moveId: 'protect', moveName: 'Protect' });
@@ -73,7 +73,7 @@ describe('seedChoices, doubles', () => {
     expect(seed.p2[1]).toEqual({ choice: null, played: played.p2Slots![1] });
   });
 
-  test('a slot with no logged action starts empty (C2)', () => {
+  test('a slot with no logged action starts empty', () => {
     const seed = seedChoices(doublesAt([move('Flare Blitz'), null]), state);
     expect(seed.p1[1]).toEqual({ choice: null, played: null });
     expect(seed.p2).toEqual([{ choice: null, played: null }, { choice: null, played: null }]);

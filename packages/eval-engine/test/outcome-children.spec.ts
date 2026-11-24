@@ -44,7 +44,7 @@ function serializeAt(battle: Battle, hp: [number | null, number | null]): string
 const jolt = () => makeSet('Jolt', 'Jolteon', ['Thunder', 'Thunderbolt']);
 const champ = () => makeSet('Champ', 'Machamp', ['Close Combat']);
 
-describe('boundary event kill rolls (round 43)', () => {
+describe('boundary event kill rolls', () => {
   test('a sure kill counts 16 rolls, a status roll none, a range its share', () => {
     const sure = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [null, 1]));
     const battle = positionBattle(sure);
@@ -74,7 +74,7 @@ const thunderAtOne = () => createRootPosition(serializeAt(makeBattle('gen9custom
 const TREE_OPTS = { baseSeeds: [SEARCH_SEEDS[0]], forcedCap: 6 };
 const weights = (children: { key: string; weight: number }[]) => Object.fromEntries(children.map(child => [child.key, Number(child.weight.toFixed(6))]));
 
-describe('classChildren (round 43)', () => {
+describe('classChildren', () => {
   test('thunder 70: one natural draw plus one forced draw give miss and hit-kill without probe seeds', () => {
     const drawn = classChildren(thunderAtOne(), 'move thunder', 'move closecombat', TREE_OPTS)!;
     expect(drawn).not.toBeNull();

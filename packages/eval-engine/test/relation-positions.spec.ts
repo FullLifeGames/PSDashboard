@@ -35,7 +35,7 @@ function entryProblems(entry: ManifestEntry): string[] {
   return problems;
 }
 
-describe('relation fixture manifest (T240)', () => {
+describe('relation fixture manifest', () => {
   const entries = readManifest();
 
   test('lists 30 to 40 positions, none twice', () => {

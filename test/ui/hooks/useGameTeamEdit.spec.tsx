@@ -88,7 +88,7 @@ describe('useGameTeamEdit', () => {
     expect(editTeams).not.toHaveBeenCalled();
   });
 
-  describe('an edit that makes played turns invalid asks before it cuts (H14a)', () => {
+  describe('an edit that makes played turns invalid asks before it cuts', () => {
     const cutRecord = async (format: string) => ({ ...(await startedRecord(format)), turns: 5 });
     const setup = async (format: string, variationOpen: boolean, kept = 2) => {
       const record = await cutRecord(format);

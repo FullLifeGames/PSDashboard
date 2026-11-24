@@ -12,7 +12,7 @@ const ids = () => listGames().map(row => row.id);
 
 beforeEach(() => localStorage.clear());
 
-describe('the 20-game store (H15a)', () => {
+describe('the 20-game store', () => {
   test('without a played turn goes first: the oldest game with no turn leaves, not the oldest game', () => {
     // game 1 is the oldest and has turns; game 2 has none
     for (let n = 1; n <= MAX_SAVED_GAMES; n += 1) expect(saveGame(stand(n, n === 2 ? 0 : 5))).toBe(true);

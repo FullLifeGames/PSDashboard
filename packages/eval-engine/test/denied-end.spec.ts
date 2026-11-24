@@ -8,7 +8,7 @@ import { deniedEndSentence } from '../src/denied-end';
 
 const denied = { turn: 73, side: 'p2' as const, species: 'Garchomp', removes: 'Corviknight', turnsRemaining: 66 };
 
-describe('T135 point 4: a sure knock-out that never came is no failed roll', () => {
+describe('a sure knock-out that never came is no failed roll', () => {
   test('singles (573756 t73 shape at odds 1): both forms say the knock-out never came', () => {
     const winner = deniedEndSentence({ ...denied, odds: 1 }, 'p2', 'SOULWIND');
     expect(winner).toContain('Garchomp stood one sure KO from clearing the rest, but the KO never came');

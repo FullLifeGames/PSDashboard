@@ -41,7 +41,7 @@ const game = (edits: TurnAnalysis[], count = 12): TurnAnalysis[] => {
 };
 const turnsOf = (list: { turn: number }[]) => list.map(entry => entry.turn);
 
-describe('the standoff window (T285)', () => {
+describe('the standoff window', () => {
   test('twelve turns without a faint or a switch are one standoff', () => {
     expect(STANDOFF_MIN_TURNS).toBe(10);
     expect(standoffsOf(game([]))).toEqual([{ from: 1, to: 12 }]);
@@ -98,7 +98,7 @@ describe('the standoff window (T285)', () => {
   });
 });
 
-describe('the report inside a standoff (T285)', () => {
+describe('the report inside a standoff', () => {
   test('a shift and a read inside the run leave the key moments and the reads', () => {
     const report = buildGameReport(game([shift(5), readOf(8)]), names, 'p2');
     expect(turnsOf(report.keyMoments)).toEqual([]);

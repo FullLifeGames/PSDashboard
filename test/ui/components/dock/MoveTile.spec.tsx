@@ -99,7 +99,7 @@ const set = (species: string, moves: string[]): PokemonSet => ({
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
 });
 
-describe('move tile type at use (T85)', () => {
+describe('move tile type at use', () => {
   test('the snapshot picker\'s Ivy Cudgel renders as a Water tile', () => {
     const snapshot: TurnSnapshot = {
       turn: 4,

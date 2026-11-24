@@ -152,7 +152,7 @@ function stopAtPrompt(board: ReviveBoard, mode: Mode): boolean {
   return revivingSlots(simOf(battle).sides[0]).some(Boolean);
 }
 
-describe('the revive answer, every Dex move with a slot condition (#131)', () => {
+describe('the revive answer, every Dex move with a slot condition', () => {
   for (const { rules, mode, name } of SWEEP_CASES) {
     test(name, () => {
       const { moves } = sweepMoves(rules, move => !!move.slotCondition, false);
@@ -264,7 +264,7 @@ function slotCase(rules: Rules, ability: string, order: keyof typeof ORDERS): vo
   expect(enteringLines(fresh.battle)).toEqual(enteringLines(ref.battle));
 }
 
-describe('a forced replacement enters the slot the log names (#144)', () => {
+describe('a forced replacement enters the slot the log names', () => {
   // Gens 3 and 4 ask one slot per request (the simulator replaces a fainted body before the next action), so they have no pair to order.
   for (const rules of RULES.filter(entry => entry.doubles && entry.generation >= 5)) {
     test(`${rules.name}: both orders of the two bodies`, () => {
@@ -316,7 +316,7 @@ const slotAbilities = (rules: Rules) => {
 };
 const SLOT_RULES = RULES.filter(entry => entry.doubles && entry.generation >= 5).map(entry => [entry.name, entry] as const);
 
-describe('the abilities whose switch-in depends on the slot (#144)', () => {
+describe('the abilities whose switch-in depends on the slot', () => {
   test.each(SLOT_RULES)('%s', (_, rules) => {
     const { dex, abilities, disguises } = slotAbilities(rules);
     // a disguising ability seats the wrong body (an open fault), and has its own rows below
@@ -344,7 +344,7 @@ describe('the abilities whose switch-in depends on the slot (#144)', () => {
  * Dex play in every run, in both orders, in every rule set that has them. The first row pins what the path does; the `test.fails` row holds
  * the demand and turns red when the fault is fixed (then the `fails` goes).
  */
-describe('a disguised holder takes its slot (#141)', () => {
+describe('a disguised holder takes its slot', () => {
   test.each(SLOT_RULES)('%s: today the forced path seats the body whose species the log shows', (_, rules) => {
     const { disguises } = slotAbilities(rules);
     expect(disguises.length).toBeGreaterThan(0);

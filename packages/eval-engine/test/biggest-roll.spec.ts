@@ -40,7 +40,7 @@ const fireFang = sideOf({ played: choice('Fire Fang', { accuracy: 0.95, killFrac
 /** The copy's next root: Beta's score if the Fire Fang had hit (p1 view). */
 const hitOf = (score: number): RollFlip => ({ turn: 3, score });
 
-describe('the game\'s biggest roll against the winner (T284, T304)', () => {
+describe('the game\'s biggest roll against the winner', () => {
   test('573756 shape: the sentence names what a hit would have left the side that rolled and where it stood after the miss', () => {
     const report = buildGameReport(game({ chanceDelta: 0.27, rolledFor: forP1, p2: fireFang }), names, 'p2', true, new Set([3]), hitOf(-0.9));
     expect(report.summary).toContain(

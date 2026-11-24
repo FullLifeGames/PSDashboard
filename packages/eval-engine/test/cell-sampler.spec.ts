@@ -61,7 +61,7 @@ function doublesOhkoTie(): SimPosition {
   });
 }
 
-describe('singles speed tie (T146 c4)', () => {
+describe('singles speed tie', () => {
   test('ohko-tie: the root cell reads the half value of the simulator, not one draw', () => {
     const root = ohkoTie();
     const [p1, p2] = ['move closecombat', 'move closecombat'];
@@ -181,7 +181,7 @@ describe('cell-plan-missing', () => {
     return { mean, se: Math.sqrt(variance / 64 + variance / BOUNDARY_DRAW_BUDGET) };
   }
 
-  describe('missing class weight (T146 c2)', () => {
+  describe('missing class weight', () => {
     test('653785 t24: Weakness Policy turns the unreachable class into a draw mean', () => {
       const root = scene('Weakness Policy');
       const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
@@ -257,7 +257,7 @@ describe('cell-plan-tie-verify', () => {
     return createRootPosition(JSON.stringify(State.serializeBattle(battle)));
   }
 
-  describe('tied singles cell in the verify pass (T146 c6)', () => {
+  describe('tied singles cell in the verify pass', () => {
     const tied: [string, SimPosition, string, string][] = [
       ['ohko-tie', ones(set('Machamp', ['Close Combat']), set('Machamp', ['Close Combat'])), 'move closecombat', 'move closecombat'],
       ['Thunder against Tackle', ones(set('Jolteon', ['Thunder']), set('Jolteon', ['Tackle'])), 'move thunder', 'move tackle'],

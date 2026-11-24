@@ -34,7 +34,7 @@ function expectTurn(format: string, attacker: PokemonSet, defender: PokemonSet, 
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
-describe('power at use asks the simulator (round 63, T81)', () => {
+describe('power at use asks the simulator', () => {
   test('Low Kick, Grass Knot, Heavy Slam and Heat Crash price by weight as in a real turn', () => {
     for (const id of ['lowkick', 'grassknot', 'heavyslam', 'heatcrash']) {
       for (const target of ['Pikachu', 'Heatran', 'Snorlax']) {
@@ -177,7 +177,7 @@ describe('multi-hit', () => {
     return powerInTurn(battleOf(format, [attacker], [defender], seed), { p1: 'move 1', p2: 'move 1' }, id).length;
   }
 
-  describe('multi-hit and sure crits in the static (round 63, T81)', () => {
+  describe('multi-hit and sure crits in the static', () => {
     test('a fixed hit count multiplies the power: Double Hit, Surging Strikes, Triple Dive, Dragon Darts into a lone foe', () => {
       for (const id of ['doublehit', 'surgingstrikes', 'tripledive', 'dragondarts']) {
         const battle = battleOf('gen9customgame', [set('Garchomp', [id])], [splash('Snorlax')]);

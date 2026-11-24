@@ -119,7 +119,7 @@ describe('LinesSection', () => {
     spy.mockRestore();
   });
 
-  test('the dice chips carry their own class, not the timeline bar\'s line chip (its padding and margin broke the pill, FT-1)', () => {
+  test('the dice chips carry their own class, not the timeline bar\'s line chip (its padding, margin broke the pill)', () => {
     const { container } = render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={host()} />);
     const chips = screen.getAllByText(/^Speed tie: .* first \(50%\)$/);
     expect(chips.length).toBeGreaterThan(0);

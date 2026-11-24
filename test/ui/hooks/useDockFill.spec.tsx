@@ -351,7 +351,7 @@ describe('useDockFill: a queued Execute dies with its run', () => {
   });
 });
 
-describe('useDockFill: the engine\'s choice for a held slot waits until the tray closes (round 84, A7a, ruling 1a)', () => {
+describe('useDockFill: the engine\'s choice for a held slot waits until the tray closes', () => {
   const fakeOut = expect.objectContaining({ kind: 'move', moveId: 'fakeout', targetLoc: 1 });
 
   test('doubles: the held slot stays empty and its part of the joint choice is the deferred pick; the partner slot fills from the same choice', () => {
@@ -455,7 +455,7 @@ describe('useDockFill: the engine\'s choice for a held slot waits until the tray
   });
 });
 
-describe('useDockFill: a forced replacement is filled like any slot (round 84, A7a, ruling 2a)', () => {
+describe('useDockFill: a forced replacement is filled like any slot', () => {
   const heatran = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
   const fluttermane = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
   const wait = rankedChoice('wait', '(waiting)', 0);

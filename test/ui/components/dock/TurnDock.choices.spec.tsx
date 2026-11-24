@@ -211,7 +211,7 @@ describe('TurnDock.choices', () => {
   });
 
   // P1 clicked Tailwind while P2 had to replace a Chien-Pao, and the pick rode into the next turn.
-  describe('the side that does not replace takes no input (B5)', () => {
+  describe('the side that does not replace takes no input', () => {
     const down = (side: 'p1' | 'p2') => ({ [`${side}ForceSwitch`]: true, [`${side}ForceSwitches`]: [true, false] });
 
     test('singles: P2 replaces, so the P1 chip is inert and the strip says whom it waits for', () => {
@@ -425,7 +425,7 @@ describe('the states of a position', () => {
     expect(screen.queryByRole('button', { name: /Select|Execute/ })).toBeNull();
   });
 
-  test('the end of a game is the game\'s own: it names the winner as won the game, not as a variation (H4h)', () => {
+  test('the end of a game is the game\'s own: it names the winner as won the game, not as a variation', () => {
     const live = simState('singles', { ended: true, winner: 'Bene' });
     const { rerender } = render(<TurnDock {...props({ simState: live, endOfGame: { winner: 'Bene' } })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Bene won the game. Go back a turn to play it another way.');
@@ -437,7 +437,7 @@ describe('the states of a position', () => {
     expect(document.querySelector('.ps-dock-chip')).toBeNull();
   });
 
-  test.each([['singles'], ['doubles']] as const)('the end of a replay (%s) reads "<winner> won the battle!" with no dock to play (H19a)', kind => {
+  test.each([['singles'], ['doubles']] as const)('the end of a replay (%s) reads "<winner> won the battle!" with no dock to play', kind => {
     // the picker of a replay's last turn shows a position that cannot be played; the end replaces it
     const { rerender } = render(<TurnDock {...props({ simState: simState(kind), endOfGame: { winner: 'Bene', battle: true } })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Bene won the battle! Go back a turn to play it another way.');
@@ -467,7 +467,7 @@ describe('the states of a position', () => {
     expect(document.querySelectorAll('.ps-dock-chip')).toHaveLength(kind === 'doubles' ? 4 : 2);
   });
 
-  test('a game\'s dock speaks of the game, not of a replay (H4h)', () => {
+  test('a game\'s dock speaks of the game, not of a replay', () => {
     const { rerender } = render(<TurnDock {...props({ source: 'stored', isGame: true })} />);
     expect(screen.getByText('Choices from the game\'s position')).toBeInTheDocument();
     rerender(<TurnDock {...props({ source: 'snapshot', isGame: true })} />);

@@ -102,7 +102,7 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'crit']);
   });
 
-  test('the hit count die of Bullet Seed stays a row of its own, now under the Hit row (F5)', () => {
+  test('the hit count die of Bullet Seed stays a row of its own, now under the Hit row', () => {
     const bullet: DieOffer = { name: { slot: 'p1a', moveId: 'bulletseed', kind: 'hit-count' }, results: [{ hits: 2 }, { hits: 3 }, { hits: 4 }, { hits: 5 }] };
     const table = diceTable([...offersOf('bulletseed', 1), bullet]);
     expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'hit-count', 'crit']);

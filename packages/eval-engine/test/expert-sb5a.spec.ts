@@ -38,7 +38,7 @@ const mixOf = (result: EvalResult, side: 'p1' | 'p2'): [string, number][] => {
   return labels.map((label, index) => [label, mix[index]] as [string, number]).filter(([, weight]) => weight > 0.01);
 };
 
-describe('SB5a: the shared Gholdengo game, Tera off', () => {
+describe('the shared Gholdengo game, Tera off', () => {
   test('the fixture is the user\'s scene: Gholdengo at -1 Special Attack, free to switch, Glimmora in front', async () => {
     expect(scene.settings.tera).toBe(false);
     const { deserializeBattleExact } = await import('../src/forward-model');

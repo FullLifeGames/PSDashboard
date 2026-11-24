@@ -32,7 +32,7 @@ function punishing(view: SimView, candidates: string[]): string[] {
   return [...found].sort();
 }
 
-describe('ATTACKER_PUNISH_ITEMS is held to the simulator (round 72)', () => {
+describe('ATTACKER_PUNISH_ITEMS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('the items that hurt the attacker are the listed ones', () => {
       const candidates = realItems(view)

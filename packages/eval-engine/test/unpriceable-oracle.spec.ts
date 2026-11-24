@@ -38,7 +38,7 @@ const UNLISTED_WITH_REASON: string[] = [
   'skydrop', 'beakblast', 'shelltrap',
 ];
 
-describe('UNPRICEABLE_MOVE_IDS is held to the simulator (round 72)', () => {
+describe('UNPRICEABLE_MOVE_IDS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const listed = [...UNPRICEABLE_MOVE_IDS].filter(id => view.dex.moves.get(id).exists);
 

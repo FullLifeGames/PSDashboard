@@ -61,7 +61,7 @@ function usage(counts: Record<string, number>): SmogonUsageStats {
 const names = (side: { candidates: { species: string }[] }) => side.candidates.map(candidate => candidate.species);
 const weights = (side: { candidates: { weight: number }[] }) => side.candidates.map(candidate => candidate.weight);
 
-describe('replayBringList: the weights of a short side (#124)', () => {
+describe('replayBringList: the weights of a short side', () => {
   test('Battle Stadium Singles: the candidates are the preview bodies P1 never fielded, in preview order', () => {
     const list = listOf(bssLog, BSS_ID)!;
     expect(list.count).toBe(3);
@@ -117,7 +117,7 @@ const side = (fielded: string[], candidates: [string, number][], open: number) =
   fielded, open, candidates: candidates.map(([species, weight]) => ({ species, weight })),
 });
 
-describe('bringWorlds: once per game (#124)', () => {
+describe('bringWorlds: once per game', () => {
   test('a bring-all game gives no worlds', () => {
     expect(bringWorlds(null, BRING_WORLD_CAP)).toBeNull();
   });
@@ -254,7 +254,7 @@ describe('blendWorlds', () => {
     expect(blended.perSide.p1.map(entry => entry.ev)).toEqual([expect.closeTo(0.42, 12), expect.closeTo(0.12, 12), expect.closeTo(0.05, 12)]);
   });
 
-  test('lines (round 89, #104): the engine line is the line of the blended best row, from whichever world holds it; the played line stays', () => {
+  test('lines: the engine line is the line of the blended best row, from whichever world holds it; the played line stays', () => {
     const line = (side: 'p1' | 'p2', label: string, roles: EvalLine['for'], end: number): EvalLine =>
       ({ side, label, choice: label.toLowerCase(), for: roles, visits: 10, end, endFainted: 0, steps: [] });
     const heavy = result({
@@ -404,7 +404,7 @@ const SCENES = [
   },
 ];
 
-describe('#124: the blend of the worlds of a short-side game', () => {
+describe('the blend of the worlds of a short-side game', () => {
   for (const scene of SCENES) {
     test(`${scene.label}: turns ${scene.turns.join(', ')} blend three worlds with one choice string for the unknown body`, async () => {
       const replay = fixture(scene.file);

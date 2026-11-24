@@ -96,7 +96,7 @@ describe('a game link (version 2)', () => {
   });
 });
 
-describe('a link that holds a game this browser has (H7, finding 4)', () => {
+describe('a link that holds a game this browser has', () => {
   for (const family of [FAMILIES[0], FAMILIES[1]]) {
     test(`${family.name}: only a link of the very same game equals the saved one`, async () => {
       const record = await playRecord(family, 2);

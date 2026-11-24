@@ -39,7 +39,7 @@ function calmMindBoard(format: string, choices: { p1: string; p2: string }, p1: 
 const clefable = () => set('Clefable', ['calmmind', 'moonblast']);
 const alakazam = () => set('Alakazam', ['splash', 'psychic']);
 
-describe('the sweep comparison drops every stage (round 64, T125)', () => {
+describe('the sweep comparison drops every stage', () => {
   test('singles: a Calm Mind flip counts once the comparison drops the Special Defense stage too', () => {
     const { battle, clefable: mon } = calmMindBoard('gen9customgame', { p1: 'move 1', p2: 'move 1' }, [clefable()], [alakazam()]);
     const features = evalFeatures(battle);

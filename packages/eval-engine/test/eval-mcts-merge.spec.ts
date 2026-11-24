@@ -112,7 +112,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(pairs).not.toContain('Safe×X'); // both trees agree at −0.2
   });
 
-  test('boundary support cells are chance-suspect regardless of visit stats (round 7)', () => {
+  test('boundary support cells are chance-suspect regardless of visit stats', () => {
     // (Safe,X) is rich and agreeing, so the visit and spread rules trust it; as a boundary cell its K fixed outcomes cannot
     // represent an accuracy x killFraction split, so it is suspect by construction.
     const cells = [
@@ -129,7 +129,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(pairs).not.toContain('Safe×Y'); // converged, no boundary flag
   });
 
-  test('a boundary cell that ended the game still verifies; a plain ended cell stays excluded (round 7)', () => {
+  test('a boundary cell that ended the game still verifies; a plain ended cell stays excluded', () => {
     // A mutual-kill range ends the game in every drawn class, which is why the pool cannot see the other class.
     const cells = [
       { key: cellKey(0, 0), visits: 1, total: 2.0, value: 1, ended: true },
@@ -145,7 +145,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(pairs).not.toContain('Sack×X'); // starved AND ended, but not boundary — excluded as today
   });
 
-  test('verified-cell diagnostics attach sorted by (i, j) (round 7)', () => {
+  test('verified-cell diagnostics attach sorted by (i, j)', () => {
     // The pooled executor returns chunk results in completion order; an unsorted attach would be nondeterministic.
     const diag = (i: number, j: number) => ({
       i, j, p1Choice: 'Sack', p2Choice: 'Y', missing: ['miss'],
@@ -161,7 +161,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(mergeMctsTrees([t1, t2]).koDiagnostics).toBeUndefined();
   });
 
-  test('a rich, agreeing boundary cell keeps the tree continuation under the analytic split (round 32)', () => {
+  test('a rich, agreeing boundary cell keeps the tree continuation under the analytic split', () => {
     // Four trees played (Safe,X) out to about -0.96 with plenty of visits; the sampler says a 5% kill class exists (-1) and
     // the open class reads a one-ply static of +0.03. Verification must not replace depth with the static (573756 t138):
     // value = 0.05 * (-1) + 0.95 * (-0.96).
@@ -180,7 +180,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(merged.matrix!.values[0][0]).toBeGreaterThan(-0.97);
   });
 
-  test('a played-out cell without a blend keeps the pooled value; a middlegame or starved one takes the sampler (round 32)', () => {
+  test('a played-out cell without a blend keeps the pooled value; a middlegame or starved one takes the sampler', () => {
     // Depth outranks the one-ply sampler only where the pool has played the cell out (|continuation| at or beyond the depth
     // floor). A rich middlegame pool at -0.3 keeps the sampler (655336 t24/t26), as does a starved cell (one visit per tree).
     const richPlain = (offset: number, mean: number) => mk({ p1N: [30, 3], p1W: [30 * mean, 1.5], p2N: [30, 3], p2W: [30 * mean, 1.5] }, [
@@ -200,7 +200,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(mergeMctsTrees(middlegame, verified).matrix!.values[0][0]).toBeCloseTo(0.4, 10);
   });
 
-  test('a rich, agreeing boundary cell below the depth floor keeps the sampler blend (round 32)', () => {
+  test('a rich, agreeing boundary cell below the depth floor keeps the sampler blend', () => {
     // 655336 t24: 528 visits agreed at +0.52 for Dragon Claw x Return while the sampler's static read +0.08; a middlegame mean
     // over exploration is not a verdict, so the sampler stands.
     const mid = (offset: number) => mk({ p1N: [40, 2], p1W: [20, 1], p2N: [40, 2], p2W: [20, 1] }, [
@@ -212,7 +212,7 @@ describe('starved support cells are verified before the verdict', () => {
     expect(mergeMctsTrees(trees, verified).matrix!.values[0][0]).toBeCloseTo(0.08, 10);
   });
 
-  test('a rich, agreeing cell with two open classes keeps the sampler blend (round 32)', () => {
+  test('a rich, agreeing cell with two open classes keeps the sampler blend', () => {
     // Hit and miss both continue the game. Every tree may have drawn the hit, so the pool's continuation says nothing about
     // the miss class; substituting it would erase the 10% miss (655336 t23). The sampler's blend stands.
     const rich = (offset: number) => mk({ p1N: [40, 2], p1W: [-38, 1], p2N: [40, 2], p2W: [-38, 1] }, [
@@ -245,7 +245,7 @@ describe('starved support cells are verified before the verdict', () => {
   });
 });
 
-describe('tree disagreement is visit-weighted (round 33)', () => {
+describe('tree disagreement is visit-weighted', () => {
   test('a thin outlier tree does not make a cell suspect', () => {
     // 573756 t137 Recover × Struggle: three trees near −0.84 with ~200 visits, one at −0.50 with 54.
     const entries = [
@@ -283,7 +283,7 @@ describe('tree disagreement is visit-weighted (round 33)', () => {
   });
 });
 
-describe('per-class continuation (round 33)', () => {
+describe('per-class continuation', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
@@ -328,7 +328,7 @@ describe('per-class continuation (round 33)', () => {
   });
 });
 
-describe('row completion for the verify step (round 33)', () => {
+describe('row completion for the verify step', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   // Row A: (A,X) rich at 60 pooled visits, (A,Y) starved (one visit per
@@ -378,7 +378,7 @@ describe('row completion for the verify step (round 33)', () => {
   });
 });
 
-describe('trees without classes pool by visits (round 43; the per-class pool left in round 90, #173)', () => {
+describe('trees without classes pool by visits', () => {
   const options = (labels: string[]) => labels.map(labelText => ({ choice: labelText, label: labelText }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } };
   const mk = (cells: MctsTreeStats['cells']): MctsTreeStats => ({
@@ -394,7 +394,7 @@ describe('trees without classes pool by visits (round 43; the per-class pool lef
   });
 });
 
-describe('the merge weighs a keyed cell by the Dex (round 89, T322, #59)', () => {
+describe('the merge weighs a keyed cell by the Dex', () => {
   // One root cell per tree draws one outcome class; the merge weighs the classes by the plan's chances, not by the trees' visits.
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const SHAPES = {

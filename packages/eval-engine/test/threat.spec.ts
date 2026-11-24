@@ -39,7 +39,7 @@ function makeBattle(p1: PokemonSet, p2: PokemonSet): Battle {
   return battle;
 }
 
-describe('matchup memo (round 49)', () => {
+describe('matchup memo', () => {
   for (const [species, move] of [['Ting-Lu', 'ruination'], ['Raticate', 'superfang'], ['Tapu Lele', 'naturesmadness']] as const) {
     test(`${move} prices off the defender's current HP, through the memo as without it`, () => {
       const battle = makeBattle(makeSet(species, [move]), makeSet('Blissey', ['softboiled']));
@@ -126,7 +126,7 @@ describe('matchup memo (round 49)', () => {
   });
 });
 
-describe('the memo keys the move answer (round 57)', () => {
+describe('the memo keys the move answer', () => {
   const withAbility = (species: string, moves: string[], ability: string): PokemonSet => ({ ...makeSet(species, moves), ability });
 
   test('Weather Ball: a weather change misses the memo', () => {
@@ -164,7 +164,7 @@ describe('the memo keys the move answer (round 57)', () => {
   });
 });
 
-describe('the memo keys the power at use (round 63, T81)', () => {
+describe('the memo keys the power at use', () => {
   /** The change must move the answer, and the memo must answer like a fresh reading after it. */
   function missesTheMemo(attacker: PokemonSet, defender: PokemonSet, change: (user: Pokemon, target: Pokemon, battle: Battle) => void) {
     const battle = makeBattle(attacker, defender);
@@ -256,7 +256,7 @@ describe('the memo keys the power at use (round 63, T81)', () => {
  * Guard Split and Power Split write those stored stats without touching species, item, ability or the slots, so a pair asked before the split would keep its old
  * answer for the whole search. The splits run in the simulator here.
  */
-describe('the memo keys the stats a move reads off its axis (round 64, T125)', () => {
+describe('the memo keys the stats a move reads off its axis', () => {
   /** The pair is asked before the turn; after it the memo must answer like a fresh reading, and the answer must have moved. */
   function missesAfter(battle: Battle, attacker: Pokemon, defender: Pokemon, turn: { p1: string; p2: string }, moved: () => boolean) {
     const cached = threatGetter(battle, createMatchupCache());
@@ -331,7 +331,7 @@ function expectNearSim(format: string, attacker: PokemonSet[], defender: Pokemon
 
 const pair = (battle: Battle): [Pokemon, Pokemon] => [active(battle, 0), active(battle, 1)];
 
-describe('stat axes from the Dex (round 63, T81)', () => {
+describe('stat axes from the Dex', () => {
   test("Body Press deals damage off the user's Defense, Psyshock against the target's Defense, Foul Play off the target's Attack", () => {
     expectNearSim('gen9customgame', [set('Corviknight', ['bodypress'], { evs: { hp: 0, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 } })], [splash('Snorlax')], 'bodypress');
     expectNearSim('gen9customgame', [set('Espeon', ['psyshock'])], [splash('Blissey')], 'psyshock');
@@ -389,7 +389,7 @@ describe('stat axes from the Dex (round 63, T81)', () => {
     expect(hint(['irondefense', 'bodypress'])).toBeGreaterThan(0.5);
   });
 
-  test("Stored Power and Power Trip price through the stages with the simulator's callback (decision 3)", () => {
+  test("Stored Power and Power Trip price through the stages with the simulator's callback", () => {
     for (const id of ['storedpower', 'powertrip']) {
       const battle = battleOf('gen9customgame', [set('Espeon', [id])], [splash('Garchomp')]);
       const [espeon, chomp] = pair(battle);
@@ -449,7 +449,7 @@ describe('tera-statics', () => {
     expect(battle.sides[0].active[0].terastallized).toBeTruthy();
   }
 
-  describe('the defender type reads live after a Tera click (round 54)', () => {
+  describe('the defender type reads live after a Tera click', () => {
     test('Body Press hits a Ceruledge that terastallized out of Ghost', () => {
       const battle = makeBattle(
         makeSet('Ceruledge', ['splash'], { teraType: 'Fighting' }),
@@ -542,7 +542,7 @@ describe('tera-statics', () => {
 
   // STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0, Stellar 2.0 and 1.2 on the first use of a type); test/threat.stab-rules.spec.ts holds it
   // against the damage the simulator deals. Blissey takes Ground and Fire neutrally, so the ratio across the click is the STAB ratio.
-  describe('STAB follows the Tera click (round 63, T81)', () => {
+  describe('STAB follows the Tera click', () => {
     test.each([['Ground', 'earthquake', 2 / 1.5], ['Fire', 'firefang', 1.5], ['Stellar', 'earthquake', 2 / 1.5]])(
       'Tera %s moves %s by x%f', (teraType, move, ratio) => {
         const battle = makeBattle(makeSet('Garchomp', ['splash', move], { teraType }), makeSet('Blissey', ['splash']));
@@ -573,7 +573,7 @@ describe('tera-statics', () => {
     });
   });
 
-  describe('abilities that blank a move flag (round 54)', () => {
+  describe('abilities that blank a move flag', () => {
     const fraction = (attacker: PokemonSet, defender: PokemonSet, move: string): number => {
       const battle = makeBattle(attacker, defender);
       return singleMoveFraction(battle.sides[0].active[0], battle.sides[1].active[0], move, battle);

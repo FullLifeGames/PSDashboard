@@ -8,7 +8,7 @@ import { replayFixture } from '../fixtures/replay';
 const kyurem = { name: 'PBA S 2 3 & 5', species: 'Kyurem', moves: ['Ice Beam', 'Freeze-Dry'], ability: 'Pressure', item: '', nature: 'Timid', evs: {}, ivs: {} } as unknown as PokemonSet;
 const cobalion = { name: 'Steel Shadow', species: 'Cobalion', moves: ['Close Combat'], ability: 'Justified', item: '', nature: 'Jolly', evs: {}, ivs: {} } as unknown as PokemonSet;
 
-describe('pinned teams (round 77, user gate 28.10.2026: a reproduction plays with the reported sets)', () => {
+describe('pinned teams (a reproduction plays with the reported sets)', () => {
   const { replayData } = replayFixture('singles');
   const sources = (pinnedTeams: TeamBuildSources['pinnedTeams']): TeamBuildSources => ({
     teamText: '', effectiveP1Info: null, effectiveP2Info: null, usageStats: { stats: null }, setAssumptions: { assumptions: null },

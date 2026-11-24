@@ -255,7 +255,7 @@ function pickReplacements(battle: SimBattle, index: number, required: boolean[])
 const DOUBLES = 'gen9doublescustomgame';
 const LEAVING_ROWS = [[0], [1], [0, 1]];
 
-describe('B1 doubles: the bench decides how many replacements are chosen', () => {
+describe('doubles: the bench decides how many replacements are chosen', () => {
   for (const leaverIndex of [0, 1]) {
     for (const leaving of LEAVING_ROWS) {
       for (const bench of [0, 1, 2]) {
@@ -305,7 +305,7 @@ describe('B1 doubles: the bench decides how many replacements are chosen', () =>
   });
 });
 
-describe('B1 singles: a forced replacement always has a Pokémon to take', () => {
+describe('singles: a forced replacement always has a Pokémon to take', () => {
   for (const leaverIndex of [0, 1]) {
     for (const bench of [1, 2]) {
       test(`${sideId(leaverIndex)} with ${bench} in the back stays one required pick`, () => {
@@ -359,7 +359,7 @@ const singlesLog = [
   '|turn|1',
 ].join('\n');
 
-describe('battle gimmick choices (G7)', () => {
+describe('battle gimmick choices', () => {
   test('describes modifier choices in pending chips', () => {
     const tera: BranchSlotChoice = { kind: 'move', moveId: 'earthquake', moveName: 'Earthquake', modifier: 'terastallize' };
     expect(describeSlotChoice(tera)).toBe('move Earthquake (Tera)');

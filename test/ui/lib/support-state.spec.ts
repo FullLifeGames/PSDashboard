@@ -41,7 +41,7 @@ function inputs(overrides: Partial<SupportStateInputs> = {}): SupportStateInputs
   };
 }
 
-describe('the support state file (round 77, user gate 28.10.2026)', () => {
+describe('the support state file', () => {
   test('names its kind and version, keeps every choice, and drops the recorded positions', () => {
     const state = buildSupportState(inputs());
     expect(isSupportState(state)).toBe(true);
@@ -99,7 +99,7 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(supportStateProblem(old)).toBeNull();
   });
 
-  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
+  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist', () => {
     const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
     const url = new URL(issueUrl(game, 'state.json'));
     expect(url.searchParams.get('replay')).toBe('New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');

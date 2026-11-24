@@ -32,7 +32,7 @@ const set = (species: string, item: string, moves: string[]): PokemonSet => ({
   level: 100, gender: '',
 });
 
-describe('the preview marker is no reveal (point 1)', () => {
+describe('the preview marker is no reveal', () => {
   // The 0.55 Hydro Pump fraction sits inside the unboosted band and outside the Choice Specs band (choice-lock.spec.ts measures the bands).
   const teams = {
     p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
@@ -226,7 +226,7 @@ const simSet = (species: string, item: string, ability: string, moves: string[])
   evs: { hp: 84, atk: 84, def: 84, spa: 84, spd: 84, spe: 84 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
 });
 
-describe('a Frisk the simulator writes leaves the frisker\'s item alone (round 64 review)', () => {
+describe('a Frisk the simulator writes leaves the frisker\'s item alone', () => {
   const eligibility = { p1: {}, p2: {} };
 
   test('singles: Dusknoir frisks a Gourgeist that could have Frisk itself and keeps its Leftovers', () => {
@@ -311,7 +311,7 @@ const itemOf = (battle: Battle, side: 0 | 1, species: string) => bodyOf(battle, 
 const lockOf = (battle: Battle, side: 0 | 1, species: string) =>
   (bodyOf(battle, side, species)?.volatiles['choicelock'] as { move?: string } | undefined)?.move ?? null;
 
-describe('the board holds the items the protocol shows (round 64, T121)', () => {
+describe('the board holds the items the protocol shows', () => {
   test('751505: Kingambit keeps the Air Balloon the protocol announced and never popped', { timeout: 240000 }, async () => {
     // The balloon is announced as Kingambit enters at t21; at t22 Kingambit only takes Rocky Helmet chip. The sim popped it.
     const replay = fixture('smogtours-gen9ou-751505.json');
@@ -351,7 +351,7 @@ const mon = (species: string, item: string, ability: string, moves: string[], sp
   name: species, species, item, ability, moves, nature: 'Serious', evs: { ...evs, spe }, ivs, level: 100, teraType: 'Normal',
 });
 
-describe('ability hand-overs and sim-only changes on synthetic boards (round 64, T121)', () => {
+describe('ability hand-overs and sim-only changes on synthetic boards', () => {
   const magicianLog = log([
     '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU',
     '|poke|p1|Blissey, F|', '|poke|p1|Klefki, F|', '|poke|p2|Chansey, F|', '|poke|p2|Happiny, F|', '|start',
@@ -430,7 +430,7 @@ describe('ability hand-overs and sim-only changes on synthetic boards (round 64,
   });
 });
 
-describe('item lines a disguised Zoroark writes belong to the Zoroark (round 64 review)', () => {
+describe('item lines a disguised Zoroark writes belong to the Zoroark', () => {
   // The 681568 shape: Zoroark-Hisui enters as Volcarona (the last party member), Sucker Punch breaks its Focus Sash and its Illusion in one hit.
   const singlesLines = [
     '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|start',

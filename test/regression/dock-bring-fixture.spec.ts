@@ -23,7 +23,7 @@ describe('the Champions VGC fixtures and the bring lists', () => {
     expect(replayBringOnly(OPEN, parseReplayLog(OPEN.log))).toBeNull();
   });
 
-  test('the first fixture still lists the four bodies of P2 on the bench (round 88, T314): without a world the bench is per side', () => {
+  test('the first fixture still lists the four bodies of P2 on the bench: without a world the bench is per side', () => {
     const bench = replayBench(OPEN, parseReplayLog(OPEN.log));
     expect(bench?.lists.p1).toEqual([]);
     expect([...(bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);

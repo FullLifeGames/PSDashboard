@@ -30,7 +30,7 @@ const ROWS: Row[] = [
   { family: 'Champions VGC', id: 'gen9championsvgc2026regmc-2692161644', turn: 2, what: 'a boost in the second slot' },
 ];
 
-describe('the correction of a block changes nothing on a board that already matches the log (#138)', () => {
+describe('the correction of a block changes nothing on a board that already matches the log', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.family} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       observations.length = 0;

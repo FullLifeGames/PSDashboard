@@ -40,7 +40,7 @@ function handlerIds(gen: number): string[] {
     .map(move => move.id);
 }
 
-describe('power handlers of the Dex (round 63, T81)', () => {
+describe('power handlers of the Dex', () => {
   test.each(GENS)('gen %d: every move with a power handler is asked or excluded with a reason', gen => {
     const unknown = handlerIds(gen).filter(id => !POWER_MOVES.has(id) && !(id in EXCLUDED));
     expect(unknown).toEqual([]);

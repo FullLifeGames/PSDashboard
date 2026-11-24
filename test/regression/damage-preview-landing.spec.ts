@@ -60,7 +60,7 @@ function expectInside(range: DamageResult | undefined, lost: number, maxhp: numb
   expect(percent).toBeLessThanOrEqual(range!.maxPercent);
 }
 
-describe('multi-hit moves land all their hits in the preview (T96 point 1)', () => {
+describe('multi-hit moves land all their hits in the preview', () => {
   test('singles: Surging Strikes into Great Tusk', () => {
     const current = battle('gen9customgame', [set('Urshifu-Rapid-Strike', ['Surging Strikes'])], [set('Great Tusk', ['Splash'])]);
     const range = preview(current).p1.default[0][0];
@@ -98,7 +98,7 @@ function expectPlainHits(log: string) {
   expect(log).not.toContain('|-miss|');
 }
 
-describe('how a move lands in doubles (T20, Rock Slide from T96)', () => {
+describe('how a move lands in doubles (Rock Slide)', () => {
   test('Rock Slide into a lone foe hits it alone: no spread reduction', () => {
     const current = battle('gen9doublescustomgame',
       [set('Garchomp', ['Rock Slide']), set('Corviknight', ['Splash'])],
@@ -191,7 +191,7 @@ describe('how a move lands in doubles (T20, Rock Slide from T96)', () => {
 /** The numbers of a range, without the KO text (that one reads the defender's current HP). */
 const span = (result: DamageResult | undefined) => result && [result.minPercent, result.maxPercent];
 
-describe('the Tera toggle in the preview equals the calc after the click (T20, decision 18)', () => {
+describe('the Tera toggle in the preview equals the calc after the click', () => {
   test('singles: the attacker\'s and the defender\'s Tera both move the number, and both together match the executed turn', () => {
     const current = battle('gen9customgame',
       [set('Garchomp', ['Earthquake'], { teraType: 'Ground' })],
@@ -234,7 +234,7 @@ describe('the Tera toggle in the preview equals the calc after the click (T20, d
   });
 });
 
-describe('the KO text reads the defender\'s current HP (review of wave 1)', () => {
+describe('the KO text reads the defender\'s current HP', () => {
   test('singles: Earthquake into a Snorlax at 60/267 HP is a guaranteed KO, and the simulator knocks it out', () => {
     const current = battle('gen9customgame', [set('Garchomp', ['Earthquake'])], [wall('Snorlax')]);
     current.sides[1].active[0].sethp(60);
@@ -268,7 +268,7 @@ const SEEDS = Array.from({ length: 60 }, (_, index) => index + 1);
 const armored = (species: string) => set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252 }, ability: 'Battle Armor' });
 const hitCountOf = (log: string) => log.match(/\|-hitcount\|[^|]+\|(\d+)/)?.[1] ?? '0';
 
-describe('a drawn hit count lands inside the preview (T124 point 3)', () => {
+describe('a drawn hit count lands inside the preview', () => {
   test('singles: every Bullet Seed lies in the range, 2 to 5 hits and with Loaded Dice 4 or 5', () => {
     for (const item of ['', 'Loaded Dice']) {
       const counts = new Set<string>();
@@ -340,7 +340,7 @@ function dartsScene(format: 'gen8doublescustomgame' | 'gen9doublescustomgame', p
   return { row, lost, log, maxhp: current.sides[1].active[0].maxhp };
 }
 
-describe('Protect on the Dragon Darts partner (T124 point 4)', () => {
+describe('Protect on the Dragon Darts partner', () => {
   test('the partner protects: both darts hit the target, as the simulator lands them', () => {
     const { row, lost, log, maxhp } = dartsScene('gen9doublescustomgame', 'Protect');
     expect(log).toContain('|-singleturn|p2b: Blissey|Protect');
@@ -373,7 +373,7 @@ describe('Protect on the Dragon Darts partner (T124 point 4)', () => {
   });
 });
 
-describe('the Stellar first-use boost (T124 point 5)', () => {
+describe('the Stellar first-use boost', () => {
   const stellar = () => set('Garchomp', ['Earthquake', 'Smack Down'], { teraType: 'Stellar' });
   /** Plays one turn from full HP (damage never reads the target's HP) and checks every previewed row against it. */
   function turnInside(current: Battle, rows: (DamageResult | undefined)[], p1: string, p2: string) {
@@ -392,7 +392,7 @@ describe('the Stellar first-use boost (T124 point 5)', () => {
     turnInside(current, [preview(current).p1.default[0][1]], 'move smackdown', 'move splash');
   });
 
-  test('a picker state without the spent list (the snapshot path) claims no first-use boost (review of wave 1.5)', () => {
+  test('a picker state without the spent list (the snapshot path) claims no first-use boost', () => {
     const current = battle('gen9customgame', [stellar()], [armored('Snorlax')]);
     turnInside(current, [preview(current, { p1: ['Stellar'], p2: [null] }).p1.default[0][0]], 'move earthquake terastallize', 'move splash');
     const state = createBranchStateFromBattle(current as never, [], {});

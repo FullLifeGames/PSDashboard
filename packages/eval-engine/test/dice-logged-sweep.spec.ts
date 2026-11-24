@@ -45,7 +45,7 @@ const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rul
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
   { cause: 'a move that fails after its accuracy draw is logged with no target (Psycho Shift without a status to pass): the offers of the click name the accuracy die (a miss shows only below 100 percent: Gens 4 and 5)', moves: ['psychoshift'], modes: ['singles', 'doubles'], when: rules => rules.generation <= 5 },
-  { cause: 'a self effect of a spread move: one gain for the whole move from Gen 7 (`self.chance`, drawn once per move: Diamond Storm in doubles) and one per target that gave it in the secondary entry of Gen 6 (round 88, T338)', moves: ['diamondstorm'], modes: ['singles', 'doubles'] },
+  { cause: 'a self effect of a spread move: one gain for the whole move from Gen 7 (`self.chance`, drawn once per move: Diamond Storm in doubles) and one per target that gave it in the secondary entry of Gen 6', moves: ['diamondstorm'], modes: ['singles', 'doubles'] },
 ];
 
 registerKindRows(SWEEP_CASES, ['accuracy']);
@@ -130,7 +130,7 @@ describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', 
     else expect(sweepMoves(rules, multiAccuracy).moves).toEqual([]);
   });
 
-  (chain ? test : test.skip)('a move whose every hit rolls its accuracy: the hit count of the log holds on another seed (the Triple Axel row, Q4)', () => {
+  (chain ? test : test.skip)('a move whose every hit rolls its accuracy: the hit count of the log holds on another seed (the Triple Axel row)', () => {
     expect(rows().failures).toEqual([]);
   });
 });

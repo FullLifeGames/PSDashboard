@@ -83,7 +83,7 @@ function seedWithCants(scene: Scene, cants: number): number {
   throw new Error(`no seed with ${cants} cants`);
 }
 
-describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 sleep counter (%s)', (_label, shape) => {
+describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('sleep counter (%s)', (_label, shape) => {
   const scene = sleepScene(shape);
 
   test('the simulator draws a sleep of 1 to 3 cants, the range the Dex condition states', () => {
@@ -150,7 +150,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 sleep
   });
 });
 
-describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 Outrage length (%s)', (_label, shape) => {
+describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('Outrage length (%s)', (_label, shape) => {
   const scene = outrageScene(shape);
   const outrage = (turns: number): [string, string][] => Array.from({ length: turns }, (): [string, string] => ['move 1', 'move 1']);
   const fatigue = (log: string) => log.includes('|-start|p1a: Dragonite|confusion|[fatigue]');

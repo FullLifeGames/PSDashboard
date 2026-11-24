@@ -48,7 +48,7 @@ const baseInfo: OpponentTeamInfo = {
   ],
 };
 
-describe('team paste pipeline (G15)', () => {
+describe('team paste pipeline', () => {
   test('parses nature, IVs, and level lines (perfect-information import)', () => {
     const sets = parsePastedTeam([
       'Garchomp @ Loaded Dice',
@@ -162,7 +162,7 @@ describe('team paste pipeline (G15)', () => {
   });
 });
 
-describe('teamInfoOfSets (round 89, #105: a new game\'s teams)', () => {
+describe('teamInfoOfSets (a new game\'s teams)', () => {
   const paste = [
     'Zed (Garchomp) @ Rocky Helmet',
     'Ability: Rough Skin',

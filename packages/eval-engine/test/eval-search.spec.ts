@@ -496,7 +496,7 @@ describe('no-op candidate filter', () => {
     expect(cleanChoices).toContain('move reflect');
   });
 
-  test('sleep moves drop under Sleep Clause while a foe already sleeps (GPL T11)', () => {
+  test('sleep moves drop under Sleep Clause while a foe already sleeps (GPL t11)', () => {
     const sleeping = () => {
       const battle = makeBattle(
         [makeSet('V', 'Vileplume', ['Sleep Powder', 'Giga Drain', 'Sludge Bomb'], 100)],
@@ -528,7 +528,7 @@ describe('no-op candidate filter', () => {
 });
 
 describe('accuracy and random-call roll sensitivity', () => {
-  test('a game-ending cell behind an accuracy roll is never priced as certain (draft T64)', () => {
+  test('a game-ending cell behind an accuracy roll is never priced as certain (draft t64)', () => {
     // Machamp's Dynamic Punch (50%) KOs the last foe when it hits: one seed that hit prices the win as a certain +1.00; the
     // seed spread prices the miss even in single-sample sweeps.
     const risky = makeBattle(
@@ -748,7 +748,7 @@ describe('mid-charge candidates', () => {
     expect(() => advancePosition(position, candidates[0].choice, 'move seismictoss 1, move seismictoss 1', [1, 2, 3, 4])).not.toThrow();
   });
 
-  test('a locked rampage offers one bare option and plays (round 60, T94)', () => {
+  test('a locked rampage offers one bare option and plays', () => {
     const battle = makeDoublesBattle(
       [
         makeSet('Dragon', 'Garchomp', ['Outrage', 'Earthquake']),
@@ -774,7 +774,7 @@ describe('mid-charge candidates', () => {
 });
 
 describe('side-invariant repair on deserialize', () => {
-  test('pokemonLeft and isActive restore from ground truth (GPL T38/T39)', () => {
+  test('pokemonLeft and isActive restore from ground truth (GPL t38 and t39)', () => {
     const battle = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
       [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],

@@ -35,7 +35,7 @@ const ROWS: Row[] = [
 const actionsOf = (lines: string[]): string[] =>
   lines.filter(line => /^\|(?:move|switch|-terastallize|-mega)\|/.test(line) && !line.includes('[from]')).map(line => line.split('|').slice(1, 4).join('|'));
 
-describe('a refused choice keeps the rest of the side (#143)', () => {
+describe('a refused choice keeps the rest of the side', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);

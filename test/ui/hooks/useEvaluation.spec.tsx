@@ -76,7 +76,7 @@ describe('useEvaluation preferences', () => {
   });
 });
 
-describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
+describe('useEvaluation preferences: Hard mode', () => {
   test('off by default and in an old store; only a stored true restores it; the switch is stored', () => {
     expect(renderHook(() => useEvaluation()).result.current.prefs).not.toHaveProperty('hardMode');
     localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: 'yes' }));
@@ -102,7 +102,7 @@ describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
  * With VITE_FEATURE_OPPONENT_READS off, a stored `hardMode: true` is read as unset by every reader and no search request carries it.
  * One row covers both game types; the search row's position is a doubles one on purpose.
  */
-describe('useEvaluation preferences: Opponent reads my move behind its flag (round 89, ruling 49)', () => {
+describe('useEvaluation preferences: Opponent reads my move behind its flag', () => {
   beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
   afterEach(() => vi.unstubAllEnvs());
 
@@ -352,7 +352,7 @@ describe('useEvaluation whole-game sweep', () => {
     expect(result.current.graph.notice).toBeNull();
   });
 
-  test('dropGraphFrom keeps the turns before the old tip of a game and drops the tip and everything the report built on it (H4h)', async () => {
+  test('dropGraphFrom keeps the turns before the old tip of a game and drops the tip and everything the report built on it', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
     act(() => result.current.runGraphSweep(sweepParams(turn => async () => position(turn - 1))));

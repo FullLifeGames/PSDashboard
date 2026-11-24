@@ -59,7 +59,7 @@ function families(): Record<string, number[]> {
 
 const z = (share: number, p: number): number => (share - p) / Math.sqrt(p * (1 - p) / KEYS);
 
-describe('(a) a seed per cell follows the Dex chance at a fixed draw index (T324)', () => {
+describe('(a) a seed per cell follows the Dex chance at a fixed draw index', () => {
   test.each(Object.keys(families()))('%s: every die at every draw index of every slot sits inside 4.5 SE, with an RMS z near 1', family => {
     const keys = families()[family];
     const misses: string[] = [];
@@ -181,7 +181,7 @@ describe('(d) the key of a cell', () => {
 });
 
 describe('the old fixed lists live in the test module, the engine keeps their counts', () => {
-  test('the counts are the lengths of the lists the engine read before round 90', () => {
+  test('the counts are the lengths of the seed lists', () => {
     expect(BASE_DRAWS).toBe(5);
     expect(FALLBACK_DRAWS).toBe(8);
     expect(SEARCH_SEEDS).toHaveLength(BASE_DRAWS);
@@ -210,7 +210,7 @@ function battleOf(formatid: string): Battle {
 
 const expected = (raw: number, k: { k0: number; k1: number }, ff: number) => 2 / (1 + Math.exp(-(k.k0 + k.k1 * ff) * raw)) - 1;
 
-describe('the leaf prices a position with the K of its rule set (T138)', () => {
+describe('the leaf prices a position with the K of its rule set', () => {
   for (const [kind, formatid] of [['singles', 'gen9customgame'], ['doubles', 'gen9doublescustomgame']] as const) {
     test(`each rule set reads its own phase K (${kind})`, () => {
       const battle = battleOf(formatid);
@@ -287,7 +287,7 @@ describe('tree-seed', () => {
     return Math.abs(share - p) <= 4 * Math.sqrt(p * (1 - p) / n);
   }
 
-  describe('tree seeds follow the Dex chance (T323)', () => {
+  describe('tree seeds follow the Dex chance', () => {
     test('draw n falls under p in a binomial share of the streams, over all trees and in each tree', () => {
       const streams = OFFSETS.map(offset => Array.from({ length: ITERATIONS }, (_, iteration) => draws(treeSeed(iteration, offset))));
       const misses: string[] = [];

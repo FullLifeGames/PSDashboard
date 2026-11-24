@@ -31,7 +31,7 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-describe('a landed flinch or drop rules out the ability that refuses it, in the corpus (#110)', () => {
+describe('a landed flinch or drop rules out the ability that refuses it, in the corpus', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.family} ${row.id}: ${row.what} on ${row.body} rules out ${row.ability}`, async () => {
       const replay = JSON.parse(readFileSync(CORPUS(row.id), 'utf-8')) as Replay;

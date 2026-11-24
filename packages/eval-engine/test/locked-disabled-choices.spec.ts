@@ -56,7 +56,7 @@ function rejectedBySimulator(battle: Battle, offered: string[]): string[] {
   return rejected;
 }
 
-describe.each(ALL_VIEWS)('$name: a locked move whose slot Disable flagged stays a choice (round 72, T246b)', view => {
+describe.each(ALL_VIEWS)('$name: a locked move whose slot Disable flagged stays a choice', view => {
   const locked: { move: string; id: string; battle: Battle }[] = [];
   for (const move of view.dex.moves.all()) {
     if (move.isNonstandard === 'Future' || move.isNonstandard === 'CAP' || move.isZ || move.isMax || move.id === 'struggle') continue;

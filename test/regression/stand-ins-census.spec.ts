@@ -31,7 +31,7 @@ const GEN4 = parseSmogonChaosStats(JSON.parse(readFileSync('test/regression/fixt
 const rawOf = (log: string) => ({ p1: inferOpponentTeam(log, 'p1'), p2: inferOpponentTeam(log, 'p2') });
 const unchanged = (log: string) => { const raw = rawOf(log); return withStandIns(raw, log, GEN4) === raw; };
 
-describe('S3: the logs of the measurements have no short side', () => {
+describe('the logs of the measurements have no short side', () => {
   test('the feedback fixtures and the tracked replays come back as they went in', () => {
     const logs = readdirSync(FEEDBACK).filter(name => name.endsWith('.json')).map(name => readLog(`${FEEDBACK}/${name}`)).filter((log): log is string => !!log);
     logs.push(...['smogtours-gen7ou-450650'].map(name => readLog(`test/regression/fixtures/${name}.json`)!));
@@ -93,7 +93,7 @@ function speciesProblems(formatId: string, species: string[], only: string[]): s
     .filter(problem => !problemsOfSets.test(problem) && (only.some(name => problem.includes(name)) || /Clause|limited/i.test(problem)));
 }
 
-describe('S2: the stand-ins are legal in the format and distinct by base species', () => {
+describe('the stand-ins are legal in the format and distinct by base species', () => {
   const formats = ['gen1ou', 'gen2ou', 'gen2ubers', 'gen3ou', 'gen3ubers', 'gen3uu', 'gen3ru', 'gen4ou', 'gen4ubers', 'gen4uu', 'gen4doublesou']
     .filter(format => cachedStats(format));
 

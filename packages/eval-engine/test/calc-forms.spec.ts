@@ -37,7 +37,7 @@ function move(name: string, targetType = 'normal'): BranchMoveOption {
 const singlesRoot = (p1: Parameters<typeof rootOf>[1], p2: Parameters<typeof rootOf>[2], setup?: Parameters<typeof rootOf>[3]) => rootOf('gen9customgame', p1, p2, setup);
 const rolls = (root: SimPosition, p1: string, p2: string) => checkedRolls(drawTurn(root, p1, p2));
 
-describe('forms the calc does not know (T72)', () => {
+describe('forms the calc does not know', () => {
   test('the preview prices Gastrodon-East as Gastrodon, attacking and defending, singles and doubles', () => {
     for (const gameType of ['Singles', 'Doubles'] as const) {
       const into = calcSingleDamageRange(mon('Gastrodon-East'), mon('Snorlax'), move('Earth Power'), { gameType, gen: 9 });
@@ -104,7 +104,7 @@ describe('forms the calc does not know (T72)', () => {
   });
 });
 
-describe('the form map reads the Dex and the calc data, no list (T72)', () => {
+describe('the form map reads the Dex and the calc data, no list', () => {
   test('every species of gens 6 to 9 the calc refuses maps to a form of the same base species with equal base stats and types, or stays', () => {
     const holds = (gen: number, name: string) => {
       const known = calcSpecies(gen, name);

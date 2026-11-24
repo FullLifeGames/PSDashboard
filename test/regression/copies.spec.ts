@@ -70,7 +70,7 @@ const TABLE: Array<[string, string]> = [
   ['doubles log, CRLF', DOUBLES_LOG.replace(/\n/g, '\r\n')],
 ];
 
-describe('the two line-endings.ts copies (T236)', () => {
+describe('the two line-endings.ts copies', () => {
   test('the function bodies read the same', () => {
     expect(copyDifference(engineText, coreText)).toBeNull();
   });
@@ -121,7 +121,7 @@ const CHOICE_LOCK = 'eval-engine/src/choice-lock.ts';
 
 const DEFINITION = /^(?:export )?const OBSERVATION_SLACK = ([0-9.]+);$/m;
 
-describe('OBSERVATION_SLACK (#133)', () => {
+describe('OBSERVATION_SLACK', () => {
 
   test('the spread fit holds no definition of its own and imports the shared one', () => {
     const text = source(FIT);

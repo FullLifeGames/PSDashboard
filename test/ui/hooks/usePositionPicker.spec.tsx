@@ -77,7 +77,7 @@ describe('usePositionPicker', () => {
     expect(result.current.pickerStale).toBe(false);
   });
 
-  test('a stored position hands the panel the battle it was read from, for the dice offers (round 82, A7b)', async () => {
+  test('a stored position hands the panel the battle it was read from, for the dice offers', async () => {
     // The chips ask the simulator which dice a move draws, so a viewed replay position needs its battle. Only a position that
     // resolved from a recorded capture has one; the live tip has the branch's own, and a stand-in has none that belongs here.
     const stored = { turn: 12 };
@@ -98,7 +98,7 @@ describe('usePositionPicker', () => {
     expect(result.current.getPickerBattle).toBeUndefined();
   });
 
-  test('the replay\'s log goes with the battle of a main line position, and with no other (round 82, A7b)', async () => {
+  test('the replay\'s log goes with the battle of a main line position, and with no other', async () => {
     // The turn a main line position stands at is the turn the replay shows, so the chips read the log's dice from its lines. A
     // position inside a variation is no turn of the replay, and an unresolved position has no battle to read them for.
     const replayData = { log: 'the replay log' } as unknown as Args['replayData'];
@@ -123,7 +123,7 @@ describe('usePositionPicker', () => {
     expect(result.current.positionPicker).toBeNull();
   });
 
-  describe('the seed of the dock (round 84, lane A)', () => {
+  describe('the seed of the dock', () => {
     const played: PlayedAtPosition = {
       p1: { kind: 'move', name: 'Flare Blitz', targetLoc: 2 }, p2: { kind: 'move', name: 'Wood Hammer', targetLoc: 1 },
       p1Slots: [{ kind: 'move', name: 'Flare Blitz', targetLoc: 2 }, { kind: 'move', name: 'Moonblast' }],

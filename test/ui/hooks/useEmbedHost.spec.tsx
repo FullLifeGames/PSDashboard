@@ -37,7 +37,7 @@ describe('useEmbedHost', () => {
     expect(loadReplay).toHaveBeenCalledTimes(1);
   });
 
-  test('a ?game= the browser holds wins over a ?replay= beside it; one it does not hold leaves the replay link its way (round 89, #105)', async () => {
+  test('a ?game= the browser holds wins over a ?replay= beside it; one it does not hold leaves the replay link its way', async () => {
     const record = await savedRecord();
     const held = setup(`?game=${record.id}&replay=gen9ou-1`);
     expect(held.result.current).toEqual({ embed: false, requestedReplay: null, requestedTurn: null, requestedGame: record.id });
@@ -53,7 +53,7 @@ describe('useEmbedHost', () => {
     expect(loadReplay).not.toHaveBeenCalled();
   });
 
-  test('reads ?turn= beside ?replay= (round 89, lane L): a whole number only, and only for a replay link', () => {
+  test('reads ?turn= beside ?replay=: a whole number only, and only for a replay link', () => {
     expect(setup('?replay=gen9ou-1&turn=7').result.current.requestedTurn).toBe(7);
     expect(setup('?embed=1&replay=gen9doublesou-2693620934&turn=5').result.current).toEqual({
       embed: true, requestedReplay: 'gen9doublesou-2693620934', requestedTurn: 5, requestedGame: null,

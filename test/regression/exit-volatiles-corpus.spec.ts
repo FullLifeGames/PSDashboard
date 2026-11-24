@@ -19,7 +19,7 @@ const ROWS: Row[] = [
   { id: 'smogtours-gen9ou-681732', turn: 31, type: 'Gen 9 OU', side: 1, body: 'Falco Peregrinus', gone: ['taunt', 'encore', 'disable', 'torment'], what: 'a body back from the bench holds none of the four (singles, guard)' },
 ];
 
-describe('a body the game switched out returns without the volatiles its exit ended (#138)', () => {
+describe('a body the game switched out returns without the volatiles its exit ended', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { battle } = await rebuildThrough(row.id, row.turn);

@@ -84,7 +84,7 @@ function sameButStages(unfired: Battle, fired: Battle): boolean {
 
 const VGC_WITNESSES = ['focusblast', 'shadowball', 'psychic', 'crunch', 'ancientpower', 'chargebeam', 'fierydance', 'flamethrower'];
 
-describe.each(SWEEP_CASES)('$name: the fired class against the unfired class (round 88, T336)', ({ rules, mode }) => {
+describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const { moves } = sweepMoves(rules, move => boostEntries(move).length > 0, mode === 'singles');
   const witnesses = VGC_WITNESSES.map(id => dex.moves.get(id)).filter(move => move.exists && boostEntries(move).length > 0 && !moves.includes(move));
@@ -203,7 +203,7 @@ const REACTORS: Reactor[] = [
   { name: 'Simple user', on: 'user', ability: 'Simple', drop: true, gain: true },
 ];
 
-describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the reactors answer the stage change (round 88, T336)', ({ rules }) => {
+describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the reactors answer the stage change', ({ rules }) => {
   const dex = dexOfRules(rules);
   const { moves } = sweepMoves(rules, move => boostEntries(move).length > 0);
   const kinds = {
@@ -272,7 +272,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
  * Doubles: the helping rule never reaches a doubles cell (`planCellEvents` refuses a combined choice, the test above); the claim
  * is the simulator's and does not depend on the mode, so row 2 plays both.
  */
-describe('the simulator reads a move\'s hit data only while the move runs (round 89, #148)', () => {
+describe('the simulator reads a move\'s hit data only while the move runs', () => {
   const books = { calls: 0, late: [] as string[], finished: new WeakSet<object>(), label: '' };
   const patched = { get: Pokemon.prototype.getMoveHitData, clear: Battle.prototype.clearActiveMove };
   beforeAll(() => {

@@ -25,7 +25,7 @@ function lossInOneTurn(gen: number, status: 'brn' | 'psn'): { sim: number; table
   return { sim: (before - mon.hp) / mon.maxhp, table: statusResidual(mon) };
 }
 
-describe('status residual per generation (round 60, T95 prover)', () => {
+describe('status residual per generation', () => {
   for (const gen of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
     for (const status of ['brn', 'psn'] as const) {
       test(`gen ${gen} ${status}`, () => {

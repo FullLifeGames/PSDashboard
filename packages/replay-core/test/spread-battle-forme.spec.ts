@@ -89,7 +89,7 @@ function firstHit(played: Played): DamageObservation {
   return observations[0];
 }
 
-describe('formeOrigin reads the origin of a battle forme from the Dex (T190)', () => {
+describe('formeOrigin reads the origin of a battle forme from the Dex', () => {
   const dexes: [string, ReturnType<typeof Dex.forGen>][] = [['gen 9', Dex.forGen(9)], ['champions', Dex.dexes.champions as ReturnType<typeof Dex.forGen>]];
   for (const [label, dex] of dexes) {
     test(`${label}: every battle forme the Dex holds maps to a base the set can carry, every other species to none`, () => {
@@ -133,7 +133,7 @@ describe('formeOrigin reads the origin of a battle forme from the Dex (T190)', (
   });
 });
 
-describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', () => {
+describe('a hit by a Mega reaches the base set and prices at the Mega', () => {
   const ATTACKERS = [
     // Attack 84 to 130 and Tough Claws (the Mega's ability, not Blaze) on a contact move.
     { forme: 'Charizard-Mega-X', base: 'Charizard', item: 'Charizardite X', ability: 'Blaze', move: 'Dragon Claw', nature: 'Adamant', stat: 'atk' },
@@ -205,7 +205,7 @@ describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', (
   }
 });
 
-describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade (T190)', () => {
+describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade', () => {
   for (const cfg of CFGS) {
     test(`${cfg.name}: Flash Cannon after the stance change rolls at Blade's Special Attack, Shield's does not contain it`, () => {
       const sets = () => ({
@@ -236,7 +236,7 @@ describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade (T19
   }
 });
 
-describe('the observation key stays the base key (T190)', () => {
+describe('the observation key stays the base key', () => {
   test('a hit by a forme the team does not name is dropped as before; the sets name the base only', () => {
     const cfg = CFGS[0];
     const sets = { p1: [body(cfg, 'Skarmory', '', 'Sturdy', ['Brave Bird'], 'Impish', { hp: 252 })], p2: [blissey(cfg)] };
@@ -263,7 +263,7 @@ describe('the observation key stays the base key (T190)', () => {
   });
 });
 
-describe('an order read for a Mega names the base set too (T190, the Mega-Z orders of order-limit)', () => {
+describe('an order read for a Mega names the base set too (the Mega-Z orders of order-limit)', () => {
   test('Garchomp-Mega-Z moving first is a race of the Garchomp set on the Mega\'s own Speed', () => {
     const cfg = CFGS[0];
     const sets = { p1: [body(cfg, 'Garchomp', 'Garchompite Z', 'Rough Skin', ['Dragon Claw'], 'Jolly', { spe: 252 })], p2: [blissey(cfg)] };

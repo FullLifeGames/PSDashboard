@@ -19,7 +19,7 @@ const DOUBLES = header('doubles', '[Gen 9] Doubles OU');
 const observe = (...lines: string[]): DamageObservation[] =>
   parseReplayLogWithObservations([...DOUBLES, ...lines, '|turn|2'].join('\n')).observations;
 
-describe('doubles damage observations (T31)', () => {
+describe('doubles damage observations', () => {
   test('doubles log, single-target move: one observation', () => {
     const observations = observe('|move|p1a: Lax|Tackle|p2a: Chomp', '|-damage|p2a: Chomp|76/100');
     expect(observations).toHaveLength(1);
@@ -95,7 +95,7 @@ describe('doubles damage observations (T31)', () => {
     expect(mixed.map(obs => obs.defenderSpecies)).toEqual(['Gyarados']);
   });
 
-  test('a hit boosted by Helping Hand is an observation that names the Helping Hand (T86 prices it)', () => {
+  test('a hit boosted by Helping Hand is an observation that names the Helping Hand', () => {
     const helped = observe(
       '|move|p1b: Zippy|Helping Hand|p1a: Lax', '|-singleturn|p1a: Lax|Helping Hand|[of] p1b: Zippy',
       '|move|p1a: Lax|Tackle|p2a: Chomp', '|-damage|p2a: Chomp|70/100',
@@ -117,7 +117,7 @@ describe('doubles damage observations (T31)', () => {
   });
 });
 
-describe('singles logs give the observations they gave before (T31)', () => {
+describe('singles logs give the observations their fixtures hold', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
   // The fields added since 006b33c are stripped before the comparison.
   const NEW_FIELDS = [

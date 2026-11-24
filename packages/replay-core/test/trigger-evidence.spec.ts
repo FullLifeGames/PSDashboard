@@ -39,7 +39,7 @@ const ruledOut = (log: string, species: string) =>
   inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === species)?.ruledOut?.items ?? [];
 const wall = () => set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled', 'Seismic Toss']);
 
-describe('Air Balloon announces itself on entry (T130)', () => {
+describe('Air Balloon announces itself on entry', () => {
   const lead = (item: string) => set('Heatran', item, 'Flash Fire', ['Magma Storm', 'Protect']);
   const turn: [string, string] = ['move softboiled', 'move protect'];
 
@@ -91,7 +91,7 @@ describe('Air Balloon announces itself on entry (T130)', () => {
   });
 });
 
-describe('Booster Energy is spent on entry outside its weather or terrain (T130)', () => {
+describe('Booster Energy is spent on entry outside its weather or terrain', () => {
   const tusk = (item: string) => set('Great Tusk', item, 'Protosynthesis', ['Headlong Rush', 'Protect']);
   const hands = (item: string) => set('Iron Hands', item, 'Quark Drive', ['Drain Punch', 'Protect']);
 
@@ -150,7 +150,7 @@ describe('Booster Energy is spent on entry outside its weather or terrain (T130)
   });
 });
 
-describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
+describe('Eject Pack switches its holder out after a stat drop', () => {
   const intimidate = () => set('Incineroar', 'Leftovers', 'Intimidate', ['Fake Out', 'Parting Shot', 'Protect']);
   const target = (item: string) => set('Garchomp', item, 'Rough Skin', ['Protect', 'Close Combat']);
 
@@ -196,7 +196,7 @@ describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
   });
 });
 
-describe('the terrain seeds and Room Service are used when the field changes (T349)', () => {
+describe('the terrain seeds and Room Service are used when the field changes', () => {
   const surge = (item: string) => set('Tapu Koko', item, 'Electric Surge', ['Thunderbolt', 'Protect']);
   const turn: [string, string] = ['move softboiled', 'move protect'];
   const doublesTurn: [string, string] = ['move softboiled, move softboiled', 'move protect, move protect'];

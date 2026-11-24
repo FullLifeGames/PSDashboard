@@ -34,7 +34,7 @@ describe('bank universe', () => {
     expect(holdoutTurns(4)).toEqual([2, 3]);
   });
 
-  test('round 66: each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
+  test('each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
     // The reference rule clamps the early point to turn 2, which a game of five or six snapshots reads as mid.
     const round65 = (maxTurn: number) => [...new Set([1 / 6, 1 / 2, 5 / 6]
       .map(at => Math.min(maxTurn - 1, Math.max(2, Math.round(at * maxTurn)))))].filter(turn => turn < maxTurn);

@@ -55,7 +55,7 @@ test('classifyDeviation implements the chess rules', () => {
   expect(classifyDeviation(span, at(16, 'main'))).toBe('replace');
 });
 
-test('a variation-line position the variation does not cover is the main line: a move there replaces (round 77)', () => {
+test('a variation-line position the variation does not cover is the main line: a move there replaces', () => {
   // A one-turn variation at turn 5, then ▶ to turn 28. The line stayed 'variation' (the intent is
   // sticky across uncovered turns), the screen showed the main line, and the move there extended the variation instead: its
   // Brave Bird ran at the variation's tip against Kyurem ("PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird."). Before the

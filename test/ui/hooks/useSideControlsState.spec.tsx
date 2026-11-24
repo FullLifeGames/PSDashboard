@@ -74,7 +74,7 @@ describe('useGimmickToggles', () => {
     expect(result.current.gimmickFor('p2', 1).modifier).toBeNull();
   });
 
-  test('teraBySlot names the type of every armed Tera toggle and nothing else (decision 18)', () => {
+  test('teraBySlot names the type of every armed Tera toggle and nothing else', () => {
     const steel = { ...withTera, teraType: 'Steel' };
     const { result } = renderToggles({ p1: [withTera, withMega], p2: [steel] });
     expect(result.current.teraBySlot).toEqual({ p1: [null, null], p2: [null] });
@@ -84,7 +84,7 @@ describe('useGimmickToggles', () => {
     expect(result.current.teraBySlot).toEqual({ p1: ['Fire', null], p2: ['Steel'] });
   });
 
-  test('armed toggles belong to one position: a new position key starts every slot unarmed (T124 point 2)', () => {
+  test('armed toggles belong to one position: a new position key starts every slot unarmed', () => {
     const sides = { p1: [withTera, withMega], p2: [withTera] };
     const hook = renderHook(({ key }: { key: string }) => useGimmickToggles(sides.p1, sides.p2, key), { initialProps: { key: 'r1:main:2' } });
     act(() => hook.result.current.gimmickFor('p1', 0).toggle('terastallize'));
@@ -102,7 +102,7 @@ describe('useGimmickToggles', () => {
     expect(hook.result.current.gimmickFor('p1', 0).modifier).toBeNull();
   });
 
-  test('a gimmick one slot holds, armed or in its pending choice, is out of reach for the side\'s other slots (T124 point 1)', () => {
+  test('a gimmick one slot holds, armed or in its pending choice, is out of reach for the side\'s other slots', () => {
     const { result } = renderToggles({ p1: [withTera, withTera], p2: [withTera] });
     act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
     expect(result.current.gimmickFor('p1', 1).heldBy).toEqual({ terastallize: 'P1A' });
@@ -119,7 +119,7 @@ describe('useGimmickToggles', () => {
     expect(pending.result.current.gimmickFor('p1', 0).modifier).toBeNull();
   });
 
-  test('a slot with a pick holds only what the pick carries: a switch or a plain move frees its armed Tera for the partner (review of wave 1.5)', () => {
+  test('a slot with a pick holds only what the pick carries: a switch or a plain move frees its armed Tera for the partner', () => {
     const switchPick = { kind: 'switch' as const, speciesId: 'rillaboom', pokemonName: 'Rillaboom' };
     const plainMove = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
     for (const pick of [switchPick, plainMove]) {
@@ -151,7 +151,7 @@ describe('useGimmickToggles', () => {
 });
 
 /** With a pick standing on a slot (the seed or the user's), the gimmick toggle edits that pick instead of arming the next click; a slot without a move pick keeps the armed toggle. */
-describe('useGimmickToggles on a slot with a move pick (round 84, C4)', () => {
+describe('useGimmickToggles on a slot with a move pick', () => {
   const flare = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
   const spore = { kind: 'move' as const, moveId: 'spore', moveName: 'Spore' };
   const switchPick = { kind: 'switch' as const, speciesId: 'rillaboom', pokemonName: 'Rillaboom' };
@@ -334,7 +334,7 @@ function commandFor(current: Battle, state: BranchSimState, gimmicks: { modifier
   return resolved.command;
 }
 
-describe('a side arms each gimmick once, as the simulator takes it (T124 point 1)', () => {
+describe('a side arms each gimmick once, as the simulator takes it', () => {
   for (const { kind, format, p1 } of SCENES) {
     test(`${kind}: the simulator rejects it on both slots and accepts the command the panel builds`, () => {
       const state = createBranchStateFromBattle(battle(format, p1, walls) as never, [], {});

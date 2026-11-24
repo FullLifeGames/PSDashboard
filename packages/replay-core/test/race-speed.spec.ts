@@ -40,7 +40,7 @@ function calcRaceSpeed(gen: number, species: string, spread: { nature: string; e
   return getFinalSpeed(generation, pokemon, field, field.attackerSide);
 }
 
-describe('a Choice Scarf races at the Speed the simulator rounds (T122 point 3)', () => {
+describe('a Choice Scarf races at the Speed the simulator rounds', () => {
   test('the Scarf Speed equals @smogon/calc on every Speed a few species reach, gens 4 to 9', () => {
     for (const gen of [4, 5, 6, 7, 8, 9]) {
       for (const species of ['Heatran', 'Garchomp', 'Shuckle', 'Ninjask']) {
@@ -107,7 +107,7 @@ const movers = (battle: Battle, turn: number) => {
 const ordersOf = (battle: Battle, turn: number) => parseReplayLogWithObservations(replayLog(battle)).speedOrders
   .filter(order => order.turn === turn).map(order => `${order.firstSide} ${order.firstSpecies} > ${order.secondSide} ${order.secondSpecies}`);
 
-describe('a battle forme races with the Speed the simulator gave it that turn (T122 point 5)', () => {
+describe('a battle forme races with the Speed the simulator gave it that turn', () => {
   // Lopunny 339 (Jolly 252) is slower than Latias 350 (Timid 252); Lopunny-Mega 405 is faster.
   const lopunny = mon('Lopunny', 'Jolly', evs(0, 0, 0, 0, 0, 252), 'Lopunnite', ['Splash']);
   const latias = mon('Latias', 'Timid', evs(0, 0, 0, 0, 0, 252), 'Leftovers', ['Splash']);
@@ -138,7 +138,7 @@ describe('a battle forme races with the Speed the simulator gave it that turn (T
   });
 });
 
-describe('a transformed mover races on its target\'s Speed with its own item (T122 point 6)', () => {
+describe('a transformed mover races on its target\'s Speed with its own item', () => {
   const copiedOf = (log: string, turn: number) => parseReplayLogWithObservations(log).speedOrders
     .filter(order => order.turn === turn)
     .map(order => `${order.firstSide} ${order.firstSpecies}${order.firstCopied ? ` as ${order.firstCopied.side} ${order.firstCopied.species}` : ''}` +
@@ -192,7 +192,7 @@ describe('a transformed mover races on its target\'s Speed with its own item (T1
   }
 });
 
-describe('only the races that cannot end strict may tie (T122 point 2)', () => {
+describe('only the races that cannot end strict may tie', () => {
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`a forced tie leaves the component's other races strict (${formatid})`, () => {
       // The known Heatran (216) moved before Garchomp, whose slowest Speed is 216: that race can only tie.
@@ -212,7 +212,7 @@ describe('only the races that cannot end strict may tie (T122 point 2)', () => {
   }
 });
 
-describe('a Speed IV below 31 only when no other Speed keeps a seen order (T122 point 4, decision 28)', () => {
+describe('a Speed IV below 31 only when no other Speed keeps a seen order', () => {
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`the highest IV that keeps the order (${formatid})`, () => {
       // The known Ting-Lu (126) moved before Incineroar, whose slowest Speed at IV 31 is 140 (Sassy, 0 EVs).
@@ -235,7 +235,7 @@ describe('a Speed IV below 31 only when no other Speed keeps a seen order (T122 
   }
 });
 
-describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Burst (T122 review)', () => {
+describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Burst', () => {
   const sorted = (orders: string[]) => [...orders].sort();
 
   test('doubles: Ally Switch moves the slots, so a later Mega Evolution names the right Pokemon (Gen 6)', () => {

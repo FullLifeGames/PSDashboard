@@ -20,7 +20,7 @@ const doubles: Offered = {
 const earthquake = { kind: 'move' as const, moveId: 'earthquake', moveName: 'Earthquake' };
 const move1 = (name: string) => ({ kind: 'move' as const, moveId: name.toLowerCase().replace(/[^a-z0-9]/g, ''), moveName: name });
 
-describe('dropStaleDraft (round 77, D2)', () => {
+describe('dropStaleDraft', () => {
   test('singles: a move the edit removed is dropped, the other pick stays', () => {
     const draft = { p1: [earthquake], p2: [move1('Roost')] };
     expect(dropStaleDraft(draft, singles)).toEqual({ p1: [null], p2: [move1('Roost')] });

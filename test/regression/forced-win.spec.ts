@@ -54,7 +54,7 @@ const EXPECTED: Record<string, Expected> = {
   'doubles-1v2-spread': { side: 'p1', mass: null },
 };
 
-describe('forced-win prover over the synthetic endgames (round 35)', () => {
+describe('forced-win prover over the synthetic endgames', () => {
   for (const fixture of ENDGAME_FIXTURES) {
     const expected = EXPECTED[fixture.name];
     const title = expected ? (expected.mass === null ? 'no proof' : `mass ${expected.mass}`) : 'unlisted';
@@ -76,7 +76,7 @@ describe('forced-win prover over the synthetic endgames (round 35)', () => {
   }
 });
 
-describe('the prover with room (round 89, ruling 22)', () => {
+describe('the prover with room', () => {
   // The game's win share is 0.999941 (5,000 simulated games: Gengar wins all, the loss needs eight misses in a row, one game in
   // 17,000). A proof is a lower bound under the class model, so it reads between 0.99 and the game's number; with 5,000 cells all
   // 20 salts of the cell key prove it (0.9966 to 0.9999) in 12 turns.

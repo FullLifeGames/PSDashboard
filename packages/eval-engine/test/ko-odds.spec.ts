@@ -191,7 +191,7 @@ const singles = (hp: number) => rootOf('gen9customgame',
 
 const ogerpon = (): PokemonSet => set('Ogerpon-Hearthflame', ['Ivy Cudgel', 'Protect'], { ability: 'Mold Breaker', item: 'Hearthflame Mask', teraType: 'Fire' });
 
-describe('Tera options price their odds on the Tera body (T84)', () => {
+describe('Tera options price their odds on the Tera body', () => {
   test('singles: the Tera Blast Tera option reads the Fire body, as the simulator\'s click makes it', () => {
     const choice = 'move terablast terastallize';
     const root = rootWithOdds(singles, choice);

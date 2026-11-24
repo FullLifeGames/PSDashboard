@@ -10,7 +10,7 @@ function wired(engines: EngineEntry[], selected = engines[0]) {
   return { engines, selected, running: false, onSelect: vi.fn(), onAdd: vi.fn(), onRemove: vi.fn() };
 }
 
-describe('the engine controls (round 77, user gate 28.10.2026: the dropdown appears once another engine is integrated)', () => {
+describe('the engine controls (the dropdown appears once another engine is integrated)', () => {
   test('with the own engine alone there is no dropdown, only the way to add one', () => {
     render(<EngineControls {...wired([BUILTIN_ENGINE])} />);
     expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();

@@ -494,7 +494,7 @@ describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', (
     expect(summary).not.toContain('No single mistake');
   });
 
-  test('a shift turn names the hindsight read against the actual click (round 13)', () => {
+  test('a shift turn names the hindsight read against the actual click', () => {
     const wide: EvalResult = {
       score: 0.0, interval: 0.3, depthCompleted: 1,
       perSide: {
@@ -707,7 +707,7 @@ describe('forced-mix dedup against the conditional', () => {
   });
 });
 
-describe('odds grounding (round 6)', () => {
+describe('odds grounding', () => {
   test('a punished mistake grounds the played move\'s kill odds', () => {
     const punished: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
@@ -796,7 +796,7 @@ describe('odds grounding (round 6)', () => {
   });
 });
 
-describe('streak clauses (round 6)', () => {
+describe('streak clauses', () => {
   const base: TurnAnalysis = {
     turn: 30, scoreBefore: 0.1, scoreAfter: 0.1, swing: 0,
     playedOutcome: null, decisionDelta: null, chanceDelta: null,
@@ -878,7 +878,7 @@ describe('round-13 narrative: entry-is-profit', () => {
     expect(summary).not.toContain('no live answer');
   });
 
-  test('a switch into a held mon names the standing holder (round 14)', () => {
+  test('a switch into a held mon names the standing holder', () => {
     // 648453 t13: the bench can only sacrifice into Lopunny; the sentence names the one standing mon still holding the pair.
     const result: EvalResult = {
       score: 0.0, interval: 0.1, depthCompleted: 1,
@@ -905,7 +905,7 @@ describe('round-13 narrative: entry-is-profit', () => {
   });
 });
 
-describe('the decided sweep in prose (round 15)', () => {
+describe('the decided sweep in prose', () => {
   // 573756 t134-138: the announcement names the sweeper once, and on decided turns a chance swing toward the decided side
   // reads as the game resolving, not as luck.
   const decidedResult = (score = -0.75): EvalResult => ({ // a bar that backs the sweep

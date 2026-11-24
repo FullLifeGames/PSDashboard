@@ -48,7 +48,7 @@ describe('the label of a forced die', () => {
     expect(dieLabel({ name: name('accuracy', { hit: 4 }), result: { happens: false } })).toBe('tackle hit 4: misses');
   });
 
-  test('the die of a random target and the die of a drag name the body the answer picks (round 89, #137)', () => {
+  test('the die of a random target and the die of a drag name the body the answer picks', () => {
     expect(label({ name: { slot: 'p1a', moveId: 'thrash', kind: 'random-target' }, result: { option: 'p2b' } })).toBe('Move thrash: aims at Body p2b');
     expect(label({ name: { slot: 'p2a', moveId: '', kind: 'drag' }, result: { option: 'Chansey' } })).toBe('Body p2a: dragged out for Chansey');
   });

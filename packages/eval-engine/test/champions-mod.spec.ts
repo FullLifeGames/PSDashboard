@@ -54,7 +54,7 @@ function simulatorStats(formatid: string, size: number, sets: PokemonSet[]): Rec
   return out;
 }
 
-describe('Champions battles run on the Champions mod (T145)', () => {
+describe('Champions battles run on the Champions mod', () => {
   test('after loadSimMods a Champions format resolves to the Champions mod, once', async () => {
     for (const { id } of Object.values(FORMATS)) {
       const format = Dex.formats.get(id);

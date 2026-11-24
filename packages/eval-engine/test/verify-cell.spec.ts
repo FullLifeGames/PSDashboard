@@ -81,7 +81,7 @@ const cheapFor = (root: ReturnType<typeof createRootPosition>): CheapDeepening |
   };
 };
 
-describe('the merge mixes per-class depth (round 63, T16)', () => {
+describe('the merge mixes per-class depth', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   // (0,1) is starved in every tree: no pool, the verified value stands alone.
@@ -114,7 +114,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     });
   }
 
-  test('a deep class pool still outranks the class one ply deeper (round 33)', () => {
+  test('a deep class pool still outranks the class one ply deeper', () => {
     const pooled = (visits: number, mean: number, classKey: string) => ({
       key: cellKey(0, 0), visits, total: mean * (visits + 1) - (-0.1), value: -0.1, ended: false, classKey,
     });
@@ -135,7 +135,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     expect(merged.matrix!.values[0][0]).toBeCloseTo(0.8 * -0.96 + 0.2 * 0.3, 1);
   });
 
-  test('in an endgame a rich, agreeing pool keeps its depth below the floor (round 77, T267)', () => {
+  test('in an endgame a rich, agreeing pool keeps its depth below the floor', () => {
     // Draft 2058494320, variation turn 63, Mienshao (Scarf, locked into Close Combat) and Kyurem
     // against Dragapult and Muk-Alola. The trees played Kyurem's switch into a Specs attack out to about −0.7 over 400
     // to 650 visits; the one-ply sampler read +0.75, the 0.9 floor gave the sampler the cells, and the ranking advised
@@ -164,7 +164,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
       .toBeCloseTo(0.9 * 0.75 + 0.1 * 0.5, 12);
   });
 
-  test('in an endgame a rich, agreeing plain cell keeps its depth below the floor too (round 77, T267)', () => {
+  test('in an endgame a rich, agreeing plain cell keeps its depth below the floor too', () => {
     const plain = (visits: number, mean: number) => ({ key: cellKey(0, 0), visits, total: mean * (visits + 1) - 0.4, value: 0.4, ended: false });
     const value: EvalCellValue = { i: 0, j: 0, value: 0.6, ended: false, deepened: 0.62 };
     const atLiving = (p1: number, p2: number) => mergeMctsTrees(
@@ -175,7 +175,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
     expect(atLiving(2, 4)).toBeCloseTo(0.62, 12);
   });
 
-  test('in an endgame a thin pool below the floor leaves the cell to the sampler (round 77, T267)', () => {
+  test('in an endgame a thin pool below the floor leaves the cell to the sampler', () => {
     // Champions VGC 2628166702 turn 7, the last pair: the trees visited Dark Pulse into Protect 24 times (8, 6, 5, 5)
     // and read about 0.1, the sampler one ply deeper read the win the prover proves. A value short of a decided game
     // needs a pool that played the cell out (400 to 650 visits); 24 visits stay with the sampler.
@@ -189,7 +189,7 @@ describe('the merge mixes per-class depth (round 63, T16)', () => {
   });
 });
 
-describe('the deepening rule (round 63, T16)', () => {
+describe('the deepening rule', () => {
   const child = (name: string) => ({ serialized: name }) as unknown as SimPosition;
   const step: Record<string, number> = { a: 0.2, b: -0.1, c: 0.4, d: 1 };
 
@@ -233,7 +233,7 @@ describe('the deepening rule (round 63, T16)', () => {
   });
 });
 
-describe('the verify executor deepens per class (round 63, T16)', () => {
+describe('the verify executor deepens per class', () => {
   test('a singles boundary cell: every open class carries its states one ply deeper, its first draw for its own state', { timeout: 60_000 }, async () => {
     const root = focusBlastRoot();
     const plan = planCellEvents(positionBattle(root), ...FOCUS);
@@ -291,7 +291,7 @@ describe('the verify executor deepens per class (round 63, T16)', () => {
   });
 });
 
-describe('a cell without a plan draws more and deepens each outcome (round 63, T16)', () => {
+describe('a cell without a plan draws more and deepens each outcome', () => {
   const checkPlain = async (root: ReturnType<typeof createRootPosition>, p1: string, p2: string, cover: number) => {
     const sample = sampleCell(root, countFainted(positionBattle(root)), p1, p2, 3, createMatchupCache(), true, VERIFY_PLAIN_DRAWS);
     const groups = sample.outcomes!;
@@ -523,7 +523,7 @@ describe('verify-spread', () => {
   const shareOf = (children: SimPosition[], f: (child: SimPosition) => number) =>
     children.reduce((sum, child) => sum + f(child), 0) / children.length;
 
-  describe('the state a draw leaves (round 64, T119)', () => {
+  describe('the state a draw leaves', () => {
     test('the sleep counter, the burn and the stat stages tell draws apart; HP does not', () => {
       const slept = naturalDraws(hypnosisRoot(), 'move hypnosis', 'move curse', log => !log.some(line => line.startsWith('|-miss|')));
       const counters = new Set(slept.map(draw => target(draw.child).statusState.time));
@@ -543,7 +543,7 @@ describe('verify-spread', () => {
     });
   });
 
-  describe('hidden lengths go one ply deeper one by one (round 64, T119)', () => {
+  describe('hidden lengths go one ply deeper one by one', () => {
     test('singles: the hit class of Hypnosis goes deeper through every sleep counter, mixed by its share', () => {
       const root = hypnosisRoot();
       const plan = planCellEvents(positionBattle(root), 'move hypnosis', 'move curse');
@@ -585,7 +585,7 @@ describe('verify-spread', () => {
     });
   });
 
-  describe('secondary effects inside a class (round 64, T119)', () => {
+  describe('secondary effects inside a class', () => {
     // The 30 percent burn of Steam Eruption is an outcome class of its own (`hit-nokill+brn`): the class of the unburned hit goes deeper unburned and the burned hit burned.
     test('singles: the burn of Steam Eruption is a class of its own, so the unburned hit goes deeper unburned and the burned hit burned', () => {
       const root = steamRoot();
@@ -615,7 +615,7 @@ describe('verify-spread', () => {
     });
   });
 
-  describe('a cell whose draws leave one state prices as before (round 64, T119)', () => {
+  describe('a cell whose draws leave one state prices from its first draw', () => {
     test('singles and doubles: Curse against Curse, value and depth from the first draw', async () => {
       for (const [root, p1, p2] of [
         [singlesRoot([WALL(), BACK()], [WALL(), BACK()]), 'move curse', 'move curse'],

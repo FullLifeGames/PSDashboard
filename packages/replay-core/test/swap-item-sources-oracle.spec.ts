@@ -79,7 +79,7 @@ function observedSources(view: SimView, emitter: Emitter): string[] {
   return [...seen].sort();
 }
 
-describe('SWAP_ITEM_SOURCES is held to the simulator (round 72)', () => {
+describe('SWAP_ITEM_SOURCES is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const writers = emitters(view);
 

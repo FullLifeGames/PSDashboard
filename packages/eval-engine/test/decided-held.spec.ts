@@ -13,7 +13,7 @@ import { replayRuleset } from '@fulllifegames/replay-core';
 const profile = (side: 'p1' | 'p2', species: string): UnansweredProfile =>
   ({ p1: [], p2: [], decided: { side, species } });
 
-describe('the decided sweep needs the search\'s key (round 50)', () => {
+describe('the decided sweep needs the search\'s key', () => {
   test('a sweep named against the bar is not held (749828 t23: p1 named, the bar at -1)', () => {
     expect(heldDecided({ score: -1, unanswered: profile('p1', 'Primarina') })).toBeUndefined();
   });
@@ -34,7 +34,7 @@ describe('the decided sweep needs the search\'s key (round 50)', () => {
   });
 });
 
-describe('the held sweep at the analysis layer and in prose (round 50)', () => {
+describe('the held sweep at the analysis layer and in prose', () => {
   const names: [string, string] = ['Alpha', 'Beta'];
   const ranked = (choice: string, label: string, ev: number): RankedChoice =>
     ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
@@ -93,7 +93,7 @@ async function search(position: BankPosition) {
     : searchPosition(position.serialized, { ...settings, depth: auto.depth, samples: auto.samples });
 }
 
-describe('the decided sweep needs the bar on real positions (round 50)', () => {
+describe('the decided sweep needs the bar on real positions', () => {
   test('the bench searches each fixture under the rule set of its replay', () => {
     expect(settingsFor(load('gen9vgc2026regi-2629703929-t6.json')).ruleset).toBe('vgc');
     expect(settingsFor(load('gen9doublesou-2663093831-t12.json')).ruleset).toBe('standard');

@@ -152,7 +152,7 @@ describe('doubles-damage-fit', () => {
   const spreadOf = (set: PokemonSet) => ({ evs: set.evs as PokemonEvs, nature: set.nature });
   const keyOfSet = (side: 'p1' | 'p2', set: PokemonSet) => keyOf(side, set.species);
 
-  describe('the solver prices doubles hits like the simulator (T31)', () => {
+  describe('the solver prices doubles hits like the simulator', () => {
     for (const cfg of CFGS) {
       for (const scene of SCENES) {
         const skipVgc = cfg.id.includes('vgc') && scene === SCENES[4];
@@ -235,7 +235,7 @@ describe('doubles-damage-fit', () => {
     });
   });
 
-  describe('the field and the defender of an observation (T31)', () => {
+  describe('the field and the defender of an observation', () => {
     const base: DamageObservation = {
       attackerSpecies: 'Garchomp', defenderSpecies: 'Blissey', attackerSide: 'p1', moveId: 'earthquake', observedFraction: 0.2, lethal: false,
       attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: ['reflect'], weather: 'raindance',
@@ -346,7 +346,7 @@ function containsDamage(ctx: SolveContext, scene: FieldScene, obs: ReadObservati
   return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
 }
 
-describe('the Ruin abilities and the Grassy Terrain are in the rolls of a hit (T86 check)', () => {
+describe('the Ruin abilities and the Grassy Terrain are in the rolls of a hit', () => {
   for (const scene of [RUIN_ON_THE_PARTNER, RUIN_ON_THE_DEFENDER, RUIN_ON_THE_ATTACKER, GRASSY_HIT]) {
     for (const kind of scene.kinds) {
       test(`${kind}: ${scene.title}`, () => {
@@ -394,7 +394,7 @@ describe('the Ruin abilities and the Grassy Terrain are in the rolls of a hit (T
   });
 });
 
-describe('the solver keeps the body the pin hit measures (T86 check)', () => {
+describe('the solver keeps the body the pin hit measures', () => {
   test('doubles: Calyrex-Ice keeps its HP under the logged field, and the prior misses the hit under the blind one', () => {
     const doubles = true;
     const kind: Kind = 'doubles';
@@ -541,7 +541,7 @@ describe('spread-item-at-hit', () => {
   const ITEM_FIELDS = ['attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged'] as const;
   const itemFields = (obs: DamageObservation) => Object.fromEntries(ITEM_FIELDS.map(field => [field, obs[field]]));
 
-  describe('the item a hit is priced with is the item at the hit (T191)', () => {
+  describe('the item a hit is priced with is the item at the hit', () => {
     // Champions plays the popped Air Balloon of 2691843318 and 2694103115; the other scenes use moves and items its generation lacks.
     for (const kind of KINDS) {
       for (const setup of kind.startsWith('champions') ? [BALLOON] : [BALLOON, KNOCK_OFF, BERRY, TRICK]) {
@@ -586,7 +586,7 @@ describe('spread-item-at-hit', () => {
     }
   });
 
-  describe('the observation names the item at the hit (T191)', () => {
+  describe('the observation names the item at the hit', () => {
     const observationsOf = (setup: Setup, kind: Kind) => hitsOf(scenesOf(kind, setup, 1)[0], setup);
 
     for (const kind of KINDS) {

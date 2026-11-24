@@ -82,7 +82,7 @@ const snapshot: TurnSnapshot = {
   log: [],
 };
 
-describe('snapshot picker Tera toggle (T136 point 2)', () => {
+describe('snapshot picker Tera toggle', () => {
   test('the fast picker shows the Tera toggle of the guessed set', async () => {
     const state = pickerStateFromSnapshot(snapshot, [set('Garchomp', ['Earthquake'], 'Fairy'), set('Heatran', ['Magma Storm'])], [set('Zapdos', ['Roost'])], 9, null, { format: 'gen9ou' });
     render(<TurnDock {...props({ simState: state, source: 'snapshot' })} />);

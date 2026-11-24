@@ -449,7 +449,7 @@ describe('predictive-read', () => {
   });
 });
 
-describe('T18 point 6: the read clause names the click with a verb that fits the odds', () => {
+describe('the read clause names the click with a verb that fits the odds', () => {
   /** A gamble that paid off (Hydro Pump gave up a mistake-sized floor and landed), with the given odds on the click. */
   const paidRead = (koOdds: KoOddsInfo): string => {
     const tied: EvalResult = {
@@ -491,7 +491,7 @@ describe('T18 point 6: the read clause names the click with a verb that fits the
   });
 });
 
-describe('T18 point 1: the near sentence waits for a quarter of the bodies to fall', () => {
+describe('the near sentence waits for a quarter of the bodies to fall', () => {
   const nearResult = (side: 'p1' | 'p2', species: string, odds: number, removes: string, score: number, doubles = false): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
     perSide: doubles
@@ -532,7 +532,7 @@ describe('T18 point 1: the near sentence waits for a quarter of the bodies to fa
   });
 });
 
-describe('T18 point 2: a side is called practically decided once, and never after its proof', () => {
+describe('a side is called practically decided once, and never after its proof', () => {
   const decidedResult = (side: 'p1' | 'p2', species: string, score: number, near?: { species: string; removes: string }): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
     perSide: { p1: [choice('move a', 'A', score)], p2: [choice('move b', 'B', -score)] },
@@ -570,7 +570,7 @@ describe('T18 point 2: a side is called practically decided once, and never afte
   });
 });
 
-describe('T18 point 3: "practically decided" stays quiet when the turn itself undid it', () => {
+describe('"practically decided" stays quiet when the turn itself undid it', () => {
   const decidedTurn = (side: 'p1' | 'p2', species: string, scoreBefore: number, scoreAfter: number | null, doubles = false) =>
     analyzeTurn({
       turn: 23,

@@ -15,7 +15,7 @@ import { CORPUS, rebuildThrough } from './rebuild-through';
 const ID = 'smogtours-gen9ru-887325';
 const play = (lines: string[]) => lines.filter(line => /^\|(switch|drag|faint|move)\|/.test(line));
 
-describe('a nicknamed Ditto with a Transform keeps its copy through its entry block (#138)', () => {
+describe('a nicknamed Ditto with a Transform keeps its copy through its entry block', () => {
   for (const turn of [20, 21]) {
     test.skipIf(!existsSync(CORPUS(ID)))(`Gen 9 RU ${ID} turn ${turn}: Tera Blast of the copy, not Transform`, async () => {
       const { logged, emitted } = await rebuildThrough(ID, turn);

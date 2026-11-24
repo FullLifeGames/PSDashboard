@@ -83,7 +83,7 @@ const detect = (view: AnswerSide, result: EvalResult): EvalCellValue[] => {
   return [...first, ...detectedOf(siblingJobs(view, result, first))];
 };
 
-describe('the answer round reads every near-equal row, whatever their order (T149)', () => {
+describe('the answer round reads every near-equal row, whatever their order', () => {
   test('the near rows are the ranked rows within the prover’s near tie of the top, in a canonical order', () => {
     expect(PROVER_NEAR_TIE).toBe(0.02);
     for (const order of NEAR_ORDERS) {
@@ -185,7 +185,7 @@ describe('the answer round reads every near-equal row, whatever their order (T14
   });
 });
 
-describe('the added column prices the rows that can decide the ranking one ply deeper (T149)', () => {
+describe('the added column prices the rows that can decide the ranking one ply deeper', () => {
   const deepen: EvalSettings = { depth: 1, samples: 1, tera: false };
 
   test('the best row and the near rows are priced one ply deeper, up to ANSWER_DEEP_ROWS; the others by one plain draw', () => {
@@ -220,7 +220,7 @@ describe('the added column prices the rows that can decide the ranking one ply d
   });
 });
 
-describe('the named scenes read the same answers in every order of their near rows (T149)', () => {
+describe('the named scenes read the same answers in every order of their near rows', () => {
   const scenes = ['gen9vgc2026regi-2629703929-t4', 'smogtours-gen9doublesou-912045-t6'];
 
   test.each(scenes)('%s: detection, candidates and deep rows of both sides do not depend on the order of the near rows', { timeout: 240_000 }, async name => {
@@ -251,7 +251,7 @@ describe('the named scenes read the same answers in every order of their near ro
 
 interface Scripted { calls: EvalCellJob[][]; afterCheck: EvalCellJob[][]; subSearches: number }
 
-describe('a round that changes the best row sends the new row through one more verify round (T149)', () => {
+describe('a round that changes the best row sends the new row through one more verify round', () => {
   const position = JSON.parse(readFileSync(new URL('./fixtures/positions/gen9vgc2026regi-2630685175-t7-played.json', import.meta.url), 'utf-8')) as {
     serialized: string; tera: EvalSettings['tera']; sleepClause: boolean; ruleset: StaticRuleset; keepPlayed: NonNullable<EvalSettings['keepPlayed']>;
   };
@@ -372,8 +372,8 @@ describe('doubles-answers', () => {
     else process.env.EVAL_DOUBLES_ANSWERS = saved;
   });
 
-  describe('the doubles matrix reads every answer (round 67, T128)', () => {
-    test('2630685175 t7: p1’s best row meets a Protect answer, and p1 is graded against it (the tree lists it since round 70)', { timeout: 120_000 }, async () => {
+  describe('the doubles matrix reads every answer', () => {
+    test('2630685175 t7: p1’s best row meets a Protect answer, and p1 is graded against it', { timeout: 120_000 }, async () => {
       const position = fixture('gen9vgc2026regi-2630685175-t7-played');
       const result = await search(position);
       // Four rows lie within 0.003 of each other in value, so which of them comes first follows the verify price of a small outcome
@@ -435,7 +435,7 @@ describe('doubles-answers', () => {
     return { tree, result, view };
   }
 
-  describe('the answer round, step by step (round 67, T128)', () => {
+  describe('the answer round, step by step', () => {
     test('the answers are the listed ones, then the unlisted legal ones; a side without legal lists has no round', () => {
       const { tree, result, view } = scene();
       expect(view.answers.map(answer => answer.label)).toEqual(['X + Y', 'X2 + Y2', 'Protect + Protect', 'Z + Y']);

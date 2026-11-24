@@ -59,7 +59,7 @@ describe('the damage roll and the hit count', () => {
   });
 });
 
-describe('which dice earn a chip (ruling 33, question 3a)', () => {
+describe('which dice earn a chip', () => {
   const forced = (kind: DieName['kind'], result: ForcedDie['result']): ForcedDie => ({ name: die(kind), result });
 
   test('an event that happens below one in one, a status check, a speed tie and a hit count show', () => {

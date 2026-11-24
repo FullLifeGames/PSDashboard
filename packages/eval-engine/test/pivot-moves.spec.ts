@@ -88,7 +88,7 @@ function simPivotsInDoubles(rules: Rules, moveId: string): boolean | null {
 
 const movesOf = (rules: Rules, battle: Battle) => battle.dex.moves.all().filter(move => move.exists && move.gen <= rules.gen && !move.isZ && !move.isMax);
 
-describe.each(RULES)('$name: every move played against the Dex reading (round 70, N1)', rules => {
+describe.each(RULES)('$name: every move played against the Dex reading', rules => {
   const dex = scene(rules, 'tackle').dex;
   const moves = movesOf(rules, scene(rules, 'tackle'));
 
@@ -130,7 +130,7 @@ function publicTurn(battle: Battle): string[] {
   return lines;
 }
 
-describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log (round 70, N1)', rules => {
+describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log', rules => {
   const candidates = [...EVERY_PIVOT, 'revivalblessing'].filter(id => Dex.forGen(rules.gen).moves.get(id).gen <= rules.gen);
 
   test.each(candidates)('%s: the switch after it is its follow-up only when the move pivoted', moveId => {
@@ -146,7 +146,7 @@ describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log (r
   });
 });
 
-describe('the played-action parser names no move the simulator never pivots with (round 70, N1)', () => {
+describe('the played-action parser names no move the simulator never pivots with', () => {
   const gameOf = (rules: Rules): GameRules => ({ gen: rules.gen, mod: rules.name === 'Pokémon Champions' ? 'champions' : undefined });
   const targetAfter = (rules: Rules, name: string, between: string[]) =>
     parsePlayedActions([`|move|p1a: Snorlax|${name}|p2a: Chansey`, ...between, '|switch|p1a: Blissey|Blissey|100/100'], gameOf(rules)).p1?.pivotTarget;

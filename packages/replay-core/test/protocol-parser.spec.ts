@@ -112,7 +112,7 @@ describe('damage observations', () => {
     expect(parseReplayLogWithObservations(multiHit).observations).toHaveLength(0);
   });
 
-  test('doubles yield an observation per target (round 69, T31; the cases are in doubles-damage-observation.spec.ts)', () => {
+  test('doubles yield an observation per target (the cases are in doubles-damage-observation.spec.ts)', () => {
     const doubles = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|gametype|doubles', '|gen|9',
       '|tier|[Gen 9] VGC', '|start',
@@ -509,7 +509,7 @@ describe('speed-order cleanliness', () => {
     expect(orders(singlesLog(['Hawlucha, M', 'Dragapult, F'], firstThenDraco('Acrobatics'), ['|-enditem|p1a: A|Grassy Seed']))).toEqual([]);
   });
 
-  test('a Choice Scarf that changed hands is read at every race with the Scarf the mon held (round 63)', () => {
+  test('a Choice Scarf that changed hands is read at every race with the Scarf the mon held', () => {
     const mons: [string, string] = ['Snorlax, M', 'Dragapult, F'];
     const race = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
     const read = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => [o.turn, o.firstScarf, o.secondScarf]);

@@ -53,7 +53,7 @@ function scene(format: Format, lead: PokemonSet, tested: PokemonSet, turns: [str
 const movesOf = (log: string, species: string) =>
   inferOpponentTeam(log, 'p2').pokemon.find(entry => entry.species === species)?.moves.map(move => move.name) ?? [];
 
-describe('a move a blocker stopped is booked from the |cant| line (T175)', () => {
+describe('a move a blocker stopped is booked from the |cant| line', () => {
   const taunter = mon('Landorus-Therian', 'Intimidate', ['Taunt', 'Earthquake'], 252);
 
   test.each(FORMATS)('%s: Taunt stops Stealth Rock before it is used, and the set has it', format => {
@@ -155,7 +155,7 @@ describe('battle-formes', () => {
   const movesOf = (text: string, species: string) =>
     team(text).find(mon => mon.species === species)?.moves.map(move => move.name);
 
-  describe('a battle-only forme on a later switch-in is the same body (T101)', () => {
+  describe('a battle-only forme on a later switch-in is the same body', () => {
     test('singles: Mimikyu-Busted joins Mimikyu, the moves after the change book on it', () => {
       const text = log(9, [['Mimikyu, F', ''], ['Heatran', '']], [
         '|switch|p2a: Kyu|Mimikyu, F|100/100', '|turn|1', '|move|p2a: Kyu|Play Rough|p1a: Skarmory',
@@ -363,7 +363,7 @@ describe('illusion-lookup', () => {
     return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
   }
 
-  describe('the Zoroark behind an ended Illusion books its moves (T230)', () => {
+  describe('the Zoroark behind an ended Illusion books its moves', () => {
     for (const format of ['singles', 'doubles'] as const) {
       test(`${format}: the replace line makes the Zoroark name known`, () => {
         const log = play(format);

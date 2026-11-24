@@ -30,7 +30,7 @@ function damage(view: SimView, hit: (typeof HITS)[number], prepare?: (side: Retu
   return battle.actions.getDamage(battle.sides[0].active[0], defender, move);
 }
 
-describe('SCREENS is held to the simulator (round 72)', () => {
+describe('SCREENS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('the side conditions that cut a physical or a special hit are the screens', () => {
       const conditions = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.sideCondition as string))];
@@ -48,7 +48,7 @@ describe('SCREENS is held to the simulator (round 72)', () => {
     });
   });
 
-  test('Generation 1 keeps Reflect and Light Screen as volatiles, which cut the damage (W10)', () => {
+  test('Generation 1 keeps Reflect and Light Screen as volatiles, which cut the damage', () => {
     const view = ALL_VIEWS[0];
     expect(view.dex.gen).toBe(1);
     for (const [id, hit] of [['reflect', HITS[0]], ['lightscreen', HITS[1]]] as const) {

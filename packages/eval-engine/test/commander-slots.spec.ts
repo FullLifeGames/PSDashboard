@@ -53,7 +53,7 @@ function askedSlots(battle: Battle, side: 'p1' | 'p2'): boolean[] {
   return battle.sides[sideIndex(side)].active.map((pokemon, slot) => !!pokemon && !pokemon.fainted && !request?.side?.pokemon?.[slot]?.commanding);
 }
 
-describe.each(RULES)('$name: the branch layer asks only the slots the simulator asks (round 85, T320)', rules => {
+describe.each(RULES)('$name: the branch layer asks only the slots the simulator asks', rules => {
   const species = commanderSpecies(rules.format);
 
   test('the Dex gives at least one species Commander', () => {

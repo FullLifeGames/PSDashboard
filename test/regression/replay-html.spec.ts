@@ -122,7 +122,7 @@ describe('Replay iframe HTML', () => {
     expect(configured.sound).toBe(false);
   });
 
-  test('relative effect sprites resolve against Showdown\'s fx folder (round 77)', () => {
+  test('relative effect sprites resolve against Showdown\'s fx folder', () => {
     // The Stealth Rock around both Pokémon of 562428 turn 12 showed as empty boxes.
     // graphics.js prefixes BattleEffects with Dex.fxPrefix only when Dex already exists; the embed loads
     // its scripts in any order, and when graphics.js runs first the sprites stay "rock1.png". A blob
@@ -137,7 +137,7 @@ describe('Replay iframe HTML', () => {
     expect(relative).toEqual([]);
   });
 
-  test('the embed\'s scripts run in the order the embed appends them (round 77)', () => {
+  test('the embed\'s scripts run in the order the embed appends them', () => {
     // A cold first load left the frame empty with "$ is not defined". replay-embed.js
     // appends its dependencies as dynamic scripts, those run in the order they arrive, and graphics.js stops halfway
     // when jQuery comes after it. test/e2e/replay-sprites.spec.ts plays that order in a browser.
@@ -158,7 +158,7 @@ describe('Replay iframe HTML', () => {
     ]);
   });
 
-  test('the battle starts at the frame\'s top edge, and no title shows under the controls (round 77)', () => {
+  test('the battle starts at the frame\'s top edge, and no title shows under the controls', () => {
     // A band of 21 px stood above the battle (the body's 12 px plus the 9 px the embed
     // puts above it), and the title under the controls ("Branch Simulation", or the players) pushed the page past
     // the frame's 480 px, so it scrolled for nothing.
@@ -171,7 +171,7 @@ describe('Replay iframe HTML', () => {
     expect(html).toContain('<title>Branch Simulation</title>');
   });
 
-  test('the frame height in layout.css is REPLAY_FRAME_HEIGHT (round 77)', () => {
+  test('the frame height in layout.css is REPLAY_FRAME_HEIGHT', () => {
     const css = readFileSync(fileURLToPath(new URL('../../src/styles/layout.css', import.meta.url)), 'utf8');
     const rule = /\.ps-iframe-wrap iframe \{[^}]*min-height: (\d+)px;/.exec(css);
     expect(Number(rule?.[1])).toBe(REPLAY_FRAME_HEIGHT);

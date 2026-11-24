@@ -41,7 +41,7 @@ const rankedScene = (name: string) => JSON.parse(readFileSync(new URL(`./fixture
 
 const modOf = (ruleset: StaticRuleset | undefined) => (ruleset === 'champions' ? 'gen9championsdoublescustomgame' : 'gen9doublescustomgame');
 
-describe('the budget scenes: the third root candidate finds its cells again (A6-2 priced the dice and spent the shared 100 cells)', () => {
+describe('the budget scenes: the third root candidate finds its cells again', () => {
   // All four games were won by the side that proves. The mass is the proven share of the classes along every reply; the cells are
   // those the two sides' attempts spend together (the second side starts with what the first one left).
   test.each([

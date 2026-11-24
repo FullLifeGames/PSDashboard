@@ -171,11 +171,11 @@ const gapsOf = (owner: string) => found.filter(row => row.gap.owner === owner).m
 
 describe.skipIf(!hasCorpus)('the gaps with an owner (expected failures until the owner is fixed)', () => {
   // A Pledge combination books the shown move, with no extra slot.
-  test('#140: no gap is left of a Pledge combination that books the partner\'s Pledge', () => expect(gapsOf('#140')).toEqual([]));
+  test('no gap is left of a Pledge combination that books the partner\'s Pledge', () => expect(gapsOf('#140')).toEqual([]));
   // A copy's move line books to the body it copied (the inference follows the client's Transform volatile).
-  test('#139: no gap is left of a transformed body\'s move that books to the body it copied', () => expect(gapsOf('#139')).toEqual([]));
+  test('no gap is left of a transformed body\'s move that books to the body it copied', () => expect(gapsOf('#139')).toEqual([]));
   test.fails('finding, no issue yet: bodies that share a nickname (smogtours-gen2ou-349774, "???" for four species) book to one body', () => expect(gapsOf('shared-nickname')).toEqual([]));
-  test.fails('#141: a Zoroark\'s moves book on the Zoroark (milestone 1.3.0)', () => expect(gapsOf('#141')).toEqual([]));
+  test.fails('a Zoroark\'s moves book on the Zoroark (milestone 1.3.0)', () => expect(gapsOf('#141')).toEqual([]));
   test('the sweep counted its games and moves', () => {
     expect(totals.games).toBe(FIXTURES.length + corpusPlayed.length);
     expect(totals.held).toBeLessThanOrEqual(totals.moves);

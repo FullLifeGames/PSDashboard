@@ -57,7 +57,7 @@ async function mountLoaded(kind: ReplayKind) {
 
 const lastProps = () => panel.props[panel.props.length - 1];
 
-describe('ReplayWorkspace hands the battle to the picker (T202, round 82)', () => {
+describe('ReplayWorkspace hands the battle to the picker', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: the live tip gets the branch's getBattle, a stored position its own battle and the replay's log`, async () => {
       const app = await mountLoaded(kind);

@@ -142,7 +142,7 @@ describe('fit helpers', () => {
   });
 });
 
-describe('cv helpers (round 8)', () => {
+describe('cv helpers', () => {
   const games = Array.from({ length: 23 }, (_, i) => `g${i}`);
 
   test('assignFolds is deterministic, complete, and balanced', () => {
@@ -205,7 +205,7 @@ describe('cv helpers (round 8)', () => {
  * one weight per column shared by both game types, a doubles override where the doubles table differs, the columns at 0 in both
  * tables held.
  */
-describe('weights at a fixed K (round 64, T127)', () => {
+describe('weights at a fixed K', () => {
   const K = { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } };
   // Columns: 0 bodies-like, 1 boosts-like and 2 tailwind-like (both overridden in doubles), 3 a sweep cell at 0.
   const hand = layoutOf([1, 1, 1, 0], [1, 0.5, 2, 0]);
@@ -363,7 +363,7 @@ describe('calibration lib', () => {
     ]);
   });
 
-  test('the decided line reads like the harness line; a dump from before round 50 prints the raw share only', () => {
+  test('the decided line reads like the harness line; a dump without decidedHeld prints the decided share only', () => {
     const base = sortSamples(load(FIXTURE) as Sample[]);
     const winner = (sample: Sample) => (sample.p1Won ? 'p1' : 'p2');
     const loser = (sample: Sample) => (sample.p1Won ? 'p2' : 'p1');
@@ -428,7 +428,7 @@ describe('calibration lib', () => {
  * A paired verdict carries its error bar. One replay yields up to eight positions with ONE outcome, so the bootstrap resamples
  * replays, not positions, and a row reads as a verdict only when its band clears zero.
  */
-describe('paired bands (round 48)', () => {
+describe('paired bands', () => {
   interface BankSample extends Sample { quality: 'hq' | 'std'; luckAgainstFavored: boolean }
   interface BandRow {
     view: string; gameType: string; phase: string; n: number; games: number;
@@ -536,7 +536,7 @@ describe('paired bands (round 48)', () => {
    * single better decision (doubles −35 bp from rescaling alone). The second table gives each side its own K per game type and
    * phase, so only a better ordering of the positions reads as a gain.
    */
-  describe('own K per phase (round 63, T52 step 1)', () => {
+  describe('own K per phase', () => {
     const scaled = (samples: BankSample[], gameType: string, phase: string, by: number) =>
       samples.map(sample => (sample.gameType === gameType && sample.phase === phase ? { ...sample, score: sample.score * by } : sample));
 

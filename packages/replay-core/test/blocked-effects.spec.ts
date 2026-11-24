@@ -39,7 +39,7 @@ describe('Doubles OU 2663093831: the Intimidate and the Rock Slide flinch rule o
     expect(ruledOut(lines.slice(0, intimidate - 1).join('\n'), 'p1', 'Dragonite')).toEqual([]);
   });
 
-  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the rule-out of indirect damage (Levitate is no ability of Sinistcha, #150)', () => {
+  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the rule-out of indirect damage (Levitate is no ability of Sinistcha)', () => {
     expect(ruledOut(fixture.log, 'p1', 'Sinistcha')).toEqual(['magicguard']);
   });
 });
@@ -109,7 +109,7 @@ describe('a landed stat drop, status, confusion or Taunt rules out the guard aga
     expect(ruledOut(log, 'p2', 'Kangaskhan').sort()).toEqual(['innerfocus', 'scrappy']);
   });
 
-  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (Sneasel cannot hold Levitate, so the Ground hit rules out nothing else, #150)', () => {
+  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (Sneasel cannot hold Levitate, so the Ground hit rules out nothing else)', () => {
     expect(ruledOut(singles(mon('Smeargle', '', ['Mud-Slap']), mon('Sneasel', 'Pickpocket')), 'p2', 'Sneasel').sort()).toEqual(['keeneye']);
   });
 

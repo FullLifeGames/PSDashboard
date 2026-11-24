@@ -18,7 +18,7 @@ const pattern = (value: PatternRead): Pattern => {
   return value as Pattern;
 };
 
-describe('a draw read as a class of the pair plan (round 56)', () => {
+describe('a draw read as a class of the pair plan', () => {
   test('the played cell: the Play Rough miss at 10 %, the Matcha Gotcha hit at 90 %, the sure Flare Blitz kill is no event', () => {
     const read1 = pattern(read(anchorRoot(), ...PLAYED));
     // The Matcha Gotcha burned Sinistcha's side in this draw: the burn die (20 percent) is part of the class, so the key ends in
@@ -107,7 +107,7 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
     expect(read(root, 'move doublekick 1, move softboiled', 'move softboiled, move softboiled')).toEqual({ kind: 'fallback', reason: 'multi-roll' });
   });
 
-  test('a crit ignores the attacker\'s drop: the margin rule does not hide its kill (final review, finding 1)', () => {
+  test('a crit ignores the attacker\'s drop: the margin rule does not hide its kill', () => {
     // Garchomp at -2 Atk: Dragon Claw deals 49 to 58, a crit ignores the drop and deals 145 to 172. Snorlax
     // at 120 HP survives every normal roll, dies to every crit: the hit is an event with a 1-in-24 kill class.
     const root = doublesRoot(
@@ -135,7 +135,7 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
   });
 });
 
-describe('pair choices and the rules before the dice (round 56)', () => {
+describe('pair choices and the rules before the dice', () => {
   test('a lone body in slot b owns the single part of its side\'s choice', () => {
     const root = doublesRoot(
       [pairSet('Gone', 'Pikachu', ['Protect']), pairSet('Rock', 'Tyranitar', ['Rock Slide', 'Protect'])],

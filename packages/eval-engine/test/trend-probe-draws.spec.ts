@@ -75,7 +75,7 @@ function byHand(serialized: string, trendOf: Trend, samples: 1 | 3 = 3) {
 }
 const evs = (result: EvalResult) => result.perSide.p2.map(row => row.ev);
 
-describe('the trend probe reads the cell from its base draws (round 70)', () => {
+describe('the trend probe reads the cell from its base draws', () => {
   test('a rolling cell: the layers book the mean over the draws, each child against its own leaf', () => {
     const reference = byHand(ROLLING, drawsProbe);
     const searched = evs(searchPosition(ROLLING, SETTINGS));
@@ -89,7 +89,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     expect(Math.abs(old.after[0] - reference.after[0])).toBeGreaterThan(0.02);
   });
 
-  test('a cell priced by one draw keeps the probe of round 69: its child is the cell', () => {
+  test('a cell priced by one draw keeps the single-draw probe: its child is the cell', () => {
     const old = byHand(SURE, todaysProbe);
     expect(old.probes).toEqual(['Shadow Ball x → Skarmory', 'Shadow Ball x → Skarmory']);
     // The layers did run on the cell, and the cell is priced by its first seed alone: the child against the cell is the child against its own leaf.
@@ -101,7 +101,7 @@ describe('the trend probe reads the cell from its base draws (round 70)', () => 
     searched.forEach((ev, index) => expect(ev).toBeCloseTo(old.after[index], 9));
   });
 
-  test('with one draw per cell the whole search is the search of round 69, rolling cells included', () => {
+  test('with one draw per cell the whole search is the single-draw search, rolling cells included', () => {
     for (const serialized of [ROLLING, SURE]) {
       const old = byHand(serialized, todaysProbe, 1);
       expect(old.probes.length).toBeGreaterThan(0);

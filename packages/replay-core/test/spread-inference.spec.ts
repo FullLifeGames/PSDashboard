@@ -435,7 +435,7 @@ describe('evidence that cannot measure keeps the prior', () => {
   }
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
-    test(`a move order no Speed can repair gets a Scarf after every legal Speed (T117, ${formatid})`, () => {
+    test(`a move order no Speed can repair gets a Scarf after every legal Speed (${formatid})`, () => {
       // Garchomp moved after a Toxapex (base 35): Toxapex's fastest Speed (185) stays under Garchomp's slowest legal one (216), so no
       // spread explains the order. An observed order is a hard limit: the Choice Scarf the real Toxapex must have carried comes in last,
       // and Garchomp sits under the Scarfed Toxapex.
@@ -468,7 +468,7 @@ describe('evidence that cannot measure keeps the prior', () => {
     });
   }
 
-  test('a move order the prior already satisfies keeps the prior Speed and nature (round 40)', () => {
+  test('a move order the prior already satisfies keeps the prior Speed and nature', () => {
     // 573756: Garchomp (Jolly 252 Spe) moved before a Clefable its prior outruns anyway. Nothing measured its Speed downward, so Speed must
     // not count as measured: else a 252-HP rung wins the damage lines and shaves the Speed to 4 for the knock-out-only offense it keeps (a
     // Garchomp Kyurem outspeeds; turn 73's hit branch priced 29% for the defender instead of near 0).

@@ -169,7 +169,7 @@ describe('the engine badge of a tile', () => {
   });
 });
 
-describe("the dock follows the column's content (ruling 4a)", () => {
+describe("the dock follows the column's content", () => {
   // `.ps-dock-log { margin-top: auto }` would push the toggle and the dock to the foot of a tall column and open a gap of about 400 px
   // under the timeline at 2560 x 1440. The dock stands directly under the last panel; it stays sticky at the column's foot when the
   // content is longer than the window, and the tray stays absolute above the bar, so a tray moves no chip.
@@ -206,7 +206,7 @@ describe("the dock follows the column's content (ruling 4a)", () => {
   });
 });
 
-describe('the hit bar (variant F, A7b)', () => {
+describe('the hit bar (variant F)', () => {
   const grey = 'rgba(255, 255, 255, 0.24)';
 
   test('what stays is grey, the roll and the lowest roll take the hit\'s tone', () => {
@@ -227,7 +227,7 @@ describe('the hit bar (variant F, A7b)', () => {
   });
 });
 
-describe('the chip (variant A, ruling 8a)', () => {
+describe('the chip (variant A)', () => {
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
   const chip = rule(base, '.ps-dock-chip') ?? '';
 
@@ -257,7 +257,7 @@ describe('the chip (variant A, ruling 8a)', () => {
   });
 });
 
-describe('the bench tile badges never change the tile (A7b)', () => {
+describe('the bench tile badges never change the tile', () => {
   const base = css.slice(0, css.indexOf('@media (max-width: 1050px)'));
 
   test('the bench tile is the containing block of the flag row, and the flags stand out of the flow', () => {

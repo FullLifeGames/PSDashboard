@@ -32,7 +32,7 @@ const COMMANDERS: { label: string; commanders: ('p1' | 'p2')[] }[] = [
 ];
 const SLOTS = [{ label: 'a', tatsugiriFirst: true }, { label: 'b', tatsugiriFirst: false }];
 
-describe.each(RULES)('$name: the search offers a choice the simulator accepts for a commanding Tatsugiri (round 72, T246)', rules => {
+describe.each(RULES)('$name: the search offers a choice the simulator accepts for a commanding Tatsugiri', rules => {
   const mon = (species: string, ability: string, moves: string[]): PokemonSet => set(species, moves, { ability, level: rules.level });
   const tatsugiri = mon('Tatsugiri', 'Commander', ['Draco Meteor', 'Muddy Water', 'Icy Wind', 'Protect']);
   const dondozo = mon('Dondozo', 'Unaware', ['Wave Crash', 'Earthquake', 'Order Up', 'Protect']);
@@ -149,7 +149,7 @@ describe('revival-blessing', () => {
 
   const magikarp = (battle: Battle) => battle.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Magikarp')!;
 
-  describe('Revival Blessing picks a fainted Pokémon (T101)', () => {
+  describe('Revival Blessing picks a fainted Pokémon', () => {
     test('singles: the greedy resolution revives the fainted Magikarp instead of sending Snorlax', () => {
       const battle = revivalBattle(false);
       expect(battle.sides[0].requestState).toBe('switch');

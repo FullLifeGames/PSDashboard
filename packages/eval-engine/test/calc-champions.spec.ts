@@ -31,7 +31,7 @@ function checkerSets(): PokemonSet[] {
   } as PokemonSet)));
 }
 
-describe('the engine prices a Champions body as the simulator plays it (decision 30)', () => {
+describe('the engine prices a Champions body as the simulator plays it', () => {
   for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmcbo3']) test(`calcPokemon on bodyOf gives the simulator's stats on every Champions body (${formatid})`, () => {
     const gen = calcGenerationFor(9, 'champions');
     const sets = checkerSets();

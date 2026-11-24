@@ -74,7 +74,7 @@ const read = (format: string, moveId: string, field: Field): number => {
 
 const NONE: Field = { weather: '', terrain: '' };
 
-describe('healProfile reads the heal the simulator plays (T258)', () => {
+describe('healProfile reads the heal the simulator plays', () => {
   test('scenes: Shore Up heals half in clear weather and two thirds in sand; Heal Pulse heals the foe, not the user', () => {
     expect(read('gen9customgame', 'shoreup', NONE)).toBeCloseTo(1 / 2, 2);
     expect(read('gen9customgame', 'shoreup', { weather: 'sandstorm', terrain: '' })).toBeCloseTo(2 / 3, 2);

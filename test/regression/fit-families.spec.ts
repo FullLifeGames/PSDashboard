@@ -78,7 +78,7 @@ describe('fit families', () => {
     expect(samples[1]).toMatchObject({ ruleset: 'standard', gameType: 'doubles', set: 'standard-doubles|carol|dave' });
   });
 
-  test('round 66: ladder games without a rating leave the fit, tournament games and rated ladder games stay', () => {
+  test('ladder games without a rating leave the fit, tournament games and rated ladder games stay', () => {
     const dir = mkdtempSync(join(tmpdir(), 'fit-families-'));
     const dump = join(dir, 'merged.jsonl');
     const row = (id: string, tranche: string, rating: number | null) => JSON.stringify({
@@ -123,7 +123,7 @@ describe('fit families', () => {
   // A capture with search holds the root value in `score`, which no start table gives back. The dump says it came from a search by the
   // root fields only a search writes (gameValue, the decided sweep, the proven forced win); the weight fit then needs the features,
   // the outcome and the start tables, and skips the identity.
-  describe('round 74 (T163, T263): a weight fit on a dump from a search', () => {
+  describe('a weight fit on a dump from a search', () => {
     const row = (id: string, extra: Record<string, unknown>, g = [1, 2]) => JSON.stringify({
       id, turn: 2, tranche: 'fit-ladder', phase: 'early', gameType: 'singles', score: 0.1, faintedFraction: 0, p1Won: true, lastPair: false, g, ...extra,
     });
@@ -185,7 +185,7 @@ describe('fit families', () => {
 
   // Once Champions prices its own scale, a Champions capture holds leaf values under the Champions K: the identity check and the refit
   // read the K of each family's rule set.
-  test('round 67 (T138): the identity and the refit read the K of each family\'s rule set', () => {
+  test('the identity and the refit read the K of each family\'s rule set', () => {
     const championsK = { singles: { k0: 1.6, k1: 4.4 }, doubles: { k0: 1.9, k1: 4.2 } };
     const kOf = (ruleset: string) => (ruleset === 'champions' ? championsK : K);
     const leafOf = (tanh: number, doubles: boolean, ff: number, ruleset: string) => {
@@ -204,7 +204,7 @@ describe('fit families', () => {
 
   // A capture is made under the tables of its day, and a weight adopted since moves the start tables: `captured` names the capture-time
   // weights the identity check starts from (the fit and its baseline stay at today's tables).
-  test('round 69 (T102): the identity starts from the capture-time weights when a table has moved since', () => {
+  test('the identity starts from the capture-time weights when a table has moved since the capture', () => {
     const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 3);
     const names = ['bodies', 'matchup'];
     const moved = [{ name: 'standard-singles', singles: [3, 2], doubles: [3, 2] }];
@@ -219,7 +219,7 @@ describe('fit families', () => {
 
   // Pokémon Champions prices its own scale. The phase K of a family comes back from its own games: the static's tanh under the family's
   // tables, outcomes against k0 + k1 × the fainted share.
-  test('round 67 (T138): the phase K of a family comes back from its own games', () => {
+  test('the phase K of a family comes back from its own games', () => {
     const random = mulberry32(67);
     const truth = (ff: number) => 1 + 4 * ff;
     const samples: FamilySample[] = [];
@@ -248,7 +248,7 @@ describe('fit families', () => {
     expect(report.spread.k1.lo).toBeLessThan(report.fitted.k1);
   });
   // A column at 0 in both tables is held, and a fit frees it by name.
-  describe('round 69: new columns, lifted holds and model-form columns', () => {
+  describe('new columns, lifted holds and model-form columns', () => {
     /**
      * Outcomes from weights that run with the fainted share: the first feature weighs w0 + w0Phase x ff. Scores are captured under
      * the start weights [2, 2].

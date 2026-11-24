@@ -30,7 +30,7 @@ async function answer(request: Record<string, unknown>): Promise<EvalWorkerRespo
   return posted.find(message => message.type !== 'progress' && message.type !== 'partial');
 }
 
-describe('eval worker on a Champions position (T145)', () => {
+describe('eval worker on a Champions position', () => {
   const positions = [['singles', 'gen9championsou-2693832490-t3'], ['doubles', 'gen9championsvgc2026regmbbo3-2679053861-t3']] as const;
   for (const [kind, id] of positions) {
     test(`a choices message on a Champions ${kind} position is answered`, async () => {

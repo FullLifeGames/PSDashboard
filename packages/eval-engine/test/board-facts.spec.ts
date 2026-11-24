@@ -243,7 +243,7 @@ describe('the simulator reads a dropped key only where the facts keep it (source
     expect(reset.test(endTurn.slice(0, endTurn.indexOf('\n    }\n') + 1)), `${key} reset in Battle.endTurn`).toBe(true);
   });
 
-  test('the roll fields are the round 88 list plus the hit data of A5f-1', () => {
+  test('the roll fields are the damage and HP fields and the move\'s hit data', () => {
     expect([...ROLL_FIELDS].sort()).toEqual(['damage', 'damageValue', 'hp', 'hurtThisTurn', 'lastDamage', 'moveHitData', 'totalDamage']);
   });
 });

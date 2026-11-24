@@ -172,7 +172,7 @@ describe('lineBlocks: the tester\'s smaller items', () => {
 describe('the note under a line names what the click cannot force', () => {
   const noteOf = (...unforced: string[]) => lineBlocks([{ ...singlesLine, unforced }], singles)[0].note;
 
-  test('a random target reads as plain English, with its article and its plural (tester, round 89 G4c)', () => {
+  test('a random target reads as plain English, with its article and its plural', () => {
     expect(noteOf('random-target')).toBe('The click cannot force random targets. The seed decides them.');
     expect(noteOf('hit-count', 'random-target')).toBe('The click cannot force the number of hits of a multi-hit move, random targets. The seed decides them.');
   });
@@ -292,7 +292,7 @@ describe('the answer a line meets', () => {
     expect(replyOf('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'Draining Kiss')?.rank).toBe("Tzon's 12th choice in this search");
   });
 
-  test('a pivot\'s pair rows stand for the bare move a line names (finding 1 of pass 4)', () => {
+  test('a pivot\'s pair rows stand for the bare move a line names', () => {
     // the line meets "Draining Kiss"; the ranking holds "Draining Kiss → Mew" at place 2: the answer is that row, not an unranked one
     expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Surf', 'Draining Kiss → Mew', 'Draining Kiss → Corviknight') })[0].reply)
       .toEqual({ label: 'Draining Kiss', rank: "Tzon's second choice in this search", off: true });

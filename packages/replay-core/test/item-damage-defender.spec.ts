@@ -95,7 +95,7 @@ const specialScene = (kind: Kind, defender: PokemonSet, attackerItem: string, mo
 const physicalScene = (kind: Kind, defender: PokemonSet, attackerItem: string): Scene =>
   ({ p1: defender, p2: garchomp(attackerItem), p1Choice: 'move swordsdance', p2Choice: choiceOf(kind, 'dragonclaw'), partner: [blissey(), chansey()] });
 
-describe('an Assault Vest the hits taken rule out (T169, decision 35)', () => {
+describe('an Assault Vest the hits taken rule out', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a Specs Gleam is too strong for a Vest on a Corviknight that holds none, so the Vest falls and Eviolite is no candidate`, () => {
       const { log, attacker } = sceneOf(kind, specialScene(kind, corviknight('Leftovers', {}), 'Choice Specs'));
@@ -118,7 +118,7 @@ describe('an Assault Vest the hits taken rule out (T169, decision 35)', () => {
   }
 });
 
-describe('an Eviolite the hits taken rule out (T169, decision 35)', () => {
+describe('an Eviolite the hits taken rule out', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a Band Dragon Claw is too strong for an Eviolite on a Doublade that holds none; the Vest, which a physical hit cannot judge, stays`, () => {
       const { attacker } = sceneOf(kind, physicalScene(kind, doublade('Leftovers'), 'Choice Band'));
@@ -143,7 +143,7 @@ describe('an Eviolite the hits taken rule out (T169, decision 35)', () => {
   }
 });
 
-describe('the attacker\'s unproven item gets a span before a hit refutes a defender item (T169, mirror of R18)', () => {
+describe('the attacker\'s unproven item gets a span before a hit refutes a defender item (the mirror of the defender\'s hull)', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a guessed Choice Specs the attacker did not hold does not refute the Vest it was set against`, () => {
       // The Vest holder is the bulkiest the judge allows. Against the guessed Specs the hit looks too weak for any Vest; the
@@ -165,7 +165,7 @@ describe('the attacker\'s unproven item gets a span before a hit refutes a defen
   }
 });
 
-describe("the attacker's built spread is a guess too (T169, the Dragonite of 752624)", () => {
+describe("the attacker's built spread is a guess too (the Dragonite of 752624)", () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a physical spread built for an attacker that really hit with its Special Attack refutes no Vest`, () => {
       // Primarina took a 63% Thunderbolt from a Dragonite the build gave a physical spread: the Vest it may hold
@@ -188,7 +188,7 @@ describe("the attacker's built spread is a guess too (T169, the Dragonite of 752
   }
 });
 
-describe('the item the log showed is never judged (T169)', () => {
+describe('the item the log showed is never judged', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     const rawOf = (attacker: RevealedPokemonInfo, holder: RevealedPokemonInfo) => ({
       p1: { pokemon: kind === 'doubles' ? [holder, bystander('Blissey')] : [holder] },
@@ -211,7 +211,7 @@ describe('the item the log showed is never judged (T169)', () => {
   }
 });
 
-describe('a Champions game prices on the calculator\'s generation 0, which has neither item (T169)', () => {
+describe('a Champions game prices on the calculator\'s generation 0, which has neither item', () => {
   const FORMAT_CH: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsdoublescustomgame' };
   const champions = (species: string, item: string, ability: string, moves: string[], nature: string, evs: Partial<PokemonEvs>): PokemonSet => ({
     name: species, species, item, ability, moves, nature, evs: sp(evs), ivs: { ...ALL_31 }, level: 50, gender: '',

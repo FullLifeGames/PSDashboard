@@ -93,7 +93,7 @@ describe.each(GAMES)('%s', (_game, make) => {
       expect(quietVoice(patched, names)).toBe('inaccuracy');
     });
 
-    test('the risk sentence of B6 beside the quiet turn (648453 t8)', () => {
+    test('the risk sentence beside the quiet turn (648453 t8)', () => {
       const { analysis, names } = buildScene(make, { reader, kind: 'gamble', playedCell: 0.189, safeCell: 0.19 });
       expect(analysis.attribution).toBe('quiet');
       const text = summarizeTurn(analysis, names);
@@ -229,7 +229,7 @@ const choice = (choiceStr: string, label: string, worstCase: number): RankedChoi
 
 const proseNames: [string, string] = ['Alpha', 'Beta'];
 
-describe('the forced win in prose (round 35)', () => {
+describe('the forced win in prose', () => {
   const forcedResult = (forcedWin: EvalResult['forcedWin']): EvalResult => ({
     score: 0.95, interval: 0, depthCompleted: 1,
     perSide: {
@@ -379,7 +379,7 @@ describe('luck-cards', () => {
 
   const names: [string, string] = ['BKC', 'devin'];
 
-  describe('T22 cards: a swing without a roll in its direction is an estimate that moved with no roll behind it', () => {
+  describe('cards: a swing without a roll in its direction is an estimate that moved with no roll behind it', () => {
     test('singles chance card (649664 t12 shape): no roll toward BKC, so no "how the turn rolled"', () => {
       const reRead = summarizeTurn(turnWith({ rolledFor: { p1: false, p2: false } }), names);
       expect(reRead).toContain('the estimate moved +12% with no roll behind it');
@@ -526,7 +526,7 @@ describe('report-prose-rolls', () => {
 
   const near = (odds: number) => ({ unanswered: { p1: [], p2: [], nearDecided: { side: 'p1' as const, species: 'Landorus-Therian', odds, removes: 'Excadrill' } } });
 
-  describe('point 3: a probability under 1 never reads as certain', () => {
+  describe('a probability under 1 never reads as certain', () => {
     test('singles near sentence (648453 t21 shape): 99.5% is a 99% roll, only 1 is a sure KO', () => {
       expect(summaryWith(near(0.995))).toContain('Landorus-Therian is one 99% roll from clearing the rest');
       expect(summaryWith(near(0.995))).not.toContain('sure KO');

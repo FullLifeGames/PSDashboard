@@ -167,7 +167,7 @@ describe('useNewGame', () => {
     expect(rendered.result.current.state.record!.pending).toBeUndefined();
   });
 
-  test('a pending tip turn is given up when a variation of an earlier turn is played; the finished tip turns keep nothing pending (H8)', async () => {
+  test('a pending tip turn is given up when a variation of an earlier turn is played; the finished tip turns keep nothing pending', async () => {
     const rendered = await startGame('gen9doublesou', { p1: ['Garchomp', 'Gengar'], p2: ['Garchomp', 'Gengar'] });
     // play on until a knockout turn waits for its replacement after at least one finished turn
     for (let turn = 0; turn < 20 && !(forcedNow(rendered) && turnsOf(rendered) >= 1); turn += 1) {
@@ -223,7 +223,7 @@ describe('useNewGame', () => {
   test.each([
     ['gen9ou', { p1: ['Snorlax'], p2: ['Snorlax'] }],
     ['gen9doublesou', { p1: ['Snorlax', 'Dragonite'], p2: ['Snorlax', 'Dragonite'] }],
-  ] as const)('planTeams (%s) reports how many turns a team edit keeps and changes nothing: no record, no save, no open (H14a)', async (format, leads) => {
+  ] as const)('planTeams (%s) reports how many turns a team edit keeps and changes nothing: no record, no save, no open', async (format, leads) => {
     const rendered = await startGame(format, { p1: [...leads.p1], p2: [...leads.p2] });
     for (let turn = 0; turn < 3; turn += 1) await playTurn(rendered, turn);
     const before = rendered.result.current.state.record!;
@@ -268,7 +268,7 @@ describe('useNewGame', () => {
     expect(fresh.result.current.game.takeLanding(freshId)).toBeNull();
   });
 
-  test('Start saves the record at once, with no entry played, so the address and the lists find a game still at team preview (D-E1)', async () => {
+  test('Start saves the record at once, with no entry played, so the address and the lists find a game still at team preview', async () => {
     const probe = newProbe();
     const rendered = renderHook(() => useGame(probe));
     const record = await startedRecord('gen9ou');

@@ -19,7 +19,7 @@ const fixtureFetcher = (async (input: string | URL | Request) => {
   return { ok: true, status: 200, json: async () => JSON.parse(readFileSync(file, 'utf-8')) } as unknown as Response;
 }) as typeof fetch;
 
-describe('built sets pass the simulator validator (round 60 prover)', () => {
+describe('built sets pass the simulator validator', () => {
   const files = readdirSync(FIXTURES).filter(name => name.endsWith('.json'));
   for (const file of files) {
     test(file, async () => {

@@ -10,7 +10,7 @@ const step = (kind: WinStep['kind'], status: WinStep['status'], extra: Partial<W
 const line = (extra: Partial<EvalLine> = {}): EvalLine => ({ ...singlesLine, for: [], ...extra });
 
 describe('the win-path words', () => {
-  test('the step names and the empty sentences (W5a, W4a)', () => {
+  test('the step names and the empty sentences', () => {
     const views = winStepViews([step('stronger', 'none'), step('luck', 'none'), step('mistake', 'none')], ctx());
     expect(views.map(view => view.title)).toEqual(['1 · A stronger play', '2 · Luck', '3 · A mistake by Tzon']);
     expect(views.map(view => view.empty)).toEqual(['None within 3 turns.', 'None within 3 turns at 1 in 1,000 or better.', 'None within 3 turns.']);
@@ -24,7 +24,7 @@ describe('the win-path words', () => {
     expect(failed.empty).not.toContain('broke');
   });
 
-  test('step 1 names the chance whatever the opponent answers, beside the played choice (W1a)', () => {
+  test('step 1 names the chance whatever the opponent answers, beside the played choice', () => {
     const [view] = winStepViews([step('stronger', 'found', { chance: 0.5175, played: 0, line: line() })], ctx({ playedLabel: 'Hydro Pump' }));
     expect(view.headline).toBe('Hydro Pump wins within 3 turns in 52 % of the dice whatever Tzon plays. What Pepitopalotin played, Hydro Pump, wins in 0 % of the dice.');
     expect(view.empty).toBeNull();
@@ -67,7 +67,7 @@ describe('the win-path words', () => {
     expect(view.block?.rows.flatMap(row => row.sides.flatMap(side => side.chips)).length).toBeGreaterThan(0);
   });
 
-  test('step 3 names the slip by its rank and turn, then the chance of the dice (W3a)', () => {
+  test('step 3 names the slip by its rank and turn, then the chance of the dice', () => {
     const [view] = winStepViews([step('mistake', 'found', { chance: 0.84375, deviation: { turn: 24, label: 'Scald', rank: 2 }, line: line() })], ctx());
     expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24, Pepitopalotin wins: this sequence has 84 %.');
   });

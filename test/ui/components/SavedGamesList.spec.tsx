@@ -46,7 +46,7 @@ describe('the saved games list', () => {
     expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
   }, 60_000);
 
-  test('a double click on the inline Delete deletes one game and opens none: the next row\'s Open slides under the pointer (H4h)', async () => {
+  test('a double click on the inline Delete deletes one game and opens none: the next row\'s Open slides under the pointer', async () => {
     await savedRecord(['Ann', 'Ben'], 1);
     await savedRecord(['Cleo', 'Dan'], 2);
     const onOpen = vi.fn().mockResolvedValue(undefined);

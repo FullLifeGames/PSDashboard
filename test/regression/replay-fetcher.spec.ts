@@ -43,7 +43,7 @@ describe('replay fetcher', () => {
   const privateId = 'gen9ou-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw';
   const privateLog = '|gametype|singles\n|gen|9\n|tier|[Gen 9] OU\n|turn|1';
 
-  test('parseReplayUrl accepts URL variants and rejects non-replay input (G2)', () => {
+  test('parseReplayUrl accepts URL variants and rejects non-replay input', () => {
     expect(parseReplayUrl('https://replay.pokemonshowdown.com/gen9ou-123?p2')).toBe('gen9ou-123');
     expect(parseReplayUrl('http://replay.pokemonshowdown.com/gen9ou-123.json')).toBe('gen9ou-123');
     expect(parseReplayUrl('  gen9ou-123 ')).toBe('gen9ou-123');
@@ -56,7 +56,7 @@ describe('replay fetcher', () => {
     expect(parseReplayUrl('not a replay!')).toBeNull();
   });
 
-  test('parseReplayUrl accepts the psim.us short links (round 77)', () => {
+  test('parseReplayUrl accepts the psim.us short links', () => {
     // Showdown shares replays as https://psim.us/r/<id>, which redirects to the replay server.
     expect(parseReplayUrl('https://psim.us/r/smogtours-gen8ou-562428')).toBe('smogtours-gen8ou-562428');
     expect(parseReplayUrl('psim.us/r/gen9ou-123?p2')).toBe('gen9ou-123');
@@ -77,12 +77,12 @@ describe('replay fetcher', () => {
     expect(parseReplayViewpoint('gen9ou-p2-123')).toBe('p1');
   });
 
-  test('fetchReplay rejects non-replay input with a clear message (G1/G2)', async () => {
+  test('fetchReplay rejects non-replay input with a clear message', async () => {
     await expect(fetchReplay('https://example.com/foo')).rejects.toThrow(/replay link or id/i);
     await expect(fetchReplay('')).rejects.toThrow(/replay link or id/i);
   });
 
-  test('fetchReplay adds the generation to display formats that omit it (G5)', async () => {
+  test('fetchReplay adds the generation to display formats that omit it', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => new Response(JSON.stringify({
       id: 'smogtours-ubers-54583',
@@ -140,12 +140,12 @@ describe('replay fetcher', () => {
     }
   });
 
-  test('parseReplayUrl keeps the password suffix the replay server needs (G22)', () => {
+  test('parseReplayUrl keeps the password suffix the replay server needs', () => {
     expect(parseReplayUrl(`https://replay.pokemonshowdown.com/${privateId}`)).toBe(privateId);
     expect(parseReplayUrl(privateId)).toBe(privateId);
   });
 
-  test('fetchReplay falls back to the .log route when .json refuses (G22)', async () => {
+  test('fetchReplay falls back to the .log route when .json refuses', async () => {
     const originalFetch = globalThis.fetch;
     const asked: string[] = [];
     globalThis.fetch = (async (url: string) => {
@@ -172,7 +172,7 @@ describe('replay fetcher', () => {
     }
   });
 
-  test('fetchReplay treats a non-JSON body as a failed JSON route (G22)', async () => {
+  test('fetchReplay treats a non-JSON body as a failed JSON route', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string) => (String(url).endsWith('.json')
       ? new Response('<!DOCTYPE html><title>404</title>', { status: 200 })
@@ -206,7 +206,7 @@ describe('replay fetcher', () => {
     }
   });
 
-  test('a private replay that stays unreachable is explained as one (G22)', async () => {
+  test('a private replay that stays unreachable is explained as one', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
 
@@ -218,7 +218,7 @@ describe('replay fetcher', () => {
     }
   });
 
-  test('a replay record without any battle log says so (G22)', async () => {
+  test('a replay record without any battle log says so', async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async (url: string) => (String(url).endsWith('.json')
       ? new Response(JSON.stringify({

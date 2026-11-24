@@ -783,7 +783,7 @@ describe('evaluatePosition', () => {
   });
 });
 
-describe('effective speed in the eval (round 9)', () => {
+describe('effective speed in the eval', () => {
   test('a Scarf breaks a mirror matchup tie', () => {
     // Identical Talonflame mirror: the pair sign is decided by speed alone. A bare mirror ties (sign 0, matchup 0); a Scarf on
     // p2 makes p2 faster (matchup < 0).
@@ -816,7 +816,7 @@ describe('effective speed in the eval (round 9)', () => {
   });
 });
 
-describe('PP truth in the threat model (round 11)', () => {
+describe('PP truth in the threat model', () => {
   // PP comes from the sim's move slots, not the Dex base PP: pools differ across rule sets (Showdown runs maxed PP Ups,
   // Pokémon Champions other counts).
   test('pairThreat ignores move slots with no PP left', () => {
@@ -851,7 +851,7 @@ describe('PP truth in the threat model (round 11)', () => {
     expect(evaluatePosition(battle, cache)).toBe(evaluatePosition(battle));
   });
 
-  describe('unanswered mons (round 13)', () => {
+  describe('unanswered mons', () => {
     test('a mon no living enemy out-races is unanswered', () => {
       // A level-100 Mewtwo one-shots both bodies; their Tackles never win a race against it (648453 t13: any entry of an
       // unanswered mon turns profit, the opponent can only sacrifice).
@@ -875,7 +875,7 @@ describe('PP truth in the threat model (round 11)', () => {
       expect(unansweredMons(battle)).toEqual({ p1: [], p2: [] });
     });
 
-    test('a benched answer pays the entry toll; the same answer active stands (round 13 gate)', () => {
+    test('a benched answer pays the entry toll; the same answer active stands', () => {
       // 648453 t13: a benched twin would hold the standing mirror, but it answers by switching in, eats one free hit on the
       // way and loses the race from tolled HP. The same twin already active pays no toll.
       const benched = makeBattle(
@@ -897,7 +897,7 @@ describe('PP truth in the threat model (round 11)', () => {
     });
   });
 
-  describe('the switch-in stage and the coin-flip check (round 14)', () => {
+  describe('the switch-in stage and the coin-flip check', () => {
     // 648453 t13: the race model called the active Tornadus-T an answer to Lopunny-Mega on a full-hit Hurricane clock while
     // every benched answer died on arrival; the real game answered with a pure Weavile sacrifice.
     test('pairThreat carries the accuracy of its category-max move', () => {
@@ -965,7 +965,7 @@ describe('PP truth in the threat model (round 11)', () => {
     });
   });
 
-  describe('the decided sweep and the near-decided roll (round 15)', () => {
+  describe('the decided sweep and the near-decided roll', () => {
     // 573756 t134–138: a locked endgame read +0.2 instead of decided; the
     // series bookkeeping is what separates a cleanup from a mere threat —
     // a mon that wins every FRESH pair can still die to the accumulated
@@ -1062,7 +1062,7 @@ describe('PP truth in the threat model (round 11)', () => {
   });
 });
 
-describe('the healer wall is a finite race (round 11)', () => {
+describe('the healer wall is a finite race', () => {
   const side = (partial: Partial<RaceSide>): RaceSide =>
     ({ hp: 1, frac: 0, residual: 0, healRate: 0, healAbsorb: 0, ppBudget: 64, ...partial });
   // A 16-PP Recover-class healer: rate 1/2 per turn, 8 bars of total fuel.
@@ -1106,7 +1106,7 @@ describe('the healer wall is a finite race (round 11)', () => {
     expect(raceClocks(attacker, weak).effFracB).toBe(0);
   });
 
-  test('held heal PP realizes only at the pin efficiency — healing now beats holding (round 12)', () => {
+  test('held heal PP realizes only at the pin efficiency — healing now beats holding', () => {
     // Under 1.0 incoming a rate-1/2 healer heals at a net loss: its held PP realize at healRate/incoming = 1/2 efficiency,
     // while HP already on the body counts in full. Same hp + absorb total (3.0 bars), but the body that already healed
     // survives longer (655336 t26: Slack Off priced a mere 0.041 over a free-turn Protect).

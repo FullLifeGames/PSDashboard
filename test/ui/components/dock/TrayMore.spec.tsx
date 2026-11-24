@@ -162,7 +162,7 @@ describe('displayName in the picker', () => {
 describe.each([
   ['singles', singles, 'gen9championsou', /^P1\b/],
   ['doubles', doubles, 'gen9championsvgc2026regma', /^P1A\b/],
-] as const)('the tray of a %s Champions game (T8a)', (_kind, state, format, chip) => {
+] as const)('the tray of a %s Champions game', (_kind, state, format, chip) => {
   test('asks for the move pool with the format of the game', async () => {
     pool.calls.length = 0;
     render(<TurnDock simState={state} executeError={null} executing={false} gen={9} format={format} onSetChoice={vi.fn()} onHypotheticalMove={vi.fn()} onExecuteTurn={vi.fn()} />);

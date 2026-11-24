@@ -135,7 +135,7 @@ const ROWS: Row[] = [
   { gen: 9, label: 'gen 9 Drizzle', entering: { ability: 'Drizzle' } },
 ];
 
-describe('a body the correction puts in plays the entry the simulator plays (round 78, @pkmn 0.10.12)', () => {
+describe('a body the correction puts in plays the entry the simulator plays (@pkmn 0.10.12)', () => {
   for (const afterFaint of [true, false]) {
     test.each(ROWS.map(row => [row.label, row] as const))(`${afterFaint ? 'after a faint' : 'a switch at the boundary'}: %s`, (_label, row) => {
       expect(entryState(correctedEntry(row, afterFaint))).toEqual(entryState(simulatorEntry(row, afterFaint)));

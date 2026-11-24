@@ -48,7 +48,7 @@ const tossVsEgg = () => serializeAt(makeBattle(
   [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
 ), { p2: [1] });
 
-describe('forced-win prover (round 35)', () => {
+describe('forced-win prover', () => {
   test('a certain knock-out proves in one turn with no caveat', () => {
     const proof = proveForcedWin(tossVsEgg(), { side: 'p1', rootOrder: ['move seismictoss', 'move protect'], tera: false });
     expect(proof.mass).toBe(1);
@@ -270,7 +270,7 @@ const scene = (name: string, folder: 'forced-win' | 'positions' = 'forced-win') 
 const prove = (board: Scene) =>
   proveForcedWin(board.serialized, { side: board.side, rootOrder: board.rootOrder ?? [], tera: board.tera ?? false, sleepClause: board.sleepClause, ruleset: board.ruleset });
 
-describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () => {
+describe('the forced-win proof without the greedy scout', () => {
   const misses: Array<[string, string, number]> = [
     ['Doubles OU 2661746817 turn 8', 'scout-miss-gen9doublesou-2661746817-t8', 1],
     ['VGC 2024 Reg G 2163312677 turn 8', 'scout-miss-gen9vgc2024regg-2163312677-t8', 1],
@@ -288,7 +288,7 @@ describe('the forced-win proof without the greedy scout (round 89, A5f-7)', () =
   // Champions VGC 2694684816 turn 8: 36 of the 100 cells are unpriced faint splits and the production budget ends with no proof (mass 0).
   // Whether the win is certain by the game is open: the pricing of a split that follows a crit, and the class plan's read of slot a with one
   // body per side. The row turns red when either lands; the pin then moves to the proof it finds.
-  test('doubles, Champions VGC 2694684816 turn 8: no proof within the production budget (#155, #156)', async () => {
+  test('doubles, Champions VGC 2694684816 turn 8: no proof within the production budget', async () => {
     const board = scene('scout-miss-gen9championsvgc2026regmc-2694684816-t8');
     await loadSimMods('gen9championsdoublescustomgame');
     expect(prove(board).mass).toBe(0);
@@ -365,7 +365,7 @@ describe('forced-win-doubles-replies', () => {
     return JSON.stringify(State.serializeBattle(battle));
   }
 
-  describe('forced-win prover: every reply of the defending side (round 64, T118)', () => {
+  describe('forced-win prover: every reply of the defending side', () => {
     test('doubles, VGC 2630685175 turn 7: the Wood Hammer and Earth Power line proves nothing, since Zamazenta\'s Protect escapes it', () => {
       const board = scene('gen9vgc2026regi-2630685175-t7');
       const root = createRootPosition(board.serialized);
@@ -463,7 +463,7 @@ describe('plain-dice-scenes', () => {
     });
   });
 
-  describe('a repeated Protect is priced at the proving move (doubles, A5f5 proofs that A7 no longer finds)', () => {
+  describe('a repeated Protect is priced at the proving move (doubles)', () => {
     // the proving move alone: the hold the draws all failed is one third, so no turn proves the win in one turn
     test.each([
       ['Champions VGC 2679549596 turn 7', 'gen9championsvgc2026regmbbo3-2679549596-t7', 'gen9championsdoublescustomgame'],
@@ -487,7 +487,7 @@ describe('plain-dice-scenes', () => {
     });
   });
 
-  describe('#145 singles scene: a second Spiky Shield holds one time in three', () => {
+  describe('singles scene: a second Spiky Shield holds one time in three', () => {
     // Chesnaught at 1 HP behind a Protect counter of 1 against a Garchomp that needs one more hit: the shield holds with the chance
     // the counter gives, and the game decides the rest. The sweep proves the share for every stalling move of every rule set.
     test.each([

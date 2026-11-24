@@ -193,7 +193,7 @@ describe('the Dex lists the five items that read the field', () => {
   });
 });
 
-describe('a terrain seed or Room Service that never fired is ruled out (T349)', () => {
+describe('a terrain seed or Room Service that never fired is ruled out', () => {
   for (const rules of RULESETS) {
     for (const doubles of [false, true]) {
       test(`${rules.name}, ${doubles ? 'doubles' : 'singles'}: the rule matches the simulator in every scene`, () => {

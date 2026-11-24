@@ -24,7 +24,7 @@ function engine(overrides: { status?: number; body?: (request: EngineRequest) =>
   });
 }
 
-describe('check-engine, the conformance tool (round 77, user gate 28.10.2026, 6a)', () => {
+describe('check-engine, the conformance tool (6a)', () => {
   test('the samples ship singles, doubles and VGC; a request lists the options of the dashboard\'s own matrix', () => {
     const requests = positions.map(position => engineRequestFor(position.serialized, 5000, true, position.format));
     expect(requests.map(request => request.gameType)).toEqual(['singles', 'doubles', 'doubles']);

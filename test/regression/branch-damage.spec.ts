@@ -74,7 +74,7 @@ function expectRowsHold(scene: (seed: number) => { current: Battle; rows: { row:
   expect(counted).toBeGreaterThan(0);
 }
 
-describe('entry boosts count once in the preview (T100)', () => {
+describe('entry boosts count once in the preview', () => {
   test('singles: Earthquake into Zamazenta-Crowned, whose Dauntless Shield stage the simulator already holds', () => {
     expectRowsHold(seed => {
       const current = battle('gen9customgame', [set('Garchomp', ['Earthquake'])],
@@ -103,7 +103,7 @@ describe('entry boosts count once in the preview (T100)', () => {
   });
 });
 
-describe('an armed Tera reads the body the simulator makes of the click (T100, Terapagos-Stellar)', () => {
+describe('an armed Tera reads the body the simulator makes of the click (Terapagos-Stellar)', () => {
   test('singles: Terapagos\'s Tera Starstorm with the toggle armed is the Terapagos-Stellar hit', () => {
     expectRowsHold(seed => {
       const current = battle('gen9customgame', [set('Terapagos', ['Tera Starstorm'], { ability: 'Tera Shift', teraType: 'Stellar' })], [armored('Snorlax')], seed);
@@ -127,7 +127,7 @@ describe('an armed Tera reads the body the simulator makes of the click (T100, T
   });
 });
 
-describe('forms the calc does not know reach the preview (T72)', () => {
+describe('forms the calc does not know reach the preview', () => {
   test('singles: Aegislash attacks in the forme its Stance Change gives it and takes hits in its Shield forme', () => {
     expectRowsHold(seed => {
       const current = battle('gen9customgame', [set('Aegislash', ['Iron Head'], { ability: 'Stance Change' })], [armored('Snorlax')], seed);
@@ -155,7 +155,7 @@ describe('forms the calc does not know reach the preview (T72)', () => {
   });
 });
 
-describe('what the simulator holds reaches the preview (T76)', () => {
+describe('what the simulator holds reaches the preview', () => {
   test('singles and doubles: Kingambit\'s Iron Head after three faints holds its row', () => {
     for (const format of ['gen9customgame', 'gen9doublescustomgame'] as const) {
       const doubles = format === 'gen9doublescustomgame';
@@ -193,7 +193,7 @@ describe('what the simulator holds reaches the preview (T76)', () => {
   });
 });
 
-describe('Hidden Power reaches the preview typed (T83)', () => {
+describe('Hidden Power reaches the preview typed', () => {
   test('singles and doubles gen 7: the Hidden Power Ice row holds the damage the simulator deals', () => {
     for (const format of ['gen7customgame', 'gen7doublescustomgame'] as const) {
       const doubles = format === 'gen7doublescustomgame';

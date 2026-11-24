@@ -259,7 +259,7 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6].replayHistory).toEqual(history);
   }, 60_000);
 
-  test('a variation that ended the game by itself raises no divergence notice (FT-1)', async () => {
+  test('a variation that ended the game by itself raises no divergence notice', async () => {
     const history = [entry(2), entry(3)];
     const wired = inputs({
       timeline: timelineAt(4, { viewLine: 'variation', variationSpan: { startTurn: 2, length: 2 } }),
@@ -388,7 +388,7 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
     expect(['applied', 'no-draw', 'no-chance', 'blocked']).toContain(entry.diceReport!.forced[0].took);
   }, 300_000);
 
-  test('Execute sends the effective choices it is given, seed included, and not the bare draft (round 84, turn dock)', async () => {
+  test('Execute sends the effective choices it is given, seed included, and not the bare draft (turn dock)', async () => {
     // The dock's seed is derived, not stored in the draft: the caller hands the merge of seed and draft to Execute.
     const { result, p1, p2 } = await viewedPosition();
     expect(result.current.draft).toEqual({ p1: [], p2: [] });

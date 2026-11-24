@@ -103,7 +103,7 @@ function abilitySetters(view: SimView): { id: string; kind: FieldLine['kind']; c
 /** The abilities a rule set must find (the oracle's own list, with the generation each debuts in): the sweep proves it plays them. */
 const NAMED_ABILITIES: [string, number][] = [['drought', 3], ['drizzle', 3], ['sandstream', 3], ['snowwarning', 4], ['electricsurge', 7], ['grassysurge', 7], ['mistysurge', 7], ['psychicsurge', 7], ['sandspit', 8], ['seedsower', 9]];
 
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('S5, the setter of a move: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the setter of a move: $name', view => {
   const setters = fieldMoves(view);
 
   test('the rule set has weather moves', () => {
@@ -125,7 +125,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('S5, the setter of a
   }
 });
 
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('S6, the setter of an ability: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the setter of an ability: $name', view => {
   const found = abilitySetters(view);
 
   test('the sweep found the abilities the rule set has', () => {
@@ -152,7 +152,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('S6, the setter of a
 });
 
 /** The cases where the turns prove nothing: each plays the control (a verdict) and then the cause. */
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S7, the turns prove nothing: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove nothing: $name', view => {
   const cases = [
     { move: 'sunnyday', kind: 'weather' as const },
     { move: 'electricterrain', kind: 'terrain' as const },
@@ -232,7 +232,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S7, the turns prove
  * replacement or a move must read none. A move that ends or changes the field with no line the reader knows fails here. The plain run plays every tenth move and the moves
  * whose Dex entry mentions a weather or a terrain.
  */
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunnyday').length > 0))('S8, removers and movers of weather and terrain: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunnyday').length > 0))('removers and movers of weather and terrain: $name', view => {
   const rock = itemsOf(view, 'sunnyday')[0];
   const extender = known(view, ['electricterrain']).length > 0 ? itemsOf(view, 'electricterrain')[0] : undefined;
   const textOf = (move: DexMove): string => { try { return JSON.stringify(move, (_key, value) => (typeof value === 'function' ? String(value) : value)); } catch { return ''; } };
@@ -264,7 +264,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunn
  * leaves. Held to the simulator: a log of 12 turns shows the field end exactly when the answer is false. Before Generation 6 an ability's weather lasts for
  * good, while the callback of `conditionTurns` says five and eight for every source: the reader leaves such a start out.
  */
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('S9, the fields an ability leaves standing for good: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the fields an ability leaves standing for good: $name', view => {
   const dex = asRulesDex(view);
 
   test('startsForGood equals what the log of the simulator shows', () => {

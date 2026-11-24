@@ -33,7 +33,7 @@ describe('EvalTurnAnalysis', () => {
       expect(new Set(titles())).toEqual(new Set(['Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']));
     });
 
-  test.each([['singles', {}], ['doubles', { playedSlots: [null, null] }]] as const)('the open turn of a game, %s, reads as an open position: the engine lines, no played choice, no verdict (H4h)', (_kind, slots) => {
+  test.each([['singles', {}], ['doubles', { playedSlots: [null, null] }]] as const)('the open turn of a game, %s, reads as an open position: the engine lines, no played choice, no verdict', (_kind, slots) => {
     const open = { playedRaw: undefined, played: null, regret: null, ...slots };
     const analysis = turnAnalysis(4, { attribution: 'unclear', swing: null, scoreAfter: null, playedOutcome: null, decisionDelta: null, chanceDelta: null, p1: sideAnalysis(open), p2: sideAnalysis(open) });
     render(<EvalTurnAnalysis analysis={analysis} playerNames={names} open />);
@@ -47,7 +47,7 @@ describe('EvalTurnAnalysis', () => {
     expect(replay.container.textContent).toMatch(/choice never surfaced/);
   });
 
-  test('the summary sits closed under its toggle; a click or the keyboard opens it, and every turn starts closed (T294)', async () => {
+  test('the summary sits closed under its toggle; a click or the keyboard opens it, and every turn starts closed', async () => {
     const analysis = turnAnalysis(4, { attribution: 'p1-decision', p1: misplayedSide(), swing: -0.2, decisionDelta: -0.15, chanceDelta: -0.05 });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} />);
     const toggle = screen.getByRole('button', { name: /Explanation/ });
@@ -74,7 +74,7 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(summarizeTurn(next, names))).not.toBeVisible();
   });
 
-  test('a residual without a roll in its direction reads as an estimate that moved with no roll behind it, in the badge and the split line (T22, 649664 t12 shape)', () => {
+  test('a residual without a roll in its direction reads as an estimate that moved with no roll behind it, in the badge and the split line (649664 t12 shape)', () => {
     const reRead = turnAnalysis(12, { attribution: 'chance', swing: 0.24, decisionDelta: 0, chanceDelta: 0.24, rolledFor: { p1: false, p2: true } });
     const { unmount } = render(<EvalTurnAnalysis analysis={reRead} playerNames={names} />);
     expect(screen.getByText('estimate moved (no roll behind it)')).toBeInTheDocument();
@@ -85,7 +85,7 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText(/expected from the choices/)).toHaveTextContent('from how it rolled');
   });
 
-  test('a read whose side lost ground loses its badge, its chip and its sentence; the turn shows its movement (T59)', () => {
+  test('a read whose side lost ground loses its badge, its chip and its sentence; the turn shows its movement', () => {
     const read = sideAnalysis({ riskPaidOff: true, riskPayoff: 0.2, safe: rankedChoice('move protect', 'Protect', 0.05) });
     render(<EvalTurnAnalysis analysis={turnAnalysis(9, { attribution: 'p1-read', p1: read, swing: -0.3, chanceDelta: -0.25 })} playerNames={names} />);
     expect(screen.queryByText("Alice's read paid off")).toBeNull();
@@ -122,7 +122,7 @@ describe('EvalTurnAnalysis', () => {
 });
 
 describe('EvalLeadAnalysis', () => {
-  test.each(['singles', 'doubles'] as const)('B7a, %s: the card offers Open matrix beside the turn header only with a matrix, on a played turn and on an open tip', async kind => {
+  test.each(['singles', 'doubles'] as const)('%s: the card offers Open matrix beside the turn header only with a matrix, on a played turn and on an open tip', async kind => {
     const analysis = turnAnalysis(4);
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={evalResult(kind)} />);
     const button = screen.getByRole('button', { name: 'Open matrix' });
@@ -143,7 +143,7 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.queryByRole('button', { name: 'Open matrix' })).toBeNull();
   });
 
-  test('B7a: a cell of the card\'s matrix dialog plays the pair through the card\'s handler', async () => {
+  test('a cell of the card\'s matrix dialog plays the pair through the card\'s handler', async () => {
     const onPickPair = vi.fn();
     render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} result={evalResult('singles')} onPickPair={onPickPair} />);
     await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
@@ -171,7 +171,7 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.getByText(/^engine:/)).toHaveTextContent('engine: Chi-Yu + Okidogi');
   });
 
-  test('doubles: a led pair that matches the engine\'s pick gets no tick either, only the neutral engine line (T123 point 5)', () => {
+  test('doubles: a led pair that matches the engine\'s pick gets no tick either, only the neutral engine line', () => {
     // gen9doublesou-2660802611 p1: led Landorus + Incineroar, the engine's pick too.
     const pair = rankedChoice('team 12', 'Lead Landorus + Incineroar', 0.1);
     render(<EvalLeadAnalysis leads={leadAnalysis({ p1: { played: pair, best: pair, regret: 0 } })} playerNames={names} />);
@@ -192,7 +192,7 @@ describe('EvalLeadAnalysis', () => {
   });
 });
 
-describe('EvalTurnAnalysis, the endgame entry (round 89, #130)', () => {
+describe('EvalTurnAnalysis, the endgame entry', () => {
   const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
 
   test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {

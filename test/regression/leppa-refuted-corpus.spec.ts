@@ -34,7 +34,7 @@ async function builtItem(id: string, side: 'p1' | 'p2', body: string): Promise<s
   return String(set.item ?? '');
 }
 
-describe('a move that ran out of PP with no Leppa Berry line leaves no Leppa Berry in the build (#132)', () => {
+describe('a move that ran out of PP with no Leppa Berry line leaves no Leppa Berry in the build', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id}: ${row.what}`, async () => {
       const item = await builtItem(row.id, row.side, row.body);

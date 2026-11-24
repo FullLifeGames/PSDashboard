@@ -58,7 +58,7 @@ const resultWith = (score: number, p1: string[], p2: string[], extra: Partial<Ev
   ...extra,
 });
 
-describe('forced-win trigger and bar (round 35)', () => {
+describe('forced-win trigger and bar', () => {
   test('forcedWinInput carries score, profile, ranking order and the search allowance', () => {
     // Rows a band apart keep the ranking's order; a near tie goes by label (the prover-near-tie rows below).
     const result = resultWith(0.3, ['move seismictoss', 'move protect'], ['move softboiled'], {
@@ -346,8 +346,8 @@ describe('a failed repeat that missed is a delay too (the stall is reset)', () =
   });
 });
 
-describe('the scenes of the user\'s three Champions boards and #145', () => {
-  test('#145, Champions VGC 2694505370 turn 10: the held Protect lets the partner hit, no proof for the side that lost', () => {
+describe('the four Champions scenes the user reported', () => {
+  test('Champions VGC 2694505370 turn 10: the held Protect lets the partner hit, no proof for the side that lost', () => {
     const proof = sceneProof(scene('forced-win-delay/champions-vgc-2694505370-t10'));
     expect(proof.delay).toBeUndefined();
     expect(proof.mass).toBe(0);
@@ -513,7 +513,7 @@ describe('singles: a sure kill that moves before the foe', () => {
   });
 });
 
-describe('doubles: the strike only takes the foe\'s last standing body (decision D2 a)', () => {
+describe('doubles: the strike only takes the foe\'s last standing body', () => {
   const lead = [set('Pikachu', ['Quick Attack', 'Splash']), set('Pidgeot', ['Splash'])];
 
   test('the foe\'s last body at 1 HP: Quick Attack at it is the strike', () => {
@@ -556,7 +556,7 @@ describe('prover-near-tie', () => {
   const row = (label: string, choice: string, ev: number): RankedChoice => ({ label, choice, ev, worstCase: ev, expected: ev, punishedBy: null });
   const result = (rows: RankedChoice[]): EvalResult => ({ score: 0, interval: 0, depthCompleted: 1, perSide: { p1: rows, p2: [] } });
 
-  describe('the prover’s root order across near ties (round 67, T134)', () => {
+  describe('the prover’s root order across near ties', () => {
     test('two rankings that differ only inside a near tie give the prover one root order (653785 t24)', () => {
       // The ranking of 653785 t24: U-turn and Hidden Power Ice stand 0.0017 apart. The second ranking is a noise-sized estimate of
       // the same root with the two swapped (every value moved by less than 0.016).

@@ -30,7 +30,7 @@ const snapshot = (p1: ReturnType<typeof mon>[], p2: ReturnType<typeof mon>[]): T
 const side = (fields: Partial<SideAnalysis>): SideAnalysis =>
   ({ playedRaw: null, played: null, best: null, safe: null, regret: null, ...fields });
 
-describe('point 10: a sack names the other bodies the side lost on the turn', () => {
+describe('a sack names the other bodies the side lost on the turn', () => {
   test('doubles (912045 t1 shape): Ogerpon fed at 9%, Rillaboom fell to the same spread move', () => {
     const events = [
       '|move|p1b: Gholdengo|Make It Rain|p2a: Ogerpon|[spread] p2a,p2b',
@@ -82,7 +82,7 @@ const choice = (choiceStr: string, label: string, ev: number, worstCase = ev): R
 
 const quiet = side({});
 
-describe('point 6: every clause on a partial side names the hidden slot', () => {
+describe('every clause on a partial side names the hidden slot', () => {
   test('the read credit (2629703929 t1 shape) says it credits the visible slot', () => {
     const played = choice('move tailwind, move solarbeam 1', 'Tailwind + Solar Beam→Groudon', 0.4, -0.2);
     const safe = choice('move tailwind terastallize, move solarbeam 1', 'Tera + Tailwind + Solar Beam→Groudon', 0.3, -0.1);
@@ -107,7 +107,7 @@ describe('point 6: every clause on a partial side names the hidden slot', () => 
   });
 });
 
-describe('point 1: the read template reads as English', () => {
+describe('the read template reads as English', () => {
   test('singles paid-off read (653785 t25 shape): "switched to", "the safe switch to"', () => {
     const played = choice('switch 4', '→ Cofagrigus', 0.3, -0.1);
     const safe = choice('switch 5', '→ Volcanion', 0.2, 0.0);
@@ -162,7 +162,7 @@ describe('point 1: the read template reads as English', () => {
 const ranked = (choice: string, label: string, ev: number): RankedChoice =>
   ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
 
-describe('T135 point 2: a doubles pair reads per slot in the gerund templates', () => {
+describe('a doubles pair reads per slot in the gerund templates', () => {
   test('a pair with a switch reads per slot in the gerund, slots of one kind share the verb, a gimmick stays with its move', () => {
     expect(phrase('→ Ting-Lu + Scale Shot→Incineroar')).toBe('switching to Ting-Lu and playing Scale Shot→Incineroar');
     expect(phrase('Parting Shot→Orthworm + → Volcanion')).toBe('playing Parting Shot→Orthworm and switching to Volcanion');

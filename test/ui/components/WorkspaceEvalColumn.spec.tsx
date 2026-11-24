@@ -71,7 +71,7 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByRole('img', { name: /Evaluation over/ })).toBeNull();
   }, 60_000);
 
-  test('at turn 0 the play-out hint names the picked leads, not a turn (round 77, C2)', async () => {
+  test('at turn 0 the play-out hint names the picked leads, not a turn', async () => {
     // At turn 0 the run starts from the lead decision, so the hint must not read "from turn 3".
     const app = await mountLoaded();
     act(() => app().board.timeline.handleGraphSelectLine(0));

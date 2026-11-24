@@ -120,7 +120,7 @@ const stale = (obs: ReadObservation): ReadObservation => {
   return rest as unknown as ReadObservation;
 };
 
-describe('a history power reaches the calculator through the Dex callback (T210 group 1)', () => {
+describe('a history power reaches the calculator through the Dex callback', () => {
   for (const scene of SCENES) {
     for (const kind of scene.kinds) {
       test(`${kind}: ${scene.title}`, () => {
@@ -167,7 +167,7 @@ const calcEvs = (spread: PokemonEvs) => Object.fromEntries(Object.entries(spread
 
 const CHAMPIONS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
 
-describe('the spread solver reads Champions Stat Points (T145)', () => {
+describe('the spread solver reads Champions Stat Points', () => {
   for (const [kind, format] of Object.entries(CHAMPIONS)) {
     test(`each Stat Point is one stat point, and the set's IVs do not count (${kind})`, () => {
       // Garchomp, base Speed 102: 122 at 0 SP, 154 at 32 SP on a neutral nature; a published Speed IV of 0 has
@@ -233,7 +233,7 @@ describe('the spread solver reads Champions Stat Points (T145)', () => {
   });
 });
 
-describe('a Champions build stays on the Stat Point scale (T145)', () => {
+describe('a Champions build stays on the Stat Point scale', () => {
   const logOf = (kind: 'singles' | 'doubles') => [
     '|player|p1|Alice|1|', '|player|p2|Bob|2|', `|gametype|${kind}`, '|gen|9',
     kind === 'singles' ? '|tier|[Gen 9 Champions] OU' : '|tier|[Gen 9 Champions] VGC 2026 Reg M-B (Bo3)',
@@ -326,7 +326,7 @@ describe('hit-history-ally', () => {
     return rest as unknown as ReadObservation;
   };
 
-  describe('an ally with Plus or Minus switches the user\'s ability on (T210 group 4)', () => {
+  describe('an ally with Plus or Minus switches the user\'s ability on', () => {
     for (const scene of SCENES) {
       for (const kind of scene.kinds) {
         test(`${kind}: ${scene.title}`, () => {
@@ -427,7 +427,7 @@ describe('hit-history-turn', () => {
     analytic(ANALYTIC_CHAMPIONS, CHAMPIONS, true),
   ];
 
-  describe('the turn facts of the hit set the ability\'s state (T210 group 3)', () => {
+  describe('the turn facts of the hit set the ability\'s state', () => {
     for (const scene of CASES) {
       for (const kind of scene.kinds) {
         test(`${kind}: ${scene.title}`, () => {

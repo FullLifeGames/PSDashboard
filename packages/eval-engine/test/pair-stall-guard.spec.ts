@@ -22,7 +22,7 @@ const RULES = [
 const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20', '21,22,23,24', '25,26,27,28', '29,30,31,32'];
 const PROTECT_FAMILY = ['banefulbunker', 'burningbulwark', 'detect', 'endure', 'kingsshield', 'obstruct', 'protect', 'silktrap', 'spikyshield'];
 
-describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex (round 70)', rules => {
+describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex', rules => {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   const board = (moveId: string, seed?: string): Battle =>
     battleOf(rules.format, [mon('Blissey', [moveId, 'splash']), mon('Blissey', ['splash'])], [mon('Pikachu', ['splash']), mon('Pikachu', ['splash'])], seed);

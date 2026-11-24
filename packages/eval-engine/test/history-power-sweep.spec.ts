@@ -28,7 +28,7 @@ const FACTS: [number, number][] = [[0, 0], [2, 0], [0, 2], [3, 5], [1, 9], [5, 1
 
 const tally = { moves: new Set<string>(), checked: 0 };
 
-describe('the history power moves: the simulator\'s callback, the calculator\'s move and the static agree on the same facts (round 76, T265)', () => {
+describe('the history power moves: the simulator\'s callback, the calculator\'s move and the static agree on the same facts', () => {
   for (const format of FORMATS) {
     test(format, () => {
       const dex = Dex.forFormat(format);

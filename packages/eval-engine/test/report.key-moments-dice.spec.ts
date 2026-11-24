@@ -49,7 +49,7 @@ const pool = (kind: Kind, extra: TurnAnalysis[]): TurnAnalysis[] => [
 const turnsOf = (analyses: TurnAnalysis[], diceTurns: ReadonlySet<number> | null, winner: 'p1' | 'p2' | null = 'p2') =>
   buildGameReport(analyses, names, winner, true, diceTurns).keyMoments.map(moment => moment.turn);
 
-describe.each(kinds)('T264 key moments, %s', kind => {
+describe.each(kinds)('key moments, %s', kind => {
   test('a dice turn at rank 6 whose chance went against the winner joins, in turn order', () => {
     const analyses = pool(kind, [decision(kind, 5, 0.3), dice(kind, 6, 0.27)]);
     expect(turnsOf(analyses, new Set([6]))).toEqual([1, 2, 3, 4, 6]);
@@ -217,7 +217,7 @@ const singlesMistake = side({
   played: choice('move stoneedge', 'Stone Edge', 0.1), best: choice('move earthquake', 'Earthquake', 0.4), regret: 0.3, tier: 'mistake',
 });
 
-describe('point 8: a regret over 1 reads as the two win chances it spans', () => {
+describe('a regret over 1 reads as the two win chances it spans', () => {
   test('the seed phrase (doubles, 2630685175 t8): "85% to 19%", no points, no dash', () => {
     const seed = seedPhrase(turn(8, doublesThrow, 0.9), 'p2');
     expect(seed).toBe('turn 8 (Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar, 85% to 19%; safer was Astral Barrage + Body Press→Calyrex-Ice)');

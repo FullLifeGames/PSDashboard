@@ -238,7 +238,7 @@ describe('scene: smogtours-gen8ou-573756 turn 8, the fifth Scald into Clefable (
     return { board, root: createRootPosition(serializeLiveBattle(board)) };
   }
 
-  test('the real position (round 86: no phantom infatuation): the Scald is no event, the cell reads none', { timeout: 120000 }, async () => {
+  test('the real position (no phantom infatuation): the Scald is no event, the cell reads none', { timeout: 120000 }, async () => {
     const { board } = await turn8('real');
     expect(board.sides[1].active[0].volatiles.attract).toBeUndefined();
     expect(planCellEvents(board, 'move softboiled', 'move scald').kind).toBe('none');

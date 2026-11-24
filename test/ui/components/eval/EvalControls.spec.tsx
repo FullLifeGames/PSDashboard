@@ -82,7 +82,7 @@ describe('EvalControls', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  test('another engine names itself in the heading title and the Engine select title, not in a line of text (round 89, FB-1)', () => {
+  test('another engine names itself in the heading title and the Engine select title, not in a line of text', () => {
     const bot = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' as const };
     const engines = { engines: [BUILTIN_ENGINE, bot], selected: bot, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
     render(<EvalControls {...props({ engines })} />);

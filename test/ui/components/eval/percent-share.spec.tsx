@@ -68,7 +68,7 @@ describe('graph and panel read one number', () => {
   });
 
   // A branch result prints at the share of its own board; the main line's share of the same turn number stands in for nothing. The scenes
-  // are in variation-share-t216.spec.tsx.
+  // are in percent-share.variation.spec.tsx.
   test('a branch result (not the graph\'s own) on a variation board of unknown share reads the opening map', () => {
     const graph = evalGraph('singles', { faintedFractions: Array.from({ length: 10 }, () => 0.5) });
     const branch = evalResult('singles', { score: 0.4 });

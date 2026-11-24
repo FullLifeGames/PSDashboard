@@ -53,7 +53,7 @@ function sweep(view: SimView, hazards: string[]): { own: string[]; foe: string[]
 
 const real = (view: SimView, ids: string[]) => ids.filter(id => isReal(view, id));
 
-describe('hazard removal lists are held to the simulator (round 72)', () => {
+describe('hazard removal lists are held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const hazards = [...hazardConditions(view.dex)].filter(id => isReal(view, id)).sort();
     const realHere = (ids: string[]) => real(view, ids);

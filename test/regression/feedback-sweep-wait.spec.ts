@@ -83,7 +83,7 @@ describe('waitForSweepEnd on a dead renderer', () => {
   });
 });
 
-describe('waitForSweepEnd and the early-lines stage (round 89, G13b)', () => {
+describe('waitForSweepEnd and the early-lines stage', () => {
   const stage = (active: boolean, done: number) => ({ active, done, total: 3 });
 
   test('the sweep ending is not the end: the dump waits for the stage, so two runs dump the same lines', async () => {

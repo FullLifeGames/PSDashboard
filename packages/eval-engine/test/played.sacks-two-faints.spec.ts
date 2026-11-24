@@ -24,7 +24,7 @@ const snapshot = (p1: ReturnType<typeof mon>[], p2: ReturnType<typeof mon>[]): T
   log: [],
 });
 
-describe('T135 point 1: detection keeps the shape of every own faint', () => {
+describe('detection keeps the shape of every own faint', () => {
   test('doubles (912045 t1 shape): the fed Ogerpon carries Rillaboom\'s shape next to its name', () => {
     const events = [
       '|move|p1b: Gholdengo|Make It Rain|p2a: Ogerpon|[spread] p2a,p2b',
@@ -83,7 +83,7 @@ const uxieTurn = (sack: SackInfo) => {
   });
 };
 
-describe('T135 point 1, rule A: every fallen body must earn the sack framing', () => {
+describe('rule A: every fallen body must earn the sack framing', () => {
   test('a low-HP feed next to a plain loss is no sack: the band stays', () => {
     const analysis = uxieTurn({ name: 'Uxie', hpFraction: 0.09, alsoFell: ['Latios'], others: [null] });
     expect(analysis.p1.sacrifice).toBeUndefined();

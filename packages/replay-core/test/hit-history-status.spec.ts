@@ -54,7 +54,7 @@ const stale = (obs: ReadObservation): ReadObservation => {
   return rest as unknown as ReadObservation;
 };
 
-describe('the defender\'s status reaches the calculator (T210 group 2)', () => {
+describe('the defender\'s status reaches the calculator', () => {
   for (const scene of SCENES) {
     for (const kind of scene.kinds) {
       test(`${kind}: ${scene.title}`, () => {

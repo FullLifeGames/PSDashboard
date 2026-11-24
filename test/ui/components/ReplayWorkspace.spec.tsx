@@ -138,7 +138,7 @@ describe('ReplayWorkspace', () => {
     expect(proceed).not.toHaveBeenCalled();
   }, 90_000);
 
-  test('an armed Tera toggle falls back when the timeline moves to another position (T124 point 2)', async () => {
+  test('an armed Tera toggle falls back when the timeline moves to another position', async () => {
     const { app } = await mountLoaded('singles');
     // The snapshot approximation names no Tera type, so the toggles come with the exact position.
     const exactAt = async (turn: number) => {

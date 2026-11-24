@@ -33,7 +33,7 @@ const ROWS: Row[] = [
   { id: 'gen9championsou-2691485449', turn: 14, side: 'p2', body: 'Pawmot', type: 'singles', pp: 1, offered: true },
 ];
 
-describe.each(ROWS)('#106 $id turn $turn: $body at the boundary ($type)', row => {
+describe.each(ROWS)('$id turn $turn: $body at the boundary ($type)', row => {
   test.skipIf(!existsSync(CORPUS(row.id)))('the slot holds the log\'s count and the ranking offers what the game can click', async () => {
     const rebuilt = await rebuild(row.id, { corpus: true, through: row.turn });
     const serialized = rebuilt.positions.get(row.turn);

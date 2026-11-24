@@ -94,7 +94,7 @@ async function typeReplayId(id: string) {
   await userEvent.type(field, `${id}{Enter}`);
 }
 
-describe('loading a replay while an unsaved variation is open (H16a)', () => {
+describe('loading a replay while an unsaved variation is open', () => {
   test.each(CASES)('$name: the question comes first; Cancel keeps the variation; after Save Branch nothing is asked', async ({ format, leads }) => {
     const app = await openVariation(format, leads);
     await typeReplayId('gen9ou-777');
@@ -115,7 +115,7 @@ describe('loading a replay while an unsaved variation is open (H16a)', () => {
   }, 300_000);
 });
 
-describe('Discard variation (FB4a)', () => {
+describe('Discard variation', () => {
   test.each(CASES)('$name: with a played turn the question comes first; Cancel keeps the variation, Discard variation drops it', async ({ format, leads }) => {
     const app = await openVariation(format, leads);
     await userEvent.click(screen.getByRole('button', { name: 'Discard variation' }));
@@ -175,7 +175,7 @@ async function copiedGameLink() {
   return read.payload;
 }
 
-describe('a game tip whose knockout turn waits for its replacement is no variation (finding 2)', () => {
+describe('a game tip whose knockout turn waits for its replacement is no variation', () => {
   test.each(CASES)('$name: no variation chrome while the replacement is pending, and none after it joins the turn', async ({ format, leads }) => {
     const { app, record } = await mountGame(format);
     await playKnockoutTurn(app, leads);
@@ -228,7 +228,7 @@ describe('a game tip whose knockout turn waits for its replacement is no variati
   }, 240_000);
 });
 
-describe('a reload while a replacement is pending keeps the played turn (finding 8)', () => {
+describe('a reload while a replacement is pending keeps the played turn', () => {
   test.each(CASES)('$name: the reopened game shows the turn played and asks for the replacement; picking it continues the game', async ({ format, leads }) => {
     const first = await mountGame(format);
     await playKnockoutTurn(first.app, leads);

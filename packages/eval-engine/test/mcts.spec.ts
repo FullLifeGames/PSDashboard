@@ -208,7 +208,7 @@ describe('DUCT-MCTS search', () => {
   });
 });
 
-describe('MCTS koOdds payload (round 7)', () => {
+describe('MCTS koOdds payload', () => {
   const settings = { depth: 1, samples: 1, tera: false, mode: 'mcts' } as const;
 
   test('sync results carry analytic koOdds on boundary rows only', () => {
@@ -230,7 +230,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(pump.koOdds).toEqual({ accuracy: expect.closeTo(0.8, 5), killFraction: 1, attacker: expect.any(Object) });
   });
 
-  test('root cells carry their outcome classes on boundary cells only, deterministically (rounds 33 and 43)', () => {
+  test('root cells carry their outcome classes on boundary cells only, deterministically (43)', () => {
     const root = gambleRoot();
     const tree = mctsTreeSearch(root, settings, 1);
     const i = tree.p1Options.findIndex(option => option.choice === 'move hydropump');
@@ -259,7 +259,7 @@ describe('MCTS koOdds payload (round 7)', () => {
     expect(tree1.boundaryCells).toEqual([]);
   });
 
-  test('doubles rows carry labeled koOdds on uncertain kills only (round 56; fail-closed before)', () => {
+  test('doubles rows carry labeled koOdds on uncertain kills only (fail-closed before)', () => {
     const battle = new Battle({
       formatid: toID('gen9doublescustomgame'),
       seed: '1,2,3,4',
@@ -349,7 +349,7 @@ describe('eval-mcts-forced-switch', () => {
     [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],
   )));
 
-  describe('forward model: stop at the forced-switch request (round 42)', () => {
+  describe('forward model: stop at the forced-switch request', () => {
     test('a knock-out halts at the request; the greedy default still reaches the boundary', () => {
       const root = explosionRoot();
       const stopped = advancePositionWithLog(root, 'move explosion', 'move substitute', '1,2,3,4', { stopAtForcedSwitch: true });
@@ -413,7 +413,7 @@ describe('eval-mcts-forced-switch', () => {
   const DOUBLE_KO = 'move seismictoss 1, move seismictoss 2';
   const TACKLES = 'move tackle 1, move tackle 1';
 
-  describe('doubles forced switches in the option lists (round 42)', () => {
+  describe('doubles forced switches in the option lists', () => {
     test('two forced slots with one replacement offer both pass assignments', () => {
       const stopped = advancePositionWithLog(doubleKoRoot(['Eevee']), DOUBLE_KO, TACKLES, '1,2,3,4', { stopAtForcedSwitch: true });
       expect(stopped.pendingSwitch).toBe(true);
@@ -462,7 +462,7 @@ describe('eval-mcts-forced-switch', () => {
     return root.children.get(cellKey(i, j));
   }
 
-  describe('MCTS: forced switches are decision nodes (round 42)', () => {
+  describe('MCTS: forced switches are decision nodes', () => {
     test('singles: the knock-out cell is a mid-turn node with the bench against wait; its children are boundaries', () => {
       const root = mctsRoot(explosionRoot().serialized, SETTINGS);
       expect(root.boundary).toBe(true);

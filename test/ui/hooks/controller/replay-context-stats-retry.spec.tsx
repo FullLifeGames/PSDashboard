@@ -35,7 +35,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('useReplayContext usage stats after a network blip (T68)', () => {
+describe('useReplayContext usage stats after a network blip', () => {
   test('the next replay of the same format loads the stats the first one could not reach', async () => {
     const first = singlesReplay();
     const second = { ...singlesReplay(), id: `${first.id}-again` };

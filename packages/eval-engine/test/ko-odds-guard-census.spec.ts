@@ -84,7 +84,7 @@ function guardFires(battle: Battle, found: Found, seat: 'attacker' | 'defender')
   return fires;
 }
 
-describe.each(RULES)('$name: the items and abilities with a crit or accuracy handler (round 70, N1)', rules => {
+describe.each(RULES)('$name: the items and abilities with a crit or accuracy handler', rules => {
   const battle = scene(rules);
   const found = effectsOf(battle, rules.gen);
 
@@ -113,7 +113,7 @@ describe.each(RULES)('$name: the items and abilities with a crit or accuracy han
   });
 });
 
-describe('Gen 9: the census in numbers (round 70, N1)', () => {
+describe('Gen 9: the census in numbers', () => {
   test('eighteen effects are guarded, the five listed stay out', () => {
     const battle = scene(RULES[RULES.length - 2]);
     const found = effectsOf(battle, 9);
@@ -131,7 +131,7 @@ test('every exclusion has a play below', () => {
   expect(Object.keys(EXCLUDED).sort()).toEqual(PLAYED);
 });
 
-describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, played (round 70, N1)', rules => {
+describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, played', rules => {
   const exists = (key: string) => effectsOf(scene(rules), rules.gen).some(effect => keyOf(effect) === key);
   const asHolder = (battle: Battle, id: string, seat: 'attacker' | 'defender') => place(bodies(battle)[seat], { kind: 'ability', id });
 
@@ -180,7 +180,7 @@ describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, pla
   });
 });
 
-describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer (round 70, N1)', () => {
+describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer', () => {
   const rules = RULES[RULES.length - 2];
   const newly = ['item:leek', 'item:stick', 'item:luckypunch', 'item:razorclaw', 'item:scopelens', 'ability:merciless', 'ability:superluck'];
   const effects = (keys: string[]) => keys.map((key): Found => ({ kind: key.startsWith('item') ? 'item' : 'ability', id: key.split(':')[1], name: key, handlers: [] }));

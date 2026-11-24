@@ -6,7 +6,7 @@ const sample = (over: Partial<SummarySample>): SummarySample => ({
   quality: 'std', luckAgainstFavored: false, ...over,
 });
 
-describe('calibration summary lines (round 34)', () => {
+describe('calibration summary lines', () => {
   test('prints the hq and luck-adjusted lines after the phase briers', () => {
     const samples = [
       sample({ id: 'a', quality: 'hq' }),
@@ -22,7 +22,7 @@ describe('calibration summary lines (round 34)', () => {
     expect(lines.indexOf(hq!)).toBeGreaterThan(lines.findIndex(line => line.startsWith('late brier=')));
     expect(lines[lines.length - 1]).toMatch(/^\|score\| /);
   });
-  test('the decided line counts the named side, raw and held by the bar (round 50)', () => {
+  test('the decided line counts the named side, raw and held by the bar', () => {
     const lines = summaryLines([
       sample({ id: 'a', score: 0.8, decided: 'p1', decidedHeld: 'p1' }),
       sample({ id: 'b', score: 0.2, p1Won: false, decided: 'p1', decidedHeld: null }),

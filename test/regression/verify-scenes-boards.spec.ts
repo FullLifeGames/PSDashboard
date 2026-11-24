@@ -29,7 +29,7 @@ function firstDifference(a: unknown, b: unknown, path = ''): string | null {
   return null;
 }
 
-describe('verify-scenes boards equal the app build (round 89, B5a)', () => {
+describe('verify-scenes boards equal the app build', () => {
   for (const scene of SCENE_BOARDS) {
     test(`${scene.id} t${scene.turn}`, { timeout: 120_000 }, async () => {
       const rebuilt = await buildBoard(scene);

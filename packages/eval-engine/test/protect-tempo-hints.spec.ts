@@ -39,7 +39,7 @@ const tempoOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => hintOf(ba
 const aimedAt = (battle: Battle, moveId: string) => (['normal', 'any', 'adjacentFoe'].includes(battle.dex.moves.get(moveId).target) ? ' 1' : '');
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 
-describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
+describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
   const mon = (species: string, moves: string[], extra: Partial<PokemonSet> = {}) =>
     set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...extra });
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => mon(species, ['splash'], extra);
@@ -66,7 +66,7 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
   }
   const choice = (shield: string) => `move ${shield}, move splash`;
 
-  describe('Protect earns the damage it denies, up to a flinch (extends T42)', () => {
+  describe('Protect earns the damage it denies, up to a flinch', () => {
     test('a heavy single-target hit: the simulator turns it away, the hint earns the ceiling', () => {
       expect(faintsInSim('splash', 'dragonclaw')).toBe(true);
       expect(faintsInSim('protect', 'dragonclaw')).toBe(false);
@@ -127,7 +127,7 @@ describe.each(RULES)('$name: Protect in the hints (round 70, 3a)', rules => {
       expect(tempoOf(mirror, 'p2', choice('protect'))).toBeCloseTo(CEILING, 10);
     });
 
-    test('T42\'s pair-only KO keeps its full tempo, whatever one hit is worth', () => {
+    test('pair-only KO keeps its full tempo, whatever one hit is worth', () => {
       // Two Garchomps: each Dragon Claw leaves a high-HP Snorlax standing, together they KO it.
       const pair = battleWith(
         [mon('Snorlax', ['protect', 'splash']), splash('Blissey')],

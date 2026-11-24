@@ -208,7 +208,7 @@ function expectFits(pokemon: Pokemon, battle: Battle): void {
 
 const FAST = { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 252 }, nature: 'Timid' };
 
-describe('the speed list against the simulator (round 60, T95 prover)', () => {
+describe('the speed list against the simulator', () => {
   test('stages floor like the sim, also under Tailwind', () => {
     const battle = battleOf([set('Kingambit', { moves: ['Tailwind', 'Protect'] })], [set('Blissey')]);
     battle.makeChoices('move tailwind', 'move protect');

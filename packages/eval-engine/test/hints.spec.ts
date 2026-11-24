@@ -26,7 +26,7 @@ const SUPPORT_FLOOR = 0.25;
 const TERAPAGOS = (moves: string[]) => set('Terapagos-Terastal', moves, { teraType: 'Stellar', ability: 'Tera Shell' });
 const OGERPON = (moves: string[]) => set('Ogerpon-Hearthflame', moves, { teraType: 'Fire', ability: 'Mold Breaker', item: 'Hearthflame Mask' });
 
-describe('Tera hints read the clicked body (round 69, T155)', () => {
+describe('Tera hints read the clicked body', () => {
   test('the click changes the forme exactly where the premise says (Terapagos, Ogerpon)', () => {
     const terapagos = battleOf('gen9customgame', [TERAPAGOS(['splash'])], [splash('Blissey')]);
     terapagos.choose('p1', 'move 1 terastallize');
@@ -132,7 +132,7 @@ describe('Tera hints read the clicked body (round 69, T155)', () => {
   });
 });
 
-describe('Tera options hinted on the terastallized body (round 63, T81)', () => {
+describe('Tera options hinted on the terastallized body', () => {
   test('singles: a Tera option is hinted on the terastallized body', () => {
     const root = rootOf(battleOf('gen9customgame', [set('Garchomp', ['earthquake', 'terablast'], { teraType: 'Ground' })], [splash('Blissey')]));
     const [quake, teraQuake] = singlesOptionHints(root, 'p1', [option('move earthquake'), option('move earthquake terastallize')]);

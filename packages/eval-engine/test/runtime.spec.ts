@@ -148,7 +148,7 @@ const pinItem = (team: PokemonSet[], species: string, item: string) => {
   set.item = item;
 };
 
-describe('the board follows the protocol after a hand-over (round 63, T115)', () => {
+describe('the board follows the protocol after a hand-over', () => {
   test('655336: after the turn-5 Trick, Bisharp holds the Choice Scarf and its only move at turn 6 is Knock Off', { timeout: 240000 }, async () => {
     // Protocol facts: Latias Tricks its Choice Scarf onto Bisharp (Bisharp's
     // Life Orb goes back), then Bisharp Knocks Off and faints Latias — turn 6
@@ -207,7 +207,7 @@ const mon = (species: string, item: string, ability: string, moves: string[]): P
   name: species, species, item, ability, moves, nature: 'Serious', evs, ivs, level: 100, teraType: 'Normal',
 });
 
-describe('doubles hand-over (round 63, T115)', () => {
+describe('doubles hand-over', () => {
   const trickLog = log([
     '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU',
     '|poke|p1|Blissey, F|', '|poke|p1|Snorlax, M|', '|poke|p2|Chansey, F|', '|poke|p2|Happiny, F|', '|start',
@@ -386,7 +386,7 @@ describe('bench-hp', () => {
     '|turn|3',
   ].join('\n');
 
-  describe('bench HP of a body that was hit and left in the same turn (round 47)', () => {
+  describe('bench HP of a body that was hit and left in the same turn', () => {
     const benchFraction = async (species: 'Scizor' | 'Alomomola', log: string, everyBoundary: boolean) => {
       const snapshots = parseReplayLog(log);
       const snapshotFor = (turn: number) => snapshots.find(entry => entry.turn === turn) ?? null;
@@ -420,7 +420,7 @@ describe('bench-hp', () => {
   });
 });
 
-describe('a gimmick click on a turn without an action line (round 54)', () => {
+describe('a gimmick click on a turn without an action line', () => {
   test('replays a Terastallization on a turn the body flinched out of its move', async () => {
     const set = (species: string, ability: string, moves: string[], teraType: string): PokemonSet => ({
       name: species, species, item: '', ability, moves,

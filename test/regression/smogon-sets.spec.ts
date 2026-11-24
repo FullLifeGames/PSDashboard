@@ -148,7 +148,7 @@ describe('Smogon set assumptions', () => {
   // Every load of a VGC 2026 replay logged twelve 404s for sets/gen9vgc2026.json, one per species of both teams. @pkmn/smogon keeps a
   // sets file only once its response arrived, and the species ask at the same time, so the species of one request share one fetch
   // per file, the Doubles Ubers fallback of Doubles OU included.
-  test('round 77: the species of one request share one fetch per sets file', async () => {
+  test('the species of one request share one fetch per sets file', async () => {
     const asked: string[] = [];
     const counting = (files: Record<string, unknown>) => {
       const answer = byUrl(files);
@@ -171,7 +171,7 @@ describe('Smogon set assumptions', () => {
   // WebKit fails json() on a 404 page with "The string did not match the expected pattern.", a message the error filter does not
   // know, so a format whose set file is missing for every species (Scarlet/Violet VGC 2026) threw "Smogon sets unavailable" in
   // Safari. A 404 sets file reads as an empty file before json() runs.
-  test('round 66: a 404 sets file reads as no sets in every browser', async () => {
+  test('a 404 sets file reads as no sets in every browser', async () => {
     const webkit404 = async () => ({
       ok: false, status: 404, json: async () => { throw new SyntaxError('The string did not match the expected pattern.'); },
     }) as unknown as Response;
@@ -181,7 +181,7 @@ describe('Smogon set assumptions', () => {
   // On 150 Bo3 games of 2025 Reg H with open team sheets the VGC 2025 sets guessed 66 % of the items
   // and 82 % of the moves, the Doubles OU sets 48 % and 73 %; a year without a VGC set file guesses better from its
   // usage file alone than from the Doubles OU sets (2026 Reg I items 77 % against 68 %, Champions VGC 56 % against 51 %).
-  test('round 66 (T142): a VGC format reads the VGC set file of its year and never the Doubles OU analyses', async () => {
+  test('a VGC format reads the VGC set file of its year and never the Doubles OU analyses', async () => {
     const doublesOnly = { gen9doublesou: kyuremSet, gen9doublesubers: kyuremSet };
     const regH = await fetchSmogonSetAssumptions({
       formatId: 'gen9vgc2025regh', species: ['Kyurem', 'Toxapex'], fetcher: byUrl({ ...doublesOnly, gen9vgc2025: toxapexSet }) as never,
@@ -202,7 +202,7 @@ describe('Smogon set assumptions', () => {
   // Champions OU must not ask for sets/gen9championsou.json (a file that does not exist: @pkmn/smogon names Champions files without
   // the generation) and fall back to the Scarlet/Violet Ubers analyses: Corviknight (39 % usage) would get Impish 252/160/96 with
   // Tera instead of its Champions set with 32/32/2 Stat Points.
-  test('round 67 (T143): Champions OU reads the Champions OU set file and no Scarlet/Violet file', async () => {
+  test('Champions OU reads the Champions OU set file and no Scarlet/Violet file', async () => {
     const corviknightChampions = { Corviknight: { 'Iron Press': { nature: 'Impish', evs: { hp: 32, def: 32, spd: 2 }, moves: ['Iron Defense', 'Body Press', 'Roost', 'Brave Bird'] } } };
     const corviknightUbers = { Corviknight: { Defog: { nature: 'Impish', evs: { hp: 252, def: 160, spd: 96 }, moves: ['Defog', 'Brave Bird', 'Roost', 'U-turn'] } } };
     const files = byUrl({ championsou: corviknightChampions, gen9ubers: { ...corviknightUbers, ...kyuremSet }, gen9ou: corviknightUbers });
@@ -220,7 +220,7 @@ describe('Smogon set assumptions', () => {
     expect(requested.filter(url => !/\/sets\/championsou\.json$/.test(url))).toEqual([]);
   });
 
-  test('keeps every option of a published move slot (T89)', async () => {
+  test('keeps every option of a published move slot', async () => {
     // @pkmn/smogon flattens a slot to its first option; the build must know
     // Heat Wave and Hidden Power Ice share one slot while Knock Off is fixed.
     const pivot = { item: 'Assault Vest', nature: 'Calm', evs: { hp: 248, spd: 252 }, moves: ['Hurricane', ['Heat Wave', 'Hidden Power Ice'], 'Knock Off', 'U-turn'] };
@@ -238,7 +238,7 @@ describe('Smogon set assumptions', () => {
     expect(vest?.moves.filter(move => move.options)).toHaveLength(1);
   });
 
-  test('keeps the move slots of a doubles sets file (T89)', async () => {
+  test('keeps the move slots of a doubles sets file', async () => {
     const assumptions = await fetchSmogonSetAssumptions({
       formatId: 'gen9doublesou', species: ['Tornadus'],
       fetcher: byUrl({ gen9doublesou: { Tornadus: { 'Bulky Tailwind': { item: 'Covert Cloak', moves: ['Bleakwind Storm', 'Tailwind', ['Taunt', 'Rain Dance', 'Sunny Day'], 'Protect'] } } } }) as never,
@@ -247,7 +247,7 @@ describe('Smogon set assumptions', () => {
     expect(assumptions?.pokemon.tornadus?.moves[3].options).toBeUndefined();
   });
 
-  test('keeps every option of a published item slot (round 64, T120)', async () => {
+  test('keeps every option of a published item slot', async () => {
     // The set as published: "Leftovers / Metal Coat" is one item slot, read like a move slot.
     const doubles = await fetchSmogonSetAssumptions({
       formatId: 'gen9doublesou', species: ['Gholdengo'],
@@ -265,7 +265,7 @@ describe('Smogon set assumptions', () => {
     expect(singles?.pokemon.clefable?.item).toMatchObject({ value: 'Leftovers', options: ['Leftovers', 'Sticky Barb'] });
   });
 
-  test('keeps the published IVs of a set, the first of a list (round 64, T122)', async () => {
+  test('keeps the published IVs of a set, the first of a list', async () => {
     const singles = await fetchSmogonSetAssumptions({
       formatId: 'gen9ou', species: ['Alomomola'],
       fetcher: byUrl({ gen9ou: { Alomomola: {

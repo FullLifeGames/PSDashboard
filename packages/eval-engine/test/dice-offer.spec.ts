@@ -137,7 +137,7 @@ describe.each(SWEEP_CASES)('the offer follows the state: $name', ({ rules, mode 
     expect(kindsOf(offerOn('thunderbolt', { ability: 'Sheer Force' }))).not.toContain('secondary:par');
   });
 
-  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability (round 89, F4a)', () => {
+  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability', () => {
     if (!has(rules, 'abilities', 'skilllink')) return;
     play('skilllink');
     expect(kindsOf(offerOn('furyattack'))).toContain('hit-count');

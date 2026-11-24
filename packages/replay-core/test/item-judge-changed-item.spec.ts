@@ -34,7 +34,7 @@ const hitsOf = (log: string, species: string) => inferOpponentTeam(log, 'p2').po
 const idle = (doubles: boolean) => (doubles ? 'move splash, move splash' : 'move splash');
 const strike = (doubles: boolean, move: string) => (doubles ? `move ${move} 1, move splash` : `move ${move}`);
 
-describe('an item that ends inside the move is the item the hit counted (T210 group 5)', () => {
+describe('an item that ends inside the move is the item the hit counted', () => {
   for (const format of ['singles', 'doubles'] as const) {
     const doubles = format === 'doubles';
     const partner = [mon('Chansey', '', 'Natural Cure', ['Splash'])];

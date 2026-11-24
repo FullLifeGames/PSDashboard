@@ -31,7 +31,7 @@ function inputs(overrides: Partial<Inputs> = {}): Inputs {
   return { replayData, snapshots, evaluation: evaluationWith(sweptGraph()), analysisTurn: null, sweepAlignment: null, replayGen: 9, ...overrides };
 }
 
-describe('the graph shares (round 69, T51: the graph and the card read one map in every engine mode)', () => {
+describe('the graph shares (the graph and the card read one map in every engine mode)', () => {
   test.each(['singles', 'doubles'] as const)('%s: a matrix or MCTS sweep records no shares, the graph still gets the share of the card for every turn', kind => {
     const fixture = replayFixture(kind);
     const last = finalPlayedTurn(fixture.snapshots);

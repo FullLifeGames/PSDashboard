@@ -242,7 +242,7 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
     expect(evalFeatures(battle).boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
   });
 
-  test('a front foe that never swings back but outlasts the horizon closes the bench as well (T225; before: the drop counted)', () => {
+  test('a front foe that never swings back but outlasts the horizon closes the bench as well (before: the drop counted)', () => {
     expect(evalFeatures(behind(['Clefable', ['splash']])).boostsBiting).toBe(0);
   });
 
@@ -274,7 +274,7 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
   });
 });
 
-describe.each(MODES)('a drop its holder clears by switching counts nothing (SB-2, round 89), $name', mode => {
+describe.each(MODES)('a drop its holder clears by switching counts nothing, $name', mode => {
   const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
   const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
   const PIKACHU: [string, string[]] = ['Pikachu', ['tackle', 'splash']];
@@ -433,7 +433,7 @@ describe('boost-bite-front', () => {
     return battle;
   }
 
-  describe('the foes in front gate the stage (T218)', () => {
+  describe('the foes in front gate the stage', () => {
     const benchBitten = (battle: Battle) => {
       const [mine, foe] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
       foe.sethp(hpAt(battle, mine, foe, 1.4));
@@ -537,7 +537,7 @@ describe('boost-bite-front', () => {
       expect(turns).toBe(3);
     });
 
-    test('the same board in front of a Palossand without its attack: the holder gets past Shore Up within the horizon, as the simulator does in three turns, and the bench foe counts (T258; T225 had it shut at five turns)', () => {
+    test('the same board in front of a Palossand without its attack: the holder gets past Shore Up within the horizon, as the simulator does in three turns, and the bench foe counts', () => {
       const battle = scene(set('Palossand', ['shoreup', 'splash']));
       expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4), 12);
     });
@@ -614,7 +614,7 @@ describe('boost-bite-front', () => {
     });
   });
 
-  describe('one race per pair (T221): the cut changes nothing', () => {
+  describe('one race per pair: the cut changes nothing', () => {
     test('boards with several stats, healers, walls and a bench give the same value with and without the cut', () => {
       const boards: Battle[] = [];
       const add = (battle: Battle, edit: (mine: Pokemon, foe: Pokemon) => void) => {

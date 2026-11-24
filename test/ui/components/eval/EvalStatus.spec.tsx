@@ -33,7 +33,7 @@ describe('EvalStatus', () => {
     expect(screen.getByText('Position changed; re-evaluate.')).toBeInTheDocument();
   });
 
-  test('a play-out in a game names no gold line: a game\'s line is its main line (H4h)', () => {
+  test('a play-out in a game names no gold line: a game\'s line is its main line', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null, game: true }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5. 1 turn played. The line below grows as it plays.');
     expect(screen.getByRole('status')).not.toHaveTextContent(/gold/);

@@ -3,7 +3,7 @@ import { gameEnd, idleGameTip, logWinner } from '../../../src/lib/game-end';
 
 const ended = { ended: true, winner: 'Bene' };
 
-describe('the end of a game\'s main line (H4h)', () => {
+describe('the end of a game\'s main line', () => {
   test('a finished live tip of a game is the game\'s end; singles and doubles read the same state', () => {
     expect(gameEnd({ isGame: true, viewingVariation: false, liveTip: true, atEndPosition: false, log: '', simState: ended })).toEqual({ winner: 'Bene' });
     expect(gameEnd({ isGame: true, viewingVariation: false, liveTip: true, atEndPosition: false, log: '', simState: { ended: true, winner: null } })).toEqual({ winner: null });
@@ -28,7 +28,7 @@ describe('the end of a game\'s main line (H4h)', () => {
   });
 });
 
-describe('a replay shows its result at its end (H19a)', () => {
+describe('a replay shows its result at its end', () => {
   const base = { isGame: false, viewingVariation: false, liveTip: false, simState: null };
   const won = '|turn|9\n|move|p1a: A|Tackle|p2a: B\n|faint|p2a: B\n|\n|win|Alice\n';
 
@@ -49,7 +49,7 @@ describe('a replay shows its result at its end (H19a)', () => {
   });
 });
 
-describe('the live tip of a game is no variation (H4h)', () => {
+describe('the live tip of a game is no variation', () => {
   const tip = { gameTip: 5, startTurn: 5, history: [] as object[], turnEntries: 0, replacementPending: false };
   const koTurn = { ...tip, history: [{}], turnEntries: 1, replacementPending: true };
 

@@ -47,7 +47,7 @@ const singles = (setup: Setup, p1Choice = 'move tackle', p2Choice = 'move growl'
   setup, p1Choice, p2Choice,
 );
 
-describe('classifyChild kill window (T146 c1)', () => {
+describe('classifyChild kill window', () => {
   test('a defender that survives the move and faints at the poison tick is hit-nokill', () => {
     const log = singles(battle => { const mon = battle.sides[1].active[0]!; mon.setStatus('psn'); mon.hp = 30; });
     expect(log.some(line => line.startsWith('|faint|p2a: Snorlax'))).toBe(true); // the simulator does faint it, at the residual
@@ -143,7 +143,7 @@ describe('cell-plan-immune', () => {
     { name: 'Thunder Wave into an Electric type (control)', attacker: set('Pikachu', ['Thunder Wave']), defender: set('Jolteon', ['Recover']), p1: P1 },
   ];
 
-  describe('status events whose accuracy roll is never reached (T146 c3)', () => {
+  describe('status events whose accuracy roll is never reached', () => {
     for (const { name, attacker, defender, p1 } of cases) {
       test(`${name}: a miss class exactly when the simulator can miss`, () => {
         const root = scene(attacker, defender);

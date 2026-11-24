@@ -499,20 +499,20 @@ describe('followup-fixes', () => {
     '|turn|4',
   ].join('\n');
 
-  describe('follow-up fixes from user testing (round 2)', () => {
-    test('reveals abilities from [from] ability: attributions (N1 — Poison Heal)', () => {
+  describe('follow-up fixes from user testing', () => {
+    test('reveals abilities from [from] ability: attributions (Poison Heal)', () => {
       const info = inferOpponentTeam(poisonHealLog, 'p1');
       const gliscor = info.pokemon.find(pokemon => pokemon.species === 'Gliscor');
       expect(gliscor?.ability).toEqual(expect.objectContaining({ value: 'Poison Heal', source: 'revealed' }));
     });
 
-    test('attributes [of]-tagged abilities to their owner (N1 — Rough Skin)', () => {
+    test('attributes [of]-tagged abilities to their owner (Rough Skin)', () => {
       const info = inferOpponentTeam(roughSkinLog, 'p2');
       const garchomp = info.pokemon.find(pokemon => pokemon.species === 'Garchomp');
       expect(garchomp?.ability).toEqual(expect.objectContaining({ value: 'Rough Skin', source: 'revealed' }));
     });
 
-    test('infers Heavy-Duty Boots when switching into rocks without damage (N2)', () => {
+    test('infers Heavy-Duty Boots when switching into rocks without damage', () => {
       const info = inferOpponentTeam(bootsLog, 'p2');
       const corviknight = info.pokemon.find(pokemon => pokemon.species === 'Corviknight');
       const garchomp = info.pokemon.find(pokemon => pokemon.species === 'Garchomp');
@@ -560,7 +560,7 @@ describe('followup-fixes', () => {
     '|turn|1',
   ].join('\n');
 
-  describe('concurrent execute protection (N4/N6)', () => {
+  describe('concurrent execute protection', () => {
     test('two overlapping executes commit exactly one turn', async () => {
       const runtime = await reconstructBranchRuntime({
         format: 'gen9ou',

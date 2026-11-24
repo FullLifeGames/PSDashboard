@@ -60,7 +60,7 @@ function expectInside(range: DamageResult | undefined, lost: number, maxhp: numb
   expect(percent).toBeLessThanOrEqual(range!.maxPercent);
 }
 
-describe('the partner of a move that hits every body next to its user (round 83)', () => {
+describe('the partner of a move that hits every body next to its user', () => {
   const scene = () => battle('gen9doublescustomgame',
     [set('Garchomp', ['Earthquake', 'Rock Slide']), wall('Blissey')],
     [wall('Snorlax'), wall('Clefable')]);
@@ -104,7 +104,7 @@ describe('the partner of a move that hits every body next to its user (round 83)
 /** Every realm with doubles the corpus plays: Scarlet/Violet and the older generations back to 3, and the Champions mod. */
 const REALMS = [3, 4, 5, 6, 7, 8, 9].map(gen => `gen${gen}doublescustomgame`).concat('gen9championsdoublescustomgame');
 
-describe.each(REALMS)('%s: the partner\'s row follows the simulator\'s targets (round 83 sweep)', format => {
+describe.each(REALMS)('%s: the partner\'s row follows the simulator\'s targets', format => {
   test('every damaging move hits the partner in the simulator exactly when the preview lists its row', () => {
     const current = battle(format, [set('Mew', ['Splash']), wall('Blissey')], [wall('Snorlax'), wall('Clefable')]);
     const [user, partner] = current.sides[0].active;

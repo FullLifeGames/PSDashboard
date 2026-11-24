@@ -21,7 +21,7 @@ function healFlagged(battle: Battle) {
   return battle.dex.moves.all().filter(move => move.exists && move.gen <= 9 && !move.isNonstandard && move.flags['heal']);
 }
 
-describe('healProfile, T220: a drain move is an attack, not a heal', () => {
+describe('healProfile: a drain move is an attack, not a heal', () => {
   test('the simulator: Horn Leech deals damage and heals half of it, Recover heals half of the max HP and deals none', () => {
     const leech = duel(['hornleech']);
     const user = leech.sides[0].active[0]!;
@@ -150,7 +150,7 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
     expect(clocks.effFracB).toBe(0.55);
   });
 
-  test('T258: a pinned healer falls to the sequence of the simulator, a hit then a heal: n hits take 1 + (n - 1) heals (before: the held PP counted at rate/incoming, 8 turns)', () => {
+  test('a pinned healer falls to the sequence of the simulator, a hit then a heal: n hits take 1 + (n - 1) heals (before: the held PP counted at rate/incoming, 8 turns)', () => {
     const attacker = (frac: number) => side({ hp: 0.05, frac });
     const shoreUp = (partial: Partial<RaceSide> = {}) => side({ hp: 1, frac: 0, healRate: 0.5, healAbsorb: 4, ppBudget: 16, ...partial });
     // 80% hits: the second hit lands on 20% + 50%, so two turns.
@@ -160,7 +160,7 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
     expect(raceClocks(attacker(1.2), shoreUp()).turnsA).toBe(1);
   });
 
-  test('T258: a pinned healer with too few heal PP for the sequence keeps the held-PP clock', () => {
+  test('a pinned healer with too few heal PP for the sequence keeps the held-PP clock', () => {
     // Two heals (one bar of PP) cannot bridge the four heals the 60% sequence needs: the PP-bound clock stays.
     expect(raceClocks(side({ hp: 0.05, frac: 0.6 }), side({ hp: 1, frac: 0, healRate: 0.5, healAbsorb: 1, ppBudget: 16 })).turnsA).toBe(4);
   });

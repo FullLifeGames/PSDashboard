@@ -401,7 +401,7 @@ describe.each(['singles', 'doubles'] as const)('an edited set survives a reload 
     expect(leadOf(second, 'p1').item.value).toBe('Choice Band');
   });
 
-  test('I+E+I2: a second import after both reloads as the session showed', () => {
+  test('import, edit, import: a second import after both reloads as the session showed', () => {
     const first = mountSession(inputs);
     first.importText(importText('Choice Band'));
     first.edit('p2', 'Safety Goggles');
@@ -413,7 +413,7 @@ describe.each(['singles', 'doubles'] as const)('an edited set survives a reload 
     expect(leadOf(second, 'p2').item.value).toBe('Safety Goggles');
   });
 
-  test('E+I+E2: a later edit replaces the import text and the first edit', () => {
+  test('edit, import, edit: a later edit replaces the import text and the first edit', () => {
     const first = mountSession(inputs);
     first.edit('p2', 'Safety Goggles');
     first.importText(importText('Choice Band'));

@@ -50,7 +50,7 @@ function setupMovesIn(view: SimView): string[] {
 }
 
 // The set is the view's own Dex's (setupMovesOf), not a global one.
-describe('The setup moves are held to the simulator (round 72)', () => {
+describe('The setup moves are held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     test('every setup move the simulator shows here is in the set', () => {
       expect(setupMovesIn(view).filter(id => !NOT_SETUP.includes(id) && !setupMovesOf(view.dex).has(id))).toEqual([]);

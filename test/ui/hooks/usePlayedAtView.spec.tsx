@@ -71,7 +71,7 @@ describe('usePlayedAtView', () => {
     expect(result.current).toEqual({ p1: { kind: 'move', name: 'Ice Beam' }, p2: { kind: 'move', name: 'Earthquake' } });
   });
 
-  test('doubles: the target, a spread move without one, and the gimmick of each slot reach the pick (round 84, turn dock)', () => {
+  test('doubles: the target, a spread move without one, and the gimmick of each slot reach the pick (turn dock)', () => {
     // The dock seeds each chip with what the log played, including the target and the Tera, Mega and Ultra flags.
     const log = [
       '|move|p1a: Greninja|Rock Slide|p2a: Regigigas|[spread] p2a,p2b',

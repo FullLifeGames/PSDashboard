@@ -76,7 +76,7 @@ const sureStatus = (generation: number, move: string): boolean => {
   return (data.accuracy === true || data.accuracy >= 100) && !(data.secondaries ?? []).some(s => (s.chance ?? 100) < 100);
 };
 
-describe.each<Kind>(['singles', 'doubles'])('T177 sure crit, %s', kind => {
+describe.each<Kind>(['singles', 'doubles'])('sure crit, %s', kind => {
   const sureMoves = Dex.moves.all().filter(move => move.willCrit && !move.isNonstandard && move.basePower > 0 && move.target === 'normal');
 
   test('every move the Dex marks as always crit prints |-crit| and is no roll with the generation', () => {
@@ -98,7 +98,7 @@ describe.each<Kind>(['singles', 'doubles'])('T177 sure crit, %s', kind => {
   });
 });
 
-describe.each<Kind>(['singles', 'doubles'])('T177 status, %s', kind => {
+describe.each<Kind>(['singles', 'doubles'])('status, %s', kind => {
   const statusLog = (format: string, move: string, seed: number): string[] => {
     const id = toID(move);
     return kind === 'singles'
@@ -149,7 +149,7 @@ describe.each<Kind>(['singles', 'doubles'])('T177 status, %s', kind => {
   });
 });
 
-describe('T177 the whole ledger, the variance sentence quotes the rolled part', () => {
+describe('the whole ledger, the variance sentence quotes the rolled part', () => {
   const sideOf = (): SideAnalysis => ({ playedRaw: null, played: null, best: null, safe: null, regret: 0 });
   const mk = (turn: number, scoreBefore: number, scoreAfter: number, over: Partial<TurnAnalysis>): TurnAnalysis => ({
     turn, scoreBefore, scoreAfter, swing: scoreAfter - scoreBefore, playedOutcome: null, decisionDelta: null, chanceDelta: null,
@@ -177,7 +177,7 @@ describe('T177 the whole ledger, the variance sentence quotes the rolled part', 
   });
 });
 
-describe.each<Kind>(['singles', 'doubles'])('T177 survival, %s', kind => {
+describe.each<Kind>(['singles', 'doubles'])('survival, %s', kind => {
   const ranked = (choice: string, label: string, koOdds: KoOddsInfo): RankedChoice =>
     ({ choice, label, worstCase: 0, expected: 0, ev: 0, punishedBy: null, koOdds });
   const played = (odds: KoOddsInfo): SideAnalysis => {
@@ -205,7 +205,7 @@ describe.each<Kind>(['singles', 'doubles'])('T177 survival, %s', kind => {
   });
 });
 
-describe.each<Kind>(['singles', 'doubles'])('T177 attacker slot, %s', kind => {
+describe.each<Kind>(['singles', 'doubles'])('attacker slot, %s', kind => {
   test('a hit carries the slot and the species of the mon that used the move', () => {
     const lines = kind === 'singles'
       ? playedLog('gen9ou', [set('Garchomp', ['Dragon Claw'])], [blissey()], [['move dragonclaw', 'move splash']], 3)
@@ -228,7 +228,7 @@ describe.each<Kind>(['singles', 'doubles'])('T177 attacker slot, %s', kind => {
 });
 
 /** A move whose secondary names only its chance picks the status in a handler (Tri Attack, Dire Claw; Generation 9 holds `{ chance: 20 }`), so it is a dice source like a secondary with a status. The oracle is the Dex entry of each move. */
-describe('T177 a status a handler picks is a roll', () => {
+describe('a status a handler picks is a roll', () => {
   const gen9 = Dex.forGen(9);
   const secondariesOf = (id: string) => {
     const move = gen9.moves.get(id);

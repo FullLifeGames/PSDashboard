@@ -99,7 +99,7 @@ function read(scene: Scene, format: Format, item: string, species = 'Blissey') {
   return { shown, out: ruledOut(play(scene, format, NEUTRAL), species).includes(toID(item)) };
 }
 
-describe('Lum Berry is eaten on a status or a confusion (T168)', () => {
+describe('Lum Berry is eaten on a status or a confusion', () => {
   const toxic: Scene = { turns: [hit('toxic')] };
   const confusion: Scene = { turns: [hit('confuseray')] };
 
@@ -135,7 +135,7 @@ describe('Lum Berry is eaten on a status or a confusion (T168)', () => {
   });
 });
 
-describe('Sitrus Berry is eaten at half HP (T168)', () => {
+describe('Sitrus Berry is eaten at half HP', () => {
   const low = { level: 70 };
   const strike: Scene = { holder: low, turns: [hit('earthquake')] };
 
@@ -180,7 +180,7 @@ describe('Sitrus Berry is eaten at half HP (T168)', () => {
   });
 });
 
-describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where rounding cannot hide it (T168)', () => {
+describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where rounding cannot hide it', () => {
   const mod = championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>;
   Dex.mod('champions', mod);
 
@@ -205,7 +205,7 @@ describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where 
   });
 });
 
-describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating (T214)', () => {
+describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating', () => {
   /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: a berry judged kept stays uneaten at every real HP that shows it. */
   test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged kept is uneaten at every real HP that shows the text', formatid => {
     const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
@@ -236,7 +236,7 @@ describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged on
   });
 });
 
-describe('Eject Button switches its holder out after a damaging hit (T168)', () => {
+describe('Eject Button switches its holder out after a damaging hit', () => {
   const attack = (id: string): Scene => ({ turns: [hit(id)] });
   test.each(FORMATS)('%s: a hit that leaves no Eject Button line rules the item out (Hatterene 2663112821 t4 shape)', format => {
     expect(read(attack('earthquake'), format, 'Eject Button')).toEqual({ shown: true, out: true });
@@ -274,7 +274,7 @@ describe('Eject Button switches its holder out after a damaging hit (T168)', () 
   });
 });
 
-describe('Commander and a fainting attacker (T168)', () => {
+describe('Commander and a fainting attacker', () => {
   const p1 = (lead: PokemonSet) => [lead, set('Skarmory', 'Leftovers', 'Sturdy', ['Splash']), set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])];
   const bench = set('Heatran', 'Leftovers', 'Flash Fire', ['Splash']);
 
@@ -299,7 +299,7 @@ describe('Commander and a fainting attacker (T168)', () => {
   });
 });
 
-describe('Red Card sends the attacker away after a damaging hit (T168)', () => {
+describe('Red Card sends the attacker away after a damaging hit', () => {
   const attack = (id: string): Scene => ({ turns: [hit(id)] });
   test.each(FORMATS)('%s: a hit that leaves no Red Card line rules the item out (Glimmora 751443 t10 shape)', format => {
     expect(read(attack('earthquake'), format, 'Red Card')).toEqual({ shown: true, out: true });

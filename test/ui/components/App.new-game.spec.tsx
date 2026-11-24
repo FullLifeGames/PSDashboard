@@ -120,7 +120,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 90_000);
 
-  test('a start with ?game=<id> of a game with one played turn opens it on its tip, turn 2, with the dock there (H4e)', async () => {
+  test('a start with ?game=<id> of a game with one played turn opens it on its tip, turn 2, with the dock there', async () => {
     const record = await playedRecord(1);
     window.history.replaceState(null, '', `/?game=${record.id}`);
     render(<App />);
@@ -130,7 +130,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  test('a finished game opened again shows its end as the live game did: the winner, no dock to play (H4h)', async () => {
+  test('a finished game opened again shows its end as the live game did: the winner, no dock to play', async () => {
     const played = await playedRecord(1);
     // the last turn ends with the win instead of the next `|turn|` line: the game's end snapshot is its tip
     const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
@@ -155,7 +155,7 @@ describe('a new game in the app', () => {
     return read.payload;
   }
 
-  test('a game at Team Preview copies its link: the game, no entry, no branch, the team preview as the view (H7)', async () => {
+  test('a game at Team Preview copies its link: the game, no entry, no branch, the team preview as the view', async () => {
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
@@ -165,7 +165,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 90_000);
 
-  test('a game with played turns copies its link on the main line and at the tip: every entry, no branch, the turn on screen (H7)', async () => {
+  test('a game with played turns copies its link on the main line and at the tip: every entry, no branch, the turn on screen', async () => {
     const record = await playedRecord(2);
     window.history.replaceState(null, '', `/?game=${record.id}`);
     render(<App />);
@@ -183,7 +183,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 150_000);
 
-  test('a finished game copies its link at the end (H7)', async () => {
+  test('a finished game copies its link at the end', async () => {
     const played = await playedRecord(1);
     const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
     saveGame(finished);
@@ -207,7 +207,7 @@ describe('a new game in the app', () => {
     expect(document.querySelector('.ps-topbar')).toBeNull();
   });
 
-  test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
+  test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy', async () => {
     const played = await playedRecord(1);
     window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
     // the sharer's game is not in this browser: the link comes from elsewhere
@@ -224,7 +224,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either (H7)', async () => {
+  test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either', async () => {
     const played = await playedRecord(1);
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
     window.location.hash = hash;
@@ -242,7 +242,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 180_000);
 
-  test('a foreign link opened twice makes one copy, and the saved games of the browser stay (H7)', async () => {
+  test('a foreign link opened twice makes one copy, and the saved games of the browser stay', async () => {
     const played = await playedRecord(1);
     const other = await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
@@ -262,7 +262,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 240_000);
 
-  test('a link whose main line goes past the saved game makes a copy (H7)', async () => {
+  test('a link whose main line goes past the saved game makes a copy', async () => {
     const played = await playedRecord(2);
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
     deleteGame(played.id);
@@ -275,7 +275,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 240_000);
 
-  test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood (H5)', async () => {
+  test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood', async () => {
     const played = await playedRecord(2);
     // the main line holds the lead and turn 1; the sharer's branch replays turn 2 from turn 1 and he stands on its tip
     const main = { ...played, entries: played.entries.slice(0, 2), turns: 1 };
@@ -293,7 +293,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 150_000);
 
-  test('a game link the reader cannot start says why on the start page and leaves the hash (H5)', async () => {
+  test('a game link the reader cannot start says why on the start page and leaves the hash', async () => {
     const played = await playedRecord(0);
     window.location.hash = `#branch=${encodeBranchShare({ ...makeGameSharePayload({ record: played }), teams: { p1: '', p2: '' } })}`;
     render(<App />);
@@ -303,7 +303,7 @@ describe('a new game in the app', () => {
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
   }, 60_000);
 
-  test('a link of a newer version names its version on the start page (H5)', async () => {
+  test('a link of a newer version names its version on the start page', async () => {
     window.location.hash = `#branch=${encodeShareJson({ version: 3, kind: 'game' })}`;
     render(<App />);
     expect(screen.getByRole('alert')).toHaveTextContent('This share link comes from a newer PS Dashboard (link version 3).');
@@ -486,7 +486,7 @@ async function importWithoutProtect(): Promise<string> {
 }
 
 /** The hook specs (`useGameTeamEdit.spec.tsx`, `useNewGame.spec.tsx`) hold the question for singles and doubles; these rows run it through the app. */
-describe('a team edit that cuts played turns asks first (H14a)', () => {
+describe('a team edit that cuts played turns asks first', () => {
   beforeEach(() => { stubReplayFetch([]); });
 
   test('Cancel leaves the game and its saved record as they were; Apply edit cuts it and says where the line ends', async () => {

@@ -189,7 +189,7 @@ describe('win probability mapping', () => {
   // the Champions mod (1.86 + 4.17 × the fainted share). Champions singles keeps the singles K: its fit (1.64 + 4.41)
   // read the mid game of the Champions OU holdout worse in both tables. Every other rule set keeps the K of its game
   // type.
-  test('round 67 (T138): Champions doubles prices its own phase K; Champions singles, standard and VGC keep their game type\'s', () => {
+  test('Champions doubles prices its own phase K; Champions singles, standard and VGC keep their game type\'s', () => {
     expect(CHAMPIONS_WINPROB_K.doubles).toEqual({ k0: 1.86, k1: 4.17 });
     expect(CHAMPIONS_WINPROB_K.singles).toEqual(WINPROB_K.singles);
     const p = (k: { k0: number; k1: number }) => 1 / (1 + Math.exp(-(k.k0 + k.k1 * 0.5) * 0.4));
@@ -205,7 +205,7 @@ describe('win probability mapping', () => {
 
   // Every family resolves its own K entry, so a fit moves one family and no other. The values: VGC doubles equals
   // standard doubles, Champions singles equals standard singles, and none of them shares an object with another.
-  test('round 74 (T163): the five families hold today\'s K, each in its own entry', () => {
+  test('the five families hold today\'s K, each in its own entry', () => {
     const today = {
       'standard-singles': { k0: 2.28, k1: 1.49 },
       'standard-doubles': { k0: 2.98, k1: 0.88 },

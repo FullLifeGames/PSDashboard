@@ -23,7 +23,7 @@ const living = (battle: SimBattle, side: 0 | 1): number => battle.sides[side].po
 const present = (id: string): boolean => existsSync(`.fit-corpus/${id}.json`);
 const SCENE_C1 = 'gen9vgc2024regh-2243810213';
 
-describe.skipIf(!present(SCENE_C1))('C1: the faint step takes a step set that gives the log\'s faints (2243810213)', () => {
+describe.skipIf(!present(SCENE_C1))('the faint step takes a step set that gives the log\'s faints (2243810213)', () => {
   let rebuilt: Rebuilt;
   beforeAll(async () => { rebuilt = await rebuild(SCENE_C1, { corpus: true }); }, 300_000);
 
@@ -46,7 +46,7 @@ const correctedWith = (rebuilt: Rebuilt, turn: number, snapshotTurn: number): Si
   return battle;
 };
 
-describe.skipIf(!present(SCENE_C1))('C3: a body the correction faints leaves the game as the simulator takes it out (2243810213)', () => {
+describe.skipIf(!present(SCENE_C1))('a body the correction faints leaves the game as the simulator takes it out (2243810213)', () => {
   let rebuilt: Rebuilt;
   beforeAll(async () => { rebuilt = await rebuild(SCENE_C1, { corpus: true, through: 7 }); }, 300_000);
 
@@ -64,7 +64,7 @@ describe.skipIf(!present(SCENE_C1))('C3: a body the correction faints leaves the
 });
 
 const SCENE_C3B = 'gen9vgc2024regg-2159578969';
-describe.skipIf(!present(SCENE_C3B))('C3: the end of Neutralizing Gas starts what the gas held back (2159578969)', () => {
+describe.skipIf(!present(SCENE_C3B))('the end of Neutralizing Gas starts what the gas held back (2159578969)', () => {
   let rebuilt: Rebuilt;
   beforeAll(async () => { rebuilt = await rebuild(SCENE_C3B, { corpus: true, through: 5 }); }, 300_000);
 

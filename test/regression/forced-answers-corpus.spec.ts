@@ -30,7 +30,7 @@ const REVIVES = [
   { id: 'gen9championsvgc2026regmc-2691996964', turn: 7, type: 'Champions VGC', name: 'Gholdengo' },
 ];
 
-describe('the revive answer names the body the log revives (#131)', () => {
+describe('the revive answer names the body the log revives', () => {
   for (const row of REVIVES) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);
@@ -55,7 +55,7 @@ const SLOTS = [
   { id: 'gen9championsvgc2026regmbbo3-2682059865', turn: 1, type: 'Champions VGC', what: 'two different bench bodies', check: 'distinct' },
 ];
 
-describe('a forced replacement enters the slot the log names (#144)', () => {
+describe('a forced replacement enters the slot the log names', () => {
   for (const row of SLOTS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);

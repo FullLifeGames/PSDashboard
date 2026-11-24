@@ -201,7 +201,7 @@ describe('the dock dice of the turn', () => {
   });
 });
 
-describe('the dock dice a forced die needs (decision 5a)', () => {
+describe('the dock dice a forced die needs', () => {
   const airSlash: BranchSlotChoice = { kind: 'move', moveId: 'airslash', moveName: 'Air Slash' };
 
   test('forcing a crit sets the hit and says why, and a miss takes the crit back', async () => {

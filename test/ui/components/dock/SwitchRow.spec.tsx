@@ -87,7 +87,7 @@ describe('the switch tile label', () => {
   });
 });
 
-describe('the badges of a tile (A7b)', () => {
+describe('the badges of a tile', () => {
   // The badge must not change the tile's box: it stands in the flag row on the tile's top edge, never in the name line.
   test('played and engine stand in the flag row, outside the name line', () => {
     const { container } = render(row({

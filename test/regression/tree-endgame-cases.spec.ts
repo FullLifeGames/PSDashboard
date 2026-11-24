@@ -13,12 +13,12 @@ import { ENDGAME_FIXTURES } from './endgame-fixtures';
 const board = (name: string): string =>
   JSON.stringify(State.serializeBattle(ENDGAME_FIXTURES.find(fixture => fixture.name === name)!.build()));
 
-describe('doubles endgames on the app path (round 67, T114)', () => {
+describe('doubles endgames on the app path', () => {
   // The solver and the prover keep their assertions. The tree's score is the mean of the trees' root cells, and each of the four trees
   // draws the tie once: the first draw of `treeSeed(0, offset)` puts p2 first for offsets 0 to 13, so the four trees read -1 (the
   // lattice seeds read 0.5, one tree order only by luck of four fixed numbers). `Math.abs(result.score)` has no stable bound at any tree
   // count, and the undrawn tie order at its Dex weight is not asserted.
-  test('doubles-ohko-tie: the speed tie is priced as a coin, no forced win of mass 1 (round 86: no tree-score assertion)', { timeout: 120_000 }, async () => {
+  test('doubles-ohko-tie: the speed tie is priced as a coin, no forced win of mass 1 (no tree-score assertion)', { timeout: 120_000 }, async () => {
     const serialized = board('doubles-ohko-tie');
     expect(proveForcedWin(serialized, { side: 'p1', rootOrder: [], tera: false }).mass).toBeLessThan(1);
     expect(proveForcedWin(serialized, { side: 'p2', rootOrder: [], tera: false }).mass).toBeLessThan(1);
@@ -31,7 +31,7 @@ describe('doubles endgames on the app path (round 67, T114)', () => {
   // At the default four trees the hashed seeds give no tree the unlucky first expansion (visits 0.9994, game 0.9993), so the contrast
   // the row exists for is gone at that count. It shows at 8 trees (visits 0.655, game 0.832; 16 trees 0.821), so the row sets the tree
   // count.
-  test('doubles-spread-2v1: at 8 trees the visit mean reads under 0.7 where the game value reads over 0.8, the rankings stay (EVAL_TREE_SCORE, round 86)', { timeout: 240_000 }, async () => {
+  test('doubles-spread-2v1: at 8 trees the visit mean reads under 0.7 where the game value reads over 0.8, the rankings stay (EVAL_TREE_SCORE)', { timeout: 240_000 }, async () => {
     const serialized = board('doubles-spread-2v1');
     const saved = process.env.EVAL_TREE_SCORE;
     const search = (form: string) => {

@@ -44,7 +44,7 @@ describe('win-reason detection', () => {
   const swept = (species: string, announce = true) =>
     ({ playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species, announce } });
 
-  test('the conversion starts where the bar holds for the winner to the end (round 50)', () => {
+  test('the conversion starts where the bar holds for the winner to the end', () => {
     // 573756: the bar backed the sweep once at t124, fell back to 0.39, and held from t137 on.
     const report = buildGameReport([
       mk(1, 0.1, -0.75),
@@ -57,7 +57,7 @@ describe('win-reason detection', () => {
     expect(report.summary).toContain('From turn 4, Zapdos-Galar cleared everything Alpha had left.');
   });
 
-  test('a turn without a sweep does not break the run while the bar holds (round 50)', () => {
+  test('a turn without a sweep does not break the run while the bar holds', () => {
     // 648453: proven at t35, no sweep on the board at t37 and t38, the bar at 1.00 throughout.
     const report = buildGameReport([
       mk(1, 0.1, -1),
@@ -68,7 +68,7 @@ describe('win-reason detection', () => {
     expect(report.conversion).toEqual({ kind: 'forced', turn: 2, provenTurns: 3 });
   });
 
-  test('a sweep whose bar never holds to the end is no conversion (round 50)', () => {
+  test('a sweep whose bar never holds to the end is no conversion', () => {
     const report = buildGameReport([
       mk(1, 0.1, -0.75),
       mk(2, -0.75, -0.3, { p2: swept('Calyrex-Ice') }),
@@ -511,7 +511,7 @@ describe('denied early end', () => {
     expect(noPlayed.deniedEnd).toBeUndefined();
   });
 
-  test('the claim needs the near stage\'s click in the played choice (T292, 2695803506 t2)', () => {
+  test('the claim needs the near stage\'s click in the played choice (2695803506 t2)', () => {
     // Champions VGC 2695803506 t2: Basculegion's 94 % Wave Crash stood against Incineroar, Basculegion switched out, and
     // the turn's only rolls were Matcha Gotcha's burns. The near stage reads the first active: the played choice's lead part.
     const doublesSide = (choice: string, click: { move: string; target?: number } = { move: 'wavecrash', target: 1 }) => ({
@@ -533,7 +533,7 @@ describe('denied early end', () => {
     expect(denied(nearSide())?.move).toBe('Fire Fang');
   });
 
-  test('labeled doubles odds never name the move (final review, finding 3)', () => {
+  test('labeled doubles odds never name the move', () => {
     // The headline odds of a doubles option may be the partner slot's; "X missed" would name
     // a roll the near-decided body did not take.
     const labeled = buildGameReport(

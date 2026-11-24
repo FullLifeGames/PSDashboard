@@ -42,7 +42,7 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const serialize = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle));
 
-describe('endgame key (round 34)', () => {
+describe('endgame key', () => {
   test('two move orders reaching the same board share one key, different PP do not', () => {
     // Setup moves without chance: Iron Defense, Swords Dance, Swords Dance
     // equals Swords Dance, Iron Defense, Swords Dance (same PP, same
@@ -66,7 +66,7 @@ describe('endgame key (round 34)', () => {
   });
 });
 
-describe('endgame children (round 34)', () => {
+describe('endgame children', () => {
   test('a deterministic pair yields one child with weight 1 and no unpriced flag', () => {
     // Chansey, not Blissey: Blissey ties Machamp on base speed, which is a
     // priced order split of its own (the next tests cover it).
@@ -123,7 +123,7 @@ describe('endgame children (round 34)', () => {
     expect(children).toHaveLength(1);
     expect(unpriced).toBe(false);
   });
-  test('class children carry their analytic share and key; the plain path says so (round 35)', () => {
+  test('class children carry their analytic share and key; the plain path says so', () => {
     const battle = makeBattle(
       [makeSet('Jolt', 'Jolteon', ['Thunder'])],
       [makeSet('Champ', 'Machamp', ['Close Combat'])],
@@ -136,7 +136,7 @@ describe('endgame children (round 34)', () => {
     expect(children.reduce((sum, child) => sum + child.share, 0)).toBeCloseTo(1, 6);
     for (const child of children) expect(child.share).toBeCloseTo(child.weight, 6);
   });
-  test('the doubles plain path reports plain with share 1 and no key (round 35)', () => {
+  test('the doubles plain path reports plain with share 1 and no key', () => {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -176,7 +176,7 @@ describe('endgame children (round 34)', () => {
 
 const SMALL = { states: 2000, wallMs: 30_000 };
 
-describe('endgame solver (round 34)', () => {
+describe('endgame solver', () => {
   test('a fixed-damage race resolves to the side that needs fewer hits, speed tie or not', () => {
     const battle = makeBattle(
       [makeSet('Toss', 'Machamp', ['Seismic Toss'])],

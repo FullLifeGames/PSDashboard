@@ -490,7 +490,7 @@ describe('search-budget', () => {
   const TREE = { depth: 1, samples: 1, mode: 'mcts' } as const;
   const MATRIX = { depth: 1, samples: 1, mode: 'matrix' } as const;
 
-  describe('search budget (round 61)', () => {
+  describe('search budget', () => {
     test('the form chosen at the round-61 gate stays reachable through the switch: trees from the first turn', () => {
       configureSearchBudget(parseSearchBudget('singles-tree-from=0,singles-early-samples=1'));
       expect(searchBudgetTag()).not.toBe('');
@@ -500,7 +500,7 @@ describe('search-budget', () => {
       }
     });
 
-    test('the search before round 61 stays reachable through the switch', () => {
+    test('the matrix-first search stays reachable through the switch', () => {
       configureSearchBudget(parseSearchBudget(`iterations=600,tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));
       for (const doubles of [false, true]) {
         expect(autoTurnSettings(0, doubles)).toEqual(MATRIX);
@@ -529,7 +529,7 @@ describe('search-budget', () => {
       expect(() => parseSearchBudget('tree-from=')).toThrow(/tree-from/);
     });
 
-    test('tree seeds: a pure function of (offset, iteration), 16 trees draw 16 different sequences (round 86, T323)', () => {
+    test('tree seeds: a pure function of (offset, iteration), 16 trees draw 16 different sequences', () => {
       for (let offset = 0; offset < 5; offset++) {
         for (let iteration = 0; iteration < 12; iteration++) {
           expect(treeSeed(iteration, offset)).toBe(treeSeed(iteration, offset));
@@ -544,7 +544,7 @@ describe('search-budget', () => {
     });
   });
 
-  describe('search budget per game type (round 63, T110)', () => {
+  describe('search budget per game type', () => {
     test('the default splits auto by game type: early singles turns run the matrix with three draws, doubles the tree from the first turn', () => {
       expect(SEARCH_BUDGET_DEFAULT).toEqual({
         trees: 4, iterations: 600,

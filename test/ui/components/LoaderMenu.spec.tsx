@@ -121,7 +121,7 @@ describe('LoaderMenu', () => {
 });
 
 /** Loading a replay, dropping a file and opening a saved game ask first when an unsaved variation is open: the question stands in the menu's panel, Discard variation goes on, Cancel leaves everything. */
-describe('LoaderMenu with an unsaved variation open (H16a)', () => {
+describe('LoaderMenu with an unsaved variation open', () => {
   test('the URL form asks before it loads; Cancel loads nothing, Discard variation loads once', async () => {
     const wired = props({ unsavedVariation: () => true });
     render(<LoaderMenu {...wired} />);

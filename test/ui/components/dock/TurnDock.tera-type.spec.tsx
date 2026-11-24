@@ -40,7 +40,7 @@ const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
 const tile = (move: RegExp) => tray().getByRole('button', { name: move });
 const toggle = () => tray().getByRole('button', { name: /^Tera \(/ });
 
-describe('the Tera toggle labels the move tiles (T182)', () => {
+describe('the Tera toggle labels the move tiles', () => {
   test('singles: Tera Blast reads Normal, then Fairy once the toggle is pressed; other moves stay', async () => {
     dock(stateOf('gen9customgame', [chomp()], [foe('Snorlax')]));
     await open('P1');

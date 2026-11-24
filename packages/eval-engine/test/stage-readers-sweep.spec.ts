@@ -20,7 +20,7 @@ await loadSimMods('gen9championsou');
 /** What the simulator shows, by name: the oracle of the census (the code reads no name). */
 const READERS = ['foulplay', 'punishment', 'psychup', 'spectralthief', 'topsyturvy', 'powerswap', 'heartswap', 'guardswap', 'transform'];
 
-describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: every move against the census (round 88, T336)', ({ rules }) => {
+describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: every move against the census', ({ rules }) => {
   const dex = dexOfRules(rules);
   const moves = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past'));
@@ -41,7 +41,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: ever
   });
 });
 
-describe.each(SWEEP_CASES)('$name: a foe board with a reader reads as one (round 88, T336)', ({ rules, mode }) => {
+describe.each(SWEEP_CASES)('$name: a foe board with a reader reads as one', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const readers = READERS.filter(id => dex.moves.get(id).exists && dex.moves.get(id).gen <= dex.gen);
   const board = (leadMoves: string[], benchMoves: string[]) => {

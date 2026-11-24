@@ -32,7 +32,7 @@ const RULES = [
   { name: 'Pokémon Champions', singles: 'gen9championscustomgame', doubles: 'gen9championsdoublescustomgame' },
 ];
 
-describe('the near stage weighs the click by the chance its user acts (T282)', () => {
+describe('the near stage weighs the click by the chance its user acts', () => {
   const attackerSet = (): PokemonSet => set('Tauros', ['doubleedge'], { level: 50, item: 'choiceband' });
   // The clicker clears the rest itself, so no second sweeper waits. A 95 % Crush Claw kills the 1-HP
   // Alakazam, whose Psychic kills the attacker when it acts first; behind Alakazam a 1-HP Machamp only bulks up. The
@@ -93,7 +93,7 @@ describe('the near stage weighs the click by the chance its user acts (T282)', (
   });
 });
 
-describe.each(RULES)('$name: who acts first, the reading against the simulator (T282)', rules => {
+describe.each(RULES)('$name: who acts first, the reading against the simulator', rules => {
   const mon = (moves: string[], extra: Partial<PokemonSet>): PokemonSet => set('Snorlax', moves, { level: 100, ...extra });
 
   /** The simulator's queue: can the foe's action come before mine (a tie counts as possible)? */

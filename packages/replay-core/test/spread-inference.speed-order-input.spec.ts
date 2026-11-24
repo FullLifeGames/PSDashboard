@@ -159,7 +159,7 @@ function hit(attacker: Mon, defender: Mon, moveName: string): DamageObservation 
 }
 const total = (spread: PokemonEvs) => Object.values(spread).reduce((sum, value) => sum + value, 0);
 
-describe('a solve spends the budget the damage lines leave open (T122 point 7)', () => {
+describe('a solve spends the budget the damage lines leave open', () => {
   // The real Rillaboom runs a small offense and a little HP; the usage prior (Adamant 252 Atk / 252 Spe)
   // hits too hard, so the fit takes the 0-offense rung, and the bulk rung beside it is uninvested.
   const truth: Mon = { species: 'Rillaboom', side: 'p1', nature: 'Hardy', evs: evs(100, 60, 0, 0, 0, 252) };
@@ -181,7 +181,7 @@ describe('a solve spends the budget the damage lines leave open (T122 point 7)',
   }
 });
 
-describe('the open budget refills toward the prior first (T122 point 7, round 64 h2)', () => {
+describe('the open budget refills toward the prior first', () => {
   // 573756 shape: the fit takes the physically defensive rung (252 HP / 252 Def) over the specially
   // defensive prior (Calm 252 HP / 252 SpD), which zeroes SpD and leaves 4 EVs open. The lines cannot tell where those
   // 4 go; the prior put its EVs in SpD, so they go there, not into an Attack no line asks for.
@@ -232,7 +232,7 @@ describe('spread-ladder-release', () => {
   const beforeClefable = { firstSide: 'p2' as const, firstSpecies: 'Garchomp', secondSide: 'p1' as const, secondSpecies: 'Clefable', turn: 3 };
   const maxHp420 = new Map([['p2:garchomp', { maxhp: 420, level: 100 }]]);
 
-  describe('a kept Speed gives way to a measured offense (round 41)', () => {
+  describe('a kept Speed gives way to a measured offense', () => {
     const truth = { ...garchomp, nature: 'Adamant', evs: bulkyAttacker };
     const sets = {
       p1: [asSet(clefable, ['Moonblast']), asSet(toxapex, ['Scald'])],
@@ -297,7 +297,7 @@ describe('spread-ladder-release', () => {
     });
   });
 
-  describe('two kept stats over the budget (round 41)', () => {
+  describe('two kept stats over the budget', () => {
     const sets = {
       p1: [asSet(clefable, ['Moonblast'])],
       p2: [asSet(garchomp, ['Earthquake', 'Swords Dance'])],

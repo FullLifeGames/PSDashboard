@@ -101,7 +101,7 @@ describe.each(SHAPES)('%s: a plain cell is no guess', (_name, make) => {
   });
 });
 
-describe.each(SHAPES)('%s: the played row\'s cell gates the read too (T217)', (_name, make) => {
+describe.each(SHAPES)('%s: the played row\'s cell gates the read too', (_name, make) => {
   test('a solid best cell with a guessed played cell leaves the read thin (red before: the read stood)', () => {
     const read = readOf(make, cellsOf(SEEN, GUESS));
     expect(read.thin).toBe(true);
@@ -167,7 +167,7 @@ function t19(side: 'p1' | 'p2', over: Partial<AnalyzeTurnParams> = {}, doubles =
   });
 }
 
-describe('the hazard sack reads the dice, not the gap between two searches (T287 follow-up)', () => {
+describe('the hazard sack reads the dice, not the gap between two searches', () => {
   for (const side of ['p1', 'p2'] as const) {
     for (const doubles of [false, true]) {
       const kind = doubles ? 'doubles' : 'singles';

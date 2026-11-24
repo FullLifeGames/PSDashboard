@@ -87,7 +87,7 @@ describe('editing the dice of a slot choice', () => {
   });
 });
 
-describe('the table the dice show (round 84, A4)', () => {
+describe('the table the dice show', () => {
   const offer = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}, results: DieOffer['results'] = [{ happens: true }, { happens: false }]): DieOffer => ({
     name: { slot: 'p1a', moveId: 'rockslide', targetSlot: 'p2a', kind, ...extra }, results,
   });
@@ -118,7 +118,7 @@ describe('the table the dice show (round 84, A4)', () => {
   });
 });
 
-describe('the dice a forced die needs (decision 5a)', () => {
+describe('the dice a forced die needs', () => {
   const offer = (kind: ForcedDie['name']['kind'], extra: Partial<ForcedDie['name']> = {}): DieOffer => ({
     name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind, ...extra }, results: [{ happens: true }, { happens: false }],
   });

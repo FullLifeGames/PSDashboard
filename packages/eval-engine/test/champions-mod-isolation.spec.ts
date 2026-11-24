@@ -20,7 +20,7 @@ function playGen9Ou(): string {
   return serializeBattleStable(battle);
 }
 
-describe('the Champions mod is loaded before a Champions battle (T145)', () => {
+describe('the Champions mod is loaded before a Champions battle', () => {
   test('a Champions position without the mod fails loudly', () => {
     expect(() => deserializeBattleExact(JSON.stringify({ formatid: 'gen9championsou' }))).toThrow(/needs the Champions mod/);
     expect(() => deserializeBattleExact(JSON.stringify({ formatid: 'gen9championsdoublescustomgame' }))).toThrow(/needs the Champions mod/);

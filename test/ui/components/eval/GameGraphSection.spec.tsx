@@ -72,7 +72,7 @@ describe('GameGraphSection', () => {
     expect(screen.queryByText(/Analysis stopped/)).toBeNull();
   });
 
-  test('the auto line hint follows the game type (round 63, T110)', () => {
+  test('the auto line hint follows the game type', () => {
     configureSearchBudget(parseSearchBudget('singles-tree-from=0.25'));
     onTestFinished(() => configureSearchBudget(null));
     const auto = { ...prefs, mode: 'auto' as const };
@@ -123,7 +123,7 @@ describe('GameGraphSection', () => {
     expect(screen.queryByText('Turn 3')).toBeNull();
   });
 
-  test('B7a: the turn card of the section opens the matrix of the turn\'s own result and a cell click reaches the panel\'s pair handler', async () => {
+  test('the turn card of the section opens the matrix of the turn\'s own result and a cell click reaches the panel\'s pair handler', async () => {
     const onPickPair = vi.fn();
     const graph = evalGraph();
     render(<GameGraphSection {...props({ graph, analysis: turnAnalysis(3), onPickPair })} />);
@@ -134,7 +134,7 @@ describe('GameGraphSection', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  test('the decided strip stands only where the bar backs the sweep (round 50)', () => {
+  test('the decided strip stands only where the bar backs the sweep', () => {
     // 649664 t15 to t22 named Medicham-Mega for p2 under a bar leaning to p1; t23 stood at 0.89 for p2.
     const graph = evalGraph();
     const sweep = { p1: [], p2: [], decided: { side: 'p2' as const, species: 'Medicham-Mega' } };

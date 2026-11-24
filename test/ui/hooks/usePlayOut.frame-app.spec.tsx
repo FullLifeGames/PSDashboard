@@ -88,7 +88,7 @@ async function variationWithPivot() {
   return { app: () => result.current };
 }
 
-describe('a play-out with the frame parked behind the tip (#112)', () => {
+describe('a play-out with the frame parked behind the tip', () => {
   test('the run keeps playing turns on the live sim', async () => {
     const { app } = await variationWithPivot();
     const before = app().ctx.branch.history.length;

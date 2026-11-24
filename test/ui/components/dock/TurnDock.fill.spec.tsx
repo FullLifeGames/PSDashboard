@@ -156,7 +156,7 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the open tray, %s
     expect(fill.holdTray).toHaveBeenLastCalledWith(null);
   });
 
-  test('a click on a chip arms the fill (Q19 b, the trigger at a replay turn)', async () => {
+  test('a click on a chip arms the fill (the trigger at a replay turn)', async () => {
     const fill = fillOf();
     renderDock(kind, fill);
     expect(fill.arm).not.toHaveBeenCalled();
@@ -334,7 +334,7 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacem
   });
 });
 
-describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', () => {
+describe('TurnDock fill, two forced slots of one side (doubles)', () => {
   // P1 replaces both bodies; P2 waits. The engine holds slot A with Flutter Mane; the user's bench click is in slot B.
   const flags = { p1ForceSwitch: true, p1ForceSwitches: [true, true] };
   const flutter: BranchSlotChoice = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };

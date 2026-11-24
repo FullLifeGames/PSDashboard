@@ -225,7 +225,7 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
  */
 const baseNames = (sets: PokemonSet[]) => sets.map(set => set.species).sort();
 
-describe('a transformed body keeps its own species on the bring list (#116)', () => {
+describe('a transformed body keeps its own species on the bring list', () => {
   test('VGC 2565721987: P1 brought Iron Bundle, Grimmsnarl, Ditto and Miraidon, and the rebuild fields four against four', async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/gen9vgc2026regi-2565721987.json', import.meta.url), 'utf-8')) as ReplayData;
     const brought = replayBringOnly(replay, parseReplayLog(replay.log));
@@ -350,7 +350,7 @@ const statsOf = (counts: [string, number][]): SmogonUsageStats => ({
 const guessedOf = (short: 'p1' | 'p2') => (short === 'p1' ? { p1: 1, p2: 0 } : { p1: 0, p2: 1 });
 const fixture = (file: string) => JSON.parse(readFileSync(new URL(`./fixtures/${file}`, import.meta.url), 'utf-8')) as ReplayData;
 
-describe('#124: the worlds of a short side', () => {
+describe('the worlds of a short side', () => {
   for (const scene of SCENES) {
     test(`${scene.label}: replayBringList names the fielded bodies and the candidates, and every world rebuilds the count against the count`, async () => {
       const replay = fixture(scene.file);
@@ -479,7 +479,7 @@ describe('#124: the worlds of a short side', () => {
   }, 240_000);
 });
 
-describe('#124: trimTeamsToBring trims both teams or neither', () => {
+describe('trimTeamsToBring trims both teams or neither', () => {
   const rules = { gen: 9, mod: undefined };
   const names = (team: PokemonSet[]) => team.map(set => set.name);
   const p2Four = ['Squirtle', 'Ivysaur', 'Bulbasaur', 'Charmander'];

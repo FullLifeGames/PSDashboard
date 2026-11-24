@@ -32,7 +32,7 @@ function leads(view: SimView): { species: string; ability: string }[] {
     .map(species => ({ species: species.name, ability: view.dex.abilities.get(species.abilities[0]).id }));
 }
 
-describe('TERA_FORME_SPECIES is held to the simulator (round 72)', () => {
+describe('TERA_FORME_SPECIES is held to the simulator', () => {
   describe.each([SINGLES_VIEWS[8], DOUBLES_VIEWS[0]])('$name', view => {
     test('the species whose Tera click changes their forme, ability or maximum HP over a turn are the set', () => {
       const dependent = leads(view)

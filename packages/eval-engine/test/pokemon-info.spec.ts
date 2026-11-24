@@ -78,7 +78,7 @@ function allowedHps(body: HpDisplayBody): Map<number, number[]> {
   return out;
 }
 
-describe('T161 sightedHp against the simulator getHealth', () => {
+describe('sightedHp against the simulator getHealth', () => {
   for (const shape of CASES) {
     test(`every shown value at every maximum HP from 50 to 700 lands in the middle of its range (${shape.label}, /${shape.scale})`, () => {
       const battle = battleOf(shape.format, [set('Garchomp', ['Splash'])], [set('Garchomp', ['Splash'])]);
@@ -193,7 +193,7 @@ function play(scene: Scene, seed: number): { battle: SimBattle; log: string } {
 const snapshotAt = (log: string, turn: number): TurnSnapshot =>
   parseReplayLogWithObservations(log).snapshots.find(snapshot => snapshot.turn === turn)!;
 
-describe.each(SCENES)('T161 the corrections write the middle of the range ($format)', scene => {
+describe.each(SCENES)('the corrections write the middle of the range ($format)', scene => {
   test('a benched body and an active body show the sighted percent and stand in the middle', () => {
     let covered = 0;
     for (let seed = 1; seed <= 12; seed++) {
@@ -234,7 +234,7 @@ describe('calc-sim-inputs', () => {
     });
   }
 
-  describe('the simulator\'s inputs reach the calc (T76)', () => {
+  describe('the simulator\'s inputs reach the calc', () => {
     test('singles: Supreme Overlord\'s fallen count reaches the odds and the table, as the simulator hits', () => {
       const root = overlordRoot('gen9customgame');
       const battle = positionBattle(root);

@@ -70,7 +70,7 @@ describe('correctActivesFromProtocol', () => {
     side.pokemon.forEach((pokemon, index) => expect(pokemon.position).toBe(index));
   });
 
-  test('a repointed Pokémon enters fresh — no inherited choice lock (GPL T38)', async () => {
+  test('a repointed Pokémon enters fresh — no inherited choice lock (GPL t38)', async () => {
     // A diverged sim can keep a mon on the field locked into a Choice move while the real game switched it out and back in. The
     // correction that forces it active must clear the lock trio: the real entry was fresh.
     const runtime = await reconstructBranchRuntime({
@@ -271,7 +271,7 @@ function playGame(scene: Scene): { battle: Battle; log: string } {
   return { battle, log: publicLog(battle) };
 }
 
-describe.each(RULES)('$name: a rebuilt Commander turn commits and leaves a clean root (round 72, T246c)', rules => {
+describe.each(RULES)('$name: a rebuilt Commander turn commits and leaves a clean root', rules => {
   const mon = (species: string, ability: string, moves: string[]): PokemonSet => set(species, moves, { ability, level: rules.level });
   const tatsugiri = mon('Tatsugiri', 'Commander', ['Draco Meteor', 'Muddy Water', 'Icy Wind', 'Protect']);
   const dondozo = mon('Dondozo', 'Unaware', ['Wave Crash', 'Earthquake', 'Order Up', 'Protect']);
@@ -377,7 +377,7 @@ describe('encore-click', () => {
   const snorlax = mon('Snorlax', 'Immunity', ['Tackle', 'Protect'], 0);
   const whimsicott = mon('Whimsicott', 'Infiltrator', ['Encore', 'Cotton Guard'], 252);
 
-  describe('an Encore that lands before its target moves (round 55)', () => {
+  describe('an Encore that lands before its target moves', () => {
     test('singles: the lock ends with the protocol, not a turn late', async () => {
       const log = [
         '|gametype|singles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] OU',

@@ -34,7 +34,7 @@ function check(drawn: PairDraw, alter: (snap: HitSnapshot) => HitSnapshot = snap
 const draw = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, seed = '1,2,3,4') =>
   drawPair(root, p1, p2, seed as never, new Map(), createMatchupCache());
 
-describe('kill tables from the calc, checked at the drawn roll (round 56)', () => {
+describe('kill tables from the calc, checked at the drawn roll', () => {
   test('every roll of the anchor cells lands on the table to the HP', () => {
     const root = anchorRoot();
     const p1Options = legalChoices(root, 'p1', { tera: false }).map(option => option.choice);

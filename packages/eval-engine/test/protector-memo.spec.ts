@@ -161,7 +161,7 @@ function variantsOf(dex: Battle['dex'], id: string): { label: string; make: () =
   ];
 }
 
-describe.each(RULES)('$name: the shared answers of protectorStops equal a copy of the board (round 72, T256)', rules => {
+describe.each(RULES)('$name: the shared answers of protectorStops equal a copy of the board', rules => {
   const base = freshBoard(rules);
   const dex = base.dex;
   const protectors = dex.moves.all()

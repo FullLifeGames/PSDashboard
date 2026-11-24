@@ -27,7 +27,7 @@ function scene(format: string, p2: PokemonSet[], clickerHp: (maxhp: number) => n
   return battle;
 }
 
-describe('the near stage names the clicker, who clears the rest itself (T292)', () => {
+describe('the near stage names the clicker, who clears the rest itself', () => {
   // Behind Alakazam stands a Ghost that Crush Claw cannot touch: only Gengar clears it.
   const ghostBehind = (): PokemonSet[] => [set('Alakazam', ['psychic'], level), set('Dusknoir', ['splash'], level)];
 

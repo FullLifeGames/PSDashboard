@@ -61,7 +61,7 @@ function* bringLimitedGames(): Generator<{ id: string; source: ReplayData; count
   }
 }
 
-describe.skipIf(!HAVE_CORPUS)('the worlds of the corpus (#124)', () => {
+describe.skipIf(!HAVE_CORPUS)('the worlds of the corpus', () => {
   test('every world of every bring-limited game names preview bodies, holds the count on both sides and trims both teams to it', async () => {
     await loadSimMods('gen9championsvgc2026regmbbo3');
     const counts: Record<string, Counts> = {};

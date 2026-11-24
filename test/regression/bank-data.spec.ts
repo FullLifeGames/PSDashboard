@@ -141,7 +141,7 @@ describe('bank-data-pack.mjs packs here and fetches in CI', () => {
     expect(existsSync(join(ci, '.fit-corpus', 'gen9vgc2025regg-2.json'))).toBe(false);
   });
 
-  test('the pack holds every replay the fit source reads (round 74, T163: CI captures the fit corpus with search) and nothing else', () => {
+  test('the pack holds every replay the fit source reads (CI captures the fit corpus with search) and nothing else', () => {
     const source = withScripts(dataRoot());
     put(source, '.fit-corpus/samples-cache.json', '{"samples":[]}\n');
     holdout(source, ['gen9ou-1']);

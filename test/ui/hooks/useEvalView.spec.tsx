@@ -89,7 +89,7 @@ describe('useEvalView', () => {
     expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ cacheKey: `${replayData.id}:${snapshots.length}:fp1` });
   });
 
-  test('the sweeps of a game key its open tip apart too, so an analysis made before the turn was played never serves the played turn (H4h)', () => {
+  test('the sweeps of a game key its open tip apart too, so an analysis made before the turn was played never serves the played turn', () => {
     const { evaluation, spies } = evaluationOf();
     const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
     const tip = snapshots.length;
@@ -106,7 +106,7 @@ describe('useEvalView', () => {
     expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`${replayData.id}:${tip}:fp1`);
   });
 
-  test('a game that grows drops the graph entry of its old tip, which was swept before the turn was played; a replay and a shrinking record keep theirs (H4h)', () => {
+  test('a game that grows drops the graph entry of its old tip, which was swept before the turn was played; a replay and a shrinking record keep theirs', () => {
     const { evaluation, spies } = evaluationOf();
     const game = { ...replayData, id: 'newgame-abcdefghij', formatid: 'gen9ou' };
     const tip = snapshots.length;

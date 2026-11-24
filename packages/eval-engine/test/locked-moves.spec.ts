@@ -24,7 +24,7 @@ function slotEntries(position: ReturnType<typeof createRootPosition>, slot: numb
   return request?.active?.[slot]?.moves ?? [];
 }
 
-describe('locked doubles slots (round 60, T94)', () => {
+describe('locked doubles slots', () => {
   test('913996 turn 6: the raging slot offers one bare option and every option plays', () => {
     const fixture = JSON.parse(readFileSync(
       new URL('./fixtures/positions/smogtours-gen9doublesou-913996-t6.json', import.meta.url), 'utf-8')) as { serialized: string };

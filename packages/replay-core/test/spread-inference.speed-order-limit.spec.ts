@@ -57,7 +57,7 @@ const margins = (solved: Map<string, SpreadCandidate>, sets: Sets, orders: Speed
 const usedUsage = (spread: { nature: string; evs: PokemonEvs }, spreads: { nature: string; evs: PokemonEvs }[]) =>
   spreads.some(entry => entry.nature === spread.nature && JSON.stringify(entry.evs) === JSON.stringify(spread.evs));
 
-describe('every observed order holds before the ladder (T117)', () => {
+describe('every observed order holds before the ladder', () => {
   test('singles: a plausible spread moves first, the mon without usage takes the rest (2663113816 t14)', () => {
     // Gholdengo (219) moved before Maushold (321), whose slowest legal Speed is 232: Gholdengo takes its
     // Timid 252 usage spread (293), Maushold (no usage, the second mover) comes down under it.

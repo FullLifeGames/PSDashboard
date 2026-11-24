@@ -58,7 +58,7 @@ describe('a boost counts when the holder wins the race with it and the stage mad
   });
 });
 
-describe('the difference a stage makes is read on the fresh race (T248, round 73)', () => {
+describe('the difference a stage makes is read on the fresh race', () => {
   test('the same stage counts at every HP the gate lets through: the HP of the held race does not decide whether the stage helps', () => {
     // The stage improves the race at full HP (two hits against four): a held race that wins counts whether or not the held race alone would show a difference.
     const full = race({ turnsMine: 2, turnsFoe: 3 });
@@ -119,7 +119,7 @@ describe('the gates read the race from the foe in front', () => {
   });
 });
 
-describe('a stage that takes away the foe\'s win counts although the holder wins nothing itself (T288, round 79)', () => {
+describe('a stage that takes away the foe\'s win counts although the holder wins nothing itself', () => {
   // Clefable behind +1/+1 against a Rhydon: the foe's clock goes from two turns to never, the holder needs fourteen.
   const without = race({ turnsMine: 3, turnsFoe: 2, first: true });
   const held = race({ turnsMine: 14, turnsFoe: Infinity, first: true });
@@ -221,7 +221,7 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
     expect(boostsTerm(battle)).toBeCloseTo(stageValue(holder, 'atk', 2), 12);
   });
 
-  test('a drop on the idle holder with a living bench is free: it can switch out and loses the stage (SB3c, 21.11.2026)', () => {
+  test('a drop on the idle holder with a living bench is free: it can switch out and loses the stage', () => {
     const { battle, holder } = board();
     holder.boosts.atk = -2;
     expect(battle.canSwitch(holder.side)).toBeGreaterThan(0);
@@ -363,7 +363,7 @@ describe('12a: the stage of an idle holder adds nothing to the hit of a foe that
  * (`pairStages`), so the events fired from inside `holderActsInFront` are counted: a board with a raised holder fires as many as one
  * `idleHolders` pass, a board without a raise none.
  */
-describe('T262: the idle reading runs once per evaluation', () => {
+describe('the idle reading runs once per evaluation', () => {
   function modifyBoostEvents(battle: Battle, run: () => void): number {
     let events = 0;
     const real = battle.runEvent.bind(battle);

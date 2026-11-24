@@ -50,7 +50,7 @@ const idsInHandler = (ability: { onModifyType?: unknown }): string[] => {
   return [...list.matchAll(/'([a-z0-9]+)'/g)].map(match => match[1]).sort();
 };
 
-describe('the type lists of move-use.ts are held to the simulator (round 72)', () => {
+describe('the type lists of move-use.ts are held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const gen = view.dex.gen;
     const moves = realMoves(view);

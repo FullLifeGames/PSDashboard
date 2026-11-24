@@ -46,7 +46,7 @@ describe('coverage notice (acquisition pass)', () => {
   });
 });
 
-describe('coverage notice of a new game (NG-2)', () => {
+describe('coverage notice of a new game', () => {
   // A new game has no replay and no guessed sets: the notice says what is true (its record rebuilds the positions) and what the user
   // can do, and never advises Edit Player/Opp.
   const pos = (bits: (0 | 1)[]) => bits.map((bit, index) => (bit ? `p${index + 1}` : null));
@@ -158,7 +158,7 @@ describe('auto mode resolution', () => {
   const before61 = { earlyDepth: 1, earlySamples: 1, treeFrom: AUTO_MCTS_FAINTED_FRACTION } as const;
   const budgetBefore61 = { ...SEARCH_BUDGET_DEFAULT, singles: before61, doubles: before61 };
 
-  test('auto runs the tree from the first turn in doubles (round 61); the threshold before it stays reachable through the budget', () => {
+  test('auto runs the tree from the first turn in doubles; the threshold before it stays reachable through the budget', () => {
     expect(resolveAutoTurnSettings(0, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
     expect(resolveAutoTurnSettings(1, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
     expect(resolveAutoTurnSettings(1, false)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });

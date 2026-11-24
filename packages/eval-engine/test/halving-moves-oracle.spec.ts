@@ -10,7 +10,7 @@ import { ALL_VIEWS, battleIn, mon } from './sim-views';
  * move that halves, or a listed move the simulator stops halving, fails with its id.
  */
 
-describe('HALVING_MOVES is held to the simulator (round 72)', () => {
+describe('HALVING_MOVES is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const withCallback = view.dex.moves.all()
       .filter(move => move.exists && move.category !== 'Status' && (move as unknown as { damageCallback?: unknown }).damageCallback)

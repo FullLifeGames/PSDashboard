@@ -94,7 +94,7 @@ describe('useTimeline', () => {
     expect(result.current.followedPlay).toBe(false);
   });
 
-  test('a rebuild that keeps the tip leaves the pointer where the user looks (round 77, D3)', () => {
+  test('a rebuild that keeps the tip leaves the pointer where the user looks', () => {
     const { result, rerender, base } = setup();
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
     expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
@@ -166,7 +166,7 @@ describe('useTimeline', () => {
     const leadVariation = (base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0), entry(1), entry(2)] });
 
-    test('a new game from T0 with the same span follows its tip once the start asks for it; a rebuild of the span stays on T0 (round 80)', () => {
+    test('a new game from T0 with the same span follows its tip once the start asks for it; a rebuild of the span stays on T0', () => {
       // Champions VGC 2646618972: back on T0, the same picks played again kept the key "0:1", so the pointer stayed on the lead picker while
       // the new game stood at turn 1.
       const { result, rerender, base } = setup();
@@ -211,7 +211,7 @@ describe('useTimeline', () => {
     });
   });
 
-  test('restorePointer puts the pointer back and the span that returns is not followed (round 77, A-2)', () => {
+  test('restorePointer puts the pointer back and the span that returns is not followed (A-2)', () => {
     const { result, rerender, base } = setup();
     const history = [entry(2), entry(3)];
     rerender({ ...base, branching: true, variationStartTurn: 2, history });
@@ -294,7 +294,7 @@ describe('useTimeline', () => {
       expect(result.current.viewTurn).toBe(4);
     });
 
-    test('the frame landing on the tip spends the play, so a rebuild after it plays nothing in again (round 77)', () => {
+    test('the frame landing on the tip spends the play, so a rebuild after it plays nothing in again', () => {
       // A set edit at the tip rebuilt the variation, the new frame document opened at the turn before the tip to play it in again (followedPlay
       // still held from the executed turn), and its landing there moved the pointer off the tip onto the main line. The play is spent once the
       // frame lands on the tip it followed.

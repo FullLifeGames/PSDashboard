@@ -105,7 +105,7 @@ describe('tera-click-field', () => {
 
   const fieldOf = (battle: Battle): Field => ({ weather: battle.field.weather, terrain: battle.field.terrain });
 
-  describe('the click that clears the field (T152 point 1)', () => {
+  describe('the click that clears the field', () => {
     test.each(FIELDS)('Terapagos clicking into %s carries the clearing flag exactly when the simulator clears it', (_name, field) => {
       const root = rootOf('gen9customgame', [terapagos()], [wall()], setField(field));
       const battle = positionBattle(root);

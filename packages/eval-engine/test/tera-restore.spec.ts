@@ -74,7 +74,7 @@ const withEntry = (snapshot: TurnSnapshot, species: string, patch: Partial<TurnS
   },
 });
 
-describe('Tera marker after a reconstruction-only faint (round 54)', () => {
+describe('Tera marker after a reconstruction-only faint', () => {
   test('the revived body gets its marker back and the side stays spent', async () => {
     const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
     const snorlax = faintInTheRebuild(battle, 'Snorlax');

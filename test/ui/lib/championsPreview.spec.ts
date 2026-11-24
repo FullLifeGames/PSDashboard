@@ -16,7 +16,7 @@ const sources = {
   hpEvidence: [], getInferredSpreads: async () => undefined,
 } as unknown as TeamBuildSources;
 
-describe('the main thread loads the Champions mod before a Champions battle (T145)', () => {
+describe('the main thread loads the Champions mod before a Champions battle', () => {
   test('the turn-0 preview of a Champions replay plays on the Champions mod', async () => {
     const serialized = await makePreviewAcquire(replayData, sources, null)();
     expect(serialized).not.toBeNull();

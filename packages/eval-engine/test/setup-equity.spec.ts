@@ -56,7 +56,7 @@ function playedStages(format: string, id: string): Partial<BoostsTable> {
   return { ...user.boosts };
 }
 
-describe('setup equity counts the stages the move gives its user (round 64, T125)', () => {
+describe('setup equity counts the stages the move gives its user', () => {
   test('a stage the move gives another body buys the user no setup', () => {
     // Swagger and Decorate raise the target, Coaching the ally; each user carries an attack the stages would feed.
     const swagger = battleOf('gen9doublescustomgame', [set('Garchomp', ['swagger', 'earthquake']), splash('Pikachu')], foes());

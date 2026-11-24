@@ -106,7 +106,7 @@ describe('the scene: P1 shows 3 of 6 in a Gen 4 OU game', () => {
   });
 });
 
-describe('a pasted team fills the open slots before any stand-in (user ruling 2)', () => {
+describe('a pasted team fills the open slots before any stand-in', () => {
   const PASTE = [
     ['Azelf', 'Nasty Plot'], ['Gyarados', 'Dragon Dance'], ['Metagross', 'Meteor Mash'],
     ['Heatran', 'Fire Blast'], ['Scizor', 'Bullet Punch'], ['Dragonite', 'Outrage'],

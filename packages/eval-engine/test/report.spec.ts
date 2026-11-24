@@ -61,7 +61,7 @@ describe('game report (multi-turn root cause)', () => {
     expect(report.keyMoments.map(moment => moment.turn)).toEqual([1, 3, 5]);
   });
 
-  test('a big roll qualifies and ranks a turn whose net swing partially cancelled (round 13)', () => {
+  test('a big roll qualifies and ranks a turn whose net swing partially cancelled', () => {
     // t2: the game's biggest roll (0.45) nets to 0.10 because the decision
     // pushed the other way (573756 t73). It must both ENTER the key moments
     // and RANK by the roll — displacing the weakest net-swing turn (t5)
@@ -312,7 +312,7 @@ describe('game report (multi-turn root cause)', () => {
   });
 });
 
-describe('null-swapped recommendations (round 5)', () => {
+describe('null-swapped recommendations', () => {
   test('misplay rows and the seeds sentence use the co-optimal alternative', () => {
     const played = ranked('move splash', 'Splash', -0.3);
     const best = ranked('move willowisp', 'Will-O-Wisp', 0.2);
@@ -340,7 +340,7 @@ describe('null-swapped recommendations (round 5)', () => {
  * and the winner (p1) stood well ahead after it; a hit would have left it further ahead. 573756 turn 73 reads the same way for p2 (the shapes
  * of both scenes, the numbers of the copy's engine score are in test/regression/rolled-copy.spec.ts).
  */
-describe('the biggest roll in the game report (T304)', () => {
+describe('the biggest roll in the game report', () => {
   const stoneEdge = {
     ...ranked('move stoneedge', 'Stone Edge', 0.2),
     koOdds: { accuracy: 0.8, killFraction: 1 },
@@ -385,7 +385,7 @@ describe('luck-report', () => {
   const forP1 = { p1: true, p2: false };
   const forP2 = { p1: false, p2: true };
 
-  describe('T22 report: the luck ledger in two parts', () => {
+  describe('report: the luck ledger in two parts', () => {
     test('649664 shape: the rolls hold under half of the ledger, so no "The rolls decided it" and the luck line names only what the rolls gave', () => {
       const report = buildGameReport([
         mk(1, -0.3, -0.1, { chanceDelta: 0.3, rolledFor: forP1 }),
@@ -453,7 +453,7 @@ describe('luck-report', () => {
     });
   });
 
-  describe('T22 report: the tip and the denied end read the same rolls', () => {
+  describe('report: the tip and the denied end read the same rolls', () => {
     test('the tip turn speaks "on a roll" only with a roll toward the winner, a marker the other way no longer suffices', () => {
       // Turn 2 produced the boundary score: the tip turn.
       const turns = (rolledFor: { p1: boolean; p2: boolean }) => [
@@ -606,7 +606,7 @@ describe('win-reason-order', () => {
     riskPaidOff: true,
   });
 
-  describe('T18 point 4: the reads examples read in turn order', () => {
+  describe('the reads examples read in turn order', () => {
     test('singles, 655336: the bigger payoff on turn 27 is named after the read on turn 13', () => {
       const analyses: TurnAnalysis[] = [];
       for (let turn = 1; turn <= 28; turn++) {
@@ -632,7 +632,7 @@ describe('win-reason-order', () => {
   });
 
   /** A conversion needs the bar to hold for the winner from its turn on, so it never names a turn before the tip: the report's "From turn N" never precedes "tipped on turn M". */
-  describe('T18: the conversion never comes before the tip', () => {
+  describe('the conversion never comes before the tip', () => {
     const swept = (species: string): SideAnalysis => ({ ...quietSide(), decided: { species, announce: true } });
 
     test('a decided sweep before a dip under the favor line does not convert before the tip', () => {

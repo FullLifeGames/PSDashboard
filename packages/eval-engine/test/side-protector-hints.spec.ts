@@ -51,7 +51,7 @@ const tempoOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => hintOf(ba
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 const aimedAt = (battle: Battle, moveId: string) => (['normal', 'any', 'adjacentFoe'].includes(battle.dex.moves.get(moveId).target) ? ' 1' : '');
 
-describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => {
+describe.each(RULES)('$name: side protectors in the hints', rules => {
   const mon = (species: string, moves: string[], extra: Partial<PokemonSet> = {}) =>
     set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...extra });
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => mon(species, ['splash'], extra);
@@ -124,7 +124,7 @@ describe.each(RULES)('$name: side protectors in the hints (round 70)', rules => 
   }
   const choice = (protector: string) => `move ${protector}, move splash`;
 
-  describe('a side protector earns the damage it denies, up to a flinch (extends T42)', () => {
+  describe('a side protector earns the damage it denies, up to a flinch', () => {
     test('Wide Guard against a spread attacker: the simulator turns it away, the hint earns the ceiling', () => {
       // From the simulator: at 1 HP a Rock Slide KOs slot 1, Wide Guard turns it away, a Dragon Claw still KOs through it.
       expect(faintsInSim('splash', 'rockslide')).toBe(true);

@@ -31,7 +31,7 @@ function damageOf(build: () => Battle, p1Choice: string, foe = 0): number {
   return before - mon.hp;
 }
 
-describe('pair focus: two slots on one foe (round 69, T42)', () => {
+describe('pair focus: two slots on one foe', () => {
   const PIKACHU = () => set('Pikachu', ['splash', 'thunderbolt'], { ability: 'Static' });
   const foes = () => [splash('Snorlax'), splash('Snorlax')];
   const base = (foeHp?: number) => () => {
@@ -104,7 +104,7 @@ function redirectedInSim(moveId: string): boolean {
   return aimed.partner === aimed.partnerMax && aimed.user < control.user;
 }
 
-describe('redirection (round 69, T42)', () => {
+describe('redirection', () => {
   const CLEFAIRY = (move: string) => set('Clefairy', [move, 'splash'], { ability: 'Magic Guard' });
   const GARCHOMP = () => set('Garchomp', ['splash', 'dragonclaw'], { ability: 'Sand Veil' });
   const board = (move: string) => battleOf(FORMAT, [CLEFAIRY(move), GARCHOMP()], [splash('Pikachu'), splash('Pikachu')]);
@@ -144,7 +144,7 @@ function stopsHitInSim(moveId: string): boolean {
   return battle.log.some(line => /^\|-activate\|p1a: .*\|move: /.test(line));
 }
 
-describe('Protect tempo and Fake Out (round 69, T42)', () => {
+describe('Protect tempo and Fake Out', () => {
   test('the Dex sweep: the moves the code calls shields stop a Tackle in the simulator', () => {
     const dex = battleOf(FORMAT, [splash('Pikachu'), splash('Pikachu')], [splash('Pikachu'), splash('Pikachu')]).dex;
     const moves = dex.moves.all().filter(move => playable(move) && move.stallingMove && move.target === 'self');
@@ -201,7 +201,7 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
   });
 });
 
-describe('singles hints stay what they were (round 69, T42)', () => {
+describe('singles hints stay what they were', () => {
   test('moves are the damage fraction (status moves 0), switches the threat differential', () => {
     const battle = battleOf('gen9customgame',
       [set('Clefairy', ['followme', 'protect', 'moonblast', 'thunderbolt']), set('Garchomp', ['dragonclaw']), splash('Blissey')],

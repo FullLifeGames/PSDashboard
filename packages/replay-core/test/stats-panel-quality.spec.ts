@@ -34,8 +34,8 @@ const healLog = [
   '|turn|2',
 ].join('\n');
 
-describe('stats panel data quality (WP11)', () => {
-  test('mega formes merge into the base species instead of a seventh card (B16)', () => {
+describe('stats panel data quality', () => {
+  test('mega formes merge into the base species instead of a seventh card', () => {
     const info = inferOpponentTeam(megaLog, 'p2');
     const speciesList = info.pokemon.map(pokemon => pokemon.species);
 
@@ -44,13 +44,13 @@ describe('stats panel data quality (WP11)', () => {
     expect(info.pokemon).toHaveLength(2);
   });
 
-  test('mega evolution reveals the stone as the held item (G19)', () => {
+  test('mega evolution reveals the stone as the held item', () => {
     const info = inferOpponentTeam(megaLog, 'p2');
     const lopunny = info.pokemon.find(pokemon => pokemon.species === 'Lopunny');
     expect(lopunny?.item).toEqual(expect.objectContaining({ value: 'Lopunnite', source: 'revealed' }));
   });
 
-  test('heal-from-item messages reveal the held item (G19)', () => {
+  test('heal-from-item messages reveal the held item', () => {
     const info = inferOpponentTeam(healLog, 'p2');
     const skarmory = info.pokemon.find(pokemon => pokemon.species === 'Skarmory');
     expect(skarmory?.item).toEqual(expect.objectContaining({ value: 'Leftovers', source: 'revealed' }));
@@ -79,7 +79,7 @@ describe('stats panel data quality (WP11)', () => {
     expect(corv?.ruledOut?.items).toContain('heavydutyboots');
   });
 
-  test('taking a Ground move rules out Levitate only for a species that can hold it (#150: Rotom-Heat holds only Levitate, a landed hit is a contradiction the rule leaves unread)', () => {
+  test('taking a Ground move rules out Levitate only for a species that can hold it (Rotom-Heat holds only Levitate, a landed hit is a contradiction the rule leaves unread)', () => {
     const log = [
       '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
       '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
@@ -232,7 +232,7 @@ describe('stats panel data quality (WP11)', () => {
     expect(clef.evs.sourceDetail).toBeUndefined();
   });
 
-  test('a tricked item is never the set item; the giver gets the credit (GPL T11)', () => {
+  test('a tricked item is never the set item; the giver gets the credit (GPL t11)', () => {
     // Rotom tricks its scarf onto Vileplume: the scarf is NOT Vileplume's
     // set item (crediting it manufactured a choice lock that hid the real
     // moves), and it IS Rotom's.
@@ -417,7 +417,7 @@ describe('stats panel data quality (WP11)', () => {
     expect(alternativeItems(usageStats, 'Blissey', 'Leftovers')).toEqual([]);
   });
 
-  test('guessed typed Hidden Power does not join a revealed generic one (G12)', () => {
+  test('guessed typed Hidden Power does not join a revealed generic one', () => {
     const revealed: RevealedPokemonInfo = {
       species: 'Zapdos',
       moves: [{ name: 'Hidden Power', source: 'revealed' }],

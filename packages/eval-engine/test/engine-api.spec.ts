@@ -36,7 +36,7 @@ const answer = (overrides: Partial<EngineResponse> = {}): EngineResponse => ({
   ...overrides,
 });
 
-describe('the engine protocol (round 77, user gate 28.10.2026: "1a 2a 3a 4a 5a 6a")', () => {
+describe('the engine protocol ("1a 2a 3a 4a 5a 6a")', () => {
   test('an option names the dashboard id, the label, and the command a Showdown client sends', () => {
     expect(engineOptions([
       { choice: 'move closecombat', label: 'Close Combat' },

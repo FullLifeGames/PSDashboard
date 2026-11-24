@@ -502,7 +502,7 @@ describe('useDockFill at a replay turn: Execute while the run is pending', () =>
   });
 });
 
-describe('useDockFill at a replay turn: the engine\'s choice for the clicked slot waits until its tray closes (round 84, A7a)', () => {
+describe('useDockFill at a replay turn: the engine\'s choice for the clicked slot waits until its tray closes', () => {
   test('doubles: the clicked empty slot keeps a deferred pick, the view shows it only after the release', () => {
     const { wired, handleEvaluate, setChoice } = replayInputs(doublesTurn());
     const { result } = renderHook(() => useDockFill(wired));

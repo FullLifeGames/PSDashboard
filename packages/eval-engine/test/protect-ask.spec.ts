@@ -70,7 +70,7 @@ function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, sourc
   }
 }
 
-describe.each(PROTECT_RULES)('$name: protectorStops asks the simulator (round 72, T239)', rules => {
+describe.each(PROTECT_RULES)('$name: protectorStops asks the simulator', rules => {
   const dex = boardOf(rules, ['splash']).dex;
   const protectors = dex.moves.all().filter(move => move.exists && move.gen <= 9 && (shieldsFromHits(dex, move) || shieldsSide(dex, move))).map(move => move.id);
   const attacks = attackClasses(dex);
@@ -104,7 +104,7 @@ describe.each(PROTECT_RULES)('$name: protectorStops asks the simulator (round 72
 const ABILITY_RULES: Rules[] = [3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `Generation ${gen}`, format: `gen${gen}customgame`, level: 100, doubles: false }))
   .concat([{ name: 'Pokémon Champions', format: 'gen9championscustomgame', level: 50, doubles: false, evs: CHAMPIONS_EVS }]);
 
-describe.each(ABILITY_RULES)('$name: protectBlocks reads the protect flag the simulator leaves after ModifyMove (round 72, T239)', rules => {
+describe.each(ABILITY_RULES)('$name: protectBlocks reads the protect flag the simulator leaves after ModifyMove', rules => {
   test('every ability with a ModifyMove handler against every move of the Dex', () => {
     const dex = boardOf(rules, ['splash']).dex;
     const abilities = dex.abilities.all().filter(ability => ability.exists && typeof (ability as { onModifyMove?: unknown }).onModifyMove === 'function').map(ability => ability.name);

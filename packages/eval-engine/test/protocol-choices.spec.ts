@@ -167,7 +167,7 @@ function builtTeams(replay: Replay, pins: [side: 'p1' | 'p2', species: string, i
 const body = (battle: Battle, side: 0 | 1, species: string) =>
   battle.sides[side].pokemon.find(mon => mon.species.name === species)!;
 
-describe('the sim brings the body the protocol shows (round 64, T121)', () => {
+describe('the sim brings the body the protocol shows', () => {
   test('751407: the Eject Pack brings Dragonite, the Knock Off lands on it, Gholdengo keeps its Choice Scarf', { timeout: 240000 }, async () => {
     const replay = fixture('smogtours-gen9ou-751407.json');
     const { p1Team, p2Team } = builtTeams(replay, [
@@ -346,7 +346,7 @@ describe('locked-slot-choice', () => {
     return { composed, runtime };
   }
 
-  describe('a locked slot carries no target loc (round 55)', () => {
+  describe('a locked slot carries no target loc', () => {
     test('doubles recharge: the partner plays its protocol move', async () => {
       const log = [
         ...doublesHead('Snorlax', 'Snorlax, M'),

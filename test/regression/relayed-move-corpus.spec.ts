@@ -35,7 +35,7 @@ const movesOf = (lines: string[], body: string, own: boolean): string[] =>
 const entrancesOf = (lines: string[], side: string): string[] =>
   lines.filter(line => line.startsWith(`|switch|${side}`)).map(line => line.split('|').slice(2, 4).join('|'));
 
-describe('a move another effect wrote for a body is not its click (#135)', () => {
+describe('a move another effect wrote for a body is not its click', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);

@@ -68,7 +68,7 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: true })).toBe('fainted · waits for the switch');
     expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: false })).toBe('fainted · no one left');
   });
-  test('a Tatsugiri that commands its Dondozo says it has no choice, also while the engine fills the side (round 85, T320)', () => {
+  test('a Tatsugiri that commands its Dondozo says it has no choice, also while the engine fills the side', () => {
     expect(chipPlaceholder({ ...base, commanding: true })).toBe('commanding · no choice');
     expect(chipPlaceholder({ ...base, hasRecord: false, commanding: true, engine: 'pending' })).toBe('commanding · no choice');
   });
@@ -81,7 +81,7 @@ describe('chipPlaceholder', () => {
   });
 });
 
-describe("chipPlaceholder, the engine's deferred pick (round 84, A7a)", () => {
+describe("chipPlaceholder, the engine's deferred pick", () => {
   const base = { forceSwitch: false, nobodyLeft: false, played: null, hasRecord: false };
   test('a held slot with a deferred pick reads "engine: <pick> · choose", in the manner of the played pick', () => {
     expect(chipPlaceholder({ ...base, deferred: { kind: 'move', name: 'Rock Slide' } })).toBe('engine: Rock Slide · choose');
@@ -95,7 +95,7 @@ describe("chipPlaceholder, the engine's deferred pick (round 84, A7a)", () => {
   });
 });
 
-describe('chipPlaceholder, a forced replacement the engine fills (round 84, A7a, ruling 2a)', () => {
+describe('chipPlaceholder, a forced replacement the engine fills', () => {
   const base = { forceSwitch: true, nobodyLeft: false, played: null, hasRecord: false };
   test('while the run is pending the forced slot says the engine is choosing, as any slot; with no engine it asks for a replacement', () => {
     expect(chipPlaceholder({ ...base, engine: 'pending' })).toBe('engine choosing…');
@@ -104,7 +104,7 @@ describe('chipPlaceholder, a forced replacement the engine fills (round 84, A7a,
   });
 });
 
-describe('chipAside (A7b, ruling 8a)', () => {
+describe('chipAside', () => {
   const blast = moveOption('Tera Blast', { type: 'Normal', typeUnderTera: 'Fire' });
   const pick: BranchSlotChoice = { kind: 'move', moveId: 'terablast', moveName: 'Tera Blast' };
 

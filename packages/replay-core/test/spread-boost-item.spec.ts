@@ -99,7 +99,7 @@ for (const world of WORLDS) {
   }
 }
 
-describe('a boost item is what the Dex says it is (T26)', () => {
+describe('a boost item is what the Dex says it is', () => {
   const gen9 = Dex.forGen(9);
   test('the offense items of the simulator are in, the others are out', () => {
     for (const name of ['Choice Band', 'Choice Specs', 'Life Orb', 'Muscle Band', 'Expert Belt', 'Wise Glasses']) {
@@ -122,7 +122,7 @@ describe('a boost item is what the Dex says it is (T26)', () => {
   });
 });
 
-describe('an item the species needs is never a guess to drop (T26)', () => {
+describe('an item the species needs is never a guess to drop', () => {
   test('the Dex names the species that cannot do without a boost item', () => {
     const dex = Dex.forGen(9);
     const needing = dex.species.all().filter(entry => [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && isBoostItem(rulesDex(9), name)));

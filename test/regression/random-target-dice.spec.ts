@@ -49,7 +49,7 @@ const ROWS: Row[] = [
   { id: 'smogtours-gen5ubers-901915', turn: 1, type: 'Gen 5 Ubers', lines: ['|drag|p1a: Arceus|Arceus-Steel|100/100'] },
 ];
 
-describe('the rebuild plays the random target and the drag the log shows (#137)', () => {
+describe('the rebuild plays the random target and the drag the log shows', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}`, async () => {
       const { logged, emitted, battle } = await rebuildThrough(row.id, row.turn);

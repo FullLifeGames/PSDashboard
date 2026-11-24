@@ -50,7 +50,7 @@ describe('PSReplayFrame', () => {
     expect(postMessage).toHaveBeenCalledWith({ type: 'ps-seek-turn', turn: 2, autoPlay: true }, '*');
   });
 
-  test('a live frame with a turn listener carries the turn tracker and reports landed turns (round 77, A-4)', async () => {
+  test('a live frame with a turn listener carries the turn tracker and reports landed turns (A-4)', async () => {
     const onTurnChange = vi.fn();
     render(<PSReplayFrame log={LOG} liveUpdates reloadKey="session" title="Branch" onTurnChange={onTurnChange} />);
     const html = await (vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).text();

@@ -154,7 +154,7 @@ describe.each(['singles', 'doubles'] as const)('the start lines against the simu
     }
   });
 
-  test('Taunt on a slower body (round 76, T261): the body\'s own move after the start line is a move still to come, as the simulator reads the queue; another body\'s move, or a move before the line, is not', () => {
+  test('Taunt on a slower body: the body\'s own move after the start line is a move still to come, as the simulator reads the queue; another body\'s move, or a move before the line, is not', () => {
     // Greninja is faster than Magikarp, so the Taunt lands while Magikarp's move waits in the queue: no extra turn.
     const real = fresh(mon('Greninja', 'Torrent', ['Taunt', 'Splash']));
     real.duelists.play(real.battle, 'move 1 1');

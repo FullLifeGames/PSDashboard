@@ -197,7 +197,7 @@ test('while "Analyze game" runs no fill starts: the chips say the engine is busy
   for (const slot of DOUBLES_SLOTS) await expect(pickLine(page, slot)).toHaveAttribute('data-wait', 'pending', { timeout: 30_000 });
 });
 
-test('Q19 b, at a replay turn: the first click on the flinched slot\'s chip starts the run, that slot stays empty while its tray is open, the other empty slot fills, no chip changes its box', async ({ page }) => {
+test('at a replay turn: the first click on the flinched slot\'s chip starts the run, that slot stays empty while its tray is open, the other empty slot fills, no chip changes its box', async ({ page }) => {
   test.setTimeout(300_000);
   // Turn 2 of the flinch game: Byeked (P2A) flinches and Coming4UrMum (P2B) faints before it moves, so both P2 slots start empty.
   await loadDockReplay(page, FLINCH_GAME, 2);

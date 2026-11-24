@@ -86,7 +86,7 @@ describe('Smogon usage stat enrichment', () => {
     ]);
   });
 
-  test('round 66 (T141): Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
+  test('Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
     // data.pkmn.cc keeps gen9championsvgc2026 (megas, Champions items and EV scale) beside gen9vgc2026.
     for (const format of ['gen9championsvgc2026regmb', 'gen9championsvgc2026regmcbo3']) {
       expect(buildSmogonStatsUrls(format).map(candidate => candidate.format)).toEqual([

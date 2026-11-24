@@ -20,7 +20,7 @@ function sources(dir: string): string[] {
 const sourceFiles = () => ['packages/eval-engine/src', 'packages/replay-core/src', 'src'].flatMap(dir => sources(`${ROOT}${dir}`));
 const rel = (path: string) => path.slice(ROOT.length);
 
-describe('the calculator generation of a battle (decision 1)', () => {
+describe('the calculator generation of a battle', () => {
   test('a game generation without a mod, or under a mod other than Champions, is its own generation, clamped to 1..9', () => {
     for (const gen of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       for (const mod of [undefined, 'base', 'gen7letsgo']) {

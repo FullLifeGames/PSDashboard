@@ -58,7 +58,7 @@ function sweep(
 
 const BOARDS = RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(type => ({ rules, type })));
 
-describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (#103)', ({ rules, type }) => {
+describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family', ({ rules, type }) => {
   test('corrections: the active body of the snapshot (sameMon)', () => {
     const { failures, formes } = sweep(rules, type, (body, species) => sameMon(body, { speciesForme: species, name: 'Other' } as PokemonSnapshot));
     expect(formes).toBeGreaterThan(100);
@@ -96,7 +96,7 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
     expect(toId(findPokemonOnSide(battle.sides[0], 'Rotom')!.species.name)).toBe('rotom');
   });
 
-  test('protocol choices: the bench slot follows the name the log shows for the origin (#118, the prefix pass is gone)', () => {
+  test('protocol choices: the bench slot follows the name the log shows for the origin (the prefix pass is gone)', () => {
     // The simulator's own log (`getUpdatedDetails`) shows Greninja-Bond as "Greninja". Every forme whose origin the log shows under another
     // name ties to the body that name stands for; a forme whose origin the log shows by its own name never ties to the base species.
     const battle = forcedBoard(rules, type, [mon(rules, 'Meowth', ['splash']), mon(rules, 'Eevee', ['splash'])]);
@@ -134,7 +134,7 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
     expect(failures).toEqual([]);
   });
 
-  test('protocol choices: names that merely share a prefix stay apart (#118)', () => {
+  test('protocol choices: names that merely share a prefix stay apart', () => {
     const PAIRS: [string, string][] = [
       ['Mewtwo', 'Mew'], ['Mew', 'Mewtwo'], ['Porygon2', 'Porygon'], ['Porygon', 'Porygon2'], ['Porygon-Z', 'Porygon'], ['Porygon', 'Porygon-Z'], ['Porygon2', 'Porygon-Z'],
       ['Pawmot', 'Pawmo'], ['Pawmo', 'Pawmot'], ['Urshifu-Rapid-Strike', 'Urshifu'], ['Urshifu', 'Urshifu-Rapid-Strike'],
@@ -163,7 +163,7 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
   });
 });
 
-describe('no site reads a species suffix list (#103)', () => {
+describe('no site reads a species suffix list', () => {
   test('no source file of the packages or the app names the list, its helper or a Tera suffix test', () => {
     const roots = ['packages/eval-engine/src', 'packages/replay-core/src', 'src'];
     const files = roots.flatMap(root => readdirSync(root, { recursive: true, withFileTypes: true })

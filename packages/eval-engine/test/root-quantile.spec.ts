@@ -213,7 +213,7 @@ describe('(a5) a quantile answer replaces the natural number, and the records ca
   });
 });
 
-describe('(a6) the salt of a position reads the game state, not the way the board was reached (round 67, T129)', () => {
+describe('(a6) the salt of a position reads the game state, not the way the board was reached', () => {
   const body = (hp: number) => ({ details: 'Keldeo, L83', hp, status: '', fainted: false, item: 'choicespecs', ability: 'justified', boosts: { atk: 0 }, moveSlots: [{ id: 'hydropump', pp: 6 }] });
   const board = (extra: Record<string, unknown>, hp = 213, turn = 14) => JSON.stringify({
     formatid: 'gen6ou', gameType: 'singles', turn, sides: [{ pokemon: [body(hp)] }, { pokemon: [body(200)] }], ...extra,

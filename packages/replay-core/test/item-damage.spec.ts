@@ -60,7 +60,7 @@ const teams = (p1: RevealedPokemonInfo[], p2: OpponentTeamInfo = { pokemon: [] }
 const attackerIn = (log: string, species: string) => inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === species)!;
 const CANDIDATES = ['Metal Coat', 'Choice Specs', 'Leftovers', 'Choice Scarf'];
 
-describe('the hits the inference records (T130)', () => {
+describe('the hits the inference records', () => {
   test('singles: a Tera hit keeps its Tera, its damage and both parties', () => {
     const log = play([moltres()], [gholdengo('Choice Specs')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
     const hits = attackerIn(log, 'Gholdengo').hits ?? [];
@@ -78,7 +78,7 @@ describe('the hits the inference records (T130)', () => {
     expect(new Set(hits.map(hit => hit.defender.species))).toEqual(new Set(['Moltres-Galar', 'Blissey']));
   });
 
-  test('doubles: a spread move whose other target protected still hits with the spread factor (ruling R4)', () => {
+  test('doubles: a spread move whose other target protected still hits with the spread factor', () => {
     // The simulator decides the factor before Protect: the [spread] tag then names one target, and the damage is the reduced one.
     const log = play([moltres(), set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'], BULKY)],
       [gholdengo('Choice Specs'), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'], BULKY)],
@@ -111,7 +111,7 @@ describe('the hits the inference records (T130)', () => {
   });
 });
 
-describe('a candidate falls when no legal spread explains the hit (T130)', () => {
+describe('a candidate falls when no legal spread explains the hit', () => {
   test('singles: the hit outruns every spread without a boost, so Metal Coat, Leftovers and Choice Scarf fall and Choice Specs stays', () => {
     const log = play([moltres()], [gholdengo('Choice Specs')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
     const refuted = judgeItemsByDamage(attackerIn(log, 'Gholdengo'), CANDIDATES, teams([builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY)]));
@@ -151,7 +151,7 @@ describe('a candidate falls when no legal spread explains the hit (T130)', () =>
   });
 });
 
-describe('the calculator sees the states the log shows (T130)', () => {
+describe('the calculator sees the states the log shows', () => {
   test('singles: Supreme Overlord counts the fallen allies, so a Leftovers Kingambit keeps its Leftovers', () => {
     const pichu = (name: string) => ({ ...set('Pichu', '', 'Static', ['Thunder Shock'], { nature: 'Hardy', evs: {} }), name });
     const kingambit = set('Kingambit', 'Leftovers', 'Supreme Overlord', ['Kowtow Cleave'], { nature: 'Adamant', evs: { atk: 252, hp: 252 } });
@@ -166,7 +166,7 @@ describe('the calculator sees the states the log shows (T130)', () => {
     expect(judgeItemsByDamage(attackerIn(log, 'Kingambit'), ['Leftovers', 'Choice Band', 'Black Glasses'], built)).not.toContain('leftovers');
   });
 
-  test('a miss within the smallest item factor (x1.1) decides nothing; a wider one does (ruling R12)', () => {
+  test('a miss within the smallest item factor (x1.1) decides nothing; a wider one does', () => {
     const attacker = attackerIn(play([moltres()], [gholdengo('Choice Specs')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]), 'Gholdengo');
     const hit = (attacker.hits ?? [])[0];
     const gen = Generations.get(9);
@@ -191,7 +191,7 @@ describe('the calculator sees the states the log shows (T130)', () => {
   });
 });
 
-describe('any doubt drops the hit (T130, ruling R3)', () => {
+describe('any doubt drops the hit', () => {
   const specsLog = () => play([moltres()], [gholdengo('Choice Specs')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
   const built = () => teams([builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY)]);
 
@@ -229,7 +229,7 @@ describe('any doubt drops the hit (T130, ruling R3)', () => {
 // The defender's item and ability count as the panel builds them only where the log has shown them: a guessed Assault Vest or Multiscale cuts the
 // damage the calculator expects, so a hit dealt without them would refute every item without a boost (649664 t23: a Hydro Pump into a
 // Tornadus-Therian whose Assault Vest was a guess ruled Keldeo's Choice Scarf out).
-describe('the defender\'s unproven item and ability widen the hull (T130, ruling R18)', () => {
+describe('the defender\'s unproven item and ability widen the hull', () => {
   const plainLog = () => play([moltres()], [gholdengo('Metal Coat')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
   const guessedVest = () => ({ ...builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY), item: guessedField('Assault Vest') });
 
@@ -326,7 +326,7 @@ describe('item-damage-champions', () => {
   const CANDIDATES = ['Life Orb', 'Leftovers', 'Sitrus Berry', 'Focus Sash'];
   const hitOf = (attacker: RevealedPokemonInfo): LoggedHit => attacker.hits![0];
 
-  describe('the damage judge on a Champions game (T159, R10)', () => {
+  describe('the damage judge on a Champions game', () => {
     for (const kind of ['singles', 'doubles'] as const) {
       test(`${kind}: the log of a Champions game names its format and its hit`, () => {
         const { attacker } = sceneOf(kind, '');
@@ -367,7 +367,7 @@ describe('item-damage-champions', () => {
     }
   });
 
-  describe('the spread solver reads the same Champions hit on Stat Points (T159, decision 7)', () => {
+  describe('the spread solver reads the same Champions hit on Stat Points', () => {
     const SOLVER_FORMAT: Record<Kind, string> = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' };
     for (const kind of ['singles', 'doubles'] as const) {
       test(`${kind}: the spread the simulator played fits the hit at the mod's power, a weaker one does not`, () => {
@@ -452,7 +452,7 @@ function chain(log: string, data: { usageStats: SmogonUsageStats; setAssumptions
   return { panel: mon.item.value, built: team.find(entry => entry.species === species)!.item, ruledOut: mon.ruledOut?.items ?? [] };
 }
 
-describe('938644 t14: the logged hit rules Metal Coat out for panel and build (T130)', () => {
+describe('938644 t14: the logged hit rules Metal Coat out for panel and build', () => {
   test('doubles: today\'s per-side enrichment plays the Nasty Plot set\'s Metal Coat', () => {
     const p2Info = enrichTeamInfo(inferOpponentTeam(scene, 'p2'), usageStats, sets);
     expect(p2Info.pokemon.find(entry => entry.species === 'Gholdengo')!.item.value).toBe('Metal Coat');
@@ -472,7 +472,7 @@ describe('938644 t14: the logged hit rules Metal Coat out for panel and build (T
   });
 });
 
-describe('singles: the same decision from a simulated game (T130)', () => {
+describe('singles: the same decision from a simulated game', () => {
   const BULKY = { nature: 'Calm', evs: { hp: 252, spd: 252 } };
   const mon = (species: string, item: string, ability: string, moves: string[], spread: { nature: string; evs: object }, teraType?: string): PokemonSet => ({
     name: species, species, item, ability, moves, nature: spread.nature, level: 100, gender: '', teraType,

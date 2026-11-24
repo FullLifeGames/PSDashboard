@@ -57,7 +57,7 @@ async function filledFor(id: string, speciesNames: string[]): Promise<Map<string
   return found;
 }
 
-describe('the ability a new game fills (X2a)', () => {
+describe('the ability a new game fills', () => {
   test('every species a format lets in gets the first ability the validator accepts, and slot 0 where none passes', async () => {
     const failures: string[] = [];
     const census: string[] = [];

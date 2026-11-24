@@ -37,7 +37,7 @@ const counted = <T>(run: () => T): [T, number] => {
   return [value, calls.n - before];
 };
 
-describe('the hint memo (round 63, T112)', () => {
+describe('the hint memo', () => {
   test('combined hints price each distinct part once per position', () => {
     const root = doublesRoot();
     const options = legalChoices(root, 'p1', { tera: true });

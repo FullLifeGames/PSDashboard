@@ -39,7 +39,7 @@ function resolve(battle: Battle, choice: BranchSlotChoice): string {
 const NICKNAME = 'Nick';
 
 describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(type => ({ rules, type }))))(
-  '$rules.label $type: the switch resolver reads a body by its Dex family (#103)',
+  '$rules.label $type: the switch resolver reads a body by its Dex family',
   ({ rules, type }) => {
     /** A board of its own per test: a forme change runs the simulator's events, and a row never inherits another's abilities. */
     const fresh = () => {
@@ -125,7 +125,7 @@ describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(ty
     }
     const where = (battle: Battle, body: Pokemon) => `switch ${battle.sides[0].pokemon.indexOf(body) + 1}`;
 
-    test('#103 Ogerpon-Teal-Tera after Tera: the chip, and the choice recorded before Tera', () => {
+    test('Ogerpon-Teal-Tera after Tera: the chip, and the choice recorded before Tera', () => {
       const { battle, body } = played(mon(rules, 'Ogerpon', ['splash'], { name: 'Mask', ability: 'Defiant', teraType: 'Grass' }), true);
       expect(body.species.name).toBe('Ogerpon-Teal-Tera');
       expect(resolve(battle, chipOf(body))).toBe(where(battle, body));

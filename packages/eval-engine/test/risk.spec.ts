@@ -242,7 +242,7 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
     expect(summarizeTurn(analysis, names)).not.toContain(READ);
   });
 
-  test('a click that ties the punisher gets the read after the chance sentence (round 76, T233; red before: no read)', () => {
+  test('a click that ties the punisher gets the read after the chance sentence (red before: no read)', () => {
     const { analysis, names } = turnOf(make, { scores: CHANCE, clickedOther: true, siblingGap: 0.05 });
     expect(analysis.attribution).toBe('chance');
     const text = summarizeTurn(analysis, names);
@@ -273,7 +273,7 @@ describe.each(GAMES)('%s: the card of a turn the chance part carried', (_name, m
   });
 });
 
-describe.each(GAMES)('%s: the card of a quiet turn (round 76, T233)', (_name, make) => {
+describe.each(GAMES)('%s: the card of a quiet turn', (_name, make) => {
   test('the side that walked into its punisher keeps the read it showed on a chance card (red before: the quiet sentence alone)', () => {
     const { analysis, names } = turnOf(make, { scores: QUIET });
     expect(analysis.attribution).toBe('quiet');
@@ -428,7 +428,7 @@ const turn = (over: Partial<TurnAnalysis>): TurnAnalysis => ({
 
 const names: [string, string] = ['BKC', '3d'];
 
-describe('T59: the shared predicate', () => {
+describe('the shared predicate', () => {
   test('a side lost ground when its own estimate fell by at least 0.1 across the turn', () => {
     expect(lostGround({ swing: -0.3 }, 'p1')).toBe(true);
     expect(lostGround({ swing: -0.3 }, 'p2')).toBe(false);
@@ -447,7 +447,7 @@ describe('T59: the shared predicate', () => {
   });
 });
 
-describe('T59: the card stays silent on a lost-ground read', () => {
+describe('the card stays silent on a lost-ground read', () => {
   test('singles (653785 t10 shape): Hydro Pump paid off on the cell, 3d lost 0.298, so no praise; the attribution field stays', () => {
     const analysis = turn({ attribution: 'p2-read', p2: paid('Hydro Pump'), swing: 0.298, decisionDelta: -0.193, chanceDelta: 0.491, scoreAfter: 0.298 });
     const summary = summarizeTurn(analysis, names);
@@ -478,7 +478,7 @@ describe('T59: the card stays silent on a lost-ground read', () => {
   });
 });
 
-describe('T59: the report lists and credits only reads whose turn held', () => {
+describe('the report lists and credits only reads whose turn held', () => {
   test('562428 shape: the lost-ground Stone Edge leaves the read list and the reads sentence, Close Combat stays; totals unchanged', () => {
     const read = (label: string, payoff: number, regret: number) =>
       paid(label, { played: ranked(`move ${label.toLowerCase().replace(' ', '')}`, label, 0.3), riskPayoff: payoff, regret });

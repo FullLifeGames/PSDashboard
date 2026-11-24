@@ -88,7 +88,7 @@ const revival = (extra: Partial<Scene> = {}): Scene => ({
 });
 const afterHolderMove = (line: string) => (log: string) => log.replace(/(\|move\|p2a: Pawmot\|Revival Blessing[^\n]*\n)/, `$1${line}\n`);
 
-describe('a move that ran out of PP with no Leppa Berry line rules the berry out (#132)', () => {
+describe('a move that ran out of PP with no Leppa Berry line rules the berry out', () => {
   for (const format of FORMATS.filter(entry => entry.revival)) {
     test(`${format.name}: Revival Blessing, a 1 PP move, spent in its first use`, () => {
       const result = read(format, revival());
@@ -127,7 +127,7 @@ describe('a move that ran out of PP with no Leppa Berry line rules the berry out
   });
 });
 
-describe('guards: the log cannot tell, so nothing is ruled out (#132)', () => {
+describe('guards: the log cannot tell, so nothing is ruled out', () => {
   const guards: [string, Partial<Scene>, string?][] = [
     ['a foe with Unnerve stops the berry', { foe: set('Tyranitar', 'Leftovers', 'Unnerve', ['Splash']), shown: false }, undefined],
     ['a holder that may have Klutz ignores its item', { holder: item => set('Lopunny', item, 'Klutz', ['Revival Blessing', 'Splash']), shown: false }, 'Lopunny'],

@@ -38,7 +38,7 @@ function sceneLog(doubles: boolean, held: string): string {
 const observationsOf = (log: string) => parseReplayLogWithObservations(log).observations.filter(obs => obs.attackerSpecies === 'Garchomp' && obs.defenderSpecies === 'Slowking');
 const teams = { p1Team: [garchomp('Choice Band')], p2Team: [slowking()] };
 
-describe('a doubles observation does not move the Choice verdict (T31 guard)', () => {
+describe('a doubles observation does not move the Choice verdict', () => {
   test('doubles: a Choice Band hit through Reflect is not contradicted', () => {
     const observations = observationsOf(sceneLog(true, 'Choice Band'));
     expect(observations).toHaveLength(1);
@@ -81,7 +81,7 @@ describe('choice-lock-defender-ability', () => {
     attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
   }];
 
-  describe('the defender of the Choice item check has its own ability (T157)', () => {
+  describe('the defender of the Choice item check has its own ability', () => {
     for (const format of ['gen9customgame', 'gen9doublescustomgame']) {
       const kind = format.includes('doubles') ? 'doubles' : 'singles';
 

@@ -86,7 +86,7 @@ function builtTeams(replay: Replay) {
   return buildTeamsFromReplay(replay.log, { observations, speedOrders });
 }
 
-describe('the sim brings the body the protocol shows (round 64, T121 step G4)', () => {
+describe('the sim brings the body the protocol shows', () => {
   test('653785: Tornadus\'s U-turn brings Excadrill, and the Knock Off lands on Excadrill', { timeout: 240000 }, async () => {
     const replay = fixture('smogtours-gen6ou-653785.json');
     const { seen } = await boundaries(replay, builtTeams(replay), [6], battle => {

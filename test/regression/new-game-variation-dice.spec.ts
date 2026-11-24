@@ -68,7 +68,7 @@ function changedEntry(entry: BranchHistoryEntry): BranchHistoryEntry {
   return { ...entry, p1SlotChoices: entry.p1SlotChoices?.map(swap) };
 }
 
-describe('a variation that changes a choice rolls what the seed gives after the change (H21a)', () => {
+describe('a variation that changes a choice rolls what the seed gives after the change', () => {
   for (const family of FAMILIES) {
     test(`${family.name}: the changed turn 2 is the turn a rebuild from the seed plays with the same change`, async () => {
       const record = await playRecord(family, 3, '4321,8765,1357,2468');

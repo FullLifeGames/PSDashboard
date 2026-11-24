@@ -80,7 +80,7 @@ const scenes: { name: string; board: () => Battle; events: string[] }[] = [
 
 const withCrlf = (lines: string[]) => lines.map(line => `${line}\r`);
 
-describe('correctActivesFromProtocol reads a block with Windows line endings like the same block with LF (T230, T206)', () => {
+describe('correctActivesFromProtocol reads a block with Windows line endings like the same block with LF', () => {
   for (const scene of scenes) {
     test(`${scene.name}: the board after a CRLF block equals the board after the LF block`, () => {
       const lf = scene.board();

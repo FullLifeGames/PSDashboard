@@ -80,7 +80,7 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1_000_000); });
 afterEach(() => { vi.useRealTimers(); });
 
 for (const kind of ['singles', 'doubles'] as const) {
-  describe(`#112 play-out and the frame's reports, ${kind}`, () => {
+  describe(`play-out and the frame's reports, ${kind}`, () => {
     test('A (guard): a pause on the turn being played in, inside the guard, keeps the run going', async () => {
       const h = harness(kind);
       await h.armAndLand();

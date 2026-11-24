@@ -121,7 +121,7 @@ describe.each([
   ['singles', SINGLES], ['doubles', DOUBLES],
   // gen9draft is a custom format: its Format object is no Format for the sim's onEvent.
   ['singles, gen9draft', { ...SINGLES, format: 'gen9draft' }],
-] as const)('T172 revived volatiles (%s)', (_label, scene) => {
+] as const)('revived volatiles (%s)', (_label, scene) => {
   test('a body the simulator fainted and the game kept gets its volatiles back', async () => {
     const truth = await play(scene, false);
     const simulated = await play(scene, true);
@@ -197,7 +197,7 @@ describe.each([
 describe.each([
   ['singles', 'gen9ou', 1],
   ['doubles', 'gen9doublesou', 2],
-] as const)('T172 items the simulator alone consumed (%s)', (_label, format, actives) => {
+] as const)('items the simulator alone consumed (%s)', (_label, format, actives) => {
   const doubles = actives === 2;
   const teams = {
     p1Team: [
@@ -258,7 +258,7 @@ describe.each([
     [set('Hatterene', 'Healer', ['Psychic Noise'])], '>p1 move 1\n>p2 move 1'],
   ['doubles', 'gen9doublescustomgame', [set('Hatterene', 'Healer', ['Splash']), set('Pidgey', 'Keen Eye', ['Splash']), set('Gliscor', 'Hyper Cutter', ['Splash'])],
     [set('Hatterene', 'Healer', ['Psychic Noise']), set('Corviknight', 'Pressure', ['Splash'])], '>p1 move 1, move 1\n>p2 move 1 1, move 1'],
-] as const)('T172 a body the simulator switched out and the game kept (%s)', (_label, format, p1, p2, turn) => {
+] as const)('a body the simulator switched out and the game kept (%s)', (_label, format, p1, p2, turn) => {
   const playOut = async (ejects: boolean): Promise<SimBattle> => {
     const team = p1.map((entry, index) => (index === 0 && ejects ? { ...entry, item: 'Eject Button' } : entry));
     const session = await openSession({ format, p1Team: team, p2Team: [...p2], replayLog: '', targetTurn: 9 }, Date.now() + 60_000);
@@ -349,7 +349,7 @@ describe('doubles-revival-slot', () => {
   const moveNames = (battle: SimBattle, slot: number) =>
     (battle.sides[0].activeRequest as { active: { moves: { move: string }[] }[] }).active[slot].moves.map(move => move.move);
 
-  describe('T151 doubles revival slot', () => {
+  describe('doubles revival slot', () => {
     const game = start('gen9doublescustomgame', [GLISCOR, PARASECT, RILLABOOM], FOES);
     const board = () => start('gen9doublescustomgame', [PARASECT, GLISCOR, RILLABOOM], FOES).battle;
 
@@ -395,7 +395,7 @@ describe('doubles-revival-slot', () => {
     });
   });
 
-  describe('T151 singles', () => {
+  describe('singles', () => {
     test('slot 0 on a board that has the body there changes nothing', () => {
       const { battle, log } = start('gen9customgame', [GLISCOR, PARASECT], FOES.slice(0, 1));
       const snapshot = snapshotOf(log);
@@ -485,7 +485,7 @@ describe('revived-volatiles-switch', () => {
     return { turn: truth.turn, p1: side(0), p2: side(1), field: { weather: truth.field.weather, terrain: truth.field.terrain, pseudoWeather: {} }, log };
   }
 
-  describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T172 a body both worlds switched out and the game brought back (%s)', (_label, scene) => {
+  describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('a body both worlds switched out and the game brought back (%s)', (_label, scene) => {
     test('the simulator carried a Choice lock and Leech Seed out, and the game entered fresh', async () => {
       const truth = await play(scene, 'Hatterene');
       expect(ids(truth, 'Hatterene')).toEqual([]);

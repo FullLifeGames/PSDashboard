@@ -85,7 +85,7 @@ describe('ReplayWorkerClient', () => {
     expect(solved.get('p1:garchomp')?.nature).toBe('Jolly');
   });
 
-  test('rolledCopy posts the roll and resolves the copy, or null where the log has no such miss (round 86, T304)', async () => {
+  test('rolledCopy posts the roll and resolves the copy, or null where the log has no such miss', async () => {
     const { client, workers } = makeClient();
     const job: RolledCopyJob = {
       format: 'gen8ou', replayLog: '', position: 'position-73', turn: 73, roll: { side: 'p2', move: 'Fire Fang' },
@@ -194,7 +194,7 @@ describe('ReplayWorkerClient', () => {
     expect(workers[0].terminated).toBe(true);
   });
 
-  test('stamps the speed-layer levers on every job and books the worker report (round 59)', async () => {
+  test('stamps the speed-layer levers on every job and books the worker report', async () => {
     const { client, workers } = makeClient();
     const promise = client.reconstruct(reconstructJob(5));
     const [worker] = workers;

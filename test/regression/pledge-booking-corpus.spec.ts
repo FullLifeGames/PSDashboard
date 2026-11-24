@@ -38,7 +38,7 @@ async function builtMoves(id: string, side: 'p1' | 'p2', body: string): Promise<
   return set.moves.map(move => toId(String(move)));
 }
 
-describe('a Pledge combination and Round book the move the line shows (#140)', () => {
+describe('a Pledge combination and Round book the move the line shows', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const moves = await builtMoves(row.id, row.side, row.body);

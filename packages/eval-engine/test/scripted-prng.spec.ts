@@ -42,7 +42,7 @@ const champ = () => makeSet('Champ', 'Machamp', ['Close Combat']);
 const singlesRoot = (formatid = 'gen9customgame') => createRootPosition(serialize(makeBattle(formatid, [jolt()], [champ()])));
 const champHp = (child: { child: { serialized: string } }) => positionBattle(child.child).sides[1].pokemon[0].hp;
 
-describe('scripted PRNG (round 43)', () => {
+describe('scripted PRNG', () => {
   test('forces a Thunder miss and a Thunder hit on every seed', () => {
     const root = singlesRoot();
     for (const seed of ['1,2,3,4', '5,6,7,8', '9,10,11,12'] as const) {
@@ -194,7 +194,7 @@ const SCRIPTS: Record<string, RollScript & PairScript> = {
   'miss, no crit': { hit: false, crit: false },
 };
 
-describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move and nothing else (T299)', rules => {
+describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move and nothing else', rules => {
   for (const [name, check] of checksOf(rules)) {
     for (const [label, script] of Object.entries(SCRIPTS)) {
       test(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {
@@ -244,7 +244,7 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
   });
 });
 
-describe.each(RULES.filter(rules => rules.doubles !== null))('PairPRNG, $name doubles: the records hold the move and nothing else (T299)', rules => {
+describe.each(RULES.filter(rules => rules.doubles !== null))('PairPRNG, $name doubles: the records hold the move and nothing else', rules => {
   for (const [name, check] of checksOf(rules)) {
     for (const [label, script] of Object.entries(SCRIPTS)) {
       test(`${name} under "${label}": every seed's check comes out as on the plain seed`, () => {

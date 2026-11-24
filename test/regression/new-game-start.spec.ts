@@ -94,7 +94,7 @@ describe('Start', () => {
     expect(startProblem({ texts: [seven, TEAM] })).toMatch(/at most 6/);
   });
 
-  test('one rule names what stops Start by box: a side, the seed, and a species the check refused; the simulator\'s other problems never stop it (NG-2)', () => {
+  test('one rule names what stops Start by box: a side, the seed, and a species the check refused; the simulator\'s other problems never stop it', () => {
     const seven = Array.from({ length: 7 }, (_, index) => `Garchomp\n- Earthquake${' '.repeat(index)}`).join('\n\n');
     expect(startBlocks({ texts: [TEAM, TEAM] })).toEqual({ teams: [null, null], seed: null });
     expect(startBlocks({ texts: ['', seven] })).toEqual({ teams: ['Paste a team for Player 1 to start.', 'A team holds at most 6 Pokémon.'], seed: null });

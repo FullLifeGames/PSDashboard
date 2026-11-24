@@ -143,7 +143,7 @@ describe('branch save/share payloads', () => {
     expect(savedBranchKey('gen9ou-123')).toBe('ps-replay-interceptor:branches:gen9ou-123');
   });
 
-  test('saved branches can be deleted again (G16)', () => {
+  test('saved branches can be deleted again', () => {
     const store = new Map<string, string>();
     (globalThis as { localStorage?: unknown }).localStorage = {
       getItem: (key: string) => store.get(key) ?? null,

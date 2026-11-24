@@ -70,7 +70,7 @@ async function makeSinglesRuntime(p1Moves: string[]) {
   });
 }
 
-describe('identity-based choice resolution (B1)', () => {
+describe('identity-based choice resolution', () => {
   test('resolves the same move id to different slots depending on the current moveset', async () => {
     const original = await makeSinglesRuntime(['Thunderbolt', 'Protect']);
     const resolvedOriginal = resolveSideChoices(original.battleStream.battle!, 'p1', [protectChoice], [true]);
@@ -160,7 +160,7 @@ const twoTurnLog = [
   '|turn|2',
 ].join('\n');
 
-describe('branch runtime validation (B7/B17)', () => {
+describe('branch runtime validation', () => {
   test('accepts a healthy reconstruction', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
@@ -255,7 +255,7 @@ describe('random-format', () => {
     '|turn|1',
   ].join('\n');
 
-  describe('random battle branching (B2)', () => {
+  describe('random battle branching', () => {
     test('starts a gen9randombattle branch with reconstructed teams and executes turns', async () => {
       const runtime = await reconstructBranchRuntime({
         format: 'gen9randombattle',

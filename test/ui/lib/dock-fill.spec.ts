@@ -172,7 +172,7 @@ describe('pickFill, held slots (the rule against jumping)', () => {
   });
 });
 
-describe("pickFillParts, the held slot's deferred pick (round 84, A7a, ruling 1a)", () => {
+describe("pickFillParts, the held slot's deferred pick", () => {
   const doubles = simState('doubles');
 
   test('a held slot keeps its part of the best joint choice as the deferred pick, and the other slot is filled from the same choice', () => {

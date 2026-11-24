@@ -21,7 +21,7 @@ const ranked = (choice: string, label: string, ev: number, extra: Partial<Ranked
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
-describe('T179 phraseReplies', () => {
+describe('phraseReplies', () => {
   test('a doubles pair of replies reads like phrase(); no raw " + →" is left', () => {
     for (const label of [DOUBLES_REPLY, DOUBLES_REPLY_TWO]) {
       expect(phraseReplies(label)).toBe(phrase(label));
@@ -39,7 +39,7 @@ describe('T179 phraseReplies', () => {
   });
 });
 
-describe('T179 the floor clause', () => {
+describe('the floor clause', () => {
   const readSide = (punishedBy: string): SideAnalysis => ({
     playedRaw: null, riskPaidOff: true, riskPayoff: 0.08,
     played: ranked('move weatherball 1, switch 3', 'Tailwind + Protect', 0.4, { punishedBy, worstCase: 0.1 }),
@@ -65,7 +65,7 @@ describe('T179 the floor clause', () => {
   });
 });
 
-describe('T179 the conditional note', () => {
+describe('the conditional note', () => {
   const sideWith = (bestWhen: string, mixWhen: string): SideAnalysis => ({
     playedRaw: null, played: null, safe: null, regret: 0,
     best: ranked('move tailwind, move protect', 'Tailwind + Protect', 0.4),
@@ -86,7 +86,7 @@ describe('T179 the conditional note', () => {
   });
 });
 
-describe('T179 the card\'s hindsight and predictive sentences', () => {
+describe('the card\'s hindsight and predictive sentences', () => {
   const quiet: SideAnalysis = { playedRaw: null, played: null, best: null, safe: null, regret: 0 };
   const card = (over: Partial<SideAnalysis>): TurnAnalysis => ({
     turn: 6, scoreBefore: 0, scoreAfter: 0.02, swing: 0.02, playedOutcome: 0, decisionDelta: 0, chanceDelta: 0.02,

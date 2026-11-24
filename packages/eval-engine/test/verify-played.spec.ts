@@ -19,7 +19,7 @@ const position = (name: string) =>
     serialized: string; tera?: EvalSettings['tera']; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'];
   };
 
-describe('the played row and column join the verify set (round 63, T78)', () => {
+describe('the played row and column join the verify set', () => {
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   const cell = (i: number, j: number, visits: number, mean: number) =>
     ({ key: cellKey(i, j), visits, total: mean * (visits + 1) - mean, value: mean, ended: false });
@@ -52,7 +52,7 @@ describe('the played row and column join the verify set (round 63, T78)', () => 
   }
 });
 
-describe('played options from keepPlayed (round 63, T78)', () => {
+describe('played options from keepPlayed', () => {
   const move = (name: string, extra: Partial<PlayedAction> = {}): PlayedAction => ({ kind: 'move', name, ...extra } as PlayedAction);
   const ranked = (choices: [string, string, number][]) => choices.map(([choice, label, ev]) => ({ choice, label, ev, worstCase: ev, expected: ev, punishedBy: null }));
 
@@ -80,7 +80,7 @@ describe('played options from keepPlayed (round 63, T78)', () => {
   });
 });
 
-describe('doubles boundary cells come from the pair plan (round 63, T78)', () => {
+describe('doubles boundary cells come from the pair plan', () => {
   const settingsOf = (fixture: ReturnType<typeof position>): EvalSettings => ({
     depth: 1, samples: 1, mode: 'mcts', tera: fixture.tera ?? true, sleepClause: fixture.sleepClause, keepPlayed: fixture.keepPlayed ?? undefined,
   });

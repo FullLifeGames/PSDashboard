@@ -591,7 +591,7 @@ describe('a death after the mon\'s own dice-failed action', () => {
     expect(noOdds.p1.sacrifice).toBeTruthy();
   });
 
-  test('labeled doubles odds may be the partner slot\'s: a rolled death stays a feed (final review, finding 3)', () => {
+  test('labeled doubles odds may be the partner slot\'s: a rolled death stays a feed', () => {
     // A doubles option's odds name one slot's move and target, which may be the partner's: odds without their attacker read as none, so the
     // same turn as the rolled case above, with a label on the odds, frames the sack like the case without odds.
     const result: EvalResult = {

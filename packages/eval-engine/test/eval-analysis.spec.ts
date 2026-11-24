@@ -1111,7 +1111,7 @@ describe('pivot pair matching', () => {
   });
 });
 
-describe('narrative signals (round 5)', () => {
+describe('narrative signals', () => {
   /** Two p1 attacks vs three p2 options; p2's equilibrium leans the switch. */
   const conditionalResult = (p2Choices?: string[]): EvalResult => ({
     score: 0.05, interval: 0.02, depthCompleted: 1,
@@ -1198,7 +1198,7 @@ describe('narrative signals (round 5)', () => {
     expect(analyzeTurn(conditionalParams(moveTop)).p2.forcedMix).toBeUndefined();
   });
 
-  test('the matrix names the hindsight read against the opponent\'s actual click (round 13)', () => {
+  test('the matrix names the hindsight read against the opponent\'s actual click', () => {
     const analysis = analyzeTurn(conditionalParams(
       conditionalResult(['move recover', 'switch 5', 'move splash'])));
     // p2 vs the Iron Head actually clicked (column 0, own-p2): Recover −0.05,
@@ -1217,7 +1217,7 @@ describe('narrative signals (round 5)', () => {
     expect(analysis.p2.hindsightRead).toBeUndefined();
   });
 
-  test('a switch into an unanswered mon carries the entry-is-profit signal (round 13)', () => {
+  test('a switch into an unanswered mon carries the entry-is-profit signal', () => {
     const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
     result.unanswered = { p1: [], p2: ['Heatran'] };
     const analysis = analyzeTurn({
@@ -1242,7 +1242,7 @@ describe('narrative signals (round 5)', () => {
     expect(quiet.p2.unanswered).toBeUndefined();
   });
 
-  test('a switch into a held mon names the standing holder (round 14)', () => {
+  test('a switch into a held mon names the standing holder', () => {
     // 648453 t13: every bench answer dies on arrival, only the standing
     // active holds the pair: the signal carries the holder's species.
     const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
@@ -1257,7 +1257,7 @@ describe('narrative signals (round 5)', () => {
     expect(analysis.p2.unanswered).toEqual({ species: 'Heatran', heldBy: 'Skarmory' });
   });
 
-  test('the report walk speaks each stage once per mon (round 14)', () => {
+  test('the report walk speaks each stage once per mon', () => {
     // The game report names a mon's entry sentence only on its FIRST entry
     // (573756: ten Zapdos-Galar entries, ten identical sentences). The walk
     // passes the already-spoken keys in; the per-turn card passes nothing
@@ -1385,7 +1385,7 @@ describe('narrative signals (round 5)', () => {
   });
 });
 
-describe('the decided sweep at the analysis layer (round 15)', () => {
+describe('the decided sweep at the analysis layer', () => {
   // 573756 t134–138: the board state (one mon clears the rest in sequence) attaches to its owning side on EVERY decided turn (display
   // layers re-book the resolution prose from it) while the announcement sentence is spoken once per game report.
   const decidedResult = (score = -0.8): EvalResult => ({

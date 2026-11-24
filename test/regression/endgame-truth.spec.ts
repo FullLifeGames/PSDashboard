@@ -124,7 +124,7 @@ function sliceOf<T>(items: T[]): T[] {
   return Number.isFinite(limit) ? sliced.slice(0, limit) : sliced;
 }
 
-describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench (round 34)', () => {
+describe.skipIf(process.env.EVAL_ENDGAME_TRUTH !== '1')('endgame truth bench', () => {
 
   test('every estimator against the solver', { timeout: 43200000 }, async () => {
     const bank = await bankItems(process.env.EVAL_ENDGAME_POSITIONS ?? DEFAULT_DIR);
@@ -169,7 +169,7 @@ async function withChampionsTables<T>(weights: Partial<typeof CHAMPIONS_FEATURE_
 }
 
 // The bench computes every position with the tables of its own rule set.
-describe('the endgame bench reads the rule set of each position (round 67, T139)', () => {
+describe('the endgame bench reads the rule set of each position', () => {
   test('an exported position brings its rule set; an export without one reads it off the replay id', async () => {
     const fs = await import('node:fs');
     const os = await import('node:os');

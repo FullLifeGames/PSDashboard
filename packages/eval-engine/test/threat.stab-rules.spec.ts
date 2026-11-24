@@ -45,7 +45,7 @@ function expectNear([ours, sim]: [number, number], label: string) {
 // Level 50: Blissey survives every hit, so the HP it loses is the whole damage.
 const chomp = (teraType: string, move: string) => set('Garchomp', [move], { teraType, level: 50 });
 
-describe('STAB by the rules after a Tera click (round 63, T81)', () => {
+describe('STAB by the rules after a Tera click', () => {
   test.each([
     ['Ground', 'earthquake', 'an old type that is also the Tera type: 2.0'],
     ['Fire', 'firefang', 'the Tera type alone: 1.5'],
@@ -289,7 +289,7 @@ const RULES = [
 ];
 const STATUSES = ['brn', 'psn', 'tox'] as const;
 
-describe.each(RULES)('$name: a finite tie by a status tick (T283)', rules => {
+describe.each(RULES)('$name: a finite tie by a status tick', rules => {
   // Seismic Toss deals the attacker's level (100) whatever the foe's stats: the hit is exact.
   const board = (status: (typeof STATUSES)[number], foeHp: number, bench: PokemonSet[] = []): Battle => {
     const battle = battleOf(rules.format,
@@ -327,7 +327,7 @@ describe.each(RULES)('$name: a finite tie by a status tick (T283)', rules => {
   });
 });
 
-describe('573756 turn 71: Magnezone against the poisoned Landorus-Therian (T283)', () => {
+describe('573756 turn 71: Magnezone against the poisoned Landorus-Therian', () => {
   const board = (tickGap: number): Battle => {
     const battle = battleOf('gen8customgame',
       [set('Magnezone', ['flashcannon', 'thunderbolt'], { level: 100, item: 'choicescarf' })],
@@ -349,7 +349,7 @@ describe('573756 turn 71: Magnezone against the poisoned Landorus-Therian (T283)
 
 describe('threat-retype', () => {
   const pairThreat = pairThreatFromThreatRetype;
-  describe('body retypes in the static (round 57)', () => {
+  describe('body retypes in the static', () => {
     test('Liquid Voice Hyper Voice hits a Tera-Ghost Sneasler', () => {
       const battle = singles('gen9customgame',
         [set('Sneasler', ['splash'], { teraType: 'Ghost' })],
@@ -381,14 +381,14 @@ describe('threat-retype', () => {
     });
   });
 
-  describe('field retypes in the static (round 57)', () => {
+  describe('field retypes in the static', () => {
     test('Weather Ball in rain hits a Ghost (gen9ou-2658663604 turn 11)', () => {
       const battle = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle' })], [set('Gengar', ['splash'])]);
       expect(singleMoveFraction(active(battle, 0), active(battle, 1), 'weatherball', battle)).toBeGreaterThan(0.2);
     });
   });
 
-  describe('Tera retypes in the static (round 57)', () => {
+  describe('Tera retypes in the static', () => {
     test('Tera-Fairy Tera Blast lands in the physical bucket against a Dragon', () => {
       const battle = singles('gen9customgame', [set('Dragonite', ['splash', 'terablast'], { teraType: 'Fairy', nature: 'Adamant' })], [set('Garchomp', ['splash'])]);
       const before = pairThreat(active(battle, 0), active(battle, 1), battle);
@@ -406,7 +406,7 @@ describe('threat-retype', () => {
     });
   });
 
-  describe('Hidden Power in the static (round 57)', () => {
+  describe('Hidden Power in the static', () => {
     test('gen 6 Hidden Power Ice is four times effective on Landorus-Therian (648453 turn 13)', () => {
       const battle = singles('gen6customgame', [set('Tornadus-Therian', ['hiddenpowerice', 'icebeam'])], [set('Landorus-Therian', ['splash'])]);
       const [tornadus, lando] = [active(battle, 0), active(battle, 1)];

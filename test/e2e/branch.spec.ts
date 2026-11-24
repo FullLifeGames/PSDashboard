@@ -50,7 +50,7 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
   });
 
-  test('the draft t56 play-out wins for p2 without crawling (round 42)', async ({ page }) => {
+  test('the draft t56 play-out wins for p2 without crawling', async ({ page }) => {
     // The failure it guards: from turn 56 (p1 Kyurem Ice Beam, p2 into Slowking) a play-out that sent Heatran into Mienshao's Knock Off
     // lost it, then crawled 21 turns to a 5% win. The pin keeps the intent, not the switch order; what it forbids is the crawl. P2 alternates
     // Slowking and Heatran while Mienshao stays locked into Knock Off: over 16 arrival dice in Node p2 wins 15 of 16, with 5.63 switches on
@@ -112,7 +112,7 @@ test.describe('PS Dashboard', () => {
     await expectReplayTurnAtLeast(frame!, 2);
   });
 
-  test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone (round 77)', async ({ page }) => {
+  test('one turn back in a turn-0 variation and a new choice: the branch frame plays the new turn alone', async ({ page }) => {
     // Scene: in the draft replay, a few turns from turn 0, one turn back and a new choice. The frame must hold the rebuilt line only (not the
     // old attack and then the new one), and the new turn must reach it although the embed script still loads: the embed comes a second late
     // here, as from the network. Turn 2 is Ice Beam first and Freeze-Dry after the step back.
@@ -389,7 +389,7 @@ test.describe('the branch frame plays executed turns', () => {
     await page.goto('/');
   });
 
-  test('the first turn of a new variation plays in from its start (round 77)', async ({ page }) => {
+  test('the first turn of a new variation plays in from its start', async ({ page }) => {
     // Scene: Iron Head into Recover opened a variation, and the frame showed the end of that turn at once, while every later turn played
     // out. The branch frame mounts after the turn ran; it opens on the turn's start.
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();

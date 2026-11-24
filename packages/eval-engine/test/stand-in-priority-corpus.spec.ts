@@ -98,7 +98,7 @@ function actsFirst(row: Row, board: Battle, bodyMove: string, chance: boolean): 
   return own >= 0 && (foe < 0 || own < foe);
 }
 
-describe('the never-acted conflicts of the corpus count (#111)', () => {
+describe('the never-acted conflicts of the corpus count', () => {
   test('the rows name the bodies the Dex lets carry them', () => {
     for (const row of ROWS) {
       const dex = dexOfRules(row.rules);

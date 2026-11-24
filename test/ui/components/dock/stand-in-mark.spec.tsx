@@ -272,7 +272,7 @@ describe('bring-guess-tiles', () => {
       expect(lookup([{ ...DOUBLES_WORLDS[0], guessed: { p1: 0, p2: 0 } }])('p1', 'Kingambit')).toBeNull();
     });
 
-    test('a teammate stand-in keeps the words of round 88, beside a bring guess', () => {
+    test('a teammate stand-in keeps its own words, beside a bring guess', () => {
       const marks = lookup(DOUBLES_WORLDS, info(['Lopunny', true]));
       expect(marks('p1', 'Lopunny')).toMatchObject({ badge: STAND_IN_BADGE, text: STAND_IN_MARK });
       expect(marks('p1', 'Kingambit')?.text).toBe('Not fielded (guessed from usage)');

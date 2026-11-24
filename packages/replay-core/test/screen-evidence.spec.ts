@@ -83,7 +83,7 @@ const scene = (screen: string, holder: Holder, extra: Partial<SceneOptions> = {}
   ({ holder, screen, turns: 10, ...extra });
 const SNORLAX = 'Snorlax';
 
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S4, the setter\'s item from the turns: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the setter\'s item from the turns: $name', view => {
   const dex = asRulesDex(view);
   for (const screen of screenMoves(view)) {
     const items = [...(conditionTurns(dex, screen)?.byItem ?? [])];

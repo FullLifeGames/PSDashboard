@@ -60,7 +60,7 @@ function drawsOf(serialized: string, p1Choice: string, p2Choice: string): { draw
   return { draws: vi.mocked(drawChild).mock.calls.length / result.children.length, plain: result.plain };
 }
 
-describe('plain draws of the endgame children (round 89, A5f-5)', () => {
+describe('plain draws of the endgame children', () => {
   test('singles: a damaging pair the class plan refuses (Protect) takes three draws, a quiet pair one', () => {
     const serialized = makeBattle([makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])], [makeSet('Egg', 'Chansey', ['Protect', 'Splash'])], 'gen9customgame');
     expect(drawsOf(serialized, 'move seismictoss', 'move protect')).toEqual({ draws: 3, plain: true });

@@ -206,7 +206,7 @@ test.describe('PS Dashboard', () => {
     await expect(tray).not.toContainText('Targeting');
   });
 
-  test('a spread move lists its partner, its dice name each target, and the tiles and chips line up (round 83)', async ({ page }) => {
+  test('a spread move lists its partner, its dice name each target, and the tiles and chips line up', async ({ page }) => {
     await page.locator('input[type="text"]').fill('gen9doubles-spread-test');
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });

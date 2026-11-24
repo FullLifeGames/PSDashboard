@@ -56,7 +56,7 @@ function simulatorFails(view: SimView, moveId: string): boolean {
   });
 }
 
-describe('field moves against a standing condition are read from the Dex and held to the simulator (round 72)', () => {
+describe('field moves against a standing condition are read from the Dex and held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const setters = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.id))].sort();
 

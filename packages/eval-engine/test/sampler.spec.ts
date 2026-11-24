@@ -159,7 +159,7 @@ describe('Pokémon Champions doubles plans the same cross (VGC Reg M-B, the roun
   });
 });
 
-describe('the odds note reads the real keys of the pair plan (gate of 13.10.2026 20:26, 4a)', () => {
+describe('the odds note reads the real keys of the pair plan', () => {
   // The played row's Tera Starstorm claim ("kills ~4%", slot b) meets the clicked Wide Guard, which turns the spread hit away,
   // and a click that lets the hit land: the cell of the played row against each click comes from the same search.
   const tree = mctsTreeSearch(position.serialized, settings, 0);
@@ -193,7 +193,7 @@ describe('the odds note reads the real keys of the pair plan (gate of 13.10.2026
   });
 });
 
-describe('a doubles turn without its protocol reads its luck from the planned cell (T217)', () => {
+describe('a doubles turn without its protocol reads its luck from the planned cell', () => {
   const names: [string, string] = ['pixelfrost', 'Mstr_Hawk'];
   const played: PlayedTurn = { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots: position.keepPlayed.p2Slots };
   const tree = mctsTreeSearch(position.serialized, settings, 0);
@@ -243,7 +243,7 @@ const asData = (sample: CellSample) => ({
 });
 const cellData = (cell: PairCell) => (cell.kind === 'sample' ? { ...cell, sample: asData(cell.sample) } : cell);
 
-describe('the pair plan at the root (round 56)', () => {
+describe('the pair plan at the root', () => {
   test('the anchor\'s played cell prices the Play Rough kill: within 0.05 of 256 seeds, where one seed missed by 0.53', { timeout: 60_000 }, () => {
     const root = anchorRoot();
     const cell = pairCellSample(root, ...PLAYED, 1, createMatchupCache());

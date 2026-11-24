@@ -178,7 +178,7 @@ describe('search orchestrator', () => {
  * A cell of one draw gets one probe on its first child, booked as the child's score against the cell's value; so does an executor
  * that answers no trend.
  */
-describe('the trend probe over the base draws (round 70)', () => {
+describe('the trend probe over the base draws', () => {
   const SETTINGS = { depth: 1, samples: 3, tera: false, prove: false } as const;
 
   /**

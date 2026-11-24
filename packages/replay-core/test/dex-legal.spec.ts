@@ -30,7 +30,7 @@ const vgcLog = (tier: string) => [
 const abilityOf = (team: { species: string; ability: string }[], species: string) =>
   toID(team.find(set => set.species === species)?.ability ?? '');
 
-describe('dex-legal abilities (round 60, T93)', () => {
+describe('dex-legal abilities', () => {
   test('every built set carries an ability the dex knows for its species', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] VGC 2026 Reg I'));
     expect({
@@ -68,7 +68,7 @@ describe('dex-legal abilities (round 60, T93)', () => {
   });
 });
 
-describe('fixed Tera type and item (round 60, T79)', () => {
+describe('fixed Tera type and item', () => {
   const doublesLog = (tier: string, extra: string[] = []) => [
     '|gametype|doubles', '|gen|9', `|tier|${tier}`,
     '|poke|p2|Ogerpon-Cornerstone, L50, F|', '|poke|p2|Ogerpon-Wellspring, L50, F|', '|poke|p2|Terapagos, L50, M|',
@@ -94,7 +94,7 @@ describe('fixed Tera type and item (round 60, T79)', () => {
     expect(p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!.teraType).toBeUndefined();
   });
 
-  test('a custom game carries the fixed Tera type and item like a standard format (round 67 gate)', () => {
+  test('a custom game carries the fixed Tera type and item like a standard format', () => {
     const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles Custom Game'));
     const cornerstone = p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!;
     expect(cornerstone.teraType).toBe('Rock');
@@ -115,7 +115,7 @@ describe('fixed Tera type and item (round 60, T79)', () => {
   });
 });
 
-describe('legality follows the replay\'s format and generation (round 60 review)', () => {
+describe('legality follows the replay\'s format and generation', () => {
   test('a battle-only forme\'s ability falls back to the species\' ability of that generation', () => {
     const set = { name: 'Gengar', species: 'Gengar', item: '', ability: 'Shadow Tag', moves: [], nature: '', gender: '', evs: {}, ivs: {}, level: 100 };
     expect(legalAbility(set as never, { gen: 6, freeAbilities: false })).toBe('Levitate');

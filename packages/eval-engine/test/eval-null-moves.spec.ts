@@ -93,7 +93,7 @@ describe('nullMoveReason', () => {
   });
 });
 
-describe('the null-move sentence asks the move table (round 57)', () => {
+describe('the null-move sentence asks the move table', () => {
   test('a type the move may take at use is no definite null', () => {
     // Primarina may carry Liquid Voice (Water), Sylveon Pixilate (Fairy), Delcatty Normalize.
     expect(nullMoveReason({ choice: 'move hypervoice', gen: 9, attackerSpecies: 'Primarina', defenderSpecies: 'Sneasler', defenderTera: 'Ghost' })).toBeNull();
@@ -122,7 +122,7 @@ describe('the null-move sentence asks the move table (round 57)', () => {
   });
 });
 
-describe('the null-move sentence after the final review (round 57)', () => {
+describe('the null-move sentence and an undecided Tera', () => {
   test('a Tera click in the same choice leaves the forme and the type undecided', () => {
     // The click turns Terapagos-Terastal into Terapagos-Stellar before Tera Starstorm, which then lands as Stellar.
     expect(nullMoveReason({ choice: 'move terastarstorm terastallize', gen: 9, attackerSpecies: 'Terapagos-Terastal', defenderSpecies: 'Gholdengo' })).toBeNull();

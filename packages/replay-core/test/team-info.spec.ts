@@ -144,7 +144,7 @@ const plotSlot = (): PokemonSetAssumption => ({
   ...plot(), item: { value: 'Leftovers', sourceDetail: 's', options: ['Leftovers', 'Metal Coat'] },
 });
 
-describe('an item slot is read like a move slot (sets as published, round 64 R1)', () => {
+describe('an item slot is read like a move slot (sets as published)', () => {
   test('a set whose first listed item is ruled out stays a candidate and plays its next listed item', () => {
     const picked = selectCuratedSet([plotSlot(), specs()], evidence({ ruledOutItems: ['leftovers'], usageItem: 'Choice Specs' }));
     expect(picked?.moves.map(move => move.value)).toEqual(['Protect', 'Nasty Plot', 'Make It Rain', 'Shadow Ball']);
@@ -290,7 +290,7 @@ describe('item-tell', () => {
     ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
   });
 
-  describe('the tell is no evidence while an ability the Pokémon may have keeps the rocks off (review of round 64)', () => {
+  describe('the tell is no evidence while an ability the Pokémon may have keeps the rocks off', () => {
     const clefableSet: PokemonSetAssumption = {
       species: 'Clefable', sourceDetail: 's', item: { value: 'Life Orb', sourceDetail: 's' },
       moves: ['Moonblast', 'Fire Blast', 'Calm Mind', 'Moonlight'].map(value => ({ value, sourceDetail: 's' })),
@@ -467,7 +467,7 @@ describe('set-fidelity', () => {
     ...moves.flatMap((move, index) => [`|turn|${index + 1}`, `|move|p2a: Mon|${move}|p1a: Skarmory`]),
   ].join('\n');
 
-  describe('the chosen set before every guess (T89, T28)', () => {
+  describe('the chosen set before every guess', () => {
     test('singles, 648453: Tornadus-T builds Knock Off, not the second option Heat Wave', () => {
       const log = singles(6, 'Tornadus-Therian', ['U-turn', 'Hidden Power', 'Hurricane']);
       const usageStats = stats(usage('Tornadus-Therian', [['U-turn', 0.9], ['Hurricane', 0.9], ['Heat Wave', 0.5], ['Knock Off', 0.45], ['Hidden Power Ice', 0.4]]));

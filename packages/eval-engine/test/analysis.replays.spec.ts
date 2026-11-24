@@ -115,7 +115,7 @@ describe('GPL replay end-to-end verdicts', () => {
 });
 
 describe('draft replay end-to-end verdicts', () => {
-  test('T50: the trend layers surface the Heatran switch over the Recover stall', { timeout: 240000 }, async () => {
+  test('the trend layers surface the Heatran switch over the Recover stall', { timeout: 240000 }, async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/draft-replay.json', import.meta.url), 'utf-8')) as {
       id: string; log: string; players: string[];
     };

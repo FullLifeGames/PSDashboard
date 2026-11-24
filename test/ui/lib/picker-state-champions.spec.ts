@@ -17,13 +17,13 @@ const position = (id: string) => fixture<{ serialized: string }>(`${id}.position
 
 const positions = [['singles', 'gen9championsou-2693832490-t3'], ['doubles', 'gen9championsvgc2026regmbbo3-2679053861-t3']] as const;
 
-describe('stored picker on a Champions position (T145)', () => {
+describe('stored picker on a Champions position', () => {
   for (const [kind, id] of positions) {
     test(`pickerStateFromSerialized revives a Champions ${kind} position`, async () => {
       await expect(pickerStateFromSerialized(position(id))).resolves.toBeDefined();
     });
 
-    test(`the stored ${kind} picker marks every body as a Champions body (decision 30)`, async () => {
+    test(`the stored ${kind} picker marks every body as a Champions body`, async () => {
       const state = await pickerStateFromSerialized(position(id));
       const infos = [...state.p1Pokemon, ...state.p2Pokemon];
       expect(infos.length).toBeGreaterThan(3);
@@ -32,7 +32,7 @@ describe('stored picker on a Champions position (T145)', () => {
   }
 });
 
-describe('snapshot picker on a Champions replay (decision 30)', () => {
+describe('snapshot picker on a Champions replay', () => {
   test('a body\'s absolute HP is the simulator\'s on the Stat Point scale', async () => {
     const replay = fixture<{ formatid: string; log: string }>('gen9championsou-2693832490.json');
     await loadSimMods('gen9championsou');
@@ -57,7 +57,7 @@ describe('snapshot picker on a Champions replay (decision 30)', () => {
     expect(compared).toBeGreaterThan(3);
   }, 60_000);
 
-  test('the fast picker offers no Tera where the Champions mod has none (T136, T145)', async () => {
+  test('the fast picker offers no Tera where the Champions mod has none', async () => {
     const replay = fixture<{ formatid: string; log: string }>('gen9championsou-2693832490.json');
     await loadSimMods('gen9championsou');
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);

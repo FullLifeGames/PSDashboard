@@ -40,7 +40,7 @@ describe('teamSizes reads the |teamsize| lines', () => {
   });
 });
 
-describe('S1: the simulator prints the side\'s body count as |teamsize| in every format with a fixed team', () => {
+describe('the simulator prints the side\'s body count as |teamsize| in every format with a fixed team', () => {
   const formats = simFormats().all().filter(format => !format.team && format.effectType === 'Format' && !/random|hackmonscup|freeforall/.test(format.id));
 
   test('the sample covers singles, doubles and Champions formats', () => {

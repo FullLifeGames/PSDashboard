@@ -43,7 +43,7 @@ const existsIn = (validator: TeamValidator, dex: { species: { get(name: string):
 const playsPast = (validator: TeamValidator, dex: { species: { all(): readonly { exists: boolean; isNonstandard?: string | null; name: string }[]; get(name: string): never } }): boolean =>
   dex.species.all().some(species => species.exists && species.isNonstandard === 'Past' && existsIn(validator, dex, species) === true);
 
-describe('the reported rows (#150): Dracovish and Zygarde under National Dex rules', () => {
+describe('the reported rows: Dracovish and Zygarde under National Dex rules', () => {
   const PLAYING = [
     ['singles draft league, an id the simulator does not list', 'gen9natdexdraft'],
     ['doubles draft league, an id the simulator does not list', 'gen9doublesdraftleague'],

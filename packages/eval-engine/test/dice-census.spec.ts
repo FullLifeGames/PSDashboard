@@ -17,7 +17,7 @@ import { dexOfRules } from './dice-sweep-support';
  */
 await loadSimMods('gen9championsou');
 
-describe('the draws of abilities, items and conditions, scanned (round 82, A4)', () => {
+describe('the draws of abilities, items and conditions, scanned', () => {
   const found = scan();
 
   test('the scan', () => {

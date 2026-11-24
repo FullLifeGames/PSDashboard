@@ -310,7 +310,7 @@ describe('scene: 752301, Landorus\'s Taunt shows only in a |cant| line', () => {
   });
 });
 
-describe('round 69 (T175): the inference books a |cant| move, so the rebuilt set holds it and the click is the shown move', () => {
+describe('the inference books a |cant| move, so the rebuilt set holds it and the click is the shown move', () => {
   test('singles: a body whose set has the Taunt plays Taunt, not a stand-in', () => {
     const board = make('gen9customgame', [landorus(['Taunt', 'Earthquake', 'Stealth Rock', 'Stone Edge'])], [taunter]);
     expect(getMainChoice(tauntTurn, 'p1', board as never)).toBe('move 1');
@@ -403,7 +403,7 @@ function bashFraction(): number {
   return rolls[15] / defender.maxHP();
 }
 
-describe('Choice item check on a Champions game (decision 30)', () => {
+describe('Choice item check on a Champions game', () => {
   test('a banded hit with a move the mod changes is judged at the power of the mod', () => {
     const observation: DamageObservation[] = [{
       attackerSpecies: 'Wyrdeer', defenderSpecies: 'Garchomp', attackerSide: 'p1', moveId: 'psyshieldbash',
@@ -469,7 +469,7 @@ describe('choice-lock-defender-item', () => {
     return { p1: { pokemon: [] }, p2: { pokemon: [mon] } };
   }
 
-  describe('the defender of the Choice item check has an item range (T193)', () => {
+  describe('the defender of the Choice item check has an item range', () => {
     for (const format of ['gen9customgame', 'gen9doublescustomgame']) {
       const kind = format.includes('doubles') ? 'doubles' : 'singles';
       for (const [name, scene] of Object.entries(SCENES)) {
@@ -533,7 +533,7 @@ describe('choice-lock-hit-field', () => {
     return corroborateChoiceItem('p1', built.species, guess, { p1Team: [built], p2Team: [defender] }, observations, 9);
   }
 
-  describe('singles: the verdict follows the item the body really held (T204)', () => {
+  describe('singles: the verdict follows the item the body really held', () => {
     // Rain doubles the water move by half, as Choice Specs do.
     const politoed = (item: string) => mon('Politoed', item, 'Drizzle', ['Surf', 'Splash'], { nature: 'Modest', evs: { hp: 252, atk: 0, def: 0, spa: 252, spd: 0, spe: 0 } });
 

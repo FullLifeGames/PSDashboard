@@ -14,7 +14,7 @@ const POSITIONS = {
 } as const;
 const serialized = (id: string) => (JSON.parse(readFileSync(new URL(`./fixtures/champions/${id}.position.json`, import.meta.url), 'utf-8')) as { serialized: string }).serialized;
 
-describe('a Champions position revives where only positions arrive (T145)', () => {
+describe('a Champions position revives where only positions arrive', () => {
   for (const [kind, id] of Object.entries(POSITIONS)) {
     test(`loadSimModsFor, then the position plays on the Champions mod (${kind})`, async () => {
       const position = serialized(id);

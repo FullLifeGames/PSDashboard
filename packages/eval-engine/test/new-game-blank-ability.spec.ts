@@ -29,7 +29,7 @@ beforeAll(async () => {
 const blank = (team: PokemonSet[]): PokemonSet[] => team.map(set => ({ ...set, ability: '' }));
 const toId = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-describe('a pasted set without an ability (H20a)', () => {
+describe('a pasted set without an ability', () => {
   test('the team check names the ability each blank set will play, in every generation that has abilities, and the validator\'s own complaint goes', async () => {
     const failures: string[] = [];
     let probed = 0;
