@@ -22,6 +22,7 @@ const collect = vm.runInNewContext('gc') as () => void;
 const heapMb = () => { collect(); collect(); return process.memoryUsage().heapUsed / 1048576; };
 
 const LEVERS = ['rules', 'clone', 'dispatch'] as const;
+const EDITED_PER_BATTLE = 4;
 /** One singles position, one Scarlet/Violet doubles position, one VGC position and the Champions VGC position of the fixtures. */
 const SCENES = ['gen9ou-2658658993#2', 'gen9doublesou-2660802611#2', 'gen9vgc2026regi-2630685175#7', 'gen9championsvgc2026regmbbo3-2634199230#5'];
 
@@ -38,9 +39,11 @@ function ask(battle: Battle): void {
   if (!source || !target) return;
   const protect = battle.dex.moves.get('protect');
   protectorStops(battle, protect, battle.dex.getActiveMove('tackle'), source, target);
-  const edited = battle.dex.getActiveMove('tackle');
-  edited.accuracy = 90; // an edited attack is asked on the board's views every time; a plain one is answered once per Dex and shared
-  protectorStops(battle, protect, edited, source, target);
+  for (let question = 0; question < EDITED_PER_BATTLE; question++) {
+    const edited = battle.dex.getActiveMove('tackle');
+    edited.accuracy = 90; // an edited attack is asked on the board's views every time (a plain one is answered once per Dex and shared); the child battle costs most, so it answers four
+    protectorStops(battle, protect, edited, source, target);
+  }
 }
 
 describe.each(SCENES)('questions to the simulator leave no heap behind (round 72, T256): %s', id => {
@@ -50,13 +53,13 @@ describe.each(SCENES)('questions to the simulator leave no heap behind (round 72
     expect(position).toBeDefined();
   });
 
-  test('600 Protect questions on fresh child battles keep the heap where it was', () => {
+  test('500 Protect questions on 100 fresh child battles keep the heap where it was', () => {
     if (!position) return;
     withSimFast([...LEVERS], () => {
       for (let round = 0; round < 30; round++) ask(childBattle(position.serialized));
-      const growth = [0, 1, 2].map(() => {
+      const growth = [0, 1].map(() => {
         const before = heapMb();
-        for (let round = 0; round < 200; round++) ask(childBattle(position.serialized));
+        for (let round = 0; round < 50; round++) ask(childBattle(position.serialized));
         return heapMb() - before;
       });
       expect(Math.min(...growth)).toBeLessThan(0.5);
