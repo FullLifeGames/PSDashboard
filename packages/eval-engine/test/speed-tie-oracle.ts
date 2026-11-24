@@ -4,18 +4,8 @@ import { FixedDice } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The two oracles the speed-tie checker holds `speedTie` to, written from the simulator's queue and independent of the code under
- * test.
- *
- * The cheap oracle: each side's move action resolved by `battle.queue.resolveAction` on a disposable battle (a round trip through
- * the stable serialization, not the module's copy), a tie when `battle.comparePriority` says 0. Quick Claw and Quick Draw draw from
- * the PRNG inside the resolve: it is asked with every chance answering false and again with every chance true, and a tie under
- * either answer is a possible tie.
- *
- * The played oracle plays the turn on a copy with the same dice and watches `speedSort`: a tie is a shuffle of a range that holds
- * both move actions.
- */
+// Oracles from the simulator's queue: `queue.resolveAction` asked with every chance false, then true (Quick Claw, Quick
+// Draw), and a played turn on a copy where `speedSort` shuffles a range that holds both move actions.
 
 export type Chance = boolean;
 export const CHANCES: readonly Chance[] = [false, true];
@@ -24,7 +14,6 @@ export interface Slot { side: 0 | 1; index: number }
 
 const disposable = (live: Battle): Battle => deserializeBattleExact(serializeBattleStable(live));
 
-/** The move action of one slot as the queue builds it, on a disposable battle with these dice. */
 export function resolvedAction(live: Battle, at: Slot, moveId: string, chance: Chance): { priority: number; speed: number; order: number; fractionalPriority: number } & object {
   const copy = disposable(live);
   copy.prng = new FixedDice({ chance });
@@ -35,7 +24,6 @@ export function resolvedAction(live: Battle, at: Slot, moveId: string, chance: C
   return action as never;
 }
 
-/** Does the queue see these two move actions as equal, under either answer of the dice? Each side's action is resolved once per answer. */
 export function cheapOracle(live: Battle, first: Slot, second: Slot): (m1: string, m2: string) => boolean {
   const held = new Map<string, ReturnType<typeof resolvedAction>>();
   const actionOf = (at: Slot, moveId: string, chance: Chance) => {
@@ -47,7 +35,6 @@ export function cheapOracle(live: Battle, first: Slot, second: Slot): (m1: strin
   return (m1, m2) => CHANCES.some(chance => live.comparePriority(actionOf(first, m1, chance) as never, actionOf(second, m2, chance) as never) === 0);
 }
 
-/** Plays one turn on a copy and reports whether `speedSort` flipped a coin between the two move actions. */
 export function playedOracle(live: Battle, first: Slot, second: Slot, choices: { p1: string; p2: string }, chance: Chance): boolean {
   const copy = disposable(live);
   const a = copy.sides[first.side].active[first.index] as Pokemon;
@@ -69,7 +56,6 @@ export function playedOracle(live: Battle, first: Slot, second: Slot, choices: {
 export const playedTie = (live: Battle, first: Slot, second: Slot, choices: { p1: string; p2: string }): boolean =>
   CHANCES.some(chance => playedOracle(live, first, second, choices, chance));
 
-/** One board: two Pokémon, the two moves they click, an optional field set-up. */
 export interface Board {
   name: string;
   p1: PokemonSet;
@@ -98,7 +84,6 @@ export function boards(): Board[] {
   ];
 }
 
-/** A board as a battle: one body per side, or two (the partner is slower and clicks Tackle) in doubles. */
 export function boardBattle(format: string, doubles: boolean, board: Board): Battle {
   const partner = () => set('Snorlax', ['tackle'], { level: 50 });
   const battle = battleOf(format, doubles ? [board.p1, partner()] : [board.p1], doubles ? [board.p2, partner()] : [board.p2]);
@@ -106,7 +91,6 @@ export function boardBattle(format: string, doubles: boolean, board: Board): Bat
   return battle;
 }
 
-/** The choices of a board's turn: slot a clicks the board's move at the foe's slot a, the partner (doubles) clicks Tackle. */
 export const boardChoices = (board: Board, doubles: boolean): { p1: string; p2: string } => ({
   p1: doubles ? `move ${board.m1} 1, move tackle 1` : `move ${board.m1}`,
   p2: doubles ? `move ${board.m2} 1, move tackle 1` : `move ${board.m2}`,

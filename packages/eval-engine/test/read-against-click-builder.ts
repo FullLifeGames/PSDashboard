@@ -2,12 +2,6 @@ import { analyzeTurn, type TurnAnalysis } from '../src/analysis';
 import type { PlayedAction, PlayedTurn } from '../src/played';
 import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 
-/**
- * A turn of three own lines and three opponent lines, built for a singles and a doubles game and for either side
- * as the reader. Own line 0 is the engine's best, line 1 the played line, line 2 the safe line (the best floor). Opponent line 0
- * is the played line's punisher, line 1 the click, line 2 another reply. The two cells under test are the played line's and the
- * safe line's value against the click; every other number is fixed so that the shape (gamble, mistake, inaccuracy) holds.
- */
 
 export type Kind = 'gamble' | 'mistake' | 'inaccuracy';
 export type Reader = 'p1' | 'p2';
@@ -17,13 +11,9 @@ export interface Scene {
   reader: Reader;
   playedCell: number;
   safeCell: number;
-  /** The payoff comes three turns later (a window read) instead of at once. */
   window?: boolean;
-  /** No matrix on the result (a cached or HTTP result). */
   noMatrix?: boolean;
-  /** Doubles only: one slot of the opponent's click never surfaced. */
   hiddenClick?: boolean;
-  /** The reader's score fell across the turn by this much (own perspective); default: it kept ground. */
   lostGround?: number;
 }
 
@@ -73,7 +63,6 @@ const singlesGame = (): Game => ({
 export const GAMES: [string, () => Game][] = [['singles', singlesGame], ['doubles', doublesGame]];
 export const READERS: Reader[] = ['p1', 'p2'];
 
-/** Own-perspective values: best, played, safe against the punisher, the click and the other reply. */
 const ownValues = (scene: Scene): number[][] => {
   const click = Math.max(scene.playedCell, scene.safeCell);
   return [
@@ -108,7 +97,6 @@ export function buildScene(make: () => Game, scene: Scene): Built {
   const oppRows: RankedChoice[] = game.opp.map((line, index) => ({
     choice: line.choice, label: line.label, ev: -0.4 - 0.001 * index, expected: -0.4, worstCase: -0.9, punishedBy: game.own[0].label,
   }));
-  // values[p1 row][p2 column], p1's value: the reader's own value for p1, its negation (transposed) for p2.
   const grid = reader === 'p1'
     ? values
     : game.opp.map((_, p1Row) => game.own.map((__, p2Col) => -values[p2Col][p1Row]));

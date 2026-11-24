@@ -47,9 +47,6 @@ const singlesLog = [
 ].join('\n');
 
 describe('correctActivesFromProtocol', () => {
-  // When the sim resolves a random switch (a Whirlwind drag) differently than the replay protocol, the correction must keep
-  // side.pokemon aligned with side.active: else the sim's next real switch swaps stale positions, duplicating one team member and
-  // erasing another (the "Cannot switch to Metagross" bug from gen9draft-2298735122).
   test('keeps side.pokemon aligned when repointing an active slot', async () => {
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
@@ -71,8 +68,6 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('a repointed Pokémon enters fresh — no inherited choice lock (GPL t38)', async () => {
-    // A diverged sim can keep a mon on the field locked into a Choice move while the real game switched it out and back in. The
-    // correction that forces it active must clear the lock trio: the real entry was fresh.
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -95,8 +90,6 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('the request regenerates after a correction — options follow the corrected active', async () => {
-    // Stale requests after a repoint made legalChoices offer the wrong mon's moves (gen9doublesou-2660802611: Grimmsnarl's screens
-    // offered while Indeedee was the corrected active; Imprison-disabled flags missing).
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -115,8 +108,6 @@ describe('correctActivesFromProtocol', () => {
   });
 
   test('a repointed mon entering beside a standing Imprison gets recomputed disable flags', async () => {
-    // The sim's DisableMove pass ran at end-of-turn, before corrections mutate the board; a freshly repointed mon (flags cleared by
-    // the fresh-entry reset) would otherwise offer, and the branch would play, moves the real game blocks.
     const runtime = await reconstructBranchRuntime({
       format: 'gen9ou',
       p1Team,
@@ -131,7 +122,6 @@ describe('correctActivesFromProtocol', () => {
     correctActivesFromProtocol(battle, ['|switch|p1a: Eve|Eevee, L50|100/100']);
 
     const eve = battle.sides[0].active[0]!;
-    // Eevee's Protect is Imprison-shared with Bulbasaur's; Tackle is not.
     expect(eve.moveSlots.find(slot => slot.id === 'protect')?.disabled).toBeTruthy();
     expect(eve.moveSlots.find(slot => slot.id === 'tackle')?.disabled).toBeFalsy();
   });
@@ -186,9 +176,6 @@ describe('protocol lock restamp after correction', () => {
   };
 
   test('repointing ONTO the locked mon restores its protocol lock; the request disables the rest', async () => {
-    // The diverged sim has the wrong mon on the field; the correction repoints onto Keldeo and deletes lock bookkeeping; the
-    // protocol trail (Specs + a lone Hydro Pump in the real log) must bring the lock back. The runtime replays a log where the sim
-    // never saw Keldeo act.
     const divergedLog = [
       '|switch|p1a: Filler|Blissey|100/100',
       '|switch|p2a: Blissey|Blissey|100/100',
@@ -241,18 +228,15 @@ const COMMANDERS: { label: string; commanders: ('p1' | 'p2')[] }[] = [
 const SLOTS = [{ label: 'a', tatsugiriFirst: true }, { label: 'b', tatsugiriFirst: false }];
 const TARGET_TURN = 3;
 
-/** The public lines of a played game, as a replay file holds them (the private halves of `|split|` pairs dropped). */
 const publicLog = (battle: Battle): string =>
   battle.log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|')).join('\n');
 
-/** Who used which move, in order; the target a spread move names is a dice draw and differs between two plays of the same choices. */
 const moveLines = (lines: readonly string[]): string[] =>
   lines.filter(line => line.startsWith('|move|')).map(line => line.split('|').slice(2, 4).join('|'));
 const pendingActions = (battle: Battle): number[] => battle.sides.slice(0, 2).map(side => side.choice.actions.length);
 
 interface Scene { format: string; p1: PokemonSet[]; p2: PokemonSet[]; turns: [string, string][] }
 
-/** One reconstruction of the played game up to TARGET_TURN: without the snapshot (the turn counter is the commit) and with it (the root the search gets). */
 async function rebuild(scene: Scene, log: string, withSnapshot: boolean) {
   const { snapshots } = parseReplayLogWithObservations(log);
   const runtime = await reconstructBranchRuntime({
@@ -282,7 +266,6 @@ describe.each(RULES)('$name: a rebuilt Commander turn commits and leaves a clean
 
   describe.each(COMMANDERS)('Commander on $label', ({ commanders }) => {
     describe.each(SLOTS)('Tatsugiri in slot $label', ({ tatsugiriFirst }) => {
-      // The commanding side sends one part (the Dondozo's), the other side two.
       const turnOne = (side: 'p1' | 'p2') => commanders.includes(side) ? 'move protect' : 'move protect, move protect';
       const turnTwo = (side: 'p1' | 'p2') => commanders.includes(side) ? 'move earthquake' : 'switch 3, switch 4';
       const scene: Scene = {
@@ -348,7 +331,6 @@ describe('encore-click', () => {
     });
   }
 
-  /** Turn 1 Protect, turn 2 the Encore lands first, turns 3 and 4 locked, turn 5 free. */
   const encoreTurns = (target: string, user: string) => [
     '|turn|1',
     `|move|${target}: Snorlax|Protect|${target}: Snorlax`,
@@ -455,8 +437,6 @@ describe('hidden-power type resolution', () => {
     expect(resolveHiddenPowerType([ev('Skarmory', 'resisted')], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Grass');
   });
   test('empty intersection falls back to usage-top (SUPER on Skarmory: no usage variant fits)', () => {
-    // Ice vs Steel/Flying is x1 and Grass x0.25 — neither reads "super", so
-    // the filter empties and the Levitate-family fallback fires.
     expect(resolveHiddenPowerType([ev('Skarmory', 'super')], usage, 'Manectric', { gen: 6, mod: undefined })).toBe('Hidden Power Ice');
   });
   test('contradictory evidence (super + immune) also falls back to usage-top', () => {
@@ -488,8 +468,6 @@ describe('set substitution', () => {
   });
 });
 
-// The protocol always hides the HP type ("|move|...|Hidden Power|..."), so a substituted typed set must still understand the
-// generic id everywhere the protocol meets the sim (653785: rejected replay choices cost two reconstructed turns).
 describe('generic protocol Hidden Power against a typed set', () => {
   test('the choice replay maps Hidden Power onto the typed slot (no rejects, no divergence)', async () => {
     const typedSet: PokemonSet = {
@@ -528,8 +506,6 @@ describe('generic protocol Hidden Power against a typed set', () => {
   });
 
   test('the sim keeps the generic id for a typed set, so the played match holds', () => {
-    // Load-bearing invariant behind the whole seam: @pkmn/sim normalizes "Hidden Power Ice" to slot/request id 'hiddenpower' (the
-    // type lives in hpType), so option tokens stay generic and the protocol's generic "Hidden Power" matches them.
     const option = {
       choice: 'move hiddenpower', label: 'Hidden Power Ice',
       worstCase: 0, expected: 0, ev: 0,

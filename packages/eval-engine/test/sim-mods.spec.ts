@@ -46,24 +46,6 @@ import { playTurn as playTurnFromDiceKeepDice, reconstruct } from './arrival-tur
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-/**
- * Relation checks on search-made leaves. The static is fitted on real positions, and the search builds boards the fit never saw
- * (a +4 Cobalion at 5 % HP priced above a healthy body, gen9draft-2058494320). Five statements must hold on any board, so they run
- * on the 34 roots of the fixture manifest and on the leaves of a one-ply sweep (three choices per side by stride, every pair
- * advanced under the seed 1,2,3,4):
- *   own HP down never raises the score; foe HP down never lowers it (p1's view, steps of 10 points from 90 to 10 %);
- *   a stage on a fainted body adds nothing; a stage on an active body that every foe in front KOs before it acts adds
- *   nothing (5 % HP, +4 attack and special attack, the simulator decides who moves first and who KOs);
- *   swapped sides negate.
- * Each group (singles, doubles OU, VGC, Champions) reads its own positions. The detectors are proved by planted
- * faults in an evaluator, on a constant stub and on the real one.
- *
- * Known breaks: every break above 1e-3 goes, a smaller slope stays with its reason. The size of a break is the largest wrong-way
- * change of the score at ONE HP point: a break found on the grid of 10 % steps is scanned point by point (`jump` of the
- * violation). A pending break is above 1e-3 and waits for its cause; it is checked by a `test.fails`: the day it passes, that test
- * turns red and the entry goes. Every other position of the group passes at 1e-9 as a plain test, so the list never hides an
- * unnamed fault. The list is empty; a pending break goes back into `KNOWN_BREAKS` with its reason.
- */
 
 interface KnownBreak {
   relation: 'ownHpDown' | 'foeHpDown';
@@ -72,7 +54,6 @@ interface KnownBreak {
   reason: string;
 }
 
-/** An entry is `{ relation, group, position, reason }`; its `test.fails` row turns red the day the position passes. */
 const KNOWN_BREAKS: KnownBreak[] = [];
 
 await loadSimMods('gen9championscustomgame');
@@ -195,24 +176,19 @@ describe('relation checks: planted faults', () => {
   const bases: [string, Evaluator][] = [['a constant stub', constant], ['the real evaluator', realEvaluator]];
 
   const plants: Record<RelationName, (base: Evaluator) => Evaluator> = {
-    // Own damage pays: p1 gains 4 points (more than the real slope of any body) for every share of its own HP it has lost.
     ownHpDown: base => (battle, ruleset) => base(battle, ruleset) + 4 * (1 - hpShare(battle, 0)),
     foeHpDown: base => (battle, ruleset) => base(battle, ruleset) - 4 * (1 - hpShare(battle, 1)),
     idleStage: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * battle.sides[0].pokemon
       .filter(mon => mon.hp <= 0)
       .reduce((sum, mon) => sum + mon.boosts.atk + mon.boosts.spa + mon.boosts.spe, 0),
-    // Stages on an active body count in full: p1's actives gain 0.05 per stage of attack and special attack, p2's lose it.
     idleStageActive: base => (battle, ruleset) => base(battle, ruleset) + 0.05 * [0, 1].reduce((sum, side) => (side === 0 ? 1 : -1) * battle.sides[side].active
       .reduce((stages, mon) => stages + (mon ? mon.boosts.atk + mon.boosts.spa : 0), 0) + sum, 0),
-    // An additive bias for p1: the swapped board gets the same bias and the two scores do not cancel.
     swapNegates: base => (battle, ruleset) => base(battle, ruleset) + 0.05,
   };
 
-  // One singles and one doubles board with a fainted body on each side of the sweep, so every relation can see its fault.
   const withFainted = (gameType: 'singles' | 'doubles') =>
     roots.find(root => root.gameType === gameType && /\d+ fainted/.test(root.reason))!;
   const boards: [string, RelationSubject][] = [['singles', withFainted('singles')], ['doubles', withFainted('doubles')]];
-  // The fault of the stage relation needs an active body that every foe in front KOs first: the first position of the game type that has one.
   const withIdle = (gameType: 'singles' | 'doubles') => subjects.find(subject => subject.gameType === gameType && subject.kind === 'root' &&
     ([0, 1] as const).some(side => idleActiveBodies(reviveBattle(subject.serialized, subject.ruleset), side).length > 0))!;
   const idleBoards: [string, RelationSubject][] = [['singles', withIdle('singles')], ['doubles', withIdle('doubles')]];
@@ -244,11 +220,8 @@ const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12'];
 
 interface Scene {
   name: string;
-  /** The side whose body leaves: it gets the switch request. */
   leaves: 'p1' | 'p2';
-  /** Pikachu's move in p1a: a pivot's own, or the hit that sets the holder off. */
   trigger: string;
-  /** The body in p2a that holds the item or ability, and its share of HP at the start of the turn. */
   holder?: { set: PokemonSet; hp: number };
 }
 
@@ -260,7 +233,6 @@ const SCENES: Scene[] = [
   { name: 'Wimp Out', leaves: 'p2', trigger: 'tackle', holder: { set: mon('Wimpod', ['tackle'], { ability: 'Wimp Out' }), hp: 0.6 } },
 ];
 
-/** The two calls of a turn: both sides' clicks, then the replacement. The die rides on the action that runs after the pause. */
 function plan(scene: Scene, mode: Mode, happens: boolean) {
   const doubles = mode === 'doubles';
   const pivots = scene.leaves === 'p1';
@@ -269,8 +241,8 @@ function plan(scene: Scene, mode: Mode, happens: boolean) {
   const lead2 = scene.holder?.set ?? mon('Snorlax', ['poisonpowder']);
   const partner2 = mon('Snorlax', [pivots ? 'splash' : 'poisonpowder']);
   const p2 = doubles ? [lead2, partner2, mon('Chansey', ['splash'])] : [lead2, mon('Chansey', ['splash'])];
-  // Pivot: the foe's Poison Powder comes after the pause. Eject kinds in doubles: the second foe's Poison Powder does. Singles ejects:
-  // nothing runs after the pause, so the die is the accuracy of the hit that sets the holder off (forced yes keeps the pause).
+  // Singles ejects: nothing runs after the pause, so the die is the accuracy of the hit that sets the holder off
+  // (forced yes keeps the pause).
   const die: ForcedDie = !pivots && !doubles
     ? accuracy('p1a', scene.trigger, 'p2a', happens)
     : accuracy(pivots ? 'p2a' : 'p2b', 'poisonpowder', doubles ? 'p1b' : 'p1a', happens);
@@ -292,7 +264,6 @@ function plan(scene: Scene, mode: Mode, happens: boolean) {
   return { format: doubles ? 'gen9doublescustomgame' : 'gen9customgame', p1, p2, commands, choices, replacement, die };
 }
 
-/** Both calls of the turn. `happens` null plays the turn without a dice argument in either call. */
 async function playTurn(scene: Scene, mode: Mode, seed: string, happens: boolean | null) {
   const setup = plan(scene, mode, happens ?? true);
   const runtime: BranchRuntime = await branchOf(setup.format, setup.p1, setup.p2, seed);
@@ -332,7 +303,6 @@ describe.each(['singles', 'doubles'] as const)('a turn that pauses for a switch 
           expect(tookOf(forced.second), label).toEqual(['applied']);
           expect(forced.seed, label).toBe(twin.seed);
         } else if (happens) {
-          // a forced yes on the 100 percent hit that sets the holder off changes nothing
           expect(forced.paused, label).toBe(true);
           expect(tookOf(forced.second), label).toEqual(['applied']);
           expect(forced.seed, label).toBe(twin.seed);
@@ -347,7 +317,6 @@ describe('dice-keep-dice', () => {
   const playTurn = playTurnFromDiceKeepDice;
 
 
-  /** Turns whose arrival plays the log perfectly (`isPerfectAlignment`): the unforced turn is the log's turn, so it is the baseline. */
   interface Scene { label: string; fixture: string; turn: number }
   const SCENES: Scene[] = [
     { label: 'singles (GPL DzBQ5azlO5l t13)', fixture: 'gpl-replay', turn: 13 },
@@ -360,7 +329,6 @@ describe('dice-keep-dice', () => {
   const identSlot = (ident: string | undefined) => /^(p[12][a-d])/.exec(ident ?? '')?.[1] ?? '';
   const queuedMove = (line: string) => parts(line)[1] === 'move' && !line.includes('|[from]');
 
-  /** The lines of each queued action, cut at the next action and at the first blank line (residuals and request breaks stay out). */
   function actionBlocks(lines: string[]): Map<string, string[]> {
     const blocks = new Map<string, string[]>();
     let key: string | null = null;
@@ -382,11 +350,6 @@ describe('dice-keep-dice', () => {
     return [...new Set([identSlot(parts(line)[4]), ...spread].filter(Boolean))];
   }
 
-  /**
-   * The die to force: the crit (or the accuracy) of the first damaging action whose target no later action aims at, flipped to the
-   * answer the unforced turn did not give. A forced crit leaves the number of draws as it was; a forced miss on a hit removes the
-   * crit and the damage roll, a forced hit on a miss adds them, so only the accuracy moves every later draw of a plain stream.
-   */
   function flippedDie(lines: string[], kind: 'crit' | 'accuracy'): { die: ForcedDie; moveId: string } | null {
     const moves = lines.filter(queuedMove);
     for (const [index, line] of moves.entries()) {
@@ -395,7 +358,7 @@ describe('dice-keep-dice', () => {
       // an action after this one on the same target would show the changed hit points in its own damage line
       if (!target || moves.slice(index + 1).some(later => aimsOf(later).includes(target))) continue;
       const dexMove = rulesDex(9).moves.get(toId(parts(line)[3]));
-      // a move of fixed damage, of a set power or that always crits draws no crit; a move that cannot miss draws no accuracy
+      // a move of fixed damage, of a set power or that always crits draws no crit; a sure hit draws no accuracy
       if (dexMove.basePower === 0 || dexMove.damage || dexMove.ohko || dexMove.damageCallback) continue;
       if (kind === 'crit' && dexMove.willCrit) continue;
       if (kind === 'accuracy' && (dexMove.accuracy === true || dexMove.accuracy >= 100)) continue;
@@ -470,7 +433,6 @@ describe('dice-keep-dice', () => {
   ];
 
   describe.each(BOARDS)('an action left alone keeps its dice on a later turn, $label', board => {
-    // a later turn draws from the plain stream: any seed is a natural turn, and the check needs one where more than one action runs
     const play = async (seed: string, flip: { die: ForcedDie; moveId: string } | null) => {
       const runtime = await branchOf(board.format, board.p1, board.p2, '1,2,3,4');
       const first = await runTurn(runtime, board.commands, null);
@@ -530,7 +492,6 @@ function replays(): Array<{ tag: string; replay: Replay }> {
 const STATIC_FLAG = /^(L\d+|M|F|shiny)$/;
 const ENTRY = /^\|(switch|drag|replace)\|(p[12])[a-d]?: ([^|]*)\|([^|]*)/;
 
-/** Species base id and the static flags of a details string, flags in the protocol's order. */
 function reading(details: string, rules: GameRules): { base: string; flags: string } {
   const [species, ...flags] = details.split(', ');
   return { base: speciesBaseId(species.trim().replace(/-\*$/, ''), rules), flags: flags.filter(flag => STATIC_FLAG.test(flag)).join(', ') };

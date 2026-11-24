@@ -3,10 +3,6 @@ import { replacementRounds } from '../src/replacement-rounds';
 import { createRootPosition, legalChoices } from '../src/forward-model';
 import { reconstructWithPoints } from './replacement-points';
 
-/**
- * The protocol's request rounds on scripted logs: singles, doubles with one and two slots, both sides at once,
- * a replacement that falls to an entry hazard, and the lines that are no replacement (a pivot, the last body of a side).
- */
 
 const log = (...lines: string[]) => lines.join('\n');
 
@@ -58,7 +54,6 @@ describe('replacementRounds', () => {
       '|turn|4', '|switch|p1a: B|Rotom|100/100', '|move|p2a: C|U-turn|p1a: B', '|switch|p2a: D|Zapdos|100/100|[from] U-turn', '|turn|5',
     ))).toEqual([]);
     expect(replacementRounds(log('|turn|9', '|faint|p2a: X', '|win|P1'))).toEqual([]);
-    // A faint left over from the block before does not answer the next block's plain switch.
     expect(replacementRounds(log('|turn|9', '|faint|p2a: X', '|turn|10', '|switch|p2a: Y|Zapdos|100/100'))).toEqual([]);
   });
 
@@ -75,7 +70,6 @@ describe('onReplacement: the hook at the open request', () => {
     expect(rounds.length).toBeGreaterThan(0);
     expect(run.points.length).toBeGreaterThan(0);
     for (const { point, serialized, serializedAgain } of run.points) {
-      // Read-only: reading it twice gives the same bytes, and the request is still open when the hook fires.
       expect(serializedAgain).toBe(serialized);
       const root = createRootPosition(serialized);
       for (const side of ['p1', 'p2'] as const) {
@@ -98,7 +92,6 @@ describe('onReplacement: the hook at the open request', () => {
     expect(first.played[side]).toEqual(rounds[0].species[side]);
   });
 
-  // The scenes test/e2e/replacement-note.spec.ts reads on the cards of the turns after them.
   test('the e2e scenes: Toxapex on turn 6 of the OU game, Flamigo and Sylveon together on turn 2 of the doubles game', { timeout: 480000 }, async () => {
     const singles = await reconstructWithPoints('gen9ou-2658662321');
     const species = singles.points.map(({ point }) => [point.turn, point.ordinal, ...point.played.p1, ...point.played.p2]);

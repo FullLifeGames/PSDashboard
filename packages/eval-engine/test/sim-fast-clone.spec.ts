@@ -68,8 +68,8 @@ describe('cloneBattle', () => {
     expect(simFastStatus()).toBe('fallback');
   });
 
-  // A copy of a branch's live battle must not keep the battle's `send`: its output went into the live stream, and a click the copy
-  // refused read as a refused turn of the branch (gen9draft-2058494320, turn 1).
+  // A copy must not keep the live battle's `send`: its output went into the branch's stream, and a refused click of
+  // the copy read as a refused turn of the branch.
   type Fields = Record<string, unknown>;
   const fields = (object: object): Fields => object as Fields;
   const levels = (battle: Battle): [string, Fields][] => [
@@ -82,7 +82,6 @@ describe('cloneBattle', () => {
   test('a copy shares a function with its source only where a deserialized copy does, every fixture', () => {
     for (const position of positions) {
       const source = fresh(position.serialized);
-      // a branch battle's send writes its stream
       (source as unknown as { send: () => void }).send = () => {};
       const copy = levels(cloneBattle(source));
       const standard = levels(fresh(serializeBattleStable(source)));

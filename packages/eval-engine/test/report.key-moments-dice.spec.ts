@@ -7,12 +7,6 @@ import { forcedQualifier } from '../src/prose/phrases';
 import { summarizeTurn } from '../src/summary';
 import type { EvalResult, RankedChoice } from '../src/types';
 
-/**
- * The report keeps its four biggest key moments and adds every dice turn that qualifies (score at least 0.25, not quiet, not a resolution
- * turn) whose chance went against the winner. 573756 turn 73: a 95 % Fire Fang missed, the turn ranked eighth of eight and the luck that
- * turned the game was not on the list. The report is game-type blind, so the doubles rows repeat the singles rows with the pair sides of a
- * doubles analysis.
- */
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
@@ -40,7 +34,6 @@ const dice = (kind: Kind, turn: number, chance: number, over: Partial<TurnAnalys
   };
 };
 
-/** Four decision turns at 0.6 to 0.45 fill the cap; a fifth, smaller decision turn is rank 5. */
 const pool = (kind: Kind, extra: TurnAnalysis[]): TurnAnalysis[] => [
   decision(kind, 1, 0.6), decision(kind, 2, 0.55), decision(kind, 3, 0.5), decision(kind, 4, 0.45),
   ...extra,
@@ -61,7 +54,6 @@ describe.each(kinds)('key moments, %s', kind => {
   });
 
   test('a dice turn whose chance went toward the winner does not join', () => {
-    // Early in the game, so the favor boundary leaves it a genuine roll and not a resolution turn.
     const analyses = [dice(kind, 1, -0.27), ...pool(kind, []).map(entry => ({ ...entry, turn: entry.turn + 1 }))];
     expect(turnsOf(analyses, new Set([1]))).toEqual([2, 3, 4, 5]);
   });
@@ -105,7 +97,6 @@ describe.each(kinds)('key moments, %s', kind => {
 const PHANTOM = 'stayed in (KO’d before acting)';
 const WORDS = 'knocked out before it moved, so the log shows no choice';
 
-/** The Game report: the misplay row and the seed sentence say what happened, in the same words as the card. */
 describe('the game report on a side that never acted (singles)', () => {
   const choice = (id: string, label: string, ev: number) => ({ choice: id, label, worstCase: ev, expected: ev, ev });
   const side = (fields: Partial<TurnAnalysis['p1']>): TurnAnalysis['p1'] => ({ playedRaw: null, played: null, best: null, safe: null, regret: null, ...fields });
@@ -156,7 +147,6 @@ const ROWS: { mass: number; caveat: Forced['caveat']; ends: string | null }[] = 
   { mass: 0.98, caveat: 'barring-crit', ends: 'every reply lost within 3 turns in 98% of the rolls, barring a crit.' },
   { mass: 0.9, caveat: 'none', ends: 'every reply lost within 3 turns in 90% of the rolls.' },
   { mass: 0.996, caveat: 'none', ends: 'every reply lost within 3 turns in 99% of the rolls.' },
-  // Under the spoken mass the report names no forced conversion at all.
   { mass: 0.67, caveat: 'none', ends: null },
 ];
 
@@ -207,7 +197,6 @@ const turn = (n: number, p2: SideAnalysis, score: number): TurnAnalysis => ({
   attribution: 'p2-decision', p1: side({}), p2,
 });
 
-// 2630685175 turn 8: Taunt + Body Press (−0.767) against Astral Barrage + Body Press (+0.920), regret 1.687.
 const doublesThrow = side({
   played: choice('move taunt 1, move bodypress 2', 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', -0.767),
   best: choice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Calyrex-Ice', 0.92),

@@ -76,7 +76,6 @@ describe('identity-based choice resolution', () => {
     const resolvedOriginal = resolveSideChoices(original.battleStream.battle!, 'p1', [protectChoice], [true]);
     expect(resolvedOriginal).toEqual({ ok: true, command: 'move 2' });
 
-    // Same stored choice after a team edit shuffled the move order:
     const edited = await makeSinglesRuntime(['Protect', 'Thunderbolt']);
     const resolvedEdited = resolveSideChoices(edited.battleStream.battle!, 'p1', [protectChoice], [true]);
     expect(resolvedEdited).toEqual({ ok: true, command: 'move 1' });
@@ -368,9 +367,6 @@ const replayLog = [
   '|switch|p2a: Pikachu|Pikachu, F|100/100',
   '|turn|1',
   '|',
-  // The real game: p2 switches to Eevee, p1 sets up with Curse. The teams
-  // handed to the branch have Curse edited away, so the replayed p1 choice
-  // is rejected while p2's switch is accepted and left pending.
   '|switch|p2a: Eevee|Eevee, F|100/100',
   '|move|p1a: Snorlax|Curse|p1a: Snorlax',
   '|-boost|p1a: Snorlax|atk|1',
@@ -511,8 +507,6 @@ const sandstormReplayLog = [
   '|-weather|Sandstorm|[from] ability: Sand Stream|[of] p2a: Tyranitar',
   '|turn|1',
   '|',
-  // Deterministic turn 1: self-targeting moves cannot miss or KO, so the
-  // sim's own damage rolls can never diverge into a forced switch here.
   '|move|p1a: Machoke|Bulk Up|p1a: Machoke',
   '|-boost|p1a: Machoke|atk|1',
   '|-boost|p1a: Machoke|def|1',
@@ -531,8 +525,7 @@ describe('weather snapshot correction', () => {
     const snapshots = parseReplayLog(sandstormReplayLog);
     const snapshot = snapshots.find(entry => entry.turn === 2);
     expect(snapshot).toBeTruthy();
-    // Precondition for the whole scenario: the client snapshot uses the
-    // display name, which the sim does not know as a condition.
+    // The client snapshot holds the weather's display name ('Sand'), which the sim does not know as a condition.
     expect(snapshot!.field.weather).toBe('Sand');
 
     const { p1Team, p2Team } = buildTeamsFromReplay(sandstormReplayLog);

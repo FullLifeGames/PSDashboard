@@ -14,7 +14,6 @@ function loadFixtureReplay() {
   };
 }
 
-// Saved from a real battle; gitignored (Gen9Draft-*), so tests using it skip when absent.
 const SAVED_REPLAY_HTML = fileURLToPath(new URL('../../../Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html', import.meta.url));
 
 function loadHtmlReplayLog(path: string): string {
@@ -470,9 +469,6 @@ describe('Replay reconstruction regression suite', () => {
       ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
       level: 50,
     });
-    // Uxie's move 1 is U-turn: falling back to `move 1` for the blocked turn
-    // plays a pivot move the real game never saw and pulls the next Pokémon
-    // in a turn early — the first domino of the GPL replay-loop desync.
     const log = [
       '|gametype|singles',
       '|player|p1|Alice||',
@@ -508,8 +504,6 @@ describe('Replay reconstruction regression suite', () => {
 });
 
 describe('Turn-synchronized replay of a video-reconstructed log', () => {
-  // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers, Sleep Talk/Rest loops, and a taunt-blocked turn 1. Without the
-  // turn-sync guard the block replayer ran ~5 turns ahead of the simulator, so pending state like Future Sight vanished from every branch.
   function loadGplReplay() {
     return JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
   }
@@ -518,11 +512,8 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
     const replay = loadGplReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
 
-    // Iron Valiant's Life Orb recoil and Uxie's Rocky Helmet chip (no [of]
-    // attribution in this log) both surface as revealed items.
     expect(p2Team.find(set => set.species === 'Iron Valiant')?.item).toBe('Life Orb');
     expect(p1Team.find(set => set.species === 'Uxie')?.item).toBe('Rocky Helmet');
-    // Rotom-Wash TRICKED its scarf away and received Black Sludge: the sludge's later self-damage reveals must not overwrite the set item.
     expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Choice Scarf');
   });
 
@@ -538,7 +529,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
       targetTurn: 2,
     });
 
-    // Turn 1: Uxie was taunted and never moved — it must still be in.
     expect(runtime.battleStream.battle?.turn).toBe(2);
     expect(runtime.battleStream.battle?.sides[0].active[0]?.species.name).toBe('Uxie');
   });
@@ -548,8 +538,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const snapshots = parseReplayLog(replay.log);
 
-    // Mirrors the eval sweep's call: per-turn snapshot corrections keep the
-    // sim's damage rolls from drifting away from the recorded HP.
     const runtime = await reconstructBranchRuntime({
       format: inferReplayFormatId(replay),
       p1Team,
@@ -565,8 +553,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
 
     const battle = runtime.battleStream.battle!;
     expect(battle.turn).toBe(25);
-    // Turn 24 cast Future Sight at p2's slot; it lands on turn 26, so the
-    // pending slot condition must survive to the turn-25 branch point.
     expect(Object.keys(battle.sides[1].slotConditions[0] ?? {})).toContain('futuremove');
     expect(battle.sides[0].active[0]?.species.name).toBe('Uxie');
     expect(battle.sides[1].active[0]?.species.name).toBe('Rhydon');

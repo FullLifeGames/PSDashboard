@@ -8,30 +8,13 @@ import { boardOf, clicksOf, GRID_SCENES, playClicks, seedOf, stableLog, SWEEPS_F
 import { sweepMoves, SWEEP_CASES } from './dice-sweep-support';
 import { LegacyScriptedPRNG } from './scripted-prng-legacy';
 
-/**
- * The parity sweep of the tree's two scripted PRNGs. Both ask the module's namer (`dice/namer.ts`) which die a draw is; the sweep
- * holds that to what must stay as it was, in every generation 1 to 9 and the Champions mod, singles and (from Gen 3) doubles:
- *
- * 1. A script for a move that is not played changes nothing the simulator can see: the plain PRNG's log, end seed and stable
- *    serialization, and after the turn the battle has none of the watch's wrappers (the live battle unchanged: the namer calls
- *    no Dex handler, it reads `battle.event` and `battle.effect`, so this is the proof AGENTS.md asks of a stand-in).
- * 2. For Gens 3 to 9 and Champions, on scenes with no status check, `ScriptedPRNG` and the frozen copy of the class
- *    (scripted-prng-legacy.ts, which told a draw by its numbers) give the same log, end seed and serialization for the scripts
- *    `hit and crit`, `miss, no crit`, `roll 0` and `roll 15`: every cell that read right keeps its price.
- * 3. The roll mapping: a script's top roll hurts more than its bottom roll under `PairPRNG` too.
- * 4. Mid-turn arrival: the faster body's status move lands (every Dex move that inflicts paralysis, confusion or infatuation
- *    on a foe, read from the Dex of the rule set) and the slower body's scripted move still gets its accuracy, crit and
- *    damage roll answered while its status check follows the seed.
- */
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: SWEEPS_FULL ? 32 : 8 }, (_, index) => seedOf(index));
 const cases = SWEEP_CASES;
 
-/** The dice a case plays with; `release` is the watch's exit. */
 interface Dice extends PRNG { attach?(battle: Battle): void; release?(): void }
 
-/** Plays the scene's turn under the dice (the plain PRNG when none). Null when the rule set lacks a move of the scene. */
 function playScene(rules: Rules, scene: Scene, mode: Mode, seed: string, dice: Dice | null): Battle | null {
   const board = boardOf(rules, scene, mode, seed);
   if (!board) return null;
@@ -56,7 +39,6 @@ const sameTurn = (ours: Battle, plain: Battle, label: string): void => {
   expect(ownNames(ours), label).toBe(ownNames(plain));
 };
 
-/** A script for a move that no scene plays. */
 const UNPLAYED: RollScript & PairScript = { hit: false, crit: true, roll: 3, doubled: true };
 
 describe.each(cases)('a script for a move that is not played changes nothing: $name', ({ rules, mode }) => {
@@ -79,7 +61,6 @@ describe.each(cases)('a script for a move that is not played changes nothing: $n
   });
 });
 
-/** The scenes with no status check on the attacker. */
 const CHECK_FREE = GRID_SCENES.filter(scene => !scene.setup || scene.id === 'tackle into a Substitute');
 
 const SCRIPTS: Record<string, RollScript> = {
@@ -122,7 +103,6 @@ describe.each(cases.filter(({ mode }) => mode === 'doubles'))('the roll mapping 
   });
 });
 
-/** The status the faster body's move puts on the slower one, and the check that status draws in the slower body's action. */
 const LANDED = /^\|-(?:status|start)\|p1a: Snorlax\|(?:par|confusion|(?:move: )?Attract)/;
 const CHECKED = /^\|cant\|p1a: Snorlax\|(?:par|(?:move: )?Attract)|^\|-damage\|p1a: Snorlax\|[^|]*\|\[from\] confusion/;
 const MOVED = /^\|move\|p1a: Snorlax\|Tackle/;

@@ -4,14 +4,6 @@ import { advancePosition, createRootPosition, legalChoices, positionBattle } fro
 import { createMatchupCache, evaluatePosition, type StaticRuleset } from '../src/eval-function';
 import { copyOf, FixedDice } from '../src/sim-ask/index';
 
-/**
- * The relation checks on search-made leaves. A relation is a
- * statement about the static score that holds on any board, whatever the
- * search built: own HP down never raises it, foe HP down never lowers it, a
- * stage on a body that cannot act adds nothing, and swapped sides negate.
- * Each check takes the evaluator as an argument, so a test can plant a fault
- * in an evaluator and prove the check can fail.
- */
 
 export type RelationGroup = 'singles' | 'doublesou' | 'vgc' | 'champions';
 
@@ -41,15 +33,12 @@ export interface Violation {
   detail: string;
   /** The size of the break in score units (an HP series: the break over the step of 10 % of the maximum HP). */
   size: number;
-  /** An HP series: the largest wrong-way change of the score at one HP point inside the broken step. */
   jump?: number;
   body?: { side: 0 | 1; index: number; fromHp: number; toHp: number };
 }
 
-/** The tolerance of every relation: the residuals are floating-point noise (largest measured on the roots: 1.7e-16). */
 export const TOLERANCE = 1e-9;
 
-/** A wrong-way change of the score at one HP point above this is a break that goes; a smaller slope stays as an expected failure with its reason. */
 export const JUMP_LIMIT = 1e-3;
 
 export const realEvaluator: Evaluator = (battle, ruleset) => evaluatePosition(battle, createMatchupCache(ruleset));
@@ -62,11 +51,11 @@ export const readManifest = (): ManifestEntry[] =>
 export const readSerialized = (entry: ManifestEntry): string =>
   (JSON.parse(readFileSync(new URL(entry.file, FIXTURES), 'utf-8')) as { serialized: string }).serialized;
 
-/** A fresh deserialization the caller may change (positionBattle of a new root; the cached battle of a position is read-only). */
+/** The cached battle of a position is read-only; this returns a copy the caller may change. */
 export const reviveBattle = (serialized: string, ruleset: StaticRuleset): Battle =>
   positionBattle(createRootPosition(serialized, ruleset));
 
-/** The same battle with the two sides exchanged (p1's side becomes p2's, with its index and id), in place: a second call swaps back. */
+/** Exchanges the two sides in place (index and id move with them); a second call swaps back. */
 export function swapSides(battle: Battle): Battle {
   const [first, second] = battle.sides;
   const sides = battle.sides as unknown as Battle['sides'] & { [i: number]: typeof first };
@@ -124,7 +113,6 @@ export const rootSubject = (entry: ManifestEntry): RelationSubject => ({
 
 const HP_STEPS = [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1] as const;
 
-/** The largest wrong-way change of the score at one HP point as the body goes from `fromHp` down to `toHp` one point at a time. */
 function largestJump(
   battle: Battle, mon: Pokemon, subject: RelationSubject, evaluate: Evaluator, side: 0 | 1, fromHp: number, toHp: number,
 ): number {
@@ -140,10 +128,6 @@ function largestJump(
   return largest;
 }
 
-/**
- * HP of one side goes down body by body (the active ones and the bench): 90 down to 10 % of the maximum in steps of 10, the
- * steps below the body's current HP only. `worse` names the direction a step must not break.
- */
 function hpSeriesViolations(
   subject: RelationSubject, evaluate: Evaluator, side: 0 | 1, relation: 'ownHpDown' | 'foeHpDown',
 ): Violation[] {
@@ -178,17 +162,14 @@ function hpSeriesViolations(
   return violations;
 }
 
-/** R1: a p1 body with less HP never makes p1's score higher. */
 export const ownHpDown = (subject: RelationSubject, evaluate: Evaluator): Violation[] =>
   hpSeriesViolations(subject, evaluate, 0, 'ownHpDown');
 
-/** R2: a p2 body with less HP never makes p1's score lower. */
 export const foeHpDown = (subject: RelationSubject, evaluate: Evaluator): Violation[] =>
   hpSeriesViolations(subject, evaluate, 1, 'foeHpDown');
 
 const IDLE_BOOSTS = { atk: 2, spa: 2, spe: 2 } as const;
 
-/** R3: a fainted body (it cannot act) carrying stages leaves the score as it was. */
 export function idleStage(subject: RelationSubject, evaluate: Evaluator): Violation[] {
   const battle = reviveBattle(subject.serialized, subject.ruleset);
   const base = evaluate(battle, subject.ruleset);
@@ -214,20 +195,13 @@ export function idleStage(subject: RelationSubject, evaluate: Evaluator): Violat
   return violations;
 }
 
-/** The stats raised by 4 on an active body that every foe in front KOs before it acts (speed untouched); a stage it holds already is not overwritten. */
 const IDLE_ACTIVE_STATS = ['atk', 'spa'] as const;
 
 const IDLE_HP_SHARE = 0.05;
 
-/** The quantile of the damage roll that is the lowest roll of the simulator (random(16) answers 15), and no critical hit. */
+// The simulator's lowest damage roll: random(16) answers 15, and no critical hit.
 const LOW_ROLL = { quantile: 0.99, chance: false } as const;
 
-/**
- * Whether the foe moves before the body and one hit of a move it can click takes the body's HP, asked of the simulator on a copy of the
- * battle: the best priority of a damaging move of each (the Dex), then the action speed (Trick Room is in it); the hit is the damage step
- * at the lowest roll without a critical hit, for a move that always hits one target; a Choice lock leaves the locked move, and a move
- * without PP is not clicked.
- */
 function koesFirst(battle: Battle, foe: Pokemon, body: Pokemon): boolean {
   const copy = copyOf(battle);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
@@ -272,12 +246,6 @@ export function idleActiveBodies(battle: Battle, side: 0 | 1): Pokemon[] {
   return bodies;
 }
 
-/**
- * R3b: a stage on an active body that every foe in front KOs before it acts adds nothing. The body is set to 5 % HP
- * and the simulator is asked whether each foe in front moves first and KOs it; then +4 attack and special attack go on
- * it (on the stats that stand at 0) and the score must stay where it was (in doubles every foe on the field must KO it
- * first, so a body that only one of two foes KOs is not read).
- */
 export function idleStageActive(subject: RelationSubject, evaluate: Evaluator): Violation[] {
   const battle = reviveBattle(subject.serialized, subject.ruleset);
   const violations: Violation[] = [];
@@ -306,7 +274,6 @@ export function idleStageActive(subject: RelationSubject, evaluate: Evaluator): 
   return violations;
 }
 
-/** R4: the same board with the sides exchanged scores the negative. */
 export function swapNegates(subject: RelationSubject, evaluate: Evaluator): Violation[] {
   const original = evaluate(reviveBattle(subject.serialized, subject.ruleset), subject.ruleset);
   const swapped = evaluate(swapSides(reviveBattle(subject.serialized, subject.ruleset)), subject.ruleset);

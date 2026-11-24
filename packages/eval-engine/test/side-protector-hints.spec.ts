@@ -8,16 +8,8 @@ import { combinedOptionHints, shieldsSide, protectorStops } from '../src/search/
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * A side protector in a doubles option. Wide Guard, Quick Guard, Crafty Shield and Mat Block stop a class of hits on the user's
- * whole side, so they carry a side condition instead of a volatile and no `stallingMove` flag, and the Protect reading of the hints
- * (a self-targeted stalling move) does not cover them: each would be the 0.25 support floor, 16th to 42nd of the 42 legal combos
- * of VGC 2630685175 turn 7, where Wide Guard turned Tera Starstorm away. The reading comes from the Dex (an allySide move whose
- * side condition has an onTryHit); which hits the condition stops comes from the simulator's own handler, held here against real
- * turns. The hint earns the damage the protector denies, up to the flinch-sized ceiling of the pair term. Both rule sets run it,
- * Scarlet/Violet and Pokémon Champions (the Champions mod has its own Dex). Singles keep their path (every base move survives the
- * singles cap).
- */
+// Wide Guard, Quick Guard, Crafty Shield and Mat Block carry a side condition and no `stallingMove` flag,
+// so the Protect reading of the hints (a self-targeted stalling move) does not cover them.
 
 await loadSimMods('gen9championsou');
 
@@ -27,7 +19,6 @@ interface Rules {
   level: number;
   /** Champions reads the sets' evs as Stat Points. */
   evs?: PokemonSet['evs'];
-  /** The side moves whose condition has a hit handler in this rule set's Dex. */
   claimed: string[];
 }
 
@@ -40,14 +31,12 @@ const RULES: Rules[] = [
 ];
 
 const SUPPORT_FLOOR = 0.25;
-/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS, the pair term). */
+// The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS, the pair term).
 const CEILING = 0.3;
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
 const hintOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => combinedOptionHints(rootOf(battle), side, [option(choice)])[0];
-/** The tempo a protector part earns over the idle pair: the hint of `<protector>, splash` minus the two support floors. */
 const tempoOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => hintOf(battle, side, choice) - 2 * SUPPORT_FLOOR;
-/** A move a battle can use: real, not a Max or Z move, not from a later game. */
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 const aimedAt = (battle: Battle, moveId: string) => (['normal', 'any', 'adjacentFoe'].includes(battle.dex.moves.get(moveId).target) ? ' 1' : '');
 
@@ -59,7 +48,6 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
 
   const slowFoeBoard = (protector: string, moveId: string) =>
     battleWith([mon('Blissey', [protector, 'splash']), splash('Blissey')], [mon('Shuckle', [moveId, 'splash']), splash('Shuckle')]);
-  /** The simulator's own answer (the log's "move: <name>" activation). */
   function stoppedInSim(protector: string, moveId: string): boolean {
     const battle = slowFoeBoard(protector, moveId);
     battle.choose('p1', 'move 1, move 1');
@@ -67,7 +55,6 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
     const name = battle.dex.moves.get(protector).name;
     return battle.log.some(line => line.startsWith('|-activate|p1') && line.includes(`move: ${name}`));
   }
-  /** The reading's answer for the same two moves: the protector's own handler asked from stand-ins. */
   function readStops(protector: string, moveId: string): boolean {
     const battle = slowFoeBoard(protector, moveId);
     const dex = battle.dex;
@@ -86,7 +73,7 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
 
     const PROBES = ['tackle', 'surf', 'rockslide', 'aquajet', 'fakeout', 'thunderwave'];
     test.each(['craftyshield', 'matblock', 'quickguard', 'wideguard'])('%s: the hits its handler stops are the hits the simulator stops (damaging, spread, priority and status probes)', protector => {
-      // A move of higher priority than the protector lands before it stands (Mat Block, priority 0, against Aqua Jet): no handler runs then.
+      // A move of higher priority lands before the protector stands (Mat Block against Aqua Jet): no handler runs.
       const probes = PROBES.filter(probe => dex.moves.get(probe).priority <= dex.moves.get(protector).priority);
       expect(probes.length).toBeGreaterThanOrEqual(4);
       const seen = probes.map(probe => `${probe} ${stoppedInSim(protector, probe)}`);
@@ -102,7 +89,6 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
     });
   });
 
-  /** p1's Blissey pair, slot 1 holding `protector`; p2's Garchomp holds `attack` (and Splash). `hp` sets slot 1's HP. */
   function board(protector: string, attack: string, hp?: number): Battle {
     const battle = battleWith(
       [mon('Blissey', [protector, 'splash']), splash('Blissey')],
@@ -116,7 +102,6 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
     battle.choose('p2', `move 1${aimedAt(battle, attack)}, move 1`);
     return battle.sides[0].active[0]!.fainted;
   }
-  /** What the engine's own damage fractions say the protector denies: each body's hit, capped at its HP (the sum for a spread hit). */
   function deniedBy(battle: Battle, attack: string, spread: boolean): number {
     const foe = battle.sides[1].active[0]!;
     const parts = battle.sides[0].active.map(body => Math.min(singleMoveFraction(foe, body!, attack, battle) * (spread ? 0.75 : 1), body!.hp / body!.maxhp));
@@ -126,7 +111,6 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
 
   describe('a side protector earns the damage it denies, up to a flinch', () => {
     test('Wide Guard against a spread attacker: the simulator turns it away, the hint earns the ceiling', () => {
-      // From the simulator: at 1 HP a Rock Slide KOs slot 1, Wide Guard turns it away, a Dragon Claw still KOs through it.
       expect(faintsInSim('splash', 'rockslide')).toBe(true);
       expect(faintsInSim('wideguard', 'rockslide')).toBe(false);
       expect(faintsInSim('wideguard', 'dragonclaw')).toBe(true);
@@ -136,13 +120,11 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
     });
 
     test('a hit worth less than a flinch earns what it is worth, and a single-target attack earns nothing', () => {
-      // Electro Web (a weak spread move) against Blissey's bulk: the tempo is the damage itself, from the engine's fractions.
       const weak = battleWith([mon('Blissey', ['wideguard', 'splash']), splash('Blissey')], [mon('Pikachu', ['electroweb', 'splash']), splash('Pikachu')]);
       const denied = deniedBy(weak, 'electroweb', true);
       expect(denied).toBeGreaterThan(0);
       expect(denied).toBeLessThan(CEILING);
       expect(tempoOf(weak, 'p1', choice('wideguard'))).toBeCloseTo(denied, 10);
-      // From the simulator: Wide Guard lets a Dragon Claw through, so the hint reads no tempo.
       expect(tempoOf(board('wideguard', 'dragonclaw'), 'p1', choice('wideguard'))).toBeCloseTo(0, 10);
     });
 
@@ -183,9 +165,8 @@ describe.each(RULES)('$name: side protectors in the hints', rules => {
       expect(source.volatiles['lockedmove']).toBeDefined();
     });
 
-    // Terastallization is a Scarlet/Violet rule: Pokémon Champions has none.
     test.skipIf(rules.format.includes('champions'))('a Tera Starstorm of Terapagos-Stellar is a spread hit for the reading (the move at use, not the Dex target)', () => {
-      // The Dex lists Tera Starstorm as a single-target move; the simulator's ModifyMove makes it hit both foes from the Stellar forme.
+      // The Dex lists Tera Starstorm as single-target; ModifyMove makes it hit both foes from the Stellar forme.
       const stellar = (): Battle => battleWith(
         [mon('Blissey', ['wideguard', 'splash']), splash('Blissey')],
         [mon('Terapagos-Stellar', ['terastarstorm', 'splash'], { ability: 'Teraform Zero', teraType: 'Stellar' }), splash('Pikachu')]);

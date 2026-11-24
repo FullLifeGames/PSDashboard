@@ -8,19 +8,8 @@ import { mon, RULES, stableLog, sweepSelection, type Mode, type Rules } from './
 import { dexOfRules, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * A `|move|` line that another effect wrote for a body is not the body's click. The simulator writes it with
- * `|[from] <effect>` when a move runs with a source effect: Magic Bounce and Dancer (an Ability), Magic Coat and Snatch (the volatile
- * of a move that relays another body's move). Read as the body's click, such a line sends a move the body lacks: the simulator refuses the
- * choice and the side plays `default`. A lock continuation (`lockedmove`) and a move that runs early under its
- * own click (Pursuit) also write a `[from]`, and their lines are the body's click.
- *
- * The sweep runs over the rule sets the corpus plays (Gens 1 to 9, Champions), singles and doubles. Its oracle
- * is the simulator: the turn's public lines go through `getMainChoice`, and the choice it writes, played on a fresh copy of the board
- * with the foe's click, makes the same battle log. It plays every Dex ability as the holder against a move to reflect, a dance, a move to
- * snatch and a switch; every Dex move with a condition as the holder's click against the same probes; and every move that locks its user
- * into a second turn. The sweep also lists the effects the rule skipped and kept, and holds that list to the Dex.
- */
+// `|move|` lines with `|[from] <effect>` are no click: Magic Bounce, Dancer, Magic Coat, Snatch relay another move.
+// A lock continuation (`lockedmove`) and a move run early under its own click (Pursuit) are the body's click.
 await loadSimMods('gen9championsou');
 
 const DEX = rulesDex(9);
@@ -50,7 +39,7 @@ describe('the rule on written lines', () => {
   });
 });
 
-/** The simulator's public lines: each private line is written twice (`|split|pN`, the owner's line, the spectator's line). */
+// `|split|pN` writes each private line twice: the owner's line, then the spectator's.
 const publicLines = (battle: Battle): string[] => {
   const out: string[] = [];
   for (let index = 0; index < battle.log.length; index++) {
@@ -73,7 +62,6 @@ interface Played { events: string[]; choice: string; accepted: boolean; same: bo
 function roundTrip(scene: Scene): Played | null {
   const dex = dexOfRules(scene.rules);
   const original = build(scene);
-  // a click the simulator refuses on this board (a trapped switch, a move whose condition is not met) is no row
   if (!scene.turns.every(clicks => original.choose('p1', clicks.p1) && original.choose('p2', clicks.p2))) return null;
   const last = scene.turns.length;
   const events = parseTurnBlocks(publicLines(original).join('\n')).turns.find(turn => turn.turn === last)!.preUpkeep;
@@ -89,7 +77,6 @@ function roundTrip(scene: Scene): Played | null {
   };
 }
 
-/** The holder: Snorlax is the slow body, so the probe user (Pikachu) acts first and the line it causes comes before the holder's own line. */
 const holderOf = (rules: Rules, moves: string[], ability?: string): PokemonSet => ({
   ...mon(rules, { species: 'Snorlax', moves, gender: 'M' }), ...(ability && rules.generation >= 3 ? { ability } : {}),
 });
@@ -127,7 +114,6 @@ describe('the four mechanisms on the simulator, singles and doubles', () => {
       expect(result.same, result.choice).toBe(true);
     });
 
-    // The body's own line (Magic Coat, Snatch) comes before the relayed line, so these two read right on the base too: guard rows.
     test(`${mode}: Magic Coat sends Taunt back`, () => {
       const result = roundTrip(scene(rules, mode, ['taunt'], holderOf(rules, ['magiccoat', 'splash']), [taunt(mode)]))!;
       expect(result.relayed).toEqual(['Magic Coat']);
@@ -142,7 +128,7 @@ describe('the four mechanisms on the simulator, singles and doubles', () => {
   }
 });
 
-/** The first `count` Dex moves of the rule set that the predicate keeps and that never miss (a miss ends the move before Magic Coat or Snatch). */
+// A miss ends a move before Magic Coat or Snatch, so only moves that never miss are asked.
 const firstOf = (rules: Rules, keep: (move: DexMove) => boolean, count = 1): DexMove[] => {
   const dex = dexOfRules(rules);
   return dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen && move.accuracy === true
@@ -155,7 +141,6 @@ const locksUser = (rules: Rules, move: DexMove): boolean => {
   return !!move.flags.charge || (!!volatile && 'onLockMove' in dex.conditions.get(volatile));
 };
 
-/** Source text of every function in an entry: a handler that makes its holder or its user run another move names `useMove` or `runMove`. */
 const handlerSource = (entry: object): string =>
   Object.values(entry).filter((value): value is () => unknown => typeof value === 'function').map(String).join('\n');
 const dispatches = (entry: object | undefined): boolean => !!entry && /useMove\(|runMove\(|useMoveInner\(/.test(handlerSource(entry));
@@ -200,7 +185,6 @@ describe('the sweep: every Dex ability and move that can write a move line for a
         for (const probe of probes) check(`move ${move.id}`, holderOf(rules, [move.id, 'splash']), { ...probe, click: { ...probe.click, p2: holderClick(mode, AIMED.has(move.target)) } });
       }
 
-      // every move that locks its user in: the second turn's line is `[from] lockedmove` or a charge line, and it stays the body's click
       const locking = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
         && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past') && locksUser(rules, move) && !move.flags.futuremove);
       const lockedIn = locking.filter(move => !move.flags.charge);

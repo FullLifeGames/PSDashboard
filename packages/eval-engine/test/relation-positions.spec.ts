@@ -3,11 +3,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { replayRuleset } from '@fulllifegames/replay-core';
 import { readManifest, type ManifestEntry } from './relation-checks';
 
-/**
- * The guard of the relation fixture. The 34 serialized positions already sit under
- * fixtures/positions/ and fixtures/champions/ (bank and holdout games, tracked); the manifest names them, so the
- * relation specs read one list and a lane that edits one of those files breaks this spec, which names the file.
- */
 
 const FIXTURES = new URL('./fixtures/', import.meta.url);
 
@@ -17,7 +12,6 @@ interface FixtureFile {
   serialized?: string;
 }
 
-/** Everything wrong with a manifest entry, one sentence each; an empty list is a sound entry. */
 function entryProblems(entry: ManifestEntry): string[] {
   const url = new URL(entry.file, FIXTURES);
   if (!existsSync(url)) return [`${entry.file}: the file does not exist`];
@@ -54,7 +48,6 @@ describe('relation fixture manifest', () => {
     expect(count('doublesou')).toBeGreaterThanOrEqual(8);
     expect(count('vgc')).toBeGreaterThanOrEqual(10);
     expect(count('champions')).toBeGreaterThanOrEqual(3);
-    // Both game types in the Champions group: its OU singles board and its two VGC doubles boards.
     expect(new Set(entries.filter(entry => entry.group === 'champions').map(entry => entry.gameType))).toEqual(new Set(['singles', 'doubles']));
   });
 

@@ -12,15 +12,6 @@ import {
 } from './dice-sweep-support';
 import { entriesOf, FAST, rootOf, toleranceOf } from './secondary-classes-support';
 
-/**
- * The record of the secondary dice. A class draw hands the fork a `DiceSink` as its scripts and reads
- * `sink.secondaries` after the advance; the doubles pair plan reads the `secondary` records of `PairPRNG`. Every generation 1 to
- * 9 and the Champions mod, singles and from Gen 3 doubles, over the moves whose entry the protocol shows by a standard line:
- *
- * - the sink changes nothing the simulator can see (the same log as the plain fork, seed for seed);
- * - every record names the move's own entry (effect id, chance of the entry, the user's slot) and its `happened` is what the
- *   protocol shows: the effect on the target when it came true, no such line when it did not.
- */
 await loadSimMods('gen9championsou');
 
 const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20', '21,22,23,24'];
@@ -29,7 +20,6 @@ const choicesOf = (mode: Mode, move: DexMove): { p1: string; p2: string } => (mo
   ? { p1: `move ${move.id}`, p2: 'move splash' }
   : { p1: `move ${move.id}${['normal', 'any', 'adjacentFoe'].includes(move.target) ? ' 1' : ''}, move splash`, p2: 'move splash, move splash' });
 
-/** The log without its wall-clock lines (`|t:|`), which differ between two plays of one turn. */
 const withoutClock = (log: string[]): string => log.filter(line => !line.startsWith('|t:|')).join('|');
 
 const witnessed = (entry: SecondaryEntry): boolean =>
@@ -51,7 +41,6 @@ function played(mode: Mode, board: Battle, move: DexMove, seed: string): { log: 
 }
 
 describe.each(SWEEP_CASES)('the record of the secondary dice: $name', ({ rules, mode, name }) => {
-  // multi-hit moves draw the entry at every hit (Twineedle, Double Iron Bash): one record per hit
   const { moves } = sweepMoves(rules, move => entriesOf(move).some(witnessed) && !isDelayed(move) && !isCharge(move) && !move.multihit && move.priority >= 0
     && ['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent'].includes(move.target));
   const sample = SWEEPS_FULL ? moves : moves.slice(0, 10);
@@ -76,7 +65,7 @@ describe.each(SWEEP_CASES)('the record of the secondary dice: $name', ({ rules, 
           if (Math.abs(record.chance - (entry.chance ?? 100) / 100) > toleranceOf(rules)) problems.push(`${move.id} ${seed}: chance ${record.chance}`);
           if (missed) problems.push(`${move.id} ${seed}: a record for a move that missed`);
           const shown = effectShown({ log } as unknown as Battle, 0, entry, target, 'p1a');
-          // a flinch that came true shows only if nothing else stops the target first (a freeze that came true in the same hit)
+          // a flinch that came true shows only if nothing else stops the target first (a freeze in the same hit)
           const preempted = record.effectId === 'flinch' && log.some(line => line.startsWith('|cant|') && line.includes(`|${target}: `) && !line.endsWith('|flinch'));
           if (!preempted && entries.filter(other => secondaryEffectId(other) === record.effectId).length === 1 && shown !== record.happened) {
             problems.push(`${move.id} ${seed} ${record.effectId}: recorded ${record.happened}, the protocol shows ${shown}`);

@@ -1,13 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Battle, Dex, State, Teams, type PokemonSet } from '@pkmn/sim';
 
-/**
- * The built sets carry the replay's shiny flag, so the simulator writes `, shiny` in a switch-in line the way the game did. This
- * sweep holds that the flag changes nothing else: for every species of generations 1 to 9 (singles and doubles formats), a body
- * with the flag and a body without it, one turn played with the same dice, give the same serialized battle once the flag and the
- * details string that spells it are masked. Generations 1 and 2 are in it on purpose (their shiny came from the DVs; the
- * simulator does not read the flag there).
- */
+// Gens 1 and 2 stay in on purpose: their shiny comes from the DVs and the simulator ignores the flag there.
 
 const FOE: PokemonSet = {
   name: 'Foe', species: 'Snorlax', item: '', ability: 'No Ability', moves: ['Tackle'], nature: 'Serious', gender: '', level: 100,
@@ -18,7 +12,6 @@ const setOf = (species: string, shiny: boolean): PokemonSet => ({
   ...FOE, name: species, species, moves: ['Tackle'], gender: 'M', ...(shiny ? { shiny: true } : {}),
 });
 
-/** The serialized battle after one turn, the shiny flag and the text that spells it removed (the details string, the set's flag and the packed team the input log holds) and the log's clock lines. */
 function played(format: string, species: string, shiny: boolean, doubles: boolean): string {
   const battle = new Battle({
     formatid: format as never, seed: [1, 2, 3, 4],
@@ -45,7 +38,7 @@ describe('the shiny flag changes no mechanic', () => {
           plain = played(format, entry.name, false, doubles);
           shiny = played(format, entry.name, true, doubles);
         } catch {
-          continue; // a species the format cannot field plays in neither
+          continue;
         }
         if (plain !== shiny) differing.push(`${entry.name} ${format}`);
       }

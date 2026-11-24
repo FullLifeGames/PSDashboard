@@ -3,10 +3,6 @@ import { TIER_THRESHOLDS } from '../src/analysis';
 import { analyzeReplacements, matchReplacementOption, replacementSpeciesOf, type ReplacementEvalData } from '../src/replacements';
 import type { EvalResult, RankedChoice } from '../src/types';
 
-/**
- * The unit of the replacement note. The played pick is found in the engine's ranked list by species (doubles: as
- * a set over the forced slots), the regret is read off the list, and nothing is graded: the record carries no tier.
- */
 
 const option = (label: string, ev: number, choice = label): RankedChoice =>
   ({ choice, label, worstCase: ev - 0.1, expected: ev, ev, punishedBy: null });

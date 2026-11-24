@@ -7,14 +7,8 @@ import { callHandler, fingerprint, isolated, playOnCopy } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The pieces of the sim-ask checks that the spec runs in the default speed-layer mode and a probe runs in all eight (the long
- * matrix). The sweep calls every handler the stand-ins of the engine reach, in every generation and the Champions mod, on a
- * copy-on-write view and on a real copy of a board.
- */
 
 export const LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
-/** The eight subsets of the speed layer's levers. */
 export const MODES: SimFastLever[][] = Array.from({ length: 8 }, (_, bits) => LEVERS.filter((_lever, index) => (bits >> index) & 1));
 export const modeName = (mode: readonly SimFastLever[]): string => (mode.length ? mode.join('+') : 'off');
 
@@ -37,17 +31,11 @@ export const RULE_SETS = [
   { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', gen: 9, doubles: true },
 ];
 
-/**
- * The suite takes the first eight kinds of move in singles and the first four in doubles (a board costs twice as much); the probe takes sixteen.
- * @public No spec reads it; the probes under docs/perf/probes do (knip skips it by this tag).
- */
+/** @public No spec reads it; the probes under docs/perf/probes do. */
 export const MOVES_PER_RULES = 16;
 export const MOVES_PER_RULES_SUITE = 8;
 export const MOVES_PER_RULES_DOUBLES = 4;
-/**
- * The sweep that runs in every speed-layer mode takes the first six kinds of move (the suite's single run, the first three).
- * @public No spec reads it; the probes under docs/perf/probes do (knip skips it by this tag).
- */
+/** @public No spec reads it; the probes under docs/perf/probes do. */
 export const MODES_MOVES = 6;
 export const MODES_MOVES_SHORT = 3;
 
@@ -57,7 +45,6 @@ const bodies = (format: string, doubles: boolean): Battle => {
   const team = (species: string) => Array.from({ length: doubles ? 2 : 1 }, () => set(species, ['tackle', 'splash']));
   return battleOf(format, team('Snorlax'), team('Pikachu'));
 };
-/** [user side, user slot, target side, target slot]: a foe in singles, a foe and the ally in doubles. */
 const PAIRS = (doubles: boolean): [number, number, number, number][] => (doubles ? [[0, 0, 1, 0], [0, 0, 0, 1]] : [[0, 0, 1, 0]]);
 const stable = (value: unknown): string => JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'function' ? 'fn' : inner));
 const summary = (body: Pokemon, move: ActiveMove | null): string => stable([body.boosts, body.hp, body.status, Object.keys(body.volatiles).sort(), body.item, body.ability, move && { ...move }]);
@@ -79,7 +66,6 @@ export function sweepRules({ format, doubles }: (typeof RULE_SETS)[number], move
   const live = bodies(format, doubles);
   const standard = (live.dex.moves.all() as unknown as (Entry & { flags: Record<string, unknown>; category: string; target: string })[])
     .filter(move => (move.gen ?? 0) <= live.dex.gen && move.exists !== false && !move.isNonstandard);
-  // The first move of every category, target and flag the generation has (the first sixteen): each handler meets the kinds of move.
   const kinds = new Map<string, string>();
   for (const move of standard) {
     for (const key of [`category:${move.category}`, `target:${move.target}`, ...Object.keys(move.flags).map(flag => `flag:${flag}`)]) {

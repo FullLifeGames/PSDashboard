@@ -6,11 +6,6 @@ import { switchInSlots } from '../src/forward/switches';
 import { switchInsOf } from '../src/branch/forced-slots';
 import type { SimBattle } from '../src/branch/types';
 
-/**
- * Whether a request asks for a fainted body (Revival Blessing) is read in one module, `forward/request-reviving.ts`.
- * The reader is held to the simulator's own request (`reviving` on the user's party entry) and the two callers that copy it
- * (`switchInSlots` of the forward model, `switchInsOf` of the branch layer) agree with it, in singles and doubles.
- */
 
 function makeSet(species: string, moves: string[], level = 100): PokemonSet {
   return {
@@ -20,7 +15,6 @@ function makeSet(species: string, moves: string[], level = 100): PokemonSet {
   };
 }
 
-/** The scene of choices.spec.ts: Magikarp fell, Pawmot (slot b in doubles) uses Revival Blessing, the battle stops at the request. */
 function revivalBattle(doubles: boolean): Battle {
   const p1 = [makeSet('Magikarp', ['Splash'], 1), makeSet('Pawmot', ['Revival Blessing', 'Nuzzle']), makeSet('Snorlax', ['Curse'])];
   const p2 = doubles
@@ -48,7 +42,6 @@ function revivalBattle(doubles: boolean): Battle {
   return battle;
 }
 
-/** The simulator's request, read straight from the JSON it sends: the slots whose party entry is marked `reviving`. */
 const requestMarks = (battle: Battle, sideIdx: number, slots: number): boolean[] => {
   const party = (battle.sides[sideIdx].activeRequest as { side: { pokemon: { reviving?: boolean }[] } }).side.pokemon;
   return Array.from({ length: slots }, (_, slot) => !!party[slot].reviving);
@@ -70,12 +63,10 @@ describe('the request reading of a Revival Blessing prompt lives in one module',
     test(`${game}: both callers follow the reader`, () => {
       const battle = revivalBattle(doubles);
       const side = battle.sides[0];
-      // The prompt takes a fainted body: the branch layer counts no living bench, the forward model lists the fainted party slots.
       expect(switchInsOf(side as unknown as SimBattle['sides'][number])).toBeNull();
       const fainted = side.pokemon.flatMap((pokemon, index) => (pokemon.fainted ? [index + 1] : []));
       expect(fainted.length).toBe(1);
       expect(switchInSlots(side)).toEqual(fainted);
-      // After the revive the request is gone and the same side reads as a plain bench again.
       expect(battle.choose('p1', `switch ${fainted[0]}`)).toBe(true);
       expect(revivingSlots(side).some(Boolean)).toBe(false);
     });

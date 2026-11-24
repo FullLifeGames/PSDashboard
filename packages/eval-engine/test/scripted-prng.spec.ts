@@ -9,7 +9,6 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 import { stableLog } from './sim-fast-helpers';
 
-/** A scripted PRNG answers the accuracy roll, the crit roll, the damage roll and the speed-tie order of one named move; everything else rolls from the seed. */
 
 function makeSet(name: string, species: string, moves: string[], spe = 0, level = 100): PokemonSet {
   return {
@@ -130,11 +129,9 @@ const RULES: Rules[] = [...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen), CHAMPIONS];
 const mon = (rules: Rules, species: string, moves: string[], gender: 'M' | 'F' | '' = ''): PokemonSet =>
   set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...(rules.generation >= 2 ? { gender } : {}) });
 
-/** Snorlax of p1 tackles Pikachu of p2, which splashes. */
 const singlesBoard = (rules: Rules, seed: string): Battle =>
   battleOf(rules.singles, [mon(rules, 'Snorlax', ['tackle'], 'M')], [mon(rules, 'Pikachu', ['splash'], 'F')], seed);
 
-/** The same pair in front, Blissey and Chansey beside them splash. */
 const doublesBoard = (rules: Rules, seed: string): Battle =>
   battleOf(rules.doubles!,
     [mon(rules, 'Snorlax', ['tackle'], 'M'), mon(rules, 'Blissey', ['splash'], 'F')],
@@ -159,7 +156,6 @@ interface Check {
   /** The first generation whose simulator draws this check. */
   from: number;
   start(battle: Battle): void;
-  /** The check went the way that stops or hurts the attacker this turn. */
   shows(log: readonly string[]): boolean;
 }
 
@@ -168,7 +164,6 @@ const started = (ok: boolean, what: string): void => {
   if (!ok) throw new Error(`${what} did not start`);
 };
 
-/** The checks the simulator draws in the attacker's own action (the dice `|cant|` reasons of pair-cant-reasons.spec.ts and the confusion self-hit). */
 const CHECKS: Record<string, Check> = {
   'full paralysis': {
     from: 1, start: battle => started(attacker(battle).setStatus('par'), 'paralysis'), shows: shown(/^\|cant\|p1a: Snorlax\|par/),
@@ -213,8 +208,7 @@ describe.each(RULES)('ScriptedPRNG, $name singles: the script decides the move a
   };
   for (const [name, { script, holds }] of Object.entries(reach)) {
     test(`${name} on every seed`, () => {
-      // Gens 1 and 2 draw no accuracy for a move of 100 percent (the draw is 255 in 256 and the simulator skips a sure one):
-      // the row plays a move under 100 there, which Tackle is in those generations, so a script has a draw to answer.
+      // Gens 1 and 2 draw no accuracy for a 100 percent move (the simulator skips it); Tackle is under 100 there.
       const accuracy = singlesBoard(rules, SEEDS[0]).dex.moves.get('tackle').accuracy;
       if (rules.generation <= 2) expect(accuracy, "Tackle's accuracy in this generation").toBeLessThan(100);
       const missed = SEEDS.filter(seed => !holds(play(singlesBoard(rules, seed), new ScriptedPRNG(seed, new Map([['p1:tackle', script]])), null, SINGLES_TURN).log));

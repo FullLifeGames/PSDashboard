@@ -6,28 +6,15 @@ import { cellKey } from '../src/rank';
 import { LINE_MIN_VISITS, lineFrom, principalVariation, rowLines as rowLinesAt, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, RowLines, TreeLineStep } from '../src/types';
 
-/**
- * The line of a root row, on synthetic nodes by hand (only the fields the walk reads): the row's first cell is the one against the
- * opponent's top row once it has 8 visits, else the row's heaviest cell; a step under 8 visits ends the line; three steps at most
- * (the fixtures' nodes carry equal means, so each later step is the pair of the most visited options; the last describe holds the
- * by-value rule); a replacement step keeps the waiting label. `principalVariation` is held to a reference copy of the plain walk
- * below. Rows are keyed by label: a reordered bench moves the choice strings and not the labels (singles and doubles boards).
- */
 
 interface Cell { i: number; j: number; visits: number; child?: Node }
 
-/** The tops a tree reports: each side's best rows by label, best first. */
 const tops = (p1: string, p2: string, ...more: string[]): { p1: string[]; p2: string[] } => ({ p1: [p1], p2: [p2, ...more] });
 
-/** The walk at the threshold of 8 visits, which the fixtures below were written for (the walk's own default is 4). */
 const rowLines = (root: Node, tops: { p1: readonly string[]; p2: readonly string[] }): RowLines => rowLinesAt(root, tops, 8);
 
 const options = (labels: string[]) => labels.map((label, index) => ({ choice: `move ${index + 1}`, label }));
 
-/**
- * What a node's options carry besides the cells: the visits of an option are the visits of its cells, and its mean (p1's view for both
- * sides, as the tree stores it) is `means` by option index, 0.5 where none is given; the hint order is the list order.
- */
 interface Means { p1?: Record<number, number>; p2?: Record<number, number> }
 
 function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = {}, means: Means = {}): Node {
@@ -48,7 +35,6 @@ function node(p1: string[], p2: string[], cells: Cell[], extra: Partial<Node> = 
   } as unknown as Node;
 }
 
-/** A reference copy of the walk, so the shared walk is held to it. */
 function referenceVariation(start: Node): { p1: string; p2: string }[] {
   const steps: { p1: string; p2: string }[] = [];
   let current = start;
@@ -94,9 +80,7 @@ describe('the line of a root row', () => {
 
   test('a row whose cell against the top row is thin takes its heaviest cell', () => {
     const lines = rowLines(deep(), tops('Surf', '→ Mew'));
-    // Surf against → Mew has 12 visits (enough): the line starts there
     expect(lines.p1.Surf[0].map(step => step.p2)).toEqual(['→ Mew']);
-    // Ice Beam against → Mew has 5 (too few): its heaviest cell, against Draining Kiss, stands in
     expect(lines.p1['Ice Beam'][0].map(step => step.p2)).toEqual(['Draining Kiss']);
   });
 
@@ -186,11 +170,6 @@ describe('a tree ships its rows\' lines by label', () => {
   });
 });
 
-/**
- * A row keeps up to three lines, one against each of the tree's top three answers that holds the visits a line needs. The first is
- * the plain line. The reference below is `rowLines` with one line per row (against the tree's top row only): the first entry of
- * every row is held to it.
- */
 function referenceRowLines(root: Node, tops: { p1?: string; p2?: string }): Record<'p1' | 'p2', Record<string, TreeLineStep[]>> {
   const out: Record<'p1' | 'p2', Record<string, TreeLineStep[]>> = { p1: {}, p2: {} };
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) return out;
@@ -236,14 +215,11 @@ describe('lines against the tree\'s top three answers', () => {
     const lines = rowLines(wide(), { p1: ['A', 'B'], p2: ['X', 'Y', 'Z'] });
     expect(lines.p1.A).toHaveLength(2);
     expect(lines.p1.A.map(line => [line[0].p2, line[0].visits])).toEqual([['X', 20], ['Y', 9]]);
-    // the first entry reads as before: the cell against the top row, then each node's pair (equal means here: the most visited options)
     expect(lines.p1.A[0].map(step => step.p2)).toEqual(['X', 'Y']);
-    // the answer outside the top three (W, 11 visits) and the thin one (Z, 3 visits) hold no line
     expect(lines.p1.A.some(line => line[0].p2 === 'W' || line[0].p2 === 'Z')).toBe(false);
   });
 
   test('a row\'s answers are distinct: a heaviest-cell fallback that is also the second answer is kept once', () => {
-    // B against the top answer X has 4 visits (too few), so its heaviest cell (against Z) stands in; Z is the third answer
     const lines = rowLines(wide(), { p1: ['A', 'B'], p2: ['X', 'Y', 'Z'] });
     expect(lines.p1.B.map(line => line[0].p2)).toEqual(['Z']);
     expect(lines.p1.B[0][0].visits).toBe(30);
@@ -251,9 +227,7 @@ describe('lines against the tree\'s top three answers', () => {
 
   test('the opponent\'s rows read the same cells against the answers of the first side\'s top three', () => {
     const lines = rowLines(wide(), { p1: ['A', 'B'], p2: ['X', 'Y', 'Z'] });
-    // X meets A (20, the top answer) and B (4, too few for a second line)
     expect(lines.p2.X.map(line => line[0].p1)).toEqual(['A']);
-    // Y meets A (9) as the first line, since its cell against the top row A has the visits
     expect(lines.p2.Y.map(line => [line[0].p1, line[0].visits])).toEqual([['A', 9]]);
   });
 
@@ -287,10 +261,6 @@ describe('lines against the tree\'s top three answers', () => {
   });
 });
 
-/**
- * A line may stand on a cell with 4 visits, on every turn. The walk of the rows asks `LINE_MIN_VISITS` (4); the principal variation,
- * which the summary's ", then ..." prose reads, keeps its 8.
- */
 describe('the line threshold of the rows is 4 visits, the principal variation keeps 8', () => {
   const thin = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
     { i: 0, j: 0, visits: 30, child: node(['Surf'], ['Moonblast'], [
@@ -311,7 +281,6 @@ describe('the line threshold of the rows is 4 visits, the principal variation ke
   test('a row\'s only cell with 4 visits is a line, one with 3 is none', () => {
     const lines = rowLinesAt(thin(), tops('Surf', 'Draining Kiss'));
     expect(lines.p1['Ice Beam'][0].map(step => step.visits)).toEqual([4]);
-    // the only cell of the opponent's row → Mew has 3 visits: no line
     expect(Object.keys(lines.p2)).toEqual(['Draining Kiss']);
   });
 
@@ -324,11 +293,6 @@ describe('the line threshold of the rows is 4 visits, the principal variation ke
   });
 });
 
-/**
- * Beside the lines against its top three answers a row keeps the line through the cell of the answer the caller names as the row's
- * floor (`floors`, by row label), when that cell holds the visits a line needs. The rows' own lists stay what they were: the donors
- * of the plain request read them, and the setting's lines must not move them.
- */
 describe('the line through a row\'s floor cell', () => {
   const deep = (): Node => node(['Surf', 'Ice Beam'], ['Draining Kiss', '→ Mew'], [
     { i: 0, j: 0, visits: 40 }, { i: 0, j: 1, visits: 12 }, { i: 1, j: 0, visits: 25 }, { i: 1, j: 1, visits: 5 },
@@ -350,14 +314,7 @@ describe('the line through a row\'s floor cell', () => {
   });
 });
 
-/**
- * The later steps of a row's line read each node by value. Each side takes its best mean (p1 the highest, p2 the lowest, both in
- * p1's view) among its options with `min` visits and a quarter of the node's most visited option; the step is that pair's cell
- * when it holds `min` visits, else the node's heaviest cell. The first step stays the row's cell. The principal variation keeps the
- * heaviest cell. Scene (655336 turn 25): Roost draws most of the visits at a lower mean than Dragon Claw.
- */
 describe('the later steps of a row\'s line read each node by value', () => {
-  /** Charizard (p1) below Dragon Dance/High Jump Kick: Roost is the heaviest option and the heaviest cell, Dragon Claw the better mean. */
   const turn25 = (): Node => node(['Dragon Claw', 'Roost'], ['Encore', 'Return 102'], [
     { i: 0, j: 0, visits: 31 }, { i: 0, j: 1, visits: 10 }, { i: 1, j: 0, visits: 22 }, { i: 1, j: 1, visits: 40 },
   ], {}, { p1: { 0: 0.55, 1: 0.43 }, p2: { 0: 0.42, 1: 0.5 } });
@@ -369,7 +326,6 @@ describe('the later steps of a row\'s line read each node by value', () => {
 
   test('singles: the step is the best-mean pair, not the heaviest cell', () => {
     expect(second(rootOf(turn25()))).toEqual(['Dragon Claw', 'Encore']);
-    // the heaviest cell of the node is Roost against Return 102, and the principal variation still walks it
     expect(principalVariation(rootOf(turn25())).map(step => [step.p1, step.p2])).toEqual([['Dragon Dance', 'High Jump Kick'], ['Roost', 'Return 102']]);
   });
 
@@ -379,7 +335,6 @@ describe('the later steps of a row\'s line read each node by value', () => {
     const below = node(own, other, [
       { i: 0, j: 0, visits: 12 }, { i: 0, j: 1, visits: 9 }, { i: 1, j: 0, visits: 6 }, { i: 1, j: 1, visits: 30 }, { i: 2, j: 0, visits: 5 },
     ], {}, { p1: { 0: 0.6, 1: 0.4, 2: 0.7 }, p2: { 0: 0.45, 1: 0.5 } });
-    // Fake Out + Wood Hammer has the best mean (0.7) but 5 of 56 visits is under a quarter of the heaviest option's 39 visits (10)
     const line = rowLinesAt(rootOf(below), tops('Dragon Dance', 'High Jump Kick'), 4).p1['Dragon Dance'][0];
     expect([line[1].p1, line[1].p2]).toEqual(['Fake Out + Flare Blitz', 'Spore + Rage Powder']);
   });
@@ -388,7 +343,6 @@ describe('the later steps of a row\'s line read each node by value', () => {
     const tied = node(['A', 'B'], ['X', 'Y', 'Z'], [
       { i: 0, j: 0, visits: 10 }, { i: 0, j: 1, visits: 12 }, { i: 0, j: 2, visits: 12 }, { i: 1, j: 0, visits: 10 }, { i: 1, j: 1, visits: 12 }, { i: 1, j: 2, visits: 12 },
     ], {}, { p1: { 0: 0.5, 1: 0.5 }, p2: { 0: 0.3, 1: 0.3, 2: 0.3 } });
-    // p1 ties on mean and on visits (44 each): the first in hint order; p2 ties on mean: Y and Z hold 24 visits against X's 20
     expect(second(rootOf(tied))).toEqual(['A', 'Y']);
     tied.p2Order = [2, 1, 0];
     expect(second(rootOf(tied))).toEqual(['A', 'Z']);
@@ -402,7 +356,6 @@ describe('the later steps of a row\'s line read each node by value', () => {
   });
 
   test('a pair whose cell is thin or absent falls back to the node\'s heaviest cell', () => {
-    // A and X are the best means with the visits, but their cell holds 3 visits; B against Y is the heaviest cell
     const thinCell = node(['A', 'B'], ['X', 'Y'], [
       { i: 0, j: 0, visits: 3 }, { i: 0, j: 1, visits: 10 }, { i: 1, j: 0, visits: 10 }, { i: 1, j: 1, visits: 20 },
     ], {}, { p1: { 0: 0.6, 1: 0.4 }, p2: { 0: 0.3, 1: 0.5 } });
@@ -425,7 +378,6 @@ describe('the later steps of a row\'s line read each node by value', () => {
 });
 
 describe('real trees: the later steps follow the rule, the principal variation stays the walk of visits', () => {
-  /** The rule written again from the node's own tallies, independent of the walk's code. */
   function expectedStep(node: Node, min: number): [string, string] | null {
     const eligible = (n: number[]): number[] => n.map((visits, index) => (visits >= min && visits * 4 >= Math.max(...n) ? index : -1)).filter(index => index >= 0);
     const best = (n: number[], w: number[], order: number[], sign: 1 | -1): number => eligible(n).sort((a, b) =>

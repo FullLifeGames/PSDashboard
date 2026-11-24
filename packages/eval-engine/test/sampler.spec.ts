@@ -18,14 +18,6 @@ import { countFainted, leafValue } from '../src/search/leaf';
 import { sampleCell, type CellSample } from '../src/search/cell-sampler';
 import { cellSeeds } from '../src/search/root-quantile';
 
-/**
- * A doubles tree carries the pair plan's answer for the cells a replay turn's card reads (singles plans per cell already;
- * planCellEvents gives up on every combined choice): a plain cell has no accuracy roll and no kill range ("none"), a planned cell
- * lists its outcome classes ("events"), a guard that sends the cell to the plain mean leaves it unlisted (it failed). The offset-0
- * tree plans the played row against every column and every row against the played column, the cells the luck sentences (the played
- * cell), the hindsight gate (the best row and the played row against the click) and the odds clause read. The rest of the matrix
- * stays unplanned: a full 13 x 13 grid would draw some 300 pair plans for a card that reads 25.
- */
 
 const position = JSON.parse(readFileSync(new URL('./fixtures/positions/gen9vgc2026regi-2630685175-t7-played.json', import.meta.url), 'utf-8')) as {
   serialized: string; tera: EvalSettings['tera']; sleepClause: boolean; ruleset: StaticRuleset; keepPlayed: NonNullable<EvalSettings['keepPlayed']>;
@@ -57,14 +49,12 @@ describe('a doubles root plans the cells of the played row and column (VGC 26306
     expect(tree.boundaryCells).toBeUndefined();
     const allowed = cross(tree);
     for (const planned of tree.plannedCells!) expect(allowed.has(planned.key)).toBe(true);
-    // Most of the cross answers; the cells a guard sends to the plain mean are missing, which the matrix reads as fail.
     expect(tree.plannedCells!.length).toBeGreaterThan(allowed.size / 2);
     expect(tree.plannedCells!.length).toBeLessThanOrEqual(allowed.size);
     expect(tree.plannedCells!.some(planned => planned.key === cellKey(row, column))).toBe(true);
   });
 
   test('each answer is the pair plan\'s own: plain is none, a planned cell lists its classes (heaviest first, weights summing to 1)', () => {
-    // The tree reads the root through `benchOrder`, and a cell's seeds key the saved position, so the spec builds it the same way.
     const order = benchOrder(position.serialized);
     const root = createRootPosition(order ? order.serialized : position.serialized, position.ruleset);
     const cache = createMatchupCache(position.ruleset);
@@ -90,7 +80,6 @@ describe('a doubles root plans the cells of the played row and column (VGC 26306
         seen.unlisted++;
       }
     }
-    // The cross holds plain cells, planned cells and cells a guard sends to the plain mean, or the check proves nothing.
     expect(seen.none).toBeGreaterThan(0);
     expect(seen.events).toBeGreaterThan(0);
     expect(seen.unlisted).toBeGreaterThan(0);
@@ -132,7 +121,6 @@ describe('a doubles root plans the cells of the played row and column (VGC 26306
 });
 
 describe('Pokémon Champions doubles plans the same cross (VGC Reg M-B, the round-56 anchor, turn 5)', () => {
-  // The anchor's played pair: p1 Life Dew and Play Rough into slot 2, p2 Matcha Gotcha and Flare Blitz into slot 1.
   const keepPlayed: NonNullable<EvalSettings['keepPlayed']> = {
     p1: null, p2: null,
     p1Slots: [{ kind: 'move', name: 'Life Dew', targetLoc: null }, { kind: 'move', name: 'Play Rough', targetLoc: 2 }],
@@ -160,8 +148,6 @@ describe('Pokémon Champions doubles plans the same cross (VGC Reg M-B, the roun
 });
 
 describe('the odds note reads the real keys of the pair plan', () => {
-  // The played row's Tera Starstorm claim ("kills ~4%", slot b) meets the clicked Wide Guard, which turns the spread hit away,
-  // and a click that lets the hit land: the cell of the played row against each click comes from the same search.
   const tree = mctsTreeSearch(position.serialized, settings, 0);
   const result = mergeMctsTrees([tree]);
   const against = (p2Slots: NonNullable<EvalSettings['keepPlayed']>['p2Slots']) => analyzeTurn({
@@ -197,17 +183,14 @@ describe('a doubles turn without its protocol reads its luck from the planned ce
   const names: [string, string] = ['pixelfrost', 'Mstr_Hawk'];
   const played: PlayedTurn = { p1: null, p2: null, p1Slots: position.keepPlayed.p1Slots, p2Slots: position.keepPlayed.p2Slots };
   const tree = mctsTreeSearch(position.serialized, settings, 0);
-  /** The turn as the card reads it, as a chance swing: the played cell's value as the played outcome, the position after the turn 0.8 below it. */
   function cardOf(stripPlans: boolean) {
     const result = mergeMctsTrees([tree]);
     const row = tree.p1Options.indexOf(findPlayedOption(tree.p1Options, position.keepPlayed.p1Slots)!);
     const column = tree.p2Options.indexOf(findPlayedOption(tree.p2Options, position.keepPlayed.p2Slots)!);
     const playedOutcome = result.matrix!.values[row][column];
-    // An old cache entry: the same cells without their answers.
     const cells = result.matrix!.cells!.map(line => line.map(cell => (stripPlans ? { visits: cell.visits, verified: cell.verified } : cell)));
     const bare = { ...result, matrix: { ...result.matrix!, cells } };
     const analysis = analyzeTurn({ turn: 7, result: bare, played, playedOutcome, scoreBefore: playedOutcome, scoreAfter: playedOutcome - 0.8, actives: { p1: null, p2: null, gen: 9 } });
-    // The attribution of this synthetic turn reads the sides' reads; the sentence under test is the chance card's.
     return { analysis, text: summarizeTurn({ ...analysis, attribution: 'chance' }, names) };
   }
 
@@ -233,10 +216,6 @@ const meanOver = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, s
 
 const seeds = (count: number) => Array.from({ length: count }, (_, k) => `${101 + 4 * k},${102 + 4 * k},${103 + 4 * k},${104 + 4 * k}`);
 
-/**
- * A sample as data: the children by their serialized identity (the live battle behind each carries per-run state such as |t:|
- * lines): the first child and the class children the verify step deepens.
- */
 const asData = (sample: CellSample) => ({
   ...sample, firstChild: sample.firstChild.serialized,
   classChildren: sample.classChildren && [...sample.classChildren].map(([key, child]) => [key, child.serialized]),
@@ -255,7 +234,6 @@ describe('the pair plan at the root', () => {
     expect(Math.abs(cell.sample.value - truth)).toBeLessThan(0.05);
     const blend = cell.sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    // The first draw is slot 0 of the cell's own list: it kills with Play Rough and burns nobody.
     expect(blend.classes.find(cls => cls.hasFirst)?.key).toBe('p1b:playrough>p2b=hit-kill|p2a:matchagotcha>p1a=hit-nokill|p2a:matchagotcha>p1b=hit-nokill');
   });
 
@@ -294,13 +272,10 @@ describe('the pair plan at the root', () => {
     const cell = pairCellSample(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', 1, createMatchupCache());
     expect(cell).toMatchObject({ kind: 'sample', via: 'fallback', reason: 'prevented:par', draws: 8 });
     if (cell.kind !== 'sample') return;
-    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_DRAWS)), 12); // r89 A5 gate: the cell's eight
+    expect(cell.sample.value).toBeCloseTo(meanOver(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest', cellSeeds(root, 'move dragonclaw 1, move softboiled', 'move rest, move rest').slice(0, FALLBACK_DRAWS)), 12);
   });
 
-  // The flinch die is part of the class and the cell is a plan, not a fallback to the plain mean; the classes with the flinch
-  // carry its chance.
   test('a flinch die is part of the plan: the classes with the flinch weigh its chance', () => {
-    // The battle of pair-pattern.spec.ts: every acting body has its own speed (no tie).
     const root = doublesRoot(
       [pairSet('Fast', 'Aerodactyl', ['Extrasensory', 'Protect'], { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } }), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
       [pairSet('Slow1', 'Snorlax', ['Body Slam', 'Protect']), pairSet('Slow2', 'Munchlax', ['Body Slam', 'Protect'])],
@@ -321,8 +296,7 @@ describe('the pair plan at the root', () => {
     const twice = pairCellSample(root, ...PLAYED, 3, createMatchupCache());
     expect(cellData(twice)).toEqual(cellData(once));
     if (once.kind !== 'sample') throw new Error('expected a sample');
-    // The cell's own three base seeds read 0.127 away from the 256-seed mean (a 3-draw class estimate; a drop counts only while its
-    // holder cannot switch out). Bound 0.1 to 0.15.
+    // The cell's own three base seeds read 0.127 away from the 256-seed mean (a 3-draw estimate); bound 0.1 to 0.15.
     expect(Math.abs(once.sample.value - meanOver(root, ...PLAYED, seeds(256)))).toBeLessThan(0.15);
   });
 

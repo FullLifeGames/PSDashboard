@@ -14,13 +14,7 @@ import {
   entriesOf, FAST, handlerHolders, hasChanceEntry, liveOf, playedChances, readOn, rootOf, row, sameChances, toleranceOf,
 } from './secondary-classes-support';
 
-/**
- * Part one of the sweep of the secondary classes (the reader and the scripts). Every generation 1 to 9 and the Champions mod,
- * singles and from Gen 3 doubles; a plain run plays the sample of `sweepSelection`, `DICE_SWEEPS=full` every Dex move. The paths
- * (class weights, scenes, fork counts) are in `secondary-classes-paths.spec.ts`; the contract of the shapes is in
- * `secondary-classes-support.ts`. The rows after the oracle (the first describe) show that the oracle sees the chances, so a red
- * row is not red by a blind oracle. `T305_RED=1` runs the KNOWN rows as plain tests.
- */
+// A plain run plays the sample of `sweepSelection`; `DICE_SWEEPS=full` plays every Dex move.
 await loadSimMods('gen9championsou');
 
 const aimed = (mode: Mode, move: DexMove): string => (mode === 'singles' ? '' : (['normal', 'any', 'adjacentFoe'].includes(move.target) ? ' 1' : ''));
@@ -52,7 +46,6 @@ describe.each(SWEEP_CASES)('the reader against the simulator: $name', ({ rules, 
 
   function problem(first: Battle, move: DexMove, label: string): string | null {
     const slots = sweepTargets(mode, move.target);
-    // a charge move is read on its second turn, the one that draws
     const { live: board, clicks } = liveOf(first, move, sweepClicks(mode, move.target), sweepClicks(mode, move.target, true));
     if (!clicksAccepted(board, clicks)) return null;
     const played = playedChances(board, clicks, slots, !!move.multihit);
@@ -109,7 +102,6 @@ function scriptedLog(mode: Mode, move: DexMove, board: Battle, secondary: Record
   return drawPair(rootOf(board), choices.p1, choices.p2, '1,2,3,4', new Map([[`p1a:${move.id}>p2a`, script]]) as never, createMatchupCache()).log;
 }
 
-/** An entry whose effect the protocol shows by a standard line (a status, a flinch, a drop of the target's stats). */
 const witnessed = (entry: SecondaryEntry): boolean =>
   entry.chance !== undefined && entry.chance < 100 && !entry.self && !!(entry.status || entry.volatileStatus === 'flinch' || entry.boosts);
 
@@ -131,7 +123,6 @@ describe.each(SWEEP_CASES)('a script answers the secondary die: $name', ({ rules
           const secondary = Object.fromEntries(entriesOf(move).filter(other => other.chance !== undefined && other.chance < 100).map(other => [secondaryEffectId(other), false]));
           secondary[id] = happens;
           const log = scriptedLog(mode, move, board, secondary);
-          // a move that fails (Snore awake) draws no die
           if (!log.some(line => line.startsWith('|-damage|p2a:'))) continue;
           scripted++;
           const shown = effectShown({ log } as unknown as Battle, 0, entry, 'p2a', 'p1a') && !log.some(line => line.startsWith('|-miss|') && (line.split('|')[3] === undefined || line.split('|')[3].startsWith('p2a:')));

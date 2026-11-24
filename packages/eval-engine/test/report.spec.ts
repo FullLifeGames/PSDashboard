@@ -23,7 +23,6 @@ const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: 
   ...over,
 });
 
-/** Tier as analyzeTurn would band it (fixtures hand-build SideAnalysis). */
 const tierOf = (regret: number) =>
   regret >= 0.3 ? { tier: 'blunder' as const } : regret >= 0.15 ? { tier: 'mistake' as const } : {};
 
@@ -62,11 +61,6 @@ describe('game report (multi-turn root cause)', () => {
   });
 
   test('a big roll qualifies and ranks a turn whose net swing partially cancelled', () => {
-    // t2: the game's biggest roll (0.45) nets to 0.10 because the decision
-    // pushed the other way (573756 t73). It must both ENTER the key moments
-    // and RANK by the roll — displacing the weakest net-swing turn (t5)
-    // from the top four. All chance runs toward p1 (against the p2 winner),
-    // so resolution booking never absorbs it.
     const report = buildGameReport([
       mk(1, -0.3, 0.0, { attribution: 'p1-decision' }),
       mk(2, 0.0, 0.1, { attribution: 'chance', chanceDelta: 0.45 }),
@@ -89,21 +83,12 @@ describe('game report (multi-turn root cause)', () => {
   });
 
   test('a decided game\'s resolution is not luck: post-boundary chance toward the winner leaves key moments and the luck ledger', () => {
-    // 573756 t134–138 in miniature: the winner is ahead through the whole
-    // endgame, the static bar underprices the locked 1v1, and the final KO
-    // "surprises" the model — chance toward the winner past the favor
-    // boundary is the decided game resolving, not luck. Chance AGAINST the
-    // winner stays genuine luck wherever it lands, and pre-boundary chance
-    // toward the eventual winner stays luck too (the game was still open).
     const report = buildGameReport([
       mk(1, 0.1, -0.2, { attribution: 'chance', chanceDelta: -0.3 }),
       mk(2, -0.2, -0.25),
       mk(3, -0.25, -0.05, { attribution: 'chance', chanceDelta: 0.2 }),
       mk(4, -0.05, -0.98, { attribution: 'chance', chanceDelta: -0.9 }),
     ], names, 'p2');
-    // Scores favor Beta from turn 2 onward: turn 4's convergence to the
-    // terminal value is resolution; turn 1's swing (pre-boundary) and turn
-    // 3's roll toward the loser are luck.
     expect(report.turningPoint).toBe(1);
     expect(report.keyMoments.map(moment => moment.turn)).toEqual([1]);
     expect(report.chanceTotal).toBeCloseTo(-0.1, 10);
@@ -130,7 +115,6 @@ describe('game report (multi-turn root cause)', () => {
     expect(report.summary).toContain('Scald');
     expect(report.summary).toContain('switching to Dragapult');
     expect(report.summary).toContain('turn 2');
-    // The played move's true odds ground the seed parenthetical.
     expect(report.summary).toContain('(kills ~43% of the time');
   });
 
@@ -151,7 +135,6 @@ describe('game report (multi-turn root cause)', () => {
       mk(4, -0.3, -0.35, { p1: misplay('Peck', 'Fly', 0.1) }),
       mk(5, -0.35, -0.5, { p2: misplay('Bite', 'Crunch', 0.25) }),
     ], names, 'p2');
-    // Top two PER SIDE — p2's bigger numbers cannot crowd p1 out.
     expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['1p1', '2p2', '3p1', '5p2']);
     expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', tier: 'blunder', riskUnpunished: true });
     expect(report.tracked).toBe(true);
@@ -187,7 +170,6 @@ describe('game report (multi-turn root cause)', () => {
       riskPayoff: payoff,
       riskPaidOff: true,
     });
-    // The read's side holds its ground on the turn (a read on a lost turn leaves the list).
     const report = buildGameReport([
       mk(1, 0.3, 0.1, { p2: read('Flip Turn', 0.3, 0.25) }),
       mk(2, 0.1, 0.2),
@@ -268,8 +250,6 @@ describe('game report (multi-turn root cause)', () => {
     const analyses = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(turn => mk(turn, 0.1, 0.1, { p1: perfect() }));
     analyses.push(mk(10, 0.1, -0.5, { p1: blunder, attribution: 'p1-decision' }));
     const report = buildGameReport(analyses, names, 'p2');
-    // In wp-units the 1.2 ev gap is a ~60% win-prob throw — it drags hard,
-    // but nine clean turns keep the game off the floor.
     expect(report.accuracy?.p1).toBeLessThan(80);
     expect(report.accuracy?.p1).toBeGreaterThan(30);
     expect(report.accuracy?.p2).toBeNull();
@@ -288,7 +268,6 @@ describe('game report (multi-turn root cause)', () => {
   });
 
   test('forced turns never inflate accuracy', () => {
-    // choiceCount 1 (forced switch / wait sentinel) is excluded from grading.
     const forced = () => ({
       playedRaw: null, played: ranked('move a', 'A', 0.1), best: ranked('move a', 'A', 0.1),
       safe: null, regret: 0, choiceCount: 1,
@@ -335,11 +314,6 @@ describe('null-swapped recommendations', () => {
   });
 });
 
-/**
- * The report's biggest-roll sentence holds both chances of the side that rolled. 562428 turn 11: Tapu Bulu's 80 % Stone Edge missed Ikki,
- * and the winner (p1) stood well ahead after it; a hit would have left it further ahead. 573756 turn 73 reads the same way for p2 (the shapes
- * of both scenes, the numbers of the copy's engine score are in test/regression/rolled-copy.spec.ts).
- */
 describe('the biggest roll in the game report', () => {
   const stoneEdge = {
     ...ranked('move stoneedge', 'Stone Edge', 0.2),
@@ -455,7 +429,6 @@ describe('luck-report', () => {
 
   describe('report: the tip and the denied end read the same rolls', () => {
     test('the tip turn speaks "on a roll" only with a roll toward the winner, a marker the other way no longer suffices', () => {
-      // Turn 2 produced the boundary score: the tip turn.
       const turns = (rolledFor: { p1: boolean; p2: boolean }) => [
         mk(1, 0.1, 0.05, { rolledFor: none }),
         mk(2, 0.05, -0.4, { attribution: 'chance', chanceDelta: -0.3, rolledFor }),
@@ -631,7 +604,6 @@ describe('win-reason-order', () => {
     });
   });
 
-  /** A conversion needs the bar to hold for the winner from its turn on, so it never names a turn before the tip: the report's "From turn N" never precedes "tipped on turn M". */
   describe('the conversion never comes before the tip', () => {
     const swept = (species: string): SideAnalysis => ({ ...quietSide(), decided: { species, announce: true } });
 

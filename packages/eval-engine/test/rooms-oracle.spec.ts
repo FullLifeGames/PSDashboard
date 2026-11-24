@@ -2,17 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { ROOMS } from '../src/pair/snapshot';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * `ROOMS` in pair/snapshot.ts names the pseudo-weathers the damage calculator's Field reads (isGravity, isMagicRoom, isWonderRoom).
- * This spec adds each pseudo-weather the view's moves set to a battle and asks the simulator for the damage of six hits (a physical
- * and a special Normal hit, a Ground move at a Flying target, a Normal hit at a Ground target, an Electric and a Fire hit, and a
- * Life Orb hit) with and without it. Those that change a roll: the three of ROOMS, and Mud Sport, Water Sport and Ion Deluge (which
- * Plasma Fists sets as well), which the calculator's Field has no flag for, so the pair snapshot prices those hits without them
- * (Ion Deluge and Plasma Fists are Past moves in Generation 9; Mud Sport and Water Sport are live in Generations 3 to 8). Trick Room
- * and Fairy Lock change no roll.
- */
 
-/** Pseudo-weathers that change a roll but are not in ROOMS. */
 const UNKEYED = ['iondeluge', 'mudsport', 'watersport'];
 
 interface Scenario { name: string; user: string; item?: string; move: string; target: string }
@@ -41,7 +31,7 @@ function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType
   let move = battle.dex.getActiveMove(scenario.move);
   move.willCrit = false;
   battle.setActiveMove(move, user, target);
-  move = battle.runEvent('ModifyType', user, target, move, move) as typeof move; // Ion Deluge turns Normal moves Electric here
+  move = battle.runEvent('ModifyType', user, target, move, move) as typeof move; // Ion Deluge: Normal becomes Electric
   return battle.actions.getDamage(user, target, move);
 }
 

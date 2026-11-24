@@ -9,12 +9,7 @@ import { RULES } from './dice-fixtures';
 import { sweepBoard } from './dice-sweep-support';
 import { rootOf } from './secondary-classes-support';
 
-/**
- * The stratifier: tree k of T answers each named die of a root draw with `U = (pi_d(k) + u_d) / T`: `pi_d` is the die's own order of
- * the T quarters, `u_d` a hash. Rows: (a1) each single die over 1,000 salts, (a2) the joint strands of two dice, (a3) the answer
- * stays in the draw's range, (a4) both PRNGs give the plain advance when the quantiles answer nothing, (a5) both PRNGs take a
- * quantile's answer and the records carry it.
- */
+// Tree k of T answers die d with `U = (pi_d(k) + u_d) / T`: `pi_d` orders the T quarters, `u_d` is a hash.
 await loadSimMods('gen9championsou');
 
 const TREES = 4;
@@ -26,7 +21,6 @@ const salts = Array.from({ length: SALTS }, (_, index) => rootSalt(`position ${i
 const cellOf = (salt: number): number => cellHash(salt, 'move 1', 'move 1');
 const quantilesOf = (salt: number, offset: number): RootQuantiles => new RootQuantiles(cellOf(salt), offset, TREES);
 
-/** What the four trees of one salt answer to a list of dice (a tree asks in the order of the list). */
 function treesOf<T>(salt: number, ask: (quantiles: RootQuantiles) => T): T[] {
   return OFFSETS.map(offset => ask(quantilesOf(salt, offset)));
 }
@@ -37,7 +31,6 @@ describe('(a1) each single die is stratified over the four trees', () => {
     const counts = salts.map(salt => treesOf(salt, quantiles => quantiles.answer(die('p1a'), chance(Math.round(p * 100), 100)) as boolean).filter(Boolean).length);
     expect(Math.abs(mean(counts) / TREES - p)).toBeLessThan(0.03);
     for (const count of counts) expect([Math.floor(TREES * p), Math.ceil(TREES * p)]).toContain(count);
-    // a die of one quarter or more is never missed by all four trees
     if (p >= 1 / TREES) expect(counts.every(count => count >= 1)).toBe(true);
   });
 
@@ -68,7 +61,6 @@ describe('(a1) each single die is stratified over the four trees', () => {
       for (const index of [0, 1]) expect(rolls.map(roll => Math.floor(roll[index] / 4)).sort()).toEqual([0, 1, 2, 3]);
       alike += rolls.filter(roll => Math.floor(roll[0] / 4) === Math.floor(roll[1] / 4)).length;
     }
-    // independent permutations agree on 1 tree in 4
     expect(Math.abs(alike / (SALTS * TREES) - 1 / TREES)).toBeLessThan(0.03);
   });
 });
@@ -137,7 +129,6 @@ const CLICKS = {
   doubles: { p1: 'move thunder 1, move splash', p2: 'move splash, move splash' },
 } as const;
 
-/** One singles root draw under a quantile sink (the real PRNG path: `forkBattle` builds the `ScriptedPRNG` for any sink). */
 function singlesDraw(quantiles: DieQuantiles | null, seed: string) {
   const board = sweepBoard(GEN9, 'thunder', 'singles');
   const sink = quantiles ? new QuantileSink(quantiles) : undefined;

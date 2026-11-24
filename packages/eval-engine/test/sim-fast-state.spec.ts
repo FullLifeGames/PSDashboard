@@ -55,7 +55,6 @@ describe('sim-fast-fork', () => {
 
   const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
 
-  /** A turn and the next one (first options), for mid-turn states. */
   function played(serialized: string, p1: string, p2: string, seed: PRNGSeed, afterFirst?: () => void): string {
     const first = advancePositionWithLog(createRootPosition(serialized), p1, p2, seed);
     afterFirst?.();
@@ -74,14 +73,8 @@ describe('sim-fast-fork', () => {
     serialized: string;
     p1: string;
     p2: string;
-    /**
-     * Copies in the first advance, exact: the root fork (the root's template is
-     * a deserialization), one snapshot for the one resolution round, and one
-     * trial per assignment of every side that chooses (two replacements each).
-     * The string path makes the root fork only (1).
-     */
+    /** Copies in the first advance, exact: the root fork, a snapshot per resolution round, a trial per assignment */
     firstCopies: number;
-    /** A pivot's snapshot still holds the rest of the turn; a double KO's comes after the turn's last action. */
     queued: boolean;
   }
 
@@ -108,11 +101,8 @@ describe('sim-fast-fork', () => {
     ];
   }
 
-  /**
-   * Alakazam (faster, no item) Tricks Snorlax's Leftovers away: takeItem leaves Snorlax an own pendingStaleness holding undefined
-   * (pokemon.mjs:1583), which the JSON round trip drops. Snorlax then moves (lastMoveTargetLoc lands after that slot). The second
-   * Trick gives the item back: setItem writes pendingStaleness (pokemon.mjs:1599), appended after the newer keys.
-   */
+  // takeItem leaves an own pendingStaleness holding undefined (pokemon.mjs:1583), which the JSON round trip drops;
+  // setItem writes it back (pokemon.mjs:1599), after the newer keys.
   function trickTwiceCases(): { name: string; serialized: string; p1: string; p2: string }[] {
     const snorlax = { ...makeSet('Snorlax', 'Snorlax', ['Tackle']), item: 'Leftovers' };
     const singles = makeBattle('gen9customgame', [makeSet('Alakazam', 'Alakazam', ['Trick'], 100)], [snorlax]);
@@ -125,14 +115,8 @@ describe('sim-fast-fork', () => {
     ];
   }
 
-  /**
-   * Gen 2 calls moveUsed without a target on every move (mods/gen2/scripts.mjs:128),
-   * so each mover holds an own lastMoveTargetLoc of undefined (pokemon.mjs:640),
-   * a key the Pokemon constructor never creates; the JSON round trip drops it.
-   * Mew (faster, no item) steals Snorlax's Leftovers with Thief: pendingStaleness lands after that slot. Mirror Move then copies
-   * Snorlax's Rollout, whose onModifyMove writes a defined lastMoveTargetLoc (moves.mjs:15651): the JSON round trip appends it
-   * after pendingStaleness, a copy that kept the slot fills it in place.
-   */
+  // Gen 2 calls moveUsed without a target (mods/gen2/scripts.mjs:128): every mover holds an own lastMoveTargetLoc of
+  // undefined (pokemon.mjs:640) that the JSON round trip drops; Rollout writes a defined one (moves.mjs:15651).
   function gen2MirrorRollout(): string {
     return serialize(makeBattle('gen2customgame', [makeSet('Mew', 'Mew', ['Thief', 'Mirror Move'], 100)],
       [{ ...makeSet('Snorlax', 'Snorlax', ['Rollout']), item: 'Leftovers' }]));
@@ -223,7 +207,6 @@ describe('sim-fast-fork', () => {
     });
 
     test('gen 2: an empty lastMoveTargetLoc keeps no slot (Thief, then Mirror Move copies Rollout, both seeds)', () => {
-      // Gen 2 has no doubles format (gen2doublescustomgame does not exist); the guard spec's census covers doubles.
       const serialized = gen2MirrorRollout();
       for (const seed of SEEDS) {
         const plies = (levers: readonly SimFastLever[]) => withSimFast(levers, () => {
@@ -268,7 +251,6 @@ describe('sim-fast-fork', () => {
           let firstCopies = -1;
           let queued = false;
           const copied = withSimFast(['clone'], () => {
-            // Every template of the run is frozen: the live battle plays on after its snapshot.
             setTemplateHook(battle => {
               queued ||= battle.queue.list.length > 0 || battle.activeMove !== null;
               deepFreeze(battle, sharedClasses(battle), new Set());
@@ -302,7 +284,6 @@ describe('sim-fast-fork', () => {
     test('a template whose constructor keys cannot be built steps back to today\'s path; forced, it throws', () => {
       const foreign = () => {
         const battle = deserializeFromParsed(parseSearchState(positions[0].serialized));
-        // A prototype the key cache has not seen, whose constructor throws.
         const constructor = function Foreign(): never { throw new Error('no constructor'); };
         Object.setPrototypeOf(battle, Object.create(Object.getPrototypeOf(battle) as object, { constructor: { value: constructor } }) as object);
         return battle;
@@ -318,12 +299,6 @@ describe('sim-fast-fork', () => {
     });
   });
 
-  /**
-   * Freezes a template down to the shared dex classes. ActiveMoves carry the
-   * DataMove prototype but belong to one battle (Utils.deepClone keeps the
-   * prototype), so they and their nested data are frozen too; sets and teams
-   * are compared as JSON instead.
-   */
   function deepFreeze(value: unknown, shared: ReadonlySet<object>, seen: Set<object>): void {
     if (typeof value !== 'object' || value === null || seen.has(value)) return;
     seen.add(value);
@@ -405,7 +380,6 @@ describe('sim-fast-champions', () => {
         set('Raichu', 'Focus Sash', 'Lightning Rod', ['Nuzzle', 'Fake Out', 'Thunderbolt', 'Protect'], 'Timid', [2, 0, 0, 32, 0, 32])]),
   };
 
-  /** A choice that Mega Evolves when one is offered, else the first legal choice. */
   function pick(serialized: string, side: 'p1' | 'p2', seedIndex: number): string {
     const choices = legalChoices(createRootPosition(serialized), side).map(choice => choice.choice);
     return choices.find(choice => choice.includes('mega')) ?? choices[seedIndex % Math.max(choices.length, 1)] ?? 'default';
@@ -471,7 +445,7 @@ describe('sim-fast-rules', () => {
   const positions = loadPositions();
   const firstOf = (format: string) => positions.find(position => position.format === format)!;
 
-  /** The table's content: State.serializeBattle leaves the rule table out (state.mjs:29). */
+  // State.serializeBattle leaves the rule table out (state.mjs:29).
   function tableOf(battle: Battle) {
     const table = battle.ruleTable;
     return { rules: [...table], valueRules: [...table.valueRules], tagRules: [...table.tagRules] };
@@ -493,8 +467,8 @@ describe('sim-fast-rules', () => {
     return { state: serializeBattleStable(battle), table: tableOf(battle), turns: playedTurns(serialized) };
   }
 
-  // The sim never stores its table (the ruleset repeals a rule); another spec file of this worker may have left one on the
-  // shared format.
+  // The sim never stores its table (the ruleset repeals a rule); another spec file of this worker may have left one on
+  // the shared format.
   beforeEach(() => { Dex.formats.get('gen9ou', true).ruleTable = null; });
   afterEach(() => resetSimFastForTests());
 

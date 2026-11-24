@@ -6,14 +6,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * The per-turn HP a body in a race (gen9draft-2058494320, a Swords Dance turn) gains or loses at
- * the end of the turn, from the simulator and not from a list of names. The reader plays three end-of-turns on a
- * copy of the battle (the HP of the actives set to 3/4 before each, so that no cap bends the reading) and gives the
- * mean loss per turn as a fraction of each active's max HP. Every scene is held to the simulator's own idle turns on a
- * second copy of the same board: Leech Seed (the seeded body loses, the active of the seeder's side heals), item
- * regeneration, weather, terrain, the statuses, in Scarlet and Violet, on the Champions mod and in an old generation.
- */
 
 await loadSimMods('gen9championscustomgame');
 
@@ -79,7 +71,6 @@ describe('the end of the turn, played on a copy', () => {
       return battle;
     };
     const rates = expectSimulator(build);
-    // p1 slot 0 Chansey, slot 1 Garchomp (the seeder), p2 slot 0 Snorlax, slot 1 Clefable (seeded).
     expect(rates[0]).toBe(0);
     expect(rates[1]).toBeLessThan(0);
     expect(rates[2]).toBe(0);
@@ -262,11 +253,8 @@ describe('residual-memo-state', () => {
     });
   };
 
-  /**
-   * The Future Sight the simulator makes (data/conditions.ts `futuremove`): it lands when the battle's turn count has reached its `endingTurn`
-   * (`getOverflowedTurnCount`, a method of the battle that reads `turn`). A search (gen9ou-2658660641 turn 47) answered a board whose
-   * Future Sight lands from the memo's entry of the turn before, where it does not.
-   */
+  // data/conditions.ts `futuremove` lands when the turn count has reached its `endingTurn` (`getOverflowedTurnCount`).
+  // A Wish heals by the same count.
   const futureSightEnding = (turn: number, endingTurn: number): Tweak => battle => {
     futureSight(battle);
     battle.turn = turn;
@@ -275,7 +263,6 @@ describe('residual-memo-state', () => {
     state.endingTurn = endingTurn;
   };
 
-  /** A Wish made at turn 10 and read at turn 10 + `later`: it heals once the turn count has passed the one it was made on (`getOverflowedTurnCount` again). */
   const wishAfter = (later: number): Tweak => battle => {
     battle.turn = 10;
     battle.sides[0].addSlotCondition(mine(battle), 'Wish', mine(battle));

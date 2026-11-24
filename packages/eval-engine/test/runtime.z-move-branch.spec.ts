@@ -19,17 +19,10 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { landedMove } from '../src/score/move-facts';
 import type { BranchSlotChoice } from '../src/branch-choices';
 
-/**
- * Scene: smogtours-gen7ou-450650 turn 2, p2's Garchomp uses a Dragon Z-move. The build stored "Devastating Drake" as its only move,
- * so the branch at turn 3 offered Struggle, the picker named the lost move, and the play-out stopped. The build holds a Dragon
- * attack, the rebuild plays the Z-move without a rejected choice, and the branch stands where the game stood: the side has spent
- * its Z-power and the body offers its moves.
- */
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const replay = JSON.parse(readFileSync(new URL('./fixtures/smogtours-gen7ou-450650.json', import.meta.url), 'utf-8')) as Replay;
 
-/** A usage list for Garchomp whose four best-used moves hold no Dragon attack. */
 const entry = (value: string, index: number) => ({ value, probability: 0.95 - index * 0.07, sourceDetail: 'test' });
 const USAGE: SmogonUsageStats = {
   format: 'gen7ou', month: '2026-09', source: 'test',
@@ -61,7 +54,6 @@ describe('450650: the branch after the Z-move of turn 2', () => {
     const battle = runtime.battleStream.battle!;
     const active = battle.sides[1].active[0]!;
     expect(active.species.name).toBe('Garchomp');
-    // The game spent the side's Z-power on turn 2; the rebuild did too, and the body is not offered a second Z-move.
     expect(battle.sides[1].zMoveUsed).toBe(true);
     const request = active.getMoveRequestData();
     expect(request.canZMove).toBeUndefined();
@@ -95,7 +87,6 @@ describe('hits-taken-pin', () => {
     test('the snapshot carries the client\'s count', () => {
       const snapshot = parseReplayLogWithObservations(replay.log).snapshots.find(entry => entry.turn === 7)!;
       expect(snapshot.p1.pokemon.find(mon => mon.speciesForme === 'Annihilape')!.timesAttacked).toBe(4);
-      // Absent at none, so an older snapshot reads the same.
       expect(snapshot.p2.pokemon.every(mon => mon.timesAttacked === undefined || mon.timesAttacked > 0)).toBe(true);
     });
 
