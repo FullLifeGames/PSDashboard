@@ -18,6 +18,7 @@ export interface OpponentModel {
   confidence: number;
 }
 
+/** A side's share of main-choice turns spent on moves and on switches, and how often a move repeated the last move. */
 export interface PlayerTendencies {
   attackRate: number;
   switchRate: number;

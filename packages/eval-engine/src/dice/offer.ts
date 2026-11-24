@@ -283,6 +283,7 @@ export function offeredOrderDice(battle: Battle, play: (battle: Battle) => void)
   return offers;
 }
 
+/** The end-of-turn dice the panel offers, read from the natural turn on a copy; the live battle is never written. */
 export function offeredEndDice(battle: Battle, play: (battle: Battle) => void): DieOffer[] {
   const natural = naturalTurn(battle, play);
   const offers: DieOffer[] = [];

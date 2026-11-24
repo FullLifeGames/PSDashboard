@@ -190,12 +190,14 @@ function cardSpeakers(analysis: TurnAnalysis, playerNames: PlayerNames, decided:
   return { beside, rideAlong, judged, standing, othersSpeak: standing || rideAlong.length > 0 };
 }
 
+/** How the turn's quiet card speaks: "A quiet turn." alone, "Neither side made a mistake." beside others, or silent. */
 export function quietVoice(analysis: TurnAnalysis, playerNames: PlayerNames): QuietVoice {
   const { standing, othersSpeak, judged } = cardSpeakers(analysis, playerNames, decidedSide(analysis));
   if (analysis.playedTracking === false) return standing ? 'silent' : 'alone';
   return quietVoiceOf(analysis, othersSpeak || walkedSentence(analysis, playerNames) !== null, judged);
 }
 
+/** The turn's card text: the estimate line, then decided, attribution, and ride-along sentences. */
 export function summarizeTurn(
   analysis: TurnAnalysis,
   playerNames: [string, string],

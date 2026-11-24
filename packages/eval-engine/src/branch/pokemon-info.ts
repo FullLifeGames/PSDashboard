@@ -200,6 +200,7 @@ function probeBody(gen: number, champions: boolean): HpDisplayBody | null {
   return null;
 }
 
+/** `sightedHp` for a body that exists only as numbers: the format's probe body at `maxhp`; null without one. */
 export function sightedHpAt(gen: number, champions: boolean, sighting: HpSighting, maxhp: number): number | null {
   const body = probeBody(gen, champions);
   if (!body) return null;
@@ -221,6 +222,7 @@ export function hiddenPowerFacts(rules: GameRules, set: { moves?: readonly strin
   return { hpType: typed || read.type, hpPower: read.power };
 }
 
+/** The simulator facts the calc reads, from a snapshot: client volatiles, the side's fallen, Hidden Power. */
 export function snapshotSimFacts(
   mon: { boostedStat?: string; fallen?: number; moves?: readonly string[] }, set: { moves?: readonly string[]; ivs?: Partial<PokemonStatTable>; hpType?: string } | undefined, rules: GameRules, sideFainted: number,
 ): Pick<SimPokemonInfo, 'boostedStat' | 'alliesFainted' | 'totalFainted' | 'hpType' | 'hpPower'> {

@@ -57,6 +57,7 @@ export function bringWorlds(list: BringList | null | undefined, cap: number): Br
   return kept.map(world => ({ ...world, weight: world.weight / total }));
 }
 
+/** The weighted mean of `values` under `weights`, normalized by the weights present; one value is returned as is. */
 export function blendValues(values: number[], weights: number[]): number {
   if (values.length === 1) return values[0];
   let sum = 0;

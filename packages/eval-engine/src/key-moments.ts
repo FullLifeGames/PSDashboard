@@ -4,6 +4,7 @@ import { inStandoff, type Standoff } from './standoff.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { momentScore } from './win-reason.ts';
 
+/** The swing one component (net swing or chance share alone) needs for a key moment; also picks deepening turns. */
 export const KEY_MOMENT_SWING = KEY_TURN_SWING;
 const REPORT_KEY_MOMENTS = 4;
 

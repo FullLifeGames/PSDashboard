@@ -25,6 +25,7 @@ export function safeStreamWrite(
   }
 }
 
+/** A side's sim command, or the reason the live request refuses the choices. */
 export type ResolvedSideCommand =
   | { ok: true; command: string }
   | { ok: false; error: string };
@@ -102,6 +103,7 @@ function describePokemon(pokemon: SimPokemon): string {
   return `${pokemon.name} (${species})`;
 }
 
+/** Appends the species after each nicknamed Pokémon in a simulator error message, so it stays decodable. */
 export function annotateNicknames(message: string, battle: SimBattle | null | undefined): string {
   if (!battle) return message;
   let annotated = message;
@@ -169,6 +171,7 @@ async function playWithDice(
 
 const pendingTurns = new WeakMap<object, PendingTurn>();
 
+/** What a call needs to play a turn with forced dice: the live battle and the slot choices the dice ride on. */
 export interface BranchDiceTurn {
   battle: SimBattle;
   p1Choices: (BranchSlotChoice | null)[];

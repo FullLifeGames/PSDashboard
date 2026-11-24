@@ -27,12 +27,14 @@ export function perfEnabled(): boolean {
   }
 }
 
+/** Starts a fresh collection window (one graph sweep). */
 export function perfReset(): void {
   stages.clear();
   counters.clear();
   startedAt = now();
 }
 
+/** Adds one timed run of a stage, in milliseconds. */
 export function perfAdd(stage: string, ms: number): void {
   const entry = stages.get(stage);
   if (entry) {
@@ -43,10 +45,12 @@ export function perfAdd(stage: string, ms: number): void {
   }
 }
 
+/** Adds to a named counter. */
 export function perfCount(name: string, by = 1): void {
   counters.set(name, (counters.get(name) ?? 0) + by);
 }
 
+/** Times one awaited stage; the failure path is charged like the success path. */
 export async function perfSpan<T>(stage: string, run: () => Promise<T>): Promise<T> {
   const start = now();
   try {

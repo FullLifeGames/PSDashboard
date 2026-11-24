@@ -15,6 +15,7 @@ export interface RollFlip {
   score: number;
 }
 
+/** The game's biggest roll against the winner, with both chances of the side that rolled. */
 export interface BiggestRoll {
   turn: number;
   /** The side the roll helped: the game's loser. */

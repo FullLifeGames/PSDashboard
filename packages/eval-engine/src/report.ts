@@ -42,6 +42,7 @@ interface GameMisplay {
   span?: { from: number; to: number; faintedFraction?: number };
 }
 
+/** The game report: turning point, key moments, misplays, reads, totals and the summary text. */
 export interface GameReport {
   winner: 'p1' | 'p2' | null;
   /** The turn whose play made the winner's advantage permanent; null = wire-to-wire or unknown. */
@@ -305,6 +306,7 @@ function optionalFields(story: WinStory | null, diceAnchor: number | null, split
   };
 }
 
+/** Builds the game report from the turn analyses of a finished game. */
 export function buildGameReport(
   analyses: (TurnAnalysis | null)[],
   playerNames: [string, string],

@@ -19,6 +19,7 @@ function spectatorLog(log: string[]): string[] {
   return extractChannelMessages(log.join('\n'), [0])[0];
 }
 
+/** The request one engine answers: the position as the dashboard holds it, with the options it ranks. */
 export function buildEngineRequest(
   serialized: string,
   options: { p1: ChoiceOption[]; p2: ChoiceOption[] },

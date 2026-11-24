@@ -1,5 +1,6 @@
 import { ENGINE_PROTOCOL, type EngineRequest, type EngineResponse } from './protocol.ts';
 
+/** The outcome of `validateEngineResponse`: the response, or every error found. */
 export type EngineCheck = { ok: true; response: EngineResponse } | { ok: false; errors: string[] };
 
 const inRange = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;

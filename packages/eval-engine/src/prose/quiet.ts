@@ -16,6 +16,7 @@ function onlyMoverBest(analysis: TurnAnalysis, playerNames: [string, string]): s
   return playedBest(analysis[mover[0]]) ? mover[1] : null;
 }
 
+/** How a quiet card speaks: `alone`, `no-mistake`, `silent` (a side has a mistake tier), `risk` or `inaccuracy`. */
 export type QuietVoice = 'alone' | 'no-mistake' | 'silent' | 'risk' | 'inaccuracy';
 
 export function hintShown(analysis: TurnAnalysis): boolean {

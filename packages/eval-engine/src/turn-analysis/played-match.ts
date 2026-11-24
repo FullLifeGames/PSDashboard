@@ -14,6 +14,7 @@ export function setupMoveClicked(side: Pick<SideAnalysis, 'playedSlots' | 'playe
   return setup?.name ?? null;
 }
 
+/** The setup move this side actually clicked, if any (display name), as the record carries it. */
 export const playedSetupMove = (side: Pick<SideAnalysis, 'setupMove'>): string | null => side.setupMove ?? null;
 
 /** "Tera + X" labels contain the slot separator, so they are re-merged after splitting. */
@@ -156,6 +157,7 @@ export function diffChoices(played: RankedChoice, best: RankedChoice): string | 
   return diffs.length === 1 ? diffs[0] : null;
 }
 
+/** The ranked option a side's played action matches: doubles slots when present, the singles action otherwise. */
 export function matchPlayedSide(
   result: EvalResult,
   side: 'p1' | 'p2',
@@ -180,6 +182,7 @@ export function matchClickedColumn(
   return matchPlayedChoice(result, side, played[side]);
 }
 
+/** The stay-in phantom: the ranked move that stands for a side KO'd before it acted, or null. */
 export function phantomStayIn(
   result: EvalResult,
   side: 'p1' | 'p2',

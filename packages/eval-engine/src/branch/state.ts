@@ -222,6 +222,7 @@ function emptyState(log: string[], choices: BranchChoices): BranchSimState {
   };
 }
 
+/** The picker state of a runtime's battle: moves, switches, field, force-switch flags and the pending choices. */
 export function createBranchState(
   battleStream: BattleStreams.BattleStream | null,
   log: string[],

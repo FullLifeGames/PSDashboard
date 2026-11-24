@@ -20,6 +20,7 @@ export interface NewGameBody {
   stats: { atk: number; def: number; spa: number; spd: number; spe: number };
 }
 
+/** The start of a game as the chosen format's own battle reads it. */
 export interface NewGameStart {
   format: string;
   gameType: string;
@@ -35,6 +36,7 @@ export interface NewGameStart {
   bodies: { p1: NewGameBody[]; p2: NewGameBody[] };
 }
 
+/** A seed the simulator reads, or the problem that names the forms the dialog accepts. */
 export type GameSeedRead = { seed: string } | { problem: string };
 
 const SEED_PROBLEM = 'A seed is four whole numbers from 0 to 65535 with commas, like 1,2,3,4, or "sodium," and up to 64 hex digits (the form of a Showdown input log), or "gen5," and 16 hex digits.';
@@ -56,6 +58,7 @@ export function readGameSeed(text: string): GameSeedRead {
   return { seed };
 }
 
+/** The input of `startGameLog`: a format and two pasted teams. */
 export interface StartGameParams {
   format: string;
   p1Team: PokemonSet[];

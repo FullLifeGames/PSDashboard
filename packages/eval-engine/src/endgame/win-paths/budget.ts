@@ -1,7 +1,7 @@
 import type { WinBudget } from './types.ts';
 
-// The work counter of a win-path step, counted and never timed, so a step answers the same on every machine.
-// `cells`: matrix cells the first choice prices; `turns`: simulator turns the dice search plays on copies.
+// Counted and never timed, so a step answers the same on every machine.
+/** The work caps of a win-path step: `cells` the first choice prices, simulator `turns` the dice search plays. */
 export const WIN_BUDGET: WinBudget = { cells: 350, turns: 175 };
 
 export const LUCK_FLOOR = 0.001;

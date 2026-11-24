@@ -37,6 +37,7 @@ export function reconstructionReached(runtime: BranchRuntime, turn: number): boo
   return battle.turn >= turn;
 }
 
+/** An error message when the battle is wedged (timed out, no pending request, no eligible switch-in), else null. */
 export function validateBranchRuntime(runtime: BranchRuntime): string | null {
   if (runtime.timedOut) {
     return 'Reconstruction timed out before reaching this turn. Try branching from a nearby turn.';

@@ -30,6 +30,7 @@ export const MCTS_ITERATIONS = SEARCH_BUDGET_DEFAULT.iterations;
 const PARTIAL_EVERY = 150;
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
+/** Progress, partial-result and stop hooks of one search run. */
 export interface MctsCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
@@ -144,6 +145,7 @@ function runMcts(
   return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights, ctx };
 }
 
+/** Runs the tree on the board with its bench in canonical order and names its choices in the given board's slots. */
 export function mctsSearch(
   serializedBattle: string,
   settings: EvalSettings,
@@ -162,6 +164,7 @@ function mctsSearchOn(serializedBattle: string, settings: EvalSettings, callback
   return result;
 }
 
+/** One parallel tree's run: root statistics plus its own ranked result, on the canonical bench in the given slots. */
 export function mctsTreeSearch(
   serializedBattle: string,
   settings: EvalSettings,

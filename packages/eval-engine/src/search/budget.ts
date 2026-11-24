@@ -100,6 +100,7 @@ export function searchBudgetTag(): string {
   return tag === budgetTag(SEARCH_BUDGET_DEFAULT) ? '' : tag;
 }
 
+/** The auto mode at one position of a game type: its early matrix below its treeFrom, the tree at or above. */
 export function autoTurnSettings(faintedFraction: number, doubles: boolean): { depth: 1 | 2 | 3; samples: 1 | 3 | 5; mode: 'matrix' | 'mcts' } {
   const split = doubles ? searchBudget().doubles : searchBudget().singles;
   return faintedFraction >= split.treeFrom

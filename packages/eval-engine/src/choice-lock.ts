@@ -11,6 +11,7 @@ import { normalizeLineEndings } from './line-endings.ts';
 /** `handedOver`: the Choice item came by a move, so the protocol itself shows it (no set guess to vet). */
 export interface ProtocolLock { species: string; moveId: string; handedOver?: boolean }
 interface TrailState { species: string; moves: string[]; itemDisturbed: boolean; handedItem?: string }
+/** Per side and turn, the active's trail: moves committed since its last real entry or item handover. */
 export type ChoiceLockTrails = Record<'p1' | 'p2', Map<number, TrailState | null>>;
 
 const bodyKey = (ident: string | undefined) => (ident ?? '').replace(/^(p[12])[a-d]?: /, '$1: ');
@@ -316,6 +317,7 @@ export function corroborateChoiceItem(
   return sawChoiceOnly ? 'corroborated' : 'ambiguous';
 }
 
+/** The Choice lock facts of one game: the trails, the items that may justify a lock stamp, the items per boundary. */
 export interface ChoiceLockContext {
   trails: ChoiceLockTrails;
   /** speciesId -> may this mon's (choice) item justify a lock stamp? */
@@ -323,6 +325,7 @@ export interface ChoiceLockContext {
   heldItems: Map<number, ProtocolHeldItem[]>;
 }
 
+/** Assembles the Choice lock context once per game: a revealed or manual item is trusted, a guessed one is not. */
 export function buildChoiceLockContext(
   rawLog: string,
   teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] },

@@ -12,6 +12,7 @@ import { safeStreamWrite, sleep } from './execute.ts';
 import { loadSimMods, simModsReady } from '../forward/sim-mods.ts';
 import { DEFAULT_GAME_SEED } from './game-seed.ts';
 
+/** One open replacement request of a knockout, with the slots to fill and the species the replay sent into them. */
 export interface ReplacementPoint {
   /** The knockout turn; the replacement stands on the board of the next one. */
   turn: number;
@@ -21,6 +22,7 @@ export interface ReplacementPoint {
   played: { p1: string[]; p2: string[] };
 }
 
+/** The input of `reconstructBranchRuntime`: the teams, the replay log and the turn to rebuild to. */
 export interface ReconstructParams {
   format: string;
   p1Team: PokemonSet[];

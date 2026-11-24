@@ -14,6 +14,7 @@ type CalcAbility = CalcMoveOptions['ability'];
 type CalcItem = CalcMoveOptions['item'];
 type CalcMoveOverrides = NonNullable<CalcMoveOptions['overrides']>;
 
+/** The preview of one move into one defender: damage range in percent of max HP, KO verdict, hit shares, roll steps. */
 export interface DamageResult {
   moveName: string;
   minPercent: number;
@@ -33,6 +34,7 @@ export interface DamageRolls {
   hits: number;
 }
 
+/** The field and live position around a damage preview: game type, generation, weather, terrain, conditions, dice. */
 export interface DamageCalcContext {
   gameType?: 'Singles' | 'Doubles';
   gen?: number;
@@ -219,6 +221,7 @@ function priceOnCopy(context: DamageCalcContext, moveName: string): DamageResult
   return { moveName, minPercent: minPct, maxPercent: maxPct, range: `${minPct}% - ${maxPct}%`, koChance };
 }
 
+/** The damage preview of one move into a defender: range, KO verdict, hit shares, roll steps; empty if unpriced. */
 export function calcSingleDamageRange(
   attacker: SimPokemonInfo,
   defender: SimPokemonInfo,

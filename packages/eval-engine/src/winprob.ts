@@ -32,6 +32,7 @@ export function winprobK(doubles: boolean, ruleset: StaticRuleset = 'standard'):
   return doubles ? table.doubles : table.singles;
 }
 
+/** P(the RAW score's side wins), the leaf mapping's core. */
 export function winProbability(score: number, doubles = false, faintedFraction = 0, ruleset: StaticRuleset = 'standard'): number {
   const { k0, k1 } = winprobK(doubles, ruleset);
   return 1 / (1 + Math.exp(-(k0 + k1 * faintedFraction) * score));
@@ -63,6 +64,7 @@ export const winPercent = (score: number, faintedFraction?: number | null): numb
   return Math.round(100 / (1 + Math.exp(-displayK(faintedFraction) * score)));
 };
 
+/** Display text of an absolute value through winPercent ("52%"; higher is better for the named side). */
 export const winPctText = (value: number, faintedFraction?: number | null): string => `${winPercent(value, faintedFraction)}%`;
 
 /** A DIFFERENCE (regret, payoff, swing, luck) as wp-unit-linear signed points ("+8%"); one wp-unit spans 50 points. */

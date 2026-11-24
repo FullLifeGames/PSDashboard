@@ -10,6 +10,7 @@ export function detectSacks(events: string[], snapshotBefore: TurnSnapshot | nul
   return detectSacksOfLf(normalizeLines(events), snapshotBefore, rules);
 }
 
+/** One side's chosen action of a turn: a move or a switch with gimmick flags, doubles target and pivot follow-up. */
 export interface PlayedAction {
   kind: 'move' | 'switch';
   /** Move name, or the incoming Pokémon's nickname for switches. */
@@ -42,6 +43,7 @@ export interface SlotBound {
 /** The bound per side and slot, as the parse's `fell` marks it; null when the slot has none. */
 export interface PlayedBounds { p1?: (SlotBound | null)[]; p2?: (SlotBound | null)[] }
 
+/** What each side chose in one turn: one action per side, or per slot in doubles. */
 export interface PlayedTurn {
   p1: PlayedAction | null;
   p2: PlayedAction | null;
@@ -206,6 +208,7 @@ export function parsePlayedActions(lines: string[], rules: GameRules): PlayedTur
   };
 }
 
+/** The leads each side sent out: species of the `|switch|` lines before the first `|turn|`, in slot order. */
 export function parseLeadSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const leads = { p1: [] as string[], p2: [] as string[] };
   let started = false;
@@ -274,6 +277,7 @@ function noteDoublesLine(scan: DoublesScan, tag: string, ref: SlotRef, parts: st
   }
 }
 
+/** Doubles variant of parsePlayedActions: the same settle rules per slot (a/b), plus move target locations. */
 export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   const scan: DoublesScan = {
     slots: { p1: [null, null], p2: [null, null] },

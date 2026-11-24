@@ -2,6 +2,7 @@
 
 import { choiceItems, dexOf, formatRules, sideIndex, toId } from '@fulllifegames/replay-core';
 
+/** A guessed-item mon and the usage-plausible items to probe it with. */
 export interface SensitivityTarget {
   species: string;
   /** Usage-plausible alternatives, rule-outs already applied. */
@@ -24,6 +25,7 @@ interface SerializedBattleShape {
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 
+/** Probe combos for one flagged side: opposing guessed-item mons involved, round-robin over alternatives, to `cap`. */
 export function selectProbeCombos(
   serialized: string,
   opposing: 'p1' | 'p2',

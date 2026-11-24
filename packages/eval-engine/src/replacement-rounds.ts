@@ -1,5 +1,6 @@
 // replacement-capture-sweep.spec.ts holds the capture hook to this read of the protocol.
 
+/** One request round: the slots a knockout leaves open when its first replacement enters, and the species sent in. */
 export interface ReplacementRound {
   /** The knockout turn; the replacement stands on the board of the next one. */
   turn: number;

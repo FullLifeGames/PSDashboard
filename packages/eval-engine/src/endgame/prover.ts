@@ -23,6 +23,7 @@ export interface ProverBudget {
   cells: number;
   depth: number;
 }
+/** The default budget of `proveForcedWin`. */
 export const PROVER_BUDGET: ProverBudget = { states: 200, cells: 100, depth: 12 };
 // Forced draws per class cell, retries included; a class beyond the cap stays open and its share leaves the mass.
 const PROVER_DRAW_BUDGET = 6;
@@ -30,6 +31,7 @@ const PROVER_INNER_DRAW_BUDGET = 3;
 const ROOT_CANDIDATES = 3;
 const INNER_CANDIDATES = 2;
 
+/** What `proveForcedWin` needs besides the position: the side, the root order, the rules and the budget. */
 export interface ProveRequest {
   side: 'p1' | 'p2';
   /** Root candidates best first (choice ids from the ranking); empty means odds order. */

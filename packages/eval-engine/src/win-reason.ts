@@ -20,6 +20,7 @@ export const momentScore = (analysis: TurnAnalysis): number =>
 export const badTier = (side: SideAnalysis): boolean =>
   side.tier === 'mistake' || side.tier === 'blunder';
 
+/** The moment the winner sealed it: the first proven forced win at spoken mass, or the first decided sweep. */
 export interface WinConversion {
   kind: 'forced' | 'decided';
   turn: number;

@@ -13,8 +13,11 @@ import { endgameKey } from './key.ts';
 
 /** The caps that keep the solver finite; at a cap the search's leaf value stands in and the result is flagged. */
 export interface EndgameCaps { turns: number; states: number; wallMs: number }
+/** The default caps of `solveEndgame`. */
 export const ENDGAME_CAPS: EndgameCaps = { turns: 30, states: 20000, wallMs: 120000 };
+/** Why a result is not exact: a cap was hit, a chance stayed unpriced, or the position looped. */
 export type EndgameFlag = 'capped' | 'unpriced' | 'loop';
+/** The value of an endgame with its flags and principal variation. */
 export interface EndgameResult {
   /** False when the position has more than three living bodies; nothing else is filled then. */
   scope: boolean;
@@ -32,6 +35,7 @@ export interface EndgameResult {
 const MAX_BODIES = ENDGAME_MAX_BODIES;
 const PV_LIMIT = 12;
 
+/** Whether the battle is small enough for the solver (`ENDGAME_MAX_BODIES` living bodies). */
 export function endgameScope(battle: Battle): boolean {
   return livingMons(battle, 0).length + livingMons(battle, 1).length <= MAX_BODIES;
 }

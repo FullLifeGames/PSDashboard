@@ -302,6 +302,7 @@ function checkDice(actions: readonly LoggedAction[], options: LoggedOptions): Fo
   return dice;
 }
 
+/** The dice a log shows for the turn, per action in the log's order, named as `recognize.ts` names the draws. */
 export function loggedDice(turnLines: readonly string[], options: LoggedOptions = {}): ForcedDie[] {
   // A result the log does not show stays with the seed: damage rolls, a flinch on a target that already moved.
   const actions = loggedActions(turnLines);
@@ -352,6 +353,7 @@ export interface MergeInput {
   switched?: ReadonlySet<string>;
 }
 
+/** The first turn's forced dice: the user's, then the logged dice of unchanged actions (the user's die wins). */
 export function mergeLoggedDice({ logged, forced, changed, switched }: MergeInput): ForcedDie[] {
   const taken = new Set(forced.map(die => dieKey(die.name)));
   // a tie belongs to two bodies: when either one changed its action the order of the log no longer holds

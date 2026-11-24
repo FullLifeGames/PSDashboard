@@ -1,6 +1,7 @@
 import { OWN_RULES, type Own } from './move-use-rules.ts';
 
 
+/** A move's catalog type, category and power, as raw facts. */
 export interface MoveLike {
   id: string;
   type: string;
@@ -9,6 +10,7 @@ export interface MoveLike {
   flags: { readonly sound?: number };
 }
 
+/** A held item's plate, memory, drive and Natural Gift data. */
 export interface ItemLike {
   id: string;
   onPlate?: string;
@@ -17,6 +19,7 @@ export interface ItemLike {
   naturalGift?: { basePower: number; type: string };
 }
 
+/** The user's facts that change a move at use. */
 export interface MoveUser {
   gen: number;
   species?: string;
@@ -34,6 +37,7 @@ export interface MoveUser {
   grounded?: boolean;
 }
 
+/** The weather and terrain in force. */
 export interface MoveField { weather?: string; terrain?: string }
 /** A move's type, category and base power at use; `powerMult` is the ability's power multiplier (1 when none). */
 export interface MoveAtUse { type: string; category: string; basePower: number; powerMult: number }
@@ -76,8 +80,8 @@ function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: Move
 const same = (a: MoveAtUse, b: MoveAtUse) =>
   a.type === b.type && a.category === b.category && a.basePower === b.basePower && a.powerMult === b.powerMult;
 
-// Raw facts only: the null-move sentence has no battle to ask and runs in the main bundle, so only rules are imported.
-// The order is the simulator's (own rule, then ability; battle-actions.js useMoveInner); an unknown fact gives null.
+// Raw facts, as the null-move sentence has no battle; the order is the simulator's (battle-actions.js useMoveInner).
+/** The type, category and power a move has when it lands; null when a needed fact is unknown. */
 export function moveAtUse(move: MoveLike, user: MoveUser, field: MoveField = {}): MoveAtUse | null {
   const rule = OWN_RULES[move.id];
   const own: Own = rule ? rule(move, user, field) : {};

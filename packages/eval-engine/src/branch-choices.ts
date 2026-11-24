@@ -5,16 +5,19 @@ import { dieLabel, type DieWords } from './dice/die-label.ts';
 import { isCommanding } from './forward/request-moves.ts';
 import type { ForcedDie } from './dice/types.ts';
 
+/** The facts of one active body that decide whether its slot is asked for a choice. */
 export interface BranchChoiceActive {
   fainted: boolean;
   /** A Tatsugiri inside its Dondozo; the simulator passes its slot, so it is asked nothing. */
   commanding?: boolean;
 }
 
+/** The facts `requiredChoicesForActiveSlots` reads, from a simulator body (the live battle's actives). */
 export function branchChoiceActive(pokemon: { fainted: boolean; volatiles: Record<string, unknown> } | null | undefined): BranchChoiceActive | null {
   return pokemon ? { fainted: pokemon.fainted, commanding: isCommanding(pokemon) } : null;
 }
 
+/** The Tera, Mega, Z-Move and Ultra Burst intents of a move choice. */
 export type BranchMoveModifier = 'terastallize' | 'mega' | 'zmove' | 'ultra';
 
 /** One slot's choice by identity, never by position; `dice` are JSON-clean forced dice, keyed `name.slot`. */
@@ -59,6 +62,7 @@ export function notationSlotDice(choice: BranchSlotChoice | null | undefined, wo
   return notationDice(choice?.dice, words);
 }
 
+/** One side's notation for a history entry: slots joined, raw text as the fallback. */
 export function notationSideLabel(
   slotChoices: (BranchSlotChoice | null)[] | undefined,
   rawCommand: string,
@@ -73,6 +77,7 @@ export function switchChoiceKey(choice: BranchSlotChoice | null | undefined): st
   return `${choice.speciesId}|${toId(choice.pokemonName)}`;
 }
 
+/** The identity key of a switch option, in the form `switchChoiceKey` gives. */
 export function switchOptionKey(option: Pick<BranchSwitchOption, 'species' | 'name'>): string {
   return `${toId(option.species)}|${toId(option.name)}`;
 }
@@ -85,6 +90,7 @@ export function fillableForcedSlots(forced: boolean[], switchIns?: number): bool
   return forced.map(slot => (slot && left > 0 ? (left--, true) : false));
 }
 
+/** Which slots the request asks for a choice: the fillable forced slots, else every living, non-commanding active. */
 export function requiredChoicesForActiveSlots(
   activeSlots: (BranchChoiceActive | null)[],
   forceSwitches: boolean[],

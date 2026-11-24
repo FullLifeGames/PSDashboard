@@ -15,6 +15,7 @@ import {
   type AnswerSide, type AnswersMode,
 } from './search/answers.ts';
 
+/** A search executor that also runs one DUCT tree per seed offset. */
 export interface TreeExecutor extends SearchExecutor {
   /** One DUCT tree for this seed offset; `onPartial` is asked of tree 0 only, and only while a caller listens. */
   tree(
@@ -22,6 +23,7 @@ export interface TreeExecutor extends SearchExecutor {
   ): Promise<MctsTreeStats>;
 }
 
+/** A tree executor that runs every job in this realm on the serialized battle. */
 export function createLocalTreeExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): TreeExecutor {
   return {
     ...createLocalExecutor(serializedBattle, ruleset),
@@ -216,6 +218,7 @@ async function withLines(executor: TreeExecutor, trees: MctsTreeStats[], result:
   return result;
 }
 
+/** Runs the trees, the verify round, the answer round, the prover and the lines, and returns the merged result. */
 export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {

@@ -8,6 +8,7 @@ import { branchLogForPosition } from './log-sync.ts';
 import { openStreams } from './runtime-session.ts';
 import type { BranchRuntime } from './types.ts';
 
+/** The input of `adoptSerializedRuntime`: a serialized position, the replay log and the target turn. */
 export interface AdoptParams {
   serialized: string;
   replayLog: string;

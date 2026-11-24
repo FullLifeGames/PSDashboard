@@ -2,6 +2,7 @@
 
 import { TIER_THRESHOLDS } from './analysis.ts';
 
+/** Score swing between consecutive evaluated turns that marks a blunder, in wp-units (the blunder band's size). */
 export const BLUNDER_SWING = TIER_THRESHOLDS.blunder;
 
 /** 1-based turns whose play made a blunder-sized swing; `scores[t-1]` starts turn t; null scores break the chain. */
@@ -18,8 +19,10 @@ export function computeBlunders(scores: (number | null)[]): number[] {
 
 const KEY_TURN_CAP = 16;
 
+/** Swing that earns the deepening pass; the report's key moments use the same constant (report.ts re-exports it). */
 export const KEY_TURN_SWING = 0.25;
 
+/** The turns worth a deeper look: each report-worthy swing's turn and the next, biggest swings first under the cap. */
 export function selectKeyTurns(scores: (number | null)[], cap = KEY_TURN_CAP): number[] {
   // Both sides of a swing: mixing depths across a swing boundary would blur the numbers people click on.
   const swings: { turn: number; magnitude: number }[] = [];

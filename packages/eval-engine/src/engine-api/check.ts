@@ -4,6 +4,7 @@ import { validateEngineResponse } from './validate.ts';
 /** The pages that host the dashboard: an engine must let them call it (CORS). */
 export const DASHBOARD_ORIGINS = ['https://fulllifegames.github.io', 'https://fulllifegames.com'];
 
+/** The result of `checkEngine`: one row per sample position and one per hosting origin's preflight. */
 export interface EngineCheckReport {
   ok: boolean;
   samples: { name: string; ok: boolean; ms: number; errors: string[] }[];

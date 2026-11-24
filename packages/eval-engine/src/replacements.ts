@@ -2,6 +2,7 @@ import { toId } from '@fulllifegames/replay-core';
 import { TIER_THRESHOLDS } from './analysis.ts';
 import type { EvalResult, RankedChoice } from './types.ts';
 
+/** Sweep payload of one replacement point: the open forced request is the root, the options are bench switches. */
 export interface ReplacementEvalData {
   turn: number;
   ordinal: number;
@@ -10,6 +11,7 @@ export interface ReplacementEvalData {
   played: { p1: string[]; p2: string[] };
 }
 
+/** The analysis of one side's replacement: the replay's pick against the engine's ranked options. */
 export interface ReplacementSideAnalysis {
   slots: number;
   /** The replay's replacement matched into the ranked list; null where no option names it. */
@@ -69,6 +71,7 @@ function analyzeSide(data: ReplacementEvalData, side: 'p1' | 'p2'): ReplacementS
   return { slots, played, best, regret, agrees, onlyChoice: bodiesToChoose(options) <= 1, options: options.slice(0, 3) };
 }
 
+/** Reads one replacement point of the sweep into its two sides' analyses. */
 export function analyzeReplacements(data: ReplacementEvalData): ReplacementAnalysis {
   return { turn: data.turn, ordinal: data.ordinal, p1: analyzeSide(data, 'p1'), p2: analyzeSide(data, 'p2') };
 }

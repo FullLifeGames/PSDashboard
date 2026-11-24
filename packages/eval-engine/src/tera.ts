@@ -4,6 +4,7 @@ import { normalizeLineEndings } from './line-endings.ts';
 
 // Draft leagues grant Terastallization to specific Pokémon: a global on/off would recommend illegal Teras.
 
+/** The panel's Tera setting. */
 export type TeraPreference = 'auto' | 'on' | 'off' | 'revealed';
 
 const PER_POKEMON_TERA_FORMATS = /draft|customgame/;
@@ -62,6 +63,7 @@ export function resolveTeraPreference(
   return true;
 }
 
+/** A stable, store-key-safe encoding of an allowance. */
 export function teraKey(tera: TeraAllowance | undefined): string {
   if (tera === undefined || tera === true) return '1';
   if (tera === false) return '0';

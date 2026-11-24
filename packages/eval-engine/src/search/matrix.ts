@@ -6,6 +6,7 @@ import { countFainted } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
 
 
+/** The progress, partial-result and stop hooks a search calls. */
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;

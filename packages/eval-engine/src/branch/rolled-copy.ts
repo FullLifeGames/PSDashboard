@@ -31,6 +31,7 @@ export interface RolledCopyInput {
   roll?: RollSelector;
 }
 
+/** The position after the copy's turn with the die turned over, and how the turn ended. */
 export interface RolledCopy {
   serialized: string;
   flip?: string;

@@ -49,11 +49,13 @@ function nearStage(params: AnalyzeTurnParams, key: Side): SideAnalysis['nearDeci
 
 const zoneMarker = (claim: string): string => `${claim}:zone`;
 
+/** Notes a spoken decided or forced key and, at DECIDED_SCORE or beyond, that it was spoken in the decided zone. */
 export function noteSpokenClaim(seen: Set<string>, claim: string, key: Side, scoreBefore: number): void {
   seen.add(claim);
   if ((key === 'p1' ? scoreBefore : -scoreBefore) >= DECIDED_SCORE) seen.add(zoneMarker(claim));
 }
 
+/** Forgets the decided and forced claims spoken in the decided zone once the side's bar falls under DECIDED_SCORE. */
 export function releaseBrokenClaims(seen: Set<string>, scoreBefore: number): void {
   // A claim spoken in the decided zone is forgotten once a later bar reads the side under DECIDED_SCORE; a proof spoken
   // under the line left no zone and stays spoken, or it repeats every turn. Near keys stay: they live under the line.

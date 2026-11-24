@@ -65,6 +65,7 @@ export function choiceSentence(forced: ForcedLean, past = false): string {
   return ` The winning line ${past ? 'was' : 'is'} ${names.first}, which ${past ? 'struck' : 'strikes'} first${beside}.`;
 }
 
+/** The near-decided click: "sure KO" only at odds 1, else an "N% roll" (99.5% is no sure KO). */
 export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
 
 export const choiceNoun = (label: string): string =>
@@ -90,6 +91,7 @@ export const displayBest = (side: SideAnalysis): { label: string; ev: number; sw
 /** Regret is best minus played ev on the [−1, 1] score scale, so it reaches 2; above this the card shows chances. */
 export const REGRET_SPAN_MIN = 1;
 
+/** A regret as text: points up to `REGRET_SPAN_MIN`, above it the two win chances the regret spans. */
 export const regretText = (regret: number, from: number, to: number, faintedFraction?: number | null): string =>
   regret > REGRET_SPAN_MIN ? `${winPctText(from, faintedFraction)} to ${winPctText(to, faintedFraction)}` : winDeltaText(-regret);
 

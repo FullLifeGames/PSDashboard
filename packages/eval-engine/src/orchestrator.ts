@@ -18,6 +18,7 @@ type CellJob = EvalCellJob;
 export type CellValue = EvalCellValue;
 type SubSearchJob = EvalSubSearchJob;
 
+/** The sim side of the orchestrator: answers the root's choices and the cell, sub-search, prover and line jobs. */
 export interface SearchExecutor {
   choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed'], sleepClause?: boolean): Promise<ChoicesInfo>;
   /** Evaluates all cells; reports incremental completion via onDone(completedCount). */
@@ -28,6 +29,7 @@ export interface SearchExecutor {
   lines?(input: LinesInput): Promise<EvalLine[]>;
 }
 
+/** Progress, partial-result and stop hooks of one search run. */
 export interface OrchestratorCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
@@ -184,6 +186,7 @@ async function deepenRootAsync(
   return { result, stopped };
 }
 
+/** The async search over an executor: root choices, cells, deepening levels, trend tiebreak and forced-win prover. */
 export async function searchOrchestrated(
   executor: SearchExecutor,
   settings: EvalSettings,

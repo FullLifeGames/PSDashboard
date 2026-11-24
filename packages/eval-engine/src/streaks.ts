@@ -2,6 +2,7 @@ import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-co
 
 // Narrative only, never a grade: shown at milestones at render time.
 
+/** One turn of a side's played-move history. */
 export interface StreakHistoryEntry {
   attacker: string;
   /** Normalized move id; null = switch/no single move (breaks streaks). */
@@ -14,6 +15,7 @@ export interface StreakHistoryEntry {
   defenderBoosts: { def: number; spd: number };
 }
 
+/** The odds a streak milestone names: per-turn and cumulative chance of the event over `n` repeats. */
 export interface StreakOdds {
   moveLabel: string;
   defenderSpecies: string;

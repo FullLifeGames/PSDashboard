@@ -7,6 +7,7 @@ import { TIER_THRESHOLDS } from './turn-analysis/types.ts';
 
 type Side = 'p1' | 'p2';
 
+/** A failed roll that stood one event from ending the game much earlier. */
 export interface DeniedEnd {
   turn: number;
   side: Side;

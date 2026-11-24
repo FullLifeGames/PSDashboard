@@ -1,9 +1,12 @@
 // Sim-free on purpose: the app's main thread imports configureSimFast from the barrel and never loads @pkmn/sim.
 // Under Node EVAL_SIM_FAST decides ('0' off, '1' all, or a list; a set variable forces, so a break throws).
 
+/** One lever of the speed layer: rule tables, battle copy or the dispatch pre-check. */
 export type SimFastLever = 'rules' | 'clone' | 'dispatch';
+/** The layer's state: active, off, or stepped back after a hash mismatch or a fallback. */
 export type SimFastStatus = 'active' | 'off' | 'hash-mismatch' | 'fallback';
 
+/** What the levers did between two reports. */
 export interface SimFastCounters {
   ruleTables: number;
   clones: number;
@@ -13,11 +16,13 @@ export interface SimFastCounters {
   fallbacks: number;
 }
 
+/** The status with the counters, as a worker reports them. */
 export interface SimFastReport {
   status: SimFastStatus;
   counters: SimFastCounters;
 }
 
+/** Every lever, in the order the switch lists them. */
 export const SIM_FAST_LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
 /** Levers a host gets without asking; `EVAL_SIM_FAST=0` (or '0' in localStorage) turns them off. */
@@ -99,12 +104,14 @@ export function breakSimFast(status: 'hash-mismatch' | 'fallback', reason: strin
   applyFlags();
 }
 
+/** The layer's status: a break outlives the host's choice, else active or off. */
 export function simFastStatus(): SimFastStatus {
   if (!configured) configureFromEnvironment();
   if (broken) return broken;
   return levers.length > 0 ? 'active' : 'off';
 }
 
+/** Status plus the counters, which it resets; a worker sends one with every final answer. */
 export function takeSimFastReport(): SimFastReport {
   const report: SimFastReport = { status: simFastStatus(), counters: { ...simFastCounters } };
   zeroCounters();

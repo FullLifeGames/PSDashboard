@@ -13,6 +13,7 @@ export function hitsIn(dex: ChainDex): (moveId: string) => number | undefined {
   };
 }
 
+/** The accuracy result of one later hit (`hit` 2 and up) of a multi-accuracy move: it lands or it misses. */
 export interface HitResult { hit: number; happens: boolean }
 
 /** Hits 2 to the count land, then the next hit misses; above the hits is the full chain, below one none. */
@@ -25,6 +26,7 @@ export function chainResults(count: number, hits: number): HitResult[] {
   return results;
 }
 
+/** The inverse of `chainResults`: the hits that landed in a row from the first; a hit with no result ends the run. */
 export function chainCount(results: readonly HitResult[]): number {
   const landed = new Set(results.filter(result => result.happens).map(result => result.hit));
   let count = 1;

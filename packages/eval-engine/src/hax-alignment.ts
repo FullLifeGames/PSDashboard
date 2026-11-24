@@ -98,6 +98,7 @@ export function extractProtocolEvents(lines: string[]): ProtocolEvents {
   return events;
 }
 
+/** How far a trial's events are from the expected ones: the hard channels are compared first, then the soft sum. */
 export interface AlignmentScore {
   endedMismatch: boolean;
   faintMismatches: number;
@@ -213,6 +214,7 @@ export function chooseAlignedSeed(params: {
   };
 }
 
+/** The alignment of one turn: the seed chosen, the trial's outcome and the score of the truly emitted block. */
 export interface TurnAlignmentRecord {
   turn: number;
   seed: PRNGSeed;
@@ -228,6 +230,7 @@ export interface TurnAlignmentRecord {
   actual: AlignmentScore;
 }
 
+/** The totals of a game's per-turn alignment records. */
 export interface AlignmentSummary {
   turns: number;
   perfectTurns: number;
@@ -240,6 +243,7 @@ export interface AlignmentSummary {
   fallbackTurns?: number;
 }
 
+/** Totals a game's per-turn records. */
 export function summarizeAlignment(records: TurnAlignmentRecord[]): AlignmentSummary {
   const summary: AlignmentSummary = {
     turns: records.length, perfectTurns: 0, softResidual: 0,

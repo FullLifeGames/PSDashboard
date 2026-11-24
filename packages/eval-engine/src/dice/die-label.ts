@@ -49,6 +49,7 @@ function resultText(name: DieName, result: DieResult, words: DieWords): string {
   return chanceText(name, words)[result.happens ? 0 : 1];
 }
 
+/** The label of a forced die: its subject, a colon and the result in words. */
 export function dieLabel(die: ForcedDie, words: DieWords = IDS): string {
   return `${subjectOf(die.name, words)}: ${resultText(die.name, die.result, words)}`;
 }

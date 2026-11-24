@@ -30,6 +30,7 @@ export function loadSimMods(format: string): Promise<void> {
 
 const FORMAT_ID = /"formatid":"([^"]*)"/;
 
+/** `loadSimMods` for a serialized position, for a realm that only revives positions (worker, adopt, move picker). */
 export function loadSimModsFor(serialized: string): Promise<void> {
   return registered ? Promise.resolve() : loadSimMods(FORMAT_ID.exec(serialized)?.[1] ?? '');
 }

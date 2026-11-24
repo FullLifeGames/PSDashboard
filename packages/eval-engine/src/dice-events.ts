@@ -65,6 +65,7 @@ export function diceEventTurns(turnEventsIndex: readonly (readonly string[])[], 
   return turns;
 }
 
+/** One hit of a move on an opposing body, as the protocol shows it. */
 export interface RolledHit {
   side: SideId;
   move: string;
@@ -75,6 +76,7 @@ export interface RolledHit {
   ko: boolean;
 }
 
+/** What one turn's protocol shows of its rolls: the side each dice marker favored and every hit on an opposing body. */
 export interface TurnRolls {
   /** The side opposing the body each dice marker went against (crit target, missing attacker, |cant| holder). */
   favored: { p1: boolean; p2: boolean };
@@ -139,6 +141,7 @@ function noteEntry(entered: Entered, parts: string[]): void {
   entered.set(ident.slice(0, 3), { name: ident.slice(5), species: (parts[3] ?? '').split(',')[0].trim() });
 }
 
+/** Sides a turn's dice markers favored, and hits on opposing bodies; `generation` drops sure crits, undiced status. */
 export function detectRolls(rawLines: readonly string[], snapshotBefore: TurnSnapshot | null, generation?: number, mod?: RulesMod): TurnRolls {
   const lines = normalizeLines(rawLines);
   const favored = { p1: false, p2: false };
