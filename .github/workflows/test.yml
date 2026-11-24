@@ -14,11 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job limits (round 89, step M4). Measured on 13.11.2026 on a 4-vCPU runner (the repository is public): healthy
-  # Node suites 22 to 28 min (34 on a slow runner), Browser flows 21 to 24 min, engine suite 14 to 35 min (the same job ran 1.8 times
-  # slower on a slower runner), dice sweeps 12 to 24 min, build smoke 1 min; setup (checkout, Node, npm ci,
-  # Chromium) takes under one minute in every job. A runner that is 1.6 times slower cancelled Node suites and
-  # Browser flows at 30 min and hid their red rows, so the limits stand at about twice the healthy time.
+  # Limits stand at about twice the healthy time: a runner 1.6 times slower cancelled jobs at 30 min and hid red rows.
   node:
     name: Node suites
     runs-on: ubuntu-24.04
@@ -39,16 +35,11 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # Round 90 (F8): the app (root specs), replay-core and ui projects. The engine project runs in the two jobs below, once with the
-      # speed layer forced off and once forced on; the default mode reads the same levers as forced on and only steps back quietly where forced on throws.
+      # The engine project runs in the two jobs below, once with the speed layer forced off and once forced on.
       - name: Run the Node suites
         run: npx vitest run --project app --project replay-core --project ui
 
-  # Round 59: the engine suite runs once with the speed layer forced off (the kill switch) and once forced on (a break throws instead
-  # of falling back). Release 1.0.0: both ran after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
-  # Round 90 (F8): they are the only runs of the engine project (Node suites left it out).
-  # Round 78: on simulator 0.10.12 the forced-off pass ran past 20 minutes (12 on 0.10.11), the
-  # forced-on pass still takes 12.
+  # The engine suite runs twice: speed layer forced off (the kill switch) and forced on (a break throws).
   engine-speed-layer:
     name: Engine suite, speed layer ${{ matrix.speed-layer }}
     runs-on: ubuntu-24.04
@@ -79,8 +70,7 @@ jobs:
         env:
           EVAL_SIM_FAST: ${{ matrix.sim-fast }}
 
-  # Round 82 (forced dice): the dice sweeps play every move of the Dex only with DICE_SWEEPS=full; the jobs above play a
-  # fixed sample of them. One full run per push, beside the other jobs (user gate 31.10.2026, "1b").
+  # Plays every move of the Dex (DICE_SWEEPS=full); the other jobs play a fixed sample.
   dice-sweeps:
     name: Dice sweeps, every move
     runs-on: ubuntu-24.04
@@ -103,13 +93,8 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 37 other spec files read the same switch. The three
-  # parts below run them with DICE_SWEEPS=full. Their size comes from the run of 17.11.2026 (CI-1, the first run of the job): parts 1 and 2 hold
-  # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
-  # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest
-  # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Required since round 90 (user 23.11.2026): the three parts are checks of their own, so branch protection lists
-  # "Full sweeps, the other specs, part 1 of 3", "part 2 of 3" and "part 3 of 3" (workflows.spec.ts holds the nine contexts). `workflows.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
-  # sweep spec to the part with the least time, and keep every part under 25 minutes of wall time.
+  # The other specs that read DICE_SWEEPS=full; workflows.spec.ts holds the lists and the nine required contexts.
+  # A new sweep spec goes into the part with the least time; a part stays under 25 minutes of wall time.
   full-sweeps:
     name: Full sweeps, the other specs, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
@@ -183,13 +168,8 @@ jobs:
           DICE_SWEEPS: full
           SPECS: ${{ matrix.files }}
 
-  # Round 90 (step E6, #222): the browser flows run in three parts side by side, and the job "Browser flows" (key `browser-flows`)
-  # after them stays the one required check, so branch protection needs no change. One job took 33.9 minutes on 22.11.2026 (49 of
-  # its 50 on a slow runner). The lists balance the seconds of the Playwright report of r90-e (run 45078312352 at E3, play-out-finish cut from 496 to an estimated 390 seconds by E4), summed
-  # over the two workers of a part: about 996, 997 and 1000 seconds, so about 8 minutes of wall time each (two workers) plus a
-  # minute of setup. The browser-flows-parts rows of the workflows regression spec hold every file of test/e2e/ in exactly one part: a new file goes
-  # into the part with the least seconds, and a part stays under 30 minutes. The files go to Playwright as path filters
-  # (regular expressions on the path); the same spec holds each entry to one file.
+  # Three parts side by side; the job "Browser flows" after them stays the one required check.
+  # The workflows spec holds every e2e file in one part: a new file goes into the part with the least seconds.
   browser:
     name: Browser flows, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
@@ -268,18 +248,14 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # Playwright runs 2 workers here (half of the 4 vCPUs). Tried on 13.11.2026: 3 workers took 28 min instead
-      # of 21 to 24 and turned play-out-finish.spec.ts:65 red (its 10 s predicate); Vitest with --maxWorkers=100%
-      # (4 workers instead of 3) took 34 min instead of 28 on Node suites. More workers did not
-      # make a run faster. The JSON report feeds the next steps.
+      # Two workers, half of the 4 vCPUs: three ran slower and turned play-out-finish.spec.ts red.
       - name: Run the browser flows of part ${{ matrix.part }}
         run: npm run test:e2e -- --reporter=dot,json $SPECS
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
           SPECS: ${{ matrix.files }}
 
-      # Round 90 (step E0): the slowest spec files and tests of the part, so the next limit review and the next cut read numbers
-      # from the log. The aggregate job prints the same over all three parts. The JSON report is kept on every run (green too).
+      # The slowest files and tests of the part; the JSON report is kept on every run.
       - name: List the slowest browser specs and tests
         if: always()
         run: test -f playwright-report.json && node scripts/merge-playwright-reports.mjs playwright-report.json || true
@@ -301,8 +277,7 @@ jobs:
           path: test-results
           retention-days: 7
 
-  # The required check. It needs the three parts, passes only when the matrix result is "success" (a failed, cancelled or skipped
-  # part gives another result), and prints the wall time of each part and the slowest files and tests over all of them.
+  # The required check: passes only when the matrix result is "success"; prints the wall time of each part.
   browser-flows:
     name: Browser flows
     runs-on: ubuntu-24.04
@@ -366,7 +341,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Round 90 (#173): the unused-code report and the lint rules run in a required check, so a merge needs both empty.
       - name: Check for unused code
         run: npm run knip
 
@@ -376,8 +350,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # Round 89 (step M4): the packed packages install and run in a throwaway consumer project; a pack that
-      # breaks (an import without its extension, a missing export) fails this job. It takes under a minute.
+      # A pack that breaks (an import without its extension, a missing export) fails this job.
       - name: Pack the packages and run the consumer smoke
         run: npm run pack:smoke
 

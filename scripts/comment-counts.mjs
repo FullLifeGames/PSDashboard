@@ -2,9 +2,10 @@
 //
 //   history   per source file, the comment lines that carry history (a round, a ruling, a date, a T-number, an issue number; the
 //             patterns are in comment-lib.mjs). The rule comments/no-history (eslint.comments.mjs) reads this baseline and fails a
-//             file above its count, so `npm run lint` holds it.
-//   lines     per project (the three source trees, the app's stylesheets and each test project), the non-blank lines that hold only
-//             a comment. `node scripts/comment-counts.mjs` checks it and `npm run lint` runs the check; the calibration ledger
+//             file above its count, so `npm run lint` holds it. The workflows have no lint rule: `node scripts/comment-counts.mjs` holds
+//             their history at the baseline (zero).
+//   lines     per project (the three source trees, the app's stylesheets, each test project, the workflows, scripts and the root
+//             config files), the non-blank lines that hold only a comment. `node scripts/comment-counts.mjs` checks it and `npm run lint` runs the check; the calibration ledger
 //             (test/regression/eval-calibration.spec.ts) is the history of the engine rounds, kept by rule, and stays out.
 //
 // `node scripts/update-lint-ratchet.mjs` writes the baseline from the tree and lowers it after a clean-up; it refuses to raise a
@@ -22,6 +23,8 @@ export const COMMENT_BASELINE = path.join(ROOT, 'comment-ratchet.json');
 export const HISTORY_FOLDERS = ['packages/eval-engine/src', 'packages/replay-core/src', 'src'];
 
 const SOURCE = /\.(ts|tsx)$/;
+const CODE = /\.(m?js|cjs|ts)$/;
+const ROOT_CONFIG = /^[^/]+\.(js|mjs|cjs|ts)$/;
 
 /** Every file under `dir` (relative to `root`) that `keep` accepts, as slash paths, sorted. */
 export function filesUnder(root, dir, keep) {
@@ -40,18 +43,32 @@ export function filesUnder(root, dir, keep) {
   return found.sort();
 }
 
+/** The workflow files: no lint rule reads them, so `node scripts/comment-counts.mjs` holds their history. */
+export const WORKFLOW_FOLDER = '.github/workflows';
+
+const YAML = /\.ya?ml$/;
+
+/** The workflow files, as paths from the root. */
+export const workflowSources = (root = ROOT) => filesUnder(root, WORKFLOW_FOLDER, file => YAML.test(file));
+
 /** The sources the history rule reads, as paths from the root. */
 export const historySources = (root = ROOT) => HISTORY_FOLDERS.flatMap(dir => filesUnder(root, dir, file => SOURCE.test(file)));
 
-/** The history lines per source file under `root`; a file without any is left out. */
-export function historyCounts(root = ROOT) {
+/** The history lines per file of `files` under `root`; a file without any is left out. */
+function historyOf(root, files) {
   const counts = {};
-  for (const file of historySources(root)) {
+  for (const file of files) {
     const count = historyLinesOf(readFileSync(path.join(root, file), 'utf8'), file).length;
     if (count > 0) counts[file] = count;
   }
   return counts;
 }
+
+/** The history lines per workflow file under `root`. */
+export const workflowHistoryCounts = (root = ROOT) => historyOf(root, workflowSources(root));
+
+/** The history lines per source and workflow file under `root`; a file without any is left out. */
+export const historyCounts = (root = ROOT) => historyOf(root, [...historySources(root), ...workflowSources(root)]);
 
 /** The baseline file as an object (empty parts when the file is missing). */
 export function commentBaseline(file = COMMENT_BASELINE) {
@@ -70,13 +87,17 @@ export function overBaseline(baseline, counts) {
 
 /**
  * The projects of the line ratchet: the three source trees and the test project of each spec folder (`SPEC_PROJECTS`). A key is
- * `source:<name>` or `test:<name>`; the stylesheets of the app count on their own.
+ * `source:<name>` or `test:<name>`; the stylesheets of the app, the workflows (`#` comments), `scripts` and the root `config`
+ * files (`flat`: only the files of the root folder) count on their own.
  */
 export const LINE_PROJECTS = {
   'source:eval-engine': { dir: 'packages/eval-engine/src', pattern: SOURCE },
   'source:replay-core': { dir: 'packages/replay-core/src', pattern: SOURCE },
   'source:app': { dir: 'src', pattern: SOURCE },
   'source:app-css': { dir: 'src', pattern: /\.css$/ },
+  workflows: { dir: WORKFLOW_FOLDER, pattern: YAML },
+  scripts: { dir: 'scripts', pattern: CODE },
+  config: { dir: '', pattern: ROOT_CONFIG, flat: true },
   ...Object.fromEntries(Object.entries(SPEC_PROJECTS).map(([name, dir]) => [`test:${name}`, { dir, pattern: SOURCE }])),
 };
 
@@ -103,9 +124,12 @@ export function commentLineCount(text, fileName) {
 /** The comment lines per project under `root`; every project of `LINE_PROJECTS` appears, with 0 when it holds none. */
 export function lineCounts(root = ROOT) {
   const counts = {};
-  for (const [key, { dir, pattern }] of Object.entries(LINE_PROJECTS)) {
+  for (const [key, { dir, pattern, flat }] of Object.entries(LINE_PROJECTS)) {
     let total = 0;
-    for (const file of filesUnder(root, dir, candidate => pattern.test(candidate) && !LEDGER_FILES.includes(candidate))) {
+    const files = flat
+      ? readdirSync(root, { withFileTypes: true }).filter(entry => entry.isFile() && pattern.test(entry.name)).map(entry => entry.name).sort()
+      : filesUnder(root, dir, candidate => pattern.test(candidate) && !LEDGER_FILES.includes(candidate));
+    for (const file of files) {
       total += commentLineCount(readFileSync(path.join(root, file), 'utf8'), file);
     }
     counts[key] = total;
@@ -118,9 +142,12 @@ export const overLines = (baseline, counts) => overBaseline(baseline.lines ?? {}
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const counts = lineCounts();
-  const over = overLines(commentBaseline(), counts);
-  if (over.length > 0) {
-    for (const { key, baseline, count } of over) console.error(`comment lines in ${key}: ${count}, baseline ${baseline}`);
+  const baseline = commentBaseline();
+  const over = overLines(baseline, counts);
+  const history = overBaseline(baseline.history, workflowHistoryCounts());
+  if (over.length > 0 || history.length > 0) {
+    for (const entry of over) console.error(`comment lines in ${entry.key}: ${entry.count}, baseline ${entry.baseline}`);
+    for (const entry of history) console.error(`history comment lines in ${entry.key}: ${entry.count}, baseline ${entry.baseline}`);
     console.error('Comments only fall (AGENTS.md, "Rules for the code", comments). Cut the comment; node scripts/update-lint-ratchet.mjs lowers the baseline.');
     process.exit(1);
   }

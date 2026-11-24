@@ -26,6 +26,8 @@ export function scriptKindOf(fileName) {
 
 export const isCss = fileName => fileName.endsWith('.css');
 
+export const isYaml = fileName => /\.ya?ml$/.test(fileName);
+
 /** What a comment of the repository's own marker looks like: `// oracle: <spec path>`; it names the spec that holds the list below it, and one spec still reads its own. */
 const ORACLE_LINE = /^\s*(\/\/|\/\*+|\*)?\s*oracle:/;
 
@@ -230,8 +232,34 @@ export function readCss(text) {
   return { comments, stripped: stripped.replace(/\s+/g, ' ').trim() };
 }
 
+/**
+ * The `#` comments of a YAML text: a `#` at the start of a line or after whitespace, outside quotes, to the end of the line. A
+ * shell comment inside a `run: |` block counts as one (it is a comment of the workflow); `$#` and `${x#y}` do not.
+ */
+export function readHashComments(text) {
+  const comments = [];
+  let offset = 0;
+  text.split('\n').forEach((line, index) => {
+    let quote = '';
+    for (let at = 0; at < line.length; at++) {
+      const ch = line[at];
+      if (quote) {
+        if (ch === '\\' && quote === '"') at++;
+        else if (ch === quote) quote = '';
+      } else if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '#' && (at === 0 || /\s/.test(line[at - 1]))) {
+        comments.push({ text: line.slice(at).replace(/\r$/, ''), line: index + 1, start: offset + at });
+        break;
+      }
+    }
+    offset += line.length + 1;
+  });
+  return comments;
+}
+
 /** The comments of a file as `{ text, line, start }` (`start`: the offset in the text), whatever its language. */
 export function commentsOf(text, fileName) {
+  if (isYaml(fileName)) return readHashComments(text);
   if (isCss(fileName)) {
     const lineOf = offset => text.slice(0, offset).split('\n').length;
     return readCss(text).comments.map(comment => ({ text: comment.text, line: lineOf(comment.start), start: comment.start }));
@@ -275,7 +303,7 @@ export function historyHits(raw) {
   const hits = [];
   raw.split(/\r?\n/).forEach((line, index) => {
     if (read?.lines?.includes(index)) return;
-    const text = lineText(line);
+    const text = raw.startsWith('#') ? line.replace(/^\s*#+\s?/, '') : lineText(line);
     const found = HISTORY_PATTERNS.find(([, pattern]) => pattern.test(text));
     if (found) hits.push({ line: index, pattern: found[0] });
   });

@@ -1,19 +1,8 @@
 name: Feedback
 
-# Round 89: the expert-feedback drift run in GitHub Actions (devbox read the page-fault cost of its host 7 to 10 times higher from
-# 17.11.2026, and a game passed the harness cap there; user 20.11.2026). A push of a feedback/<name> branch starts a run:
-# scripts/feedback-ci.mjs builds that branch from the measured commit plus one file, .feedback-run.json, and deletes it after the
-# download. Each job of the matrix runs one whole `npm run test:feedback` with FEEDBACK_DUMP=1 on a runner of its own, one
-# Playwright worker, no trace, as the script runs it on a machine; it keeps the dumps (docs/reports/feedback-full-*.json), the
-# drift report and the log as the artifact feedback-run-<index>. The last job compares the dumps of all runs byte for byte.
-#
-# Security, as bank.yml: only a push to feedback/** starts it (no pull_request, no workflow_run: a fork cannot) or a run by hand;
-# the token is read-only and no job holds a secret; every action is GitHub's own and pinned to a commit; the checkout keeps no
-# credentials; .feedback-run.json is untrusted input, so scripts/feedback-run-config.mjs validates it, and no shell line holds an
-# expression. The fixtures of the harness are tracked
-# (test/e2e-feedback/fixtures), so a run needs no data download.
-# Every job runs on ubuntu-24.04 and Node 24.21.0, the image and version of bank.yml (round 76: pin exact versions).
-# test/regression/workflows.spec.ts pins these properties.
+# The feedback drift run: a push of feedback/<name> runs one whole `npm run test:feedback` per matrix job.
+# Security as bank.yml: only a push to feedback/** starts it; read-only token, .feedback-run.json is untrusted input.
+# Pinned to ubuntu-24.04 and Node 24.21.0 like bank.yml; workflows.spec.ts pins these properties.
 
 on:
   push:
@@ -54,7 +43,7 @@ jobs:
     name: Run ${{ matrix.index }}
     needs: config
     runs-on: ubuntu-24.04
-    # A run took 27 minutes on devbox while the host was healthy; a runner has 4 cores and the harness caps one game at 35 minutes.
+    # A healthy run takes about 27 minutes; the harness caps one game at 35.
     timeout-minutes: 120
     strategy:
       fail-fast: false

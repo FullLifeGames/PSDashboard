@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { commentBaseline, commentLineCount, filesUnder, historyCounts, lineCounts, overBaseline, overLines } from '../../scripts/comment-counts.mjs';
+import { commentBaseline, commentLineCount, filesUnder, historyCounts, lineCounts, overBaseline, overLines, workflowHistoryCounts } from '../../scripts/comment-counts.mjs';
 import { historyLinesOf } from '../../scripts/comment-lib.mjs';
 
 /**
@@ -71,6 +71,45 @@ describe('historyCounts', () => {
   });
 });
 
+describe('workflow comments', () => {
+  const yaml = [
+    '# one',
+    'on: push # trailing, no',
+    'jobs:',
+    '  a:',
+    '    steps:',
+    '      - run: |',
+    '          echo "a # b" ${x#y}',
+    '          # shell comment',
+    '      - name: "quoted # not a comment"',
+    '  # two',
+  ].join('\n');
+
+  test('counts the lines that hold only a # comment, a shell comment in a run block included; quotes and ${x#y} are no comment', () => {
+    expect(commentLineCount(yaml, 'w.yml')).toBe(3);
+  });
+
+  test('reads history in a # comment, in a whole line and after a key', () => {
+    const text = '# Round 90 (step E6, #222): three parts\non: push # since round 70\njobs: {}\n# a limit at twice the healthy time\n';
+    expect(historyLinesOf(text, 'w.yml')).toEqual([{ line: 1, pattern: 'round' }, { line: 2, pattern: 'round' }]);
+  });
+
+  test('history is counted per workflow file under .github/workflows, and the repository holds it at zero', () => {
+    const root = tree({
+      '.github/workflows/a.yml': '# gate 31.10.2026\n# fine\non: push\n',
+      '.github/workflows/b.yml': '# fine\non: push\n',
+      'src/other.yml': '# round 1\n',
+    });
+    try {
+      expect(workflowHistoryCounts(root)).toEqual({ '.github/workflows/a.yml': 1 });
+      expect(historyCounts(root)).toEqual({ '.github/workflows/a.yml': 1 });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+    expect(workflowHistoryCounts()).toEqual({});
+  });
+});
+
 describe('commentBaseline', () => {
   test('a missing file reads as empty baselines', () => {
     expect(commentBaseline('/nonexistent/comment-ratchet.json')).toEqual({ history: {} });
@@ -127,6 +166,24 @@ describe('lineCounts', () => {
         'test:ui': 1,
         'test:e2e': 0,
       });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('counts the workflows, the scripts and the root config files as projects of their own', () => {
+    const root = tree({
+      '.github/workflows/a.yml': '# one\non: push\n',
+      '.github/workflows/b.yaml': '# two\n# three\n',
+      'scripts/deep/s.mjs': '// four\nexport const s = 1;\n',
+      'scripts/note.json': '{}\n',
+      'vite.config.ts': '// five\n// six\nexport default {};\n',
+      'eslint.config.js': '// seven\n',
+      'src/app.tsx': '// eight\n',
+      'packages/x/vite.config.ts': '// nine\n',
+    });
+    try {
+      expect(lineCounts(root)).toMatchObject({ workflows: 3, scripts: 1, config: 3, 'source:app': 1 });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
