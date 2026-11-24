@@ -3,14 +3,8 @@ import type { SimPosition } from '../forward-model.ts';
 import type { CellOutcomeClass, PlannedCell } from '../types.ts';
 import { pairCellSample } from './sampler.ts';
 
-/**
- * The pair plan's answer for a doubles root cell, in the shape the matrix cells carry (PlannedCell, the doubles twin of planCellEvents'
- * answer for singles). A cell with no accuracy roll and no kill range in the pair is `none`; a planned cell is `events` with its outcome
- * classes, heaviest first (ties by key), the weights summing to 1, each key the sequence of the cell's events
- * (`p1b:terastarstorm>p2b=hit-nokill`: attacker slot, move, target slot, outcome). A cell the plan hands to the plain mean (a guard it
- * does not price) or cannot parse is left out, which the matrix reads as failed. One base draw: the weights are the analytic products
- * of the events, not counts of draws.
- */
+/** The pair plan's answer for a doubles root cell: `none` or `events` (classes heaviest first, weights sum to 1). */
+// A cell the plan hands to the plain mean or cannot parse is left out, which the matrix reads as failed.
 export function pairPlanAnswer(
   root: SimPosition, key: number, p1Choice: string, p2Choice: string, matchupCache: MatchupCache,
 ): PlannedCell | null {

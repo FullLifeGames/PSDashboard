@@ -1,8 +1,6 @@
 import { OWN_RULES, type Own } from './move-use-rules.ts';
 
-// A move as it lands: its type, category and power after the ability, forme, item, weather, terrain, Tera click and Hidden Power rules.
 
-/** A move's catalog type, category and power, as raw facts. */
 export interface MoveLike {
   id: string;
   type: string;
@@ -11,7 +9,6 @@ export interface MoveLike {
   flags: { readonly sound?: number };
 }
 
-/** A held item's plate, memory, drive and Natural Gift data. */
 export interface ItemLike {
   id: string;
   onPlate?: string;
@@ -20,14 +17,11 @@ export interface ItemLike {
   naturalGift?: { basePower: number; type: string };
 }
 
-/** The user's facts that change a move at use. */
 export interface MoveUser {
   gen: number;
-  /** Species name ('Ogerpon-Wellspring-Tera'). */
   species?: string;
   /** Candidate ability ids; the static passes its one. Empty: no ability rule applies. */
   abilities: readonly string[];
-  /** Held item data; null = none. */
   item?: ItemLike | null;
   /** Tera type once clicked; null = not clicked. */
   terastallized?: string | null;
@@ -40,15 +34,14 @@ export interface MoveUser {
   grounded?: boolean;
 }
 
-/** The weather and terrain in force. */
 export interface MoveField { weather?: string; terrain?: string }
-/** A move's type, category and base power at use, with the ability's power multiplier (1 when none applies). */
+/** A move's type, category and base power at use; `powerMult` is the ability's power multiplier (1 when none). */
 export interface MoveAtUse { type: string; category: string; basePower: number; powerMult: number }
 
-/** Types that were special before the physical/special split (gens 1 to 3). */
+// Special before the physical/special split (gens 1 to 3).
 const SPECIAL_TYPES = new Set(['Fire', 'Water', 'Grass', 'Ice', 'Electric', 'Dark', 'Psychic', 'Dragon']);
 const ATE: Record<string, string> = { pixilate: 'Fairy', aerilate: 'Flying', refrigerate: 'Ice', galvanize: 'Electric', dragonize: 'Dragon' };
-/** Moves the -ate family leaves alone (abilities.js noModifyType); Normalize adds Hidden Power and Struggle. */
+/** The moves the -ate family leaves alone (abilities.js noModifyType). */
 // oracle: packages/eval-engine/test/type-change-oracle.spec.ts
 export const NO_ATE = new Set(['judgment', 'multiattack', 'naturalgift', 'revelationdance', 'technoblast', 'terrainpulse', 'weatherball']);
 // oracle: packages/eval-engine/test/type-change-oracle.spec.ts
@@ -56,15 +49,12 @@ export const NO_NORMALIZE = new Set([...NO_ATE, 'hiddenpower', 'struggle']);
 
 export const RULE_MOVES: ReadonlySet<string> = new Set(Object.keys(OWN_RULES));
 export const RULE_ABILITIES: ReadonlySet<string> = new Set(['liquidvoice', 'normalize', ...Object.keys(ATE)]);
-/** Moves whose answer reads a fact the matchup memo's key does not carry (weather, terrain, grounding, stages, Hidden Power): pairKey appends it. */
+/** Moves whose answer reads a fact the matchup memo key lacks; pairKey appends it. */
 // oracle: packages/eval-engine/test/type-change-oracle.spec.ts
 export const CONTEXT_MOVES: ReadonlySet<string> = new Set<string>(['weatherball', 'terrainpulse', 'terablast', 'terastarstorm', 'hiddenpower']);
 
-/**
- * Normalize. Generations 3 and 4 turn every move but Struggle Normal. Generations 5 and 6 turn the moves whose Dex type is not Normal
- * and leave the others the type their own handlers gave them (Hidden Power keeps its IV type; Struggle is Normal already). From
- * Generation 7 the NO_NORMALIZE moves stay and the rest turn Normal with a boost.
- */
+// Normalize: gens 3 and 4 turn every move but Struggle Normal; gens 5 and 6 those whose Dex type is not Normal
+// (Hidden Power keeps its IV type); from gen 7 the NO_NORMALIZE moves stay and the rest turn Normal with a boost.
 function withNormalize(move: MoveLike, own: MoveAtUse, user: MoveUser, teraBlastAfterClick: boolean): MoveAtUse {
   if (user.gen <= 4) return move.id === 'struggle' ? own : { ...own, type: 'Normal' };
   if (user.gen <= 6) return move.type === 'Normal' ? own : { ...own, type: 'Normal' };
@@ -86,11 +76,8 @@ function withAbility(ability: string, move: MoveLike, own: MoveAtUse, user: Move
 const same = (a: MoveAtUse, b: MoveAtUse) =>
   a.type === b.type && a.category === b.category && a.basePower === b.basePower && a.powerMult === b.powerMult;
 
-// Raw facts only: the null-move sentence has no battle to ask and runs in the app's main bundle, so this module imports only the rules.
-// The order is the simulator's (the move's own rule, then the ability; battle-actions.js useMoveInner). A fact left undefined is unknown:
-// a type rule that needs it answers null, a power rule keeps the catalog power. Powers that read weight, HP, speed, status or item are
-// not here: the static asks the simulator's own handler (score/move-facts.ts POWER_MOVES).
-/** The type, category and power a move has when it lands; null when a needed fact is unknown and the type stays undecided. */
+// Raw facts only: the null-move sentence has no battle to ask and runs in the main bundle, so only rules are imported.
+// The order is the simulator's (own rule, then ability; battle-actions.js useMoveInner); an unknown fact gives null.
 export function moveAtUse(move: MoveLike, user: MoveUser, field: MoveField = {}): MoveAtUse | null {
   const rule = OWN_RULES[move.id];
   const own: Own = rule ? rule(move, user, field) : {};

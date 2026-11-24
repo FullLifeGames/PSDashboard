@@ -9,9 +9,6 @@ import { parsePairChoice, type PairAction } from './guards.ts';
 import { mixedKillShare } from './kill-table.ts';
 import { snapshotPair } from './snapshot.ts';
 
-// Kill odds for doubles options, the narrative payload the singles rows carry: every own slot's damaging move is priced against the
-// living foes it names on the root with the doubles calc, and the option shows its slot event with the best uncertain kill chance
-// (0 < kill, hit × kill < 1).
 
 type Odds = Required<KoOddsInfo> & { pKill: number };
 type MoveAction = Extract<PairAction, { kind: 'move' }>;
@@ -19,28 +16,19 @@ type MoveAction = Extract<PairAction, { kind: 'move' }>;
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 const SINGLE_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
-/** The answers of `targetAtUse` per body of a reader battle, move and Tera click. */
 const targetsAsked = new WeakMap<Pokemon, Map<string, string>>();
 
 type ModifyMoveHandler = (this: unknown, move: unknown, user: unknown, target: unknown) => void;
 
-/**
- * The move's target as the simulator's ModifyMove leaves it for this user: the move's own handler from the
- * Dex runs on a stand-in for the attacker (the species its Tera click makes, the body otherwise) and for the battle (its
- * field, cleared when the click clears it), so Tera Starstorm of Terapagos-Stellar and Expanding Force of a grounded user
- * on Psychic Terrain read allAdjacentFoes. A handler that needs more than that leaves the Dex target. The stand-ins are
- * copy-on-write views, so the question never writes the live battle (a copy of it would cost 17 times as much).
- */
+/** The move's target as the simulator's ModifyMove leaves it, asked of the Dex handler on copy-on-write stand-ins. */
+// Tera Starstorm of Terapagos-Stellar and Expanding Force on Psychic Terrain read allAdjacentFoes; a copy costs 17x.
 export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction): string {
   const dexMove = battle.dex.moves.get(action.moveId);
-  // A move without an onModifyMove keeps its Dex target: the common move never reaches the stand-in.
   if (typeof (dexMove as { onModifyMove?: unknown }).onModifyMove !== 'function') return dexMove.target;
-  // The reader battle of a position is never mutated, and an option list asks the same slot move once per option: one answer per body, move and click.
   let asked = targetsAsked.get(attacker);
   if (!asked) targetsAsked.set(attacker, asked = new Map());
   const key = `${action.moveId}|${action.tera === true}`;
   const known = asked.get(key);
-  // With the development check on, a hit is asked again, so a caller that mutated the battle after its first question fails loudly.
   if (known !== undefined && !askCheckOn()) return known;
   const answer = askTargetAtUse(battle, attacker, action, dexMove);
   if (known !== undefined && known !== answer) throw new AskLeak();
@@ -51,7 +39,7 @@ export function targetAtUse(battle: Battle, attacker: Pokemon, action: MoveActio
 function askTargetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction, dexMove: DexMove): string {
   const handler = (dexMove as { onModifyMove?: unknown }).onModifyMove;
   const body = bodyAsClicked(battle, attacker, action.tera === true);
-  // Copy-on-write views of the live body and field: a ModifyMove that writes the user (Beat Up of Gens 3 and 4 adds its volatile) writes the view.
+  // Copy-on-write views: a ModifyMove that writes the user (Beat Up, Gens 3 and 4, adds its volatile) writes the view.
   const view = isolated(battle);
   const mine = view.sides[attacker.side.n].pokemon[attacker.side.pokemon.indexOf(attacker)];
   const user = Object.create(mine, { species: { value: battle.dex.species.get(body.species) } });
@@ -61,7 +49,6 @@ function askTargetAtUse(battle: Battle, attacker: Pokemon, action: MoveAction, d
   return answered.ok ? move.target : dexMove.target;
 }
 
-/** The living foes a move action names on the root: every foe for a spread move, the named slot (its partner when it fell), the lone foe without a slot. */
 function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction, target: string): Pokemon[] {
   const foeSide = battle.sides[own === 0 ? 1 : 0];
   const foes = foeSide.active.filter((mon): mon is Pokemon => !!mon && !mon.fainted);
@@ -74,18 +61,15 @@ function rootTargets(battle: Battle, own: 0 | 1, action: MoveAction, target: str
   return foes.length === 1 ? foes : [];
 }
 
-/** The sim's spread flag at the start of the move: two or more targets, the living ally among them for an allAdjacent move. */
+// The sim's spread flag at the move's start: two or more targets, the living ally among them for an allAdjacent move.
 function spreadAtStart(battle: Battle, own: 0 | 1, action: MoveAction, targets: readonly Pokemon[], target: string): boolean {
   if (target !== 'allAdjacent') return targets.length > 1;
   const allies = battle.sides[own].active.filter(mon => mon && !mon.fainted && mon.position !== action.slot).length;
   return targets.length + allies > 1;
 }
 
-/**
- * One slot's event; a slot that clicks Tera is priced on the body the click makes. `cleared`: a click of
- * the option clears the weather and the terrain (Teraform Zero) before any of its slots moves, so every slot meets
- * the cleared field, the clicking one and its partner alike.
- */
+// `cleared`: a click of the option clears weather and terrain (Teraform Zero) before any slot moves, so every slot
+// meets the cleared field, the clicking one and its partner alike.
 function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: MoveAction, spread: boolean, cleared: boolean): Odds | null {
   const move = battle.dex.moves.get(action.moveId);
   if (move.category === 'Status' || unpriceable(attacker, defender, move)) return null;
@@ -101,7 +85,6 @@ function slotOdds(battle: Battle, attacker: Pokemon, defender: Pokemon, action: 
   };
 }
 
-/** Does a slot of the option click a Tera that clears the field (the body the click makes carries abilityOn)? */
 function clearsField(battle: Battle, own: 0 | 1, actions: readonly PairAction[]): boolean {
   return actions.some(action => {
     const mon = action.kind === 'move' && action.tera ? battle.sides[own].active[action.slot] : null;
@@ -109,12 +92,8 @@ function clearsField(battle: Battle, own: 0 | 1, actions: readonly PairAction[])
   });
 }
 
-/**
- * The option's headline: the uncertain kill with the best chance, or null. A
- * foe another slot of the option kills for sure is left out: odds on it say
- * nothing about whether it lives (Karate Chop kills Eevee, Tackle's crit
- * into the same Eevee is no headline).
- */
+// The option's headline: the uncertain kill (0 < kill, hit × kill < 1) with the best chance. A foe another slot of the
+// kills for sure is left out: odds on it say nothing about whether it lives.
 function optionOdds(battle: Battle, own: 0 | 1, choice: string): KoOddsInfo | null {
   const events: { defender: Pokemon; odds: Odds }[] = [];
   const actions = parsePairChoice(battle, own, choice) ?? [];

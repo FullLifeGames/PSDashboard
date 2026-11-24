@@ -11,38 +11,29 @@ import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
 import { FORCED_ROOT_LEVEL, recordDeepenedCell, recordTurnCell, turnSettings, type DeepeningState } from './search/deepening.ts';
 
-// Async search orchestration over an abstract executor: pure (no @pkmn/sim imports), so it runs on the main thread and fans the sim
-// work out to workers; `createLocalExecutor` (search.ts) is the single-threaded reference.
+// Pure (no @pkmn/sim imports), so it runs on the main thread and fans the sim work out to workers.
 
 type ChoicesInfo = EvalChoicesInfo;
 type CellJob = EvalCellJob;
 export type CellValue = EvalCellValue;
 type SubSearchJob = EvalSubSearchJob;
 
-/** The sim side of the orchestrator: answers the root's choices and the cell, sub-search, prover and line jobs. */
 export interface SearchExecutor {
   choices(tera: TeraAllowance, keepPlayed?: EvalSettings['keepPlayed'], sleepClause?: boolean): Promise<ChoicesInfo>;
-  /** Evaluate all cells; report incremental completion via onDone(completedCount). */
+  /** Evaluates all cells; reports incremental completion via onDone(completedCount). */
   evalCells(jobs: CellJob[], onDone?: (completed: number) => void): Promise<CellValue[]>;
-  /** Advance from the root by the job's pair (first fixed seed) and search the child. */
   subSearch(job: SubSearchJob): Promise<EvalResult>;
-  /** The forced-win prover on the root, given the finished result's input. */
   prove(input: ForcedWinInput): Promise<ForcedWinOutcome | null>;
-  /**
-   * Replays the trees' lines for the rows a turn shows, every die at its likeliest result (search/lines.ts); an executor without it
-   * sends no lines.
-   */
+  /** Replays the trees' lines for the rows a turn shows; an executor without it sends no lines. */
   lines?(input: LinesInput): Promise<EvalLine[]>;
 }
 
-/** Progress, partial-result and stop hooks of one search run. */
 export interface OrchestratorCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
   shouldStop?(): boolean;
 }
 
-/** One cell job per (i, j) pair, row-major. */
 function cellJobs(p1: EvalChoiceOption[], p2: EvalChoiceOption[], samples: number): CellJob[] {
   const jobs: CellJob[] = [];
   for (let i = 0; i < p1.length; i++) {
@@ -53,11 +44,7 @@ function cellJobs(p1: EvalChoiceOption[], p2: EvalChoiceOption[], samples: numbe
   return jobs;
 }
 
-/**
- * Writes the executor's cell values into the matrix, collecting the blends, the base draws and the diagnostics. The executor returns
- * chunks in completion order, so the diagnostics are sorted by cell: the values are index-addressed and the blends and draws are looked
- * up by key, but the diagnostic list is read as is.
- */
+// The executor returns chunks in completion order: the diagnostics are sorted by cell, the rest is read by key.
 function collectCells(
   cellValues: CellValue[],
   matrix: ValueMatrix,
@@ -75,17 +62,11 @@ function collectCells(
   diagnostics.sort((a, b) => a.i - b.i || a.j - b.j);
 }
 
-/**
- * The root payload from the executor's choices info: kill odds and the
- * unanswered-mon profile are computed sim-side by choices(); the shared
- * helpers keep this module sim-free.
- */
 function orchestratedPayload(info: ChoicesInfo, diagnostics: KoOddsMismatch[]): RootPayload {
   const koOddsMaps = info.koOdds ? koOddsMapsFor(info.p1, info.p2, info.koOdds) : null;
   return { diagnostics, koOddsMaps, unanswered: info.unanswered, playedBounds: info.playedBounds };
 }
 
-/** The orchestrated search's deepening state: the shared record plus the executor-side context. */
 interface Orchestration extends DeepeningState {
   executor: SearchExecutor;
   settings: EvalSettings;
@@ -98,12 +79,7 @@ interface Orchestration extends DeepeningState {
   ranked: Ranked;
 }
 
-/**
- * Mirrors searchPosition: expansion iterates because deepening a cell
- * shifts a row's worst case onto still-shallow siblings. Each batch of
- * wanted cells runs in parallel through the executor and is booked on
- * return; true when the caller asked to stop mid-level.
- */
+// Mirrors searchPosition: expansion iterates, because deepening a cell shifts a row's worst case onto shallow siblings.
 async function deepenLevelAsync(state: Orchestration, depth: number): Promise<boolean> {
   const expandedThisLevel = new Set<number>();
   const budget = TOP_EXPANSION * 2;
@@ -130,11 +106,7 @@ async function deepenLevelAsync(state: Orchestration, depth: number): Promise<bo
   return false;
 }
 
-/**
- * Mirrors searchPosition: level 2 of a forced root. Every switch-in's child goes to the executor as the turn it opens (`turn: true`), in
- * parallel; the values are booked together, so a stop leaves the arrival values and no row mixes the two scales. A cancel that ends the
- * pool rejects the pending jobs, as it does for any sub-search. True when stopped.
- */
+// Mirrors searchPosition: level 2 of a forced root; values are booked together, so a stop leaves the arrival values.
 async function deepenForcedRootAsync(state: Orchestration): Promise<boolean> {
   const cells: [number, number][] = [];
   state.matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!state.matrix.ended[i][j]) cells.push([i, j]); }));
@@ -152,12 +124,7 @@ async function deepenForcedRootAsync(state: Orchestration): Promise<boolean> {
   return false;
 }
 
-/**
- * Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists only; probes are one-ply sub-searches of the tied rows'
- * decisive cells. A cell of several draws gets one probe per base draw (the executor answers the trend of the draw's child against its
- * own leaf) and books the mean; a cell of one draw gets the one probe on its first child, booked as the child's score against the
- * cell's value. An executor that answers no trend is booked that way for every draw.
- */
+// Horizon-trend tiebreak, mirroring searchPosition: singles-shaped lists only; one-ply probes of the tied rows' cells.
 async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, stopped: boolean): Promise<void> {
   const combined = state.p1.some(option => option.choice.includes(',')) ||
     state.p2.some(option => option.choice.includes(','));
@@ -183,10 +150,7 @@ async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, s
   applyTrendTiebreak(state.matrix, result, state.trendMap);
 }
 
-/**
- * The root's levels above the first, mirroring the sync search's `deepenRoot`: a forced root's turn after each replacement (level 2),
- * then one deepening per further depth the settings name. Returns the finished result and whether a stop cut a level short.
- */
+// Mirrors the sync search's `deepenRoot`: a forced root's turn after each replacement, then one deepening per depth.
 async function deepenRootAsync(
   state: Orchestration, forced: boolean, payload: RootPayload, first: EvalResult,
 ): Promise<{ result: EvalResult; stopped: boolean }> {
@@ -220,7 +184,6 @@ async function deepenRootAsync(
   return { result, stopped };
 }
 
-/** The async search over an executor: the root's choices, every cell, the deepening levels, the trend tiebreak and the forced-win prover. */
 export async function searchOrchestrated(
   executor: SearchExecutor,
   settings: EvalSettings,
@@ -265,7 +228,6 @@ export async function searchOrchestrated(
   return result;
 }
 
-/** The forced-win prover on the finished root, unless the settings skip it or the search was stopped. */
 async function proveRoot(
   executor: SearchExecutor, result: EvalResult, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<void> {

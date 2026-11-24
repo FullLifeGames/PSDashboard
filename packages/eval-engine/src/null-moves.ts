@@ -1,7 +1,6 @@
 import { rulesDex, type RulesDex, type RulesMod } from '@fulllifegames/replay-core';
 import { moveAtUse } from './move-use.ts';
 
-// Mechanical-null detection: names a recommended move that provably does nothing (Will-O-Wisp into Charizard-X: Fire-types cannot be burned).
 
 const STATUS_TEXT: Record<string, string> = {
   brn: 'burned',
@@ -15,16 +14,11 @@ const STATUS_TEXT: Record<string, string> = {
 type GenDex = RulesDex;
 type DexMove = ReturnType<GenDex['moves']['get']>;
 
-/**
- * Types immune to a major status, by generation: the @pkmn/dex type chart has only type-vs-type entries, so this is the status half,
- * curated to the unconditional rules.
- */
+// The type chart has only type-vs-type entries; this is the status half, curated to the unconditional rules.
 function statusImmuneTypes(status: string, gen: number): string[] {
   switch (status) {
     case 'brn': return ['Fire'];
-    // Electric-types are paralysis-immune from gen 6.
     case 'par': return gen >= 6 ? ['Electric'] : [];
-    // Steel is poison-immune from gen 2, its first generation.
     case 'psn':
     case 'tox': return gen >= 2 ? ['Steel', 'Poison'] : ['Poison'];
     case 'frz': return ['Ice'];
@@ -34,11 +28,7 @@ function statusImmuneTypes(status: string, gen: number): string[] {
 
 const toAbilityId = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/**
- * The attacker's possible abilities (empty when the species is unknown); a
- * `mega` choice adds its Mega formes' (Mega evolution comes before moves).
- * They only ever SUPPRESS verdicts.
- */
+// A `mega` choice adds its Mega formes' abilities (Mega evolution comes before moves); they only SUPPRESS verdicts.
 function candidateAbilities(dex: GenDex, attackerSpecies: string | null, mega: boolean): string[] {
   const attacker = attackerSpecies ? dex.species.get(attackerSpecies) : null;
   if (!attacker?.exists) return [];
@@ -52,10 +42,6 @@ function candidateAbilities(dex: GenDex, attackerSpecies: string | null, mega: b
   return [...names];
 }
 
-/**
- * The type the move lands with, from what the sentence knows: the species, its possible abilities, the generation and the attacker's
- * Tera. An unknown item, weather, terrain or hidden type, or abilities that disagree, leave it undecided (null) and the sentence silent.
- */
 function typeAtUse(
   move: DexMove,
   dex: GenDex,
@@ -76,11 +62,7 @@ function typeAtUse(
   return use ? use.type : null;
 }
 
-/**
- * The move's type-chart immunity against the defender's types, and whether
- * an attacker ability the species may carry breaks it (Scrappy and gen 9's
- * Mind's Eye hit Ghosts with Normal/Fighting moves).
- */
+// An ability the attacker may carry can break it (Scrappy and gen 9's Mind's Eye hit Ghosts with Normal or Fighting).
 function typeImmunityOf(
   dex: GenDex,
   move: DexMove,
@@ -97,7 +79,6 @@ function typeImmunityOf(
   return { typeImmune, immunityBroken };
 }
 
-/** Why a status move provably does nothing: the status immunity, the move's own type immunity, powder, or Leech Seed. */
 function statusNullReason(
   move: DexMove,
   type: string,
@@ -114,8 +95,7 @@ function statusNullReason(
     if (blocked && !corroded) {
       return `${named} cannot be ${STATUS_TEXT[move.status] ?? move.status} (${blocked}-type)`;
     }
-    // Thunder Wave is the canonical status move WITHOUT ignoreImmunity: the
-    // move's own type immunity applies (Ground blocks it).
+    // Thunder Wave has no ignoreImmunity: its own type immunity applies (Ground blocks it).
     if (immunity.typeImmune && !immunity.immunityBroken) {
       return `${named} is immune to ${type}-type moves`;
     }
@@ -130,13 +110,8 @@ function statusNullReason(
   return null;
 }
 
-/**
- * The attacker as the move meets it. A Tera click in this very choice lands
- * before the move, with a type and sometimes a forme (Terapagos-Stellar,
- * Ogerpon's Tera formes) the sentence does not know; an unknown attacker's
- * Tera is unknown too, whatever the caller passes (the app sends null for a
- * side without one active).
- */
+// A Tera click in this choice lands before the move, with a type and sometimes a forme the sentence does not know;
+// attacker's Tera is unknown too, whatever the caller passes (the app sends null for a side without one active).
 function attackerAtUse(
   tokens: readonly string[],
   species: string | null,
@@ -146,23 +121,17 @@ function attackerAtUse(
   return { species: clicking ? null : species, tera: clicking || !species ? undefined : tera };
 }
 
-/**
- * Why a single-slot move choice provably does nothing against the defender, or null when it might (unknown move or species, a
- * non-move choice, a comma choice with two acting slots: it judges singles and a doubles endgame with one living active per side). Only
- * definite type-chart and status nulls fire; ability-granted immunities (Levitate, Flash Fire) are out of scope. When any of the
- * attacker's possible abilities breaks the immunity (Scrappy, Corrosion), or the move's type depends on a fact the sentence lacks,
- * the null is not definite and the guard stays silent. A terastallized defender is read by its Tera type and named with it.
- */
+/** Why a single-slot move choice provably does nothing against the defender; null when it might. Definite only. */
+// Out of scope: ability immunities (Levitate, Flash Fire); judges singles and a doubles endgame with one active a side.
 export function nullMoveReason(params: {
   choice: string;
   gen: number;
-  /** The replay's mod (Champions); absent for none. */
   mod?: RulesMod;
   attackerSpecies: string | null;
   defenderSpecies: string;
-  /** The defender's Tera type when it has terastallized: it defends with that type (Stellar keeps the old ones). */
+  /** Set once terastallized: it defends with that type (Stellar keeps the old ones). */
   defenderTera?: string | null;
-  /** The attacker's Tera type when it has terastallized; undefined when unknown. */
+  /** Set once terastallized; undefined when unknown. */
   attackerTera?: string | null;
 }): string | null {
   const tokens = params.choice.split(' ');

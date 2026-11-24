@@ -1,23 +1,16 @@
 import { CHANCE_CANT } from '../dice-events.ts';
 
-// The doubles pair plan reads a draw's own lines: a hit's window runs from its roll to the next |move| line, and the owner's HP lines
-// carry the exact HP (denominator = max HP), the public ones a percentage.
+// A hit's window ends at the next |move| line; the owner's HP lines give exact HP (max HP is the denominator).
 
-/**
- * The `|cant|` reasons whose cause the simulator draws this turn. It writes each reason by the name of its condition, so the
- * infatuation reads "Attract" and never "attract". test/pair-cant-reasons.spec.ts holds this set to the dice ones. The report's dice
- * markers (CHANCE_CANT) are the same set plus sleep, whose length the simulator draws when the status starts, so the plan prices
- * no roll in a sleeping turn.
- */
+// The |cant| reasons the simulator draws, by condition name ("Attract"), not sleep: test/pair-cant-reasons.spec.ts.
 const RANDOM_CANT: ReadonlySet<string> = new Set([...CHANCE_CANT].filter(reason => reason !== 'slp'));
 
-/** The next |move| line at or after `from`, or the log's end. */
 function windowEnd(log: readonly string[], from: number): number {
   for (let index = from; index < log.length; index++) if (log[index].startsWith('|move|')) return index;
   return log.length;
 }
 
-/** The target's exact HP right after the hit rolled at `from`: 0 on `0 fnt`, null when the window has no direct damage line. */
+/** The target's exact HP right after the hit rolled at `from`: 0 on `0 fnt`; null without a direct damage line. */
 export function hpAfterHit(log: readonly string[], from: number, targetSlot: string, maxhp: number): number | null {
   const end = windowEnd(log, from);
   const prefix = `|-damage|${targetSlot}: `;
@@ -32,11 +25,7 @@ export function hpAfterHit(log: readonly string[], from: number, targetSlot: str
   return null;
 }
 
-/**
- * A random outcome the plan does not price: a |cant| from flinch, paralysis, freeze or attraction, a confusion check, a random drag-in.
- * A `|cant|` that a recorded secondary die explains (`<slot>|<effect id>`: the flinch the hit's die came true with) is
- * priced as a token of the hit's class, not a deviation.
- */
+/** A random outcome the plan does not price; a |cant| a recorded secondary die explains is no deviation. */
 export function randomDeviation(log: readonly string[], explained: ReadonlySet<string> = new Set()): string | null {
   for (const line of log) {
     const parts = line.split('|');
@@ -48,14 +37,13 @@ export function randomDeviation(log: readonly string[], explained: ReadonlySet<s
   return null;
 }
 
-/** Whether the body in `slot` has a |move| or a |cant| line at or after `from`: it takes its turn later (a flinched body shows the |cant|). */
+/** Whether the body in `slot` has a |move| or |cant| line at or after `from` (a flinched body shows |cant|). */
 export function actsLater(log: readonly string[], from: number, slot: string): boolean {
   const prefixes = [`|move|${slot}: `, `|cant|${slot}: `];
   for (let index = from; index < log.length; index++) if (prefixes.some(prefix => log[index].startsWith(prefix))) return true;
   return false;
 }
 
-/** Whether the body in `slot` has a |move| line at or after `from`: it acts later in the turn. */
 export function movesLater(log: readonly string[], from: number, slot: string): boolean {
   const prefix = `|move|${slot}: `;
   for (let index = from; index < log.length; index++) if (log[index].startsWith(prefix)) return true;

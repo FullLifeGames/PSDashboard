@@ -23,10 +23,8 @@ export function parseSearchState(serialized: string): ParsedSearchState {
     trims.push({ side: sideIndex, index, length: slots.length });
     while (slots.length < base.length) slots.push(base[slots.length]);
   }));
-  // The state is shared because State.deserializeBattle rebuilds every object it walks; the two shared pieces are the `set` objects
-  // (the Pokemon constructor normalizes them idempotently) and the log array (deserializeFromParsed replaces it per battle).
-  // The sim reads `log` only to send updates (sentLogPos) and to attribute the move line it just wrote (lastMoveLine); `inputLog`
-  // and `messageLog` it only writes. The search reads the log delta of one advance, which is the same from an empty start.
+  // The `set` objects (the Pokemon constructor normalizes them idempotently) are shared by every battle of this state;
+  // the log array is shared too, and deserializeFromParsed replaces it per battle.
   state.log = [];
   state.inputLog = [];
   state.messageLog = [];
@@ -35,7 +33,6 @@ export function parseSearchState(serialized: string): ParsedSearchState {
   return { state, trims };
 }
 
-/** A fresh battle from the parsed state, with the search's side invariants restored. */
 export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
   assertSimMods(String(parsed.state.formatid));
   prepareFormat(String(parsed.state.formatid));
@@ -43,8 +40,7 @@ export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
   for (const trim of parsed.trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
   }
-  // The deserializer hands the battle the parsed log array itself; a fork must never append into the object its siblings start from.
-  // The sim types the field read-only; its own deserializer assigns it the same way.
+  // The deserializer hands out the parsed log array itself: a fork appending to it would corrupt its siblings.
   (battle as unknown as { log: string[] }).log = [];
   restoreSideInvariants(battle);
   prepareBattle(battle);

@@ -2,10 +2,9 @@
 
 import { TIER_THRESHOLDS } from './analysis.ts';
 
-/** Score swing between consecutive evaluated turns that marks a blunder: the verdict band's blunder size, in wp-units. */
 export const BLUNDER_SWING = TIER_THRESHOLDS.blunder;
 
-/** The 1-based turns whose play created a blunder-sized swing; scores[t-1] is the position at the start of turn t, null scores break the chain. */
+/** 1-based turns whose play made a blunder-sized swing; `scores[t-1]` starts turn t; null scores break the chain. */
 export function computeBlunders(scores: (number | null)[]): number[] {
   const blunders: number[] = [];
   for (let index = 1; index < scores.length; index++) {
@@ -17,15 +16,12 @@ export function computeBlunders(scores: (number | null)[]): number[] {
   return blunders;
 }
 
-/** How many turns the deepening pass of a two-pass sweep may take on. */
 const KEY_TURN_CAP = 16;
 
-/** Swing that earns the deepening pass; the report's key moments use the same constant (report.ts re-exports it). */
 export const KEY_TURN_SWING = 0.25;
 
-/** The turns worth a deeper look after a fast first pass: each report-worthy swing's turn and the turn after it, biggest swings first under the cap. */
 export function selectKeyTurns(scores: (number | null)[], cap = KEY_TURN_CAP): number[] {
-  // Both sides of a swing, because analysis compares them and mixing depths across a swing boundary would blur the numbers people click on.
+  // Both sides of a swing: mixing depths across a swing boundary would blur the numbers people click on.
   const swings: { turn: number; magnitude: number }[] = [];
   for (let index = 1; index < scores.length; index++) {
     const previous = scores[index - 1];

@@ -4,21 +4,12 @@ import { inStandoff, type Standoff } from './standoff.ts';
 import { chanceRolled } from './turn-analysis/luck.ts';
 import { momentScore } from './win-reason.ts';
 
-/** The swing one component (net swing or chance share alone) needs for a key moment; the same constant selects the sweep's deepening turns (graph.ts). */
 export const KEY_MOMENT_SWING = KEY_TURN_SWING;
-/** How many key moments the report keeps by rank. */
 const REPORT_KEY_MOMENTS = 4;
 
 type Winner = 'p1' | 'p2' | null;
 
-/**
- * Selection by the biggest component (momentScore, win-reason.ts); resolution turns stay excluded. The top REPORT_KEY_MOMENTS stay,
- * and every other qualifying dice turn whose chance went against the winner joins them (a missed 95 % Fire Fang ranked eighth). A
- * dice turn is a turn whose own rolls ran in its residual's direction (chanceRolled) or, without the turn's rolls, one that carries
- * a protocol-visible dice event. Without a winner or dice info no turn joins. The selection runs over the whole game, then a turn
- * inside a standoff drops out unless it is a graded decision (a decision attribution): its shift, roll or read is the HP and PP
- * cycle of one position. The slot of a dropped turn stays empty.
- */
+/** The report's key moments, by the biggest component (`momentScore`); resolution and standoff turns drop out. */
 export function keyMomentsFor(
   known: TurnAnalysis[],
   resolution: Set<number>,

@@ -3,14 +3,11 @@ import type { WinPaths, WinPathsRequest, WinStep } from './endgame/win-paths/typ
 import type { StaticRuleset } from './score/weights.ts';
 
 // Worker messages are internal, so a new job kind keeps ENGINE_PROTOCOL; no job writes into an EvalResult.
-/** A job the app starts on request; it runs on a worker of its own, streams a step each time one is done, and the client stops it by ending that worker. */
+/** A job the app starts on request: it runs on its own worker, streams steps, and is stopped by ending the worker. */
 export type OnRequestJob = { kind: 'winPaths'; request: WinPathsRequest };
-/** One streamed step of a job. */
 export type OnRequestStep = { kind: 'winPaths'; step: WinStep };
-/** The whole result a job ends with. */
 export type OnRequestResult = { kind: 'winPaths'; paths: WinPaths };
 
-/** Runs a job on the serialized position under the rule set the message names; `onStep` fires as each step is done. */
 export function runOnRequestJob(
   serialized: string,
   ruleset: StaticRuleset,

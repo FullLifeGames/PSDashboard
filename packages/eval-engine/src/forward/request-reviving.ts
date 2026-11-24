@@ -1,17 +1,14 @@
-// The one reader of a Revival Blessing prompt: the simulator marks the user's party entry `reviving` in the request (`@pkmn/sim`
-// pokemon.js, getSwitchRequestData), so a request asks for a fainted body by that mark, never by a move name.
+// Revival Blessing: the request marks the party entry `reviving` (pokemon.js getSwitchRequestData), not the move name.
 
-/** What the reader needs of a side: its active table (one entry per slot) and the request the simulator last sent it. */
 export interface RevivingSide {
   active: readonly unknown[];
   activeRequest?: unknown;
 }
 
-/** Per active slot: does the request mark that slot's party entry `reviving`? The request lists the actives first, in slot order. */
+/** One entry per active slot: is its party entry marked `reviving`? The request lists actives first, in slot order. */
 export function revivingSlots(side: RevivingSide): boolean[] {
   const party = (side.activeRequest as { side?: { pokemon?: { reviving?: boolean }[] } } | null | undefined)?.side?.pokemon;
   return side.active.map((_, slot) => !!party?.[slot]?.reviving);
 }
 
-/** Does the request ask this side for a fainted body? */
 export const isReviving = (side: RevivingSide): boolean => revivingSlots(side).some(Boolean);

@@ -1,9 +1,6 @@
 import type { MoveField, MoveLike, MoveUser } from './move-use.ts';
 
-/**
- * The move's own rule at use: what the simulator's onModifyType, onModifyMove and basePowerCallback of that move decide.
- * A partial answer overrides the catalog; null means a needed fact is unknown.
- */
+/** The move's own rule at use: a partial answer overrides the catalog; null means a needed fact is unknown. */
 export type Own = { type?: string; category?: string; basePower?: number } | null;
 type Rule = (move: MoveLike, user: MoveUser, field: MoveField) => Own;
 
@@ -26,7 +23,7 @@ const ITEM_TYPE: Record<string, (item: NonNullable<MoveUser['item']>) => string 
   naturalgift: item => item.naturalGift?.type,
 };
 
-/** Plates, memories, drives, berries; Klutz ignores the item (the ability is keyed). */
+// Plates, memories, drives, berries; Klutz ignores the item (the ability is keyed).
 const byItem: Rule = (move, user) => {
   if (user.item === undefined) return null;
   const item = user.abilities.includes('klutz') ? null : user.item;
@@ -35,7 +32,7 @@ const byItem: Rule = (move, user) => {
   return { type: type ?? move.type };
 };
 
-/** Revelation Dance: the first type after a Tera click (a Stellar Tera keeps the old types). */
+// Revelation Dance: the first type after a Tera click (a Stellar Tera keeps the old types).
 const byUserType: Rule = (_move, user) => {
   if (!user.types || user.terastallized === undefined) return null;
   const tera = user.terastallized;
@@ -52,21 +49,19 @@ const TERRAIN_TYPES: Record<string, string> = {
   electricterrain: 'Electric', grassyterrain: 'Grass', mistyterrain: 'Fairy', psychicterrain: 'Psychic',
 };
 
-/** Weather Ball: the user's effective weather (Umbrella and Cloud Nine already applied by the caller), power doubled. */
+// Weather Ball: the caller applies Umbrella and Cloud Nine to the user's weather.
 const byWeather: Rule = (move, _user, field) => {
   if (field.weather === undefined) return null;
   const type = WEATHER_TYPES[field.weather];
   return type ? { type, basePower: move.basePower * 2 } : {};
 };
 
-/** Terrain Pulse: the terrain's type and double power, for a grounded user. */
 const byTerrain: Rule = (move, user, field) => {
   if (field.terrain === undefined || user.grounded === undefined) return null;
   const type = user.grounded ? TERRAIN_TYPES[field.terrain] : undefined;
   return type ? { type, basePower: move.basePower * 2 } : {};
 };
 
-/** Tera Blast: the Tera type after the click, physical when Attack with its stage leads; Stellar power 100. */
 const byTera: Rule = (move, user) => {
   if (user.terastallized === undefined) return null;
   if (!user.terastallized) return {};
@@ -78,7 +73,6 @@ const byTera: Rule = (move, user) => {
   };
 };
 
-/** Tera Starstorm: Stellar for Terapagos-Stellar, physical like Tera Blast once terastallized. */
 const byStarstorm: Rule = (_move, user) => {
   if (user.species === undefined) return null;
   if (user.species !== 'Terapagos-Stellar') return {};
@@ -86,13 +80,12 @@ const byStarstorm: Rule = (_move, user) => {
   return { type: 'Stellar', ...(physical ? { category: 'Physical' } : {}) };
 };
 
-/** Hidden Power: the body's hidden type; up to gen 5 its hidden power (mods/gen5 basePowerCallback). */
+// Hidden Power: the body's hidden type; up to gen 5 its hidden power (mods/gen5 basePowerCallback).
 const byHiddenPower: Rule = (_move, user) => {
   if (user.hpType === undefined) return null;
   return { type: user.hpType, ...(user.gen <= 5 ? { basePower: user.hpPower ?? 70 } : {}) };
 };
 
-/** Struggle is typeless from gen 2 on. */
 const byStruggle: Rule = (_move, user) => (user.gen >= 2 ? { type: '???' } : {});
 
 export const OWN_RULES: Record<string, Rule> = {

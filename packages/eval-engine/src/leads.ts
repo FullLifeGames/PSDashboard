@@ -1,12 +1,10 @@
 import { TIER_THRESHOLDS, type VerdictTier } from './analysis.ts';
 import type { EvalResult, RankedChoice } from './types.ts';
 
-// Turn-0 (team preview) analysis: the lead decision graded like any other simultaneous choice, the played pair against the
-// equilibrium-best pair. No decided-position leniency: the game start is never decided. Pure, no sim imports, main-bundle safe.
+// Graded like any other simultaneous choice, with no decided-position leniency: the game start is never decided.
+// Pure, no sim imports, main-bundle safe.
 
-/** The grade of one side's lead choice. */
 export interface LeadSideAnalysis {
-  /** The actually led pair matched into the ranked options. */
   played: RankedChoice | null;
   best: RankedChoice | null;
   /** best.ev − played.ev (own perspective), floored at 0. */
@@ -14,13 +12,11 @@ export interface LeadSideAnalysis {
   tier?: VerdictTier;
 }
 
-/** The lead analysis of both sides. */
 export interface LeadAnalysis {
   p1: LeadSideAnalysis;
   p2: LeadSideAnalysis;
 }
 
-/** Sweep payload for the turn-0 slot. */
 export interface LeadEvalData {
   result: EvalResult;
   played: { p1: string[] | null; p2: string[] | null };
@@ -30,7 +26,7 @@ export interface LeadEvalData {
 export const leadSpeciesOf = (label: string): string[] =>
   label.replace(/^Lead /, '').split(' + ');
 
-/** Matches led species against a ranked lead option as an unordered set: the engine enumerates pairs i<j, the replay shows slot order. */
+/** Matches led species as an unordered set: the engine enumerates pairs i<j, the replay shows slot order. */
 export function matchLeadOption(
   options: RankedChoice[],
   species: string[] | null,
@@ -40,7 +36,6 @@ export function matchLeadOption(
   return options.find(option => leadSpeciesOf(option.label).sort().join('|') === wanted) ?? null;
 }
 
-/** Grades each side's played lead against the best ranked pair, by regret tier. */
 export function analyzeLeads(
   result: EvalResult,
   played: { p1: string[] | null; p2: string[] | null },

@@ -1,39 +1,29 @@
-// The speed layer's switch, status and counters, sim-free on purpose: the app's main thread imports configureSimFast from the
-// barrel, and the main chunk never loads @pkmn/sim (types.ts). Under Node EVAL_SIM_FAST decides ('0' off, '1' all, or a list of
-// rules, clone, dispatch; a set variable forces, so a break throws); in a browser the layer stays off until the host configures it.
+// Sim-free on purpose: the app's main thread imports configureSimFast from the barrel and never loads @pkmn/sim.
+// Under Node EVAL_SIM_FAST decides ('0' off, '1' all, or a list; a set variable forces, so a break throws).
 
-/** One lever of the speed layer: rule tables, battle copy or the dispatch pre-check. */
 export type SimFastLever = 'rules' | 'clone' | 'dispatch';
-/** The layer's state: active, off, or stepped back after a hash mismatch or a fallback. */
 export type SimFastStatus = 'active' | 'off' | 'hash-mismatch' | 'fallback';
 
-/** What the levers did since the last report. */
 export interface SimFastCounters {
-  /** Battles built on a rule table the layer keeps (lever rules). */
   ruleTables: number;
-  /** Battles copied instead of deserialized (lever clone). */
   clones: number;
-  /** runEvent calls through the pre-check (lever dispatch). */
   dispatchCalls: number;
   /** Of those, answered without the original. */
   dispatchAnswered: number;
-  /** Breaks: the layer stepped back to the standard path. */
   fallbacks: number;
 }
 
-/** The status with the counters, as a worker reports them. */
 export interface SimFastReport {
   status: SimFastStatus;
   counters: SimFastCounters;
 }
 
-/** Every lever, in the order the switch lists them. */
 export const SIM_FAST_LEVERS: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
-/** Levers a host gets without asking (Node without the variable, the app without an override); `EVAL_SIM_FAST=0` or '0' in localStorage turns them off. */
+/** Levers a host gets without asking; `EVAL_SIM_FAST=0` (or '0' in localStorage) turns them off. */
 export const SIM_FAST_DEFAULT: readonly SimFastLever[] = ['rules', 'clone', 'dispatch'];
 
-/** Effective flags (configured and not broken); the hot paths read them directly. */
+/** Effective flags: configured and not broken. */
 export const simFastFlags: Record<SimFastLever, boolean> = { rules: false, clone: false, dispatch: false };
 
 export const simFastCounters: SimFastCounters = {
@@ -43,7 +33,6 @@ export const simFastCounters: SimFastCounters = {
 interface ProcessLike { env?: Record<string, string | undefined>; versions?: { node?: string } }
 const nodeProcess = (): ProcessLike | undefined => (globalThis as { process?: ProcessLike }).process;
 
-/** Unminified sources under Node: the hash gate can read them. */
 export const onNode = (): boolean => typeof nodeProcess()?.versions?.node === 'string';
 
 let configured = false;
@@ -52,7 +41,7 @@ let forced = false;
 let broken: 'hash-mismatch' | 'fallback' | null = null;
 let changeHook: (() => void) | null = null;
 
-/** Parses an EVAL_SIM_FAST value: null when unset, [] for '0', every lever for '1', else the named list; throws on an unknown lever. */
+/** Parses EVAL_SIM_FAST: null when unset, [] for '0', every lever for '1', else the named list; unknown ones throw. */
 export function parseSimFastSwitch(raw: string | null | undefined): SimFastLever[] | null {
   const value = raw?.trim() ?? '';
   if (value === '') return null;
@@ -76,7 +65,7 @@ function applyFlags(): void {
   changeHook?.();
 }
 
-/** The host's choice. A break (hash mismatch, fallback) outlives it for the rest of the process. */
+/** The host's choice; a break (hash mismatch, fallback) outlives it for the rest of the process. */
 export function configureSimFast(next: readonly SimFastLever[], options: { forced?: boolean } = {}): void {
   configured = true;
   levers = SIM_FAST_LEVERS.filter(lever => next.includes(lever));
@@ -98,7 +87,6 @@ export function simFastOn(lever: SimFastLever): boolean {
   return simFastFlags[lever];
 }
 
-/** rule-table.ts resets its tables when the lever goes off. */
 export function onSimFastChange(hook: () => void): void {
   changeHook = hook;
 }
@@ -111,21 +99,18 @@ export function breakSimFast(status: 'hash-mismatch' | 'fallback', reason: strin
   applyFlags();
 }
 
-/** The layer's status: a break outlives the host's choice, else active or off. */
 export function simFastStatus(): SimFastStatus {
   if (!configured) configureFromEnvironment();
   if (broken) return broken;
   return levers.length > 0 ? 'active' : 'off';
 }
 
-/** Status plus the counters since the last report; a worker sends one with every final answer. */
 export function takeSimFastReport(): SimFastReport {
   const report: SimFastReport = { status: simFastStatus(), counters: { ...simFastCounters } };
   zeroCounters();
   return report;
 }
 
-/** Test hook: forget configuration, break and counters; the environment decides again. */
 export function resetSimFastForTests(): void {
   configured = false;
   levers = [];

@@ -8,19 +8,14 @@ import { DiceSink, ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 import { battleRuleset, tagRuleset } from './ruleset.ts';
 import type { StaticRuleset } from '../score/weights.ts';
 
-// The immutable search position: a lazily serialized or deserialized battle whose serialized string is its identity.
 
-/** One legal choice of a side with its label. */
 export interface ChoiceOption {
   /** Sim choice string, accepted verbatim by Battle#choose. */
   choice: string;
   label: string;
 }
 
-/**
- * An immutable battle position. The serialized string is its identity, computed lazily: depth-1 leaf children are only
- * evaluated, and serializing them would double the cost of every fork for nothing.
- */
+/** An immutable battle position; its serialized string is its identity and is computed lazily. */
 export interface SimPosition {
   readonly serialized: string;
   /** The rule set the position is searched under (a root takes its search's, children inherit). */
@@ -32,7 +27,6 @@ class Position implements SimPosition {
   private battleCache: Battle | null;
   private parsedCache: ParsedSearchState | null = null;
   private templateCache: Battle | null = null;
-  /** Built around a live battle (a child), not around a string (a root). */
   private readonly live: boolean;
   readonly ruleset: StaticRuleset;
 
@@ -61,10 +55,7 @@ class Position implements SimPosition {
     return this.battleCache;
   }
 
-  /**
-   * The battle forks copy, never handed to readers and never written. A root's template is its own unrepaired deserialization
-   * (the reader's battle is repaired); a child's is a copy of its battle at the first fork.
-   */
+  /** The battle forks copy: never handed to readers, never written. */
   template(): Battle | null {
     if (!this.templateCache) {
       const template = this.live ? copyBattle(this.battleCache!) : deserializeFromParsed(this.getParsed());
@@ -75,11 +66,9 @@ class Position implements SimPosition {
   }
 }
 
-/** Fallback caches for foreign `{ serialized }` literals. */
 const foreignParsedCache = new WeakMap<SimPosition, ParsedSearchState>();
 const foreignBattleCache = new WeakMap<SimPosition, Battle>();
 
-/** A root position from a serialized battle, searched under `ruleset`. */
 export function createRootPosition(serializedBattle: string, ruleset: StaticRuleset = 'standard'): SimPosition {
   return new Position(serializedBattle, null, ruleset);
 }
@@ -105,7 +94,6 @@ export function positionBattle(position: SimPosition): Battle {
   return battle;
 }
 
-/** A fresh, unseeded, unrepaired battle of the position: a copy of its template, or a fresh deserialization. */
 function freshBattle(position: SimPosition): Battle {
   if (position instanceof Position && simFastOn('clone')) {
     const template = position.template();
@@ -119,10 +107,7 @@ function freshBattle(position: SimPosition): Battle {
   return deserializeFromParsed(positionParsed(position));
 }
 
-/**
- * A fresh battle from the position's parsed state, seeded so the advance is reproducible; siblings share the parsed state, never
- * a battle. With scripts the dice of the named moves answer on demand.
- */
+/** A fresh battle from the parsed state, seeded; siblings share the parsed state, never a battle. */
 export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: RollScripts): Battle {
   const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
   if (scripts && (scripts.size > 0 || scripts instanceof DiceSink)) {
@@ -136,7 +121,6 @@ export function forkBattle(position: SimPosition, seed: PRNGSeed, scripts?: Roll
   return battle;
 }
 
-/** A fork whose dice are the given PRNG: the doubles pair plan's recorder attaches itself to the battle it rolls for. */
 export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(battle: Battle): void }): Battle {
   const battle = tagRuleset(freshBattle(position), position.ruleset ?? 'standard');
   prng.attach(battle);
@@ -145,9 +129,7 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
   return battle;
 }
 
-/** Wraps a live battle as a position. */
 export function toPosition(battle: Battle): SimPosition {
-  // A scripted PRNG's watch leaves the battle before the position wraps it.
   if (battle.prng instanceof ScriptedPRNG) battle.prng.release();
   return new Position(null, battle, battleRuleset(battle));
 }

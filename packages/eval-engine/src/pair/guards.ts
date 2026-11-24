@@ -2,7 +2,6 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { rollsStall } from '../dex-facts/protect.ts';
 import { randomCallMoves } from '../ko-odds.ts';
 
-// A doubles pair choice as slot actions, and the rules that send a cell to the fallback before anything is drawn.
 
 /** `tera`: the move part clicks Tera (its terastallize token), set only then. */
 export type PairAction =
@@ -18,7 +17,7 @@ function parseAction(part: string, slot: number): PairAction {
   return { kind: 'move', slot, moveId: tokens[1], loc: loc === undefined ? null : Number(loc), ...(tokens.includes('terastallize') ? { tera: true as const } : {}) };
 }
 
-/** The slot actions of a choice (its parts map onto the living actives in slot order), or null for team preview, wait or a part count that does not fit. */
+/** The choice's slot actions, parts mapped onto the living actives in slot order; null for preview, wait or misfit. */
 export function parsePairChoice(battle: Battle, sideIdx: 0 | 1, choice: string): PairAction[] | null {
   const head = choice.split(' > ')[0].trim();
   const first = head.split(/\s+/)[0];
@@ -32,14 +31,13 @@ export function parsePairChoice(battle: Battle, sideIdx: 0 | 1, choice: string):
   return parts.map((part, index) => parseAction(part, living[index]));
 }
 
-/** The reason one acting body's dice go beyond the plan, or null. */
 function moverFallback(battle: Battle, mon: Pokemon, moveId: string, foes: number): string | null {
   const move = battle.dex.moves.get(moveId);
   if (mon.status === 'par' || mon.status === 'frz') return `prevented:${mon.status}`;
   if (mon.volatiles['confusion'] || mon.volatiles['attract']) return 'prevented:volatile';
   if (mon.item === 'quickclaw' || mon.ability === 'quickdraw') return 'quick';
-  // A move whose success the simulator rolls against the stall counter: the Protect family, Endure included (Wide Guard, Quick Guard and
-  // Mat Block set a side condition and roll nothing; test/pair-stall-guard.spec.ts plays every one).
+  // The Protect family, Endure included, rolls against the stall counter; Wide Guard, Quick Guard, Mat Block do not
+  // (test/pair-stall-guard.spec.ts plays every one).
   if (rollsStall(battle.dex, move) && mon.volatiles['stall']) return 'stall';
   if (move.multihit || mon.ability === 'parentalbond') return 'multi-hit';
   if (randomCallMoves(battle.dex).has(move.id)) return 'random-call';
@@ -47,7 +45,6 @@ function moverFallback(battle: Battle, mon: Pokemon, moveId: string, foes: numbe
   return null;
 }
 
-/** Rule F1: a reason the pair's dice go beyond the plan before anything is drawn, or null. */
 export function planTimeFallback(battle: Battle, actions: readonly [PairAction[], PairAction[]]): string | null {
   for (const sideIdx of [0, 1] as const) {
     const foes = battle.sides[sideIdx === 0 ? 1 : 0].active.filter(mon => mon && !mon.fainted).length;

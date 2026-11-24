@@ -11,25 +11,17 @@ import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from 
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
 
-// Choice submission and forced-switch resolution: applying a choice, repairing fainted actives after snapshot corrections, and the
-// greedy mid-turn replacement pick.
 
 const REPAIR_SEED: PRNGSeed = '1,2,3,4';
 
-/**
- * Snapshot corrections can faint an active without updating the request (rare diverged reconstructions); the sim then auto-passes
- * the dead slot and rejects every choice with "more choices than unfainted Pokémon". Repair: flag the corpse for replacement,
- * regenerate a proper switch request, and greedily resolve it to a clean turn boundary. Deterministic, so every fork of the same
- * serialized string repairs identically.
- */
+/** Repairs an active that a snapshot correction fainted without updating the request (the sim rejects every choice). */
 export function repairFaintedActives(battle: Battle): void {
   if (battle.ended) return;
   const stale = battle.sides
     .slice(0, 2)
     .filter(side => side.requestState === 'move' &&
       side.active.some(active => active?.fainted) &&
-      // Without a living bench there is nothing to send in — the sim
-      // auto-passes the dead slot, so a switch request would only wedge.
+      // No living bench: the sim auto-passes the dead slot, so a switch request would only wedge.
       side.pokemon.some(pokemon => !pokemon.isActive && !pokemon.fainted));
   if (stale.length === 0) return;
   for (const side of stale) {
@@ -41,11 +33,7 @@ export function repairFaintedActives(battle: Battle): void {
   resolveForcedSwitches(battle, REPAIR_SEED);
 }
 
-/**
- * The party slots a forced switch may send in. A request that marks an active `reviving` (Revival Blessing) takes only a fainted
- * party member, and the simulator rejects a living one ("You have to pass to a fainted Pokémon"); every other forced switch takes
- * the living bench.
- */
+/** A `reviving` request (Revival Blessing) takes only a fainted member; other forced switches the living bench. */
 export function switchInSlots(side: Side): number[] {
   const reviving = isReviving(side);
   return side.pokemon.flatMap((pokemon, index) => (!pokemon.isActive && pokemon.fainted === reviving ? [index + 1] : []));
@@ -53,20 +41,16 @@ export function switchInSlots(side: Side): number[] {
 
 /** Submits a choice string to a side; throws when the sim rejects it. */
 export function applyChoice(battle: Battle, side: 'p1' | 'p2', choice: string): void {
-  // The waiting-side sentinel (see legalChoices): nothing to submit.
   if (choice === 'wait') return;
-  // Pivot pairs carry their follow-up after ' > ' — the move submits now,
-  // the follow-up answers the forced-switch request in resolveForcedSwitches.
+  // The follow-up after ' > ' answers the forced-switch request in resolveForcedSwitches.
   [choice] = choice.split(' > ');
   const sideState = battle.sides[sideIndex(side)];
-  // Locked doubles slots submit by request index.
   if (!battle.choose(side, submittableChoice(sideState, choice))) {
     const error = sideState.choice.error || 'choice rejected';
     throw new Error(`${side} "${choice}": ${error}`);
   }
 }
 
-/** Slots the request forces to switch (at least one — a singles request carries no table). */
 function forcedSlotCount(side: Side): number {
   const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
   return Math.max(1, (request?.forceSwitch ?? []).filter(Boolean).length);
@@ -78,10 +62,7 @@ function pendingSwitchSides(battle: Battle): Side[] {
     .filter(side => side.requestState === 'switch' && !side.isChoiceDone());
 }
 
-/**
- * A pivot pair's declared follow-up answers this side's first switch request. Consumed once; false after a reject (target dragged
- * or fainted mid-turn), which falls back to the greedy resolution.
- */
+// Consumed once; false after a reject (target dragged or fainted mid-turn): the greedy resolution takes over.
 function answerFollowUp(
   battle: Battle,
   side: Side,
@@ -96,12 +77,7 @@ function answerFollowUp(
   return false;
 }
 
-/**
- * The tree's stop-at-request resolution. Pivot follow-ups are answered as the greedy path answers them; a request without one (a
- * knock-out's replacement, or a rejected follow-up) stays open and becomes a decision node. Returns 'boundary' (turn boundary or
- * game over), 'pending' (an open request the caller turns into a node) or 'mixed' (an answerable follow-up beside an open request:
- * nothing was submitted; the caller resolves the turn greedily so no position carries a half-answered request).
- */
+/** 'boundary', 'pending' (an open request the caller makes a node) or 'mixed' (nothing submitted: resolve greedily). */
 export function answerFollowUps(
   battle: Battle,
   followUps: { p1?: string; p2?: string },
@@ -121,10 +97,6 @@ export function answerFollowUps(
   return 'pending';
 }
 
-/**
- * The assignment whose entry statically evaluates best for the choosing side (the first one when alone). Every trial starts from
- * the round's one mid-turn state, and the static weighs by the rule set the battle was forked under, as the leaves do.
- */
 function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assignments: string[], ruleset: StaticRuleset): string {
   let best = assignments[0];
   if (assignments.length > 1) {
@@ -144,10 +116,6 @@ function bestAssignment(side: Side, midTurn: () => Battle, seed: PRNGSeed, assig
   return best;
 }
 
-/**
- * The state every trial of one resolution round starts from, taken before any side answers: a snapshot copy with each trial a copy
- * of it (a break mid-round serializes the snapshot instead).
- */
 function midTurnSource(battle: Battle): () => Battle {
   const snapshot = simFastOn('clone') ? copyBattle(battle) : null;
   if (snapshot) {
@@ -167,7 +135,6 @@ function midTurnSource(battle: Battle): () => Battle {
   return () => deserializeFromParsed(parsedMid ??= parseSearchState(midTurn));
 }
 
-/** Resolves open forced-switch requests (mid-turn KOs) by greedily picking the replacement that statically evaluates best. */
 export function resolveForcedSwitches(
   battle: Battle,
   seed: PRNGSeed,

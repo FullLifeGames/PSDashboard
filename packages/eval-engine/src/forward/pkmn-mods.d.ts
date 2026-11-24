@@ -1,5 +1,5 @@
-// @pkmn/mods exports `./champions` without a `types` condition (TS7016), so these are the package's own declarations
-// (build/champions/*.d.ts); Formats is typed as the list the simulator's `Dex.formats.extend` takes.
+// @pkmn/mods exports `./champions` without a `types` condition (TS7016): these are the package's own declarations
+// (build/champions/*.d.ts).
 declare module '@pkmn/mods/champions' {
   import type {
     Dex, ModdedAbilityDataTable, ModdedBattleScriptsData, ModdedConditionDataTable, ModdedFormatDataTable,

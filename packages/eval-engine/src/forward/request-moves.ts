@@ -1,10 +1,7 @@
 import type { Side } from '@pkmn/sim';
 import { toId } from '@fulllifegames/replay-core';
 
-/**
- * A request entry as the sim writes it (side.activeRequest.active[n].moves). A locked move (rampage, charge release, recharge,
- * Bide, Uproar) has no `target` key at all (pokemon.js getMoves(lockedMove)).
- */
+/** A request entry (side.activeRequest.active[n].moves); a locked move has no `target` key (pokemon.js getMoves). */
 export interface RequestMove {
   move: string;
   id?: string;
@@ -16,10 +13,8 @@ interface RequestSlot {
   moves: RequestMove[];
 }
 
-/** The move id the sim accepts: the entry's id when present, else the display name's key. */
 export function requestMoveKey(move: RequestMove): string {
-  // Happiness moves display with computed BP ("Return 102"): the entry's id
-  // is the token the sim accepts, the display name is only the label.
+  // Happiness moves display with computed BP ("Return 102"): the entry's id is what the sim accepts, not the label.
   return move.id || toId(move.move);
 }
 
@@ -28,12 +23,11 @@ export function isLockedEntry(move: RequestMove): boolean {
   return !('target' in move);
 }
 
-/** A Tatsugiri inside its Dondozo (the simulator's `commanding` volatile): the simulator passes its slot (side.js getChoiceIndex). */
+/** A Tatsugiri inside its Dondozo (`commanding` volatile): the simulator passes its slot (side.js getChoiceIndex). */
 export function isCommanding(pokemon: { volatiles: Record<string, unknown> }): boolean {
   return !!pokemon.volatiles['commanding'];
 }
 
-/** The first slot at or after `from` the sim asks a choice for (side.js getChoiceIndex: fainted and commanding actives pass). */
 export function nextChoosingSlot(sideState: Side, from: number): number {
   let slot = from;
   while (slot < sideState.active.length) {
@@ -52,11 +46,8 @@ function submittablePart(part: string, entries: RequestMove[]): string {
   return ['move', String(index + 1), ...tokens.slice(2).filter(token => !/^[+-]?\d+$/.test(token))].join(' ');
 }
 
-/**
- * A doubles choice the sim accepts. By name a locked move makes the sim assume target type 'normal' and demand a target
- * (side.js:397,469); by its entry index the sim takes the missing type as is and uses the locked target (side.js:384,480-492).
- * Locked parts therefore go by index, without a target number; singles and choices without a locked part come back unchanged.
- */
+/** A doubles choice the sim accepts: locked parts go by entry index, without a target number. */
+// By name the sim demands a target for a locked move (side.js:397,469); by index it uses the locked one (side.js:384).
 export function submittableChoice(sideState: Side, choice: string): string {
   if (sideState.active.length < 2 || sideState.requestState !== 'move') return choice;
   const slots = (sideState.activeRequest as { active?: (RequestSlot | null)[] } | null)?.active;
