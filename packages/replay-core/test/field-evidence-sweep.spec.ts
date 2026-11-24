@@ -5,14 +5,8 @@ import { RULE_VIEWS, proven, ruledOut, type Holder, type Side } from './screen-s
 import { cleanEnd, fieldLines, playField, type FieldLine, type FieldSceneOptions } from './field-scenes';
 import type { SimView } from './sim-views';
 
-// The turns of a weather or a terrain name the item that held it: Sunny Day lasts five turns, eight with Heat Rock; Rain Dance with Damp Rock, Sandstorm
-// with Smooth Rock, Hail and Snowscape with Icy Rock, the four terrains with Terrain Extender (Generation 4 on). The log shows the start and the end of the
-// field but never the item, so the inference reads the field's lifetime and holds it to the Dex's own turns (conditionTurns, held to the simulator by
-// screen-turns-sweep.spec.ts): the plain five turns rule the items out for the setter, the turns of one item prove it. The setter is the user of the move, or
-// the `[of]` body of an ability's start (found by playing every ability, never by its name). Nothing is read when the turns prove nothing: a field that never
-// ends in the residual phase, a removal, a replacement (a terrain's replacement prints only the new start), an item that did not count (Klutz, Embargo, Magic
-// Room), an item the log showed change, an Illusion team. The oracle is `cleanEnd`: a log that ends cleanly must give exactly the verdict of the held item,
-// every other log must give none.
+// Oracle `cleanEnd`: a log that ends cleanly gives exactly the held item's verdict, every other log gives none.
+// A plain run plays every tenth move and the weather and terrain moves; `DICE_SWEEPS=full` plays every move.
 
 const FULL = process.env.DICE_SWEEPS === 'full';
 const asRulesDex = (view: SimView): RulesDex => view.dex as unknown as RulesDex;
@@ -41,10 +35,6 @@ function itemsOf(view: SimView, condition: string): { id: string; name: string }
   return [...(table?.byItem.keys() ?? [])].map(id => ({ id, name: view.dex.items.get(id).name }));
 }
 
-/**
- * The verdict of a log against the scene: a log that ends cleanly gives the held item's verdict, every other log gives none.
- * Returns whether the log ended cleanly, so a row can also insist that it did.
- */
 function expectVerdict(view: SimView, log: string, scene: { kind: FieldLine['kind']; condition: string; side: Side; species: string; held?: string }, sound = false): boolean {
   const items = itemsOf(view, scene.condition);
   const clean = cleanEnd(linesOf(view, log), scene.kind, scene.side, scene.side) !== null;
@@ -53,7 +43,6 @@ function expectVerdict(view: SimView, log: string, scene: { kind: FieldLine['kin
   const label = `${scene.condition} held ${scene.held ?? 'nothing'}`;
   const held = items.find(item => item.name === scene.held);
   if (sound && clean) {
-    // a move that shows an item (Trick, Knock Off) lets the reader abstain; it must never read a wrong item
     // the item evidence also writes "(consumed)" after a Fling that threw the item
     expect(shown === '' || (!!held && shown.startsWith(held.name)), `${label}: proven ${shown}`).toBe(true);
     if (held) expect(ruled, `${label}: ruled out`).not.toContain(held.id);
@@ -80,7 +69,6 @@ const played = (view: SimView, options: FieldSceneOptions): string => {
   return log;
 };
 
-/** Every ability of the rule set that starts a weather or a terrain, found by playing it as the lead (the foe's Tackle also reaches the abilities that answer a hit). */
 const abilityCache = new Map<string, { id: string; kind: FieldLine['kind']; condition: string }[]>();
 function abilitySetters(view: SimView): { id: string; kind: FieldLine['kind']; condition: string }[] {
   const cached = abilityCache.get(view.name);
@@ -100,7 +88,6 @@ function abilitySetters(view: SimView): { id: string; kind: FieldLine['kind']; c
   return found;
 }
 
-/** The abilities a rule set must find (the oracle's own list, with the generation each debuts in): the sweep proves it plays them. */
 const NAMED_ABILITIES: [string, number][] = [['drought', 3], ['drizzle', 3], ['sandstream', 3], ['snowwarning', 4], ['electricsurge', 7], ['grassysurge', 7], ['mistysurge', 7], ['psychicsurge', 7], ['sandspit', 8], ['seedsower', 9]];
 
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the setter of a move: $name', view => {
@@ -141,8 +128,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the setter of an ab
         test(`${id}, ${held ?? 'no item'}${view.doubles ? `, slot ${slot + 1}` : ''}: the lifetime reads the item`, () => {
           const log = played(view, { p1: { species: SNORLAX, ability: view.dex.abilities.get(id).name, item: held }, moves2: { 1: 'tackle' }, turns: TURNS, slot });
           const clean = expectVerdict(view, log, { kind, condition, side: 'p1', species: SNORLAX, held });
-          // an ability sets a weather for good before Generation 6, and a primal weather stands until its setter leaves: no move of
-          // the rule set sets that condition, so the Dex has no turns for it
+          // Before Gen 6 an ability's weather lasts for good, as does a primal one: no move sets it, so no Dex turns.
           const finite = view.dex.gen >= 6 && fieldMoves(view).some(entry => entry.condition === condition);
           expect(clean, finite ? 'the log shows the field ending cleanly' : 'the field stands for good').toBe(finite);
         });
@@ -151,7 +137,6 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the setter of an ab
   }
 });
 
-/** The cases where the turns prove nothing: each plays the control (a verdict) and then the cause. */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove nothing: $name', view => {
   const cases = [
     { move: 'sunnyday', kind: 'weather' as const },
@@ -219,19 +204,11 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
       const log = played(view, { p1: { species: SNORLAX }, moves1: { 1: first }, p2: { species: 'Vaporeon' }, moves2: { 4: second }, turns: TURNS, slot });
       expect(cleanEnd(linesOf(view, log), kind, 'p1', 'p1'), `${first} then ${second}`).toBeNull();
       for (const item of itemsOf(view, condition)) expect(ruledOut(log, 'p1', SNORLAX, item.id), `${first} then ${second}: ${item.id}`).toBe(false);
-      // the first field would read eight turns if the reader let it live on to the second one's end
       expect(proven(log, 'p1', SNORLAX), `${first} then ${second}`).toBe('');
     }
   });
 });
 
-/**
- * The removers and the silent movers, found by playing every move of the rule set against a board with a weather and a terrain standing (p1's Sunny Day with
- * the rock and p2's Electric Terrain with Terrain Extender, both on turn 1), p1 playing the move on turn 5, the last turn a plain field stands. A log whose
- * field ended cleanly must read the held item (one that shows an item change may abstain, never read a wrong one); a log whose field was cut short by a removal, a
- * replacement or a move must read none. A move that ends or changes the field with no line the reader knows fails here. The plain run plays every tenth move and the moves
- * whose Dex entry mentions a weather or a terrain.
- */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunnyday').length > 0))('removers and movers of weather and terrain: $name', view => {
   const rock = itemsOf(view, 'sunnyday')[0];
   const extender = known(view, ['electricterrain']).length > 0 ? itemsOf(view, 'electricterrain')[0] : undefined;
@@ -259,11 +236,6 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && itemsOf(view, 'sunn
   });
 });
 
-/**
- * The fields an ability's start leaves standing for good: `startsForGood` runs the condition's onFieldStart handler on a stand-in and reads the duration it
- * leaves. Held to the simulator: a log of 12 turns shows the field end exactly when the answer is false. Before Generation 6 an ability's weather lasts for
- * good, while the callback of `conditionTurns` says five and eight for every source: the reader leaves such a start out.
- */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the fields an ability leaves standing for good: $name', view => {
   const dex = asRulesDex(view);
 
@@ -283,11 +255,7 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 3))('the fields an abili
   });
 });
 
-/**
- * A log of the simulator never ends a field that stands for good in the residual phase, so the rule is held by a log with a
- * residual end spliced in: the weather of Torkoal's Drought ends where turn 5's upkeep line stood (five turns from the lead). From
- * Generation 6 the five turns rule the rock out; before it the field stands for good and the end proves nothing.
- */
+// The simulator never ends a field that stands for good in the residual phase: a spliced residual end holds the rule.
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4 && !view.doubles && itemsOf(view, 'sunnyday').length > 0))('a residual end spliced into a field that stands for good: $name', view => {
   test('the spliced end reads as five turns only where an ability\'s weather ends', () => {
     const rock = itemsOf(view, 'sunnyday')[0];

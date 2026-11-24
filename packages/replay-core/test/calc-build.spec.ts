@@ -14,8 +14,7 @@ import { rulesDex } from '../src/rules-dex';
 import { boostItemIds } from '../src/spreads/boost-items';
 import { toId } from '../src/ids';
 
-// The build hands the solver the usage list of the species less the items the log refutes, and the format's Item Clause read from the log's
-// `|rule|` line (else the simulator's rule table of the `|tier|`; a Custom Game has none).
+// Item Clause: the log's `|rule|` line, else the simulator's rule table of the `|tier|` (a Custom Game has none).
 const evs = (spread: Partial<PokemonEvs>): PokemonEvs => ({ hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...spread });
 const usage = (species: string, items: string[], nature: string, spread: PokemonEvs): SmogonUsageStats['pokemon'][string] => ({
   species, rawCount: 100, abilities: [], moves: [],
@@ -109,7 +108,6 @@ describe('what the build offers', () => {
     expect(itemClauseLimit(rule('|rule|Item Clause: Limit 1 of each item'))).toBe(1);
     expect(itemClauseLimit(rule('|rule|Item Clause: Limit one of each item'))).toBe(1);
     expect(itemClauseLimit(rule('|rule|Item Clause: Limit 2 of each item'))).toBe(2);
-    // No rule line: the simulator's own rule table names the clause (Doubles OU carries none, a VGC format does).
     expect(itemClauseLimit(rule('', '[Gen 9] Custom Game'))).toBeUndefined();
     expect(itemClauseLimit(rule('', '[Gen 9] Doubles OU'))).toBeUndefined();
     expect(itemClauseLimit(rule('', '[Gen 9] VGC 2024 Reg G'))).toBe(1);
@@ -158,7 +156,6 @@ for (const formatid of ['gen9ou', 'gen9doublesou']) {
       '|poke|p1|Garchomp, M|', '|poke|p2|Gengar, M|',
       '|start', '|switch|p1a: Garchomp|Garchomp, M|100/100', '|switch|p2a: Gengar|Gengar, M|100/100', '|turn|1',
     ].join('\n');
-    // Shadow Ball from a Timid 252 SpA Gengar without an item on a Calm 252 HP / 252 SpD Garchomp: three rolls.
     const gen = calcGenerationFor(9);
     const body = (species: string, nature: string, spread: PokemonEvs) => buildCalcPokemon(gen, species, { level: 100, nature, evs: spread });
     const wall = body('Garchomp', 'Calm', evs({ hp: 252, spd: 252, spe: 4 }));

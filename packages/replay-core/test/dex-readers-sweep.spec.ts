@@ -14,10 +14,6 @@ import { unknownEvs, unknownField } from '../src/team-info';
 import type { RevealedPokemonInfo } from '../src/types';
 import type { SmogonUsageStats } from '../src/smogon/stats-types';
 
-// The Dex a reader gets from its state is the Dex of the game, entry by entry. The mod: every move, ability, item and condition the Champions mod
-// changes (found by comparing the raw mod data with Scarlet/Violet, not by our code) reads the mod's value, in singles and doubles, and the
-// Scarlet/Violet value through a Scarlet/Violet tier line. The generations: the readers of base stats, abilities and the type chart run over every
-// species and type of Generations 1 to 9 against the generation's own data; older generations must really differ from Generation 9 on what they read.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const mod = Dex.dexes.champions;
 const standard = Dex.forGen(9);
@@ -35,7 +31,6 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a, text) === JSON.string
 interface Row { id: string; mod: unknown; standard: unknown }
 type Kind = 'moves' | 'abilities' | 'items' | 'conditions';
 
-/** The fields that carry text or listing data, not rules (and the ones the Dex derives from the mod's own data set). */
 const PROSE = new Set(['desc', 'shortDesc', 'rating', 'isNonstandard', 'tier', 'doublesTier', 'natDexTier', 'gen', 'num', 'fullname', 'effectType', 'sourceEffect', 'toString']);
 
 function changed(kind: Kind, fields: string[]): Record<string, Row[]> {
@@ -60,7 +55,7 @@ const conditions = changed('conditions', []);
 
 describe('the sweep sees what the mod changes', () => {
   test('the changed entries are the ones the round-67 diff and the fact check counted', () => {
-    // By id, not by row: the mod's 16 typed Hidden Power rows share one id (the fact check's 18 types and 23 flags count rows).
+    // By id, not by row: the mod's 16 typed Hidden Power rows share one id (the fact check counts rows).
     expect(moves.type?.map(row => row.id).sort()).toEqual(['growth', 'snaptrap']);
     expect(moves.basePower?.length).toBe(25);
     expect(moves.accuracy?.length).toBe(5);

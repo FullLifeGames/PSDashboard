@@ -3,10 +3,7 @@ import { Dex } from '@pkmn/sim';
 import { megaEvolution } from '../src/protocol/speed-evidence';
 import { generationsFor } from '../src/format-generations';
 
-/**
- * The tempo evidence marks a forme change as a Mega Evolution from the Dex: the Mega-Z formes of Champions carry no isMega flag,
- * so the rule reads the holder's item (`megaStone`), as the simulator's canMegaEvo does.
- */
+// The Mega-Z formes of Champions carry no `isMega` flag: the rule reads the holder's `megaStone`, as canMegaEvo does.
 const data = generationsFor('[Gen 9 Champions] OU').get(9);
 
 describe('megaEvolution reads the Mega formes from the Dex', () => {

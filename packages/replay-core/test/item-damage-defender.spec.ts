@@ -8,9 +8,6 @@ import { judgeItemsByDamage } from '../src/team/item-damage';
 import { guessedEvs, guessedField, revealedField, unknownField } from '../src/team-info';
 import type { PokemonEvs, PokemonFieldInfo, RevealedPokemonInfo } from '../src/types';
 
-// An Assault Vest (special hits) or an Eviolite (both Defenses, only on a species that can still evolve) falls when a logged hit is too strong for
-// the bulkiest-not-enough holder: no EVs, IV 0 and a lowering nature at its softest, the item on. The attacker is as built with its unproven item
-// ranged, so a hit that the attacker's item cancels against the Vest refutes nothing. Every hit is a real @pkmn/sim battle; the judge sees only the log.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -24,9 +21,7 @@ const set = (build: Build): PokemonSet => ({
   evs: sp(build.evs ?? {}), ivs: { ...ALL_31, ...build.ivs }, level: 100, gender: '',
 }) as PokemonSet;
 
-/** The softest bulk the judge allows: no EVs, IV 0 in HP and the defenses, a nature that lowers a defense. */
 const SOFT = { nature: 'Naive', ivs: { hp: 0, def: 0, spd: 0 } };
-/** The hardest: HP and both defenses at the cap and a nature that raises Special Defense. */
 const HARD = { nature: 'Sassy', evs: { hp: 252, def: 252, spd: 252 }, ivs: { hp: 31, def: 31, spd: 31 } };
 const SOFT_PHYSICAL = { nature: 'Hasty', ivs: { hp: 0, def: 0, spd: 0 } };
 
@@ -133,9 +128,7 @@ describe('an Eviolite the hits taken rule out', () => {
     });
 
     test(`${kind}: a fully evolved species never gets Eviolite judged: where the Vest explains the hit, an Eviolite that does nothing on it must not fall`, () => {
-      // Corviknight really holds a Vest at its hardest and the attacker is guessed with Choice Specs but holds none: the span
-      // (no item) lets the Vest explain the hit. The calculator gives an Eviolite no effect on a species that cannot evolve, so
-      // it reads like no item, which the hit does not explain; that must not count against the item.
+      // The calculator gives an Eviolite no effect on a species that cannot evolve: it reads like no item.
       const { attacker } = sceneOf(kind, specialScene(kind, corviknight('Assault Vest', HARD), '', 'shadowball'));
       const guessed = builtAttacker(attacker, GHOLDENGO_BUILD, guessedField('Choice Specs'));
       expect(judge(kind, holderInfo('Corviknight', guessedField('Eviolite')), guessed, none, ['Assault Vest', 'Eviolite'])).toEqual([]);
@@ -146,8 +139,6 @@ describe('an Eviolite the hits taken rule out', () => {
 describe('the attacker\'s unproven item gets a span before a hit refutes a defender item (the mirror of the defender\'s hull)', () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a guessed Choice Specs the attacker did not hold does not refute the Vest it was set against`, () => {
-      // The Vest holder is the bulkiest the judge allows. Against the guessed Specs the hit looks too weak for any Vest; the
-      // attacker holds no item, so the Vest it took is fine, and the span that includes no item keeps it.
       const { attacker } = sceneOf(kind, specialScene(kind, corviknight('Assault Vest', HARD), '', 'shadowball'));
       const guessed = builtAttacker(attacker, GHOLDENGO_BUILD, guessedField('Choice Specs'));
       expect(judge(kind, holderInfo('Corviknight', guessedField('Assault Vest')), guessed)).toEqual([]);
@@ -157,9 +148,7 @@ describe('the attacker\'s unproven item gets a span before a hit refutes a defen
       const { attacker } = sceneOf(kind, specialScene(kind, corviknight('Assault Vest', {}), 'Choice Specs', 'shadowball'));
       const guessed = builtAttacker(attacker, GHOLDENGO_BUILD, guessedField('Leftovers'));
       const holder = holderInfo('Corviknight', guessedField('Assault Vest'));
-      // Without the span the hit outruns the softest Vest holder against a Leftovers attacker...
       expect(judge(kind, holder, guessed)).toEqual(['assaultvest']);
-      // ...with the span of the items the attacker could hold, Specs explains it.
       expect(judge(kind, holder, guessed, () => ['Choice Specs', 'Leftovers'])).toEqual([]);
     });
   }
@@ -168,9 +157,6 @@ describe('the attacker\'s unproven item gets a span before a hit refutes a defen
 describe("the attacker's built spread is a guess too (the Dragonite of 752624)", () => {
   for (const kind of ['singles', 'doubles'] as const) {
     test(`${kind}: a physical spread built for an attacker that really hit with its Special Attack refutes no Vest`, () => {
-      // Primarina took a 63% Thunderbolt from a Dragonite the build gave a physical spread: the Vest it may hold
-      // must not fall to a Special Attack the build never gave. Here the Gholdengo really has 252 Special Attack and the
-      // build a physical spread; the Vest holder is at its softest, where the hit would refute it against the built spread.
       const { attacker } = sceneOf(kind, specialScene(kind, corviknight('Assault Vest', {}), 'Choice Specs', 'shadowball'));
       const physical: Build = { ...GHOLDENGO_BUILD, nature: 'Adamant', evs: { atk: 252, spe: 252, hp: 4 } };
       const guessed = builtAttacker(attacker, physical, revealedField('Choice Specs'));

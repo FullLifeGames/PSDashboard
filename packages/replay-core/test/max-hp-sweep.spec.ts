@@ -5,13 +5,7 @@ import * as championsMod from '@pkmn/mods/champions';
 import { hpEvsForMaxHp } from '../src/spreads/max-hp.ts';
 import { calcEvs, evBudget, evStep, ZERO_EVS, type EvBudget } from '../src/spreads/ev-budget.ts';
 
-// `hpEvsForMaxHp` computes a maximum HP with the library (gen.stats.calc of @pkmn/data), not with its own copy of the formula. Held in two ways. The
-// simulator is the oracle for every species of generations 3 to 9 (and every Champions species on the Stat Point scale), at the levels a replay plays
-// and at 1 and 5: a Pokémon built with chosen HP EVs reports its maxhp, and the inverse, asked for that maxhp with the chosen EVs as its prior, answers the
-// chosen EVs (the prior is nearest to itself, so a level that leaves several candidates still has one answer). Shedinja, whose HP is 1 whatever the spread,
-// measures nothing: `undefined`. The hand formula (`legacyHpEvsForMaxHp`) and the library agree on every base HP 1 to 255, at the levels below, with IVs 31,
-// 30 and 0, from either end of the prior, on both budgets, for every HP the formula can print and for the ones next to them. The formula reads no game
-// type; the Champions budget is the second table.
+// The formula reads no game type; the Champions budget is its second table. Shedinja measures nothing (`undefined`).
 
 function legacyHpEvsForMaxHp(
   baseHp: number, level: number, maxhp: number, priorHp: number, iv = 31, budget: EvBudget = evBudget(''),
@@ -32,7 +26,6 @@ Dex.formats.extend(championsMod.Formats);
 const LEVELS = [1, 2, 5, 10, 50, 99, 100];
 const BUDGETS: Array<[string, EvBudget]> = [['EVs', evBudget('gen9ou')], ['Stat Points', evBudget('gen9championsou')]];
 
-/** The HP the hand formula prints for a count of EVs (or Stat Points) on a budget. */
 const printedHp = (baseHp: number, level: number, iv: number, value: number, budget: EvBudget): number =>
   Math.floor((2 * baseHp + iv + Math.floor(calcEvs({ ...ZERO_EVS, hp: value }, budget).hp / 4)) * level / 100) + level + 10;
 
@@ -79,12 +72,10 @@ describe('the library formula equals the hand formula it replaced', () => {
   });
 });
 
-/** Teams of six built from `mons`, battle by battle, so one Battle reports twelve maximum HPs. */
 function maxHpsOf(format: string, mons: Array<{ species: string; level: number; ev: number }>): number[] {
   const out: number[] = [];
   for (let i = 0; i < mons.length; i += 12) {
     const real = mons.slice(i, i + 12);
-    // A side with no Pokémon asks the (absent) team generator: the last battle is filled up with a filler whose HP is dropped.
     const chunk = [...real, ...Array.from({ length: 12 - real.length }, () => ({ species: 'Pikachu', level: 50, ev: 0 }))];
     const sets = (part: typeof chunk): PokemonSet[] => part.map(mon => ({
       name: mon.species, species: mon.species, item: '', ability: 'No Ability', moves: ['tackle'], nature: 'Hardy', gender: '',
@@ -111,7 +102,6 @@ describe('the simulator is the oracle: every species, the maxhp it reports comes
     })));
     const reported = maxHpsOf(`gen${generation}customgame`, mons);
     expect(reported.length).toBe(mons.length);
-    // The oracle reads real numbers: Shedinja reports 1 HP.
     expect(reported[mons.findIndex(mon => mon.species === 'Shedinja')]).toBe(1);
     const wrong: string[] = [];
     mons.forEach((mon, index) => {

@@ -3,10 +3,6 @@ import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { historyPower, historyPowerMove } from '../src/spreads/hit-power';
 
-// Every move of the Dex with a basePowerCallback, in every generation and mod the corpus plays, sorted by what the callback reads on a recording
-// stand-in. The history class (the fallen of the user's side, the hits the user took) is what the solver prices; its members are held against
-// the simulator's own callback on a real battle at sampled counts. A new move that reads only the history joins the class and fails the list below.
-
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
 const dexes = [1, 2, 3, 4, 5, 6, 7, 8, 9].map(gen => [`gen ${gen}`, Dex.forGen(gen)] as const).concat([['champions', Dex.mod('champions')] as never]);

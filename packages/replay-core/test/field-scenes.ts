@@ -2,20 +2,14 @@ import type { Battle, PokemonSet } from '@pkmn/sim';
 import { spectatorLog, plainStyle, type Holder, type Side, type Style } from './screen-scenes';
 import { battleIn, mon, type SimView } from './sim-views';
 
-// Every log comes from the simulator (the spectator's view, as a replay holds it). Side p1 (Alpha) and side p2 (Beta) each play a first body
-// with the moves the scene names; the others splash.
-
 export interface FieldSceneOptions {
   p1: Holder;
   p2?: Holder;
-  /** A move by turn for each side (a side splashes otherwise). The body knows every move it names. */
   moves1?: Record<number, string>;
   moves2?: Record<number, string>;
   turns: number;
-  /** Which of its two slots the first body of p1 stands in (doubles). */
   slot?: 0 | 1;
   style?: Style;
-  /** Bodies behind p1's first body (Illusion users and the like). */
   bench?: Holder[];
 }
 
@@ -59,7 +53,6 @@ export interface FieldLine {
 
 const idOf = (text: string): string => text.replace(/^move: /, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The weather and terrain lines of a log. `isTerrain` is the rule set's own answer (the Dex's effect type), so no id sits in this file. */
 export function fieldLines(log: string, isTerrain: (id: string) => boolean): FieldLine[] {
   const found: FieldLine[] = [];
   let turn = 0;
@@ -81,10 +74,7 @@ export function fieldLines(log: string, isTerrain: (id: string) => boolean): Fie
   return found;
 }
 
-/**
- * Whether the log shows the field standing from a start to its own end in the residual phase, with no other start between and no end in the
- * action phase: the one case where its turns may prove an item. `moveSide` stands in for `setter` where a move's start carries no side.
- */
+/** `moveSide` stands in for `setter` where a move's start carries no side. */
 export function cleanEnd(lines: FieldLine[], kind: FieldLine['kind'], setter: Side, moveSide: Side): { start: number; end: number } | null {
   const own = lines.filter(line => line.kind === kind);
   const start = own.findIndex(line => line.op === 'start' && (line.side || moveSide) === setter);

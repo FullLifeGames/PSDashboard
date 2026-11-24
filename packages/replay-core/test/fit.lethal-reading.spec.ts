@@ -39,12 +39,8 @@ import {
 import { Dex, type PokemonSet } from '@pkmn/sim';
 import type { ReadObservation } from '../src/spreads/observation-read';
 
-// A knockout reads the shown HP by the game's own display. The log prints the defender's HP before the hit as a text (`75/100`); the real HP behind
-// it lies in the range the rounding of the battle's mode allows (Scarlet/Violet rounds the percentage up, the Champions mod down, the pixel bar down,
-// an exact text is exact; hp-display.ts, held to the simulator by hp-display-sweep.spec.ts). A rung whose best roll stays below the lowest HP the text
-// allows is refuted with no slack; the slack of two percent stays for readings that are not knockouts. The rows build every observation from the
-// maximum roll of the built attacker, so the edge sits at one HP point: the text one step above is refuted, the text of that very HP is not. The display
-// rules are written out in the rows (ceil, floor, 48ths) and never taken from hp-display.ts.
+// The rows write the display rounding out (ceil, floor, 48ths) and never take it from hp-display.ts.
+// Scarlet/Violet rounds the percentage up, the Champions mod down, the pixel bar down.
 const WORLDS = [
   { name: 'Scarlet/Violet singles', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: false, round: 'up' },
   { name: 'Scarlet/Violet doubles', formatid: 'gen9vgc2025regi', gen: calcGenerationFor(9), level: 50, max: 252, doubles: true, round: 'up' },
@@ -59,14 +55,9 @@ const asSet = (species: string, nature: string, spread: PokemonEvs, level: numbe
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level, gender: '',
 });
 
-/**
- * The prior attacker (a bulky-offense guess) and the defender of every row: Garchomp's Stone Edge (one target in doubles too) hits a Clefable that holds no
- * investment and no Defense nature (no defender rung is weaker, so the defender cannot absorb the refutation).
- */
 function scene(world: World, attackerAtk: number, defender = 'Clefable', move = 'Stone Edge') {
   const sets = {
     p1: [asSet(defender, 'Hardy', evs({}), world.level, ['Moonblast'])],
-    // The prior spends the whole budget (Atk, full HP, the rest in Speed), as a build does: the top-up has nothing left to hand to the offense.
     p2: [asSet('Garchomp', 'Adamant', evs({ atk: attackerAtk, hp: world.max, spe: (world.max === 252 ? 508 : 66) - world.max - attackerAtk }), world.level, [move])],
   };
   const base: DamageObservation = {
@@ -89,7 +80,6 @@ describe('a knockout is refuted when the best roll stays below the lowest HP the
     describe(world.name, () => {
       const { base, ctx, prior, maxHp, best } = scene(world, 252);
       const error = (obs: DamageObservation) => observationError(ctx, obs, 'p2:garchomp', prior);
-      // The text of the best roll's own HP: the lowest HP it allows is at most the best roll. One step higher, every HP it allows is above it.
       const printedOk = world.round === 'up' ? Math.ceil(100 * best / maxHp) : Math.floor(100 * best / maxHp);
 
       test('the scene sits inside the percentage scale (a body of 100 or more HP, a best roll below full)', () => {
@@ -113,7 +103,6 @@ describe('a knockout is refuted when the best roll stays below the lowest HP the
       });
 
       test('a Sturdy or Focus Sash survivor reads the lowest HP before the hit less the highest HP left', () => {
-        // Left at the text 1/100: the real HP left is 1 to the highest HP that prints 1.
         const highestLeft = world.round === 'up' ? Math.floor(maxHp / 100) : Math.ceil(2 * maxHp / 100) - 1;
         const lowestBefore = (shown: number) => (world.round === 'up' ? Math.floor((shown - 1) * maxHp / 100) + 1 : Math.ceil(shown * maxHp / 100));
         let bad = 2;
@@ -161,7 +150,6 @@ describe('a knockout is refuted when the best roll stays below the lowest HP the
 describe('an attacker seen only in knockouts opens its offense when the game refutes the prior, and keeps it otherwise', () => {
   for (const world of WORLDS) {
     describe(world.name, () => {
-      // The prior carries 100 Atk EVs (12 Stat Points in Champions); the two knockouts read the text one step above its best roll, which an Atk of 252 reaches.
       const priorAtk = world.max === 252 ? 100 : 12;
       const { sets, base, best, maxHp } = scene(world, priorAtk);
       const reach = scene(world, world.max);
@@ -188,7 +176,6 @@ describe('an attacker seen only in knockouts opens its offense when the game ref
       });
 
       test('a knockout no rung reaches opens nothing: the prior stands', () => {
-        // The Atk 252 roll tops out below full (the scene's own check), so a defender shown at 100/100 is out of every rung's reach.
         expect(reach.best).toBeLessThan(reach.maxHp);
         const solved = solve(100);
         expect(solved?.evs.atk ?? priorAtk).toBe(priorAtk);
@@ -197,14 +184,10 @@ describe('an attacker seen only in knockouts opens its offense when the game ref
   }
 });
 
-// The top-up spends the offense stat while the mon's lines "fit as well as at the winning rung". When the winning rung is a coarse one (Special Attack 0)
-// that a knockout refutes, its own error is the knockout's shortfall and the tolerance lets a clean line on the same mon overshoot by as much (gen9ou-2658671254,
-// Iron Valiant: the stat ran to 180 where the lines fit best between 32 and 56). The top-up measures from the cheapest spread that reaches every knockout.
 describe('the top-up never ends on an offense the lines fit worse than the cheapest spread that reaches every knockout', () => {
   for (const world of WORLDS) {
     describe(world.name, () => {
       const step = world.max === 252 ? 4 : 1;
-      // The prior carries Speed only and a neutral nature (a guess without a boost), so the defender has nothing to absorb and the scene stays on the attacker.
       const start = scene(world, 0);
       const sets = { p1: start.sets.p1, p2: start.sets.p2.map(set => ({ ...set, nature: 'Hardy', evs: evs({ spe: world.max }) })) };
       const { base, maxHp } = start;
@@ -212,16 +195,12 @@ describe('the top-up never ends on an offense the lines fit worse than the cheap
       const prior = spreadFor(ctx, 'p2', 'Garchomp');
       const foe = spreadFor(ctx, 'p1', 'Clefable');
       const rollAt = (atk: number) => rollRange(ctx, base, { ...prior, evs: { ...prior.evs, atk } }, foe)!;
-      // The knockout needs the best roll of a quarter of the budget: the exact text of that HP (a player's own view), so no rounding hides it.
       const quarter = Math.round(world.max / 4 / step) * step;
       const knockout = lethalAt(base, Math.floor(rollAt(quarter).max * maxHp), maxHp);
-      // A clean line at the lowest roll of Atk 0: it fits every spread to the quarter and starts to overshoot above it.
       const clean: DamageObservation = { ...base, lethal: false, observedFraction: rollAt(0).min };
       const lines = [clean, clean, knockout];
-      // The defender's maximum HP is the log's (an exact text and switch line), so its HP EVs cannot drift into the hit the attacker answers.
       const solved = inferSpreads(lines, sets, world.formatid, [], new Map(), new Map([['p1:clefable', { maxhp: maxHp, level: world.level }]]));
       const mine = solved.get('p2:garchomp')!;
-      // The lines priced against the defender as the solve left it, the solved attacker's Atk swapped.
       const priced = buildSolveContext(lines, sets, world.formatid, []);
       priced.solved = new Map(solved);
       const spread = (atk: number) => ({ ...mine, evs: { ...mine.evs, atk } });
@@ -331,7 +310,6 @@ describe('a forced spread on a lone foe gives the solver no reading (doubles)', 
   }
 });
 
-/** Singles: the foe sets the terrain itself; the hit has one target in the game and in the calculator's Singles field. */
 const SINGLES: FieldScene = {
   title: 'Expanding Force in Psychic Terrain',
   p1: () => [HATTERENE()],
@@ -361,7 +339,6 @@ describe('singles: nothing spreads, the reading stays and holds the simulator da
 
 describe('partner-ability-hits', () => {
   const GARCHOMP = (move: string) => set('Garchomp', '', 'Rough Skin', [move, 'Splash'], 'Hardy', { hp: 252, [Dex.moves.get(move).category === 'Special' ? 'spa' : 'atk']: 252 });
-  /** A weak attacker: under the boost of Flower Gift the strong one would knock out the Blissey. */
   const WEAK_GARCHOMP = (move: string) => set('Garchomp', '', 'Rough Skin', [move, 'Splash'], 'Hardy', { hp: 252 });
   const BLISSEY = () => set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252, spd: 252 });
   const CHANSEY = () => set('Chansey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 });
@@ -434,7 +411,6 @@ describe('partner-ability-hits', () => {
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation without the partner reading and the partner fact. */
   const stale = (obs: ReadObservation, fact: string): ReadObservation => {
     const rest: Record<string, unknown> = { ...obs };
     for (const field of ['attackerAlly', 'defenderAlly', 'attackerAllyAbility', 'defenderAllyAbility']) delete rest[field];
@@ -459,7 +435,6 @@ describe('partner-ability-hits', () => {
               expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1}`).toBe(true);
               expect(observationError(ctx, obs, keyOf('p2', scene.defender), spread)).toBe(0);
             });
-            // Read without the partner, at least one hit misses the simulator's damage: the scene shows something.
             expect(reads.some((obs, index) => !containsDamage(ctx, scene, stale(obs, scene.fact), damages[index], played.maxHp)), 'a hit the stale reading misses').toBe(true);
           }
         });
@@ -524,7 +499,6 @@ describe('spread-fit-field', () => {
     return Math.round(range!.min * maxHp * (1 - slack)) <= damage && damage <= Math.round(range!.max * maxHp * (1 + slack));
   }
 
-  /** Scenes the stale reading (without the field facts) gets wrong: every hit is in the rolls with them, and at least one is not in the rolls without. */
   const FIELD_SCENES: FieldScene[] = [
     WEATHER_BALL, TERRAIN_PULSE, MULTISCALE, SUPREME_OVERLORD, TERA_ATTACKER, TERA_DEFENDER, ERUPTION, GASTRO_ACID, GAS_ON_THE_PARTNER, GRAVITY,
     FLASH_FIRE, HELPING_HAND, BEADS_OF_RUIN,
@@ -547,7 +521,6 @@ describe('spread-fit-field', () => {
               expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1} of ${damages.length}`).toBe(true);
               expect(observationError(ctx, obs, keyOf('p2', scene.defender), spread), `error of hit ${index + 1}`).toBe(0);
             });
-            // The reading before the Champions fix gets at least one hit wrong, or the scene shows nothing.
             expect(reads.some((obs, index) => !containsDamage(ctx, scene, stale(obs), damages[index], played.maxHp)), 'a hit the stale reading misses').toBe(true);
           }
         });
@@ -610,7 +583,6 @@ describe('spread-fit-field', () => {
       test(`${kind}: a suppressed ability, and an ability that is on`, () => {
         expect(observationsOf(GASTRO_ACID, kind)[0]).toMatchObject({ defenderSuppressed: true });
         expect(observationsOf(GASTRO_ACID, kind)[0].attackerSuppressed).toBeUndefined();
-        // The ability comes back with the switch.
         expect(observationsOf(GASTRO_ACID_THEN_SWITCH, kind)[0].defenderSuppressed).toBeUndefined();
         const [flashed] = observationsOf(FLASH_FIRE, kind);
         expect(flashed).toMatchObject({ attackerAbility: 'flashfire', attackerAbilityOn: true });

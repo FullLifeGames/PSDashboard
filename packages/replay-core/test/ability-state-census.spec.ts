@@ -3,9 +3,6 @@ import { Dex } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { abilityStateAtHit, abilityStateIds, allyStateIds } from '../src/spreads/ability-state';
 
-// Every ability whose damage handler reads how long the target has been out (activeTurns) or whether a Pokémon still has to move (willMove)
-// is in the table of spreads/ability-state.ts, and every table id is such an ability; a new Dex ability of that kind fails here.
-
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
 const dexes = [5, 6, 7, 8, 9].map(gen => [`gen ${gen}`, Dex.forGen(gen)] as const).concat([['champions', Dex.mod('champions')] as never]);

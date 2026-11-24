@@ -6,11 +6,6 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { isSitrusBerry, sitrusEatsAt, sitrusKeptAt } from '../src/inference/item-triggers';
 import { rulesDex } from '../src/rules-dex';
 
-// Four items whose trigger the protocol shows without the item's line are ruled out (Air Balloon, Booster Energy and Eject Pack: trigger-evidence.spec.ts): a
-// Lum Berry holder eats on a status or a confusion, a Sitrus Berry holder at half HP, an Eject Button holder survives a damaging hit from another
-// Pokémon and leaves, a Red Card holder sends the attacker away. Every log comes from @pkmn/sim: each case first checks what a real holder shows, then
-// what the inference reads for p2 from the same battle with a neutral item. A guard is a case where the real holder shows nothing and nothing is ruled out.
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -29,7 +24,6 @@ interface Scene {
   mate?: PokemonSet;
   p1Bench?: number;
   p2Bench?: number;
-  /** The turns as the p1 move ids with targets: 'earthquake' (the holder is target 1 in doubles), 'splash'. */
   turns: string[][];
   p2Turns?: string[];
   gen?: number;
@@ -65,7 +59,6 @@ function playTeams(p1: PokemonSet[], p2: PokemonSet[], options: { doubles: boole
     battle.choose('p1', first);
     battle.choose('p2', second);
   }
-  // A pivot, an Eject Button or a Red Card asks for a switch: the first Pokémon on the bench comes in.
   if (battle.requestState === 'switch') {
     for (const side of [battle.p1, battle.p2]) {
       const forced = (side.activeRequest as { forceSwitch?: boolean[] } | null)?.forceSwitch;
@@ -157,8 +150,7 @@ describe('Sitrus Berry is eaten at half HP', () => {
     expect(ruledOut(mixed, 'Chansey')).not.toContain('sitrusberry');
   });
 
-  // Leech Seed's drain is the residual phase: the simulator eats the berry in its last update, after the upkeep line (level 90 holds above half after the
-  // Earthquake and below it after the drain).
+  // Leech Seed's drain is residual: the simulator eats the berry in its last update, after the upkeep line.
   test.each(FORMATS)('%s: a berry eaten after the upkeep line is no miss, and a drain below half without it rules the item out', format => {
     const scene: Scene = { holder: { level: 90 }, turns: [hit('earthquake'), hit('leechseed')] };
     const real = play(scene, format, 'Sitrus Berry');
@@ -184,7 +176,6 @@ describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where 
   const mod = championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>;
   Dex.mod('champions', mod);
 
-  /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: the upper bound of the true ratio never undercuts the real one. */
   test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged to eat at the shown HP eats at every real HP that shows it', formatid => {
     const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
     if (battle.requestState === 'teampreview') { battle.choose('p1', 'team 1'); battle.choose('p2', 'team 1'); }
@@ -206,7 +197,6 @@ describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where 
 });
 
 describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating', () => {
-  /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: a berry judged kept stays uneaten at every real HP that shows it. */
   test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged kept is uneaten at every real HP that shows the text', formatid => {
     const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
     if (battle.requestState === 'teampreview') { battle.choose('p1', 'team 1'); battle.choose('p2', 'team 1'); }
@@ -248,7 +238,6 @@ describe('Eject Button switches its holder out after a damaging hit', () => {
     const real = play(scene, 'doubles', 'Eject Button');
     expect(real).toMatch(/\|-enditem\|p2a: Blissey\|Eject Button/);
     expect(real).not.toMatch(/\|-enditem\|p2b: Chansey\|Eject Button/);
-    // The holder that held on has its item: the other holder's line is in its window.
     expect(ruledOut(real, 'Chansey')).not.toContain('ejectbutton');
     expect(ruledOut(play(scene, 'doubles', NEUTRAL), 'Blissey')).not.toContain('ejectbutton');
   });

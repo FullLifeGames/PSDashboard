@@ -11,11 +11,7 @@ import type { PokemonEvs, SpeedOrderObservation } from '../src/types';
 import { toId } from '../src/ids';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * A race reads the Speed the simulator plays: a Choice Scarf rounded as the simulator rounds it, a battle forme on its own base
- * Speed, a transformed mover on its target's Speed with its own item. Only a race that cannot end strict may tie, and a Speed IV
- * below 31 comes in only when no other Speed keeps an order.
- */
+// Only a race that cannot end strict may tie; a Speed IV below 31 comes in only when no other Speed keeps the order.
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
 const evs = (hp: number, atk: number, def: number, spa: number, spd: number, spe: number): PokemonEvs => ({ hp, atk, def, spa, spd, spe });
@@ -32,7 +28,7 @@ const race = (first: Side, firstSpecies: string, second: Side, secondSpecies: st
 const spreadOf = (solved: Map<string, SpreadCandidate>, sets: Sets, side: Side, species: string) =>
   solved.get(`${side}:${toId(species)}`) ?? sets[side].find(set => toId(set.species) === toId(species))!;
 
-/** The Speed @smogon/calc gives the built mon with its item (an independent reading of the simulator's rounding). */
+// An independent reading of the simulator's rounding: @smogon/calc's Speed for the built mon with its item.
 function calcRaceSpeed(gen: number, species: string, spread: { nature: string; evs: PokemonEvs }, item: string): number {
   const generation = Generations.get(gen as 4 | 5 | 6 | 7 | 8 | 9);
   const pokemon = new Pokemon(generation, species, { nature: spread.nature, evs: spread.evs, item: item || undefined });
@@ -58,7 +54,6 @@ describe('a Choice Scarf races at the Speed the simulator rounds', () => {
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`a strict repair under a Scarf lands on a real lead, not on 301.5 against 301 (${formatid})`, () => {
-      // Scarf Heatran (190 at 0 Speed EVs, 285 with the Scarf) moved before a known Garchomp at 301.
       // 44 Speed EVs give Heatran 201 and a Scarfed 301.5 unrounded; the simulator plays 301, a coin flip.
       const sets = {
         p1: [mon('Heatran', 'Modest', evs(252, 0, 0, 252, 4, 0), 'Choice Scarf')],
@@ -84,7 +79,6 @@ function simulate(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: [st
   return battle;
 }
 
-/** The spectator's log of a simulated battle (a replay): each split keeps its public line. */
 function replayLog(battle: Battle): string {
   const lines: string[] = [];
   for (let i = 0; i < battle.log.length; i++) {
@@ -108,7 +102,6 @@ const ordersOf = (battle: Battle, turn: number) => parseReplayLogWithObservation
   .filter(order => order.turn === turn).map(order => `${order.firstSide} ${order.firstSpecies} > ${order.secondSide} ${order.secondSpecies}`);
 
 describe('a battle forme races with the Speed the simulator gave it that turn', () => {
-  // Lopunny 339 (Jolly 252) is slower than Latias 350 (Timid 252); Lopunny-Mega 405 is faster.
   const lopunny = mon('Lopunny', 'Jolly', evs(0, 0, 0, 0, 0, 252), 'Lopunnite', ['Splash']);
   const latias = mon('Latias', 'Timid', evs(0, 0, 0, 0, 0, 252), 'Leftovers', ['Splash']);
   const shuckle = (name: string) => ({ ...mon('Shuckle', 'Relaxed', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']), name });
@@ -145,7 +138,6 @@ describe('a transformed mover races on its target\'s Speed with its own item', (
       ` > ${order.secondSide} ${order.secondSpecies}${order.secondCopied ? ` as ${order.secondCopied.side} ${order.secondCopied.species}` : ''}`);
 
   test('singles: an Imposter Ditto with a Choice Scarf outruns the foe\'s next Pokémon as a Scarfed Garchomp (simulator)', () => {
-    // Garchomp Jolly 252 (333) copied and Scarfed: 499 against Dragapult Timid 252 (421).
     const battle = simulate('gen9customgame', [
       mon('Garchomp', 'Jolly', evs(0, 252, 0, 0, 4, 252), 'Rocky Helmet', ['Splash']),
       mon('Dragapult', 'Timid', evs(0, 0, 0, 252, 4, 252), 'Choice Specs', ['Splash']),
@@ -173,7 +165,6 @@ describe('a transformed mover races on its target\'s Speed with its own item', (
 
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`the copied race binds the target's spread with the mover's Scarf, never gives the target one (${formatid})`, () => {
-      // Garchomp (Adamant 0 Speed, 240) copied by a Scarf Ditto outran a known Dragapult at 421: Garchomp needs 282.
       const build = (item: string) => ({
         p1: [mon('Garchomp', 'Adamant', evs(252, 252, 0, 0, 4, 0), 'Rocky Helmet'), mon('Dragapult', 'Timid', evs(0, 0, 0, 252, 4, 252), 'Choice Specs')],
         p2: [mon('Ditto', 'Relaxed', evs(252, 0, 252, 0, 4, 0), item)],
@@ -183,7 +174,6 @@ describe('a transformed mover races on its target\'s Speed with its own item', (
       const scarfed = build('Choice Scarf');
       const solved = inferSpreads([], scarfed, formatid, [order], know);
       expect(calcRaceSpeed(9, 'Garchomp', spreadOf(solved, scarfed, 'p1', 'Garchomp'), 'Choice Scarf')).toBeGreaterThan(421);
-      // Without the Scarf no Garchomp Speed reaches 421: the order binds nothing it can repair, and no item moves.
       const plain = build('Light Clay');
       const unsolved = inferSpreads([], plain, formatid, [order], know);
       expect(spreadOf(unsolved, plain, 'p1', 'Garchomp').evs.spe).toBe(0);
@@ -195,8 +185,6 @@ describe('a transformed mover races on its target\'s Speed with its own item', (
 describe('only the races that cannot end strict may tie', () => {
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`a forced tie leaves the component's other races strict (${formatid})`, () => {
-      // The known Heatran (216) moved before Garchomp, whose slowest Speed is 216: that race can only tie.
-      // Garchomp then moved before Gholdengo (prior 219), which must come strictly under 216, not onto it.
       const sets = {
         p1: [mon('Heatran', 'Modest', evs(252, 0, 0, 152, 0, 104), 'Leftovers'), mon('Gholdengo', 'Bold', evs(252, 0, 196, 0, 0, 60), 'Air Balloon')],
         p2: [mon('Garchomp', 'Jolly', evs(0, 252, 0, 0, 4, 252), 'Rocky Helmet')],
@@ -215,7 +203,6 @@ describe('only the races that cannot end strict may tie', () => {
 describe('a Speed IV below 31 only when no other Speed keeps a seen order', () => {
   for (const formatid of ['gen9ou', 'gen9doublesou']) {
     test(`the highest IV that keeps the order (${formatid})`, () => {
-      // The known Ting-Lu (126) moved before Incineroar, whose slowest Speed at IV 31 is 140 (Sassy, 0 EVs).
       // IV 14 gives 125, IV 15 would tie at 126.
       const sets = {
         p1: [mon('Ting-Lu', 'Careful', evs(252, 0, 4, 0, 252, 0), 'Leftovers')],
@@ -228,7 +215,6 @@ describe('a Speed IV below 31 only when no other Speed keeps a seen order', () =
       const incineroar = known.get('p2:incineroar');
       expect(incineroar?.ivs?.spe).toBe(14);
       expect([incineroar?.evs.spe, incineroar?.nature]).toEqual([0, 'Sassy']);
-      // Control: an unknown Ting-Lu can still move, so no IV leaves 31.
       const open = inferSpreads([], sets, formatid, orders, knowledge({ 'p1:tinglu': { itemKnown: true }, 'p2:incineroar': { itemKnown: true } }));
       expect(open.get('p2:incineroar')?.ivs?.spe ?? 31).toBe(31);
     });
@@ -239,10 +225,6 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
   const sorted = (orders: string[]) => [...orders].sort();
 
   test('doubles: Ally Switch moves the slots, so a later Mega Evolution names the right Pokemon (Gen 6)', () => {
-    // Meowstic (Timid 252, 307) Ally Switches into p1a at t1; at t2 Kangaskhan, now p1b, mega evolves and
-    // races on its base Speed in Gen 6 (216). Meowstic Psyshocks first (a status move could ride Prankster),
-    // Garchomp (333) before Kangaskhan, Shuckle last. Read with the slots before the swap, Kangaskhan's
-    // evolution looked like Meowstic's and its races were named Meowstic.
     const battle = simulate('gen6doublescustomgame', [
       mon('Kangaskhan', 'Hardy', evs(0, 0, 0, 0, 0, 0), 'Kangaskhanite', ['Splash']),
       mon('Meowstic', 'Timid', evs(0, 0, 0, 0, 0, 252), 'Light Clay', ['Ally Switch', 'Psyshock']),
@@ -256,9 +238,6 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
     ]));
   });
   test('singles: a second mover that changes forme after the first mover acted raced in its old forme (Gen 9, Eiscue)', () => {
-    // Garchomp (Adamant 0 Speed, 240) Tackles Eiscue (136), whose Ice Face breaks into Eiscue-Noice (296)
-    // before it moves; the simulator had already put Garchomp first. Read as Eiscue-Noice, the order
-    // asked Garchomp for 228 Speed EVs.
     const garchomp = mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Tackle']);
     const eiscue = { ...mon('Eiscue', 'Hardy', evs(0, 0, 0, 0, 0, 0), 'Leftovers', ['Splash']), ability: 'Ice Face' };
     const battle = simulate('gen9customgame', [garchomp], [eiscue], [['move 1', 'move 1']]);
@@ -270,9 +249,6 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
   });
 
   test('doubles: each race reads the formes from the last sort before its first mover acted (Gen 9)', () => {
-    // Before Garchomp (240) acts, Rotom-Wash (208) sits ahead of Eiscue (136); Garchomp's Tackle breaks
-    // Eiscue into Eiscue-Noice (296) and the simulator re-sorts the movers still waiting, so Eiscue now
-    // moves before Rotom-Wash: Garchomp raced Eiscue, Eiscue-Noice raced Rotom-Wash.
     const battle = simulate('gen9doublescustomgame', [
       mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Tackle']),
       mon('Rotom-Wash', 'Bold', evs(252, 0, 252, 0, 4, 0), 'Leftovers', ['Splash']),
@@ -287,8 +263,6 @@ describe('the forme that raced, after Ally Switch, mid-turn changes and Ultra Bu
   });
   for (const format of ['gen7customgame', 'gen7doublescustomgame']) {
     test(`Ultra Burst re-sorts like a Mega Evolution in Gen 7, so the order names Necrozma-Ultra (${format})`, () => {
-      // Necrozma-Dusk-Mane (0 Speed, 190) bursts into Necrozma-Ultra (294) and, re-sorted, moves before
-      // Garchomp (240). Read on its turn-start forme, the order forced Dusk-Mane past 240.
       const necrozma = mon('Necrozma-Dusk-Mane', 'Hardy', evs(0, 252, 0, 0, 4, 0), 'Ultranecrozium Z', ['Splash']);
       const garchomp = mon('Garchomp', 'Adamant', evs(0, 252, 0, 0, 4, 0), 'Leftovers', ['Splash']);
       const doubles = format.includes('doubles');

@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-// The sim writes [of] differently per line: a heal names the holder (battle.js:2103), Pickpocket's -enditem only the attacker
-// (abilities.js:3390), Rough Skin's -damage the victim and [of] the holder. The dex decides: a species never gets an ability it cannot have.
+// A heal's [of] names the holder (battle.js:2103), Pickpocket's -enditem only the attacker (abilities.js:3390).
 
 const head = (tier: string) => ['|gametype|singles', '|gen|9', `|tier|${tier}`, '|start'];
 const abilityOf = (log: string[], side: 'p1' | 'p2', species: string) =>
@@ -56,7 +55,7 @@ describe('ability holders from [from] ability lines', () => {
     expect(abilityOf(log, 'p2', 'Landorus-Therian')).toBe('');
   });
 
-  // @pkmn/protocol reads an absorbing heal (Dry Skin, Earth Eater, Volt Absorb, Water Absorb) without the attacker's [of].
+  // @pkmn/protocol reads an absorbing heal (Dry Skin, Earth Eater, Volt/Water Absorb) without the attacker's [of].
   test('a format with free abilities: an absorbing heal goes to the healed Pokémon, as the protocol reads the line', () => {
     const log = [...head('[Gen 9] Balanced Hackmons'),
       '|switch|p1a: Alomomola|Alomomola, F|100/100', '|switch|p2a: Toad|Seismitoad, M|80/100', '|turn|1',

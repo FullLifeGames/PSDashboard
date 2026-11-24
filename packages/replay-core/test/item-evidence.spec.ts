@@ -4,8 +4,6 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { contactLands } from '../src/inference/item-evidence';
 import { rulesDex } from '../src/rules-dex';
 
-// Items the protocol rules out by a line it does not show. Every log comes from @pkmn/sim: each case first checks the sim fact, then what the inference reads for p2.
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -14,10 +12,7 @@ function set(species: string, item: string, ability: string, moves: string[], le
   };
 }
 
-/**
- * The spectators' log: each `|split|` keeps its public line. `format` defaults to OU, whose rules fix each species' abilities; Balanced Hackmons lets any
- * species hold any ability, and the inference then judges nothing that hangs on an ability.
- */
+// `format` defaults to OU, which fixes each species' abilities; Balanced Hackmons judges nothing about abilities.
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'ou'): string {
   const battle = new Battle({
     formatid: toID(doubles ? `gen${gen}doubles${format}` : `gen${gen}${format}`), seed: '1,2,3,4',
@@ -98,7 +93,6 @@ describe('Leftovers and Black Sludge show their heal below full HP', () => {
   test('full HP or Heal Block rule nothing out', () => {
     const full = play([hitter()], [tank('Expert Belt')], [['move bulkup', 'move curse']]);
     expect(ruledOut(full, 'Snorlax')).not.toContain('leftovers');
-    // Psychic Noise blocks healing for two turns: the sim shows no heal, the inference stays out.
     const blocker = set('Mew', '', 'Synchronize', ['Psychic Noise'], 100);
     const blocked = (item: string) => play([blocker], [tank(item)], [['move psychicnoise', 'move curse']]);
     expect(shown(blocked('Leftovers'), 'Leftovers')).toBe(false);
@@ -108,8 +102,6 @@ describe('Leftovers and Black Sludge show their heal below full HP', () => {
 
 describe('Illusion hides who stands on the field', () => {
   test('a side that may hold an Illusion user rules nothing out by absence (Zoroark-Hisui as Dondozo)', () => {
-    // Zoroark-Hisui (Choice Specs) takes the shape of the last party member:
-    // the log names Dondozo while the sand chips it and its Shadow Balls land.
     const sand = set('Tyranitar', '', 'Sand Stream', ['Calm Mind']);
     const zoroark = set('Zoroark-Hisui', 'Choice Specs', 'Illusion', ['Shadow Ball'], 50);
     const dondozo = set('Dondozo', 'Leftovers', 'Unaware', ['Rest']);
@@ -147,7 +139,6 @@ describe('Rocky Helmet from the generation of Protective Pads on', () => {
     play(p1, p2, turns, doubles, gen, 'ou');
 
   test('singles gen 9: an attacker whose Leftovers were knocked off hits without helmet damage: Rocky Helmet ruled out', () => {
-    // Turn 1 the attacker's item is unknown when it hits; turn 2 it holds nothing, as the log showed (573756 Melmetal).
     const attacker = set('Rattata', 'Leftovers', 'Guts', ['Tackle']);
     const knocked: [string, string][] = [['move tackle', 'move knockoff'], ['move tackle', 'move roost']];
     expect(shown(ou([attacker], [holder('Rocky Helmet')], knocked), 'Rocky Helmet')).toBe(true);
@@ -230,9 +221,7 @@ describe('Shell Bell heals its holder after a hit below full HP', () => {
 
 describe('the slot map, gen 4 Life Orb and free abilities', () => {
   test('doubles: after Ally Switch the slot map follows the swap, so a benched Leftovers holder is not judged', () => {
-    // Singles is not affected: Ally Switch fails without a partner. Snorlax holds Leftovers,
-    // Psychic Noise keeps them silent for two turns, Ally Switch moves Snorlax to slot a,
-    // and slot a switches out: the benched Snorlax shows no heal and must not be judged.
+    // Singles is not affected: Ally Switch fails without a partner.
     const p1 = [set('Mew', '', 'Synchronize', ['Tackle']), set('Blissey', '', 'Natural Cure', ['Seismic Toss', 'Psychic Noise'])];
     const p2 = [
       set('Kadabra', '', 'Synchronize', ['Ally Switch', 'Calm Mind']), set('Snorlax', 'Leftovers', 'Thick Fat', ['Curse']),
@@ -280,7 +269,6 @@ describe('the slot map, gen 4 Life Orb and free abilities', () => {
 });
 
 describe('a one-hit KO and Life Orb, per generation', () => {
-  // A level-30 target: Sheer Cold's accuracy grows with the level gap, so the KO lands.
   const target = () => [set('Snorlax', '', 'Thick Fat', ['Rest'], 30)];
   const lapras = (item: string) => [set('Lapras', item, 'Shell Armor', ['Sheer Cold'])];
   const ohko = (item: string, gen: number) => play(target(), lapras(item), [['move rest', 'move sheercold']], false, gen, 'ou');

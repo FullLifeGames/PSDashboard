@@ -5,18 +5,7 @@ import { toId } from '../src/ids';
 import type { RulesDex } from '../src/rules-dex';
 import { play, type PlayBody } from './blocked-effects-play';
 
-// For every ability of every generation and mod the corpus plays with abilities (Generations 3 to 9 and the Champions mod), in singles and doubles, a
-// species that can hold the ability takes one of 17 effects (a flinch, Intimidate, a primary and a secondary drop, each kind of status by a status move
-// and by a secondary, confusion, Taunt, Encore, Torment, a status under sun, which Leaf Guard needs). The scene is played on @pkmn/sim once with no
-// ability on the target (the log the inference reads) and once with each ability of the species. The expected set is every ability under which the effect
-// did NOT land; the inference reads the first log and must rule out exactly that set. A false rule-out is never allowed; a miss is allowed only for the
-// scenes in `UNREAD`, each pinned with the reason. Doubles run the same scenes with an ally on the field, and a second sweep gives the ally the ability
-// (the `onAlly` guards: Flower Veil, Sweet Veil, Pastel Veil, Aroma Veil): the ally's candidates are ruled out by what lands on the body next to it.
-// A third sweep plays every species as the source of the flinch against a body that holds Inner Focus or nothing: the inference must rule Inner Focus
-// out exactly when no ability of the attacker's species ignores it (Mold Breaker, Teravolt, Turboblaze). The default run plays the abilities that have a
-// guard handler (`onTryAddVolatile`, `onTryBoost`, `onTryHit`, `onSetStatus`, `onImmunity`, `onModifySecondaries`, `onAllyTry*`, `onAllySetStatus`; every third
-// of them) and every 24th of the rest; with `DICE_SWEEPS=full` it plays every ability; doubles play in Generations 5 and 9, the full run in all realms.
-// The sweep runs in two specs by realm, each calling `registerBlockedEffectsSweep` with its realms.
+// `DICE_SWEEPS=full` plays every ability; a plain run every third guard-handler ability and every 24th of the rest.
 
 const FULL = process.env.DICE_SWEEPS === 'full';
 
@@ -34,9 +23,7 @@ interface Scene {
   moves: string[];
   sourceAbility?: string;
   landed: RegExp;
-  /** A move that picks one foe: the ally sweep plays only these. */
   single: boolean;
-  /** A dice-bound effect (an accuracy below 100, a secondary chance): an ability that changes the dice (No Guard, Forewarn) needs more than one seed to show it. */
   chance?: boolean;
 }
 const onTarget = (command: string, rest: string) => new RegExp(`\\|${command}\\|p2a: Target\\|${rest}`);
@@ -61,11 +48,7 @@ const SCENES: Scene[] = [
 ];
 
 const SEEDS = Array.from({ length: 60 }, (_, index) => `${index + 1},2,3,4`);
-/**
- * The source of every scene: a species that learns every move the scenes use, holding an ability its species has. A source with no ability is a body the
- * game never plays, and Trace copies it as nothing (Smeargle's only Generation 3 ability is Own Tempo, which Trace copies and which refuses confusion). The
- * second ability is the one that touches no scene (Technician); the first stands where a generation has one.
- */
+// The source holds an ability its species has: Trace copies a body with none as nothing.
 const sourceOf = (realm: Realm): PlayBody => {
   const abilities = dexOf(realm).species.get('Smeargle').abilities as Record<string, string>;
   return { species: 'Smeargle', ability: abilities['1'] ?? abilities['0'] };
@@ -94,11 +77,7 @@ function baseline(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody
   return null;
 }
 
-/**
- * Whether the effect lands on the target with the ability: on the baseline's seed, else on any other seed of the list (a dice-bound
- * effect needs many, an ability that halves a status move's accuracy needs a few). A target that transforms into the source (Imposter) is
- * no refusal: it copies the source's moves, and the scene then plays another battle.
- */
+// A target that transforms into the source (Imposter) is no refusal: it copies the source's moves.
 function landsWith(realm: Realm, doubles: boolean, scene: Scene, target: PlayBody, ally: PlayBody | null, seed: string, user: PlayBody = sourceOf(realm)): boolean {
   const first = battleOf(realm, doubles, scene, target, ally, seed, user);
   if (scene.landed.test(first) || /\|-transform\|/.test(first)) return true;
@@ -114,10 +93,6 @@ function ruledOutOf(log: string, species: string): string[] {
 }
 
 const GUARD = /^on(Try(AddVolatile|Boost|Hit)|SetStatus|Immunity|ModifySecondaries|Ally(Try|SetStatus))/;
-/**
- * The abilities every run plays, one for each kind of row the sampled run misses: an ability that copies the foe's, a weather guard, a redirect the move
- * never gets past, a field the ability sets on entry.
- */
 const ALWAYS = ['trace', 'leafguard', 'lightningrod', 'psychicsurge'];
 const DOUBLES_DEFAULT = ['Generation 5', 'Generation 9'];
 
@@ -136,21 +111,12 @@ function speciesPerAbility(dex: RulesDex): Map<string, { species: string; abilit
   return picks;
 }
 
-/**
- * Refusals the reader leaves unread, by scene: the guard refuses the move itself and never the effect, so the log's effect proves the guard away only through
- * the move's own refusal (the landed hit reads those: landed-hit-sweep.spec.ts holds the verdicts). Only the Neutralizing Gas row of the Intimidate scene
- * stays unread; a pin the reader reads turns the row red.
- */
+// The guard refuses the move itself, never the effect: the log proves it away only through the move's own refusal.
 const UNREAD: Record<string, string[]> = {
-  // The gas stops the activation of the source's Intimidate on the field; the log of a holder shows the gas itself, so the log without it is the absence read.
   Intimidate: ['neutralizinggas'],
 };
 
-/**
- * The same for the ally sweep: an ally with Lightning Rod draws the Thunder Wave aimed at its partner (the redirect is the ability's own
- * line on the log), so with the ability the effect never reaches the body the scene looks at; the redirect is no refusal of the effect.
- * The target sweep reads the ability (the holder's own immunity is a `TryHit`), so the pin stands here only.
- */
+// Lightning Rod on the ally draws the Thunder Wave aimed at its partner: a redirect, no refusal of the effect.
 const UNREAD_ALLY: Record<string, string[]> = {
   'paralysis (Thunder Wave)': ['lightningrod'],
   'paralysis under sun': ['lightningrod'],
@@ -181,8 +147,7 @@ function sweepAllies(realm: Realm): Verdict {
   const dex = dexOf(realm);
   const verdict: Verdict = { missed: [], falseRuleOuts: [], stalePins: [], played: 0, skipped: 0 };
   const holders = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
-  // The inference keeps one team entry per species (a format with Species Clause, as every ladder and tournament one): a target of the ally's
-  // own species would share its entry, so the target's own rule-outs (Leaf Guard under sun) would read as the ally's. Targets are another species.
+  // One team entry per species: a target of the ally's species would share its entry, so targets differ from it.
   const targetsOf = (ally: string) => ['Grass', 'Normal'].map(type => holders.find(entry => entry.name !== ally && entry.types.length === 1 && entry.types[0] === type)!);
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
   const allyOf = (ability: (typeof abilities)[number]) => holders.find(entry => Object.values(entry.abilities).includes(ability.name));
@@ -210,7 +175,6 @@ function sweepAllies(realm: Realm): Verdict {
   return verdict;
 }
 
-/** The sweep over the attacker's species: the flinch rules Inner Focus out exactly when no ability of the attacker's species ignores it. */
 function sweepSources(realm: Realm): { wrong: string[]; played: number; ignoring: number } {
   const dex = dexOf(realm);
   const found = dex.species.all().filter(entry => entry.exists && entry.gen <= dex.gen && !entry.battleOnly && !String(entry.isNonstandard ?? '').startsWith('Future'));
@@ -223,7 +187,6 @@ function sweepSources(realm: Realm): { wrong: string[]; played: number; ignoring
   for (const entry of attackers) {
     const own = [...new Set(Object.values(entry.abilities) as string[])];
     const logs = own.map(ability => battleOf(realm, false, flinch, { species: target.name, ability: 'Inner Focus' }, null, '1,2,3,4', { species: entry.name, ability }));
-    // An attacker that transforms into the target (Imposter) copies the target's moves: the scene plays another battle, no refusal and no ignore.
     if (logs.some(log => /\|-transform\|/.test(log))) continue;
     const may = logs.some(log => flinch.landed.test(log));
     const calm = own.find((ability, index) => !flinch.landed.test(logs[index])) ?? own[0];

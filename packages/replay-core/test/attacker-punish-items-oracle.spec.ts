@@ -4,11 +4,7 @@ import { toId } from '../src/ids';
 import { arg, fromEffect, readLine } from '../src/inference/log-line';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-// The Dex marks nine items with an onDamagingHit handler (Absorbent Bulb, Air Balloon, Cell Battery, Jaboca Berry, Luminous Moss, Rocky
-// Helmet, Rowap Berry, Snowball, Weakness Policy) and the handler does not say whom it hurts. Each is played in every view the corpus
-// plays (a contact move and a special move without contact, alone and with a partner in doubles); the `|-damage|` lines against the
-// attacker with `[from] item:` name the items that punish, which is the list of ATTACKER_PUNISH_ITEMS (Rocky Helmet from Generation 5,
-// the two berries from Generation 4, so Generations 1 to 3 have none).
+// The handler does not say whom an item hurts: the `[from] item:` damage on the attacker of a played hit is the oracle.
 
 const realItems = (view: SimView) => view.dex.items.all().filter(item => item.exists && item.isNonstandard !== 'Future');
 

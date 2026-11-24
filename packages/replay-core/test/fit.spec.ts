@@ -21,17 +21,8 @@ import {
   type Scene,
 } from './fit-field-scenes';
 
-// The spread solver prices the doubles hits the parser records. The oracle is the simulator: real battles on the doubles format, a VGC format and the
-// Champions doubles format, each scene one turn (Reflect two) with the damage taken off every target. The calculator's rolls under the played spreads
-// must contain it, so the Field must say Doubles, cut a spread hit and leave a lone target alone, and a hit on the attacker's partner must reach the
-// partner's set.
-//   A  Rock Slide on two foes                       the 0.75 cut
-//   B  Rock Slide while one foe protects            the simulator keeps spreadHit (two targets at the start): the cut stays
-//   C  Earthquake on a foe and the partner          the other foe is immune (Flying); the partner is a defender of its own side
-//   D  Stomping Tantrum through Reflect             the screen is x2732/4096 in doubles, x0.5 in singles
-//   E  Rock Slide with one foe left on the field    no spreadHit: no cut, whatever the move's target says (the other foe set off
-//                                                   Explosion the turn before and has no replacement; VGC picks four, so its bench would come in: not run there)
-// Singles has no spread targets and no partner: the Field of a singles hit is the one of before (last test).
+// Reflect is x2732/4096 in doubles, x0.5 in singles.
+// The simulator keeps spreadHit (two targets at the start) when a foe protects, so the 0.75 cut stays.
 describe('doubles-damage-fit', () => {
   interface Cfg { name: string; id: string; level: number; points: boolean }
   const CFGS: Cfg[] = [
@@ -44,7 +35,6 @@ describe('doubles-damage-fit', () => {
   const body = (cfg: Cfg, species: string, ability: string, moves: string[], nature: string, evs: Partial<PokemonEvs>): PokemonSet => ({
     name: species, species, item: '', ability, moves, nature, evs: sp(evs), ivs: { ...ALL_31 }, level: cfg.level, gender: '',
   });
-  // The most a stat takes: 252 EVs, 32 Stat Points.
   const top = (cfg: Cfg) => (cfg.points ? 32 : 252);
   const garchomp = (cfg: Cfg) => body(cfg, 'Garchomp', 'Rough Skin', ['Rock Slide', 'Earthquake', 'Stomping Tantrum', 'Protect'], 'Jolly', { atk: top(cfg), spe: top(cfg) });
   const blissey = (cfg: Cfg) => body(cfg, 'Blissey', 'Natural Cure', ['Splash', 'Protect'], 'Calm', { hp: top(cfg) });
@@ -52,7 +42,6 @@ describe('doubles-damage-fit', () => {
   const slowking = (cfg: Cfg) => body(cfg, 'Slowking', 'Regenerator', ['Splash', 'Protect', 'Reflect'], 'Calm', { hp: top(cfg) });
   const bomber = (cfg: Cfg) => body(cfg, 'Corviknight', 'Pressure', ['Splash', 'Protect', 'Explosion'], 'Impish', { hp: top(cfg) });
   const corviknight = (cfg: Cfg) => body(cfg, 'Corviknight', 'Pressure', ['Splash', 'Protect'], 'Impish', { hp: top(cfg) });
-  // Four-mon teams: the VGC format picks four at team preview. Bench bodies never move.
   const bench = (cfg: Cfg) => [blissey(cfg), blissey(cfg)].map((mon, index) => ({ ...mon, species: ['Chansey', 'Audino'][index], name: ['Chansey', 'Audino'][index] }));
 
   interface Scene {
@@ -169,18 +158,15 @@ describe('doubles-damage-fit', () => {
               const key = keyOf(obs.defenderSide!, obs.defenderSpecies);
               expect(obs).toMatchObject({ doubles: true, spread: played.spreadHit });
               expect(Math.abs(obs.observedFraction - damage / maxHp)).toBeLessThan(0.01);
-              // The oracle: the calculator's rolls under the played spreads, on the field the observation names.
               const attackerSet = played.sets.p1[0];
               const defenderSet = (obs.defenderSide === 'p1' ? played.sets.p1 : played.sets.p2).find(set => set.species === obs.defenderSpecies)!;
               const range = rollRange(ctx, obs, spreadOf(attackerSet), spreadOf(defenderSet))!;
               expect(damage / maxHp).toBeGreaterThanOrEqual(range.min - 1e-9);
               expect(damage / maxHp).toBeLessThanOrEqual(range.max + 1e-9);
-              // The solver keeps the hit (partner included) and scores the played spread 0.
               expect(ctx.byMon.get(keyOfSet('p1', attackerSet))).toContain(obs);
               expect(ctx.byMon.get(key)).toContain(obs);
               expect(observationError(ctx, obs, keyOfSet('p1', attackerSet), spreadOf(attackerSet))).toBe(0);
             }
-            // Read on a singles field, the same spread hit lies a third below what the played spread rolls: the solver would refute it.
             if (scene.spread) {
               for (const obs of observations.filter(entry => entry.defenderSide === 'p2')) {
                 const asSingles = { ...obs, doubles: false, spread: false };
@@ -257,19 +243,15 @@ describe('doubles-damage-fit', () => {
 });
 
 const DRAGONITE = () => set('Dragonite', '', 'Multiscale', ['Extreme Speed', 'Splash'], 'Adamant', { atk: 252, spe: 252 }, 'Normal');
-/** A weak Wood Hammer: Bold and no Attack IV, so that a Grassy Terrain hit does not take Calyrex-Ice down. */
 const RILLABOOM = () => ({ ...set('Rillaboom', '', 'Grassy Surge', ['Wood Hammer', 'Splash'], 'Bold', {}), ivs: { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 31 } });
-/** The body the pin's usage prior gave Calyrex-Ice: Brave, 252 HP, 252 Attack, 4 Special Defense. */
 const CALYREX_ICE = () => set('Calyrex-Ice', '', 'As One (Glastrier)', ['Splash'], 'Brave', { hp: 252, atk: 252, spd: 4 });
 const CHIEN_PAO = (moves: string[], nature: string, spread: Partial<PokemonEvs>) => set('Chien-Pao', '', 'Sword of Ruin', moves, nature, spread);
 
-/** The Chien-Pao beside the defender holds the Sword of Ruin (the pin's turn 3). Doubles only. */
 const RUIN_ON_THE_PARTNER: FieldScene = {
   title: "the defender's partner holds the Sword of Ruin, the attacker Terastallizes to Normal",
   p1: () => [DRAGONITE(), RILLABOOM()],
   p2: () => [CALYREX_ICE(), CHIEN_PAO(['Splash'], 'Impish', { hp: 252, def: 252 })],
   attacker: 'Dragonite', defender: 'Calyrex-Ice',
-  // Two hits, since the solver wants two lines before it moves a body; the Grassy Terrain heals between them.
   steps: () => [
     { p1: `${hit(true, 'Extreme Speed', true)}, ${splash()}`, p2: `${splash()}, ${splash()}` },
     { p1: `${hit(true, 'Extreme Speed')}, ${splash()}`, p2: `${splash()}, ${splash()}` },
@@ -278,7 +260,6 @@ const RUIN_ON_THE_PARTNER: FieldScene = {
   hitLine: true,
 };
 
-/** The defender holds the Sword of Ruin itself: the ability does not lower its own Defense, whatever the other holders do. Doubles only. */
 const RUIN_ON_THE_DEFENDER: FieldScene = {
   title: 'the defender holds the Sword of Ruin',
   p1: () => [DRAGONITE(), RILLABOOM()],
@@ -289,7 +270,6 @@ const RUIN_ON_THE_DEFENDER: FieldScene = {
   hitLine: true,
 };
 
-/** The attacker holds the Sword of Ruin: the target's Defense falls by a quarter. Singles and doubles. */
 const RUIN_ON_THE_ATTACKER: FieldScene = {
   title: 'the attacker holds the Sword of Ruin',
   p1: doubles => [CHIEN_PAO(['Crunch', 'Splash'], 'Hardy', {}), ...(doubles ? [RILLABOOM()] : [])],
@@ -300,7 +280,6 @@ const RUIN_ON_THE_ATTACKER: FieldScene = {
   hitLine: true,
 };
 
-/** A Grassy Surge lead hits with Wood Hammer, which the terrain lifts by a third, and the terrain heals the defender at the end of the turn. */
 const GRASSY_HIT: FieldScene = {
   title: 'Wood Hammer in Grassy Terrain',
   p1: doubles => [RILLABOOM(), ...(doubles ? [set('Blissey', '', 'Natural Cure', ['Splash'], 'Calm', { hp: 252 })] : [])],
@@ -311,7 +290,6 @@ const GRASSY_HIT: FieldScene = {
   hitLine: true,
 };
 
-/** The observation without the fields the field-fact rows added. */
 const T86_FIELDS = [
   'moveName', 'terrain', 'attackerTera', 'defenderTera', 'attackerHp', 'defenderHp', 'attackerFallen', 'attackerAbility', 'defenderAbility',
   'attackerAbilityOn', 'attackerSuppressed', 'defenderSuppressed', 'fieldFacts',
@@ -362,8 +340,6 @@ describe('the Ruin abilities and the Grassy Terrain are in the rolls of a hit', 
             expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1}`).toBe(true);
             expect(observationError(ctx, obs, keyOf('p2', scene.defender), spreadFor(ctx, 'p2', scene.defender)), `error of hit ${index + 1}`).toBe(0);
           });
-          // Without the field fact the reading misses the hit, except where the calculator reads the Ruin off the two bodies: the defender's own
-          // Sword of Ruin lowers nothing, and the attacker's comes with the ability of its set.
           if (scene !== RUIN_ON_THE_DEFENDER && scene !== RUIN_ON_THE_ATTACKER) {
             expect(reads.some((obs, index) => !containsDamage(ctx, scene, stale(obs), damages[index], played.maxHp)), 'a hit the stale reading misses').toBe(true);
           }
@@ -405,12 +381,10 @@ describe('the solver keeps the body the pin hit measures', () => {
       const observations = hitsOf(scene, played);
       const solved = inferSpreads(observations, teams, FORMAT[kind], []).get(key);
       const ctx = buildSolveContext(observations, teams, FORMAT[kind], []);
-      // The prior explains the hit exactly; the solver has nothing to move.
       const body = solved ?? spreadFor(ctx, 'p2', 'Calyrex-Ice');
       expect(body.evs.hp).toBeGreaterThanOrEqual(156);
       expect(observationError(ctx, readsOf(ctx, scene)[0], key, body)).toBe(0);
 
-      // Without Tera, Sword of Ruin and terrain the prior misses the hit (the pin's solver then took the least bad body, HP 0).
       const blind = observations.map(stale);
       const blindCtx = buildSolveContext(blind, teams, FORMAT[kind], []);
       expect(observationError(blindCtx, readsOf(blindCtx, scene)[0], key, spreadFor(blindCtx, 'p2', 'Calyrex-Ice'))).toBeGreaterThan(0);
@@ -442,11 +416,9 @@ describe('spread-item-at-hit', () => {
     title: string;
     attacker: PokemonSet;
     defender: PokemonSet;
-    /** The attacker's move of each turn (the defender splashes); a doubles move may differ where the singles one is a spread move. */
     moves: Record<'singles' | 'doubles', string[]>;
   }
 
-  /** Garchomp pops Aegislash's Air Balloon with a Dragon Claw, then a Ground hit lands (2691843318). */
   const BALLOON: Setup = {
     title: 'a popped Air Balloon',
     attacker: set('Garchomp', '', 'Rough Skin', 'Jolly', { atk: 252, spe: 252 }),
@@ -533,7 +505,6 @@ describe('spread-item-at-hit', () => {
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation without the item fields: no item at the hit, the set's item. */
   const stale = (obs: ReadObservation): ReadObservation => ({
     ...obs, attackerItem: undefined, defenderItem: undefined, attackerItemChanged: undefined, defenderItemChanged: undefined,
   });
@@ -542,7 +513,7 @@ describe('spread-item-at-hit', () => {
   const itemFields = (obs: DamageObservation) => Object.fromEntries(ITEM_FIELDS.map(field => [field, obs[field]]));
 
   describe('the item a hit is priced with is the item at the hit', () => {
-    // Champions plays the popped Air Balloon of 2691843318 and 2694103115; the other scenes use moves and items its generation lacks.
+    // Champions plays only the popped Air Balloon scene: the other scenes use moves and items its generation lacks.
     for (const kind of KINDS) {
       for (const setup of kind.startsWith('champions') ? [BALLOON] : [BALLOON, KNOCK_OFF, BERRY, TRICK]) {
         test(`${kind}: ${setup.title}: the rolls at the hit contain the simulator's damage, the set's item does not`, () => {
@@ -555,7 +526,6 @@ describe('spread-item-at-hit', () => {
             const last = readOf(ctx, setup, observations.length - 1);
             expect(containsDamage(ctx, setup, last, lastDamage, scene.maxHp)).toBe(true);
             expect(containsDamage(ctx, setup, stale(last), lastDamage, scene.maxHp)).toBe(false);
-            // The played spreads have no error at the hit; priced with the item that was gone they do.
             const defenderKey = keyOf('p2', setup.defender.species);
             expect(observationError(ctx, last, defenderKey, spreadFor(ctx, 'p2', setup.defender.species))).toBe(0);
             expect(observationError(ctx, stale(last), defenderKey, spreadFor(ctx, 'p2', setup.defender.species))).toBeGreaterThan(0);
@@ -568,7 +538,6 @@ describe('spread-item-at-hit', () => {
           const observations = hitsOf(scene, KNOCK_OFF);
           expect(itemFields(observations[0])).toEqual({ attackerItem: '', defenderItem: '', attackerItemChanged: false, defenderItemChanged: false });
           const ctx = contextOf(kind, KNOCK_OFF, observations);
-          // Knock Off hits 1.5 times harder while the target holds an item: the set's Eviolite is what the first line is priced with.
           expect(containsDamage(ctx, KNOCK_OFF, readOf(ctx, KNOCK_OFF, 0), scene.damage[0], scene.maxHp)).toBe(true);
         }
       });

@@ -9,9 +9,7 @@ import {
 
 registerChampionsDex(championsMod as never, (championsMod as unknown as { Formats: never }).Formats);
 
-// The turn snapshots show the bodies on the field at the turn's end, so a Pokémon that enters (switch, U-turn, Volt Switch, drag, Illusion
-// break) and faints before then never stood active in a snapshot; it still counts as brought. The protocol is the oracle, no species name
-// stands in the code. Singles bring 3 (Battle Stadium Singles), doubles bring 4 (VGC).
+// Snapshots show the turn's end: a Pokémon that enters and faints before never stood active, yet counts as brought.
 
 type Kind = 'switch' | 'switch after a U-turn' | 'switch after Volt Switch' | 'drag' | 'Illusion break';
 const KINDS: Kind[] = ['switch', 'switch after a U-turn', 'switch after Volt Switch', 'drag', 'Illusion break'];
@@ -53,7 +51,6 @@ function scene(kind: Kind, game: 'singles' | 'doubles') {
     `|switch|${doubles ? 'p2b' : 'p2a'}: Ivysaur|${detail('Ivysaur')}${hp('100/100')}`, '|turn|3',
     '|turn|4',
   ];
-  // Bring 3 (singles): Pikachu, Raichu, the short-lived one. Bring 4 (doubles): Pikachu, Eevee, Raichu, the short-lived one.
   const p1Brought = doubles ? ['Pikachu', 'Eevee', 'Raichu', shortLived] : ['Pikachu', 'Raichu', shortLived];
   const p2Brought = doubles ? ['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur'] : ['Bulbasaur', 'Squirtle', 'Ivysaur'];
   const formatid = doubles ? 'gen9vgc2026regi' : 'gen9battlestadiumsinglesregh';
@@ -74,7 +71,6 @@ describe('a body that enters and faints within one turn is fielded', () => {
         expect(bases(broughtSpeciesFor(snapshots, 'p1', rules))).toEqual(bases(p1Brought));
         expect(bases(broughtSpeciesFor(snapshots, 'p2', rules))).toEqual(bases(p2Brought));
         if (kind === 'Illusion break') expect(broughtSpeciesFor(snapshots, 'p1', rules)).not.toContain(disguise);
-        // Both sides fielded their whole selection: a pinned list and a list with nothing open.
         const pinned = replayBringOnly(replay, snapshots);
         expect(pinned).not.toBeNull();
         expect(pinned!.p1).toContain(shortLived);

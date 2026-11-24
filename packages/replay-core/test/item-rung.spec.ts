@@ -11,15 +11,11 @@ import { buildSolveContext, observationError } from '../src/spreads/fit';
 import { toId } from '../src/ids';
 import type { DamageObservation, PokemonEvs } from '../src/types';
 
-// A knockout that stays refuted under every spread of the set is the log's word that the guessed item is wrong: the solver then tries the
-// usage-listed damage-boost items in usage order and the first that makes every knockout reach (with a lower total error than the best spread
-// alone) is the item (`itemReason: 'boost'`). The scene: a Timid 252 SpA Gengar hits an uninvested Alakazam from a shown 100/100 twice and the
-// hit took everything; the best item-less rung (Modest, 252 SpA) reaches only about 0.8 of it, in Scarlet/Violet and Champions alike.
 const WORLDS = [
   { name: 'Scarlet/Violet singles', formatid: 'gen9ou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: false, item: 'Choice Specs', other: 'Life Orb' },
   { name: 'Scarlet/Violet doubles', formatid: 'gen9doublesou', gen: calcGenerationFor(9), level: 100, max: 252, doubles: true, item: 'Choice Specs', other: 'Life Orb' },
   { name: 'Scarlet/Violet VGC', formatid: 'gen9vgc2026regi', gen: calcGenerationFor(9), level: 50, max: 252, doubles: true, item: 'Choice Specs', other: 'Life Orb' },
-  // Champions' generation 0 has no Choice Specs (a past item of the mod): the Dex there lists the items the game has, Life Orb among them.
+  // Champions' generation 0 has no Choice Specs (a past item of the mod); the Dex there lists the game's items.
   { name: 'Champions singles', formatid: 'gen9championsou', gen: calcGenerationFor(0), level: 50, max: 32, doubles: false, item: 'Life Orb', other: 'Expert Belt' },
   { name: 'Champions VGC', formatid: 'gen9championsvgc2026regma', gen: calcGenerationFor(0), level: 50, max: 32, doubles: true, item: 'Life Orb', other: 'Expert Belt' },
 ] as const;
@@ -48,7 +44,6 @@ const DEFENDERS = ['Alakazam', 'Gardevoir', 'Clefable', 'Dragonite', 'Garchomp',
 interface Attacker { species: string; guessed: string; plus: string; moves: string[] }
 const GENGAR: Attacker = { species: 'Gengar', guessed: 'Timid', plus: 'Modest', moves: ['Shadow Ball', 'Sludge Bomb'] };
 
-/** The first defender and move for which no rung of the item-less ladder reaches the full HP the text shows, and the boost item at the guessed spread does. */
 function scene(world: Pick<World, 'gen' | 'level' | 'max'>, item: string, attacker: Attacker = GENGAR) {
   const stat = attacker.moves[0] === 'Flare Blitz' || attacker.moves[0] === 'Dragon Claw' ? 'atk' : 'spa';
   for (const defender of DEFENDERS) {
@@ -68,7 +63,6 @@ for (const world of WORLDS) {
   describe(`a knockout no spread reaches takes the usage-listed boost item (${world.name})`, () => {
     const { defender, move, without, withItem } = scene(world, world.item);
     const prior = evs({ spa: world.max, spe: world.max });
-    // The build guessed Leftovers (the usage marginal); the attacker really held the boost item.
     const sets = (guess = 'Leftovers') => ({
       p1: [asSet(defender, 'Hardy', evs({}), world.level, ['Protect'])],
       p2: [asSet('Gengar', 'Timid', prior, world.level, [move, 'Protect'], guess)],
@@ -86,13 +80,11 @@ for (const world of WORLDS) {
       const solved = solve(new Map([[key, known({ itemOffers: ['Leftovers', world.item, world.other] })]]));
       expect(solved?.item).toBe(world.item);
       expect(solved?.itemReason).toBe('boost');
-      // The prior's own spread reaches with the item, so the tie-break toward the prior keeps it.
       expect(solved?.nature).toBe('Timid');
       expect(solved?.evs.spa).toBe(world.max);
     });
 
     test('the usage order decides among the items that reach', () => {
-      // An item that cannot help the hit (a Choice Band on a special attacker) comes first and is skipped: it does not reach.
       const band = world.item === 'Choice Specs' ? 'Choice Band' : 'Expert Belt';
       const solved = solve(new Map([[key, known({ itemOffers: [band, world.item] })]]));
       expect(solved?.item).toBe(world.item);
@@ -118,7 +110,6 @@ for (const world of WORLDS) {
     test('no offered item, or an offer that does not reach, leaves the item alone', () => {
       expect(solve(new Map([[key, known({ itemOffers: [] })]]))?.itemReason).not.toBe('boost');
       expect(solve(new Map([[key, known()]]))?.itemReason).not.toBe('boost');
-      // Items that are no boost item at all are never swapped in, whatever the usage says.
       const solved = solve(new Map([[key, known({ itemOffers: ['Leftovers', 'Focus Sash', 'Rocky Helmet', 'Choice Scarf'] })]]));
       expect(solved?.itemReason).not.toBe('boost');
     });
@@ -158,7 +149,6 @@ describe('an item the species needs is never swapped out (a Mega Stone)', () => 
     expect(gen.species.get('Charizard-Mega-X').requiredItem).toBe('Charizardite X');
     const world = { formatid: 'gen7ou', gen: calcGenerationFor(7), level: 100, max: 252 } as const;
     const mega: Attacker = { species: 'Charizard-Mega-X', guessed: 'Jolly', plus: 'Adamant', moves: ['Flare Blitz', 'Dragon Claw'] };
-    // The scene is real for a free item: Life Orb would reach the knockout the stone's holder cannot.
     const { defender, move, without, withItem } = scene(world, 'Life Orb', mega);
     expect(without).toBeLessThan(0.97);
     expect(withItem).toBeGreaterThanOrEqual(1.01);

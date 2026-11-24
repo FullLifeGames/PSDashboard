@@ -3,9 +3,8 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { judgeable } from '../src/team/item-damage-shared';
 
-// A weakening berry or a gem ends inside the move, before the damage line, so the client showed no item; the hit walk (inference/hits.ts) reads
-// the item before the first `-enditem` of the move and the hit records the item it counted. An item taken before the move (Knock Off) is
-// still a changed item and the hit stays skipped. Real simulator battles, singles and doubles.
+// A weakening berry or a gem ends inside the move, before the damage line, so the client showed no item.
+// An item taken before the move (Knock Off) is still a changed item: the hit stays skipped.
 
 type Format = 'singles' | 'doubles';
 

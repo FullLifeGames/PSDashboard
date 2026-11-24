@@ -18,10 +18,7 @@ import {
   type SceneSpec,
 } from './paradox-scenes';
 
-/**
- * The snapshot carries what @pkmn/client counts for a sleeping body (statusState.sleepTurns, one per |cant|..|slp| line) and the
- * slot of every active body (side.active); the expected numbers come from the simulator's log.
- */
+// The expected numbers come from the simulator's log (statusState.sleepTurns, side.active).
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -54,7 +51,6 @@ const DOUBLES = {
   format: 'gen9doublescustomgame',
   p1: [set('Parasect', ['Spore', 'Splash']), set('Gliscor', ['Splash']), set('Rillaboom', ['Splash'])],
   p2: [set('Snorlax', ['Splash']), set('Corviknight', ['Splash']), set('Amoonguss', ['Splash'])],
-  // Spore on the target in p2a, the slot the others keep naming through the sleep.
   turns: [['move 1 1, move 1', 'move 1, move 1'], ...Array.from({ length: 5 }, () => ['move 2, move 1', 'move 1, move 1'])],
 };
 
@@ -96,10 +92,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('snapshot f
   });
 });
 
-/**
- * The quick picker needs the stat Protosynthesis or Quark Drive raised (the client's `protosynthesis` and `quarkdrive` volatiles)
- * and the fallen allies of Supreme Overlord (`fallenN`); the expected values come from the simulator's own body, not from the log.
- */
+// The expected values come from the simulator's own body, not from the log.
 type SimBattle = InstanceType<typeof Battle>;
 function playSteps(format: string, p1: PokemonSet[], p2: PokemonSet[], steps: [string, string][][], seed = 1): { battle: SimBattle; log: string } {
   const battle = new Battle({
@@ -138,7 +131,6 @@ describe.each([['singles', 'gen9customgame', ''], ['doubles', 'gen9doublescustom
   });
 
   test('fallen is the count the Supreme Overlord state keeps, and absent for the others', () => {
-    // The first body faints to a Psychic and Kingambit comes in from the bench: one fallen ally.
     const p1 = label === 'singles'
       ? [withAbility('Magikarp', 'No Ability', ['Splash'], 5), withAbility('Kingambit', 'Supreme Overlord', ['Splash'])]
       : [withAbility('Magikarp', 'No Ability', ['Splash'], 5), set('Gliscor', ['Splash']), withAbility('Kingambit', 'Supreme Overlord', ['Splash'])];
@@ -281,7 +273,6 @@ for (const kind of KINDS) {
       const observations = first(kind, SWORDS_AFTER_ACTIVATION);
       expect(observations).toHaveLength(2);
       for (const obs of observations) {
-        // The sun came with the first lines (Drought), before Swords Dance: Speed was the best stat, with no stage.
         expect(obs.attackerParadox).toMatchObject({ stat: 'spe' });
         expect(obs.attackerParadox?.stages.atk ?? 0).toBe(0);
         expect(obs.attackerBoosts.atk).toBe(2);

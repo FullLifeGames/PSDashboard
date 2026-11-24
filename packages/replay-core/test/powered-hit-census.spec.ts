@@ -7,10 +7,8 @@ import { buildSolveContext, keyOf, rollRange, spreadFor } from '../src/spreads/f
 import { readObservation } from '../src/spreads/observation-read';
 import { simGenNum } from '../src/calc-gen';
 
-/**
- * A Z-move or Max move prices from the base power of its placeholder in the Dex (1 for a Z-move, 10 for most Max moves) while the
- * simulator plays the real power: a powered hit gives no reading, and the one predicate comes from the Dex (`isZ`, `isMax`).
- */
+// A Z-move or Max move prices from its placeholder's base power in the Dex (1, or 10 for most Max moves), while the
+// simulator plays the real power: a powered hit gives no reading.
 
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
@@ -26,7 +24,6 @@ describe('the predicate holds the code to the Dex (every move of every generatio
     const powered = moves.filter(move => !!move.isZ || !!move.isMax);
     for (const move of moves) expect(poweredMove(dex, move.id), move.id).toBe(powered.includes(move));
     if (dex.gen >= 7 && dex.gen <= 9 && !dex.currentMod.includes('champions')) {
-      // Past generations hold the entries as non-standard; the census would be empty if the Dex dropped them.
       expect(powered.length).toBeGreaterThan(30);
     }
   });
@@ -49,7 +46,6 @@ const GARCHOMP_MAX = mon('Garchomp', '', 'Rough Skin', ['Dragon Claw', 'Splash']
 
 interface Played { log: string; formatid: string; sets: { p1: PokemonSet[]; p2: PokemonSet[] } }
 
-/** Turn 1: a plain Dragon Claw. Turn 2: the powered click (`zmove` or `dynamax`). */
 function play(gen: 7 | 8, format: Format, tested: PokemonSet, power: 'zmove' | 'dynamax'): Played {
   const doubles = format === 'doubles';
   const formatid = `gen${gen}${doubles ? 'doublescustomgame' : 'customgame'}`;
@@ -91,10 +87,8 @@ describe('a powered hit leaves the solver, a plain hit of the same game stays', 
         const held = (ctx.byMon.get(keyOf('p2', 'Garchomp')) ?? []).map(obs => obs.moveId);
         expect(held, 'the solver holds the plain hit only').toEqual(['dragonclaw']);
         expect(held).not.toContain(powered);
-        // The defender's key holds the same single hit: the powered one sits on neither side.
         expect((ctx.byMon.get(keyOf('p1', 'Toxapex')) ?? []).map(obs => obs.moveId)).toEqual(['dragonclaw']);
 
-        // Why: priced from the placeholder, the calculator's range sits far under what the simulator played.
         const dex = Dex.forGen(simGenNum(ctx.gen));
         const read = readObservation(dex, ctx.sets, garchomp[1]);
         const range = rollRange(ctx, read, spreadFor(ctx, 'p2', 'Garchomp'), spreadFor(ctx, 'p1', 'Toxapex'));

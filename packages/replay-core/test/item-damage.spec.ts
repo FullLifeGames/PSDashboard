@@ -15,9 +15,6 @@ import type { PokemonSetAssumption, SetAssumption, SmogonSetAssumptions } from '
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import { toId } from '../src/ids';
 
-// An item candidate falls when no legal spread of its holder lets the calculator explain a hit the log shows, against the defender as the panel
-// builds it. Logs come from @pkmn/sim, so each hit really happened with the item the game gave its holder; the judge sees only the log.
-
 function set(species: string, item: string, ability: string, moves: string[], spread: { nature: string; evs: Partial<PokemonEvs> }, teraType?: string): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: spread.nature, level: 100, gender: '', teraType,
@@ -79,7 +76,7 @@ describe('the hits the inference records', () => {
   });
 
   test('doubles: a spread move whose other target protected still hits with the spread factor', () => {
-    // The simulator decides the factor before Protect: the [spread] tag then names one target, and the damage is the reduced one.
+    // The simulator decides the factor before Protect: the [spread] tag names one target; the damage is reduced.
     const log = play([moltres(), set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled'], BULKY)],
       [gholdengo('Choice Specs'), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'], BULKY)],
       [['move protect, move softboiled', 'move dazzlinggleam terastallize, move softboiled']], true);
@@ -128,7 +125,6 @@ describe('a candidate falls when no legal spread explains the hit', () => {
   });
 
   test('doubles: a spread move into a lone target hits without the spread factor', () => {
-    // Turn 1 knocks out p1's Pichu (no replacement); turn 2's Dazzling Gleam finds Moltres-Galar alone.
     const pichu = set('Pichu', '', 'Static', ['Thunder Shock'], { nature: 'Hardy', evs: {} });
     const log = play([moltres(), pichu], [gholdengo('Choice Specs'), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'], BULKY)],
       [['move protect, move thundershock 1', 'move dazzlinggleam terastallize, move softboiled'], ['move nastyplot', 'move dazzlinggleam, move softboiled']], true);
@@ -156,7 +152,6 @@ describe('the calculator sees the states the log shows', () => {
     const pichu = (name: string) => ({ ...set('Pichu', '', 'Static', ['Thunder Shock'], { nature: 'Hardy', evs: {} }), name });
     const kingambit = set('Kingambit', 'Leftovers', 'Supreme Overlord', ['Kowtow Cleave'], { nature: 'Adamant', evs: { atk: 252, hp: 252 } });
     const p1 = [set('Corviknight', 'Leftovers', 'Pressure', ['Body Press', 'Roost'], { nature: 'Impish', evs: { hp: 252, def: 4 } })];
-    // Four Pichu fall to Body Press, then Kingambit hits with four allies down (power x1.4).
     const fall = (next: number): [string, string][] => [['move bodypress', 'move thundershock'], ['', `switch ${next}`]];
     const log = play(p1, [pichu('Pichu A'), pichu('Pichu B'), pichu('Pichu C'), pichu('Pichu D'), kingambit],
       [...fall(2), ...fall(3), ...fall(4), ...fall(5), ['move roost', 'move kowtowcleave']]);
@@ -210,7 +205,6 @@ describe('any doubt drops the hit', () => {
   });
 
   test('doubles: a partner that may hold Friend Guard keeps the hit out', () => {
-    // Clefairy protects, so the only hit lands on Moltres-Galar with a possible Friend Guard beside it.
     const log = play([moltres(), set('Clefairy', 'Eviolite', 'Friend Guard', ['Protect'], BULKY)],
       [gholdengo('Choice Specs'), set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled'], BULKY)],
       [['move nastyplot, move protect', 'move dazzlinggleam terastallize, move softboiled']], true);
@@ -226,9 +220,6 @@ describe('any doubt drops the hit', () => {
   });
 });
 
-// The defender's item and ability count as the panel builds them only where the log has shown them: a guessed Assault Vest or Multiscale cuts the
-// damage the calculator expects, so a hit dealt without them would refute every item without a boost (649664 t23: a Hydro Pump into a
-// Tornadus-Therian whose Assault Vest was a guess ruled Keldeo's Choice Scarf out).
 describe('the defender\'s unproven item and ability widen the hull', () => {
   const plainLog = () => play([moltres()], [gholdengo('Metal Coat')], [['move protect', 'move dazzlinggleam terastallize'], ['move nastyplot', 'move dazzlinggleam']]);
   const guessedVest = () => ({ ...builtAs('Moltres-Galar', 'Leftovers', 'Berserk', BULKY), item: guessedField('Assault Vest') });
@@ -246,14 +237,12 @@ describe('the defender\'s unproven item and ability widen the hull', () => {
   });
 
   test('an Assault Vest the log showed still decides: Choice Specs stays, the items without a boost fall', () => {
-    // An Assault Vest holder cannot use status moves: Moltres-Galar attacks instead of protecting.
     const vest = set('Moltres-Galar', 'Assault Vest', 'Berserk', ['Fiery Wrath'], BULKY);
     const log = play([vest], [gholdengo('Choice Specs')], [['move fierywrath', 'move dazzlinggleam terastallize']]);
     const refuted = judgeItemsByDamage(attackerIn(log, 'Gholdengo'), CANDIDATES, teams([builtAs('Moltres-Galar', 'Assault Vest', 'Berserk', BULKY)]));
     expect(refuted.sort()).toEqual(['choicescarf', 'leftovers', 'metalcoat']);
   });
 
-  // Solid Rock takes a quarter off a super-effective hit, a cut Choice Specs makes up for and no plain item does.
   const SPECIAL = { nature: 'Modest', evs: { spa: 252, hp: 252 } };
   const blissey = (item: string) => set('Blissey', item, 'Natural Cure', ['Flash Cannon', 'Soft-Boiled'], SPECIAL);
   const rhyperior = (ability: string) => set('Rhyperior', 'Leftovers', ability, ['Iron Defense', 'Protect'], BULKY);
@@ -286,7 +275,6 @@ describe('item-damage-champions', () => {
   const garchomp = () => set('Garchomp', 'Leftovers', 'Sand Veil', ['Swords Dance'], 'Impish', GARCHOMP_SPREAD);
   const blissey = () => set('Blissey', 'Leftovers', 'Natural Cure', ['Protect'], 'Calm', { hp: 32, spd: 32 });
 
-  /** The spectators' log of one turn: Wyrdeer (p2) hits Garchomp (p1) with Psyshield Bash; null when the roll crit or the simulator drew no clean hit. */
   function turnLog(kind: Kind, item: string, seed: number): string | null {
     const doubles = kind === 'doubles';
     const battle = new Battle({
@@ -305,7 +293,6 @@ describe('item-damage-champions', () => {
     return /\|-crit\|/.test(log) || !/\|move\|p2a: Wyrdeer\|Psyshield Bash/.test(log) ? null : log;
   }
 
-  /** The clean log with the highest roll of the scene (a weak roll cannot tell an item from the defender as built); the hit the judge reads is the simulator's own. */
   function sceneOf(kind: Kind, item: string): { log: string; attacker: RevealedPokemonInfo } {
     let best: { log: string; attacker: RevealedPokemonInfo } | null = null;
     for (let seed = 1; seed <= 120; seed++) {
@@ -331,15 +318,12 @@ describe('item-damage-champions', () => {
       test(`${kind}: the log of a Champions game names its format and its hit`, () => {
         const { attacker } = sceneOf(kind, '');
         expect(hitOf(attacker)).toMatchObject({ move: 'psyshieldbash', gen: 9, doubles: kind === 'doubles', attacker: { species: 'Wyrdeer' }, defender: { species: 'Garchomp', side: 'p1' } });
-        // The hit carries the log's tier name ('[Gen 9 Champions] OU'), not a format id: it must still price on generation 0.
         expect(hitOf(attacker).format).toMatch(/champions/i);
         expect(calcGenerationFor(hitOf(attacker).gen, calcModOf(hitOf(attacker).format)).num).toBe(0);
       });
 
       test(`${kind}: Wyrdeer without a boost item hits at the mod's power 90 and the judge rules out no item`, () => {
         const { attacker } = sceneOf(kind, '');
-        // The scene is a scene only if the base game's power would have read as a boost: priced at the base Dex's
-        // Psyshield Bash, the hit lies above the strongest unboosted spread.
         const hit = hitOf(attacker);
         const gen = calcGenerationFor(9, 'champions');
         const basePower = Dex.forGen(9).moves.get('psyshieldbash').basePower;
@@ -359,8 +343,7 @@ describe('item-damage-champions', () => {
       });
 
       test(`${kind}: a Choice Band hit, which the Champions mod marks Past, is explained by no item that exists there`, () => {
-        // The simulator still plays Choice Band; the calculator's generation 0 lists neither Band nor Specs, so no candidate
-        // reaches a x1.5 hit and the judge drops the hit rather than refute what the holder may carry.
+        // The simulator still plays Choice Band, but the calculator's generation 0 lists neither Band nor Specs.
         const { attacker } = sceneOf(kind, 'Choice Band');
         expect(judgeItemsByDamage(attacker, CANDIDATES, teamsOf())).toEqual([]);
       });
@@ -425,7 +408,6 @@ const usageStats: SmogonUsageStats = {
   ].map(entry => [toId(entry.species), entry])),
 };
 
-/** Turn 2 of the excerpt is 938644's turn 14: Moltres-Galar 90 % to 24 % from a Tera-Fairy spread Dazzling Gleam. */
 const scene = [
   '|player|p1|Alpha|', '|player|p2|Beta|', '|gametype|doubles', '|gen|9', '|tier|[Gen 9] Doubles OU',
   '|poke|p1|Incineroar, M|', '|poke|p1|Moltres-Galar|', '|poke|p1|Ursaluna, F|', '|poke|p1|Sinistcha|',

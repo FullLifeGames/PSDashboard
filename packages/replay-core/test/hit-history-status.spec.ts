@@ -6,10 +6,6 @@ import type { ReadObservation } from '../src/spreads/observation-read';
 import type { DamageObservation } from '../src/types';
 import { FORMAT, KINDS, alone, damagingTurns, hit, isDoubles, scaled, scenesOf, set, splash, team, type FieldScene, type Kind, type Scene } from './fit-field-scenes';
 
-// Hex and Infernal Parade double their power against any status, Venoshock and Barb Barrage against poison, and Marvel Scale lifts the
-// defender's Defense under one. The observation carries the defender's status as the client battle holds it before the hit (`defenderStatus`).
-// The oracle is the simulator's damage; every move that reads the target's status in its Dex handler is swept below.
-
 const DRAGONITE = () => set('Dragonite', '', 'Inner Focus', ['Splash'], 'Hardy', { hp: 252, def: 252 });
 const GENGAR = (moves: string[]) => set('Gengar', '', 'Cursed Body', [...moves, 'Splash'], 'Modest', { hp: 252, spa: 252 });
 const stepsOf = (doubles: boolean, setup: string, strike: string) => [
@@ -89,9 +85,7 @@ describe('the Dex moves whose handler reads the target\'s status are the ones th
   }).map(move => move.id).sort();
 
   test('gen 9', () => {
-    // Hex, Infernal Parade, Smelling Salts and Wake-Up Slap read the status through the base power callback; Venoshock and Barb
-    // Barrage through a base power handler. Smelling Salts and Wake-Up Slap also cure it: the calculator prices the hit with the
-    // status it had, which the observation now carries.
+    // Smelling Salts and Wake-Up Slap also cure the status: the calculator prices the hit with the status it had.
     expect(readers(Dex.forGen(9))).toEqual(expect.arrayContaining(['hex', 'infernalparade', 'venoshock']));
   });
 });

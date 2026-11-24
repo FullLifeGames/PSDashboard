@@ -40,9 +40,7 @@ import type { SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import { toId } from '../src/ids';
 import { rulesDex } from '../src/rules-dex';
 
-// Last Respects and Rage Fist take their power from the battle's history (the fallen of the attacker's side, the hits the attacker took); the
-// Dex gives the calculator the plain 50. The observation carries the two counts and the solver asks the Dex move's own basePowerCallback
-// (spreads/hit-power.ts). The oracle is the simulator's damage: singles and doubles (the Champions roster holds neither move's users).
+// The Dex gives the calculator Last Respects and Rage Fist at the plain 50; the Champions roster has neither's users.
 
 const GARCHOMP = () => set('Garchomp', '', 'Rough Skin', ['Crunch', 'Dragon Claw', 'Splash'], 'Hardy', { hp: 252, def: 252, spd: 4 });
 const DRAGONITE = () => set('Dragonite', '', 'Inner Focus', ['Crunch', 'Dragon Claw', 'Splash'], 'Hardy', { hp: 252 });
@@ -112,7 +110,6 @@ function containsDamage(ctx: SolveContext, scene: FieldScene, obs: ReadObservati
   return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
 }
 
-/** The observation without the history counts. */
 const stale = (obs: ReadObservation): ReadObservation => {
   const rest: Record<string, unknown> = { ...obs };
   delete rest.attackerFainted;
@@ -162,7 +159,6 @@ const race = (first: Side, firstSpecies: string, second: Side, secondSpecies: st
   ({ firstSide: first, firstSpecies, secondSide: second, secondSpecies, turn });
 const knowledge = (entries: Record<string, Partial<SpeedKnowledge>>): Map<string, SpeedKnowledge> =>
   new Map(Object.entries(entries).map(([key, value]) => [key, { itemKnown: false, scarfRuledOut: false, spreadKnown: false, spreads: [], ...value }]));
-/** The calculator's own view of a Champions body, for building observations the replay would show. */
 const calcEvs = (spread: PokemonEvs) => Object.fromEntries(Object.entries(spread).map(([stat, value]) => [stat, value >= 1 ? 8 * value - 4 : 0]));
 
 const CHAMPIONS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
@@ -170,8 +166,7 @@ const CHAMPIONS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026re
 describe('the spread solver reads Champions Stat Points', () => {
   for (const [kind, format] of Object.entries(CHAMPIONS)) {
     test(`each Stat Point is one stat point, and the set's IVs do not count (${kind})`, () => {
-      // Garchomp, base Speed 102: 122 at 0 SP, 154 at 32 SP on a neutral nature; a published Speed IV of 0 has
-      // no meaning in Champions (statModify reads no IV).
+      // A published Speed IV of 0 means nothing in Champions (statModify reads no IV).
       const sets = { p1: [mon('Garchomp', 'Hardy', sp(0, 0, 0, 0, 0, 0), { ivs: { ...ALL_31, spe: 0 } })], p2: [] };
       const ctx = buildSolveContext([], sets, format, []);
       const at = (points: number) => speedStat(ctx, 'p1', 'Garchomp', { evs: sp(0, 0, 0, 0, 0, points), nature: 'Hardy' });
@@ -194,8 +189,6 @@ describe('the spread solver reads Champions Stat Points', () => {
     });
 
     test(`a settled order steps one Stat Point (${kind})`, () => {
-      // Charizard's sheet says 14 SP Speed (134); Garchomp moved first from 0 SP (122): 13 SP (135) is the
-      // smallest Speed that keeps the order, not the 16 SP a 4-point step would land on.
       const sets = { p1: [mon('Garchomp', 'Hardy', sp(32, 32, 0, 0, 2, 0))], p2: [mon('Charizard', 'Hardy', sp(0, 0, 0, 32, 2, 14))] };
       const solved = inferSpreads([], sets, format, [race('p1', 'Garchomp', 'p2', 'Charizard')], knowledge({ 'p2:charizard': { spreadKnown: true } }));
       expect(solved.get('p1:garchomp')?.evs.spe).toBe(13);
@@ -210,8 +203,6 @@ describe('the spread solver reads Champions Stat Points', () => {
     });
 
     test(`a Champions usage spread counts as tempo-invested on its own scale (${kind})`, () => {
-      // Every Garchomp runs Jolly 32 SP Speed (169) and still moved before a 32-SP Timid Dragapult (213): it holds a
-      // Scarf (253). The tempo camp read 32 against the EV threshold of 200 and never let a Scarf in.
       const sets = { p1: [mon('Garchomp', 'Jolly', sp(2, 32, 0, 0, 0, 32))], p2: [mon('Dragapult', 'Timid', sp(2, 0, 0, 32, 0, 32))] };
       const orders = readableOrders([race('p1', 'Garchomp', 'p2', 'Dragapult')], sets, rulesDex(9, 'champions'));
       const ctx = buildSolveContext([], sets, format, orders);
@@ -228,7 +219,6 @@ describe('the spread solver reads Champions Stat Points', () => {
     expect(hpEvsForMaxHp(108, 50, 215, 0, 31, evBudget('gen9championsou'))).toBe(32);
     expect(hpEvsForMaxHp(108, 50, 183, 32, 31, evBudget('gen9championsou'))).toBe(0);
     expect(hpEvsForMaxHp(108, 50, 200, 0, 31, evBudget('gen9championsou'))).toBe(17);
-    // The Scarlet/Violet scale is untouched (573756: Garchomp 409 HP at level 100 is 208 EVs).
     expect(hpEvsForMaxHp(108, 100, 409, 0)).toBe(208);
   });
 });
@@ -253,8 +243,6 @@ describe('a Champions build stays on the Stat Point scale', () => {
 
   for (const kind of ['singles', 'doubles'] as const) {
     test(`a Scarlet/Violet spread reaches the Stat Point scale by the inverse, IVs stay 31 (${kind})`, () => {
-      // A Scarlet/Violet analysis (EV scale, Speed IV 0) for Corviknight: 252/160/96 EVs give the stats of 32/20/12 SP
-      // at level 50; clamping read them as 32/32/2.
       const corviknight = built(kind, assumptions(sp(252, 0, 160, 0, 96, 0), { spe: 0 }), 'Corviknight');
       expect(corviknight.evs).toEqual(sp(32, 0, 20, 0, 12, 0));
       expect(corviknight.ivs).toEqual(ALL_31);
@@ -265,7 +253,6 @@ describe('a Champions build stays on the Stat Point scale', () => {
     });
 
     test(`the no-data default reaches the Stat Point scale too (${kind})`, () => {
-      // Garchomp's last-resort spread is 252 Atk / 4 SpD / 252 Spe: 32/1/32 SP, not 30/4/32 after a clamp and a shave.
       expect(built(kind, assumptions(sp(32, 0, 32, 0, 2, 0)), 'Garchomp').evs).toEqual(sp(0, 32, 0, 0, 1, 32));
     });
   }
@@ -341,7 +328,6 @@ describe('hit-history-ally', () => {
               expect(containsDamage(ctx, scene, obs, damages[index], played.maxHp), `hit ${index + 1}: sim ${damages[index]}`).toBe(true);
               expect(observationError(ctx, obs, keyOf('p2', scene.defender), spreadFor(ctx, 'p2', scene.defender))).toBe(0);
             });
-            // Without the ally the reading misses exactly where the lift is real.
             const misses = reads.some((obs, index) => !containsDamage(ctx, scene, withoutAlly(obs), damages[index], played.maxHp));
             expect(misses, 'the reading without the ally').toBe(scene.boosted);
           }
@@ -353,7 +339,6 @@ describe('hit-history-ally', () => {
 
 describe('hit-history-turn', () => {
   const DRAGONITE = () => set('Dragonite', '', 'Inner Focus', ['Splash'], 'Jolly', { hp: 252, spe: 252 });
-  /** A partner that outruns the attacker, so that the attacker is the last mover of a doubles turn when the foes are faster too. */
   const FAST = () => set('Regieleki', '', 'Transistor', ['Splash'], 'Timid', { spe: 252 });
   const SKARMORY = () => set('Skarmory', '', 'Sturdy', ['Splash'], 'Impish', { hp: 252, def: 252 });
 
@@ -364,7 +349,6 @@ describe('hit-history-turn', () => {
 
   const attackerOf = (kit: Kit, ...extra: string[]) => set(kit.species, '', kit.ability, [...kit.hits, kit.priority, ...extra], 'Adamant', { hp: 252, atk: 252 });
 
-  /** Stakeout: the foe switches Skarmory in and the attacker hits it that turn, then hits it again on the next turn (no boost). */
   const stakeout = (kinds: Kind[]): FieldScene => ({
     title: 'Stakeout on the turn the target came in, and the turn after',
     p1: team(attackerOf(STAKEOUT)),
@@ -378,7 +362,6 @@ describe('hit-history-turn', () => {
     kinds, hitLine: true,
   });
 
-  /** Analytic: the foe is faster (it moves first), so the hit is the last mover's; or the attacker's priority move goes first and gets no boost. */
   const analytic = (kit: Kit, kinds: Kind[], priority: boolean): FieldScene => ({
     title: `Analytic ${priority ? 'moving first on priority' : 'moving last'} (${kit.species})`,
     p1: doubles => [attackerOf(kit), ...(doubles ? [FAST()] : [])],
@@ -407,7 +390,6 @@ describe('hit-history-turn', () => {
     return Math.round(range!.min * maxHp) <= damage && damage <= Math.round(range!.max * maxHp);
   }
 
-  /** The observation with the opposite turn facts: the reading of a solver that took the order of the turn from the speeds alone and got it wrong. */
   const flipped = (obs: ReadObservation): ReadObservation => {
     const rest: Record<string, unknown> = { ...obs };
     delete rest.defenderNewlyIn;
@@ -418,7 +400,6 @@ describe('hit-history-turn', () => {
   const GEN9: Kind[] = ['singles', 'doubles'];
   const CHAMPIONS: Kind[] = ['champions singles', 'champions doubles'];
 
-  // The foe is faster in the first Analytic scenes (the speed order agrees with the game); the priority move goes first against the speeds.
   const CASES: FieldScene[] = [
     stakeout(GEN9),
     analytic(ANALYTIC_GEN9, GEN9, false),
@@ -485,7 +466,6 @@ describe('survival-marker-observation', () => {
   const NO_MARKER = drillRun('the same hit without a marker', set('Gengar', '', 'Cursed Body', ['Splash'], 'Timid', {}));
   const BERRY = drillRun('a berry that weakens the hit', set('Gengar', 'Shuca Berry', 'Cursed Body', ['Splash'], 'Timid', {}));
 
-  /** The observation of the Drill Run on the first clean seed of the scene (a crit is no reading and the scene skips it). */
   function observationOf(kind: Kind, scene: FieldScene): DamageObservation {
     for (let seed = 1; seed <= 200; seed++) {
       const played = playScene(kind, scene, seed);
@@ -531,7 +511,6 @@ describe('survival-marker-observation', () => {
         const ctx = buildSolveContext(observations, teams, FORMAT[kind], []);
         for (const obs of observations) {
           const range = rollRange(ctx, ctx.byMon.get(keyOf('p2', obs.defenderSpecies))![0], spreadFor(ctx, 'p1', 'Garchomp'), spreadFor(ctx, 'p2', obs.defenderSpecies))!;
-          // The hit would have taken all of the HP, the log shows only the part up to the Sash.
           expect(range.min, obs.defenderSpecies).toBeGreaterThan(obs.observedFraction);
           expect(observationError(ctx, ctx.byMon.get(keyOf('p2', obs.defenderSpecies))![0], keyOf('p2', obs.defenderSpecies), spreadFor(ctx, 'p2', obs.defenderSpecies)), obs.defenderSpecies).toBe(0);
         }

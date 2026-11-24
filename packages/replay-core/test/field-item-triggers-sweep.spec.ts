@@ -5,11 +5,8 @@ import { registerChampionsDex, type RulesDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { fieldItemIds } from '../src/inference/field-item-triggers';
 
-// The five items that fire when the field changes: the four terrain seeds (onTerrainChange, Generation 7 on) and Room Service
-// (onAnyPseudoWeatherChange, Generation 8 on, Past in the Champions mod). A log that shows the trigger without the item's line rules the item out.
-// Each scene plays twice on @pkmn/sim: with the item (does the simulator use it, and does the inference leave it alone) and with an inert item and
-// the same choices (does the inference rule the item out exactly when the simulator used it). A scene the rule leaves unjudged on purpose (a
-// possible Klutz under Neutralizing Gas, an item the generation does not hold) is listed with its reason and must never rule the item out.
+// Each scene plays with the item and with an inert one: the inference rules the item out exactly when the sim used it.
+// A scene left unjudged on purpose is listed with its reason and never rules the item out.
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -156,7 +153,6 @@ function scenesFor(doubles: boolean, rules: RuleSet, item: string, dex: RulesDex
     add('a second Trick Room ends the first (the holder was blocked by Embargo at the first)', [foe, ...rest()], lead(holder()),
       [[pick(mv(foe, 'embargo', 1)), idle], [pick(mv(foe, 'trickroom')), idle], [idle, idle], [idle, idle], [idle, idle], [pick(mv(foe, 'trickroom')), idle]]);
   }
-  // Every pseudo-weather the Dex names, started late under a Trick Room the holder was blocked at.
   const ids = [...new Set(dex.moves.all().filter(move => !!move.pseudoWeather && move.pseudoWeather !== 'trickroom').map(move => move.pseudoWeather as string))];
   for (const id of ids) {
     const move = dex.moves.all().find(entry => entry.pseudoWeather === id && entry.target === 'all');
@@ -230,7 +226,6 @@ describe('a terrain seed or Room Service that never fired is ruled out', () => {
           }
         }
         expect(problems).toEqual([]);
-        // The sweep is no vacuous pass: Generation 6 holds no such item, the others use some in most of their scenes.
         expect(rows).toBeGreaterThan(rules.smoke ? 4 : 50);
         if (!rules.smoke) expect(fired).toBeGreaterThan(20);
       });
@@ -238,7 +233,6 @@ describe('a terrain seed or Room Service that never fired is ruled out', () => {
   }
 });
 
-/** The head of gen9championsvgc2026regmc-2710507840: Indeedee-F's Psychic Surge at the lead, a Trick Room at turn 1. */
 const ISSUE_LOG = (tier: string) => [
   '|gametype|doubles', '|player|p1|Alpha|1|1000', '|player|p2|Beta|1|1008', '|gen|9', `|tier|${tier}`,
   '|poke|p1|Glimmora, L50, M, shiny|', '|poke|p1|Volcarona, L50, F|', '|poke|p1|Rillaboom, L50, F|', '|poke|p1|Kingambit, L50, F, shiny|',

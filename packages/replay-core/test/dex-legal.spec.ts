@@ -3,8 +3,7 @@ import { toID } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/team-builder';
 import { abilitiesAreFree, legalAbility } from '../src/team/dex-legal';
 
-// The log names an ability by its display name. "As One" is no ability id of the gen 9 dex ("As One (Glastrier)", "As One (Spectrier)"), and the sim
-// plays an unknown id as no ability at all. Ogerpon and Terapagos must not carry the ability of a battle-only forme (Embody Aspect, Teraform Zero) on their base forme.
+// The log names display names: 'As One' is no id of the Gen 9 Dex, and the sim plays an unknown id as no ability.
 
 const vgcLog = (tier: string) => [
   '|gametype|doubles', '|gen|9', `|tier|${tier}`,
@@ -41,9 +40,6 @@ describe('dex-legal abilities', () => {
     }).toEqual({ calyrexIce: 'asoneglastrier', calyrexShadow: 'asonespectrier', terapagos: 'terashift', ogerpon: 'waterabsorb' });
   });
 
-  // The inference reads an ability a line names as its effect, as the client does:
-  // Terapagos shows Tera Shift on entry (`|-activate|p1b: Terapagos|ability: Tera Shift`) before its Stellar forme shows
-  // Teraform Zero, so the set keeps the ability it entered with; Ogerpon's Embody Aspect still shows only on its Tera.
   test('a format with free abilities keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Balanced Hackmons'));
     expect(abilityOf(p2Team, 'Calyrex-Shadow')).toBe('asonespectrier');
@@ -51,7 +47,6 @@ describe('dex-legal abilities', () => {
     expect(abilityOf(p1Team, 'Terapagos')).toBe('terashift');
   });
 
-  // Draft leagues play as custom games under the usual abilities.
   test('a custom game reads abilities like a standard format', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
     expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('waterabsorb');

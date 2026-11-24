@@ -1,10 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { hpEvsForMaxHp, observedMaxHp } from '../src/spreads/max-hp';
 
-/**
- * A server log prints every Pokémon's exact maximum HP on its switch line; at level 100 that pins the HP EVs (573756 Garchomp
- * 409/409 = 208 HP EVs, so 300 EVs remain for 252 Spe; the 252-HP rung reads 420 HP and contradicts the log).
- */
 describe('max HP from the log', () => {
   test('reads the first switch or drag line per side and species, skipping percent logs', () => {
     const log = [
@@ -32,11 +28,9 @@ describe('max HP from the log', () => {
   test('inverts the HP formula at level 100 exactly', () => {
     // Garchomp base 108: 409 = (216 + 31 + 52) + 110 → 52 × 4 = 208 EVs.
     expect(hpEvsForMaxHp(108, 100, 409, 0)).toBe(208);
-    // Kyurem base 125: 405 → 56; Zapdos-Galar base 90: 321 → 0; Landorus-T base 89: 382 → 252.
     expect(hpEvsForMaxHp(125, 100, 405, 0)).toBe(56);
     expect(hpEvsForMaxHp(90, 100, 321, 252)).toBe(0);
     expect(hpEvsForMaxHp(89, 100, 382, 0)).toBe(252);
-    // No 31-IV spread reaches this HP: unknown IVs, no measurement.
     expect(hpEvsForMaxHp(108, 100, 300, 0)).toBeUndefined();
     expect(hpEvsForMaxHp(108, 100, 500, 0)).toBeUndefined();
   });

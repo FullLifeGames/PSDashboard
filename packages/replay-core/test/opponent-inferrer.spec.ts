@@ -4,13 +4,8 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import type { LoggedHit } from '../src/types';
 import { buildTeamsFromReplay } from '../src/team-builder';
 
-/**
- * A `|cant|` line that names a move books that move for the Pokémon, as a `|move|` line does: the move never ran (Taunt, Imprison,
- * Disable, Heal Block, Throat Chop), so the log shows it only here (752301 t1 to t3). A blocker's `[of]` line (Dazzling, Queenly
- * Majesty, Armor Tail, Damp) books that move once for the stopped attacker and nothing for the blocker; a reason without a move
- * (sleep, paralysis, flinch, recharge, Truant) and a blocked move of a transformed Pokémon book nothing. Each scene first checks
- * the line the simulator writes.
- */
+// A `|cant|` line that names a move books it like a `|move|` line: the move never ran, so the log shows it only there.
+// A blocker's `[of]` line (Dazzling, Queenly Majesty, Armor Tail, Damp) books the move once for the stopped attacker.
 
 function mon(species: string, ability: string, moves: string[], spe = 0, item = 'Leftovers'): PokemonSet {
   return {
@@ -40,7 +35,6 @@ function play(format: Format, p1: PokemonSet[], p2: PokemonSet[], turns: [string
 }
 
 const SPLASH = mon('Chansey', 'Natural Cure', ['Splash']);
-/** p1 leads with a fast `lead` (in doubles its partner splashes); p2 gets `mate` beside the tested body. */
 function scene(format: Format, lead: PokemonSet, tested: PokemonSet, turns: [string, string][]) {
   const doubles = format === 'doubles';
   const p1 = doubles ? [lead, SPLASH] : [lead];
@@ -131,8 +125,6 @@ describe('a |cant| line without a move books nothing', () => {
   test.each(FORMATS)('%s: a Pokémon that Transform copied does not book the copied move it could not use', format => {
     const taunter = mon('Landorus-Therian', 'Intimidate', ['Taunt', 'Earthquake'], 252, 'Choice Scarf');
     const ditto = mon('Ditto', 'Imposter', ['Transform']);
-    // Imposter copies the Taunter at once (in doubles the Pokémon across, which is p1b); the Taunter is faster, so Ditto is
-    // taunted before it uses the copied Taunt itself, and the move is the copy's, not a move of Ditto's set.
     const doubles = format === 'doubles';
     const log = play(format, doubles ? [SPLASH, taunter] : [taunter], doubles ? [ditto, mon('Skarmory', 'Sturdy', ['Splash'])] : [ditto],
       [doubles ? ['move splash, move taunt 1', 'move taunt 1, move splash'] : ['move taunt', 'move taunt']]);
@@ -263,7 +255,6 @@ const treads = () => set({ species: 'Iron Treads', item: 'Leftovers', ability: '
 const blissey = () => set({ species: 'Blissey', ability: 'Natural Cure', moves: ['Soft-Boiled'], evs: { hp: 252 } });
 const chansey = () => set({ species: 'Chansey', ability: 'Natural Cure', moves: ['Soft-Boiled'], evs: { hp: 252 } });
 
-/** One turn of a real battle for a seed; the log has no crit. */
 function turnLog(kind: Kind, p1: PokemonSet, p2: PokemonSet, moves: [string, string], seed: number): string | null {
   const doubles = kind === 'doubles';
   const battle = new Battle({
@@ -275,7 +266,6 @@ function turnLog(kind: Kind, p1: PokemonSet, p2: PokemonSet, moves: [string, str
     battle.choose('p1', 'team 1');
     battle.choose('p2', 'team 1');
   }
-    // A move that names its target needs one in doubles; a spread move takes none.
   const choice = (move: string) => (doubles ? `move ${move}${['normal', 'any', 'adjacentFoe'].includes(Dex.moves.get(move).target) ? ' 1' : ''}, move softboiled` : `move ${move}`);
   battle.choose('p1', choice(moves[0]));
   battle.choose('p2', choice(moves[1]));
@@ -308,10 +298,8 @@ describe('the stat a Protosynthesis or Quark Drive holder has raised, read at th
     for (const [name, foe, holder, moves] of holders) {
       test(`${kind}: ${name}`, () => {
         const scene = sceneOf(kind, foe(), holder(), moves);
-        // The holder as attacker and as defender both carry the stat of the simulator's -start line.
         expect(scene.tuskHits[0]!.attacker.boostedStat).toBe(scene.stat);
         expect(scene.foeHits[0]!.defender.boostedStat).toBe(scene.stat);
-        // The foe has no such ability.
         expect(scene.tuskHits[0]!.defender.boostedStat).toBe('');
         expect(scene.foeHits[0]!.attacker.boostedStat).toBe('');
       });
@@ -340,7 +328,6 @@ describe('illusion-lookup', () => {
 
   function play(format: Format): string {
     const doubles = format === 'doubles';
-    // Illusion copies the last member of the team, so Zoroark leads with Hawlucha's looks.
     const p1 = doubles ? [TOXAPEX, TOXAPEX] : [TOXAPEX];
     const p2 = doubles ? [ZOROARK, SLOWBRO, HAWLUCHA] : [ZOROARK, HAWLUCHA];
     const battle = new Battle({
@@ -352,7 +339,6 @@ describe('illusion-lookup', () => {
       battle.choose('p1', `team ${p1.map((_, index) => index + 1).join('')}`);
       battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
     }
-    // Turn 1: Zoroark (as Hawlucha) is hit and the Illusion ends. Turns 2 to 4: Zoroark clicks three more moves under its own name.
     const hit = doubles ? 'move 1 1, move 1 1' : 'move 1';
     const clicks = [1, 2, 3, 4].map(index => (doubles ? `move ${index}${index < 4 ? ' 1' : ''}, move 1` : `move ${index}`));
     clicks.forEach(click => {
@@ -371,7 +357,6 @@ describe('illusion-lookup', () => {
         expect(log).toContain('|switch|p2a: Hawlucha|Hawlucha');
         const zoroark = inferOpponentTeam(log, 'p2').pokemon.find(entry => entry.species === 'Zoroark')!;
         const names = zoroark.moves.map(move => move.name);
-        // Turn 1 is played under the disguise, so the move of that turn books on the disguised species (a limit, not the fix).
         expect(names).toEqual(expect.arrayContaining(['Flamethrower', 'Sludge Bomb', 'Nasty Plot']));
       });
     }
@@ -410,7 +395,6 @@ describe('transform-booking', () => {
       expect(log).toMatch(/\|-transform\|p1a: Ditto\|p2a: Garchomp\|\[from\] ability: Imposter/);
       expect(log).toMatch(/\|move\|p1a: Ditto\|Earthquake/);
       expect(movesOf(log, 'p2', 'Garchomp')).toEqual(['Earthquake', 'Swords Dance']);
-      // The copy's own side shows no copied move on the copy, and the inference of p1 never sees the foe's Garchomp as its own.
       expect(movesOf(log, 'p1', 'Ditto')).toEqual([]);
     });
 
@@ -482,7 +466,6 @@ describe('unknown-forme marker from team preview', () => {
     const info = inferOpponentTeam(urshifuLog, 'p2');
     expect(info.pokemon.map(pokemon => pokemon.species)).toEqual(['Miraidon', 'Urshifu-Rapid-Strike', 'Incineroar']);
     const urshifu = info.pokemon[1];
-    // The preview's item marker and the battle's reveals land on the same entry.
     expect(urshifu.item).toEqual(expect.objectContaining({ value: 'Focus Sash', source: 'revealed' }));
     expect(urshifu.moves.map(move => move.name)).toEqual(['Surging Strikes']);
     expect(urshifu.gender).toBe('M');

@@ -16,10 +16,8 @@ const obsHeader = [
 
 describe('protocol parser fault tolerance', () => {
   test('a malformed event after a faint does not kill the whole parse', () => {
-    // The gpl-pipeline shape: video-reconstructed logs can emit impossible
-    // orderings — here a |-fail| targeting a mon that just fainted, which
-    // @pkmn/client resolves to null and crashes on. One bad line must not
-    // take down the whole replay.
+    // Video-reconstructed logs can emit impossible orderings: a `|-fail|` for a mon that just fainted, which
+    // @pkmn/client resolves to null and crashes on.
     const log = [
       '|player|p1|Alice|',
       '|player|p2|Bob|',
@@ -34,8 +32,6 @@ describe('protocol parser fault tolerance', () => {
       '|move|p1a: Uxie|Moonblast|p2a: Sig',
       '|-damage|p2a: Sig|0 fnt',
       '|faint|p2a: Sig',
-      // Unresolvable ident — @pkmn/client returns null and its |-fail|
-      // handler dereferences it unconditionally.
       '|-fail|p2a: Someone Else',
       '|turn|2',
     ].join('\n');
@@ -69,9 +65,6 @@ describe('damage observations', () => {
   });
 
   test('a knock-out hit is recorded as a lethal lower bound', () => {
-    // The line only says the hit took everything that was left: the
-    // recorded fraction is the remaining HP, the flag tells the fitter to
-    // read it as a lower bound rather than a damage reading.
     const log = [
       ...obsHeader,
       '|move|p1a: Lax|Tackle|p2a: Chomp',
@@ -127,8 +120,6 @@ describe('damage observations', () => {
   });
 
   test('unattributed damage outside the move action window yields no observation', () => {
-    // A miss ends the action: the confusion self-hit that follows must not be
-    // recorded as Tackle damage (the stale-attribution bug class).
     const confusionAfterMiss = [
       ...obsHeader,
       '|move|p1a: Lax|Tackle|p2a: Chomp',
@@ -139,8 +130,7 @@ describe('damage observations', () => {
     ].join('\n');
     expect(parseReplayLogWithObservations(confusionAfterMiss).observations).toHaveLength(0);
 
-    // Future Sight resolves at end of turn with a bare |-damage| after |-end|;
-    // it must not be attributed to an earlier move that targeted the same mon.
+    // Future Sight resolves at the end of the turn with a bare `|-damage|` after `|-end|`.
     const futureSight = [
       ...obsHeader,
       '|move|p1a: Lax|Tackle|p2a: Chomp',
@@ -208,7 +198,6 @@ describe('speed-order evidence', () => {
       '|move|p2a: Val|Moonblast|p1a: Fast',
       '|turn|3',
     ]));
-    // Turn 1's order predates the Tailwind; turn 2's is explained by it.
     expect(speedOrders).toHaveLength(1);
     expect(speedOrders[0].turn).toBe(1);
   });
@@ -223,10 +212,6 @@ describe('speed-order evidence', () => {
       '|move|p1a: Fast|Air Slash|p2a: Val',
       '|turn|3',
     ]));
-    // Turn 1: Val moved second AND is paralyzed by move time — the para
-    // explains the slowness, no constraint. Turn 2: the paralyzed Val
-    // moving FIRST is STRONGER evidence (its quartered speed still won —
-    // the base-speed conclusion follows a fortiori).
     expect(speedOrders).toEqual([{
       firstSide: 'p2', firstSpecies: 'Iron Valiant',
       secondSide: 'p1', secondSpecies: 'Noivern',
@@ -243,8 +228,6 @@ describe('speed-order evidence', () => {
       '|move|p2a: Val|Moonblast|p1a: Fast',
       '|turn|3',
     ]));
-    // Val moved second DESPITE doubled speed — Noivern outruns even the
-    // doubled value, so it outruns the base speed a fortiori.
     expect(speedOrders).toEqual([{
       firstSide: 'p1', firstSpecies: 'Noivern',
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
@@ -262,8 +245,6 @@ describe('speed-order evidence', () => {
       '|move|p1a: Fast|Air Slash|p2a: Val',
       '|turn|3',
     ]));
-    // Turn 1: Val moved second at −1 Speed — explained, dropped. Turn 2:
-    // Val moved FIRST at −1 Speed — stronger than a clean read.
     expect(speedOrders).toEqual([{
       firstSide: 'p2', firstSpecies: 'Iron Valiant',
       secondSide: 'p1', secondSpecies: 'Noivern',
@@ -295,8 +276,6 @@ describe('speed-order evidence', () => {
       '|move|p2a: Val|Moonblast|p1a: Fast',
       '|turn|3',
     ]));
-    // Turn 1 pair is clean (the boost lands after the move); turn 2's first
-    // mover carries +1 Speed — excluded.
     expect(speedOrders).toHaveLength(1);
     expect(speedOrders[0].turn).toBe(1);
   });
@@ -352,7 +331,6 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toEqual([]);
   });
 
-  // Doubles turns prove every opposite-side pair; copied actions and rearranged slots do not.
   const doublesLog = (body: string[]) => [
     '|player|p1|Alice|', '|player|p2|Bob|',
     '|teamsize|p1|4', '|teamsize|p2|4',
@@ -368,7 +346,6 @@ describe('speed-order evidence', () => {
   const pairs = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => `${o.firstSpecies}>${o.secondSpecies}`);
 
   test('a doubles turn proves every opposite-side pair in action order', () => {
-    // Fast > Val, Fast > Ori, Val > Slow, Ori > Slow; Fast > Slow and Val > Ori are same-side.
     expect(pairs(doublesLog([
       '|move|p1a: Fast|Air Slash|p2a: Val',
       '|move|p2a: Val|Moonblast|p1a: Fast',
@@ -421,7 +398,6 @@ describe('speed-order evidence', () => {
   });
 
   test('After You moves the target out of the race', () => {
-    // Val > Fast stands; Ori's position was arranged, so no pair with Ori.
     expect(pairs(doublesLog([
       '|move|p2a: Val|After You|p2b: Ori',
       '|-activate|p2b: Ori|move: After You',
@@ -433,7 +409,6 @@ describe('speed-order evidence', () => {
 
 });
 
-// Conditional priority, quick items, field speed, always-last abilities and a Scarf that changed hands explain an order without Speed.
 describe('speed-order cleanliness', () => {
   const singlesLog = (mons: [string, string], body: string[], pre: string[] = []) => [
     '|player|p1|Alice|', '|player|p2|Bob|', '|teamsize|p1|2', '|teamsize|p2|2',
@@ -513,28 +488,20 @@ describe('speed-order cleanliness', () => {
     const mons: [string, string] = ['Snorlax, M', 'Dragapult, F'];
     const race = ['|move|p1a: A|Body Slam|p2a: B', '|move|p2a: B|Draco Meteor|p1a: A'];
     const read = (log: string) => parseReplayLogWithObservations(log).speedOrders.map(o => [o.turn, o.firstScarf, o.secondScarf]);
-    // Knocked off at turn 2: the race of turn 1 ran with the Scarf, the race of turn 3 without it; the set keeps
-    // the Scarf, so the order says which one ran.
     expect(read(singlesLog(mons, [
       ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', '|turn|3', ...race,
     ]))).toEqual([[1, undefined, true], [3, undefined, false]]);
-    // The race of the turn the Scarf moved is dropped: which item ran it is open.
     expect(read(singlesLog(mons, [
       ...race, '|turn|2', '|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A', ...race,
     ]))).toEqual([[1, undefined, true]]);
-    // Knocked off before any race: the race runs without it.
     expect(read(singlesLog(mons, race, ['|-enditem|p2a: B|Choice Scarf|[from] move: Knock Off|[of] p1a: A']))).toEqual([[1, undefined, false]]);
-    // Tricked onto A at turn 2: the race A lost at turn 1 ran without a Scarf, the race A won at turn 3 with it
-    // (the build keeps A's own item, a swapped-in one is never the set's).
     expect(read(singlesLog(mons, [
       '|move|p2a: B|Draco Meteor|p1a: A', '|move|p1a: A|Body Slam|p2a: B',
       '|turn|2', '|-item|p1a: A|Choice Scarf|[from] move: Trick', '|turn|3', ...race,
     ]))).toEqual([[1, undefined, false], [3, true, undefined]]);
-    // Given away before any race: the giver races without it.
     expect(read(singlesLog(mons, race, [
       '|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A', '|-item|p2a: B|Leftovers|[from] move: Trick',
     ]))).toEqual([[1, undefined, false]]);
-    // Frisk only reveals the Scarf: the set carries it, the race stands as it is.
     expect(read(singlesLog(mons, race, ['|-item|p2a: B|Choice Scarf|[from] ability: Frisk|[of] p1a: A']))).toEqual([[1, undefined, undefined]]);
   });
 });
@@ -568,7 +535,6 @@ describe('KO-before-acting speed evidence', () => {
   });
 
   test('a victim that already acted this turn yields no KO evidence', () => {
-    // The victim's switch resolved first — its speed never raced the attack.
     const { speedOrders } = parseReplayLogWithObservations(koLog([
       '|switch|p2a: Val2|Garchomp, F|100/100',
       '|move|p1a: Fast|Draco Meteor|p2a: Val2',
@@ -599,15 +565,11 @@ describe('KO-before-acting speed evidence', () => {
       '|faint|p2a: Val',
       '|turn|2',
     ]));
-    // Both moved — the ordinary pair evidence stands; the residual faint
-    // adds nothing (the victim acted).
     expect(speedOrders).toHaveLength(1);
     expect(speedOrders[0].turn).toBe(1);
   });
 
   test('a paradox booster is directional: it voids the fast, not the outrun', () => {
-    // Booster on the VICTIM: the attacker outran a Quark-Drive-boosted
-    // speed — outrunning the base speed follows a fortiori. Keep.
     const boostedVictim = parseReplayLogWithObservations(koLog([
       '|-activate|p2a: Val|ability: Quark Drive',
       '|-start|p2a: Val|quarkdrivespe',
@@ -621,7 +583,6 @@ describe('KO-before-acting speed evidence', () => {
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
       turn: 1, knockOut: true,
     }]);
-    // Booster on the ATTACKER: the boosted speed explains the race. Drop.
     const boostedAttacker = parseReplayLogWithObservations(koLog([
       '|-activate|p1a: Fast|ability: Protosynthesis',
       '|-start|p1a: Fast|protosynthesisspe',

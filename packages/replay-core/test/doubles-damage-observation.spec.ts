@@ -4,9 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { parseReplayLogWithObservations } from '../src/protocol-parser';
 import type { DamageObservation } from '../src/types';
 
-// An observation says which game type it came from, whether the move line named `[spread]` (the simulator's 0.75 cut) and the side of its defender
-// (a spread move hits the attacker's partner as well). The two stored singles logs are compared field for field against the parser of 006b33c.
-
 const header = (gametype: string, tier: string) => [
   '|player|p1|Alice|', '|player|p2|Bob|', `|gametype|${gametype}`, '|gen|9', `|tier|${tier}`, '|start',
   '|switch|p1a: Lax|Snorlax, M|100/100',
@@ -40,7 +37,6 @@ describe('doubles damage observations', () => {
   });
 
   test('a spread move that only one target takes still reads spread: the simulator cut the damage', () => {
-    // Gyarados protected: the simulator keeps spreadHit (two targets at the start) and names the one slot that was hit.
     const observations = observe('|move|p1a: Lax|Rock Slide|p2a: Chomp|[spread] p2a', '|-damage|p2a: Chomp|70/100');
     expect(observations).toHaveLength(1);
     expect(observations[0].spread).toBe(true);
@@ -72,7 +68,6 @@ describe('doubles damage observations', () => {
   });
 
   test('a single-target move that a target is immune to ends the move as before', () => {
-    // The -immune line ends a single-target action: a confusion self-hit that follows belongs to nobody.
     expect(observe('|move|p1a: Lax|Earthquake|p2b: Gyro', '|-immune|p2b: Gyro', '|-damage|p2b: Gyro|90/100')).toEqual([]);
   });
 
@@ -85,7 +80,6 @@ describe('doubles damage observations', () => {
   });
 
   test('a second damage line on one target drops that target\'s observation only', () => {
-    // Dragon Darts hit one target twice: no reading. Synthetic mix: the other target keeps its single hit, whichever line came first.
     expect(observe('|move|p1a: Lax|Dragon Darts|p2a: Chomp', '|-damage|p2a: Chomp|80/100', '|-damage|p2a: Chomp|60/100')).toEqual([]);
     const split = observe('|move|p1a: Lax|Dragon Darts|p2a: Chomp', '|-damage|p2a: Chomp|80/100', '|-damage|p2b: Gyro|70/100');
     expect(split.map(obs => obs.defenderSpecies)).toEqual(['Garchomp', 'Gyarados']);
@@ -112,14 +106,12 @@ describe('doubles damage observations', () => {
       expect(read(tier, 'doubles')).toHaveLength(1);
       expect(read(tier, 'doubles')[0]).toMatchObject({ doubles: true, spread: false, defenderSide: 'p2' });
     }
-    // A singles game under a doubles-sounding name is still singles.
     expect(read('[Gen 9] Doubles OU', 'singles')[0]).toMatchObject({ doubles: false, spread: false, defenderSide: 'p2' });
   });
 });
 
 describe('singles logs give the observations their fixtures hold', () => {
   const fixture = (name: string) => readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf-8');
-  // The fields added since 006b33c are stripped before the comparison.
   const NEW_FIELDS = [
     'doubles', 'spread', 'defenderSide', 'attackerItem', 'defenderItem', 'attackerItemChanged', 'defenderItemChanged',
     'attackerParadox', 'defenderParadox', 'moveName', 'terrain', 'attackerHp', 'defenderHp', 'attackerAbility', 'defenderAbility',

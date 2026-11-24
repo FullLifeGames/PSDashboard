@@ -7,9 +7,6 @@ import { replayRuleset, inferReplayFormatId } from '../src/replay-format';
 import { isChampionsFormat } from '../src/champions-format';
 import { evBudget } from '../src/spreads/ev-budget';
 
-// One function decides whether a format is Pokémon Champions, for a format id, a replay id, a branch format with custom rules and the tier
-// name a log prints ('[Gen 9 Champions] OU'). The checker is the Dex: every format of the mod names mod 'champions', every format of the base Dex
-// names another mod, and the fit corpus manifests list the ids played.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
 const manifest = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/regression/fixtures/${name}`, import.meta.url), 'utf8')) as Record<string, unknown>;

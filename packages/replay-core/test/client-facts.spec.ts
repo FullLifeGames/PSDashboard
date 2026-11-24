@@ -2,10 +2,6 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-// The inference takes from @pkmn/client the facts its handlers missed: an ability a line names as its effect (`|-activate|p2a: X|ability: Quark Drive`,
-// a Queenly Majesty block), an item a line names from the holder's own side (`[from] item: Toxic Orb`, Poltergeist), and the client's rule for a move
-// that is no choice of the user's (a Magic Bounce reflection, a move while transformed, Struggle). Every log comes from @pkmn/sim.
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',

@@ -4,15 +4,11 @@ import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-// The simulator's Leppa Berry eats in onUpdate the moment any slot sits at 0 PP and its holder has HP, so a log that shows the 0-PP use without the
-// berry's line rules the berry out. Each scene plays once with a neutral item (what the inference reads) and once with a Leppa Berry (what a real
-// holder shows), and the two must agree. A guard is a scene where the real holder shows nothing although the move ran out, or where the log cannot
-// tell. The sweep over every Dex item is pp-trigger-sweep.spec.ts; the corpus rows are test/regression/leppa-refuted-corpus.spec.ts.
+// The simulator's Leppa Berry eats in onUpdate the moment a slot sits at 0 PP and its holder has HP.
 
 if (!Dex.formats.get('gen9championsou').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
 interface Format { name: string; id: string; doubles: boolean; revival: boolean }
-// Revival Blessing (1 PP, so 1 PP at the maximum too) exists from Generation 9; the other rows spend the PP of a repeated move.
 const FORMATS: Format[] = [
   { name: 'Gen 9 OU (singles)', id: 'gen9ou', doubles: false, revival: true },
   { name: 'Gen 9 Doubles OU', id: 'gen9doublesou', doubles: true, revival: true },
@@ -36,11 +32,10 @@ interface Scene {
   foe?: PokemonSet;
   foeTurns?: string[];
   shown: boolean;
-  /** A line spliced into the neutral log after the holder's last move line (a faint, a transform). */
   splice?: (log: string) => string;
 }
 
-/** The format's own maximum PP of a move (the simulator builds every move with three PP Ups; Champions computes PP its own way). */
+// The simulator builds every move with three PP Ups; Champions computes PP its own way.
 function maxPpIn(format: Format, move: string): number {
   const holder = set('Blissey', '', 'Natural Cure', [move]);
   const battle = new Battle({ formatid: toID(format.id), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([holder]) }, p2: { name: 'B', team: Teams.pack([holder]) } });
@@ -111,7 +106,6 @@ describe('a move that ran out of PP with no Leppa Berry line rules the berry out
       foe: set('Heatran', 'Leftovers', 'Pressure', ['Splash']),
     });
     const max = maxPpIn(format, 'toxic');
-    // The simulator names the use: the first turn after which a real Leppa Berry holder eats.
     let eaten = 0;
     for (let uses = 1; uses <= max && !eaten; uses++) if (read(format, toxic(uses), 'Blissey').shown) eaten = uses;
     expect(eaten, 'a use below the plain maximum eats').toBeGreaterThan(0);
@@ -136,13 +130,12 @@ describe('guards: the log cannot tell, so nothing is ruled out', () => {
   const revivalFormats = FORMATS.filter(entry => entry.revival);
   test.each(revivalFormats.flatMap(format => guards.map(guard => [format.name, ...guard, format] as const)))('%s: %s', (_name, _what, extra, species, format) => {
     const result = read(format, revival(extra), species);
-    // A spliced line (a faint) exists only in the inferred log: the real holder's log cannot say what it would have shown.
     if (!extra.splice) expect(result.shown).toBe(false);
     expect(result.out).toBe(false);
   });
 
   test.each(revivalFormats.map(format => [format.name, format] as const))('%s: a transformed holder is read for nothing', (_name, format) => {
-    // Ditto copies a foe that knows Revival Blessing; the copy's slots hold 5 PP, and the client books them as the target's, not the holder's.
+    // A copy's slots hold 5 PP, and the client books them as the target's, not the holder's.
     const scene: Scene = {
       turns: ['transform', 'revivalblessing'], foeTurns: ['revivalblessing', 'revivalblessing'], shown: false,
       holder: item => set('Ditto', item, 'Limber', ['Transform']),
@@ -152,7 +145,6 @@ describe('guards: the log cannot tell, so nothing is ruled out', () => {
   });
 
   test.each(revivalFormats.map(format => [format.name, format] as const))('%s: Embargo on the holder keeps the item from working', (_name, format) => {
-    // The foe embargoes in turn 1, the holder uses Revival Blessing in turn 2.
     const scene: Scene = {
       turns: ['splash', 'revivalblessing'], foeTurns: ['embargo', 'splash'], shown: false, holder: item => set('Pawmot', item, 'Natural Cure', ['Revival Blessing', 'Splash']),
       foe: set('Chansey', 'Leftovers', 'Natural Cure', ['Embargo', 'Splash']),

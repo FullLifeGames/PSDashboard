@@ -3,8 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { play, type PlayBody } from './blocked-effects-play';
 
-// Every log except the fixture's comes from @pkmn/sim; the sweep over every ability of every generation and mod is blocked-effects-sweep.spec.ts.
-
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
 const CHAMPIONS = 'gen9championsdoublescustomgame';
@@ -45,7 +43,6 @@ describe('Doubles OU 2663093831: the Intimidate and the Rock Slide flinch rule o
 });
 
 describe('an Intimidate that a Transform copied: the log names the ability, so the drop still rules out the guards', () => {
-  // Doubles OU 2543203909 turn 5: Mew transforms into Incineroar and Intimidate lowers the Attack of Dragonite.
   const copied = (target: PlayBody, format = DOUBLES) => play({
     format, p1: [mon('Mew', 'Synchronize', ['Transform']), FILLER, FILLER, FILLER], p2: [mon('Incineroar', 'Intimidate'), target, FILLER, FILLER],
     turns: [{ p1: 'move 1 1, move 1', p2: 'move 1, move 1' }],
@@ -71,7 +68,7 @@ describe('an Intimidate that a Transform copied: the log names the ability, so t
     expect(ruledOut(log, 'p2', 'Dragonite')).toEqual(['innerfocus']);
   });
 
-  // Singles has no row: the foe of the copier is the body it copied from, and that body's Intimidate is on the log already.
+  // Singles has no row: the copier's foe is the body it copied from, and that body's Intimidate is on the log already.
 });
 
 describe('a landed flinch rules out the ability that refuses it', () => {

@@ -4,15 +4,9 @@ import * as championsMod from '@pkmn/mods/champions';
 import { historyPower, historyPowerMove } from '../src/spreads/hit-power';
 import { FORMAT, KINDS, isDoubles, scaled, set, type Kind } from './fit-field-scenes';
 
-// spreads/hit-power.ts runs a Dex basePowerCallback on a recording stand-in with no battle behind it; hit-power-census.spec.ts holds the history
-// class to exactly Last Respects and Rage Fist. This spec plays real battles (Gen 9 and Champions, singles and doubles) and at every use of a
-// history move compares the base power of the simulator's own damage step (its BasePower event, before any modifier) with historyPower at the
-// counts the battle held then. A move of the class this spec does not play fails the sweep test at the bottom.
-
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 
 const FALLEN = (nickname: string): PokemonSet => ({ ...set('Shedinja', '', 'Wonder Guard', ['Splash'], 'Hardy', {}), name: nickname });
-/** Bulky foes that survive the whole scene: the history hits would otherwise knock the lone foe out and end the battle. */
 const DONDOZO = () => set('Dondozo', '', 'Unaware', ['Crunch', 'Dragon Claw', 'Splash'], 'Bold', { hp: 252, def: 252, spd: 4 });
 const BLISSEY = () => set('Blissey', '', 'Natural Cure', ['Crunch', 'Dragon Claw', 'Splash'], 'Calm', { hp: 252, spd: 252 });
 const BASCULEGION = () => set('Basculegion', '', 'Swift Swim', ['Last Respects', 'Rage Fist', 'Splash'], 'Hardy', { hp: 252 });
@@ -29,7 +23,7 @@ function play(kind: Kind): Use[] {
     p2: { name: 'Beta', team: Teams.pack((doubles ? [DONDOZO(), BLISSEY()] : [DONDOZO()]).map(body => scaled(body, kind))) },
   });
   const uses: Use[] = [];
-  // The highest priority runs before any ability, item or field modifier: the relayed value is the callback's own answer.
+  // The highest priority runs before any ability, item or field modifier: the relayed value is the callback's own.
   battle.onEvent('BasePower', battle.format, 1e6, (basePower: number, attacker: { side: { totalFainted: number }; timesAttacked: number }, _defender: unknown, move: { id: string }) => {
     if (historyPowerMove(Dex.forGen(9), move.id)) uses.push({ move: move.id, basePower, fainted: attacker.side.totalFainted, timesAttacked: attacker.timesAttacked });
   });
@@ -74,7 +68,6 @@ describe('the history power equals the simulator\'s base power on a played battl
     for (const use of uses) {
       expect(historyPower(dex(kind) as never, use.move, use), `${use.move} at ${use.fainted} fallen, ${use.timesAttacked} hits`).toBe(use.basePower);
     }
-    // The counts really moved: the battle did not stay at zero, where every callback answers its floor.
     expect(Math.max(...uses.map(use => use.fainted))).toBeGreaterThan(0);
     expect(Math.max(...uses.map(use => use.timesAttacked))).toBeGreaterThan(0);
   });

@@ -4,9 +4,6 @@ import { Dex as BaseDex } from '@pkmn/dex';
 import * as championsMod from '@pkmn/mods/champions';
 import { generationsFor } from '../src/format-generations';
 
-// A Champions battle's log names species the mod calls non-standard (Heatran-Mega: `Future` in both), so the parser reads the 'logged' scope
-// (every species the Dex knows, with the base Dex's data) and the team editor's pools read the 'legal' scope (exactly what the registered mod
-// allows). Every other format keeps the one shared standard Generations. The checker is the mod: Dex.mod('champions', @pkmn/mods/champions).
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const mod = Dex.dexes.champions;
 const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3', logTier: '[Gen 9 Champions] OU' } as const;
