@@ -9,12 +9,6 @@ import { BRING_WORLD_CAP, bringWorlds, type BringWorld } from '../src/branch/bri
 import { serializePreviewPosition } from '../src/branch-engine';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * The worlds of every bring-limited game of `.fit-corpus` (Scarlet/Violet VGC, Champions VGC bo1 and bo3, Battle Stadium Singles; skipped
- * without the corpus). Each world, with equal weights, names only bodies of its side's team preview, holds the bring count on both sides,
- * puts the guesses last, and trims both sides to the count through the team-preview position (`serializePreviewPosition`): no world pits
- * a pinned four against an open six. The lists of `replayBringOnly` are held by `bring-list-corpus.spec.ts`.
- */
 const FIT = join(process.cwd(), '.fit-corpus');
 const HAVE_CORPUS = existsSync(FIT);
 

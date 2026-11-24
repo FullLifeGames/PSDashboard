@@ -8,14 +8,6 @@ import { battleOf } from './power-oracle';
 import { setRaceCut } from '../src/score/boost-race';
 import { pairThreat, threatGetter } from '../src/score/threat';
 
-/**
- * A stage below 0 bites too. A drop that moves the 1v1 race against its holder counts negative in boostsBiting, as the same stage
- * counts in boosts; a drop that moves nothing counts 0. A drop is the mirror of a boost: it is the foe's stage, so it bites only where
- * the FOE wins the race with it (a flip from my win to the foe's, or a win the drop made faster) and gets to act in it; a drop in a
- * race I still win costs nothing, and a foe that never swings back never wins one. Every premise is played in the simulator, in
- * Scarlet and Violet and on the Champions mod, singles and doubles.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const SP = { hp: 32, atk: 32, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -31,10 +23,6 @@ const MODES: Mode[] = [
   { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', doubles: true, mon: champion },
 ];
 
-/**
- * The board: my slot 0 and the foe's slot 0 carry the scene, a Splashing Snorlax stands next to each in doubles. `bench` puts a Blissey
- * behind my side (alive, or fainted as after a loss); `trapper` is the ability of the foe's lead.
- */
 function board(mode: Mode, mine: [string, string[]], foe: [string, string[]], seed = '1,2,3,4', extra: { bench?: 'living' | 'fainted'; trapper?: string } = {}): Battle {
   const partner = () => mode.mon('Snorlax', ['splash']);
   const team = (lead: [string, string[]]) => [mode.mon(lead[0], lead[1]), ...(mode.doubles ? [partner()] : [])];
@@ -69,10 +57,6 @@ function turnsToKo(battle: Battle, attacker: 0 | 1, victim: 'mine' | 'foe', mode
   return 8;
 }
 
-/**
- * `hits` times the median first hit of the attacker on the other lead on no stages, over sixteen seeds (a middle roll, no crit), in HP
- * points: the simulator's dice and the static (top roll) then count the same hits.
- */
 function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, string[]], attacker: 0 | 1): number {
   const damage: number[] = [];
   let capacity = Infinity;
@@ -86,7 +70,6 @@ function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, 
     damage.push(before - victim.hp);
   }
   damage.sort((x, y) => x - y);
-  // A scene that asks for more hits than the victim's max HP holds is a mistake in the scene, not a board.
   if (hits * damage[8] > capacity) throw new Error(`${hits} hits of ${damage[8]} HP are more than ${capacity}`);
   return Math.max(1, Math.floor(hits * damage[8]));
 }
@@ -94,7 +77,6 @@ function hpAt(hits: number, mode: Mode, mine: [string, string[]], foe: [string, 
 const foeCount = (battle: Battle) => battle.sides[1].pokemon.filter(mon => !mon.fainted).length;
 
 describe.each(MODES)('a stage drop in the race, $name', mode => {
-  /** Garchomp (Crunch) against a faster Jolteon (Shadow Ball): the foe stands at 1.15 of my plain hits, I stand at 2.4 of its hits. */
   const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
   const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
   function raceScene(mode: Mode, stage: number, swapped = false): Battle {
@@ -224,7 +206,6 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
   const GARCHOMP: [string, string[]] = ['Garchomp', ['crunch', 'splash']];
   const JOLTEON: [string, string[]] = ['Jolteon', ['shadowball', 'splash']];
 
-  /** Garchomp at -2 Attack against `front` with a Jolteon on the bench that the drop turns from a lost race into a won one. */
   function behind(front: [string, string[]]): Battle {
     const battle = battleOf(mode.format, [mode.mon(...GARCHOMP)], [mode.mon(...front), mode.mon(...JOLTEON)]);
     const [mine, bench] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
@@ -235,10 +216,8 @@ describe.each(MODES.filter(mode => !mode.doubles))('a drop behind a front that b
   }
 
   test('a front foe that wins the race anyway closes the gate: the drop costs nothing against the bench behind it (before: it counted)', () => {
-    // The front Jolteon at full HP wins on the move order whatever the drop does; the bench Jolteon would be the flip.
     const battle = behind(JOLTEON);
     expect(evalFeatures(battle).boosts).toBeLessThan(0);
-    // The front Jolteon is bitten itself, as it wins and the drop makes the win safer in the fresh race (half the foes); the bench Jolteon behind it would add the other half.
     expect(evalFeatures(battle).boostsBiting).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', -2) / 2, 12);
   });
 
@@ -263,12 +242,10 @@ describe.each(MODES)('a positive stage that moves the race, as before, $name', m
     foe.sethp(1);
     battle.field.addPseudoWeather('trickroom', mine);
     expect(battle.field.pseudoWeather['trickroom']).toBeTruthy();
-    // Under Trick Room the action speed is inverted: the slower Gyarados moves first; at +2 Speed it is the faster one and moves last.
     expect(mine.getActionSpeed()).toBeGreaterThan(foe.getActionSpeed());
     mine.boosts.spe = 2;
     expect(mine.getActionSpeed()).toBeLessThan(foe.getActionSpeed());
     const features = evalFeatures(battle);
-    // The slowed holder at 1 HP never acts (the foe moves first and KOs it), so `boosts` reads its stage as 0 too.
     expect(features.boosts).toBe(0);
     expect(features.boostsBiting).toBe(0);
   });
@@ -281,7 +258,6 @@ describe.each(MODES)('a drop its holder clears by switching counts nothing, $nam
   const SHADOW_TAG = 'Shadow Tag';
   type Extra = { bench?: 'living' | 'fainted'; trapper?: string };
 
-  /** The three scenes of (a), (b) and (c) above, each with its drop, after one Splash turn (the end of a turn writes `trapped`). */
   const SCENES: Record<'a' | 'b' | 'c', (extra: Extra, stage?: number) => Battle> = {
     a: (extra, stage = -2) => {
       const battle = board(mode, GARCHOMP, JOLTEON, '1,2,3,4', extra);
@@ -358,7 +334,6 @@ describe.each(MODES)('a drop its holder clears by switching counts nothing, $nam
 
 describe('boost-bite-front', () => {
 
-
   const SINGLES = 'gen9customgame';
   const DOUBLES = 'gen9doublescustomgame';
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
@@ -368,10 +343,6 @@ describe('boost-bite-front', () => {
     return Math.max(threat.physical, threat.special);
   };
 
-  /**
-   * HP (points) at which `hits` hits of the attacker's best move on no stages take the victim: 1.4 is one boosted hit but not one plain
-   * one.
-   */
   const hpAt = (battle: Battle, attacker: Pokemon, victim: Pokemon, hits: number) => {
     const share = hits * hit(battle, attacker, victim);
     if (share > 1) throw new Error(`${hits} hits of ${attacker.name} are ${share.toFixed(2)} of ${victim.name}'s max HP`);
@@ -391,10 +362,6 @@ describe('boost-bite-front', () => {
   const GARCHOMP = (extra: Partial<PokemonSet> = {}) => set('Garchomp', ['crunch', 'splash'], extra);
   const KILLER = () => set('Jolteon', ['icebeam', 'splash']);
 
-  /**
-   * Garchomp at half HP and +2 Attack against a faster Jolteon (Ice Beam hits it four times over: the lowest roll of the
-   * simulator KOs it), the foe at the HP where only the boosted Crunch KOs.
-   */
   function lostRace(extra: Partial<PokemonSet> = {}): Battle {
     const battle = battleOf(SINGLES, [GARCHOMP(extra)], [KILLER()]);
     const [mine, foe] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!];
@@ -448,10 +415,6 @@ describe('boost-bite-front', () => {
       expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
     });
 
-    /**
-     * Garchomp (+2 Attack) at 2.4 Shadow Balls in front of a faster Jolteon that stands behind +3 Defense (the boosted Crunch needs
-     * three hits, the Shadow Ball three as well and it moves first), a Clefable the boosted Crunch KOs behind it.
-     */
     const beaten = () => {
       const battle = behind(set('Jolteon', ['shadowball', 'splash']), splash('Clefable'));
       const [mine, foe] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!];
@@ -498,10 +461,6 @@ describe('boost-bite-front', () => {
   describe('the report on gen9draft-2058494320: a 5% Cobalion at +4 into a full-HP Shore Up Palossand', () => {
     const COBALION = () => set('Cobalion', ['smartstrike', 'splash']);
     const PALOSSAND = () => set('Palossand', ['shoreup', 'earthpower']);
-    /**
-     * Cobalion at 5% and +4 Attack (a hit three times as hard); the bench foe stands at 1.4 plain hits, so only the boosted Smart Strike
-     * KOs it.
-     */
     function scene(front: PokemonSet): Battle {
       const battle = battleOf(SINGLES, [COBALION()], [front, splash('Clefable')]);
       const [mine, bench] = [battle.sides[0].active[0]!, battle.sides[1].pokemon[1]];
@@ -544,16 +503,11 @@ describe('boost-bite-front', () => {
 
     test('the same Palossand with no heal move: the holder gets past it within the horizon and the bench foe counts', () => {
       const battle = scene(set('Palossand', ['splash']));
-      // Both foes bite now: the Palossand in front and the Clefable behind it.
       expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 4), 12);
     });
   });
 
   describe('the end of the turn is part of the race (Leech Seed)', () => {
-    /**
-     * Garchomp at 22% and +2 Attack against a slow Snorlax, the foe at the HP where the boosted Crunch needs two hits. Its Tackle takes
-     * 15 to 18% of Garchomp: the holder lives through it, and the seed's 12% at the end of the turn finishes it.
-     */
     function seededRace(seeded: boolean): Battle {
       const battle = battleOf(SINGLES, [GARCHOMP()], [set('Snorlax', ['tackle', 'splash'])]);
       const [mine, foe] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!];
@@ -585,7 +539,6 @@ describe('boost-bite-front', () => {
   });
 
   describe('the doubles gate: the foes in front are the foes on the field', () => {
-    /** Garchomp +2 Attack at half HP with a Splashing partner against `first` and a Clefable the stage bites; `first` sits at 1 HP. */
     const board = (first: PokemonSet) => {
       const battle = battleOf(DOUBLES, [GARCHOMP(), splash('Snorlax')], [first, splash('Clefable')]);
       const [mine, quick, other] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle.sides[1].active[1]!];

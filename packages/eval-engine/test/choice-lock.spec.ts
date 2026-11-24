@@ -77,8 +77,7 @@ describe('protocol choice-lock trails', () => {
   });
 
   test('a Trick-handed Choice item locks the next move; any other item event disturbs the trail', () => {
-    // The sim's Choice Scarf drops the old lock on arrival and locks the next move (items.ts onStart / onModifyMove); the GPL replay shows it:
-    // Vileplume clicks Sludge Bomb at t19 after the Trick and again at t20. The re-entry at t37 starts a fresh trail.
+    // The sim's Choice Scarf drops the old lock on arrival and locks the next move (items.ts onStart / onModifyMove).
     const trails = buildChoiceLockTrails(log([
       '|switch|p1a: Plume|Vileplume|100/100',
       '|turn|1',
@@ -106,8 +105,8 @@ describe('protocol choice-lock trails', () => {
 });
 
 describe('choice-item damage corroboration', () => {
-  // Bands measured once (gen6, Keldeo Hydro Pump vs the shared inline spread on Mew, ± the 0.02 HP-bar slack): Specs 0.766-0.947,
-  // Mystic Water 0.608-0.762, unboosted 0.502-0.639; disjoint, so each pinned fraction below sits inside exactly one band.
+  // Bands measured (gen6, Keldeo Hydro Pump vs the shared spread on Mew, ±0.02 HP-bar slack): Specs 0.766-0.947,
+  // Mystic Water 0.608-0.762, unboosted 0.502-0.639; disjoint, so each pinned fraction sits inside exactly one band.
   const teams = {
     p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
     p2Team: [set('Mew', '', ['Protect'])],
@@ -128,7 +127,7 @@ describe('choice-item damage corroboration', () => {
 
   test('a knock-out reads as a lower bound: below the choice band it neither contradicts nor corroborates', () => {
     const lethal = observation(0.55).map(obs => ({ ...obs, lethal: true }));
-    // 0.55 sits inside the unboosted band; a knock-out at 0.55 only says "at least 0.55", which both hypotheses explain.
+    // 0.55 sits in the unboosted band; a KO at 0.55 only says "at least 0.55", which both hypotheses explain.
     expect(corroborateChoiceItem('p1', 'Keldeo', 'Choice Specs', teams, lethal, 6)).toBe('ambiguous');
   });
 
@@ -164,7 +163,6 @@ describe('choice-lock context', () => {
   });
 
   test('a contradicted guessed choice item loses eligibility', () => {
-    // 0.55 sits inside the unboosted band and outside both boost bands.
     const teams = {
       p1Team: [set('Keldeo', 'Choice Specs', ['Hydro Pump'])],
       p2Team: [set('Mew', '', ['Protect'])],
@@ -179,8 +177,6 @@ describe('choice-lock context', () => {
 });
 
 test('649664: after its t23 Hydro Pump, Keldeo @ Specs is a locked side (the corpus gap\'s mechanism)', { timeout: 240000 }, async () => {
-  // Keldeo enters at the end of t22 (Excadrill faints) and fires its first Hydro Pump during t23, so t24 is the protocol-locked boundary
-  // the t23 grading plays through.
   const replay = JSON.parse(readFileSync(new URL('./fixtures/smogtours-gen6ou-649664.json', import.meta.url), 'utf-8')) as {
     id: string; format: string; formatid?: string; players: string[]; log: string;
   };
@@ -287,7 +283,6 @@ describe('scene: 752301, Landorus\'s Taunt shows only in a |cant| line', () => {
     const replay = fixture('smogtours-gen9ou-752301.json');
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-    // The bank's set for p1's Landorus: the inference does not read the Taunt of the cant line.
     p1Team.find(set => set.species === 'Landorus-Therian')!.moves = ['U-turn', 'Earthquake', 'Stealth Rock', 'Stone Edge'];
     const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
     const seen = new Map<number, { active: string; taunted: boolean }>();
@@ -360,7 +355,6 @@ const alakazam: PokemonSet = {
   gender: '', level: 50, evs: { hp: 0, atk: 0, def: 0, spa: 32, spd: 2, spe: 32 }, ivs: ALL_31,
 };
 
-/** The banded hit as the server rolls it: the calc on the Champions stats, the top roll. */
 function bandedFraction(): number {
   const gen = Generations.get(9);
   const budget = evBudget('gen9championsou');
@@ -378,7 +372,7 @@ const observations = (): DamageObservation[] => [{
   observedFraction: bandedFraction(), lethal: false, attackerBoosts: {}, defenderBoosts: {}, attackerStatus: '', screens: [], weather: '',
 }];
 
-/** The Champions mod changes moves calc 0.11 still prices at Gen 9 values: Psyshield Bash hits at 90 there, not 70. */
+// The Champions mod changes moves calc 0.11 still prices at Gen 9 values: Psyshield Bash hits at 90 there, not 70.
 await loadSimMods('gen9championsou');
 const wyrdeer: PokemonSet = {
   name: 'Wyrdeer', species: 'Wyrdeer', item: 'Life Orb', ability: 'Intimidate', moves: ['Psyshield Bash'], nature: 'Adamant',
@@ -389,7 +383,6 @@ const garchomp: PokemonSet = {
   gender: '', level: 50, evs: { hp: 32, atk: 0, def: 32, spa: 0, spd: 2, spe: 0 }, ivs: ALL_31,
 };
 
-/** The banded Psyshield Bash as the server rolls it: the mod's power 90 on the Champions stats, the top roll. */
 function bashFraction(): number {
   const gen = Generations.get(9);
   const budget = evBudget('gen9championsou');
@@ -440,7 +433,6 @@ describe('choice-lock-defender-item', () => {
     },
   };
 
-  /** The fraction of its HP the defender holding `item` loses to the move in one real turn, a hit with no critical. */
   function hitFraction(format: string, scene: Scene, item: string): number {
     const doubles = format.includes('doubles');
     const partner = () => set('Blissey', ['splash'], { ability: 'Natural Cure' });
@@ -560,7 +552,7 @@ describe('choice-lock-hit-field', () => {
     // A Terastallized Gengar hits with the doubled same-type bonus.
     const gengar = (item: string) => mon('Gengar', item, 'Cursed Body', ['Shadow Ball', 'Splash'], { teraType: 'Ghost', level: 60, nature: 'Modest', evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 0, spe: 0 } });
     const CLEFABLE = mon('Clefable', '', 'Unaware', ['Splash']);
-    // Specs and Spell Tag (1.5 against 1.2) overlap at the extreme rolls of the 2 percent slack: the seed gives a middle roll.
+    // Specs and Spell Tag (1.5 against 1.2) overlap at the slack's extreme rolls; the seed gives a middle roll.
     const TERA_SEED = 2;
     function teraVerdict(truth: string): ItemCorroboration {
       const log = turnOf('gen9customgame', gengar(truth), CLEFABLE, 'move shadowball terastallize', [], TERA_SEED);

@@ -9,12 +9,7 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, verdictOf, type Holder, type Lineup } from './board-key-support';
 
-/**
- * A field that every reader in the Dex tests only as "zero or not" is keyed as that predicate: `activeTurns` is read by Stakeout,
- * Mountaineer, Rebound, Speed Boost, Slow Start, Truant, Electrify, Taunt, Octolock and a partial trap, each against 0, so the key splits
- * a board at 0 and keeps 1, 2 and 17 together. Each reader, placed on each holder, plays the same hit and end of turn at 1, 4 and 17; at
- * 0 against 3 the plays differ (the teeth). A simulator entry that compares the field with a number turns the row red.
- */
+// `activeTurns` is tested only against 0 by every Dex reader: the key splits at 0 and keeps 1, 2 and 17 together.
 
 await loadSimMods('gen9championscustomgame');
 
@@ -32,7 +27,6 @@ function freshEnd(battle: Battle): string {
 }
 
 describe.each(CASES)('$name: the turns a body has stood are keyed as zero or not', ({ rules, mode, name }) => {
-  // A move that costs its user HP by itself: the cost of the hit then follows the damage a Stakeout or a Slow Start changes.
   const recoil = sweepMoves(rules, move => !!move.recoil || !!move.struggleRecoil, true).moves.find(move => move.category === 'Physical')?.id ?? 'tackle';
   const base = boardFor(rules, mode, recoil);
   const { dex } = base;
@@ -66,10 +60,8 @@ describe.each(CASES)('$name: the turns a body has stood are keyed as zero or not
       for (const id of ids) for (const holder of holders) if (holderOf(base, holder)) check(`${kind} ${id} on ${holder}`, recoil, lineupOf(kind, id, holder));
     }
     for (const move of moves) check(`move ${move}`, move, {});
-    // Generations 1 and 2 have no entry that reads the field.
     if (rules.generation >= 3) expect(rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    // The teeth: Stakeout on the attacker (Gen 7 on) and Mountaineer-like entries read the zero.
     if (rules.generation >= 7 || rules.name === 'Champions') expect(teeth).toBeGreaterThan(0);
   });
 

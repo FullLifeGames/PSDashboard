@@ -11,11 +11,6 @@ import { rootOf } from './calc-roll-oracle';
 import { doubles, IDLE_ALONE, SCENES, SCREENS, wall, type Scene } from './forced-spread-scenes';
 import { simDamages } from './sim-rolls';
 
-/**
- * A move button also carries the type the move lands with after the Tera click (typeUnderTera), read from the simulator on a copy of
- * the battle where the simulator's own terastallize ran. The oracle is the real queue: the same position played through the click,
- * then read with the same reading as `type`. Singles and doubles share the code (VGC is a doubles format).
- */
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
@@ -47,7 +42,6 @@ describe('typeUnderTera labels a move with the type after the Tera click', () =>
     clickTeraAt(played, 0, false);
     const oracle = afterClick(movesOf(played));
     expect(underTera(before)).toEqual(oracle);
-    // The click changes Tera Blast (Normal to Water) and leaves the mask's Ivy Cudgel alone.
     expect(byName(before)['Tera Blast'].type).toBe('Normal');
     expect(byName(before)['Tera Blast'].typeUnderTera).toBe(oracle['Tera Blast']);
     expect(byName(before)['Ivy Cudgel'].typeUnderTera).toBeUndefined();
@@ -82,9 +76,7 @@ describe('typeUnderTera labels a move with the type after the Tera click', () =>
   });
 
   test('singles: a body that cannot terastallize, and one that already did, carry no typeUnderTera', () => {
-    // Generation 8 has no Terastallization.
     const gen8 = movesOf(singles('gen8customgame', [set('Sylveon', ['hypervoice', 'splash'], { ability: 'Pixilate' })], [splash('Snorlax')]));
-    // Pixilate turns every Normal move Fairy, Splash included.
     expect(gen8.map(move => move.type)).toEqual(['Fairy', 'Fairy']);
     expect(gen8.every(move => move.typeUnderTera === undefined)).toBe(true);
     const played = singles(SINGLES, [garchomp()], [splash('Snorlax')]);
@@ -132,7 +124,6 @@ describe('typeUnderTera labels a move with the type after the Tera click', () =>
         expect(mon.terastallized).toBeFalsy();
         expect(mon.canTerastallize).toBeTruthy();
       }
-      // The same state with the label stripped is the state the plain reading builds.
       const stripped = JSON.parse(JSON.stringify(state, (key, value) => (key === 'typeUnderTera' ? undefined : value)));
       expect(stripped.p1MovesBySlot.flat().map((move: BranchMoveOption) => move.type)).toEqual(
         state.p1MovesBySlot.flat().map(move => move.type));
@@ -167,7 +158,6 @@ describe('move buttons show the type at use', () => {
       [set('Ogerpon-Wellspring', ['ivycudgel', 'hornleech'], { item: 'Wellspring Mask' })],
       [set('Sylveon', ['hypervoice', 'shadowball', 'protect'], { ability: 'Pixilate' })]);
     expect(typesOf(battle)).toEqual({ 'Ivy Cudgel': 'Water', 'Horn Leech': 'Grass' });
-    // Pixilate turns every Normal move Fairy, a status move like Protect included.
     expect(typesOf(battle, 'p2')).toEqual({ 'Hyper Voice': 'Fairy', 'Shadow Ball': 'Ghost', Protect: 'Fairy' });
   });
 
@@ -195,7 +185,6 @@ describe('move buttons show the type at use', () => {
 
   test('asking the simulator writes nothing to the log of a custom game, which runs in debug mode', () => {
     const battle = singles('gen9customgame', [set('Garchomp', ['earthquake', 'tackle'])], [splash('Snorlax')]);
-    // Electrify's handler retypes the move and writes a debug line when asked.
     battle.sides[0].active[0].addVolatile('electrify');
     const before = battle.log.length;
     expect(typesOf(battle)).toEqual({ Earthquake: 'Electric', Tackle: 'Electric' });
@@ -331,7 +320,6 @@ describe('the preview of a forced spread on a lone foe behind a screen (doubles)
         const before = serializeBattleStable(battle);
         const { result, maxhp } = previewOf(scene, root, screen, true, battle);
         expect([result.minPercent, result.maxPercent]).toEqual([pct(Math.min(...damages.normal), maxhp), pct(Math.max(...damages.normal), maxhp)]);
-        // The live battle is read and never written.
         expect(serializeBattleStable(battle), 'the live battle is unchanged').toBe(before);
       });
 

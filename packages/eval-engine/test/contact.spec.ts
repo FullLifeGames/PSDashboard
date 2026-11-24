@@ -6,14 +6,6 @@ import { configureSimFast, resetSimFastForTests, simFastCounters } from '../src/
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * What one hit of a move costs the attacker, read from the simulator and not from a list of items, abilities or moves (Cobalion's
- * contact moves into Talonflame meet Flame Body). The reader plays the hit on a copy of the board on fixed quantiles of its dice and
- * answers the HP the hit takes (a share of the attacker's max HP) and the chance of each status it leaves. Every scene is held to turns
- * of the simulator: the HP the attacker really loses, and how often the dice really burn, paralyze or poison it. The effects run in
- * singles and in doubles; the generations, the Champions mod, benched bodies and the memo have their own scenes below.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const SINGLES = 'gen9customgame';
@@ -383,8 +375,8 @@ describe('the Champions mod and every generation', () => {
     expect(read(skin(), 'bodyslam').chip).toBeCloseTo(realLoss(skin(), SINGLES_CLICK), 9);
     expect(read(skin(), 'bodyslam').chip).toBeGreaterThan(0);
     const recoil = (seed: string) => battleOf(format, [attackerOf('Snorlax', ['doubleedge'])], [foe('Snorlax')], seed);
-    // The reader's two probes (u = 0.075 and 0.925) meet no crit at the ordinary stage (1 in 16 up to gen 6, 1 in 24 later), so a recoil it
-    // reads deterministic is the cost of a hit without a crit, and the simulator's turns are held to that.
+    // The reader's probes (u = 0.075, 0.925) meet no crit at the base stage (1 in 16 up to gen 6, 1 in 24 later),
+    // so the recoil it reads is the cost of a hit without a crit, and the simulator's turns are held to that.
     expect(Math.abs(read(recoil('1,2,3,4'), 'doubleedge').chip / meanLossWithoutCrit(recoil, 60, SINGLES_CLICK) - 1)).toBeLessThan(0.06);
   });
 
@@ -503,7 +495,6 @@ describe('the reader leaves the battle alone and keeps a memo', () => {
 
 describe('contact-memo-state', () => {
 
-
   type Tweak = (battle: Battle) => void;
   type Body = Pokemon & Record<string, unknown>;
   const attackerOf = (battle: Battle): Body => battle.sides[0].active[0]! as Body;
@@ -523,7 +514,8 @@ describe('contact-memo-state', () => {
     second: Tweak;
   }
 
-  /** The attacker's happiness, in the field and in its set: the slow mode's copy (EVAL_SIM_FAST=0) rebuilds it from the set, the fast mode's takes the field. */
+  // Happiness in the field and in the set: the slow mode's copy (EVAL_SIM_FAST=0) rebuilds it from the set,
+  // the fast mode's copy takes the field.
   const happiness = (battle: Battle, value: number): void => {
     attackerOf(battle).happiness = value;
     attackerOf(battle).set.happiness = value;
@@ -595,7 +587,6 @@ describe('contact-memo-state', () => {
         return;
       }
       const expected = boards.map(battle => fresh(battle!, row.move));
-      // Teeth: the two boards differ in the played hit (counted below where a format's rules give the same hit twice).
       if (JSON.stringify(expected[0]) === JSON.stringify(expected[1])) noTeeth.push(row.name);
       const wrong: string[] = [];
       for (const order of [[0, 1], [1, 0]]) {

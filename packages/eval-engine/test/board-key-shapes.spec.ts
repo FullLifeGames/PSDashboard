@@ -4,12 +4,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
 
-/**
- * The key of a body or a board is made from the shape of its own fields and the read set of its composition: the class of a field and the
- * key's decision about it are made once per shape for the process, and a read set only picks the fields that a handler on its board
- * reads. Nothing is kept per body: a body that changes between two calls gives the key a fresh build gives.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const CONSUMERS: Consumer[] = ['hit', 'residual'];

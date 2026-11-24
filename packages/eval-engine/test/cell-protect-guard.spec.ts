@@ -5,17 +5,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The singles planner keeps a cell out of the analytic blend when a move changes what a hit means (a Protect turns the foe's hit
- * away). The rule reads the Dex: a stalling move (`move.stallingMove`) or a side protector (`shieldsSide`). Held against the
- * simulator: every status move that sets a volatile or a side condition on its user's side is played in a singles turn against
- * probe hits, in Scarlet/Violet and in the Champions mod.
- *
- * The hits are the damaging ones (Tackle, Surf, Aqua Jet at a 1-HP body, lethal and accurate) and Crafty Shield's class, a status
- * hit (Spore). Magic Coat, Safeguard, Shed Tail and Substitute turn a status hit away through their own effect; the rule does not
- * read them and this sweep does not claim them.
- */
-
 await loadSimMods('gen9championsou');
 
 const NAMES_UNTIL_ROUND_69 = [

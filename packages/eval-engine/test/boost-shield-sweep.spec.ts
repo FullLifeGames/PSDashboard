@@ -6,16 +6,6 @@ import { boostedFraction, pairThreat } from '../src/score/threat';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The sweep behind the shield rule: every move of the Dex that raises Defense or Special Defense, played once at a Rhydon-shaped hard
- * hitter in every generation and mod the corpus plays (Generations 6, 8 and 9, the Champions mod; singles, and doubles for the
- * stage). The rule reads two things the simulator owns: the stage a standing boost is (the stages each attack sees, `pairStages`)
- * and the damage of the foe's hit at that stage (`boostedFraction`). Both must equal what the simulator played: the stage the move
- * applied, and the hit that came after it in the same turn (the holder moves first), inside the cell of the damage rolls. The moves
- * come from the Dex fields (`boosts`, `self.boosts`) and from the simulator's own play (Stockpile, Curse, Psyshield Bash stand in
- * conditions and secondaries), never by name.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 interface Mode { name: string; format: string; gen: number; doubles: boolean; mon: (species: string, moves: string[]) => PokemonSet }
@@ -34,7 +24,6 @@ const MODES: Mode[] = [
 
 const dexOf = (mode: Mode) => battleOf(mode.format, [set('Pikachu', ['splash']), set('Pikachu', ['splash'])], [set('Pikachu', ['splash']), set('Pikachu', ['splash'])]).dex;
 
-/** The moves the Dex fields say raise Defense or Special Defense of the user for sure (no chance, no handler that can fail it). */
 function raisesBulk(move: Move): boolean {
   const boosts = move.target === 'self' ? move.boosts : move.self?.boosts;
   const handlers = ['onTry', 'onTryMove', 'onTryHit', 'onPrepareHit'].some(key => key in move);
@@ -59,10 +48,6 @@ function turn(mode: Mode, battle: Battle): void {
   }
 }
 
-/**
- * The share of its maximum HP the holder loses to the foe's hit in the turn: its HP when the foe is about to move against the
- * HP after the turn (the holder's own move and its cost, Clangorous Soul's third of the HP, come before).
- */
 function playTurn(mode: Mode, battle: Battle, mine: Pokemon, foe: Pokemon): number {
   let before = mine.hp;
   battle.onEvent('BeforeMove', battle.format, -100, (pokemon: Pokemon) => { if (pokemon === foe) before = mine.hp; });
@@ -98,7 +83,7 @@ describe.each(MODES)('every move that raises Defense or Special Defense, played 
     }
   });
 
-  // Doubles hit with spread moves at 0.75 and aim at slots: the damage cell is read in singles, the stage above in both.
+  // Doubles use spread moves at 0.75 and aim at slots: the damage cell is read in singles, the stage in both.
   test.skipIf(mode.doubles)('the hit the race prices matches the hit the simulator played at that stage, inside the cell of the damage rolls', () => {
     const problems: string[] = [];
     let checked = 0;

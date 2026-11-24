@@ -4,8 +4,6 @@ import { Interner, hitKeyReader } from '../src/score/memo-keys';
 import { mon, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-/** What the sweeps of the board key share: a pair of boards that differ in one piece of state is sound when the key splits wherever the unmemoized hit reads differently. */
-
 export const attackerOf = (battle: Battle): Pokemon => battle.sides[0].active[0]!;
 export const defenderOf = (battle: Battle): Pokemon => battle.sides[1].active[0]!;
 export const partnerOf = (battle: Battle): Pokemon | undefined => battle.sides[0].active[1] ?? undefined;
@@ -18,10 +16,7 @@ export const holderOf = (battle: Battle, holder: Holder): Pokemon | undefined =>
 
 export interface Lineup { attacker?: Partial<PokemonSet>; defender?: Partial<PokemonSet>; partner?: Partial<PokemonSet>; foePartner?: Partial<PokemonSet> }
 
-/**
- * The board of a case: Snorlax (male) with the move against a Vaporeon (a pure Water type: no immunity of any generation reaches it),
- * in doubles a Blissey beside the attacker and a Chansey beside the foe, a second body behind each lead in singles.
- */
+/** Snorlax with the move against a Vaporeon (pure Water: no immunity of any generation reaches it). */
 export function boardFor(rules: Rules, mode: Mode, moveId: string, lineup: Lineup = {}): Battle {
   const body = (species: string, moves: string[], extra: Partial<PokemonSet> | undefined, gender: 'M' | 'F' = 'F'): PokemonSet => ({ ...mon(rules, { species, moves, gender }), ...extra });
   const p1 = [body('Snorlax', [moveId, 'splash'], lineup.attacker, 'M'), body('Blissey', ['splash'], lineup.partner)];
@@ -31,7 +26,6 @@ export function boardFor(rules: Rules, mode: Mode, moveId: string, lineup: Lineu
 
 export type Verdict = 'same' | 'split' | 'wrong';
 
-/** Whether the two boards' hits differ (`split`: and the keys differ, as they must; `wrong`: and the keys are equal) or read the same. */
 export function verdictOf(first: Battle, second: Battle, moveId: string): Verdict {
   const interner = new Interner();
   const keys = [first, second].map(battle => hitKeyReader(battle, interner)(attackerOf(battle), defenderOf(battle), moveId));
@@ -40,10 +34,6 @@ export function verdictOf(first: Battle, second: Battle, moveId: string): Verdic
   return keys[0] === keys[1] ? 'wrong' : 'split';
 }
 
-/**
- * Two values for a field, from the value the body holds: a flag flipped, a count raised, a stat name swapped; undefined where no pair is
- * known.
- */
 export function twoValues(value: unknown): [unknown, unknown] | undefined {
   if (typeof value === 'boolean') return [true, false];
   if (typeof value === 'number') return [0, Math.max(3, Math.floor(value / 2) + 1)];

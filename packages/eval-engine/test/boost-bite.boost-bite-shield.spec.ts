@@ -8,13 +8,6 @@ import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 import { BITE_TURNS } from '../src/score/boost-race';
 
-/**
- * A standing defensive stage takes away the foe's win bites although the holder wins nothing itself. Clefable behind +1 Defense and
- * +1 Special Defense against a Rhydon whose Earthquake and Avalanche then never KO it: the simulator is the judge of that (the
- * Rhydon's hits and Clefable's Moonlight), the race reads it, and the holder's own clock (fourteen turns against a resting Rhydon)
- * does not shut the stage. The rule's table is in boost-race.spec.ts.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const SINGLES = 'gen9customgame';
@@ -40,7 +33,6 @@ const BOTH = (battle: Battle) => {
 };
 
 describe('the simulator: with the stage the Rhydon never KOs Clefable, without it the Rhydon does', () => {
-  /** Clefable at 70% clicks one move each turn against the Rhydon's Earthquake; how many turns it lives (12 at most). */
   const lives = (boosts: boolean, move: 'move 2' | 'move 3'): number => {
     const battle = battleOf(SINGLES, [WALL()], [BRUISER()]);
     const mine = battle.sides[0].active[0]!;
@@ -65,7 +57,6 @@ describe('the stage bites a foe it takes the win from', () => {
   test('Clefable at +1 Defense and +1 Special Defense against an awake Rhydon: both stages count (before: 0)', () => {
     const battle = shielded(BRUISER());
     expect(sideValue(battle)).toBeGreaterThan(0);
-    // The front foe bites for both stages; the bench Landorus-Therian may add a share, never more than the sum of the stages.
     expect(sideValue(battle)).toBeLessThanOrEqual(BOTH(battle));
   });
 
@@ -95,7 +86,6 @@ describe('the stage bites a foe it takes the win from', () => {
 describe('doubles and the other families', () => {
   const DOUBLES = 'gen9doublescustomgame';
   const CHAMPIONS = 'gen9championscustomgame';
-  // Stat points of the mode: a bulky Rhydon whose Earthquake the holder needs three turns to answer, so the foe wins the fresh race.
   const SP = { hp: 32, atk: 8, def: 0, spa: 0, spd: 32, spe: 0 };
   const splash = (species: string) => set(species, ['splash']);
 
@@ -113,7 +103,6 @@ describe('doubles and the other families', () => {
     const weights = featureWeights(true, 'standard');
     expect(weights.boostsBiting).toBe(0);
     expect(weights.boosts).toBeGreaterThan(0);
-    // The column is computed only where its weight is not 0 (boost-bite.spec.ts): the rule adds nothing to this family's score.
     expect(evalFeatures(battle, createMatchupCache('standard'), weights).boostsBiting).toBe(0);
   });
 
@@ -151,14 +140,12 @@ const hit = (battle: Battle, attacker: Pokemon, victim: Pokemon) => {
   return Math.max(threat.physical, threat.special);
 };
 
-/** HP (points) at which `hits` plain hits of the attacker's best move take the victim: 1.4 is one boosted hit but not one plain one. */
 const hpAt = (battle: Battle, attacker: Pokemon, victim: Pokemon, hits: number) => {
   const share = hits * hit(battle, attacker, victim);
   if (share > 1) throw new Error(`${hits} hits of ${attacker.name} are ${share.toFixed(2)} of ${victim.name}'s max HP`);
   return Math.max(1, Math.floor(share * victim.maxhp));
 };
 
-/** The wall: a Skarmory at +6 Defense that only splashes (it cannot hurt the holder, and the holder needs more than the horizon). */
 const wall = () => splash('Skarmory');
 const walled = (foe: Pokemon) => { foe.boosts.def = 6; };
 
@@ -200,7 +187,6 @@ describe.each([SINGLES, CHAMPIONS])('singles on %s: the bench credit needs the h
 
   test('the same board with a front foe the holder takes within three turns keeps the bench credit', () => {
     const battle = singlesBoard(format, splash('Snorlax'), foe => foe.sethp(1));
-    // The front foe at 1 HP is bitten as well as the bench foe (the stage is judged on the fresh race).
     expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 });
@@ -222,14 +208,12 @@ describe('doubles: the holder has to get past every foe on the field', () => {
   });
 
   test('one front foe the holder cannot get past closes the bench for the other foes too', () => {
-    // The front foe at 1 HP is bitten itself (a third of the foes); the Clefable on the bench would add another third if the bench were open.
     const battle = board(wall(), walled);
     expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2) / 3, 12);
   });
 
   test('both front foes within the horizon: the bench foe the stage bites counts', () => {
     const battle = board(splash('Snorlax'), foe => foe.sethp(1));
-    // All three foes are bitten: the two at 1 HP in front and the Clefable on the bench.
     expect(sideValue(battle)).toBeCloseTo(stageValue(battle.sides[0].active[0]!, 'atk', 2), 12);
   });
 });

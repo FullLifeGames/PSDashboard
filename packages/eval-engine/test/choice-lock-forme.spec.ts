@@ -7,12 +7,7 @@ import { isBodyOf } from '../src/choice-lock-defender';
 import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 
-/**
- * A log names the battle forme a body stands in (Aegislash-Blade after Stance Change), but the built set is the base species'. The
- * Choice item check matches the body to its set by the Dex (battleOnly, changesFrom, the species a Mega Stone turns into), not by
- * the logged name, and prices the hit with the forme's stats on the set's nature and spread. The oracle is the simulator: the damage
- * a real Stance Change body deals or takes in one turn, as a fraction of the defender's HP. Singles and doubles are the same function.
- */
+// A log names the battle forme a body stands in (Aegislash-Blade), but the built set is the base species'.
 const PARTNER = () => set('Blissey', ['splash'], { ability: 'Natural Cure' });
 
 function play(format: string, p1: PokemonSet, p2: PokemonSet, choices: { p1: string; p2: string }) {
@@ -64,7 +59,6 @@ describe('a battle forme reaches the Choice item check through its base species'
       expect(fraction).toBeGreaterThan(0.05);
       const teams = { p1Team: [latios()], p2Team: [vest()] };
       const hit = observation('Latios', 'Aegislash-Blade', 'psychic', fraction);
-      // The built Vest is a guess the item range keeps open (ambiguous); the log showing it makes the Specs the only reading.
       expect(corroborateChoiceItem('p1', 'Latios', 'Choice Specs', teams, hit, 9)).toBe('ambiguous');
       expect(corroborateChoiceItem('p1', 'Latios', 'Choice Specs', teams, hit, 9, undefined, shown('Aegislash', 'Assault Vest'))).toBe('corroborated');
     });

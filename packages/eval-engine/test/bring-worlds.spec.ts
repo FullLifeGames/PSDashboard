@@ -18,11 +18,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { searchPosition } from '../src/search';
 import { serializeLiveBattle } from '../src/serialize';
 
-/**
- * The list of a bring-limited game with its unknown bodies, and the worlds the engine will play: a world is one set of guesses for the
- * bodies a side brought but never fielded. Units over the weights, the pairs, the cap and the pinned game; the rebuilds of the scenes are
- * in bring-limit.spec.ts. Singles and doubles both.
- */
 const PREVIEW = ['Garchomp', 'Gholdengo', 'Kingambit', 'Dragonite', 'Corviknight', 'Glimmora'];
 
 function log(gametype: 'singles' | 'doubles', tier: string, preview: { p1: string[]; p2: string[] }, played: { p1: string[]; p2: string[] }, count?: number): string {
@@ -200,7 +195,6 @@ describe('blendValues', () => {
 
   test('the weighted mean, normalized by the weights that are present', () => {
     expect(blendValues([1, 0], [0.75, 0.25])).toBeCloseTo(0.75, 12);
-    // Weights that do not sum to 1 (a world dropped out): the mean renormalizes.
     expect(blendValues([1, 0, 0.5], [0.3, 0.1, 0.1])).toBeCloseTo((0.3 + 0.05) / 0.5, 12);
   });
 });
@@ -249,7 +243,7 @@ describe('blendWorlds', () => {
     const heavy = result({ perSide: { p1: [row('a', 0.2), row('b', 0.1), row('c', 0.05)], p2: [row('x', -0.1)] } });
     const light = result({ perSide: { p1: [row('b', 0.9), row('a', 0), row('d', 0.99)], p2: [row('x', -0.1)] } });
     const blended = blendWorlds([light, heavy], [0.4, 0.6]);
-    // a: 0.12, b: 0.06 + 0.36 = 0.42, c: only the heavy world holds it, so its own 0.05; d: only the light world, dropped.
+    // a: 0.12, b: 0.06 + 0.36 = 0.42, c: only the heavy world holds it (its own 0.05), d: only the light one, dropped.
     expect(blended.perSide.p1.map(entry => entry.choice)).toEqual(['b', 'a', 'c']);
     expect(blended.perSide.p1.map(entry => entry.ev)).toEqual([expect.closeTo(0.42, 12), expect.closeTo(0.12, 12), expect.closeTo(0.05, 12)]);
   });
@@ -267,14 +261,11 @@ describe('blendWorlds', () => {
     });
     const blended = blendWorlds([heavy, light], [0.6, 0.4]);
     expect(blended.perSide.p1[0].label).toBe('B');
-    // p1: the blended best row B has its line from the light world; the heavy world's line of A (its own best) is not the engine's any more
-    // and it was not played, so it goes; the light world's played line of A stays. p2: the engine row X keeps the heavy world's line.
     const seen = [...(blended.lines ?? [])].sort((a, b) => a.side.localeCompare(b.side) || a.label.localeCompare(b.label));
     expect(seen.map(entry => [entry.side, entry.label, entry.for, entry.end])).toEqual([
       ['p1', 'A', ['played'], 0.01], ['p1', 'B', ['engine'], 0.61], ['p2', 'X', ['engine', 'played'], -0.2],
     ]);
     expect(blendWorlds([result(), result()], [0.6, 0.4]).lines).toBeUndefined();
-    // the worlds that hold a line but none of the blended best row's: the result has the played lines only, or none
     const onlyHeavy = blendWorlds([heavy, result({ perSide: light.perSide })], [0.6, 0.4]);
     expect(onlyHeavy.lines?.every(entry => entry.for.includes('played') || entry.label === onlyHeavy.perSide[entry.side][0].label)).toBe(true);
   });
@@ -292,7 +283,6 @@ describe('blendWorlds', () => {
       cells: values.map((line, i) => line.map((_, j) => ({ visits: 10 * (i + 1) + j, verified: verified[i][j] }))),
     });
     const heavy = result({ matrix: matrix(['a', 'b'], ['x', 'y'], [[0.4, 0.2], [0, -0.2]], [[true, true], [true, false]], [0.75, 0.25], [0.5, 0.5]) });
-    // The light world lists its rows in another order and holds a column the frame lacks.
     const light = result({ matrix: matrix(['b', 'a'], ['y', 'x', 'z'], [[0.8, 0.6, 0.1], [0.4, 0, 0.3]], [[true, true, true], [true, true, true]], [0.5, 0.5], [0.2, 0.2, 0.6]) });
     const blended = blendWorlds([light, heavy], [0.25, 0.75]).matrix!;
     expect(blended.p1Choices).toEqual(['a', 'b']);
@@ -302,11 +292,10 @@ describe('blendWorlds', () => {
     expect(blended.values[0][0]).toBeCloseTo(0.3, 12);
     // Cell (b, y): heavy -0.2, light row b col y = values[0][0] = 0.8.
     expect(blended.values[1][1]).toBeCloseTo(0.75 * -0.2 + 0.25 * 0.8, 12);
-    // Visits add up (heavy cell (a,x) = 10, light cell (a,x) = cells[1][1] = 21), verified only when every holder verified.
+    // Visits add up (heavy cell (a,x) = 10, light cell = cells[1][1] = 21); verified only when every holder verified.
     expect(blended.cells![0][0].visits).toBe(10 + 21);
     expect(blended.cells![0][0].verified).toBe(true);
     expect(blended.cells![1][1].verified).toBe(false);
-    // Mixes: the weighted mean per id over the holders, renormalized to 1.
     const p1Raw = [0.75 * 0.75 + 0.25 * 0.5, 0.75 * 0.25 + 0.25 * 0.5];
     expect(blended.mixes.p1).toEqual(p1Raw.map(share => expect.closeTo(share / (p1Raw[0] + p1Raw[1]), 12)));
     expect(blended.mixes.p1[0] + blended.mixes.p1[1]).toBeCloseTo(1, 12);
@@ -355,11 +344,6 @@ const guessRows = (result: EvalResult, side: 'p1' | 'p2', slots: number) =>
   result.perSide[side].filter(row => new RegExp(`switch ${slots}\\b`).test(row.choice));
 const named = (label: string, species: string) => label.includes(`→ ${species.split('-')[0]}`);
 
-/**
- * The unknown body is one choice string in every world: a row switches to the last party slot exactly when its label names the
- * world's own candidate, and the blended rows hold the strings the heaviest world ranks (the frame), named for its candidate only.
- * Returns how many the blended rows hold.
- */
 function expectOneStringForTheGuess(results: EvalResult[], worlds: BringWorld[], blended: EvalResult, side: 'p1' | 'p2', slots: number, note: string): number {
   const candidates = worlds.map(world => world[side][slots - 1]);
   const seen = new Set<string>();
@@ -391,15 +375,9 @@ const SCENES = [
     teamsFile: null,
   },
   {
-    // 2630452654 fielded all four P2 bodies (Farigiraf came in and fainted within turn 2), so 2630181744
-    // (P1 never fielded its fourth body) carries the VGC Scarlet/Violet scene; the counts are test data.
     label: 'VGC 2630181744 (doubles; P1 short)', file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
     stats: statsOf([['Incineroar', 400000], ['Amoonguss', 200000], ['Grimmsnarl', 50000]]),
     order: ['Incineroar', 'Amoonguss', 'Grimmsnarl'], noBody: [] as string[], turns: [2, 4],
-    // The app's build of this game (usage stats and set assumptions, frozen). The naked build (no items, no spreads,
-    // Tackle for every unlogged slot) drifts from the log in turn 1 (Ninetales faints to Bulldoze), so the logged clicks of turns 2 to 4
-    // meet other bodies, and with the stand-in for a refused move the rebuilt game plays to its end before turn 6.
-    // Turn 6 is not asserted: at the log's real position no world ranks a switch to the unknown body, so the row would check nothing.
     teamsFile: 'gen9vgc2026regi-2630181744-teams.json',
   },
 ];
@@ -430,7 +408,6 @@ describe('the blend of the worlds of a short-side game', () => {
         expect(blended.score).toBeCloseTo(sum(result => result.score), 9);
         expect(blended.interval).toBeCloseTo(sum(result => result.interval), 9);
         const top = blended.perSide[scene.short][0];
-        // The top row's ev is the mean over the worlds that rank its choice (the doubles search keeps a few combinations per world).
         const own = results.flatMap((result, index) => {
           const found = result.perSide[scene.short].find(row => row.choice === top.choice);
           return found ? [{ ev: found.ev, weight: weights[index] }] : [];
@@ -441,7 +418,6 @@ describe('the blend of the worlds of a short-side game', () => {
           const evs = blended.perSide[side].map(row => row.ev);
           expect(evs).toEqual([...evs].sort((a, b) => b - a));
         }
-        // The worlds differ at some turn: the blend is not the heaviest world's own score (before the unknown body can enter, the worlds agree).
         if (new Set(results.map(result => result.score.toFixed(9))).size > 1) differed++;
       }
       expect(differed, 'the worlds read differently at some turn').toBeGreaterThan(0);
@@ -471,7 +447,6 @@ describe('the blend of the worlds of a short-side game', () => {
     const blended = blendWorlds(results, weights);
     expectOneStringForTheGuess(results, worlds, blended, 'p1', 3, 'BSS turn 3');
     expect(blended.score).toBeCloseTo(results.reduce((total, result, index) => total + result.score * weights[index], 0), 9);
-    // P2 never fields a Glimmora or a Gholdengo it did not bring.
     for (const row of blended.perSide.p2) expect(row.label).not.toMatch(/Glimmora|Gholdengo/);
   }, 600_000);
 });

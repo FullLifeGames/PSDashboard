@@ -9,14 +9,6 @@ import { CHAMPIONS, mon, playClicks, RULES, type Mode } from './dice-fixtures';
 import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * Two draws of one cell are the same board when they differ only by what the dice of the roll decide (damage, crit, hit count) or by the
- * turn's own bookkeeping; the facts are the memo key's state (`endgame/key.ts`) without those fields. Rows: (1) the roll fields and the
- * nominal aim of a move without a chosen target leave the facts alone (doubles in Gens 3 to 9 and the Champions mod, singles for the roll
- * fields); (2) PP, status counter, volatile, boost, item, ability, field duration, weather, HP and the aim of a chosen-target move (a
- * lock re-aims on it) each move them; (3) a source scan of @pkmn/sim and @pkmn/mods: every read of a dropped bookkeeping key is one of
- * the reads pinned below, each inside the turn that wrote the key (the simulator resets the flags at the end of the turn).
- */
 await loadSimMods('gen9championsou');
 
 const DOUBLES = SWEEP_CASES.filter(entry => entry.mode === 'doubles');
@@ -152,11 +144,8 @@ describe.each([RULES[8], CHAMPIONS])('what the facts keep, $name', rules => {
   });
 });
 
-/**
- * A finished battle has no later turn, so nothing reads what it holds beyond the winner. A game that ends in the middle of a turn
- * leaves the rest of the turn's actions in the queue (their nominal targets differ between draws), and the battle's last move is the
- * move of whichever action ran last; the prover returns at `battle.ended` before it reads either (`prove`).
- */
+// A finished battle has no later turn: a game that ends mid-turn leaves the rest of the turn's actions in the queue
+// (their nominal targets differ between draws); the prover returns at `battle.ended` before it reads them (`prove`).
 describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
   const finished = (winner: 'p1' | 'p2'): Battle => {
     const board = battleOf(rules.singles, [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['quickattack'] : ['tackle'] })], [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['tackle'] : ['quickattack'] })]);
@@ -169,7 +158,6 @@ describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
     const a = finished('p1');
     const b = finished('p1');
     expect(a.ended && b.ended).toBe(true);
-    // the queue holds the actions the game did not reach: a draw with other nominal targets leaves other leftovers
     expect(a.queue.list.length, 'the finished turn left its queue').toBeGreaterThan(0);
     b.queue.clear();
     b.lastMove = null;
@@ -178,14 +166,8 @@ describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
   });
 });
 
-/**
- * The source scan. A dropped key is safe only when no handler reads what a turn wrote in a later turn. The simulator ends every turn
- * with the resets (`Battle.endTurn`: `lastSuccessfulMoveThisTurn`, `moveThisTurn`, `statsRaisedThisTurn`, `statsLoweredThisTurn`), and
- * every read pinned here sits in a handler that runs while the turn runs: Burning Jealousy and Alluring Voice (stages raised this
- * turn), Lash Out (lowered this turn), Fusion Flare and Fusion Bolt (the move before this one), the Gen 1 and Gen 2 "already moved"
- * test in the move runner. `lastMoveTargetLoc` is the one key with a read in a later turn (Instruct, a locked or charging body):
- * those moves take a chosen target, so the facts keep the aim for them. A new reader in an updated simulator fails the pin below.
- */
+// A dropped key is safe only if no handler reads it in a later turn: `Battle.endTurn` resets the this-turn flags.
+// `lastMoveTargetLoc` is read later (Instruct, a locked or charging body), so the facts keep the aim.
 describe('the simulator reads a dropped key only where the facts keep it (source scan)', () => {
   const require = createRequire(import.meta.url);
   const roots = ['@pkmn/sim', '@pkmn/mods'].map(name => {

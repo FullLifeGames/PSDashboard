@@ -4,12 +4,7 @@ import { calcGenerationFor } from '@fulllifegames/replay-core';
 import { bodyOf, calcPokemon } from '../src/calc/body';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * A species the calculator does not know must not throw: every species the Champions mod allows (isNonstandard null) builds through
- * calcPokemon on a body read off the simulator (bodyOf), with the simulator's stats at 0 Stat Points on a neutral nature, the mod's types
- * and the mod's weight. The calculator's generation 0 lacks 35 of them (the base Aegislash, the Vivillon patterns, the Alcremie flavors,
- * the Ogerpon Tera forms, Terapagos-Terastal, ...). The run covers the OU and the VGC format, which load the same mod.
- */
+// Calculator generation 0 lacks 35 of these species.
 await loadSimMods('gen9championsou');
 
 const legalSpecies = () => Dex.dexes.champions.species.all().filter(species => species.exists && !species.isNonstandard).map(species => species.name);

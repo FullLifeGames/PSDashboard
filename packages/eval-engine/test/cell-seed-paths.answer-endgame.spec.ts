@@ -14,17 +14,8 @@ import { cellHash, positionKey } from '../src/search/root-quantile';
 import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import type { EvalSettings } from '../src/types';
 
-/**
- * The answer round's plain price (search/position.ts), the endgame's plain and class children (endgame/children.ts) and the order of a
- * log (mcts.ts classesOf) read the cell's own seed list. Rows: (a) a die at a fixed draw index of the first seed sits inside its
- * binomial band over 200 cells of each path's own call, singles and doubles; (b) every seed a path reads belongs to its cell's list
- * and to no fixed list; (c) the paths share the cell's slots: the plain price and the matrix's first draw read one seed, the endgame
- * children read slots 0 to 4 (plain: 0 to count - 1), the log order reads slot 0.
- */
-
 const seen = vi.hoisted(() => ({
   reads: [] as { p1: string; p2: string; seed: string }[],
-  /** The reach question of the odds plan (search/event-reach.ts) advances a scripted draw under its own seed: no price, not a read. */
   read(p1: string, p2: string, seed: string) {
     if (!new Error().stack?.includes('event-reach')) this.reads.push({ p1, p2, seed });
   },
@@ -100,10 +91,6 @@ function readsOf(call: (cell: Cell) => void | Promise<unknown>, cell: Cell): str
 const priceJob = (cell: Cell) => ({ i: 0, j: 0, p1Choice: cell.p1, p2Choice: cell.p2, plain: true });
 const plainPrice = (cell: Cell) => createLocalExecutor(cell.root.serialized).evalCells([priceJob(cell)]);
 
-/**
- * Cells whose order a log settles are rare in the fixtures (26 over the singles ones), so the log-order rows also take the cells
- * of the children one advance of the first choices reaches under other seeds: each child is another position, another key.
- */
 const LOG_FIXTURES = ['smogtours-gen9ou-751466-t2', 'smogtours-gen9ou-749351-t10', 'smogtours-gen6ou-649664-t14-g1', 'smogtours-gen6ou-649664-t14-g2', 'smogtours-gen8ou-573756-t73'];
 function logCells(count: number): Cell[] {
   const cells: Cell[] = [];

@@ -5,12 +5,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
 
-/**
- * What never reaches the board key: the protocol's bookkeeping (log, PRNG seed, rule table, format) would make every play its own entry.
- * `battle.queue` is a `read` field (Analytic, Sucker Punch, Fake Out ask whether a body still moves this turn) and points back at its
- * battle: the key follows the queue's list and leaves the back-reference out. Both consumers, every rule set, singles and doubles, every
- * `read` field keyed.
- */
+// `battle.queue` is a `read` field and points back at its battle: the key follows the queue's list, not the back link.
 
 await loadSimMods('gen9championscustomgame');
 
@@ -49,11 +44,6 @@ describe('the board key leaves the bookkeeping of the protocol out', () => {
   });
 });
 
-/**
- * `apparentType` (the client's display text after a type change; `types` carries the rule) and the Leppa Berry bookkeeping
- * (`pendingStaleness`, `staleness`, read only by a tie-break of a stalled battle) enter the key only where a handler of the board names
- * them.
- */
 describe('the display type and the Leppa bookkeeping split a key only where a handler reads them', () => {
   for (const { rules, mode, name } of SWEEP_CASES) {
     for (const consumer of ['hit', 'residual'] as Consumer[]) {

@@ -3,11 +3,7 @@ import { resolveSideChoices } from '../src/branch/execute';
 import { createBranchStateFromBattle } from '../src/branch/state';
 import { FORMATS, moveCommand, setOf, sideId, startBattle } from './branch-rule-battles';
 
-/**
- * On a recharge turn the simulator's request lists one entry, "Recharge", which the Dex does not know: the picker must not show every
- * move disabled with no button at all. Every Dex move that forces a recharge, in singles and doubles, on either side: the next turn
- * offers exactly one enabled button, and it executes.
- */
+// A recharge request lists one entry, "Recharge", unknown to the Dex: the picker must not show every move disabled.
 const RECHARGE_MOVES = (() => {
   const battle = startBattle('gen9customgame', [setOf('Snorlax', ['Splash'])], [setOf('Snorlax', ['Splash'])]);
   return battle.dex.moves.all()

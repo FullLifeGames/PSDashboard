@@ -4,11 +4,8 @@ import type { BranchSlotChoice } from '../src/branch-choices';
 import type { ForcedDie } from '../src/dice/types';
 import { set } from './move-oracle';
 
-/** Small branches for the specs of the execution path: the runtime is the app's own (`reconstructBranchRuntime` on the log of a fresh game). */
-
 export const mon = (species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet => set(species, moves, { level: 50, ...extra });
 
-/** The public log of a fresh game past team preview: the leads are in, turn 1 is asked for. */
 function freshLog(format: string, p1: PokemonSet[], p2: PokemonSet[]): string {
   const battle = new Battle({ formatid: format as never, seed: [1, 2, 3, 4], p1: { name: 'A', team: Teams.pack(p1) }, p2: { name: 'B', team: Teams.pack(p2) } });
   if (battle.sides.some(side => side.requestState === 'teampreview')) {

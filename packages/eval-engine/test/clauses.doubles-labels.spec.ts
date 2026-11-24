@@ -5,12 +5,6 @@ import { conditionalNote, hindsightLine, phrase, phraseReplies } from '../src/pr
 import { summarizeTurn } from '../src/summary';
 import type { RankedChoice } from '../src/types';
 
-/**
- * An opponent reply that is a doubles pair reads in the gerund per slot, like every other label, in the floor clause, the conditional note
- * and the turn card's hindsight and predictive sentences (2695803506 turn 6 said "The floor priced in Weather Ball→Incineroar + →
- * Basculegion"; 2629703929 turns 4 and 6 carried the same raw " + →"). A singles reply keeps its string.
- */
-
 const DOUBLES_REPLY = 'Weather Ball→Incineroar + → Basculegion';
 const DOUBLES_REPLY_TWO = 'Fake Out→Incineroar + → Kingambit';
 const SINGLES_SWITCH = '→ Heatran';

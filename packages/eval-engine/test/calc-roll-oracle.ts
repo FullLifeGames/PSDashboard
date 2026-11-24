@@ -6,12 +6,7 @@ import { killTable, rollValue, type KillTable } from '../src/pair/kill-table';
 import { hpAfterHit } from '../src/pair/log';
 import type { RollRecord } from '../src/pair/prng';
 
-/**
- * Test helpers: the calc against the simulator at the drawn roll. A turn is drawn under the recording dice (pair/draw.ts); every
- * hit's kill table, priced from the snapshot the dice took, must hold the damage the log shows (at least the HP on a kill), as
- * pair-kill-table.spec.ts checks it. A singles hit runs through the same table: its doubles field differs from the singles one only
- * by screens, and these battles have none.
- */
+// A singles hit runs through the same table: the doubles field differs only by screens, and these battles have none.
 
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 

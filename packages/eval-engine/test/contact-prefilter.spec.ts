@@ -5,17 +5,10 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The reader plays a hit only for a pair where something could cost the attacker, and that decision reads the Dex (a handler for the
- * hit on the foe's item or ability, one for the attacker's own move on its item or ability, a recoil field on the move) and plays
- * the one move the Dex does not describe (a move whose cost the simulator codes and does not list) on a bare pair, never a name.
- * Held to the simulator over the whole Dex of generation 9 and the Champions mod's: wherever the played hit costs the attacker HP
- * or leaves it a status, the decision said so (Chloroblast, whose recoil lives in the simulator's code, is the move that found the probe).
- */
+// Chloroblast's recoil is in the simulator's code, not a Dex field: it plays on a bare pair.
 
 await loadSimMods('gen9championscustomgame');
 
-/** A rule set to sweep: its format, its Dex, and the sets' stat points where the mode reads them (Champions: Stat Points in `evs`, level 50). */
 interface Mode { name: string; format: string; dex: ModdedDex | typeof Dex; extra: Partial<PokemonSet> }
 const MODES: Mode[] = [
   { name: 'Scarlet and Violet', format: 'gen9customgame', dex: Dex.forGen(9), extra: {} },

@@ -18,11 +18,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The rule that says whether a standing stage moves the 1v1 race of a pair in favour of the side it helps; the scenes on real boards are
- * in the boost-bite specs, held to the simulator.
- */
-
 const race = (partial: Partial<Race>): Race => ({
   turnsMine: Infinity, turnsFoe: Infinity, first: false, foeFirst: false, mineSurvives: true, foeSurvives: true, ...partial,
 });
@@ -37,7 +32,6 @@ describe('a boost counts when the holder wins the race with it and the stage mad
       race({ turnsMine: 1, turnsFoe: 1, foeFirst: true, mineSurvives: false }), race({ turnsMine: 2, turnsFoe: 1, foeFirst: true, mineSurvives: false }), false],
     ['a later KO of me in a race I still lose', race({ turnsMine: 5, turnsFoe: 4 }), race({ turnsMine: 5, turnsFoe: 2 }), false],
     ['a race won either way at the same speed: the stage changed nothing', race({ turnsMine: 2 }), race({ turnsMine: 2 }), false],
-    // A stage that only makes a won race safer decides the race at a lower HP, so it counts (the HP enters through the gate only).
     ['a win either way, only safer: the foe\'s clock is longer, mine is not', race({ turnsMine: 2, turnsFoe: 4 }), race({ turnsMine: 2, turnsFoe: 3 }), true],
     ['a win beyond the horizon is a stall war', race({ turnsMine: BITE_TURNS + 1 }), race({ turnsMine: BITE_TURNS + 3 }), false],
     ['nobody wins with the stage', race({}), race({}), false],
@@ -48,7 +42,6 @@ describe('a boost counts when the holder wins the race with it and the stage mad
   });
 
   test('the holder must get to act: the clocks say win, but the foe\'s hit KOs it before it moves', () => {
-    // A healer that spends turns healing has a long clock on paper; its single hit still KOs the holder first.
     const held = race({ turnsMine: 2, turnsFoe: 3, first: false, mineSurvives: false });
     const without = race({ turnsMine: 4, turnsFoe: 3, first: false, mineSurvives: false });
     expect(holderActs(held)).toBe(false);
@@ -60,7 +53,6 @@ describe('a boost counts when the holder wins the race with it and the stage mad
 
 describe('the difference a stage makes is read on the fresh race', () => {
   test('the same stage counts at every HP the gate lets through: the HP of the held race does not decide whether the stage helps', () => {
-    // The stage improves the race at full HP (two hits against four): a held race that wins counts whether or not the held race alone would show a difference.
     const full = race({ turnsMine: 2, turnsFoe: 3 });
     const without = race({ turnsMine: 4, turnsFoe: 3 });
     for (const heldHere of [race({ turnsMine: 2, turnsFoe: 3 }), race({ turnsMine: 1, turnsFoe: 3 }), race({ turnsMine: 2, turnsFoe: 9 })]) {
@@ -69,7 +61,6 @@ describe('the difference a stage makes is read on the fresh race', () => {
   });
 
   test('a stage that changes nothing at full HP counts nowhere, though the held race shows a difference at its low HP', () => {
-    // The held race at a low HP of the foe differs from the race without the stage (one hit against five); the fresh races of both are the same.
     const same = race({ turnsMine: 4, turnsFoe: 3 });
     expect(stageBites(race({ turnsMine: 1, turnsFoe: 3 }), same, false, same)).toBe(false);
   });
@@ -120,7 +111,6 @@ describe('the gates read the race from the foe in front', () => {
 });
 
 describe('a stage that takes away the foe\'s win counts although the holder wins nothing itself', () => {
-  // Clefable behind +1/+1 against a Rhydon: the foe's clock goes from two turns to never, the holder needs fourteen.
   const without = race({ turnsMine: 3, turnsFoe: 2, first: true });
   const held = race({ turnsMine: 14, turnsFoe: Infinity, first: true });
   const full = race({ turnsMine: 16, turnsFoe: Infinity, first: true });
@@ -180,7 +170,6 @@ function scores(battle: Battle, holder: Pokemon): { raised: number; plain: numbe
 const boostsTerm = (battle: Battle) => evalFeatures(battle, createMatchupCache('standard')).boosts;
 
 describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%s: the faster foe KOs the holder before it moves', (_name, format) => {
-  /** Garchomp at 5% and +2 Attack against a faster Jolteon whose Ice Beam takes it: with Choice Scarf Garchomp moves first. */
   function board(extra: Partial<PokemonSet> = {}, foe: PokemonSet = KILLER()): { battle: Battle; holder: Pokemon } {
     const battle = battleOf(format, [GARCHOMP(extra), splash('Clefable')], [foe, splash('Snorlax')]);
     const holder = battle.sides[0].active[0]!;
@@ -241,7 +230,6 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
 
   test('a stage that keeps the holder alive counts: +2 Special Defense lives through the Shadow Ball that takes it on no stage', () => {
     const shadow = () => set('Jolteon', ['shadowball', 'splash']);
-    // The simulator's own damage of the Shadow Ball on the full-HP holder, with and without the stage (same seed, same roll).
     const damage = (spd: number): number => {
       const { battle, holder } = board({}, shadow());
       holder.sethp(holder.maxhp);
@@ -251,7 +239,6 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
     };
     const [plain, staged] = [damage(0), damage(2)];
     expect(staged).toBeLessThan(plain);
-    // The holder keeps half as much HP again as the staged hit takes: it lives through the staged hit and not through the plain one.
     const standing = (spd: number) => {
       const { battle, holder } = board({}, shadow());
       holder.sethp(Math.ceil(staged * 1.5));
@@ -264,7 +251,6 @@ describe.each([['Gen 9 singles', SINGLES], ['Champions singles', CHAMPIONS]])('%
     const dead = standing(0);
     turn(dead.battle);
     expect(dead.holder.fainted).toBe(true);
-    // The reader and the term follow the simulator: the staged holder acts, so its Attack stage counts; the unstaged one does not.
     const withStage = standing(2);
     withStage.holder.boosts.atk = 2;
     expect(boostsTerm(withStage.battle)).toBeCloseTo(stageValue(withStage.holder, 'atk', 2) + stageValue(withStage.holder, 'spd', 2), 12);
@@ -303,22 +289,13 @@ describe('doubles: one foe on the field that moves first and KOs the holder', ()
   });
 });
 
-/**
- * A foe that hits through the holder's own Attack (Foul Play reads the target's stat, so the Dex entry names the holder as the stat's
- * owner) hits an idle holder harder with a raised stage, and the coverage term must read that hit at the holder's raised stage
- * (gen9ou-2658675932 turn 2: the bench Umbreon's Foul Play against a Great Tusk at +4 that the active Dragonite KOs first). A body
- * that never acts is read on its drops as the defender too: the stage is moot to every pair term, whether it stands on the attacker
- * or the defender side of the pair. Singles, Champions singles and doubles; the control is the same board where the holder acts.
- */
 describe('12a: the stage of an idle holder adds nothing to the hit of a foe that reads it (Foul Play)', () => {
   const FOUL = () => set('Umbreon', ['foulplay', 'splash']);
-  // The holder hits hard enough that the Foul Play carrier is the foe's best answer to it only while the hit is small; a priority hit KOs it first.
   const HITTER = () => set('Garchomp', ['earthquake', 'splash']);
   const QUICK = () => set('Jolteon', ['quickattack', 'splash']);
 
   function board(format: string, first: PokemonSet): { battle: Battle; holder: Pokemon } {
     const doubles = format === DOUBLES;
-    // The Foul Play carrier stays on the bench in both game types; the foe in front KOs the holder first.
     const battle = battleOf(format, doubles ? [HITTER(), splash('Snorlax')] : [HITTER(), splash('Clefable')],
       doubles ? [first, splash('Clefable'), FOUL()] : [first, FOUL()]);
     const holder = battle.sides[0].active[0]!;
@@ -357,12 +334,6 @@ describe('12a: the stage of an idle holder adds nothing to the hit of a foe that
   });
 });
 
-/**
- * One evaluation asks whether a raised body acts once per foe in front, not once for the boosts term and again for the pair terms (the
- * same pair was read twice per leaf in the VGC trees). The reading is the simulator's ModifyBoost event of each attack of the pair
- * (`pairStages`), so the events fired from inside `holderActsInFront` are counted: a board with a raised holder fires as many as one
- * `idleHolders` pass, a board without a raise none.
- */
 describe('the idle reading runs once per evaluation', () => {
   function modifyBoostEvents(battle: Battle, run: () => void): number {
     let events = 0;

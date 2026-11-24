@@ -7,11 +7,8 @@ import { calcMove } from '../src/calc/move';
 import { makePokemonInfo } from '../src/branch/pokemon-info';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * @smogon/calc does not know Pokémon Champions. The engine's one builder (calcPokemon) gives a body of a Champions battle EV = 8·SP − 4
- * and every IV 31, so the calculator's stats equal the simulator's on the Champions mod: every body over the Champions species and six
- * natures, read off the simulator (bodyOf) and built by calcPokemon, against the simulator's stored stats and maximum HP.
- */
+// @smogon/calc does not know Champions: calcPokemon gives a body EV = 8·SP − 4 and every IV 31, so its stats
+// equal the simulator's stored stats and maximum HP on the Champions mod.
 type Stat = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 const STATS: Stat[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const GRID = [0, 1, 2, 15, 31, 32];
@@ -54,7 +51,6 @@ describe('the engine prices a Champions body as the simulator plays it', () => {
       }
     }
     expect(wrong.slice(0, 10)).toEqual([]);
-    // Species names @smogon/calc does not know even through calcSpecies: their bodies go uncompared.
     expect(unknown.size, [...unknown].join(', ')).toBeLessThan(championsSpecies().length / 10);
   });
 

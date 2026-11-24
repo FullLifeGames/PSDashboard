@@ -12,16 +12,8 @@ import type { SimBattle } from '../src/branch/types';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * A Tatsugiri that commands a Dondozo passes its slot (side.js getChoiceIndex skips fainted and commanding actives), and the
- * simulator's request marks the body (`side.pokemon[i].commanding`, pokemon.js getSwitchRequestData). The branch layer must not count
- * the commanding slot as one that chooses: a pick there goes to the Dondozo and the simulator refuses the side's choice. The scene:
- * Scarlet/Violet VGC 2556366252 turn 3, Tatsugiri-Curly inside the opposing Dondozo.
- *
- * Held against the simulator for every species the battle's Dex gives Commander, in both rule sets, with Commander on either side or
- * both and the Tatsugiri in slot a and in slot b: the required slots equal the slots the request asks, the engine's best line maps
- * onto them, and the command built from one pick per required slot is accepted with each move on its own body.
- */
+// A commanding Tatsugiri passes its slot (side.js getChoiceIndex); the request marks it (`side.pokemon[i].commanding`,
+// pokemon.js getSwitchRequestData), so the branch layer must not count that slot as one that chooses.
 
 await loadSimMods('gen9championsou');
 
@@ -37,7 +29,6 @@ const COMMANDERS: { label: string; commanders: ('p1' | 'p2')[] }[] = [
 ];
 const SLOTS = [{ label: 'a', commanderFirst: true }, { label: 'b', commanderFirst: false }];
 
-/** The species of the battle's own Dex that can have Commander and take the field as they are (no forme that needs an item or a battle). */
 function commanderSpecies(format: string): Species[] {
   const pair = [set('Pikachu', ['Splash']), set('Snorlax', ['Splash'])];
   const probe = battleOf(format, pair, pair);

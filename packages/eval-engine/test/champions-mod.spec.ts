@@ -10,11 +10,8 @@ import {
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * Champions battles run on the Champions mod of @pkmn/mods. The checkers hold the simulator's stats against the mod's own statModify
- * (Stat Points in the sets' evs: base + SP + 20, HP base + SP + 75 at level 50) for every Champions species and nature, and the
- * calculator's stats (the spread solver's reading, EV 8·SP − 4 with every IV 31) against the simulator's.
- */
+// Simulator stats equal the mod's statModify (Stat Points in evs: base + SP + 20, HP base + SP + 75 at level 50)
+// for every Champions species and nature, and the calculator's stats (EV 8·SP − 4, every IV 31) equal the simulator's.
 type Stat = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 const STATS: Stat[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const GRID = [0, 1, 2, 15, 31, 32];
@@ -24,14 +21,10 @@ const FORMATS = { singles: { id: 'gen9championsou', team: 6 }, doubles: { id: 'g
 await loadSimMods('gen9championsou');
 
 const championsDex = () => Dex.dexes.champions;
-/**
- * Every out-of-battle forme of the Champions dex, legal or not: the formula does not depend on legality (the corpus fielded species
- * the mod's FormatsData of 0.10.11 marked illegal). Shedinja's fixed HP stays out.
- */
+// Shedinja's fixed HP stays out.
 const championsSpecies = () => championsDex().species.all()
   .filter(species => species.exists && !species.battleOnly && !species.maxHP)
   .map(species => species.name);
-/** statModify outside the simulator: the mod's own formula, no level clause. */
 function serverStat(set: PokemonSet, stat: Stat): number {
   const context = { trunc: championsDex().trunc, ruleTable: new Map(), dex: championsDex() };
   const modify = Scripts.statModify as unknown as (this: unknown, base: Record<Stat, number>, set: PokemonSet, stat: Stat) => number;
@@ -87,8 +80,8 @@ describe('Champions battles run on the Champions mod', () => {
     sets().forEach((set, i) => {
       let calc: CalcPokemon;
       try {
-        // The app's one builder (calc-build.ts) takes the Dex values where the calculator's differ (Obliteryx 2.0 of @pkmn 0.10.12:
-        // Special Defense 78, @smogon/calc 0.12 lists 90).
+        // calc-build.ts takes the Dex values where the calculator's differ (Obliteryx 2.0 of @pkmn 0.10.12: Special
+        // Defense 78, @smogon/calc 0.12 lists 90).
         calc = buildCalcPokemon(gen, set.species, { level: 50, nature: set.nature, evs: calcEvs(set.evs, budget), ivs: calcIvs({ ...ALL_31, spe: 0 }, budget) }, championsDex() as never);
       } catch {
         unknown.add(set.species);
@@ -98,7 +91,6 @@ describe('Champions battles run on the Champions mod', () => {
       for (const stat of STATS) if (stats[stat] !== simulated[i][stat]) wrong.push(`${set.species} ${set.nature} ${stat}: ${stats[stat]} vs ${simulated[i][stat]}`);
     });
     expect(wrong.slice(0, 10)).toEqual([]);
-    // Species names @smogon/calc 0.11 does not know (cosmetic formes, names it spells apart): their bodies go uncompared.
     expect([...unknown].length, [...unknown].join(', ')).toBeLessThan(championsSpecies().length / 10);
   });
 

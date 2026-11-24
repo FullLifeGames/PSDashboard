@@ -80,7 +80,6 @@ describe('branch choice helpers', () => {
     expect(notationSideLabel([moveBy('Ice Beam')], 'move 1')).toBe('Ice Beam');
     expect(notationSideLabel([moveBy('Icy Wind', 1), switchTo('Skarmory')], 'move 2 +1, switch 3'))
       .toBe('Icy Wind +1 + → Skarmory');
-    // Entries recorded without an identity fall back raw.
     expect(notationSideLabel(undefined, 'move 1')).toBe('move 1');
     expect(notationSideLabel([null], 'switch 2')).toBe('switch 2');
   });
@@ -116,8 +115,6 @@ describe('engine choice → branch slot choices', () => {
   });
 
   test('switch parts resolve by the label species, surviving bench-order divergence', () => {
-    // The engine's "switch 3" indexes ITS battle's bench; here the branch
-    // holds Amoonguss at slot 5, so the label species must win over the slot.
     expect(evalChoiceToSlotChoices(
       'move protect, switch 3',
       [[move('Protect', 0, 1)], []],
@@ -131,10 +128,6 @@ describe('engine choice → branch slot choices', () => {
   });
 
   test('a forced-replacement choice maps onto the forced slot, not slot 0', () => {
-    // Doubles wedge (VGC play-out): slot b's Pokémon fainted while slot a
-    // pivoted out the same turn. The engine emits the one-part choice
-    // "switch 2" FOR THE FORCED SLOT; without the mask it landed on slot 0,
-    // reserved the species there, and locked the only legal button.
     expect(evalChoiceToSlotChoices(
       'switch 2',
       [[], []],
@@ -167,8 +160,6 @@ describe('engine choice → branch slot choices', () => {
   });
 
   test('a mask/part mismatch refuses instead of guessing a slot', () => {
-    // Two parts but only one slot may act, and the string is not full-width
-    // either (three slots): a guessed placement could play the wrong slot.
     expect(evalChoiceToSlotChoices(
       'move protect, switch 2',
       [[move('Protect', 0, 1)], [], []],
@@ -181,14 +172,11 @@ describe('engine choice → branch slot choices', () => {
   test('a pass slot stays empty and an unresolvable part rejects the whole pick', () => {
     expect(evalChoiceToSlotChoices('pass, move protect', [[], [move('Protect', 1, 1)]], [[], []]))
       .toEqual([null, { kind: 'move', moveId: 'protect', moveName: 'Protect' }]);
-    // The move exists but the named switch target does not: no partial prefill.
     expect(evalChoiceToSlotChoices('move protect, switch 5', [[move('Protect', 0, 1)], []], [[], [bench('Amoonguss', 3)]]))
       .toBeNull();
   });
 });
 
-// The labels of a slot's forced dice come from `dieLabel`, so a history row, a share link
-// and a frame line say the same thing about a die.
 describe('notation of forced dice', () => {
   const words: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
   const flinch: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'secondary', effectId: 'flinch' }, result: { happens: true } };
@@ -219,7 +207,6 @@ const BENCH_SPECIES = ['Pikachu', 'Eevee'];
 const FOES = ['Snorlax', 'Corviknight', 'Amoonguss', 'Gliscor'];
 const sideId = (index: number) => (index === 0 ? 'p1' : 'p2') as 'p1' | 'p2';
 
-/** The leavers' team: `actives` Pokémon that faint on a Memento or stand, then `bench` living ones. */
 function team(actives: number, bench: number) {
   const front = ['Rillaboom', 'Parasect'].slice(0, actives).map(species => setOf(species, EXIT));
   return [...front, ...BENCH_SPECIES.slice(0, bench).map(species => setOf(species, ['Splash']))];
@@ -270,13 +257,11 @@ describe('doubles: the bench decides how many replacements are chosen', () => {
           expect(leaverIndex === 0 ? state.p1ForceSwitches : state.p2ForceSwitches).toEqual(forced);
 
           if (!asked.some(Boolean)) {
-            // The simulator asks nothing (zero in the back, or one slot fainted and nothing to send): the side passes by itself.
             expect(forced.some(Boolean)).toBe(false);
             expect(battle.requestState === 'move' || battle.ended).toBe(true);
             return;
           }
           expect(required.filter(Boolean).length).toBe(fillable);
-          // A slot that passes offers no switch-in: its header says nobody is left, and no chip can reserve a Pokémon there.
           const switches = leaverIndex === 0 ? state.p1SwitchesBySlot : state.p2SwitchesBySlot;
           battle.sides[leaverIndex].active.forEach((active, slot) => { if (active.fainted && !forced[slot]) expect(switches[slot]).toEqual([]); });
           required.forEach((needed, slot) => { if (needed) expect(asked[slot]).toBe(true); });
@@ -401,7 +386,6 @@ describe('battle gimmick choices', () => {
     }
     expect(runtime.log.some(line => line.startsWith('|-terastallize|p1a'))).toBe(true);
 
-    // Tera is once per battle: availability disappears afterwards.
     const nextState = createBranchState(runtime.battleStream, runtime.log, { p1Choices: [], p2Choices: [] });
     expect(nextState.p1ModifiersBySlot[0]?.teraType).toBeNull();
   });

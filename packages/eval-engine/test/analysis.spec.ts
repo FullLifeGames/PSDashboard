@@ -4,14 +4,6 @@ import type { PlayedTurn } from '../src/played';
 import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 import type { TurnRolls } from '../src/dice-events';
 
-/**
- * What makes a hindsight read's cell "a guess" (HINDSIGHT_MIN_VISITS visits, not verified): a cell the planner calls plain (no
- * accuracy roll and no kill range in the pair) has one outcome, so the first draw that priced it is no guess however few visits it
- * has (VGC 2630685175 turn 7: Wood Hammer into Calyrex-Shadow with Earth Power into Zamazenta against Pollen Puff with Wide Guard,
- * 4 visits, value 1.00). The gain is the best row's cell minus the played row's, so the gate looks at both: a played row priced by
- * a one-visit rolled cell lets a guessed number through.
- */
-
 const rowOf = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev - 0.1, expected: ev, ev, punishedBy: 'Reply' });
 
 type Cell = NonNullable<EvalMatrix['cells']>[number][number];
@@ -28,7 +20,6 @@ interface Shape {
   played: PlayedTurn;
 }
 
-/** Doubles: p1 played row 0 against p2's pair "Protect + Drain Punch" (column 0), where row 1 is worth 0.40 more. */
 const doublesShape = (): Shape => ({
   p1Choices: ['move icywind, move protect', 'move tackle 1, move protect'],
   p1Labels: ['Icy Wind + Protect', 'Tackle→Incineroar + Protect'],
@@ -43,7 +34,6 @@ const doublesShape = (): Shape => ({
   },
 });
 
-/** Singles: p1 played Iron Head against Iron Head's answer Seismic Toss (column 0), where Earth Power is worth 0.35 more. */
 const singlesShape = (): Shape => ({
   p1Choices: ['move ironhead', 'move earthpower'],
   p1Labels: ['Iron Head', 'Earth Power'],
@@ -136,7 +126,7 @@ const ranked = (choice: string, label: string, worstCase: number, expected: numb
 const quiet: TurnRolls = { favored: { p1: false, p2: false }, hits: [] };
 const rolled = (side: 'p1' | 'p2'): TurnRolls => ({ favored: { p1: side === 'p1', p2: side === 'p2' }, hits: [] });
 
-/** The numbers of 653785 t19 (p1 view): best -0.1, played -0.1155 (regret 0.0155), safe floor -0.1307, window peak 0.2136. */
+// p1 view: best -0.1, played -0.1155 (regret 0.0155), safe floor -0.1307, window peak 0.2136.
 function t19(side: 'p1' | 'p2', over: Partial<AnalyzeTurnParams> = {}, doubles = false) {
   const sign = side === 'p1' ? 1 : -1;
   const own = (value: number) => sign * value;

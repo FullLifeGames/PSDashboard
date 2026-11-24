@@ -5,15 +5,6 @@ import { buildGameReport } from '../src/report';
 import type { KoOddsInfo, RankedChoice } from '../src/types';
 import { winPercent } from '../src/winprob';
 
-/**
- * The report names the game's biggest roll against the eventual winner. 573756 turn 73: the 95 % Fire Fang missed, worth +13 % to
- * SOULWIND, the largest roll of the game, but the report spoke of turn 71. The roll is the largest |chanceDelta| on a turn whose roll
- * went toward the loser, at least CHANCE_THRESHOLD (0.2); the move is named only when the winner's played move provably carried it
- * (a sure kill behind an accuracy under 1). The sentence names both chances of the side that rolled: the hit is the engine's score
- * of the next root of the copy that plays the turn with the die turned over (rolled-copy.ts), the miss the actual next root; a
- * doubles click waits for the copy, since the copy finds the die in the log.
- */
-
 const names: [string, string] = ['Alpha', 'Beta'];
 const none = { p1: false, p2: false };
 const forP1 = { p1: true, p2: false };
@@ -37,7 +28,6 @@ const game = (rollTurn: Partial<TurnAnalysis>, extra: TurnAnalysis[] = []): Turn
   ...extra,
 ];
 const fireFang = sideOf({ played: choice('Fire Fang', { accuracy: 0.95, killFraction: 1, attacker: { slot: 0, species: 'Garchomp' } }) });
-/** The copy's next root: Beta's score if the Fire Fang had hit (p1 view). */
 const hitOf = (score: number): RollFlip => ({ turn: 3, score });
 
 describe('the game\'s biggest roll against the winner', () => {

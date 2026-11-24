@@ -8,11 +8,6 @@ import type { RankedChoice } from '../src/types';
 import { phrase } from '../src/prose/phrases';
 import { seedPhrase } from '../src/win-reason';
 
-/**
- * Detection reads every sack-shaped faint of a side, not only the first (corpus: 2663093831 t11, 2630685175 t4, 912045 t1,
- * 653785 t26). The verdict still reads the first faint (no faint of the four would earn a different one); the sentence names the others.
- */
-
 const mon = (name: string, speciesForme: string, hpPercent: number, isActive: boolean) => ({
   name, speciesForme, hp: hpPercent, maxhp: 100, hpPercent,
   status: '', fainted: false, isActive, boosts: {}, moves: [],

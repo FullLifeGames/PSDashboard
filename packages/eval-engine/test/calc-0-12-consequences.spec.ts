@@ -6,11 +6,8 @@ import { bodyOf, calcPokemon, type CalcBody } from '../src/calc/body';
 import { positionBattle } from '../src/forward-model';
 import { checkedRolls, drawTurn, rollSet as set, rootOf } from './calc-roll-oracle';
 
-/**
- * The small consequences of calculator 0.12: it drops the Gmax and Totem species from the calculator's Gen 8 and Gen 9 (the form map
- * must carry them), gives 110 Gen 9 species a gender (Rivalry reads it), and lets Struggle take Normal items in Gens 2 to 4 (the
- * simulator's Struggle has no type there).
- */
+// Calculator 0.12 drops the Gmax and Totem species of Gens 8 and 9 (the form map must carry them)
+// and gives 110 Gen 9 species a gender (Rivalry); Struggle takes Normal items in Gens 2 to 4 (typeless in the sim).
 const BASE: Omit<CalcBody, 'species'> = {
   level: 100, ability: '', item: '', nature: 'Hardy', evs: { hp: 4, atk: 252, spe: 252 }, ivs: {},
   boosts: { atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, tera: null, onField: false,
@@ -70,7 +67,7 @@ describe('the body passes the battle\'s gender, and a female-only Rivalry attack
 });
 
 describe('Struggle in the Gens 2 to 4 takes no item boost, as the simulator plays it', () => {
-  // Gens 3 and 4 (the roll oracle draws no damage roll for Gen 2's Struggle, so Gen 2 rides on the same typeless rule unchecked).
+  // Gens 3 and 4 (the roll oracle draws no roll for Gen 2's Struggle, so Gen 2 rides on the same rule unchecked).
   for (const [format, item] of [['gen3customgame', 'Silk Scarf'], ['gen4customgame', 'Silk Scarf']] as const) {
     test(`${format}: a ${item} attacker's Struggle lies on the kill table`, () => {
       const root = rootOf(format, [set('Snorlax', ['Splash'], { item, ability: '' })], [set('Blissey', ['Splash'], { ability: '' })],

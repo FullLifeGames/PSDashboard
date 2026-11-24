@@ -9,8 +9,6 @@ import {
 import { buildChoiceLockContext } from '../src/choice-lock';
 import { serializeLiveBattle } from '../src/serialize';
 
-/** A runtime adopted from a SERIALIZED position must be the same battle to everything above it: pickers, protocol log, accepted and rejected choices, turns played. */
-
 const TURN = 12;
 const noChoices = { p1Choices: [], p2Choices: [] };
 
@@ -47,11 +45,8 @@ const pickers = (runtime: BranchRuntime) => {
 };
 const serialized = (runtime: BranchRuntime) => serializeLiveBattle(runtime.battleStream.battle!);
 
-/**
- * The battle minus the sim's log bookkeeping that legitimately differs between a live battle and an adopted one: the stable
- * serialization drops the `|t:|` lines, so the send cursor and last-move line index count fewer lines, and deserialization leaves
- * `formatid` as an own key in another position.
- */
+// Serialization drops the `|t:|` lines (the send cursor and last-move index count fewer lines), and deserialization
+// leaves `formatid` as an own key in another position: both differ legitimately from a live battle.
 function comparable(runtime: BranchRuntime): string {
   const state = JSON.parse(serialized(runtime)) as Record<string, unknown>;
   delete state.sentLogPos;

@@ -3,11 +3,7 @@ import { readFileSync } from 'node:fs';
 import { deserializeBattleExact } from '../src/forward/serialize';
 import { loadSimModsFor } from '../src/forward/sim-mods';
 
-/**
- * A realm that only revives positions (an evaluation worker, the branch view's adopt, the move picker) loads the Champions mod from
- * the position itself before it deserializes one: `await loadSimModsFor(serialized)`. In a module graph of its own (vitest isolates
- * files), so nothing loaded the mod before. The positions are the two replay fixtures' turn-3 boundaries.
- */
+// `await loadSimModsFor(serialized)`, in a module graph of its own (vitest isolates files): nothing loaded it before.
 const POSITIONS = {
   singles: 'gen9championsou-2693832490-t3',
   doubles: 'gen9championsvgc2026regmbbo3-2679053861-t3',

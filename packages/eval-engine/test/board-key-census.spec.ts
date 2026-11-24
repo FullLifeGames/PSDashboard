@@ -19,7 +19,6 @@ vi.mock('../src/sim-ask/copy', async importOriginal => {
   return { ...real, copyOf: (battle: Battle) => { const copy = real.copyOf(battle); hooks.onCopy?.(copy); return copy; } };
 });
 
-/** Under `DICE_SWEEPS=full` an ability or item is played against this many moves, not every move (the full product took over an hour in one CI part). */
 const FULL_MOVES_PER_ENTRY = 6;
 
 const EVENT_CALLS = ['runEvent', 'singleEvent', 'priorityEvent', 'eachEvent', 'fieldEvent'] as const;
@@ -35,16 +34,6 @@ function listen(battle: Battle, fired: Set<string>): void {
   }
 }
 
-/**
- * The census of the board key (score/board-key.ts) names every own field of the simulator's `Pokemon`, `Side`, `Field` and `Battle` with
- * a class (keyed, read, normalized, relative, a reference, inert). A simulator that adds a field turns this spec red; a field the table
- * does not know is keyed anyway (the fail-safe): the key fails toward a lower hit rate, never toward a wrong answer. Every rule set the
- * corpus plays (Gens 1 to 9, the Champions mod), singles and, from Gen 3 on, doubles. The last row plays hits: the plain run 6 cases;
- * `DICE_SWEEPS=full` every move of the Dex on five fixed boards (a Flame Body, a Static, a Poison Point with a Sticky Barb, a Life Orb
- * against a Rocky Helmet with a Rough Skin, the bare board) and every ability and item against 6 moves spread over the list (every move
- * against every entry is a few million hits).
- */
-
 await loadSimMods('gen9championscustomgame');
 
 function playedBoard(rules: Rules, mode: Mode): Battle {
@@ -59,7 +48,6 @@ function playedBoard(rules: Rules, mode: Mode): Battle {
   return battle;
 }
 
-/** The data fields of an object (a game mod puts methods on the instance: they are the format's, and the format is in the key). */
 const dataNames = (object: object): string[] => Object.getOwnPropertyNames(object).filter(name => typeof (object as Record<string, unknown>)[name] !== 'function');
 
 const NAMES = {
@@ -69,9 +57,8 @@ const NAMES = {
   battle: (battle: Battle) => dataNames(battle),
 } as const;
 
-/** Fields the simulator creates only when an event happens that the sample board lacks, with the event. */
 const AFTER_AN_EVENT: Record<string, string[]> = {
-  pokemon: ['terastallized' /* a Terastallization */, 'lastMoveTargetLoc' /* a move with a chosen target slot */, 'pendingStaleness' /* an item given or taken */, 'staleness' /* a berry eaten after one was given */],
+  pokemon: ['terastallized', 'lastMoveTargetLoc', 'pendingStaleness', 'staleness'],
 };
 
 describe('the board key names every own field of the simulator', () => {
@@ -93,7 +80,6 @@ describe('the board key names every own field of the simulator', () => {
       for (const owner of ['pokemon', 'side', 'field', 'battle'] as const) for (const name of NAMES[owner](battle)) seen[owner].add(name);
     }
     const stale = Object.fromEntries((['pokemon', 'side', 'field', 'battle'] as const).map(owner => [owner, Object.keys(BOARD_FIELDS[owner]).filter(name => !seen[owner].has(name) && !(AFTER_AN_EVENT[owner] ?? []).includes(name)).sort().join(' ')]));
-    // A field some generation or mod never builds is listed here with its reason; the rest of the table is held to the simulator.
     expect(stale).toEqual({ pokemon: '', side: '', field: '', battle: '' });
   });
 

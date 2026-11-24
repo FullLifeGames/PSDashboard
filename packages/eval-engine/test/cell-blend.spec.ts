@@ -59,7 +59,6 @@ const event = (side: 'p1' | 'p2', accuracy: number, killFraction: number, defend
 
 describe('foldClassWeights', () => {
   test('the t23 shape: kill truncates the second actor', () => {
-    // p1 Scald: 100% acc, 43% kill. p2 HJK: 90% acc, 100% kill. p1 first.
     const events = [event('p1', 1, 0.43, 'p2a: Medicham'), event('p2', 0.9, 1, 'p1a: Keldeo')];
     const weights = foldClassWeights(events, 'p1');
     expect(weights.get('hit-kill|none')).toBeCloseTo(0.43, 9);
@@ -135,7 +134,7 @@ test('reblendValue swaps the first leaf inside its class only', () => {
   const blend = {
     firstLeaf: 1,
     classes: [
-      { key: 'hit-nokill', weight: 0.43, leafSum: 2, count: 2, hasFirst: true, ended: false },   // leaves 1, 1
+      { key: 'hit-nokill', weight: 0.43, leafSum: 2, count: 2, hasFirst: true, ended: false },
       { key: 'hit-kill', weight: 0.57, leafSum: -1, count: 1, hasFirst: false, ended: true },
     ],
   };
@@ -188,7 +187,7 @@ test('advancePositionWithLog returns exactly this advance\'s lines', () => {
   const root = createRootPosition(serialize(battle));
   const { log } = advancePositionWithLog(root, 'move seismictoss', 'move tackle', '1,2,3,4');
   expect(log.some(line => line.startsWith('|move|p1a:'))).toBe(true);
-  expect(log.some(line => line.startsWith('|start'))).toBe(false); // pre-advance lines excluded
+  expect(log.some(line => line.startsWith('|start'))).toBe(false);
 });
 
 test('koOddsForOptions prices the stay-column headline', () => {
@@ -206,8 +205,7 @@ test('the boundary cell draws at most sixteen times', () => {
 });
 
 describe('root-cell blend integration', () => {
-  // Mutual-OHKO cell with exact ±1 leaves: p1's 80% Hydro Pump kills on a hit (+1); on a miss the surviving Pikachu's Tackle
-  // kills the 1-HP attacker (-1). Analytic value = 0.8·1 + 0.2·(-1) = 0.6. The fixed base seeds hit only 3/5, so only the analytic weights pass.
+  // Analytic value = 0.8·1 + 0.2·(-1) = 0.6; the fixed base seeds hit only 3/5, so only the analytic weights pass.
   const mutualRoot = () => {
     const battle = makeBattle(
       [makeSet('Deo', 'Deoxys-Speed', ['Hydro Pump', 'Seismic Toss'], 100)],
@@ -216,7 +214,6 @@ describe('root-cell blend integration', () => {
     battle.sides[0].active[0]!.hp = 1;
     return serialize(battle);
   };
-    // Full-HP variant: miss children stay alive, so the deepening re-blend runs.
   const machampRoot = () => serialize(makeBattle(
     [makeSet('Machamp', 'Machamp', ['Hydro Pump', 'Seismic Toss'], 100)],
     [makeSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], 30)],
@@ -256,7 +253,7 @@ describe('root-cell blend integration', () => {
     const matrix = result.matrix!;
     const i = matrix.p1Choices!.indexOf('move hydropump');
     const j = matrix.p2Choices!.indexOf('move tackle');
-    // One base draw hits (+1); the probe chase must fold the missing miss class at its analytic 0.2, not the 1/3 of a 3-draw mean.
+    // One base draw hits (+1); the probe chase folds the missing miss class at its analytic 0.2, not a 3-draw 1/3.
     expect(matrix.values[i][j]).toBeCloseTo(0.6, 9);
     const toss = result.perSide.p1.find(row => row.choice === 'move seismictoss')!;
     const pump = result.perSide.p1.find(row => row.choice === 'move hydropump')!;
@@ -377,7 +374,6 @@ describe('a real singles search ships the planner answer of every root cell', ()
         }
       }
     }
-    // The position needs a rolled cell, a two-event cell and deterministic cells, or the test proves nothing.
     expect(seen.events).toBeGreaterThan(0);
     expect(seen.twoEvents).toBeGreaterThan(0);
     expect(seen.none).toBeGreaterThan(0);
@@ -389,7 +385,6 @@ describe('the report reads the played cell when the turn has no protocol', () =>
     ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
   const names: [string, string] = ['Alpha', 'Beta'];
 
-  // A plain cell holding a move with a secondary effect under 100% (Thunder's paralysis) gives no answer; these cases keep Hydro Pump, which has none.
   const single = (cellOf: NonNullable<EvalMatrix['cells']>[number][number]): { result: EvalResult; played: PlayedTurn } => ({
     result: {
       score: 0.05, interval: 0.02, depthCompleted: 1,
@@ -467,7 +462,6 @@ const set = (species: string, moves: string[]): PokemonSet => ({
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
 });
 
-/** Two Jolteon at 1 HP and equal speed with a bench each, so no class ends the game. */
 function thunderTie(setup: (battle: Battle) => void = () => {}): SimPosition {
   const battle = new Battle({
     formatid: toID('gen9customgame'), seed: '1,2,3,4',
@@ -483,10 +477,8 @@ function thunderTie(setup: (battle: Battle) => void = () => {}): SimPosition {
   return createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 }
 
-// A tree's seed hashes (offset, iteration): the seeds a root cell can draw are those of the iterations that can first visit it.
 const FIRST_VISITS = 40;
 
-/** The keys the simulator gives the cell over the seeds a tree of this offset can draw it with: first mover's side and log class. */
 function drawnKeys(root: SimPosition, p1: string, p2: string, offset: number): Set<string> {
   const plan = planCellEvents(positionBattle(root), p1, p2);
   if (plan.kind !== 'events') throw new Error('the cell has no class plan');
@@ -511,8 +503,8 @@ describe('tree class keys of a tied cell', () => {
       const j = stats.p2Options.findIndex(option => option.choice === p2);
       const cell = stats.cells.find(entry => entry.key === cellKey(i, j))!;
       expect(cell.classKey).toBeDefined();
-      // A tree inside the budget's tree count (0 to 3) answers its root draw's dice by quantile, so its class may be one the stream's
-      // seeds never show (a 0.09 class in forty iterations); the sampler's classes bound it.
+      // Trees 0 to 3 answer their root draw by quantile, so their class may be one the stream's seeds never show
+      // (a 0.09 class in forty iterations); the sampler's classes bound it.
       if (offset >= SEARCH_BUDGET_DEFAULT.trees) expect(drawnKeys(root, p1, p2, offset)).toContain(cell.classKey);
       expect(sampled).toContain(cell.classKey);
       expect(cellContribution(cell, cell.classKey, false)).not.toBeNull();
@@ -553,8 +545,6 @@ describe('kill odds for doubles options', () => {
   });
 
   test('a foe the partner kills for sure carries no odds for the other slot', () => {
-    // Karate Chop kills the level-30 Eevee on every roll, so Snorlax's crit-only Tackle kill on that Eevee says nothing about whether it
-    // lives; next to a Karate Chop on Pikachu the Tackle keeps its odds.
     const root = doublesRoot(
       [pairSet('Machamp', 'Machamp', ['Rock Slide', 'Karate Chop']), pairSet('Snorlax', 'Snorlax', ['Tackle', 'Protect'])],
       [pairSet('Pikachu', 'Pikachu', ['Tackle', 'Growl'], { level: 30 }), pairSet('Eevee', 'Eevee', ['Tackle', 'Growl'], { level: 30 })],

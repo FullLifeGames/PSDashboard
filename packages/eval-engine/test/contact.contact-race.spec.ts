@@ -10,13 +10,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * What a hit costs its attacker enters the races of boostsBiting (Cobalion's contact moves into Talonflame meet Flame Body). The cost
- * is read from the simulator (score/contact.ts, held to it in contact.spec.ts) and priced by score/contact-price.ts: the chip of every
- * hit after which the race goes on joins the attacker's residual, a status chance compounds over the hits into expected end-of-turn
- * damage and expected lost damage. Held to turns of the simulator and to boards where the stage's verdict flips with the cost and nowhere else.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const SINGLES = 'gen9customgame';
@@ -51,11 +44,6 @@ function turn(battle: Battle): void {
 const mine = (battle: Battle): Pokemon => battle.sides[0].active[0]!;
 const theirs = (battle: Battle): Pokemon => battle.sides[1].active[0]!;
 
-/**
- * Garchomp at +2 Attack against the faster Weavile. The foe stands at 3 plain Crunches, so that the boosted Crunch needs
- * two hits; Garchomp stands at 2.2 Knock Offs, so that the Weavile needs three hits on its own and two with the chip of
- * one hit of Garchomp's, and the Weavile moves first: the chip hands it the tie.
- */
 function race(own: Partial<PokemonSet> = {}, other: Partial<PokemonSet> = {}, foeHits = 3, holderHits = 2.2): Battle {
   const battle = battleOf(SINGLES, [GARCHOMP(own)], [WEAVILE(other)]);
   mine(battle).boosts.atk = 2;
@@ -120,7 +108,6 @@ describe('the chip of a hit joins the race: the stage counts only where the hold
   });
 
   test('a second mover that wins in one hit acts before the chip it has not paid yet: the simulator\'s Garchomp survives the first Knock Off and its Crunch KOs', () => {
-    // Garchomp at 1.33 Knock Offs: one Knock Off plus the sixth of a helmet would take it (a plain residual says so), the Knock Off alone does not.
     const battle = race({}, { item: 'Rocky Helmet' }, 1.5, 1.33);
     turn(battle);
     expect(theirs(battle).fainted).toBe(true);
@@ -144,7 +131,6 @@ describe('the chip of a hit joins the race: the stage counts only where the hold
 });
 
 describe('a status chance joins the race as expected damage and expected lost damage', () => {
-  /** The foe stands at 3.8 plain Crunches (two boosted hits at the best roll, three once a burn has halved the second); Garchomp at 2.6 Knock Offs. */
   const burning = (ability: string) => race({}, { ability }, 3.8, 2.6);
 
   test('without the burn Garchomp wins in two hits, with the expected burn it needs three and the Weavile, who moves first, wins the tie', () => {
@@ -178,7 +164,6 @@ describe('a status chance joins the race as expected damage and expected lost da
 });
 
 describe('the foe pays for its own hits too: a stage is judged on the race both sides run', () => {
-  /** Garchomp against a slower Snorlax with Double-Edge; the foe's ability decides whether its recoil exists (Rock Head: none). */
   const against = (ability: string, foeHp: number) => {
     const battle = battleOf(SINGLES, [GARCHOMP()], [set('Snorlax', ['doubleedge', 'splash'], { ability })]);
     theirs(battle).sethp(Math.floor(theirs(battle).maxhp * foeHp));
@@ -204,7 +189,6 @@ describe('the foe pays for its own hits too: a stage is judged on the race both 
 });
 
 describe('a drop is judged on the race both sides run: the holder\'s helmet punishes the foe that profits from it', () => {
-  /** Garchomp at -2 Defense and 0.9 HP against a slower Snorlax at 0.6 HP: Body Slam takes it in two hits with the drop, in three without. */
   function dropped(item: string): Battle {
     const battle = battleOf(SINGLES, [GARCHOMP({ item })], [set('Snorlax', ['bodyslam', 'splash'])]);
     mine(battle).boosts.def = -2;
@@ -243,7 +227,6 @@ describe('a drop is judged on the race both sides run: the holder\'s helmet puni
 });
 
 describe('the doubles gate: the pair of the holder and the foe in front of it is its own race', () => {
-  /** Garchomp +2 with a Splashing partner against `first` (the Weavile) and a Snorlax the stage bites; the helmet decides the Weavile's race. */
   const board = (first: PokemonSet) => {
     const battle = battleOf(DOUBLES, [GARCHOMP(), splash('Clefable')], [first, splash('Snorlax')]);
     const [holder, quick, other] = [battle.sides[0].active[0]!, battle.sides[1].active[0]!, battle.sides[1].active[1]!];
@@ -366,7 +349,6 @@ describe('singles', () => {
   test('a singles board has no third active, so the scene key has no body to add (not affected)', () => {
     const battle = battleOf('gen9customgame', [set('Cobalion', [MOVE, 'splash'])], [set('Chansey', ['splash'], { ability: 'Rough Skin' }), set('Snorlax', ['splash'], { ability: 'Neutralizing Gas' })]);
     expect(battle.getAllActive()).toHaveLength(2);
-    // The gas on the bench is off the field: the reaction stands.
     expect(fresh(battle).chip).toBeGreaterThan(0);
   });
 });

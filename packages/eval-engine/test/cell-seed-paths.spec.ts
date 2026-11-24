@@ -12,14 +12,6 @@ import { pairCellSample } from '../src/pair/sampler';
 import { FALLBACK_SEEDS, PROBE_SEEDS, SEARCH_SEEDS, VERIFY_PLAIN_SEEDS } from './seed-streams';
 import { countFainted } from '../src/search/leaf';
 
-/**
- * The matrix, the verify round, the pair sampler and the trend probe read one seed list per cell
- * (`cellSeedList(cellHash(positionKey(root), p1Choice, p2Choice), 16)`). Rows: (a) a die at a fixed draw index of the first seed sits
- * inside its binomial band over 200 cells of each path's own call, singles and doubles (the fixed list gave every cell one stream);
- * (b) every seed a path reads belongs to its own cell's list and none is a fixed seed; (c) the lists are shared: the matrix's first
- * draw is the verify round's slot 0 and the pair sampler's first draw, the trend probe rebuilds the child the matrix priced.
- */
-
 const seen = vi.hoisted(() => ({ reads: [] as { root: unknown; p1: string; p2: string; seed: string }[] }));
 vi.mock('../src/forward/advance', async importOriginal => {
   const real = await importOriginal<typeof import('../src/forward/advance')>();

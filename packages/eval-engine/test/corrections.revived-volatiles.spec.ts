@@ -9,12 +9,6 @@ import { openSession, startBattle, waitForBattle, type ReconstructionSession } f
 import type { SimBattle } from '../src/branch/types';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 
-/**
- * When the simulator faints a body the game kept, the boundary correction revives it, and the volatiles the simulator wiped at the
- * faint (Protosynthesis or Quark Drive with its best stat, Leech Seed) come back, unless the protocol ended them. Battle B is the
- * game's truth (the body survives the same hit); battle A is the simulator's run (the body stands at 1 HP and is knocked out).
- */
-
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const set = (species: string, ability: string, moves: string[]): PokemonSet => ({
@@ -58,7 +52,6 @@ async function openScene(scene: Scene): Promise<ReconstructionSession> {
 
 const bodyOf = (battle: SimBattle, name: string) => battle.sides[0].pokemon.find(pokemon => pokemon.name === name)!;
 
-/** Plays turn 1, then turn 2; with `knockOut` the victim stands at 1 HP when the hit lands. Returns the battle after any forced switch. */
 async function play(scene: Scene, knockOut: boolean, bare = false): Promise<SimBattle> {
   const session = await openScene(scene);
   const battle = session.battleStream.battle!;
@@ -190,10 +183,6 @@ describe.each([
   });
 });
 
-/**
- * A body the simulator pulled in and the game never had consumed its Booster Energy at the entry (no Sun); the game's body still holds
- * the item. A body the protocol did show keeps the game's verdict: it came in without a trigger line, so the item is ruled out.
- */
 describe.each([
   ['singles', 'gen9ou', 1],
   ['doubles', 'gen9doublesou', 2],
@@ -221,7 +210,6 @@ describe.each([
     '|move|p2a: Garchomp|Earthquake|p1a: Magikarp',
     ...(doubles ? ['|move|p2b: Corviknight|Splash|p2b: Corviknight', '|-nothing', '|move|p1b: Pidgey|Splash|p1b: Pidgey', '|-nothing'] : []),
   ];
-  /** The game's Magikarp lives on 10 %; the simulator's Garchomp knocks it out and brings Great Tusk in. */
   const survives = [...header, ...moves, '|-damage|p1a: Magikarp|10/100', '|move|p1a: Magikarp|Splash|p1a: Magikarp', '|-nothing', '|upkeep', '|turn|2'].join('\n');
   const faints = [
     ...header, ...moves, '|-damage|p1a: Magikarp|0 fnt', '|faint|p1a: Magikarp', '|', '|switch|p1a: Great Tusk|Great Tusk|100/100', '|upkeep', '|turn|2',
@@ -249,10 +237,6 @@ describe.each([
   });
 });
 
-/**
- * A switch-out the game never saw clears the volatiles too: 752755 turn 9, where the build's guessed Eject Button sent Hatterene out of the
- * simulator after a Psychic Noise that had started Heal Block, and the game kept it in.
- */
 describe.each([
   ['singles', 'gen9customgame', [set('Hatterene', 'Healer', ['Splash']), set('Gliscor', 'Hyper Cutter', ['Splash'])],
     [set('Hatterene', 'Healer', ['Psychic Noise'])], '>p1 move 1\n>p2 move 1'],
@@ -285,7 +269,6 @@ describe.each([
 
     expect(simulated.sides[0].active.includes(bodyOf(simulated, 'Hatterene'))).toBe(true);
     expect(ids(simulated, 'Hatterene')).toEqual(['healblock']);
-    // The game's counter ticked at the turn's residual round; the simulator's body stood on the bench for it.
     expect(durationOf(simulated, 'Hatterene', 'healblock')).toBe(durationOf(truth, 'Hatterene', 'healblock'));
   });
 
@@ -453,7 +436,6 @@ describe('revived-volatiles-switch', () => {
   const bodyOf = (battle: SimBattle, name: string) => battle.sides[0].pokemon.find(pokemon => pokemon.name === name)!;
   const ids = (battle: SimBattle, name: string) => Object.keys(bodyOf(battle, name).volatiles).sort();
 
-  /** Turn 1 (the Choice lock and Leech Seed land on Hatterene), turn 2 (it switches out and the replacement is knocked out), then the replacement the game or the simulator sent. */
   async function play(scene: Scene, replacement: string): Promise<SimBattle> {
     const session = openSession({ format: scene.format, p1Team: scene.p1, p2Team: scene.p2, replayLog: '', targetTurn: 9 }, Date.now() + 60_000);
     await startBattle(session, scene.p1, scene.p2);

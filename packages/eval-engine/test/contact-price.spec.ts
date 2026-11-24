@@ -3,17 +3,11 @@ import { MAX_PRICED_HITS, priceHit } from '../src/score/contact-price';
 import { raceClocks } from '../src/score/races';
 import { NO_COST, type HitCost, type StatusCost } from '../src/score/contact';
 
-/**
- * How the reading of one hit (score/contact.ts) enters a race. The chip of a hit is paid right after the hit, for every hit: the side
- * that moves first has paid t chips when the other side lands its t-th hit, the side that moves second t - 1. A status chance
- * compounds over the hits: a status that lands on hit j takes its chip at the end of the turns j to the turn before the other
- * side's last hit and changes the damage of the hits after j. The oracle lists every way the statuses can land, hit by hit, with its
- * probability; the clock tests hold the chip to the exact turn-by-turn race of two sides.
- */
+// A hit's chip is paid right after it: the side that moves first has paid t chips when the other lands its t-th hit,
+// the second side t - 1. A status landing on hit j takes its chip from turn j on and changes the damage of later hits.
 
 const status = (name: string, chance: number, chip: number, output: number): StatusCost => ({ status: name, chance, chip, output });
 
-/** Every history of the hits: the status that lands first (or none) and the hit it lands on, with its probability. */
 function expected(cost: HitCost, own: number, other: number, ownFirst: boolean) {
   const landing = Math.min(own, MAX_PRICED_HITS);
   const turns = Math.min(other, MAX_PRICED_HITS);
@@ -51,7 +45,6 @@ describe('the chip of a hit is paid for every hit, and the side that moves secon
     expect(priceHit(chip, 2, turns, false)).toEqual({ residual: 0.12, output: 1, buffer: 0.12 });
   });
 
-  /** The race turn by turn: Y hits X for `hit` a turn and X pays `chip` after each hit of its own; X dies at the first t where its HP is gone before its next action. */
   function turnsToKill(hp: number, hit: number, chip: number, xFirst: boolean): number {
     for (let turn = 1; turn < 100; turn++) {
       const chipsPaid = xFirst ? turn : turn - 1;
@@ -71,7 +64,7 @@ describe('the chip of a hit is paid for every hit, and the side that moves secon
   });
 
   test('a second mover that KOs in one hit is not KO\'d by a chip it has not paid yet: the Weavile\'s first hit leaves it standing', () => {
-    // 0.3 of HP 0.66 is no KO; a residual of the whole chip (the plain table) would have the clock at 1 for 0.3 + 0.4 >= 0.66.
+    // 0.3 of HP 0.66 is no KO; a whole-chip residual (the plain table) would put the clock at 1 (0.3 + 0.4 >= 0.66).
     const price = priceHit({ chip: 0.4, statuses: [] }, 1, 3, false);
     const payer = { hp: 0.66 + price.buffer, frac: 0.5, residual: price.residual, healRate: 0, healAbsorb: 0, ppBudget: 99 };
     const other = { hp: 1, frac: 0.3, residual: 0, healRate: 0, healAbsorb: 0, ppBudget: 99 };

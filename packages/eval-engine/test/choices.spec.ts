@@ -10,12 +10,8 @@ import { battleOf } from './power-oracle';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import { createRootPosition as createRootPositionFromRevivalBlessing } from '../src/forward-model';
 
-/**
- * A Tatsugiri that commands a Dondozo passes its slot, and the simulator hands the first part of a doubles choice to the Dondozo
- * (side.js getChoiceIndex skips fainted and commanding actives). Held against the simulator: every choice legalChoices offers is
- * played on a copy of the battle, with Commander active for either side or both and the Tatsugiri in slot a and in slot b, in both
- * rule sets. Singles is not affected (Commander's onUpdate returns outside doubles): one row shows the Tatsugiri keeps its own moves there.
- */
+// A Tatsugiri that commands a Dondozo passes its slot; the simulator hands the first choice part to the Dondozo
+// (side.js getChoiceIndex skips commanding actives); singles is unaffected: Commander's onUpdate returns in singles.
 
 await loadSimMods('gen9championsou');
 
@@ -75,7 +71,6 @@ describe.each(RULES)('$name: the search offers a choice the simulator accepts fo
           expect(offered.length).toBeGreaterThan(0);
           expect(rejected).toEqual([]);
 
-          // The commanding side chooses for one slot (the Dondozo's); the other side for two.
           const parts = new Set(offered.map(choice => choice.split(',').length));
           expect([...parts]).toEqual([commanding ? 1 : 2]);
           if (!commanding) continue;
@@ -119,7 +114,6 @@ describe('revival-blessing', () => {
     };
   }
 
-  /** Magikarp falls on turn 1, Pawmot uses Revival Blessing on turn 2: the battle stops at the reviving request. */
   function revivalBattle(doubles: boolean): Battle {
     const p1 = [makeSet('Magikarp', ['Splash'], 1), makeSet('Pawmot', ['Revival Blessing', 'Nuzzle']), makeSet('Snorlax', ['Curse'])];
     const p2 = doubles

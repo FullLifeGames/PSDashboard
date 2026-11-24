@@ -9,15 +9,6 @@ import { dexOfRules } from './dice-sweep-support';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The sweep of the fainted body. `takeBodyOut` takes a body the log faints out the way the simulator does (`Battle#resolveFaints`: the
- * fallen count, the End events of the ability and the item, then the flags); an ability that ends with its holder (Neutralizing Gas above
- * all) must end, or the bodies it held back never start (VGC 2159578969 turn 5: Slow Start never ran on Regigigas). Every ability of the
- * Dex with an End handler, in every rule set the corpus plays (Gens 3 to 9 and the Champions mod, singles and doubles): the holder faints
- * once through the simulator and once through `takeBodyOut` on identical boards, and every other body, both sides, the field and the
- * fallen counts must read the same. A control row proves the comparison sees what the End event does.
- */
-
 await loadSimMods('gen9championsou');
 
 const RULE_SETS: Rules[] = RULES.filter(rules => rules.generation >= 3);
@@ -30,15 +21,12 @@ function endingAbilities(rules: Rules): string[] {
     .map(ability => ability.name);
 }
 
-/** The witness: the species whose ability Neutralizing Gas holds back (Slow Start), else a body with a plain ability (Truant). */
 function witnessOf(rules: Rules): { species: string; ability: string } {
   return dexOfRules(rules).species.get('regigigas').exists ? { species: 'Regigigas', ability: 'Slow Start' } : { species: 'Slaking', ability: 'Truant' };
 }
 
-/** The bench body of the entry rows: Intimidate starts on entry, so a Start event that runs twice or too early shows in the foe's Attack. */
 const intimidator = (rules: Rules) => set('Gyarados', ['splash'], { level: rules.level, ability: 'Intimidate', ...(rules.evs ? { evs: rules.evs } : {}) });
 
-/** A board past team preview: the holder leads p1 with the ability, witnesses beside and across, one benched body each so no win ends the scene. */
 function board(rules: Rules, mode: Mode, ability: string, entering?: PokemonSet): Battle {
   const witness = () => set(witnessOf(rules).species, ['splash'], { level: rules.level, ability: witnessOf(rules).ability, ...(rules.evs ? { evs: rules.evs } : {}) });
   const bench = () => entering ?? mon(rules, { species: 'Blissey', moves: ['splash'] });
@@ -94,7 +82,6 @@ function flagged(rules: Rules, mode: Mode, ability: string): unknown {
   return worldState(battle, holder);
 }
 
-/** The turn both sides splash, so the board stands at a boundary (turn 2) and the simulator's block holds no switch line. */
 function atBoundary(rules: Rules, mode: Mode, ability: string): Battle {
   const battle = board(rules, mode, ability, intimidator(rules));
   const clicks = mode === 'singles' ? 'move 1' : 'move 1, move 1';
@@ -105,7 +92,6 @@ function atBoundary(rules: Rules, mode: Mode, ability: string): Battle {
 
 const protocolBody = (battle: Battle) => battle.sides[0].pokemon.find(body => body.species.name === 'Gyarados')!;
 
-/** The simulator's own replacement: the holder faints and its End events run, then the bench body switches in. */
 function replacedBySimulator(rules: Rules, mode: Mode, ability: string): unknown {
   const battle = atBoundary(rules, mode, ability);
   const holder = battle.sides[0].active[0]!;
@@ -116,11 +102,8 @@ function replacedBySimulator(rules: Rules, mode: Mode, ability: string): unknown
   return worldState(battle, holder);
 }
 
-/**
- * The rebuild's way: the boundary correction of a protocol that shows the faint and the switch-in on the slot while the simulator's
- * holder still stands (`faintThePredecessor` in `branch/entry-effects.ts`): the replacement is repointed into the slot first, and the
- * faint of the predecessor has to run its End events as if the replacement were not there yet.
- */
+// The rebuild's way (`faintThePredecessor`, `branch/entry-effects.ts`): the replacement is repointed into the slot,
+// and the predecessor's faint must run its End events as if the replacement were not there yet.
 function replacedByCorrection(rules: Rules, mode: Mode, ability: string): unknown {
   const battle = atBoundary(rules, mode, ability);
   const holder = battle.sides[0].active[0]!;
@@ -146,9 +129,6 @@ describe.each(RULE_SETS.flatMap(rules => (['singles', 'doubles'] as const).map(m
       if (abilities.includes('Neutralizing Gas')) expect(changing, `${rules.name}: Neutralizing Gas is one of them`).toContain('Neutralizing Gas');
     });
 
-    // The on-field path: the body leaves while a replacement already stands in its slot (the log's switch-in, repointed by the
-    // correction), as in 2159578969 turn 2 (Weezing's gas, Grafaiai in its slot). The End events run with the holder on the field and
-    // the replacement not yet in, then the replacement's own entry runs once.
     test('every ability with an End handler: the holder leaves a repointed slot as the simulator replaces it', () => {
       const wrong = abilities.filter(ability => JSON.stringify(replacedByCorrection(rules, mode, ability)) !== JSON.stringify(replacedBySimulator(rules, mode, ability)));
       expect(wrong, `${rules.name} ${mode}: abilities whose end differs from the simulator's replacement`).toEqual([]);

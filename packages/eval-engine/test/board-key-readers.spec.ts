@@ -7,23 +7,12 @@ import { SWEEPS_FULL, type Mode } from './dice-fixtures';
 import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, twoValues, verdictOf, type Holder, type Lineup } from './board-key-support';
 
-/**
- * The `read` fields of the board key held to the Dex and to the simulator's own move path. A `read` field enters the key only when a
- * handler of an entry on the board names it (dex-facts/state-readers.ts); this sweep varies each such field on two boards and requires,
- * wherever the hit played without a memo reads differently, that the keys differ too (`verdictOf`): for the entries the scan names
- * (placed on the attacker, the defender and, in doubles, the partners) and a sample it does not name (a miss moves the field to the `key`
- * class), and for a bare board with every move that costs its user HP by itself. The plain run plays the four rule sets that count most;
- * `DICE_SWEEPS=full` every case and reader and 8 other entries per field. The teeth are checked in the plain run only: older Dexes have
- * no entry that changes the cost of this hit through a `read` field (Stakeout comes in Gen 7).
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const PLAIN_CASES = ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'];
 const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => PLAIN_CASES.includes(name));
 const NAMED_CAP = SWEEPS_FULL ? Infinity : 3;
 const SAMPLE = SWEEPS_FULL ? 8 : 4;
-/** The full run reads every named entry: Gen 9 doubles takes several minutes. */
 const NAMED_TIMEOUT = SWEEPS_FULL ? 600_000 : 60_000;
 
 type Pair = [unknown, unknown];
@@ -117,9 +106,8 @@ describe.each(CASES)('the read fields of the key hold on $name', ({ rules, mode,
       }
     }
     expect(wrong).toEqual([]);
-    // No read field reaches a bare hit: the sweep's teeth are the control below, a stage (a `key` field) on the same boards.
     expect(split).toBe(0);
-    // The stage goes in through the simulator's own `boostBy`: Gen 1 reads `modifiedStats`, which a write to `boosts` leaves alone.
+    // The stage goes in through `boostBy`: Gen 1 reads `modifiedStats`, which a write to `boosts` leaves alone.
     const staged = moves.filter(recoil => recoil.category === 'Physical' && recoil.basePower > 0 && !!recoil.recoil).slice(0, 3).map(recoil => verdictOf(
       ...[0, 3].map(stage => { const battle = boardFor(rules, mode, recoil.id); attackerOf(battle).boostBy({ atk: stage }); return battle; }) as [Battle, Battle], recoil.id));
     expect(staged).toContain('split');
@@ -156,7 +144,6 @@ describe.each(CASES)('the read fields of the key hold on $name', ({ rules, mode,
       expect(split).toBeGreaterThan(0);
       if (rules.generation >= 3) expect(touched.has('activeTurns')).toBe(true);
     }
-    // The fields without a pair of values are named, not dropped; a new simulator field of the `read` class is held by the census.
     expect(skipped.length).toBeLessThan(40);
   });
 

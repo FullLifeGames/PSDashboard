@@ -9,11 +9,7 @@ import { BOUNDARY_DRAW_BUDGET } from '../src/cell-blend';
 import { pairCellSample } from '../src/pair/sampler';
 import { VERIFY_PLAIN_SEEDS } from './seed-streams';
 
-/**
- * A singles cell whose two moves have equal priority at equal speed is a coin flip for the move order. The root cell draws each
- * order with the order scripted and mixes the two at one half, as the doubles pair plan writes its `tie` record. The reference is
- * the simulator: the mean leaf over 64 natural seeds, where the shuffle of the tied actions decides the order.
- */
+// The reference is the simulator's mean leaf over 64 natural seeds.
 
 const cache = createMatchupCache();
 
@@ -48,10 +44,9 @@ function ones(p1: PokemonSet, p2: PokemonSet, setup: (battle: Battle) => void = 
   return createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 }
 
-/** Mutual sure OHKO at equal speed, the shape of the truth bench's ohko-tie: two Machamp at 1 HP with Close Combat. */
 const ohkoTie = (): SimPosition => ones(set('Machamp', ['Close Combat']), set('Machamp', ['Close Combat']));
 
-/** The same in doubles: a 1v1 whose partners are fainted (the simulator refuses one-mon doubles teams). */
+// The same in doubles: a 1v1 whose partners are fainted (the simulator refuses one-mon doubles teams).
 function doublesOhkoTie(): SimPosition {
   const mon = () => pairSet('Machamp', 'Machamp', ['Close Combat'], { level: 100 });
   return doublesRoot([mon(), pairSet('Pika', 'Pikachu', ['Tackle'], { level: 5 })], [mon(), pairSet('Chu', 'Pikachu', ['Tackle'], { level: 5 })], battle => {
@@ -77,9 +72,9 @@ describe('singles speed tie', () => {
     const equal = ones(set('Machamp', ['Tackle', 'Quick Attack']), set('Machamp', ['Tackle', 'Quick Attack']));
     const staged = ones(set('Machamp', ['Tackle']), set('Machamp', ['Tackle']), battle => { battle.sides[0].active[0]!.boosts.spe = 1; });
     const cases: [SimPosition, string, string][] = [
-      [fast, 'move tackle', 'move tackle'], // unequal speed
-      [equal, 'move quickattack', 'move tackle'], // unequal priority
-      [staged, 'move tackle', 'move tackle'], // a stage breaks the tie
+      [fast, 'move tackle', 'move tackle'],
+      [equal, 'move quickattack', 'move tackle'],
+      [staged, 'move tackle', 'move tackle'],
     ];
     for (const [root, p1, p2] of cases) {
       expect(speedTie(positionBattle(root), p1, p2)).toBe(false);
@@ -187,7 +182,6 @@ describe('cell-plan-missing', () => {
       const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
       const truth = plainMean(root, p1, p2);
       const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-      // The cell's own seeds also leave 'hit-kill|none' (a crit class) unreached.
       expect(sample.diagnostic?.missing).toEqual(['hit-kill|none', 'hit-nokill|hit-nokill']);
       expect(Math.abs(sample.value - truth.mean)).toBeLessThan(2.5 * truth.se);
       expect(sample.blend).toBeUndefined();
@@ -198,7 +192,6 @@ describe('cell-plan-missing', () => {
       const [p1, p2] = ['move hiddenpower', 'move dragonclaw'];
       const truth = plainMean(root, p1, p2);
       const sample = sampleCell(root, 0, p1, p2, 1, createMatchupCache(), true);
-      // The cell's own seeds reach every class of this cell, so there is no diagnostic; a cell that misses a class must still stay below the cut.
       const missing = (sample.diagnostic?.missing ?? []).reduce((sum, key) => sum + sample.diagnostic!.analytic[key], 0);
       expect(missing).toBeLessThan(MISSING_WEIGHT_CUT);
       const classes = sample.blend!.classes;

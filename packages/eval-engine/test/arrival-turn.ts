@@ -15,18 +15,10 @@ import type { BranchSlotChoice } from '../src/branch-choices';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { rulesDex } from '@fulllifegames/replay-core';
 
-/**
- * The branch's first turn as the specs play it: the app's reconstruction of a fixture up to a turn, and the logged turn played through
- * the branch's own execution path.
- */
-
 export const loadReplay = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
 
-/**
- * The app's reconstruction: healed, locked, boundaries captured. `source` is a replay outside this folder's fixtures (the feedback
- * corpus); `fixture` still names its game type.
- */
+/** The app's reconstruction up to a turn; `source` is a replay outside the fixtures, `fixture` names its game type. */
 export async function reconstruct(fixture: string, targetTurn: number, source?: ReplayData) {
   const replay = source ?? loadReplay(fixture);
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
@@ -52,11 +44,7 @@ export async function reconstruct(fixture: string, targetTurn: number, source?: 
 
 export const prngOf = (runtime: BranchRuntime) => runtime.battleStream.battle!.prng.getSeed();
 
-/**
- * The logged turn through the branch's own execution path: the commands the replay would send (`choices` replaces a side's logged
- * click), the forced replacements answered from the log, scored the way the replay scores its blocks (faints, misses, crits,
- * secondaries, cants, move order).
- */
+/** The logged turn through the branch's own execution path; `choices` replaces a side's logged click. */
 export async function playTurn(
   runtime: BranchRuntime, replayLog: string, turn: number, choices?: string | { p1?: string; p2?: string },
   dice?: { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] },
@@ -64,7 +52,6 @@ export async function playTurn(
   const replaced = typeof choices === 'string' ? { p2: choices } : choices ?? {};
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
   const battle = runtime.battleStream.battle!;
-  // with `dice` the turn plays through the dice module; the later calls (forced replacements) carry no choices
   const send = (commands: { side: 'p1' | 'p2'; command: string }[], first = false) =>
     executeBranchChoices({
       streams: runtime.streams, log: runtime.log, choiceErrors: runtime.choiceErrors, commands,
@@ -98,7 +85,7 @@ export async function playTurn(
 
 export interface Draw { key: string | null; from?: number; to?: number; value: number }
 
-/** Every number the battle's PRNG draws from now on, with the action (slot and move) it was drawn for; null outside an action. */
+/** Every number the battle's PRNG draws from now on with the action (slot, move) it was drawn for; null outside one. */
 export function observeDraws(battle: SimBattle): Draw[] {
   const draws: Draw[] = [];
   const prng = battle.prng;
@@ -120,10 +107,6 @@ export function drawsByAction(draws: Draw[]): Map<string, Draw[]> {
   return byAction;
 }
 
-/**
- * The `play` of the dice module for the logged turn: writes the commands the replay would send to the battle it gets (live battle and
- * copy alike) and answers the forced replacements from the log.
- */
 export function loggedClicks(replayLog: string, turn: number, choices: { p1?: string; p2?: string } = {}): (battle: Battle) => void {
   const block = parseTurnBlocks(replayLog).turns.find(entry => entry.turn === turn)!;
   return battle => {

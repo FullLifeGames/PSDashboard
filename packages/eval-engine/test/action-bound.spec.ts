@@ -15,12 +15,6 @@ import { parsePlayedActions, parsePlayedActionsDoubles, turnEvents, type FellMar
 import { CHAMPIONS, mon, playClicks, RULES, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-/**
- * The order bound of a body that fell before it acted: a move is out when it stands certainly ahead of a logged action (a higher
- * priority bracket, or the same bracket and a higher speed while no line moved a speed; a tie is no proof). Rows: doubles 2710981835
- * turn 7, singles smogtours-gen9ou-671362 turn 9 (Prankster Grafaiai), Champions singles gen9championsou-2691527224 turn 14
- * (Rillaboom's Grassy Glide in Grassy Terrain).
- */
 await loadSimMods('gen9championsou');
 
 const ANSWERS = [false, true] as const;
@@ -42,7 +36,6 @@ describe('the shared order rules', () => {
   });
 });
 
-/** Whether `own` acts ahead of the foe's logged action in one turn on a copy: true ahead, false behind or never (knocked out first). */
 function actsFirst(board: Battle, clicks: { p1: string; p2: string }, ownSlot: string, foeSlot: string, chance: boolean): boolean {
   const copy = copyOf(board);
   copy.prng = new FixedDice({ chance });
@@ -108,7 +101,6 @@ describe('doubles: replay 2710981835 turn 7', () => {
     const acting = firstUnderBoth(board, click, 'p1a', 'p2a');
     expect([...bound.moves].sort()).toEqual(acting);
     expect(bound.switchOut).toBe(true);
-    // The report: Extreme Speed (+2) and Protect (+4) are out, Dragon Pulse and Thunderbolt are not.
     expect(bound.moves.every(id => ['extremespeed', 'protect'].includes(id))).toBe(true);
     if (moves) expect([...bound.moves].sort()).toEqual(['extremespeed', 'protect']);
     else expect(bound.moves).toEqual([]);
@@ -127,7 +119,6 @@ describe('doubles: replay 2710981835 turn 7', () => {
     const dragonite = scene.battle.sides[0].active[0]!;
     const floette = scene.battle.sides[1].active[0]!;
     expect(dragonite.getActionSpeed()).toBeLessThan(floette.getActionSpeed());
-    // The mover is faster than the body: no move of the body is certainly ahead, with or without the speed proof.
     for (const speedMoved of [false, true]) {
       expect(ruledOutMoves(scene.battle, dragonite, { ...mark(), speedMoved }).moves).toEqual([]);
     }

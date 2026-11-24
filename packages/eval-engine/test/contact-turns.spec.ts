@@ -6,20 +6,13 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Paralysis and sleep take turns, not HP, so a hit that leaves them costs the attacker the share of its next turns on which it cannot
- * move. The reader plays the turns on a copy of the hit (BeforeMove of the attacker with the status on it) and hands the race the
- * share of turns the body acts on (`acts`). The oracle is real simulator turns: a body that carries the status clicks a move for four
- * turns on 200 seeds, and the share of seeds on which the move runs is the share. A status that never stops a move (a burn, poison)
- * carries no profile; the sweep over the foe's items and abilities in both modes checks every status the reader finds, so a status
- * of a later simulator that stops a move cannot slip in unpriced.
- */
+// Oracle: a body with the status clicks a move for four turns on 200 seeds; the share of seeds it runs on is `acts`.
 
 await loadSimMods('gen9championscustomgame');
 
 const SEEDS = 200;
 const TURNS = 4;
-/** The slack between a share over 200 seeds and the reader's grid of 20 quantiles. */
+// The slack between a share over 200 seeds and the reader's grid of 20 quantiles.
 const SLACK = 0.1;
 
 const attacker = (extra: Partial<PokemonSet> = {}, move = 'ironhead') => set('Cobalion', [move, 'splash'], extra);
@@ -55,11 +48,9 @@ function oracleOf(mode: Mode, shape: Shape, status: string): number[] {
   if (!shares) {
     const ran = new Array<number>(TURNS).fill(0);
     for (let index = 0; index < SEEDS; index++) {
-      // Tackle cannot finish the target in one turn, so the game outlasts the four turns the oracle plays.
       const battle = shape.board(mode, seedOf(index), foe('Chansey', mode.extra), 'tackle');
       battle.sides[0].active[0]!.setStatus(status);
       for (let turn = 0; turn < TURNS; turn++) {
-        // The foe stands again every turn: a game that ends on the target stops the oracle.
         for (const foeMon of battle.sides[1].active) foeMon!.sethp(foeMon!.maxhp);
         const from = battle.log.length;
         battle.choose('p1', shape.p1);

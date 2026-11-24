@@ -8,13 +8,7 @@ import { calcMove } from '../src/calc/move';
 import type { CalcBody } from '../src/calc/body';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * The Champions mod stays the truth for moves: every damaging move the mod allows (isNonstandard null), read through the engine's
- * calcMove for a body of the Champions mod, has the mod's base power (a power callback excepted), type, category, hit count and the
- * contact, punch, bite, sound and slicing flags. Negative priority is left out: the calculator reads priority only as "greater than
- * zero", so it has no damage effect. A move's data does not depend on the game type, so one run covers singles and doubles. The moves the
- * engine's override layer touches in legal Champions play are recorded by the last row.
- */
+// category, hit count and flags. Negative priority is out: the calculator reads priority only as "greater than zero".
 await loadSimMods('gen9championsou');
 
 const FLAGS = ['contact', 'punch', 'bite', 'sound', 'slicing'] as const;

@@ -20,14 +20,7 @@ import { killing, simDamages } from './sim-rolls';
 
 const mon = (species: string, moves: string[], extra: Parameters<typeof set>[2] = {}) => set(species, [...moves, 'splash'], extra);
 
-/**
- * The ability the calc is given is the one the simulator lets act now. An ability the simulator suppresses (Gastro Acid, an active
- * Neutralizing Gas) goes to the calc as No Ability; a body still to come in gets the entry stage of Intrepid Sword or Dauntless Shield
- * only when the simulator would give it (its own handler, asked on a stand-in with the holder's flags: Gen 9 gives it once per battle,
- * Gen 8 every time, none under Neutralizing Gas). The oracle is the simulator: the stage a body really holds after it switches in,
- * and the kill table against the logged damage at the drawn roll. Singles and doubles both (the doubles path shares bodyOf and the
- * calc builder).
- */
+// Intrepid Sword/Dauntless Shield entry stage: Gen 9 once per battle, Gen 8 every time, none under Neutralizing Gas.
 
 type Kind = 'singles' | 'doubles';
 const KINDS: Kind[] = ['singles', 'doubles'];
@@ -41,7 +34,6 @@ function calcStages(battle: Battle, mon: Pokemon, foe: Pokemon) {
   return { atk: asAttacker.attacker.boosts.atk, def: asDefender.defender.boosts.def };
 }
 
-/** One turn: the side of `incoming` brings it in for its first active (its team slot as it stands now); the other side Splashes. */
 function switchIn(battle: Battle, kind: Kind, incoming: Pokemon) {
   const side = battle.sides.indexOf(incoming.side) as 0 | 1;
   const slot = incoming.side.pokemon.indexOf(incoming) + 1;
@@ -158,7 +150,6 @@ await loadSimMods('gen9championscustomgame');
 
 describe('calc-champions-entry-stage', () => {
 
-
   const SP = { hp: 32, atk: 0, def: 0, spa: 32, spd: 0, spe: 0 };
   const set = (species: string, moves: string[], extra: Partial<PokemonSet> = {}) => rollSet(species, moves, { evs: SP, ...extra });
   const FORMAT = { singles: 'gen9championscustomgame', doubles: 'gen9championsdoublescustomgame' } as const;
@@ -168,7 +159,6 @@ describe('calc-champions-entry-stage', () => {
       const gen0 = calcGenerationFor(9, 'champions');
       expect(gen0.num).toBe(0);
       const reads = (gen: number, ability: string) => calcAddsStages(gen, ability);
-      // Whatever generation 0 does for Download, the probe and a calculation by hand agree: both come from the calculator.
       const byHand = (gen: number) => calcAddsStages(gen, 'Download');
       expect(reads(0, 'Download')).toBe(byHand(0));
       expect(reads(9, 'Download'), 'a generation the probe always read').toBe(true);
@@ -192,8 +182,7 @@ describe('calc-champions-entry-stage', () => {
       });
     }
 
-    // Meganium-Mega's Mega Sol makes Weather Ball a Fire move of double power, which the calculator's generation 0 knows. The
-    // simulator is the judge.
+    // Meganium-Mega's Mega Sol makes Weather Ball a Fire move of double power.
     for (const game of ['singles', 'doubles'] as const) {
       test(`${game}: a Mega Sol Weather Ball lies on the kill table at the drawn roll`, () => {
         const doubles = game === 'doubles';
@@ -206,7 +195,7 @@ describe('calc-champions-entry-stage', () => {
         expect(hits.length, 'a priced hit').toBeGreaterThan(0);
         expect(hits.filter(({ table }) => table === null).length, 'every hit priced').toBe(0);
         expect(hits.filter(({ holds }) => !holds).length, 'hits off the table').toBe(0);
-        // A Fire hit of 100 power into a Steel type takes the whole body (Weather Ball's 50 power Normal hit takes a tenth).
+        // A 100-power Fire hit takes the whole Steel body; Weather Ball's 50-power Normal hit takes a tenth.
         expect(Math.max(...hits[0].table!.normal), 'Mega Sol read').toBeGreaterThanOrEqual(hits[0].roll.snapshot.defender.hp);
       });
     }
@@ -311,7 +300,6 @@ describe('the abilities the calc boosts by itself are read from the calc', () =>
     expect(found(3)).toEqual([]);
     for (const gen of [4, 5, 6, 7]) expect(found(gen), `gen ${gen}`).toEqual(['Download']);
     expect(found(8)).toEqual(['Dauntless Shield', 'Download', 'Intrepid Sword']);
-    // Intrepid Sword and Dauntless Shield give their stage in Gen 9 only with abilityOn (calcOwnEntryStage).
     expect(found(9)).toEqual([
       'Download', 'Embody Aspect (Cornerstone)', 'Embody Aspect (Hearthflame)', 'Embody Aspect (Teal)', 'Embody Aspect (Wellspring)',
     ]);
@@ -446,7 +434,6 @@ describe('Protect reaches the calculator as the simulator plays it', () => {
         expect(loss, `${scene.label}: simulator loss ${loss}, calc ${min}-${max}`).toBeGreaterThanOrEqual(min - 1);
         expect(loss, `${scene.label}: simulator loss ${loss}, calc ${min}-${max}`).toBeLessThanOrEqual(max + 1);
       }
-      // Not vacuous: the move without contact is stopped, the two contact moves are not.
       expect(hits[1].loss).toBe(0);
       expect(hits[0].loss).toBeGreaterThan(0);
       expect(hits[2].loss).toBeGreaterThan(0);
@@ -459,7 +446,6 @@ describe('stellar-first-use', () => {
   const garchomp = (tera: string): PokemonSet => set('Garchomp', ['Earthquake', 'Stone Edge', 'Flamethrower', 'Splash'], { teraType: tera });
   const wall = (species = 'Blissey'): PokemonSet => set(species, ['Splash'], { evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 252, spe: 0 } });
 
-  /** The battle after the click turn: Garchomp has terastallized and spent its type, the foes are healed so no roll is cut short. */
   const afterClick = (choice: string, idle: string) => (battle: Battle) => {
     battle.choose('p1', choice);
     battle.choose('p2', idle);

@@ -9,32 +9,15 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, twoValues, verdictOf, type Verdict } from './board-key-support';
 
-/**
- * The state of every effect the Dex knows (a volatile, a side, slot or field condition, a weather, a terrain, a status, an ability, an
- * item), placed where it acts: each own field of its state that holds a number, a flag or a stat name is set to two values, and on the
- * two boards the keys must differ wherever the play reads differently, for the hit of a move that costs its user HP (against the hit
- * memo's key) and for the end of the turn (against the end-of-turn key; every event it fires is one the key reads: RESIDUAL_EVENTS).
- * Doubles put the effect on the partners too. The plain run plays the four rule sets that count most; `DICE_SWEEPS=full` every rule set
- * and condition.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'].includes(name));
 
-/**
- * The conditions the plain run always plays, whatever the sample: a Substitute, a pending Future Sight, toxic, Leech Seed, sleep,
- * confusion.
- */
 const ALWAYS = ['substitute', 'futuremove', 'tox', 'leechseed', 'slp', 'confusion'];
 
 type Kind = 'volatile' | 'side' | 'slot' | 'field' | 'weather' | 'terrain' | 'status';
 type Dex = Battle['dex'];
 
-/**
- * Which kind of effect each condition id is, by what the Dex's moves and conditions say (a move names the effect it puts on a body, a
- * side, a slot or the field).
- */
 function kindsOf(dex: Dex): Map<string, Kind> {
   const kinds = new Map<string, Kind>();
   for (const move of dex.moves.all()) {
@@ -133,13 +116,11 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     }
     expect(counts.rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    // Teeth: a Substitute's HP moves the hit, a pending Future Sight's turn the end of the turn.
     if (rules.generation >= 4) expect(counts.hitSplit).toBeGreaterThan(0);
     expect([...fired].filter(event => !RESIDUAL_EVENTS.has(event)).sort().join(' ')).toBe('');
   });
 
   test('who set each condition: the source and the source slot of its state, at two bodies', () => {
-    // The fields the loop above leaves out (references and slots): a condition's source is the attacker on one board and the defender on the other.
     const wrong: string[] = [];
     const counts = { rows: 0, hitSplit: 0, residualSplit: 0 };
     const fired = new Set<string>();
@@ -168,7 +149,6 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     }
     expect(counts.rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    // Teeth: a Leech Seed's slot and a trap's source move the end of the turn.
     if (rules.generation >= 4) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
   });
 

@@ -1,8 +1,6 @@
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import type { SimBattle } from '../src/branch/types';
 
-/** Shared builders of the branch-rule specs (forced passes, disabled moves, trapping): real simulator battles, no mocks. */
-
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -29,7 +27,6 @@ export const FORMATS = [
 
 export const sideId = (index: number) => (index === 0 ? 'p1' : 'p2') as 'p1' | 'p2';
 
-/** One side's turn: the clicked move with a foe target where the Dex target type asks for one (doubles), the partner on Splash. */
 export function moveCommand(battle: SimBattle, move: string, doubles: boolean): string {
   const targeted = doubles && battle.actions.targetTypeChoices(battle.dex.moves.get(move).target);
   return `move ${move}${targeted ? ' 1' : ''}${doubles ? ', move Splash' : ''}`;

@@ -9,14 +9,6 @@ import { getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import { toId } from '@fulllifegames/replay-core';
 import { playTurn, prngOf, reconstruct } from './arrival-turn';
 
-/**
- * A branch opens with the dice its own turn has in the log. GPL DzBQ5azlO5l turn 13 (Air Slash against Heavy Slam, no flinch in the
- * game): an arrival that carried the dice state the previous block left (1,2,3,4) flinches Cobalion, so rebuilding the turn with the
- * logged pair or with any other move for Cobalion showed a flinch the log does not have. The arrival plays its own turn under the
- * seed whose rolls reproduce the block, in singles and in doubles.
- */
-
-/** The scenes: turns whose arrival must carry 1,2,3,4 (the rebuild forces the log's dice under seed index 0). */
 const SINGLES = { label: 'singles (GPL DzBQ5azlO5l)', fixture: 'gpl-replay', turn: 13, seed: '1,2,3,4' };
 const DOUBLES = { label: 'doubles (Doubles OU 912884)', fixture: 'smogtours-gen9doublesou-912884', turn: 10, seed: '1,2,3,4' };
 const VGC = { label: 'VGC doubles (Regulation I 2630181744)', fixture: 'gen9vgc2026regi-2630181744', turn: 3, seed: '1,2,3,4' };
@@ -81,8 +73,6 @@ describe.each([
   { ...DOUBLES, side: 'p1' as const, slot: 0 },
   { ...VGC, side: 'p1' as const, slot: 0 },
 ])('an arrival whose logged move the edited set lost plays with the rebuild\'s stand-in: $label', ({ fixture, turn, seed, side, slot }) => {
-  // The click names the missing move and the simulator would refuse it; the stand-in of the body's request (`playableMove`) makes the click, the
-  // turn plays as the rebuild plays it, and the arrival is that turn's own: the seed of the unedited rebuild, the logged dice forced on it.
   test('the stand-in click plays, the record is the forced turn\'s and the dice follow the logged draws', { timeout: 300000 }, async () => {
     const { replay, runtime, captured } = await reconstruct(fixture, turn + 1);
     const battle = deserializeBattleExact(captured.get(turn)!);
@@ -99,11 +89,9 @@ describe.each([
 
     const aligned = runtime.haxAlignment.find(record => record.turn === turn)!;
     const result = alignArrivalDice(battle, replay.log, turn);
-    // the meaning: a forced record (no trial ran) on the seed the rebuild plays this turn under; the other fields are that record's constants
     expect(result).toEqual({ seed: aligned.seed, trialScore: null, trialPerfect: false, candidatesTried: 0, trialsFailed: 0 });
     expect(result!.seed).toBe(seed);
     expect(aligned).toMatchObject({ via: 'forced', trialPerfect: false, candidatesTried: 0 });
-    // the dice: the logged-draws stream on that seed, carrying the turn and the clicks the rebuild's function answers for this position
     expect(battle.prng).toBeInstanceOf(LoggedRollPRNG);
     expect(battle.prng.getSeed()).toBe(seed);
     const prng = battle.prng as LoggedRollPRNG;
@@ -116,8 +104,6 @@ describe.each([
   { ...DOUBLES, turn: 9, side: 'p1' as const, label: 'doubles (Doubles OU 912884)' },
   { ...VGC, turn: 3, side: 'p2' as const, label: 'VGC doubles (Regulation I 2630181744)' },
 ])('an arrival whose turn no trial can play keeps its dice: $label', ({ fixture, turn, side }) => {
-  // `playableMove` repairs moves only: the click stays `switch n`, the simulator refuses a switch to a fainted body, the forced turn throws,
-  // and none of the sixteen trials plays either.
   test('the logged switch has no benched body: null, and the dice stay as they were', { timeout: 300000 }, async () => {
     const { replay, captured } = await reconstruct(fixture, turn + 1);
     const battle = deserializeBattleExact(captured.get(turn)!);

@@ -20,15 +20,6 @@ import { getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 import type { SimBattle } from '../src/branch/types';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * `queuePlace` and `actionPriority` read the live battle the rebuild plays turn after turn: a value read in one turn must never
- * answer a later turn (Trick Room, Tailwind, paralysis, a stat stage, a switch, a knocked-off item, an item or ability that gains a
- * priority handler). Scene: 2630685175 turn 5, Trick Room: Fake Out's user read the speed of turn 4 (105 for 1703) and the cant
- * stand-in of the flinching body got no move. Each row asks one body, changes the battle the way the simulator does, asks again, and
- * must equal a never-asked battle and `getActionSpeed()`; it also checks that the change moved the answer. Singles and doubles, with
- * the development check off and on (on, a memo throws `AskLeak` at the second question).
- */
-
 const GEN9 = RULES.find(rules => rules.generation === 9 && rules.name === 'Gen 9')!;
 const MODES: Mode[] = ['singles', 'doubles'];
 
@@ -80,7 +71,7 @@ const unasked = (battle: Battle, body: Pokemon, move: string, chance: boolean) =
   const copy = copyOf(battle);
   const same = copy.sides[0].pokemon[body.side.pokemon.indexOf(body)];
   const check = askCheckOn();
-  setAskCheck(false); // a copy has no live prng to fingerprint
+  setAskCheck(false);
   try { return queuePlace(copy, same, move, chance); } finally { setAskCheck(check); }
 };
 
@@ -98,7 +89,6 @@ describe.each(MODES)('a body asked twice on one live battle: %s', mode => {
       const now = battle.sides[0].active[0] as Pokemon;
       const expected = unasked(battle, now, change.move, chance);
       const after = queuePlace(battle, now, change.move, chance);
-      // the row proves its change: the answer a never-asked battle gives is not the first one
       expect(change.moves === 'speed' ? expected.speed : expected.priority).not.toBe(change.moves === 'speed' ? before.speed : before.priority);
       expect(after).toEqual({ priority: expected.priority, speed: expected.speed });
       expect(after.speed).toBe(now.getActionSpeed());
@@ -122,10 +112,6 @@ describe('stand-in-order', () => {
 
   interface Scene { battle: SimBattle; preUpkeep: string[]; logged: string[] }
 
-  /**
-   * The battle at the start of turn 7 as the app rebuilds it, with the teams the log gives; `dragonite` replaces the moves of the p1
-   * Dragonite.
-   */
   async function sceneOf(dragonite?: string[]): Promise<Scene> {
     await loadSimMods(getBranchSimulatorFormat(replay));
     const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
@@ -175,8 +161,7 @@ describe('stand-in-order', () => {
       for (const chance of [false, true]) expect(actionPriority(scene.battle, dragonite, id, chance)).toBeLessThanOrEqual(0);
     });
 
-    // The simulator's damage roll is not the log's, so Dragonite may survive Dazzling Gleam in the emitted block (it then moves, behind
-    // Floette); what the stand-in decides is the order of the move lines: nothing opens the turn but Floette, and the log's moves that the simulator also shows keep the log's order (a high roll can knock Empoleon out as well).
+    // The simulator's roll is not the log's: Dragonite may survive Dazzling Gleam, and a high roll can KO Empoleon.
     test.each([false, true])('the turn the simulator emits (dice answer %s) opens with Floette and keeps the log\'s order of moves', chance => {
       const copy = copyOf(scene.battle);
       copy.prng = new FixedDice({ chance });

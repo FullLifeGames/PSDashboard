@@ -39,17 +39,9 @@ import { matchPlayedSide } from '../src/turn-analysis/played-match';
 import { analyzeTurn } from '../src/analysis';
 import type { PlayedTurn } from '../src/played';
 
-/**
- * The answer round reads the rows within the prover's near tie of the top, not the top row alone, and prices an added answer by one
- * deepened ply, not one natural draw. 2629703929 t4: six p1 rows lie within 0.012 of each other, so which row stands first (a tree's
- * noise) must not decide which answers the round finds. 912045 t6: the switching row read 0.18 to 0.21 priced by one draw and 0.03 to
- * 0.07 one ply deeper. A round that changes the best row sends the new row's unverified cells through one more verify round.
- */
-
 const NAMES = ['R0', 'R1', 'R2', 'R3'];
 const evs = [1, 0.995, 0.99, 0.5];
 
-/** Four p1 rows (three within the near tie of the top, one far below), two listed p2 answers and two unlisted ones. */
 function scene(order: number[]): { tree: MctsTreeStats; result: EvalResult; view: AnswerSide } {
   const p1 = NAMES.map(name => ({ choice: `move ${name.toLowerCase()} 1, move ${name.toLowerCase()} 2`, label: `${name} A + ${name} B` }));
   const p2 = [{ choice: 'move x 1, move y 1', label: 'X + Y' }, { choice: 'move x 2, move y 2', label: 'X2 + Y2' }];
@@ -68,7 +60,6 @@ function scene(order: number[]): { tree: MctsTreeStats; result: EvalResult; view
   return { tree, result, view };
 }
 
-/** The one-ply price of row r against answer a: Protect (2) refutes R1, Z + Y (3) refutes R2, the listed answers refute nothing. */
 const priced = (row: number, answer: number): number => (answer === 2 && row === 1 ? 0.4 : answer === 3 && row === 2 ? 0.7 : 0.98);
 
 const permutations = <T>(items: T[]): T[][] => (items.length <= 1
@@ -100,7 +91,6 @@ describe('the answer round reads every near-equal row, whatever their order', ()
       const first = detectionJobs(view, result);
       expect(sorted(first)).toEqual(['0:0', '0:1', '0:2', '0:3']);
       const more = siblingJobs(view, result, detectedOf(first));
-      // Two unlisted answers, fewer than the probes: every near row meets every answer.
       expect(sorted([...first, ...more])).toEqual(expected);
       expect([...first, ...more].every(job => job.plain && job.deepen === undefined)).toBe(true);
     }
@@ -112,7 +102,6 @@ describe('the answer round reads every near-equal row, whatever their order', ()
     const wide = answerSides({ ...tree, p2Legal: [...tree.p2Options, ...unlisted] }, result)!.find(side => side.side === 'p1')!;
     const first = detectionJobs(wide, result);
     expect(first).toHaveLength(2 + unlisted.length);
-    // Unlisted answer k reads 0.9 - k / 100 against the best row: the lowest are the last ones.
     const values = detectedOf(first).map(value => (value.j >= 2 ? { ...value, value: 0.9 - (value.j - 2) / 100 } : value));
     const probed = new Set(siblingJobs(wide, result, values).filter(job => job.i === 1).map(job => job.j));
     const lowest = unlisted.map((_, k) => k + 2).slice(-ANSWER_SIBLING_PROBES);
@@ -139,8 +128,6 @@ describe('the answer round reads every near-equal row, whatever their order', ()
       expect(jobs.map(job => [job.p1Choice, job.p2Choice, job.settings])).toEqual([
         [view.rows[1].choice, 'move protect, move protect', deepen], [view.rows[2].choice, 'move z 1, move y 1', deepen],
       ]);
-      // R1 reads 0.995 in the matrix against both listed answers: Protect holds it to 0.3 one ply deeper (kept), the
-      // search of R2 against Z + Y reads 0.97, which is not 0.05 below its 0.99 (dropped).
       const deep = (score: number) => ({ score, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } }) as EvalResult;
       expect(confirmedAnswers(view, result, refuting, [deep(0.3), deep(0.97)])).toEqual([2]);
     }
@@ -259,19 +246,13 @@ describe('a round that changes the best row sends the new row through one more v
     depth: 1, samples: 1, mode: 'mcts', tera: position.tera, sleepClause: position.sleepClause, ruleset: position.ruleset, keepPlayed: position.keepPlayed,
   };
 
-  /**
-   * The local executor with the answer round's prices scripted: p1's best row meets every unlisted answer at -0.9 in
-   * detection and the depth check, so an answer is added; in the extension the row `target` keeps 0.99 against it and
-   * every other row reads -0.9, so `target` takes the lead. p2 finds no refutation. Every call is recorded; a verify job
-   * on a listed cell is priced 0.3.
-   */
   async function run(trees: MctsTreeStats[], merged: EvalResult, target: number, verified = new Map<number, EvalCellValue>()) {
     const listed1 = merged.matrix!.p1Choices!.length;
     const listed2 = merged.matrix!.p2Choices!.length;
     const bestRow = merged.matrix!.p1Choices!.indexOf(merged.perSide.p1[0].choice);
     const base = createLocalTreeExecutor(position.serialized, position.ruleset);
     const log: Scripted = { calls: [], afterCheck: [], subSearches: 0 };
-    let extension = false; // set once the depth check has run: from then on the plain and deep jobs are the extension's
+    let extension = false;
     const executor = {
       ...base,
       evalCells: async (jobs: EvalCellJob[]): Promise<EvalCellValue[]> => {
@@ -299,7 +280,6 @@ describe('a round that changes the best row sends the new row through one more v
     expect(answerSides(trees[0], merged)).not.toBeNull();
     const choices = merged.matrix!.p1Choices!;
     const bestRow = choices.indexOf(merged.perSide.p1[0].choice);
-    // A row that is not the best one and has starved cells once it leads: the ranking after the flip selects them.
     const leading = (row: number): EvalResult['perSide'] => {
       const lead = merged.perSide.p1.find(entry => entry.choice === choices[row])!;
       return { ...merged.perSide, p1: [lead, ...merged.perSide.p1.filter(entry => entry !== lead)] };
@@ -340,8 +320,6 @@ describe('a round that changes the best row sends the new row through one more v
     const round = await run(trees, merged, bestRow);
     expect(round.log.subSearches).toBeGreaterThan(0);
     expect(rechecks(round.log).length).toBeLessThanOrEqual(1);
-    // The detection refuted the best row only, so its cells against the added answers come from the depth check.
-    // (The runner-up here lies outside the near tie, so no other row is deep and the extension is plain draws.)
     const listed1 = merged.matrix!.p1Choices!.length;
     const extension = round.log.afterCheck.flat().filter(job => job.j >= round.listed2 && job.i < listed1);
     expect(extension.length).toBeGreaterThan(0);
@@ -376,10 +354,7 @@ describe('doubles-answers', () => {
     test('2630685175 t7: p1’s best row meets a Protect answer, and p1 is graded against it', { timeout: 120_000 }, async () => {
       const position = fixture('gen9vgc2026regi-2630685175-t7-played');
       const result = await search(position);
-      // Four rows lie within 0.003 of each other in value, so which of them comes first follows the verify price of a small outcome
-      // and the answers the near rows add; the pin reads the Earth Power row into Zamazenta-Crowned, which the trees rated best at 1.00.
-      // A Protect earns the damage it denies in the doubles hints, so p2's tree lists Protect + Protect itself.
-      // Reference: over every legal answer the line holds about 0.75 (column-cut probe), so the bound is 0.8; against the listed answers alone p1's played U-turn + Tera Starstorm took a mistake of regret 1.233.
+      // Over every legal answer the line holds about 0.75 (column-cut probe), so the bound is 0.8.
       const best = result.perSide.p1.find(row => row.label.startsWith('Wood Hammer→Calyrex-Shadow + Earth Power→Zamazenta-Crowned'))!;
       expect(best.worstCase).toBeLessThanOrEqual(0.8);
       expect(best.punishedBy).toMatch(/Protect/);
@@ -389,9 +364,7 @@ describe('doubles-answers', () => {
     });
 
     test('2630685175 t8: a double Protect that only stalls answers nothing, and the played Taunt stays the mistake (user truth pin)', { timeout: 180_000 }, async () => {
-      // At one ply p1's Protect + Protect read -0.16 for p2, the board's static after a stalled turn, where the trees read +0.84;
-      // one ply deeper it reads +0.87, like the listed answers. An answer counts only when it still refutes the best row one ply deeper.
-      // The best row reads 0.7529 (above 0.8 under the earlier static and without the Protect tempo) and the Taunt stays the mistake at regret 1.3531.
+      // At one ply p1's Protect + Protect reads -0.16 for p2 (stalled-turn static), one ply deeper +0.87.
       const position = fixture('gen9vgc2026regi-2630685175-t8');
       const result = await search(position);
       const best = result.perSide.p2[0];
@@ -463,8 +436,6 @@ describe('doubles-answers', () => {
       expect(jobs.map(job => [job.p1Choice, job.p2Choice, job.settings])).toEqual([
         ['move a 1, move b 1', 'move protect, move protect', deepen], ['move a 1, move b 1', 'move z 1, move y 1', deepen],
       ]);
-      // The best row reads 1.00 against the listed answers: one ply deeper Protect + Protect holds it to 0.3 (kept),
-      // Z + Y only to 1 - ANSWER_MARGIN / 2 (dropped: the one-ply refutation does not survive the deeper search).
       const deep = (score: number) => ({ score, interval: 0, depthCompleted: 1, perSide: { p1: [], p2: [] } }) as EvalResult;
       expect(confirmedAnswers(view, result, refuting, [deep(0.3), deep(1 - ANSWER_MARGIN / 2)])).toEqual([2]);
     });
@@ -473,7 +444,6 @@ describe('doubles-answers', () => {
       const { view, result, tree } = scene();
       const jobs = extensionJobs(view, [2], [], { depth: 1, samples: 1, tera: false });
       expect(jobs.map(job => [job.i, job.j])).toEqual([[0, 2], [1, 2]]);
-      // Both rows read 1.00 against the listed answers; the added Protect answer holds A + B to 0.1 and C + D to 0.5.
       const ranked = gradedRanking(view, result, tree, [2], [{ i: 0, j: 2, value: 0.1, ended: false }, { i: 1, j: 2, value: 0.5, ended: false }]);
       const byLabel = new Map(ranked.map(row => [row.label, row]));
       expect(byLabel.get('A + B')!.worstCase).toBeCloseTo(0.1, 12);

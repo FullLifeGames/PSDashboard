@@ -3,11 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { calcGenerationFor, calcModOf, simGenNum } from '@fulllifegames/replay-core';
 
-/**
- * One function decides the calculator's generation from the game generation and the battle's mod (replay-core calc-gen.ts), and
- * every caller takes it. The calculator's generation number is not the simulator's: the Champions mod is the calculator's
- * generation 0, which plays on Gen 9's rules, so a reader that wants the simulator's generation asks simGenNum.
- */
+// Champions is the calculator's generation 0 but plays Gen 9's rules: ask simGenNum for the simulator's generation.
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 function sources(dir: string): string[] {
@@ -58,7 +54,7 @@ describe('the calculator generation of a battle', () => {
   });
 
   test('no source file reads the calculator generation\'s number as the simulator\'s generation', () => {
-    // calc/body.ts keys its memos by the calculator generation itself (calcAddsStages, calcSpecies) and tells generation 0 apart.
+    // calc/body.ts keys memos by the calculator generation (calcAddsStages, calcSpecies) and tells generation 0 apart.
     const allowedInBody = /calcAddsStages\(gen\.num|calcSpecies\(gen\.num|\(gen\.num as number\)/;
     const reads = sourceFiles().filter(path => !path.endsWith('replay-core/src/calc-gen.ts')).flatMap(path => readFileSync(path, 'utf-8').split(/\r?\n/)
       .filter(line => /\b(?:gen|calcGen|ctx\.gen)\.num\b/.test(line) && !(path.endsWith('eval-engine/src/calc/body.ts') && allowedInBody.test(line)))

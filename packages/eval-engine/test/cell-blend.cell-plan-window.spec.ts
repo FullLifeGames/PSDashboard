@@ -8,12 +8,6 @@ import { classChildren } from '../src/search/outcome-children';
 import { SEARCH_SEEDS } from './seed-streams';
 import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
-/**
- * A cell's kill window ends with the move phase. A defender that survives the hit and faints at the turn's residual (poison, Leech
- * Seed, Future Sight) is `hit-nokill`: the kill fraction the plan prices is the move's own. The logs are the simulator's, played in
- * singles and in doubles.
- */
-
 const set = (species: string, moves: string[], item = '', level = 50): PokemonSet => ({
   name: species, species, item, ability: 'No Ability', moves, nature: 'Hardy',
   evs: { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 },
@@ -50,12 +44,11 @@ const singles = (setup: Setup, p1Choice = 'move tackle', p2Choice = 'move growl'
 describe('classifyChild kill window', () => {
   test('a defender that survives the move and faints at the poison tick is hit-nokill', () => {
     const log = singles(battle => { const mon = battle.sides[1].active[0]!; mon.setStatus('psn'); mon.hp = 30; });
-    expect(log.some(line => line.startsWith('|faint|p2a: Snorlax'))).toBe(true); // the simulator does faint it, at the residual
+    expect(log.some(line => line.startsWith('|faint|p2a: Snorlax'))).toBe(true);
     expect(classifyChild(log, [event('p1', 'p2a: Snorlax')])).toBe('hit-nokill');
   });
 
   test('the second mover window ends with the move phase too', () => {
-    // Pikachu moves first; Snorlax's Growl is the second move and Pikachu, poisoned at 1 HP, faints at the tick.
     const log = singles(battle => { const mon = battle.sides[0].active[0]!; mon.setStatus('psn'); mon.hp = 1; });
     expect(log.some(line => line.startsWith('|faint|p1a: Pikachu'))).toBe(true);
     expect(classifyChild(log, [event('p1', 'p2a: Snorlax'), event('p2', 'p1a: Pikachu')])).toBe('hit-nokill|hit-nokill');
@@ -151,8 +144,8 @@ describe('cell-plan-immune', () => {
         const plan = planCellEvents(positionBattle(root), p1, P2);
         expect(plan.kind).toBe(reachable ? 'events' : 'none');
         const sample = sampleCell(root, 0, p1, P2, 3, createMatchupCache(), true);
-        // A cell's own seeds can all hit a 90 percent move (0.9^14 = 23 percent, the Water control reads 14 hits): the miss class
-        // is then unreached and booked as a diagnostic.
+        // A cell's own seeds can all hit a 90 percent move (0.9^14 = 23 percent; the Water control reads 14 hits):
+        // the miss class is then unreached and booked as a diagnostic.
         if (reachable) expect(sample.diagnostic?.missing ?? ['miss']).toEqual(['miss']);
         else expect(sample.diagnostic).toBeUndefined();
         expect(sample.blend !== undefined).toBe(reachable);
@@ -175,7 +168,6 @@ describe('cell-plan-immune', () => {
 describe('KoOddsInfo.attacker', () => {
   test('doubles: the slot of the attacking move and its species, the second slot included', () => {
     const battle = positionBattle(anchorRoot());
-    // PLAYED[0] is "move lifedew, move playrough 2": the second slot's Play Rough makes the odds.
     const slot = battle.sides[0].active.findIndex(mon => mon?.moves.includes('playrough'));
     expect(slot).toBe(1);
     const [odds] = koOddsForOptions(battle, 'p1', [PLAYED[0]]);

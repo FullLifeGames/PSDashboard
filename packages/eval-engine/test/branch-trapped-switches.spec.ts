@@ -4,15 +4,7 @@ import { createBranchStateFromBattle } from '../src/branch/state';
 import type { SimBattle } from '../src/branch/types';
 import { FORMATS, moveCommand, setOf, sideId, startBattle } from './branch-rule-battles';
 
-/**
- * Scene: Magnezone (Magnet Pull) against Melmetal, the picker offered five switch chips, and Execute failed with "Can't switch: The
- * active Pokémon is trapped". The simulator refuses a switch while `pokemon.trapped` is set in a move request (side.js chooseSwitch),
- * whatever put it there: a trapping ability (Shadow Tag, Arena Trap, Magnet Pull), a trapping move (Mean Look, Block, Spider Web, the
- * binding moves, Octolock, Ingrain, No Retreat, Jaw Lock, Anchor Shot and the rest the Dex knows), a locked move; a Ghost type or Shed
- * Shell frees it. The sweep plays every move of the Dex once from a No Guard source against the victim, and every ability the Dex gives a
- * trap handler, and compares the simulator's own `choose` with the picker: the chip is disabled exactly when the simulator refuses. The
- * victim stands on either side, in singles and in doubles.
- */
+// The simulator refuses a switch while `pokemon.trapped` is set in a move request (side.js chooseSwitch).
 
 interface Victim { species: string; item?: string }
 const PLAIN: Victim = { species: 'Pikachu' };
@@ -43,7 +35,6 @@ function play(format: typeof FORMATS[number], victimSide: number, setup: Setup):
   const victimTurn = doubles ? 'move Splash, move Splash' : 'move Splash';
   const sourceTurn = setup.move ? moveCommand(battle, setup.move, doubles) : (doubles ? 'move Splash, move Splash' : 'move Splash');
   if (!battle.choose(sideId(victimSide), victimTurn) || !battle.choose(sideId(1 - victimSide), sourceTurn)) return null;
-  // Only a plain next turn is compared: a move that left a replacement open or ended the game has no switch to ask about.
   const side = battle.sides[victimSide];
   if (battle.ended || side.requestState !== 'move' || side.active[0].fainted) return null;
   return battle;
@@ -68,7 +59,6 @@ describe('A-3 the switch chips follow the simulator on trapping', () => {
           expect(picker, move.name).toBe(refused);
           if (refused) trappedBy.push(move.id);
         }
-        // The sweep reached the trapping moves: the binding family, Mean Look and its kin all show up.
         expect(compared).toBeGreaterThan(500);
         expect(trappedBy.length).toBeGreaterThanOrEqual(8);
       });

@@ -3,7 +3,6 @@ import { Dex } from '@pkmn/sim';
 import { isChampionsFormat } from '@fulllifegames/replay-core';
 import { isChampionsSimFormat } from '../src/forward/sim-mods';
 
-/** The engine's "is this a Champions format" is replay-core's one rule: compared over every base-Dex format and the spellings hosts hand over. */
 describe('isChampionsSimFormat is replay-core isChampionsFormat', () => {
   const spellings = [
     'gen9championsou', 'gen9championsdoublescustomgame', 'gen9championsvgc2026regmbbo3', 'smogtours-gen9championsou-12',

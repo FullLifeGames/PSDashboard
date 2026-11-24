@@ -9,13 +9,6 @@ import { benchOrder, choiceToCanonical, choiceToGiven } from '../src/search/benc
 import type { StaticRuleset } from '../src/eval-function';
 import type { EvalResult, EvalSettings } from '../src/types';
 
-/**
- * A verdict must not depend on the order in which the rebuild keeps the bench in the simulator's team list. 649664 t14: two boards
- * with the same game state in two bench orders read the switch to Ferrothorn as the best move and as a blunder. The static sums in
- * team order and a tie among replacement hints falls to the team order, so the trees part at their first near tie: the search runs
- * every board with its bench in one fixed order and names the choices back in the board's own slots.
- */
-
 interface Position {
   serialized: string;
   tera?: boolean;
@@ -42,10 +35,6 @@ function reverseBench(serialized: string): string {
   return JSON.stringify(State.serializeBattle(battle));
 }
 
-/**
- * Each tree's result per board, kept for the whole file: the search is the cost and the rows ask for the same boards. The key holds the
- * board and the settings.
- */
 const treeResults = new Map<string, Promise<EvalResult>>();
 const tree = (serialized: string, position: Position): Promise<EvalResult> => {
   const settings = settingsOf(position, 'mcts');
@@ -60,7 +49,6 @@ const tree = (serialized: string, position: Position): Promise<EvalResult> => {
 const matrix = (serialized: string, position: Position): Promise<EvalResult> =>
   Promise.resolve(searchPosition(serialized, settingsOf(position, 'matrix')));
 
-/** A ranking in identity space: labels in rank order with their values (the choice ids name slots, and slots differ). */
 const ranking = (result: EvalResult) => ({
   score: result.score,
   gameValue: result.gameValue,
@@ -131,7 +119,6 @@ describe('one board in two bench orders', () => {
   test('2629703929 t6 (VGC tree): the board and its reversed bench read the same ranking', { timeout: 300_000 }, async () => {
     const position = fixture('gen9vgc2026regi-2629703929-t6');
     expect(ranking(await tree(reverseBench(position.serialized), position))).toEqual(ranking(await tree(position.serialized, position)));
-    // Two VGC trees take 122 to 144 s with the speed layer forced off on devbox, 70 s with it on.
   });
 
   test('every switch a ranking names brings in the species of its label on the board it was asked about', { timeout: 120_000 }, async () => {

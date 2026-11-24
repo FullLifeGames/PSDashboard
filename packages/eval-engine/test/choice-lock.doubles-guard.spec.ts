@@ -5,26 +5,18 @@ import { corroborateChoiceItem } from '../src/choice-lock';
 import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 
-/**
- * The Choice item check prices every observation with an empty singles field. A hit through Reflect shows it: a real Choice Band
- * Garchomp hits a Reflect-screened Slowking in doubles for 1.5 x 2732/4096 = about the bare damage, so the check would read "the Band
- * does not explain it" and contradict the Band the holder has. Until the check reads the doubles field, a doubles observation does
- * not reach the Choice verdict (no observation, ambiguous); singles reads normally. The oracle is the simulator: both logs come from
- * real battles.
- */
 const garchomp = (item: string): PokemonSet => set('Garchomp', ['dragonclaw', 'splash'], { item, ability: 'Rough Skin' });
 const slowking = (): PokemonSet => set('Slowking', ['reflect', 'splash'], { ability: 'Regenerator' });
 const bystander = (): PokemonSet => set('Corviknight', ['splash'], { ability: 'Pressure' });
 
 const publicLog = (lines: string[]) => lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
 
-/** Garchomp (p1) hits Slowking (p2) with Dragon Claw, in doubles after Slowking set up Reflect: a clean log of a hit with no critical, else the next seed. */
 function sceneLog(doubles: boolean, held: string): string {
   for (let seed = 1; seed <= 60; seed++) {
     const battle = battleOf(doubles ? 'gen9doublescustomgame' : 'gen9customgame',
       doubles ? [garchomp(held), bystander()] : [garchomp(held)], doubles ? [slowking(), bystander()] : [slowking()], `1,2,3,${seed}`);
     if (doubles) {
-      battle.makeChoices('move dragonclaw 2, move splash', 'move reflect, move splash'); // a Choice item locks Garchomp into Dragon Claw from turn 1
+      battle.makeChoices('move dragonclaw 2, move splash', 'move reflect, move splash');
       battle.makeChoices('move dragonclaw 1, move splash', 'move splash, move splash');
     } else {
       battle.makeChoices('move dragonclaw', 'move splash');
@@ -62,7 +54,6 @@ describe('choice-lock-defender-ability', () => {
   const garchomp = (): PokemonSet => set('Garchomp', ['dragonclaw', 'splash'], { item: 'Choice Band', ability: 'Rough Skin' });
   const dragonite = (ability: string): PokemonSet => set('Dragonite', ['splash'], { ability, item: '' });
 
-  /** The fraction of its HP Dragonite loses to Dragon Claw in one real turn, a hit with no critical. */
   function dragonClawFraction(format: string): number {
     const doubles = format.includes('doubles');
     const battle = battleOf(format, doubles ? [garchomp(), set('Corviknight', ['splash'])] : [garchomp()],
