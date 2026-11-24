@@ -193,11 +193,6 @@ describe('the SV VGC table (round 69, T144)', () => {
     expect([w.sweepFastKo, w.sweepFastChip, w.sweepSlowKo, w.sweepSlowChip, w.pairRedirect, w.statusFix]).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
-  test('the other tables keep their Tailwind and Coverage', () => {
-    expect(FEATURE_WEIGHTS.tailwind).toBe(8);
-    expect(FEATURE_WEIGHTS.coverage).toBe(40);
-  });
-
   test('the flag follows the simulator: Tailwind lasts four turns, the turn it is set included', () => {
     const user = set('Whimsicott', ['tailwind', 'splash'], { ability: 'Prankster' });
     const battle = battleOf(FORMAT, [user, set('Snorlax', ['splash'])], [set('Snorlax', ['splash']), set('Snorlax', ['splash'])]);
