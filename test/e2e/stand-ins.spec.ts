@@ -53,15 +53,6 @@ async function loadReplay(page: Page, replay: ReplayData) {
   await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });
 }
 
-test('singles: P1 shows 3 of 6 and the panel lists three stand-ins with the marker', async ({ page }) => {
-  const replay = regression('smogtours-gen4ou-544639') as ReplayData;
-  await loadReplay(page, replay);
-  const panel = page.locator('.ps-stats-panel');
-  await expect(panel.getByText(MARK)).toHaveCount(3, { timeout: 30_000 });
-  await expect(panel.getByRole('img', { name: 'Azelf' })).toHaveCount(1);
-  await expect(panel.getByText(/never showed/)).toHaveCount(0);
-});
-
 test('doubles: both sides show two of six and the panel lists four stand-ins on each', async ({ page }) => {
   await loadReplay(page, doublesReplay());
   const panel = page.locator('.ps-stats-panel');
@@ -95,8 +86,12 @@ async function expectBenchBadges(page: Page) {
   for (const name of plain) expect(standIns, `${name} wears no badge`).not.toContain(name);
 }
 
-test('singles: the What-if bench badges the stand-ins and no shown body', async ({ page }) => {
+test('singles: P1 shows 3 of 6, the panel marks three stand-ins, and the What-if bench badges the stand-ins and no shown body', async ({ page }) => {
   await loadReplay(page, regression('smogtours-gen4ou-544639') as ReplayData);
+  const panel = page.locator('.ps-stats-panel');
+  await expect(panel.getByText(MARK)).toHaveCount(3, { timeout: 30_000 });
+  await expect(panel.getByRole('img', { name: 'Azelf' })).toHaveCount(1);
+  await expect(panel.getByText(/never showed/)).toHaveCount(0);
   await expectBenchBadges(page);
 });
 

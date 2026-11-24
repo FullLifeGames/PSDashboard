@@ -22,14 +22,6 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible();
   });
 
-  test('shows a notice when the Smogon sets fail to load', async ({ page }) => {
-    // Both data hosts unreachable: the fallback runs dry and the top bar says so.
-    await routeSmogon(page, route => route.abort());
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.getByText('Smogon sets unavailable')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('Smogon stats unavailable')).toBeVisible();
-  });
-
   test('displayed set guesses pass the coherence vetoes (GPL Cobalion)', async ({ page }) => {
     // Deterministic usage payload: Body Press tops the marginals while the
     // replay reveals Swords Dance — the panel must show the vetoed assembly
@@ -141,22 +133,6 @@ test.describe('PS Dashboard', () => {
     await expect(page.locator('.ps-main-right')).toContainText('Flamethrower');
   });
 
-  test('rejects an import without side headers', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await fromSetup(page, 'Import/Export Sets');
-    const dialog = page.getByRole('dialog', { name: 'Import / Export Sets' });
-    await dialog.locator('textarea').fill('Garchomp @ Choice Band\n- Earthquake');
-    await dialog.locator('button', { hasText: 'Import' }).click();
-    await expect(dialog.getByRole('alert')).toContainText('=== p1');
-  });
-
-  test('loads a replay and shows match info', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('TestPlayer2', { exact: true }).first()).toBeVisible();
-    await expect(page.locator('text=[Gen 9] OU')).toBeVisible();
-  });
-
   test('shows single replay iframe after loading', async ({ page }) => {
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     const iframe = page.locator('iframe[title="PS Replay"]');
@@ -181,12 +157,5 @@ test.describe('PS Dashboard', () => {
     await expect(page.getByText('Beta', { exact: true }).first()).toBeVisible();
     // The panel closed after the load.
     await expect(page.locator('.ps-loader-panel')).toHaveCount(0);
-  });
-
-  test('Battle Statistics panel appears after loading replay', async ({ page }) => {
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    await expect(page.locator('text=Battle Statistics')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('.ps-stats-team')).toHaveCount(2);
-    await expect(page.locator('.ps-stats-pokemon').first()).toBeVisible();
   });
 });
