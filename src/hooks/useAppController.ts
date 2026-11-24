@@ -43,7 +43,6 @@ function seededRefreshRequest(args: {
   };
 }
 
-/** "What if it had ...": a team edit plus the normal branch refresh. */
 function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   const { effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info } = ctx.knowledge;
   const { setPendingBranchRefresh } = ctx.refreshQueue;
@@ -56,8 +55,7 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   ) => {
     const sideInfo = side === 'p1' ? effectiveP1Info : effectiveP2Info;
     if (!sideInfo) return;
-    // The hypothetical seeds a pending choice where the sim will stand after the refresh: the live tip, or the viewed turn when
-    // there is no variation. Mid-variation views stay inert: the seeded slot would belong to the tip.
+    // Mid-variation views stay inert: the seeded slot would belong to the tip.
     if (variationSpan !== null && !liveTip) return;
 
     const pokemon = sideInfo.pokemon.map(entry => {
@@ -81,7 +79,6 @@ function useHypotheticalMove(ctx: ReplayContext, board: BoardController) {
   }, [effectiveP1Info, effectiveP2Info, setEditedP1Info, setEditedP2Info, simState, history, liveTip, variationSpan, setPendingBranchRefresh]);
 }
 
-/** The early-lines stage after the game report; its progress goes to the Game review's header. */
 function useEarlyLinesStage(ctx: ReplayContext, engine: EngineController, analyses: ReturnType<typeof useGameAnalysis>['gameAnalyses']) {
   const { evaluation } = ctx;
   const { replayData, snapshots } = ctx.replay;
@@ -125,7 +122,7 @@ function useAnalysisSurface(ctx: ReplayContext, board: BoardController, engine: 
   const latestBranchHistoryEntry = history.length > 0 ? history[history.length - 1] : null;
 
   const showBranch = branching && simLog.length > 0;
-  // Keyed on session and branch start, not the viewed turn: a viewTurn key would remount the sim iframe on every navigation and executed turn.
+  // Keyed on session and branch start, not the viewed turn: a viewTurn key remounts the sim iframe on every navigation.
   const branchReloadKey = `${branchSession}:${variationStartTurn ?? 0}`;
 
   return { turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport, gameAnalyses, earlyLines, lineComing, simLog, latestBranchHistoryEntry, showBranch, branchReloadKey };
@@ -138,16 +135,13 @@ export function useAppController() {
   const board = useTimelineController(ctx, transients);
   const engine = useEngineController(ctx, transients, board);
   const handleHypotheticalMove = useHypotheticalMove(ctx, board);
-  // The dock's Execute also sends a forced replacement the engine filled.
   const { executePending } = ctx.branch;
   const handleExecuteTurn = useCallback(async () => {
     await executePending();
   }, [executePending]);
   const analysis = useAnalysisSurface(ctx, board, engine);
   const support = useSupport({ ctx, transients, board });
-  // A game's share link opens the game, its branch and the sharer's turn.
   const sharedGame = useOpenSharedGame({ ctx, board });
-  // A reload while the tip turn waits for its replacement plays that turn again.
   useRestorePendingTurn({ ctx, board }, sharedGame.opening || ctx.shared.sharedGame !== null);
   return { ctx, transients, board, engine, handleHypotheticalMove, handleExecuteTurn, analysis, support, sharedGame };
 }

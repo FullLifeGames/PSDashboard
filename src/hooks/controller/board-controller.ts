@@ -9,11 +9,6 @@ import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 import { prefsAfterRun } from '../../lib/play-out';
 
-/**
- * Guessed sets can make the branch replay DIVERGE from the real game; in the worst case the simulated game ends before the requested
- * turn (three rejected choices, sim winner declared early). Playing recommendations into that dead sim produced baffling errors
- * ("more choices than unfainted Pokémon"), so the divergence is surfaced and play-outs are refused.
- */
 function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline: Timeline) {
   const { replayData, snapshots, observations } = ctx.replay;
   const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn, stopBranch } = ctx.branch;
@@ -75,8 +70,7 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   const liveEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
-  // The same reading against the live tip's position, for the play-out and the Auto evaluation of a run: the pointer may stand elsewhere
-  // (the frame reported another turn) while the run plays on at the tip.
+  // Against the live tip, not the pointer: a run plays on at the tip while the pointer may stand elsewhere.
   const tipEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && evaluation.resultTag !== null && evaluation.resultTag !== (timeline.tip?.key ?? null) ? 'stale' : evaluation.status;
 
@@ -105,8 +99,6 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores, setBranchDivergence, evaluation, playOut,
     branchWindowOpenRef, setPendingConfirm, setPlayOut, setPlayOutNotice, setDraftChoices]);
 
-  // A freshly loaded replay starts clean (slider at turn 1, no live branch, no team edits); host pages inject replays repeatedly via
-  // ps-load-replay, so the previous game's state must never leak into the next one.
   const { takeLanding } = ctx.newGame;
   const landOnTurn = timeline.landOnTurn;
   useEffect(() => {
@@ -114,11 +106,8 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-    // A game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
     const tip = takeLanding(replayData?.id);
-    // The landing is the game's own id's: the run before its document arrives (a reload mounts the board first) takes none.
-    // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
-    // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads.
+    // A selection, not a restore: a reloaded frame reports turn 1 until it loads; the landing guard drops that report.
     if (tip !== null) landOnTurn(tip);
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
   useRequestedTurnOf(ctx, maxTurn, landOnTurn);

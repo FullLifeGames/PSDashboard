@@ -2,10 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { BranchRefs, BranchHistoryEntry } from './shared';
 
-/**
- * State with a ref that holds its latest value: a caller that acts right after an async write reads the ref where the render's copy is
- * stale. Every write goes through the setter, a function update included.
- */
+/** State plus a ref with its latest value; every write goes through the setter, a function update included. */
 export function useTrackedState<T>(initial: T): [T, Dispatch<SetStateAction<T>>, RefObject<T>] {
   const [value, setValue] = useState<T>(initial);
   const ref = useRef<T>(initial);
@@ -24,10 +21,7 @@ interface TrackedHandles {
   setStartSerialized: Dispatch<SetStateAction<string | null>>;
 }
 
-/**
- * What a new game reads and does at the branch. `rebaseAtTip`: the live runtime stays and becomes the start of a new branch at `startTurn`
- * with no entry of its own (the turns it played joined the game's main line), the state `requestDeviation(null)` leaves at a turn.
- */
+/** The branch access of a new game; `rebaseAtTip` turns the live runtime into a branch start at `startTurn`. */
 export function useNewGameAccess(refs: BranchRefs, handles: TrackedHandles) {
   const { logRef, startLogLengthRef, battleStreamRef } = refs;
   const { historyRef, startTurnRef, setHistory, setVariationStartTurn, setStartSerialized } = handles;

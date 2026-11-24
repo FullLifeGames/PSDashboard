@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-/** WAI-ARIA dialog behaviour: focus moves in on open and back to the trigger on close, Escape closes, Tab stays inside. */
+/** WAI-ARIA dialog behaviour: focus in on open and back to the trigger on close, Escape closes, Tab stays inside. */
 export function useDialogFocus(onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
 

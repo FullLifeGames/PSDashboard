@@ -7,11 +7,6 @@ import type { PositionSource } from './usePositionSource';
 type GetBattle = ReturnType<typeof useBranch>['getBattle'];
 type Report = (turn: number, target: number) => void;
 
-/**
- * Quietly reconstructs a main-line turn's exact position in the background when the pointer dwells on it (the same healed path
- * Evaluate acquires through), so the pickers upgrade in place. Scrubbing stays free: the timer fires once the user settles, never
- * while the sim, an evaluation or a play-out is busy (`dwellEnabled`).
- */
 function useDwellReconstruction(args: {
   replayData: ReplayData | null;
   dwellEnabled: boolean;
@@ -27,8 +22,7 @@ function useDwellReconstruction(args: {
     if (!replayData || !dwellEnabled || smogonPending) return;
     const key = exactKeyFor(viewTurn);
     if (!key || hasStored(key) || hasFailed(key)) return;
-    // One acquisition at a time: a turn the pointer settled on while another runs waits (the effect runs again when
-    // `exactAcquiringTurn` changes) instead of being dropped.
+    // A turn settled on while another acquires waits, not dropped: the effect reruns when `exactAcquiringTurn` changes.
     if (exactAcquiringTurn !== null) return;
     const turn = viewTurn;
     const timer = window.setTimeout(() => {
@@ -37,8 +31,7 @@ function useDwellReconstruction(args: {
       setExactAcquiringTurn(turn);
       void acquireExact(turn, () => {})
         .catch(() => {
-          // The approximation stays usable (the sim validates on execute). Remember the failure so a diverging replay does not
-          // re-run the reconstruction on every render tick.
+          // The approximation stays usable; remember the failure so a diverging replay does not re-run every render.
           markFailed(key);
         })
         .finally(() => {
@@ -51,14 +44,12 @@ function useDwellReconstruction(args: {
   return exactAcquiringTurn;
 }
 
-/** The acquisition surface the evaluation and picker layers read, all over the one position source: the live branch battle, the
- *  healed main-line position behind Evaluate, the sweep's streamed pass and the dwell upgrade. */
+/** The acquisition surface the evaluation and picker layers read, all over the one position source. */
 export function useEvalAcquire(inputs: {
   replayData: ReplayData | null;
   source: PositionSource;
   getBattle: GetBattle;
   viewTurn: number;
-  /** View-side gate for the dwell rebuild (main line, nothing busy). */
   dwellEnabled: boolean;
   smogonPending: boolean;
 }) {

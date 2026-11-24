@@ -39,7 +39,6 @@ function useReplaySurface() {
     openGame, extendGame, byLink,
   } = useReplay();
   const { embed, requestedReplay, requestedTurn, requestedGame } = useEmbedHost({ loadReplay, loadReplayFile });
-  // Canonical link of whatever is loaded, mirrored into the loader input whichever path loaded it.
   const loadedReplayUrl = replayData
     ? `https://replay.pokemonshowdown.com/${replayData.id}${replayData.viewpoint === 'p2' ? '?p2' : ''}`
     : null;
@@ -87,14 +86,8 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
     () => (replayData ? getReplayBringCount(replayData) : null),
     [replayData],
   );
-  /**
-   * The worlds of a game where a side brought more bodies than it fielded, the heaviest first (the guesses come from the side's team
-   * preview, weighted by the format's usage counts). Null for every other game: a bring-all format and a game whose sides both fielded their
-   * whole selection (one pinned world) read through `replayBringOnly`. The weights follow the statistics when they arrive, so the memo
-   * reads them.
-   */
+  /** The worlds of a game where a side brought more bodies than it fielded, heaviest first; null for any other game. */
   const bringWorldsOfGame = useMemo(() => {
-    // A new game's log holds the bodies fielded so far only; its lists are the lead entry's, below.
     const list = replayData && !game ? replayBringList(replayData, snapshots, usageStats) : null;
     if (!list || (list.p1.open === 0 && list.p2.open === 0)) return null;
     return bringWorlds(list, BRING_WORLD_CAP);
@@ -103,11 +96,7 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
     const lead = game?.entries[0]?.leadChoices;
     return lead?.bring ? { p1: lead.p1, p2: lead.p2 } : null;
   }, [game]);
-  /**
-   * The bring lists the rebuild pins, from the protocol: null for a bring-all format. A game with a short side plays its heaviest world:
-   * the fielded bodies plus the guesses, which `guessed` counts at the end of each list (a short side otherwise left both teams at six, ADR
-   * 0010). Shared by every branch, sweep, and preview reconstruction.
-   */
+  /** The bring lists the rebuild pins, from the protocol; null for a bring-all format. */
   const bringOnlyLists = useMemo(() => {
     if (bringWorldsOfGame) {
       const { p1, p2, guessed } = bringWorldsOfGame[0];
@@ -116,10 +105,7 @@ function useFormatMeta(replayData: ReplayData | null, snapshots: TurnSnapshot[],
     if (game) return gameLists;
     return replayData ? replayBringOnly(replayData, snapshots) : null;
   }, [replayData, snapshots, bringWorldsOfGame, game, gameLists]);
-  /**
-   * The bench the user sees, per side: the bodies the side fielded, and for a short side the heaviest world's guess besides. Null when no
-   * side has a list.
-   */
+  /** The bench per side: fielded bodies plus a short side's guesses; null when no side has a list. */
   const bench = useMemo(
     () => (replayData ? replayBench(replayData, snapshots, bringWorldsOfGame?.[0] ?? gameLists ?? undefined) : null),
     [replayData, snapshots, bringWorldsOfGame, gameLists],
@@ -148,10 +134,6 @@ function useTeamSources(
   }), [teamText, effectiveP1Info, effectiveP2Info, stats, assumptions, hpEvidence, getInferredSpreads, pinnedTeams]);
 }
 
-/**
- * The team knowledge with the reproduction's pin: the pinned teams for the build, and the pin's marker in the sets fingerprint every store
- * and cache keys on.
- */
 function withPinnedTeams(knowledge: TeamKnowledge, pins: ReturnType<typeof usePinnedTeams>) {
   return {
     ...knowledge,
@@ -181,16 +163,14 @@ function useLoadsThatEndTheGame(replay: ReturnType<typeof useReplaySurface>, set
 export function useReplayContext() {
   const replayWorker = useReplayWorker();
   const replay = useReplaySurface();
-  // The branch filters its bench by the bring lists, so the format meta is read before it; the worlds of a short side weigh by the usage
-  // statistics, so the Smogon bundle is read first.
+  // Read first: the branch filters its bench by the bring lists, whose worlds weigh by the usage statistics.
   const smogon = useSmogonBundle(replay.replayData, replay.p1Info, replay.opponentInfo);
   const gameState = useGameState(replay.replayData?.id ?? null);
   const meta = useFormatMeta(replay.replayData, replay.snapshots, smogon.usageStats.stats, gameState.record);
-  /** Set by the new-game hook below: the branch calls it after every finished turn and every lead start. */
+  /** Set by the new-game hook below; the branch calls it after every finished turn and lead start. */
   const afterTurnRef = useRef<(() => Promise<void>) | null>(null);
   const branch = useBranch(meta.bench, afterTurnRef);
   const evaluation = useEvaluation();
-  // Another engine's results never mix with the own engine's on screen.
   const engines = useEngineChoice(() => {
     evaluation.cancel();
     evaluation.reset();
@@ -214,7 +194,6 @@ export function useReplayContext() {
     onTeamsEdited: refreshQueue.handleTeamsEdited, replayWorker,
   }), pins);
   const teamSources = useTeamSources(knowledge, smogon, replay.hpEvidence);
-  // Every exact position (Evaluate, the sweep, the dwell, a branch start) comes from one source: the store, else the replay worker.
   const positions = usePositionSource({
     replayData: replay.replayData, snapshots: replay.snapshots, observations: replay.observations,
     sources: teamSources, setsFingerprint: knowledge.setsFingerprint, bringOnlyLists: meta.bringOnlyLists, bringWorlds: meta.bringWorlds,

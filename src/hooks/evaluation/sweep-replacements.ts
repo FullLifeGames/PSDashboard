@@ -4,10 +4,8 @@ import { evalStoreKey, loadStoredEval, saveStoredEval } from '../../lib/eval-cac
 import type { TurnEvalSettings } from './prefs';
 import { aborted, isCancelled, type SweepEnv } from './sweep-types';
 
-/** The sweep's last stage, after the lead: prices each replacement request round once, at the position the reconstruction held, with
- *  the engine of the turn that follows. Nothing is graded; a round without a position, a search or a card is a silent gap. */
+/** Prices each replacement request round after the lead; a round without position, search or card is a silent gap. */
 
-/** The in-memory entry, else the persisted one (the run's prefetch, or one read when no prefetch could run). */
 export async function loadCachedResult(
   env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -21,7 +19,6 @@ export async function loadCachedResult(
   return stored.result;
 }
 
-/** Search the open request (no forced-win proof: nothing is graded) and persist the result. */
 async function searchReplacement(
   env: SweepEnv, round: ReplacementRound, engine: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -48,7 +45,6 @@ async function searchReplacement(
   }
 }
 
-/** 'abort' = the run changed hands. */
 async function replacementOf(env: SweepEnv, round: ReplacementRound): Promise<'abort' | ReplacementEvalData | null> {
   const { replacementKeyFor } = env.params;
   // The card of turn t + 1 sits at index t; the engine is the one that card's turn ran.
@@ -64,7 +60,7 @@ async function replacementOf(env: SweepEnv, round: ReplacementRound): Promise<'a
   return { turn: round.turn, ordinal: round.ordinal, result, forced: round.slots, played: round.species };
 }
 
-/** false = aborted (the caller must skip the finalize, as after the lead). */
+/** false = aborted: the caller must skip the finalize. */
 export async function evaluateReplacements(env: SweepEnv, paintFinal: (running: boolean) => void): Promise<boolean> {
   const rounds = env.params.replacementRounds;
   if (!rounds?.length || aborted(env)) return true;

@@ -4,12 +4,10 @@ import type { BranchSimState } from './useBranch';
 import { askDice, type DiceOffers } from '../lib/branch-dice-offers';
 import { wordsOf } from '../lib/branch-dice';
 
-/** The dice the engine offers for the position the panel shows: they read the live battle on copies, so they exist only on the live
- *  tip while a tray shows the dice ("Dice · What if" open); `null` means the panel is still asking. */
+// Exist only on the live tip while the dice tray shows; null means the panel is still asking.
 
 type Battle = LiveHit['battle'];
 
-/** A pick without its dice: the dice change what a turn plays, never what the move offers. */
 const pickKey = (choice: BranchSlotChoice | null): string =>
   choice === null ? '-' : choice.kind === 'move' ? `m:${choice.moveId}:${choice.targetLoc ?? ''}:${choice.modifier ?? ''}` : `s:${choice.speciesId}`;
 
@@ -21,7 +19,6 @@ export interface DiceView extends DiceOffers { words: DieWords }
 
 export function useDiceOffers(args: {
   enabled: boolean; simState: BranchSimState | null; getBattle: (() => Battle | null) | undefined;
-  /** The replay's log at a stored position of the main line: the log's dice are read from its lines. */
   replayLog?: string;
 }): DiceView | null {
   const { enabled, simState, getBattle, replayLog } = args;

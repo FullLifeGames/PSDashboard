@@ -15,8 +15,7 @@ export type BranchEngineModule = typeof import('../../lib/lazy/branch-engine');
 export type LiveBattle = NonNullable<BattleStream['battle']>;
 
 export interface BranchRefs {
-  // Concurrent sim writes commit unintended extra turns and desync the UI from the battle (double clicks, rapid forced-switch clicks):
-  // one execute may run at a time.
+  // One execute at a time: concurrent sim writes commit extra turns (double clicks, rapid forced-switch clicks).
   executingRef: React.RefObject<boolean>;
   branchEngineRef: React.RefObject<BranchEngineModule | null>;
   streamsRef: React.RefObject<PlayerStreams | null>;

@@ -14,7 +14,6 @@ export type {
 } from '@fulllifegames/eval-engine';
 export type { BranchHistoryEntry } from './branch/shared';
 
-/** Wraps an executor so it resolves to the error text the tracked setter recorded while it ran (null when none). */
 function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefObject<string | null>) {
   return useCallback(async (): Promise<string | null> => {
     lastErrorRef.current = null;
@@ -23,19 +22,14 @@ function useReportingExecutor(run: () => Promise<void>, lastErrorRef: React.RefO
   }, [run, lastErrorRef]);
 }
 
-/**
- * The branch simulator: one live @pkmn/sim battle rebuilt at a replay turn. `bench` is the bring-limited game's bench lists
- * (`replayBench`): the rebuild plays the brought bodies of the world the user plays (ADR 0024), and the state the pickers and the
- * dock read offers only the bodies the bring allows. `engineSimState` is the unfiltered state, for the engine's own choices.
- */
+/** The branch simulator; `bench` filters what the pickers offer, `engineSimState` is the unfiltered state. */
 export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefObject<(() => Promise<void>) | null>) {
   const [branching, setBranching] = useState(false);
   const [rawSimState, setSimState] = useState<BranchSimState | null>(null);
   const simState = useMemo(() => (rawSimState ? limitBench(rawSimState, bench) : null), [rawSimState, bench]);
   const [history, setHistory, historyRef] = useTrackedState<BranchHistoryEntry[]>([]);
-  /** Turn the current branch runtime was started at (null = no runtime). */
+  /** Turn the runtime was started at; null = no runtime. */
   const [variationStartTurn, setVariationStartTurn, startTurnRef] = useTrackedState<number | null>(null);
-  /** Serialized position at the branch start, before entry 0. */
   const [startSerialized, setStartSerialized] = useState<string | null>(null);
   const [executeError, setExecuteError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
@@ -69,11 +63,9 @@ export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefOb
     p2ChoicesRef.current = [];
   }, []);
 
-  /** The pending picks of both sides right now: the dock's engine fill reads them where its result lands, when a render's copy is stale. */
+  /** The pending picks of both sides right now, read where a render's copy is stale. */
   const getChoices = useCallback(() => ({ p1: p1ChoicesRef.current as readonly (BranchSlotChoice | null)[], p2: p2ChoicesRef.current as readonly (BranchSlotChoice | null)[] }), []);
 
-  // executeTurn hands its failure to the caller: a deviation that replaced a variation needs it to roll back. The tracked setter
-  // records what the executor reported last.
   const lastExecuteErrorRef = useRef<string | null>(null);
   const trackedSetters = useMemo(() => ({
     ...setters,
@@ -83,9 +75,8 @@ export function useBranch(bench: Bench | null = null, afterTurnRef?: React.RefOb
     },
   }), [setters]);
   const { executeTurn: runTurn, setChoice, recordChoice, executePending: runPending } = useBranchExecute(refs, trackedSetters, clearChoices);
-  /** Runs the pending choices; resolves to the executor's error text, or null when the turn ran or nothing was due. */
+  /** Resolves to the executor's error text, or null when the turn ran or nothing was due. */
   const executeTurn = useReportingExecutor(runTurn, lastExecuteErrorRef);
-  /** Execute of the dock: the forced replacement it holds, else the turn. Same result as `executeTurn`. */
   const executePending = useReportingExecutor(runPending, lastExecuteErrorRef);
   const { startBranch: startBranchRaw, getBattle, stopBranch } = useBranchSession(refs, setters, clearChoices, updateState);
   const startBranch = useLeadPromotion(startBranchRaw, afterTurnRef);

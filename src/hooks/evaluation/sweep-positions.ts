@@ -1,9 +1,7 @@
 import { perfSpan, type ReplacementPoint } from '@fulllifegames/eval-engine';
 import type { GraphSweepParams, SweepData, SweepEnv } from './sweep-types';
 
-/** Why the game line is short, worded by shape. The counts describe the reconstruction pass (one fast replay), which settles while
- *  evaluations still stream, so the wording must not claim analysis that has not happened. A missing final turn alone is the mildest
- *  cascade (the simulated line ends one turn early) and gets no set-correction advice. */
+/** Why the game line is short; a missing final turn alone gets no set-correction advice. */
 export function coverageNotice(positions: (string | null)[], opts: { game?: boolean } = {}): string | null {
   const total = positions.length;
   const covered = positions.filter(Boolean).length;
@@ -18,7 +16,7 @@ export function coverageNotice(positions: (string | null)[], opts: { game?: bool
   return `The reconstruction diverged from the real game: ${covered} of ${total} turns could be reconstructed for analysis. Correcting items/moves via Edit Player/Opp is the common fix.`;
 }
 
-/** A new game has no replay and no guessed sets, so the notice says the rebuild fell short and never advises Edit Player/Opp. */
+// A new game has no guessed sets: never advise Edit Player/Opp.
 function gameCoverageNotice(covered: number, total: number): string {
   if (covered === 0) {
     return "This game's positions could not be rebuilt from its record, so no turn has a live position to analyze. Analyze game again; if this stays, Report issue sends the game.";
@@ -33,8 +31,7 @@ function noteCoverage(data: SweepData, positions: (string | null)[], diagnostics
   data.notice = data.notice ? `${data.notice} ${extra}` : extra;
 }
 
-/** The open replacement requests of the knockouts stream out of the same reconstruction as the turn positions, by `turn.ordinal`.
- *  A waiter resolves with the request's position, or null once the reconstruction settled without it: a silent gap, never an error. */
+// A waiter resolves null once the reconstruction settled without its request: a silent gap, never an error.
 function makeReplacementChannel() {
   const arrived = new Map<string, string>();
   const waiters = new Map<string, ((serialized: string | null) => void)[]>();
@@ -60,7 +57,7 @@ function makeReplacementChannel() {
   };
 }
 
-/** Lazily-run single-pass acquisition: positions stream out of the ongoing reconstruction. Runs once; a failure fails every waiting turn. */
+/** Lazy single-pass acquisition; runs once, and a failure fails every waiting turn. */
 export function makePositionSource(params: GraphSweepParams, data: SweepData): Pick<SweepEnv, 'positionFor' | 'replacementPositionFor'> {
   const arrived = new Map<number, string>();
   const replacements = makeReplacementChannel();

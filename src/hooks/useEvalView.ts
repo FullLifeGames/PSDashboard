@@ -21,7 +21,7 @@ import {
 type Evaluation = ReturnType<typeof useEvaluation>;
 type Acquire = ReturnType<typeof useEvalAcquire>;
 
-/** The actions played on a replay turn: snapshots[turn] carries the block ending at |turn|turn+1. */
+// snapshots[turn] carries the block ending at |turn|turn+1.
 const playedOn = (snapshots: TurnSnapshot[], turn: number, doubles: boolean, rules: GameRules) => (doubles
   ? parsePlayedActionsDoubles(snapshots[turn]?.log ?? [])
   : parsePlayedActions(snapshots[turn]?.log ?? [], rules));
@@ -40,7 +40,7 @@ export interface EvalViewInputs {
   evalViewKey: string;
   serializedAtView: string | null;
   liveEvalStatus: Evaluation['status'];
-  /** The live sim's position (null outside a variation) and the status of the result against it. */
+  /** The live sim's position; null outside a variation. */
   tip: { key: string; turn: number; variation: boolean } | null;
   tipEvalStatus: Evaluation['status'];
   analysisTurn: number | null;
@@ -53,7 +53,6 @@ export interface EvalViewInputs {
   acquire: Pick<Acquire, 'acquireBranchPosition' | 'acquireReplayPosition' | 'makeReplayAcquire' | 'makeSweepAcquireAll'>;
   sources: TeamBuildSources;
   bringOnlyLists: { p1: string[]; p2: string[] } | null;
-  /** The worlds of a short-side game (the heaviest first); null for any other game. */
   bringWorlds?: BringWorld[] | null;
   setsFingerprint: string;
   sensitivityTargetsFor: (side: 'p1' | 'p2') => SensitivityTarget[];
@@ -65,21 +64,19 @@ export interface EvalViewInputs {
 
 function useEvalFormat(inputs: EvalViewInputs) {
   const { replayData, evaluation, replayGameType } = inputs;
-  // Tera resolution: 'auto' turns enumeration off when the game never terastallized, and in draft/custom formats (per-Pokemon Tera
-  // rights) restricts it to the species that did: a global switch would recommend illegal Teras and price floors against impossible threats.
+  // Tera 'auto': off when the game never terastallized; in draft and custom formats only for species that did.
   const effectiveTera = useMemo(
     () => (replayData
       ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log)
       : false),
     [replayData, evaluation.prefs.tera],
   );
-  // Sleep Clause: the branch format carries it; the eval candidate filter needs a flag because serialization strips custom rules.
+  // Serialization strips custom rules, so the eval candidate filter needs a Sleep Clause flag from the branch format.
   const effectiveSleepClause = useMemo(
     () => (replayData ? formatEnforcesSleepClause(getBranchSimulatorFormat(replayData)) : false),
     [replayData],
   );
-  // The rule set from the replay's own format: the reconstruction runs Champions as Doubles OU or a custom game, and the static
-  // weighs its features by the replay's game.
+  // The reconstruction runs Champions as Doubles OU or a custom game: the ruleset reads the replay's own format.
   const effectiveRuleset = useMemo(
     (): StaticRuleset => (replayData ? replayRuleset(replayData) : 'standard'),
     [replayData],
@@ -93,8 +90,7 @@ function useEvalFormat(inputs: EvalViewInputs) {
 
 type EvalFormat = ReturnType<typeof useEvalFormat>;
 
-/** The position at a new game's tip, where nothing has been played yet, caches under its own key: once the turn is played, the
- *  sweep's entry for it carries the played outcome, the verified round and the sensitivity, which an earlier entry must never serve. */
+// An entry from before the turn was played lacks its outcome and verification, so it must never serve the played turn.
 const gameTipTag = (id: string, turn: number, snapshotCount: number): string => (isGameId(id) && turn >= snapshotCount ? 't' : '');
 
 export const turnCacheKey = (replayId: string, turn: number, snapshotCount: number, setsFingerprint: string): string =>
@@ -105,11 +101,9 @@ export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
   const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores, tip, playOutActive } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
-  // While a run is active the live sim is the wanted position, wherever the pointer stands (a frame report can move it): the
-  // evaluation, its tag and its score slot follow the tip.
+  // While a run is active, the live sim is the position wherever the pointer stands (a frame report can move it).
   const runAtTip = playOutActive && tip !== null ? tip : null;
-  // `onResult` is read by name, never spread: the Evaluate button hands its click event to this function. Evaluate never sets
-  // `prefs.auto`; only the explore click of the engine walk does.
+  // `onResult` is read by name, never spread: the Evaluate button hands its click event to this function.
   const handleEvaluate = useCallback((options?: EvaluateOptions) => {
     if (!replayData) return;
     const onResult = typeof options?.onResult === 'function' ? options.onResult : undefined;
@@ -133,8 +127,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
     }
   }, [replayData, snapshots, evalIsDoubles, liveTip, runAtTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
-  // Every eval finishing while the pointer sits on the variation feeds the graph overlay; the tag guard keeps a run that finished
-  // after a navigation out of the wrong turn's slot (the score belongs to the position it STARTED at).
+  // The score belongs to the position the run STARTED at: the tag guard keeps it out of a later turn's slot.
   const scored = runAtTip ?? { key: evalViewKey, turn: viewTurn, variation: viewingVariation };
   useEffect(() => {
     if (evaluation.status !== 'done' || !evaluation.result || !scored.variation) return;
@@ -179,8 +172,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
     });
   }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sources, bringOnlyLists, bringWorlds, sensitivityTargetsFor]);
 
-  // Explains ONE turn: a two-turn mini sweep (turn + its follow-up) so the report can price the played outcome, at the panel's
-  // settings. Runs only from a gap turn's Analyze button: selecting a turn shows the stored result and never re-searches.
+  // Explains one turn with a two-turn mini sweep (turn plus follow-up) so the report can price the played outcome.
   const analyzeTurnNow = useCallback((turn: number) => {
     if (!replayData) return;
     evaluation.runGraphSweep({
@@ -200,8 +192,7 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
     });
   }, [replayData, snapshots, evaluation, analyzableTurns, effectiveTera, effectiveSleepClause, effectiveRuleset, evalIsDoubles, setsFingerprint, acquire, playedFor, rules, sensitivityTargetsFor]);
 
-  // With the autoAnalyze pref set, Analyze game starts by itself once a replay (and its Smogon data) is ready: one attempt per
-  // replay + set knowledge + Tera resolution; a failed sweep does not retry-loop.
+  // One attempt per replay, set knowledge and Tera resolution: a failed sweep does not retry-loop.
   const autoAnalyzeAttemptRef = useRef<string | null>(null);
   useEffect(() => {
     if (!evaluation.prefs.autoAnalyze || !replayData || !evalAvailable) return;
@@ -222,8 +213,6 @@ function useSweepRuns(inputs: EvalViewInputs, format: EvalFormat) {
 
 function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleEvaluate: () => void) {
   const { evaluation, historyLength, editedP1Info, editedP2Info, replayData, branching, liveEvalView, liveEvalStatus, tip, tipEvalStatus, executing, branchPreparing, playOutActive } = inputs;
-  // A change of the position itself (a turn executed, a set edited) invalidates a displayed result; moving the pointer does not:
-  // the result's position tag decides whether it fits the screen.
   const { markStale: markEvalStale, reset: resetEval, clearGraph, dropGraphFrom } = evaluation;
   useEffect(() => {
     markEvalStale();
@@ -231,12 +220,9 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
   useEffect(() => {
     resetEval();
   }, [replayData?.id, branching, resetEval]);
-  // The graph is tied to a replay + set knowledge + Tera mode; the SELECTION survives the reset (analysisTurn mirrors the slider).
   useEffect(() => {
     clearGraph();
   }, [replayData?.id, inputs.setsFingerprint, format.effectiveTera, clearGraph]);
-  // A new game's main line grows at its tip, and the graph's entry for the old tip was swept before anybody played that turn (no
-  // played choice, no outcome): the played turn takes a new sweep, not that entry.
   const tipSeen = useRef<{ id: string; count: number } | null>(null);
   const snapshotCount = inputs.snapshots.length;
   const gameId = replayData?.id ?? null;
@@ -245,11 +231,9 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
     tipSeen.current = gameId === null ? null : { id: gameId, count: snapshotCount };
     if (before && gameId === before.id && isGameId(gameId) && snapshotCount > before.count) dropGraphFrom(before.count);
   }, [gameId, snapshotCount, dropGraphFrom]);
-  // Opt-in: keep the branch evaluation fresh after each executed turn. Live positions only: without the liveEvalView gate, navigating
-  // onto a main-line turn (the end sentinel included) fired a stray single-turn reconstruction (a "diverged before turn 68" error).
+  // Live positions only: without the liveEvalView gate a main-line turn fired a stray single-turn reconstruction.
   useEffect(() => {
-    // Not while the game sweep runs (a single evaluation would stop it); the effect fires again when it ends. A run keeps the live
-    // tip fresh, whichever turn the pointer shows.
+    // Not while the game sweep runs (a single evaluation would stop it).
     const atTip = playOutActive && tip !== null;
     const view = atTip || liveEvalView;
     const status = atTip ? tipEvalStatus : liveEvalStatus;
@@ -258,8 +242,6 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
       handleEvaluate();
     }
   }, [branching, evaluation.prefs.auto, evaluation.stopped, inputs.evalViewKey, liveEvalView, liveEvalStatus, tipEvalStatus, playOutActive, tip, executing, evaluation.graph.running, handleEvaluate]);
-  // "Always on" also covers the live sim: a freshly opened variation (or a navigation back to its tip) evaluates without the
-  // Evaluate button, never while the game sweep runs (a single evaluation supersedes the run id and would silently kill the sweep).
   useEffect(() => {
     if (!evaluation.prefs.autoAnalyze || !format.evalAvailable) return;
     if (!inputs.liveTip || executing || branchPreparing || playOutActive) return;
@@ -275,8 +257,7 @@ function useEvalHousekeeping(inputs: EvalViewInputs, format: EvalFormat, handleE
 
 function useAnalyzedTurn(inputs: EvalViewInputs, analyzeTurnNow: (turn: number) => void) {
   const { evaluation, liveEvalView, analysisTurn, evalIsDoubles } = inputs;
-  // In replay view the advantage bar, ranked lists and matrix render from the ANALYZED turn's cached sweep result (turn 0 = the lead
-  // decision); the branch view keeps its live result.
+  // Replay view shows the analyzed turn's cached sweep result (turn 0 = lead decision); the branch view its live one.
   const analyzedResult = useMemo(() => {
     if (liveEvalView) return evaluation.result;
     if (analysisTurn === 0) return evaluation.graph.lead?.result ?? null;
@@ -286,7 +267,6 @@ function useAnalyzedTurn(inputs: EvalViewInputs, analyzeTurnNow: (turn: number) 
   const analyzedSettings = !liveEvalView && analysisTurn !== null && analysisTurn >= 1
     ? evaluation.graph.settings[analysisTurn - 1] ?? null
     : null;
-  // A gap turn (no result yet) offers its analysis at the panel's settings; an analyzed turn offers nothing.
   const analyzeTarget = useMemo(
     () => resolveAnalyzeTarget(liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles),
     [liveEvalView, analysisTurn, evaluation.graph, evaluation.prefs, evalIsDoubles],
@@ -308,8 +288,6 @@ function resolveAnalyzeTarget(
   if (liveEvalView || analysisTurn === null || analysisTurn < 1) return null;
   if (graph.settings[analysisTurn - 1]) return null;
   if (prefs.mode === 'auto') {
-    // The engine the sweep will resolve; a gap turn's routing signal is
-    // unknown until swept, and the sweep resolves it itself.
     const fraction = graph.faintedFractions[analysisTurn - 1] ?? null;
     return fraction !== null ? resolveAutoTurnSettings(fraction, doubles) : { mode: 'auto' };
   }

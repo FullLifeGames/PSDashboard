@@ -10,9 +10,7 @@ import { gamePositions, rebuildGame } from './branch/game-rebuild';
 import { forceSwitches } from './branch/shared';
 import type { BranchHistoryEntry, BattleStream } from './branch/shared';
 
-/** A new game in the hooks: the record is the truth, the replay data is its log, and a turn played at the game's tip joins the main
- *  line ("promotion"): the record takes its entries, the exact store the positions, the replay state the grown log, and the live
- *  branch rebases at the new tip. */
+/** The record is the truth; a turn played at the game's tip joins the main line and the live branch rebases there. */
 
 export function useGameState(replayId?: string | null) {
   const [held, setState] = useState<NewGameRecord | null>(null);
@@ -21,8 +19,7 @@ export function useGameState(replayId?: string | null) {
     recordRef.current = next;
     setState(next);
   }, []);
-  // The record is the game of the replay data that carries its id: while another replay is on screen (or the game's own data is
-  // still on its way) the app reads no game. Without an id to compare (the hook specs) the record stands as set.
+  // The record is the game of the replay data that carries its id; hook specs pass none and take it as set.
   const record = held && (replayId === undefined || held.id === replayId) ? held : null;
   return { record, recordRef, setRecord };
 }
@@ -33,7 +30,7 @@ export function infoOfTeam(team: PokemonSet[]): OpponentTeamInfo {
   return teamInfoOfSets(parsePastedTeam(Teams.export(team)));
 }
 
-/** The pointer turn the main line's next turn is played from: turn 0 before the lead pick, else the turn after the finished ones. */
+/** The pointer turn the main line's next turn is played from. */
 export const gameTipTurn = (record: NewGameRecord): number => (record.entries.length === 0 ? 0 : record.turns + 1);
 
 function replacementPending(stream: BattleStream | null): boolean {
@@ -42,9 +39,7 @@ function replacementPending(stream: BattleStream | null): boolean {
   return (['p1', 'p2'] as const).some(side => forceSwitches(battle, side).some(Boolean));
 }
 
-/** The turn the pointer should land on once an opened game's replay state has reset it (a saved game's tip, turn 0 at Team Preview),
- *  else null. The board's reset runs once for replay data without an id (a reload on `?game=` mounts it while the document is on its
- *  way) and again for the new id; only the run for the game's own id takes the landing. */
+// Only the run for the game's own id takes the landing: the board's reset also runs once for replay data without an id.
 function useLanding() {
   const landing = useRef<{ id: string; turn: number } | null>(null);
   const askLanding = useCallback((next: { id: string; turn: number } | null) => { landing.current = next; }, []);
@@ -72,8 +67,7 @@ export interface NewGameInputs {
   save?: (record: NewGameRecord) => boolean;
 }
 
-/** Start saves the record before the game opens (no entry played), so the address and the saved lists find a game still at Team
- *  Preview. A saved game that opens again saves nothing (its row keeps its place). */
+// A saved game that opens again saves nothing: its row keeps its place.
 function useStartGame(openRecord: (next: NewGameRecord) => Promise<void>, save: (record: NewGameRecord) => boolean, setSaveFailed: (failed: boolean) => void) {
   return useCallback(async (next: NewGameRecord) => {
     setSaveFailed(!save(next));
@@ -90,15 +84,13 @@ interface PromoteInputs extends Pick<NewGameInputs, 'replay' | 'branch' | 'landR
 }
 
 function usePromote({ recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed }: PromoteInputs) {
-  /** Called after a finished turn and after a lead start: a turn that started at the game's tip and is finished (no replacement
-   *  pending) joins the main line; a turn played from any other position stays a variation. */
+  /** A finished turn that started at the tip joins the main line (no replacement pending); others stay variations. */
   return useCallback(async (): Promise<boolean> => {
     const current = recordRef.current;
     const history = branch.getHistory();
     if (!current || history.length === 0) return false;
     const start = branch.getStartTurn();
     if (start === null || start !== gameTipTurn(current)) {
-      // a variation of an earlier turn replaces the live branch: the tip turn that waited for its replacement is given up
       if (current.pending) {
         const cleared = withPendingTurn(current, []);
         recordRef.current = cleared;
@@ -108,7 +100,6 @@ function usePromote({ recordRef, setRecord, replay, branch, storePosition, landR
       return false;
     }
     if (replacementPending(branch.getStream())) {
-      // the turn is played and waits for its replacement: it stays out of the main line, and the record keeps it for a reload
       const waiting = withPendingTurn(current, history);
       recordRef.current = waiting;
       setRecord(waiting);
@@ -137,8 +128,7 @@ export function useNewGame(inputs: NewGameInputs) {
   const [saveFailed, setSaveFailed] = useState(false);
   const { askLanding, takeLanding } = useLanding();
 
-  /** Opens a record (a fresh Start or a saved game) as the app's current game. A game asks the pointer for its tip, which the
-   *  timeline controller hands over after the new id has reset the pointer (`takeLanding`); the same game opened again leaves it. */
+  /** A game asks the pointer for its tip (`takeLanding`) after the new id reset it; the same game again leaves it. */
   const openRecord = useCallback(async (next: NewGameRecord) => {
     askLanding(recordRef.current?.id !== next.id ? { id: next.id, turn: next.entries.length > 0 ? next.turns + 1 : 0 } : null);
     setRecord(next);
@@ -149,8 +139,6 @@ export function useNewGame(inputs: NewGameInputs) {
 
   const promote = usePromote({ recordRef, setRecord, replay, branch, storePosition, landRef, save, setSaveFailed });
 
-  /** Plays the record's entries again on other teams (a set edit) and says what the game would be: every entry that still applies
-   *  stays, and the main line ends before the first one that does not, at a settled turn. It changes nothing: the caller asks first. */
   const planTeams = useCallback(async (teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<{ kept: number; error: string | null; next: NewGameRecord } | null> => {
     const current = recordRef.current;
     if (!current) return null;
@@ -175,11 +163,10 @@ export function useNewGame(inputs: NewGameInputs) {
     return { kept: next.turns, error: failure?.error ?? null, next };
   }, [recordRef]);
 
-  /** Plays the record again on other teams and opens the result; the caller stops the live branch, its runtime stands on the old teams. */
+  /** The caller stops the live branch: its runtime stands on the old teams. */
   const editTeams = useCallback(async (teams: { p1: PokemonSet[]; p2: PokemonSet[] }): Promise<{ kept: number; error: string | null } | null> => {
     const plan = await planTeams(teams);
     if (!plan) return null;
-    // the positions follow on the new sets: the store keys them by the sets' fingerprint, so the position source rebuilds them once from the record
     await openRecord(plan.next);
     setSaveFailed(!save(plan.next));
     return { kept: plan.kept, error: plan.error };
@@ -188,8 +175,7 @@ export function useNewGame(inputs: NewGameInputs) {
   return { record, openRecord, startGame, promote, planTeams, editTeams, saveFailed, takeLanding };
 }
 
-/** The game hook wired to the app's pieces: `afterTurnRef` is called after every entry and lead start; `landRef` is where the
- *  timeline puts the pointer after a promotion. */
+/** `afterTurnRef` runs after every entry and lead start; `landRef` takes the pointer turn after a promotion. */
 export function useNewGameAt(args: {
   state: GameState;
   replay: NewGameInputs['replay'];

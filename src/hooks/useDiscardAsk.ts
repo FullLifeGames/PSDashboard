@@ -1,11 +1,6 @@
 import { useCallback, useState } from 'react';
 
-/**
- * Discard variation asks first once the variation has a played turn (a play-out of a hundred seconds must not go with one
- * click): `request` discards at once while no turn was played, else opens the question, whose `proceed` runs the discard and
- * `cancel` drops it. `playedTurns` is `turnEntryCount`, the same for singles and doubles. A question that stands while the
- * variation goes away by another route closes with it, reconciled in render.
- */
+/** `request` discards at once while no turn was played, else asks; `playedTurns` is `turnEntryCount`. */
 export function useDiscardAsk(playedTurns: number, discard: () => void) {
   const [asking, setAsking] = useState(false);
   if (asking && playedTurns === 0) setAsking(false);

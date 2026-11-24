@@ -6,11 +6,7 @@ import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-cl
 import { registerPatchedWorlds } from '../../lib/eval/world-positions';
 import { matchOrPhantom, type SweepEnv } from './sweep-types';
 
-/**
- * The tier a flagged turn re-adjudicates at: matrix pairs one depth up, engine-independent (an MCTS-line flag verifies at the same
- * matrix-d2 tier as the d1 matrix line), because the verdict statistic is internal to the deep pass and pair valuation already runs
- * as matrix subsearches (playedOutcomeSettings). null = no tier left (the ladder caps at depth 3).
- */
+/** The tier a flagged turn re-adjudicates at: matrix pairs one depth up; null when the ladder (cap 3) is spent. */
 export function verificationDeepSettings(settings: AppEvalSettings): AppEvalSettings | null {
   if ((settings.mode ?? 'matrix') === 'mcts') {
     return { ...settings, depth: 2, mode: 'matrix', keepPlayed: undefined };
@@ -19,8 +15,7 @@ export function verificationDeepSettings(settings: AppEvalSettings): AppEvalSett
   return { ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined };
 }
 
-/** Deep re-search before a misplay verdict sticks: for each side whose played choice trails the best by the regret threshold, values
- *  the played and best pairs at verificationDeepSettings. The position is acquired only when a flag needs it. */
+/** Deep re-search before a misplay verdict sticks; the position is acquired only when a flag needs it. */
 export async function verifyFlagged(
   env: SweepEnv,
   getSerialized: () => Promise<string>,
@@ -75,7 +70,7 @@ async function runProbeCombos(env: SweepEnv, args: {
   for (const combo of combos) {
     const patched = patchSerializedItem(serialized, opposing, combo.species, combo.item);
     if (!patched) continue;
-    // The edited item is valued in every world of a short-side position (a world without the body leaves the blend).
+    // The edited item is valued in every world of a short-side position; a world without the body leaves the blend.
     registerPatchedWorlds(serialized, patched, world => patchSerializedItem(world, opposing, combo.species, combo.item));
     env.clientRef.current ??= new EvalWorkerClient();
     const playedEv = await env.clientRef.current.evalPair(patched, p1Choice.choice, p2Choice.choice, probeSettings);
@@ -114,11 +109,7 @@ async function probeSide(env: SweepEnv, args: {
   return probes.length > 0 ? probes : null;
 }
 
-/**
- * Item-sensitivity probes for sides still flagged after verification: re-evaluates the played and best pairs with an opposing guessed
- * item swapped for its next usage candidates (at most 2 combos per side), at the sweep's own settings. The acquit statistic compares
- * only probe EVs with each other; downstream it only acquits (analyzeTurn).
- */
+/** Item-sensitivity probes for still-flagged sides, at most 2 combos per side; downstream they only acquit. */
 export async function probeSensitivity(
   env: SweepEnv,
   getSerialized: () => Promise<string>,

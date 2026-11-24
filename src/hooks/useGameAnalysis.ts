@@ -19,7 +19,6 @@ function useAnalysisContext(args: {
   replayGen: number;
 }) {
   const { replayData, snapshots, graphPlayed, replayGen } = args;
-  // The replay's mod rides with its generation, so the analysis reads the game's own Dex.
   const mod = useMemo(() => (replayData ? logRules(replayData.log).mod : undefined), [replayData]);
   const tendencies = useMemo(() => (replayData
     ? { p1: parseTendencies(replayData.log, 'p1'), p2: parseTendencies(replayData.log, 'p2') }
@@ -35,8 +34,7 @@ function useAnalysisContext(args: {
   return { tendencies, context };
 }
 
-/** Game-level root cause, once enough of the game is swept. The memo keeps the per-turn analyses next to the report: the
- *  feedback drift harness reads both through the window handle. */
+// The memo keeps the per-turn analyses next to the report: the feedback drift harness reads both off the window.
 function useGameReportData(args: {
   replayData: ReplayData | null;
   graph: Evaluation['graph'];
@@ -45,8 +43,7 @@ function useGameReportData(args: {
 }) {
   const { replayData, graph, context, tendencies } = args;
   const replayWinner = useMemo<'p1' | 'p2' | null>(() => (replayData ? replayWinnerOf(replayData) : null), [replayData]);
-  // While a sweep runs, the LAST report stays up: recomputing waits for completion (per-tick rebuilds are expensive), and returning
-  // null made the report blink on every turn click. 'hold' keeps the previous data via a render-phase adjustment (no ref writes here).
+  // While a sweep runs the last report stays up: null made it blink on every turn click.
   const computed = useMemo(() => {
     if (!replayData) return null;
     if (graph.running) return 'hold' as const;
@@ -94,7 +91,6 @@ export function useGameAnalysis(inputs: {
 
   const gameReportData = useGameReportData({ replayData, graph: evaluation.graph, context, tendencies });
 
-  // Structured handle for the feedback drift harness: the same objects the UI renders.
   useEffect(() => {
     (window as Window & { __psDebug?: unknown }).__psDebug = {
       graph: evaluation.graph,
@@ -108,7 +104,6 @@ export function useGameAnalysis(inputs: {
 
   return {
     turnReads, turnAnalysis, faintedShares, leadAnalysisData, gameReport: gameReportData?.report ?? null,
-    // The report's own per-turn analyses, for the Game review and the graph's marks.
     gameAnalyses: gameReportData?.analyses ?? null,
   };
 }

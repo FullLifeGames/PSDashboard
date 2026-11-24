@@ -3,20 +3,13 @@ import { loadGame } from '../lib/new-game/store';
 import type { NewGameRecord } from '../lib/new-game/record';
 import { parseReplayUrl, parseReplayViewpoint } from '../lib/replay-fetcher';
 
-/**
- * The address names what is open, so a reload brings it back: a game is `?game=<id>`; a replay loaded by link or id is `?replay=<id>`
- * (with `?p2` when seen from player 2's side); a replay from a file has none. Written with `replaceState`, so Back leaves the app
- * and does not walk through every replay loaded. Read once at start: a saved game opens at its tip, an unknown game is named for the
- * start page's notice. The embedded view (the host owns the address) and a shared branch (`#branch=` wins, as in `useEmbedHost`)
- * are neither read nor written. A `?replay=` link that already names the loaded replay stays as written.
- */
+/** Read once at start, written with `replaceState` so Back leaves the app; embed and `#branch=` views are skipped. */
 
 export interface OpenAddressInputs {
   embed: boolean;
   requestedGame: string | null;
   replayId: string | null;
   viewpoint: 'p1' | 'p2' | undefined;
-  /** Whether that replay came by link or id (a file, a game and a host message do not name an address). */
   byLink: boolean;
   openRecord: (record: NewGameRecord) => Promise<unknown> | void;
 }
@@ -49,7 +42,7 @@ export function useOpenAddress(inputs: OpenAddressInputs): { missingGame: string
     if (embed || replayId === null || sharedBranchInAddress()) return;
     const url = new URL(window.location.href);
     const want = wanted({ embed, requestedGame, replayId, viewpoint, byLink, openRecord }, url.searchParams.get('replay'));
-    // the address already says it, as it was written: not even its encoding changes
+    // The address already says it: leave it as written, encoding included.
     const params = url.searchParams;
     if (want && params.get(want[0]) === want[1] && !params.has(want[0] === 'game' ? 'replay' : 'game')) return;
     url.searchParams.delete('game');

@@ -2,12 +2,7 @@ import { useCallback, useMemo, useRef } from 'react';
 import type { NewGameRecord } from '../lib/new-game/record';
 import { gameAdoptSnapshot, restoreGamePositions } from './branch/game-rebuild';
 
-/**
- * The positions of a new game come from its record, never from a 'replay' job: the main line's positions land in the exact store as
- * the turns are promoted, and a missing position (a reloaded game, an edited team) is rebuilt from the record's entries. Only a
- * rebuild in flight is shared: a settled one is forgotten, so a missing turn rebuilds again. One sweep (`acquireAll`) rebuilds at
- * most once, so a record that cannot be rebuilt costs one try per Analyze game, not one per turn.
- */
+/** Positions of a new game come from its record, never a 'replay' job; one sweep rebuilds at most once. */
 export function useGamePositions(args: {
   record: NewGameRecord | null;
   exact: { getExact(turn: number): string | null; storeExactPosition(turn: number, serialized: string): void };
@@ -36,7 +31,6 @@ export function useGamePositions(args: {
     await running.promise;
   }, [record, exact]);
 
-  /** One position; `attempt` carries whether this caller's rebuild already ran (a sweep shares one across its turns). */
   const positionOf = useCallback(async (turn: number, attempt: { rebuilt: boolean }): Promise<string> => {
     let stored = exact.getExact(turn);
     if (!stored && !attempt.rebuilt) {

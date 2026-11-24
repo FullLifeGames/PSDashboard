@@ -16,11 +16,7 @@ export interface PendingConfirm {
   proceed: () => void;
 }
 
-/**
- * Per-position interaction state that dies with the previous replay: the play-out run, its notice, draft choices, the inline confirm.
- * User navigation while the engine plays must STOP the run (the loop only advances while the pointer sits on the live tip);
- * internal navigations (tip-follow, the finish's move to the frame's turn) keep it alive.
- */
+/** User navigation while the engine plays stops the run; internal navigations (tip-follow, finish) keep it alive. */
 export function useTransients(replayId: string | undefined) {
   const playOutRef = useRef<{ active: boolean; stopping?: { navigated: boolean } | null } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { navigated?: boolean }) => void) | null>(null);
@@ -28,24 +24,15 @@ export function useTransients(replayId: string | undefined) {
   const [playOut, setPlayOut] = useState<PlayOutState | null>(null);
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
-  /** The lead picker's complete selection while the turn 0 view shows it (null otherwise): "Let it play out" starts from the leads on screen. */
   const leadPicksRef = useRef<LeadSelection | null>(null);
   const setLeadPicks = useCallback((picks: LeadSelection | null) => { leadPicksRef.current = picks; }, []);
-  /**
-   * "Fast play-out": every evaluation of a run uses the depth-1 matrix instead of the Auto line. A session option, never stored; it
-   * survives a replay change.
-   */
+  /** Session option, never stored; it survives a replay change. */
   const [fastPlayOut, setFastPlayOut] = useState(false);
 
-  /**
-   * Draft choices for positions WITHOUT the live sim: executed via requestDeviation → rebuild → executeTurn; cleared on every navigation (a
-   * draft belongs to one position).
-   */
+  /** Draft choices for positions without the live sim; cleared on every navigation. */
   const [draftChoices, setDraftChoices] = useState<{ p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }>({ p1: [], p2: [] });
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
-  // The transient interaction state dies with the previous replay: render-phase adjustment on the replay id (the react-hooks gate forbids
-  // plain setState resets inside the load-sync effect).
   const [transientsReplayId, setTransientsReplayId] = useState(replayId);
   if (transientsReplayId !== replayId) {
     setTransientsReplayId(replayId);

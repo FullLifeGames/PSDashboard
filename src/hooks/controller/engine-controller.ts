@@ -49,7 +49,6 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
   });
   const acquire = useEvalAcquire({ replayData, source: positions, getBattle, viewTurn, dwellEnabled, smogonPending });
   // Read before the picker, which seeds its untouched slots with it.
-  // The played-action parser reads the replay's own Dex (generation and mod).
   const rules = useMemo(() => logRules(replayData?.log ?? ''), [replayData]);
   const parseSingles = useCallback((lines: string[]) => parsePlayedActions(lines, rules), [rules]);
   const playedAtView = usePlayedAtView({
@@ -63,8 +62,6 @@ function useAcquireLayer(ctx: ReplayContext, transients: Transients, board: Boar
     getExact: acquire.getExact, exactPositionsVersion: acquire.exactPositionsVersion, draftChoices,
     liveSimState: ctx.branch.simState, played: playedAtView,
   });
-  // A draft pick that the rebuilt position no longer offers goes, instead of failing on Execute. The reconciliation runs in render: the
-  // draft state lives in this same component.
   const resolvedForView = !liveTip ? positionPicker?.simState ?? null : null;
   if (resolvedForView) {
     const kept = dropStaleDraft(draftChoices, resolvedForView);
@@ -106,11 +103,6 @@ function useEvalViewLayer(
   });
 }
 
-/**
- * At the live tip the fill reads the evaluation the view layer drives and writes into the branch's picks. At a replay turn it works on
- * the picker's effective choices (the logged seed under the user's picks), keeps what it writes in the view, and hands the dock the
- * state with that fill laid over the empty slots.
- */
 function useFillLayer(
   ctx: ReplayContext, transients: Transients, board: BoardController,
   evalView: ReturnType<typeof useEvalViewLayer>, acquireLayer: ReturnType<typeof useAcquireLayer>,
@@ -153,8 +145,7 @@ function usePlayLayer(
     branchPreparing, handleSetChoice, requestDeviation, setBranchDivergence, startLeadVariation, setVariationNotice,
   } = board.deviation;
   const { handleEvaluate } = evalView;
-  // A run plays the live sim wherever the pointer stands. The pickers' handler files the choice as a draft for the viewed turn when the
-  // pointer is off the tip, which would leave the run's turn without its choices.
+  // A run plays the live sim wherever the pointer stands; off the tip the pickers would file the choice as a draft.
   const runAtTip = (playOut?.active ?? false) && tip !== null;
   const handleSetChoiceForWalk = useCallback<typeof handleSetChoice>(
     (side, choice, activeSlot) => (runAtTip ? setChoice(side, choice, activeSlot) : handleSetChoice(side, choice, activeSlot)),

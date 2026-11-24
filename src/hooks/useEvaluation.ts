@@ -14,8 +14,7 @@ export { recordEvalError } from './evaluation/sweep-types';
 export { coverageNotice, withEvalGapNotice } from './evaluation/graph-sweep';
 export type { EvalGraphState } from './evaluation/graph-sweep';
 
-/** The evaluation surface: panel preferences, the single-position evaluate path and the whole-game graph sweep, over one shared worker
- *  client, one result cache and one run counter (bumping it cancels whatever else was running). */
+/** Preferences, single evaluation and game sweep on one client; bumping the run counter cancels whatever else ran. */
 export function useEvaluation() {
   const { prefs, prefsRef, persistPrefs } = usePrefsState();
   const { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom } = useGraphState();
@@ -23,8 +22,7 @@ export function useEvaluation() {
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   const runRef = useRef(0);
-  // A concrete engine pinned over the prefs for single evaluations (the fast play-out sets it for its run): a ref, never stored,
-  // never shown as the panel's setting.
+  // Pinned over the prefs for single evaluations: a ref, never stored, never shown as the panel's setting.
   const engineOverrideRef = useRef<TurnEvalSettings | null>(null);
   const setEngineOverride = useCallback((override: TurnEvalSettings | null) => {
     engineOverrideRef.current = override;

@@ -7,11 +7,6 @@ import type { RolledCopyParams } from '../../lib/rolled-copy-stage';
 import { loadCachedResult } from './sweep-replacements';
 import { aborted, isCancelled, type SweepEnv } from './sweep-types';
 
-/**
- * The sweep's last stage, after the replacement points: replays the report's biggest roll (a missed sure kill of the winner) with
- * the die turned over and evaluates the copy's next root once, at the engine the actual next root ran. The result rides in the graph
- * (`rollFlip`), so the report is complete when `graph.running` turns false; a missing roll, copy, worker or evaluation is a silent gap.
- */
 
 function remember(env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey: string, result: EvalResult): void {
   env.cacheRef.current.set(key, { result, depth: engine.depth, samples: engine.samples, mode: engine.mode, tera: env.params.tera, prove: false });
@@ -21,7 +16,6 @@ function remember(env: SweepEnv, engine: TurnEvalSettings, key: string, storeKey
   });
 }
 
-/** Search the copy's next root (no forced-win proof: nothing is graded) and persist the result. */
 async function searchCopy(
   env: SweepEnv, serialized: string, engine: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -41,11 +35,9 @@ async function searchCopy(
   }
 }
 
-/** The copy of the roll's turn through the worker, after the sweep's pool gives its workers back: a long game ends its sweep with
- *  twelve of them and the replay worker alive (about 6.2 GB in the renderer), and one more took the page down. */
+// Runs after the pool gives its workers back: twelve alive plus the replay worker, and one more took the page down.
 async function copyOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll): Promise<'abort' | RolledCopyOutcome | null> {
   try {
-    // A run that took over owns the pool now: only the run that still holds it gives it back.
     if (aborted(env)) return 'abort';
     env.clientRef.current?.dispose();
     const position = await env.positionFor(roll.turn);
@@ -57,7 +49,6 @@ async function copyOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll
   }
 }
 
-/** The score of the copy's next root: from the cache, else played and searched. A game that ends in the copy needs no search. */
 async function flipOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll): Promise<'abort' | RollFlip | null> {
   // The card of turn t + 1 sits at index t; the engine is the one that card's turn ran.
   const engine = env.data.turnSettings[roll.turn];
@@ -70,8 +61,6 @@ async function flipOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll
   const copy = await copyOf(env, params, roll);
   if (copy === 'abort' || copy === null) return copy;
   if (copy.stage === 'ended' && copy.terminal !== null) {
-    // The end's score is cached too (a result with no search behind it: interval 0, depth 0, no ranked choices), so a second sweep of a
-    // game that ends in its biggest roll plays no copy and rebuilds no position.
     remember(env, engine, key, storeKey, { score: copy.terminal, interval: 0, depthCompleted: 0, perSide: { p1: [], p2: [] } });
     return { turn: roll.turn, score: copy.terminal };
   }
@@ -80,7 +69,7 @@ async function flipOf(env: SweepEnv, params: RolledCopyParams, roll: BiggestRoll
   return { turn: roll.turn, score: result.score };
 }
 
-/** false = aborted (the caller must skip the finalize, as after the replacement points). */
+/** false = aborted: the caller must skip the finalize. */
 export async function evaluateRolledCopy(env: SweepEnv): Promise<boolean> {
   const params = env.params.rolledCopy;
   if (!params || aborted(env)) return true;

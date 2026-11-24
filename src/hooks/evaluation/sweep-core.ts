@@ -17,12 +17,10 @@ import { probeSensitivity, verifyFlagged } from './sweep-verify';
 import { installCachedTurn } from './sweep-cached';
 import { playedCellValue } from './played-cell';
 
-/** Turns the sweep evaluates concurrently (half the pool): one turn's serial sections leave workers idle. Turns are independent
- *  (own position, fixed seeds, slots and cache keys), so lanes change wall-clock, never results. */
+// Turns are independent (own position, fixed seeds, slots and cache keys): lanes change wall-clock, never results.
 const TURN_LANES = lanesForPool(evalPoolSize());
 
-/** Resolves 'auto' to the turn's concrete engine before any cache or store-key work (stored results carry concrete modes only);
- *  the fainted fraction comes from the serialized position the engine evaluates, and a cached fraction skips the position. */
+// Resolves 'auto' before any cache or store-key work: stored results carry concrete modes only.
 async function resolveTurnEngine(
   env: SweepEnv, turn: number, settings: SweepSettings,
 ): Promise<'abort' | 'gap' | TurnEngine> {
@@ -46,9 +44,7 @@ async function resolveTurnEngine(
   return { depth, samples, mode, ...(settings.prove === false ? { prove: false } : {}) };
 }
 
-/** A cached result serves a request unless it is a sketch (no prover) and the request is not. */
 const proveMatches = (hit: { prove?: boolean }, engine: TurnEngine): boolean => hit.prove !== false || engine.prove === false;
-/** The sketch marker (no prover) of a cache entry or a settings object. */
 const sketchFields = (engine: { prove?: boolean }): { prove?: false } => (engine.prove === false ? { prove: false } : {});
 const memoryHitMatches = (hit: CachedEval | undefined, engine: TurnEngine, tera: TeraAllowance): hit is CachedEval =>
   hit !== undefined && hit.depth === engine.depth && hit.samples === engine.samples && hit.mode === engine.mode
@@ -77,7 +73,6 @@ async function loadTurnHit(
   return hit;
 }
 
-/** The engine's expectation of the real choices: the decision part of the coming swing (chance is the rest). */
 async function computeFreshPlayedOutcome(
   env: SweepEnv, client: EvalWorkerClient, serialized: string, result: EvalResult,
   turnPlayed: PlayedTurn | null, engine: TurnEngine,
@@ -86,7 +81,6 @@ async function computeFreshPlayedOutcome(
   let outcome: number | null = null;
   const p1Choice = matchOrPhantom(result, 'p1', turnPlayed, env.params.rules);
   const p2Choice = matchOrPhantom(result, 'p2', turnPlayed, env.params.rules);
-  // A tree turn prices the pair with the root's own cell; the sub-search stays where the pair is no cell.
   const cell = p1Choice && p2Choice && mode === 'mcts' ? playedCellValue(result, p1Choice.choice, p2Choice.choice) : null;
   if (cell !== null) return { value: cell };
   if (p1Choice && p2Choice) {
@@ -98,7 +92,6 @@ async function computeFreshPlayedOutcome(
   return { value: outcome };
 }
 
-/** Verification and sensitivity of a fresh turn (final-verdict passes only). */
 async function verifyAndProbeFresh(
   env: SweepEnv, serialized: string, result: EvalResult, turnPlayed: PlayedTurn | null,
   resolvedSettings: AppEvalSettings, turn: number,
@@ -169,7 +162,6 @@ async function runFreshEvaluation(
 async function evaluateFreshTurn(
   env: SweepEnv, args: Omit<TurnStageArgs, 'hit'>, verify: boolean,
 ): Promise<boolean> {
-  // A failed acquisition belongs to the coverage notice; only a throwing eval on a live position is an eval-layer gap.
   let acquired: string | null = null;
   try {
     acquired = await env.positionFor(args.turn);
@@ -210,8 +202,6 @@ async function evalTurn(
     depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, ...sketchFields(engine),
   };
 
-  // Monotone merge: skip the turn when the graph already holds a result this pass must not replace (a deeper one, an explicit
-  // deepen, or the configured engine's result when this pass carries the other).
   if (!supersedesStored(env.data.turnSettings[turn - 1], { depth, samples, mode }, env.configuredMode, env.data.faintedFractions[turn - 1], env.params.doubles)) {
     finishTurn();
     return true;
@@ -229,8 +219,7 @@ async function evalTurn(
   return true;
 }
 
-/** One pass over `turnList` at `settings`; false = cancelled. `verify` runs the depth+1 misplay verification: final-verdict passes
- *  only, never the fast shaping pass (its results are provisional). */
+/** One pass over `turnList`; false = cancelled. `verify` only in final-verdict passes, never the fast shaping pass. */
 export async function sweepTurns(
   env: SweepEnv, turnList: number[], settings: SweepSettings, verify: boolean,
 ): Promise<boolean> {

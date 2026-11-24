@@ -4,10 +4,7 @@ import { computePreviewDamage, EMPTY_SIDE_DAMAGE, type DamagePreviewInputs, type
 import { EMPTY_MOVES, EMPTY_SWITCHES } from '../lib/dock-panel';
 import { useGimmickToggles, type PendingEdit } from './useSideControlsState';
 
-/**
- * The slot views, the gimmick toggles and the damage preview of a position. The toggles live here, not per slot, because the preview
- * reads both sides' Tera; with `onEdit` a toggle edits the slot's pending move, without it a toggle arms the slot's next pick.
- */
+// Gimmick toggles live here, not per slot: the preview reads both sides' Tera.
 
 type Side = 'p1' | 'p2';
 type LiveBattle = LiveHit['battle'];
@@ -69,7 +66,6 @@ export function useDockPreview(
   onEdit?: (side: Side, slot: number, choice: BranchSlotChoice) => void,
 ) {
   const slots = useSlots(simState);
-  // Both sides' chosen actions: a gimmick in one slot's pick is the side's for this turn.
   const choices = useMemo(() => ({ p1: simState?.p1Choices ?? EMPTY_CHOICES, p2: simState?.p2Choices ?? EMPTY_CHOICES }), [simState]);
   const { p1ActiveSlots, p2ActiveSlots, p1MovesBySlot, p2MovesBySlot } = slots;
   const edit = useMemo<PendingEdit | undefined>(

@@ -6,10 +6,7 @@ import { LINE_PASS } from '../../components/eval/early-lines';
 import type { EvalGraphState, GraphData } from './graph-sweep';
 import type { CachedEval } from './single-eval';
 
-/**
- * A tree search for the lines of a graded turn runs on the shared pool without cancelling anything (`exclusive: false`); its lines are
- * written into that turn's stored result with the line-pass mark (graph, memory cache, store entry), so a reload searches nothing again.
- */
+/** Searches a graded turn's lines without cancelling the pool's other work and stores them with the line-pass mark. */
 export function useEarlyLinesIO(env: {
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
@@ -24,11 +21,10 @@ export function useEarlyLinesIO(env: {
     return result.lines ?? [];
   }, [clientRef]);
 
-  /** Writes `lines` into the result `base` of `turn`; false (nothing written) when the turn's result is no longer `base`. */
+  /** False, nothing written, when the turn's result is no longer `base`. */
   const attachLines = useCallback((turn: number, base: EvalResult, lines: EvalLine[], cacheKey: string): boolean => {
     const data = graphDataRef.current;
     if (!data || data.results[turn - 1] !== base) return false;
-    // a search that kept no line leaves the lines the sweep made (a tree turn); the pass is marked either way
     const withLines: EvalResult = { ...base, lines: lines.length > 0 ? lines : base.lines ?? [], linePass: LINE_PASS };
     const replaced = (results: (EvalResult | null)[]) => results.map((result, index) => (index === turn - 1 ? withLines : result));
     graphDataRef.current = { ...data, results: replaced(data.results) };

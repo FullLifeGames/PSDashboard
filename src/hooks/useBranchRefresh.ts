@@ -32,9 +32,7 @@ interface RefreshContext {
   branchWindowOpenRef: MutableRefObject<boolean>;
   isCancelled: () => boolean;
   clearRequest: () => void;
-  /** The rebuild kept no turn: the variation is gone. */
   reportEnded: (notice: string) => void;
-  /** A new game's dice seed: a variation refreshed from turn 0 starts the game's own battle again. */
   seed?: string;
 }
 
@@ -76,8 +74,7 @@ async function runRefresh(ctx: RefreshContext, request: BranchRefreshRequest) {
   }
 }
 
-/** Rebuilds the VARIATION from its start turn, wherever the pointer wanders; without a live runtime (fresh hypothetical) the
- *  viewed turn is the target. */
+/** Rebuilds the variation from its start turn; with no live runtime the viewed turn is the target. */
 export function useBranchRefresh(args: {
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
@@ -107,7 +104,6 @@ export function useBranchRefresh(args: {
     const refreshTurn = (branching ? variationStartTurn : null) ?? viewTurn;
     void runRefresh({
       replayData, snapshots, observations, sources, refreshTurn,
-      // Bring-limited replays keep their trim through team-edit refreshes (a T0 variation re-seeds it from its lead entry).
       bringOnly: refreshTurn > 0 ? bringOnlyLists ?? undefined : undefined,
       session, startBranch, acquireRuntime, branchWindowOpenRef,
       isCancelled: () => cancelled,

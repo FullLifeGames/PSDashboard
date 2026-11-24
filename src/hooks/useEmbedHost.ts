@@ -10,32 +10,22 @@ interface EmbedHostOptions {
 }
 
 export interface EmbedHostState {
-  /** `?embed=1`: the app is framed by another site and hides its chrome. */
   embed: boolean;
-  /** `?replay=<id|url>`: replay to load on startup. */
   requestedReplay: string | null;
-  /** `?turn=<n>`: the turn to open that replay on (read once; null for no turn, a non-number, or a link a share link or a held game overrides). */
+  /** `?turn=<n>`, read once; null for no turn, a non-number, or when a share link or held game overrides the link. */
   requestedTurn: number | null;
-  /** `?game=<id>`: the saved game the address names (opened by `useOpenAddress`). */
   requestedGame: string | null;
 }
 
-/**
- * Lets another site drive the app: `?replay=` auto-loads a replay, `&turn=<n>` opens it on that turn (`useRequestedTurn`), `?embed=1`
- * strips the chrome, and the host page can post `{ type: 'ps-load-replay', replay }` (an id, a URL, a raw protocol log or an exported
- * replay HTML). The app answers with `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error`; these types are disjoint from the
- * internal viewer protocol (`ps-turn`, `ps-seek-turn`, `ps-append-log`, `ps-replay-ready`), so both listeners share the window.
- */
+/** Host-page contract: `ps-load-replay` in; `ps-embed-ready` / `ps-replay-loaded` / `ps-replay-error` out. */
 export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): EmbedHostState {
   const [config] = useState<EmbedHostState>(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedGame = params.get('game');
-    // a saved game the address names is the game to open; a game this browser does not hold leaves the replay link its way
     const requestedReplay = requestedGame && loadGame(requestedGame) ? null : params.get('replay');
     return {
       embed: params.get('embed') === '1',
       requestedReplay,
-      // the turn belongs to the replay link; a #branch= share link owns the view and brings its own turn
       requestedTurn: requestedReplay === null || window.location.hash.startsWith('#branch=') ? null : parseRequestedTurn(params.get('turn')),
       requestedGame,
     };
@@ -44,7 +34,6 @@ export function useEmbedHost({ loadReplay, loadReplayFile }: EmbedHostOptions): 
 
   useEffect(() => {
     if (!config.requestedReplay || autoLoadedRef.current) return;
-    // A #branch= share link owns the view: no replay fetch behind it.
     if (window.location.hash.startsWith('#branch=')) return;
     autoLoadedRef.current = true;
     void loadReplay(config.requestedReplay);

@@ -3,19 +3,12 @@ import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 import { teamOfInfo } from '../lib/new-game/edit-team';
 import type { NewGameRecord } from '../lib/new-game/record';
 
-/**
- * Edit Player, Edit Opp and Import/Export Sets on a new game: the game takes the editor's `OpponentTeamInfo` as sets (`teamOfInfo`),
- * stops the live branch (its runtime stands on the old teams), plays the record again on the new teams (`editTeams`) and says where
- * the main line ends when an entry no longer applies. A dry run (`planTeams`) comes first: an edit that invalidates played turns
- * asks before it cuts and Cancel changes nothing. The editor stays mounted under the question, hidden while `hold` is true, so
- * Cancel returns to it with the text as typed; it closes only when the edit applies. A replay keeps its own path.
- */
 
 type Teams = { p1: ReturnType<typeof teamOfInfo>; p2: ReturnType<typeof teamOfInfo> };
 
 interface Inputs {
   record: NewGameRecord | null;
-  /** A dry run of the edit: how many turns the game would keep. Changes nothing. */
+  /** A dry run: how many turns the game would keep; changes nothing. */
   planTeams: (teams: Teams) => Promise<{ kept: number; error: string | null } | null>;
   editTeams: (teams: Teams) => Promise<{ kept: number; error: string | null } | null>;
   variationOpen: boolean;
@@ -23,7 +16,6 @@ interface Inputs {
   close: () => void;
 }
 
-/** "its first turn", "its first 3 turns", "no turn" (an edit that ends the line before its first turn). */
 const keptTurns = (kept: number): string => (kept === 0 ? 'no turn' : kept === 1 ? 'its first turn' : `its first ${kept} turns`);
 
 function cutQuestion(falling: number, kept: number, variationOpen: boolean): string {
@@ -53,8 +45,7 @@ export function useGameTeamEdit({ record, planTeams, editTeams, variationOpen, s
       }
     }, (failure: unknown) => setNotice(`The edit could not be applied: ${failure instanceof Error ? failure.message : String(failure)}`));
   }, [editTeams, stopBranch]);
-  /** Plays the record again on the sides given (a null side keeps the record's own sets); false when no game is open. A plan that
-   *  cuts played turns asks first (nothing changes until the answer), any other edit applies and closes the editor (`closeEditor`). */
+  /** A null side keeps the record's own sets; false when no game is open; an edit that cuts played turns asks first. */
   const editSides = useCallback((next: { p1: OpponentTeamInfo | null; p2: OpponentTeamInfo | null }, closeEditor: () => void = close): boolean => {
     if (!record) return false;
     const teams = {
