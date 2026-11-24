@@ -6,16 +6,6 @@ import { checkGameTeams, loadSimMods, startGameLog } from '../src/index';
 import { SWEEPS_FULL } from './dice-fixtures';
 import { playableFormatIds } from './new-game-teams';
 
-/**
- * The ability a new game fills into a pasted set without one. Slot 0 of the species can be a banned
- * ability (Garchomp's Sand Veil under Evasion Abilities Clause in OU and Doubles OU, Dugtrio's Sand Veil and Arena Trap in OU,
- * Tatsugiri's Commander in Doubles OU), so the fill takes the first slot (0, 1, H, S) the format allows and keeps slot 0 only when none passes.
- * The sweep plays every species of the format's Dex that the format lets in, in every format family the app offers for new games
- * (singles and doubles, Scarlet/Violet, the older generations, Champions), and holds the fill to the simulator's own validator: a
- * second call, `validateSet`, whose problems name the ability. A Custom Game checks nothing, so slot 0 stays there; a Hackmons
- * format is free too.
- */
-
 const FAMILIES = [
   'gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9customgame', 'gen9doublescustomgame', 'gen9bssregi', 'gen9championsou',
   'gen9championsvgc2026regmc', 'gen9championscustomgame', 'gen8ou', 'gen4ou', 'gen3ou', 'gen7doublesou', 'gen9balancedhackmons',
@@ -31,21 +21,18 @@ beforeAll(async () => {
 
 const dexOf = (id: string) => Dex.forFormat(Dex.formats.get(id));
 
-/** The abilities of a species in slot order, without gaps or repeats: the order the Dex lists them. */
 function slotAbilities(species: { abilities: Record<string, string | undefined> }): string[] {
   const names = SLOTS.map(slot => species.abilities[slot]).filter((name): name is string => !!name);
   return names.filter((name, index) => names.indexOf(name) === index);
 }
 
-/** The oracle: whether the full set validation of the format finds a problem that names the ability. */
 function refuses(validator: TeamValidator, species: string, ability: string): boolean {
   const set = { name: species, species, item: '', ability, moves: [], nature: 'Hardy', gender: '', evs: {}, ivs: {}, level: 100 } as unknown as PokemonSet;
   const problems = validator.validateSet(set, {}) ?? [];
-  // The validator words a refused ability "<set>'s ability <name> is ..."; event-origin lines name only "its Hidden Ability" and are no ban.
+  // A refused ability reads "<set>'s ability <name> is ..."; event-origin lines name "its Hidden Ability": no ban.
   return problems.some(problem => problem.includes(`ability ${ability} `));
 }
 
-/** What the fill writes for the species, read from the team check's own line ("<species> has no ability: plays <ability>."). */
 async function filledFor(id: string, speciesNames: string[]): Promise<Map<string, string>> {
   const sets = speciesNames.map(species => ({ name: species, species, item: '', ability: '', moves: ['Protect'], nature: 'Hardy', gender: '', evs: {}, ivs: {}, level: 100 }) as unknown as PokemonSet);
   const { p1 } = await checkGameTeams(id, { p1: sets, p2: [] });
@@ -96,7 +83,6 @@ describe('the ability a new game fills', () => {
     }
     const report = `ability fill census (${SWEEPS_FULL ? 'full' : 'sample'}):\n${census.join('\n')}`;
     console.info(report);
-    // vitest hides the output of a green test: FILL_CENSUS_FILE keeps the census for the ledger
     if (process.env.FILL_CENSUS_FILE) writeFileSync(process.env.FILL_CENSUS_FILE, `${report}\n`);
     expect(probed).toBeGreaterThan(10);
     expect(failures.slice(0, 40)).toEqual([]);

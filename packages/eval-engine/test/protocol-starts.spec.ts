@@ -11,17 +11,10 @@ import { playProtocolStarts } from '../src/branch/entry-effects';
 import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * A `|-start|` line the block shows and the rebuilt board lacks is played through the simulator's own addVolatile on the body, without a
- * list of effects. The scene: smogtours-gen9ou-752733 turn 14, where the game's Garganacl survives Moonblast at 5 % and starts Salt Cure on
- * Iron Valiant; a simulator that K.O.s the Garganacl first leaves the board without Salt Cure for turns 15 to 17.
- */
-
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 type Teams = ReturnType<typeof buildTeamsFromReplay>;
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
 
-/** `teams`: the build the bank made for the replay (the Smogon fills of .smogon-cache, saved as a fixture), else the naked build. */
 async function boundaries<T>(replay: Replay, turns: number[], read: (battle: Battle) => T, teams?: Teams) {
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = teams ?? buildTeamsFromReplay(replay.log, { observations, speedOrders });
@@ -142,7 +135,7 @@ describe.each(['singles', 'doubles'] as const)('the start lines against the simu
   });
 
   test('Taunt: a start before the residual round of the block ticks once, as the simulator does after the real move; a start after it does not', () => {
-    // Magikarp is faster and has moved when the Taunt lands, which is how the simulator reads a start outside a move (an empty queue).
+    // A start outside a move reads with an empty queue: Magikarp is faster and has moved when the Taunt lands.
     const real = fresh(mon('Sableye', 'Keen Eye', ['Taunt', 'Splash']));
     real.duelists.play(real.battle, 'move 1 1');
     const realDuration = real.battle.sides[1].active[0]!.volatiles['taunt']!.duration!;
@@ -155,7 +148,6 @@ describe.each(['singles', 'doubles'] as const)('the start lines against the simu
   });
 
   test('Taunt on a slower body: the body\'s own move after the start line is a move still to come, as the simulator reads the queue; another body\'s move, or a move before the line, is not', () => {
-    // Greninja is faster than Magikarp, so the Taunt lands while Magikarp's move waits in the queue: no extra turn.
     const real = fresh(mon('Greninja', 'Torrent', ['Taunt', 'Splash']));
     real.duelists.play(real.battle, 'move 1 1');
     const realDuration = real.battle.sides[1].active[0]!.volatiles['taunt']!.duration!;
@@ -212,12 +204,6 @@ describe.each(['singles', 'doubles'] as const)('the start lines against the simu
 
 await loadSimMods('gen9championsou');
 
-/**
- * The sweep: every Dex condition a volatile status can name, in every generation the corpus plays and in the Champions mod,
- * singles and doubles. The simulator starts the condition on a body and writes its `-start` lines; the same lines fed to a
- * second identical board must leave the same volatile with the same duration. What the rule cannot reproduce is counted
- * (not named): a handler that reads the move in progress or needs a source the line does not carry.
- */
 describe('the sweep: the lines the simulator writes for a started volatile start it again on a second board', () => {
   const formats = [3, 4, 5, 6, 7, 8, 9].flatMap(gen => [`gen${gen}customgame`, `gen${gen}doublescustomgame`]).concat('gen9championscustomgame', 'gen9championsdoublescustomgame');
   const conditionIds = (dex: typeof Dex) => {
@@ -233,7 +219,7 @@ describe('the sweep: the lines the simulator writes for a started volatile start
   const bodies = (format: string) =>
     board(format, [filler('Pikachu', 'Static'), filler('Eevee', 'Run Away')].slice(0, size(format)), [filler('Eevee', 'Run Away'), filler('Pikachu', 'Static')].slice(0, size(format)));
   const tally = { checked: 0, ok: 0, notAdded: 0, noStartLine: 0, notReproduced: [] as string[], differs: [] as string[] };
-  /** Two conditions per format: Stockpile writes a count (`stockpile1`), a token no condition names; Attract checks the genders of the body and a source its line does not carry. */
+  // Stockpile writes a count (`stockpile1`) no condition names; Attract needs the genders and a source its line lacks.
   const KNOWN_NOT_REPRODUCED = 32;
 
   for (const format of formats) {

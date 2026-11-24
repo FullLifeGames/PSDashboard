@@ -2,21 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { entries, lastTurn, play, rebuiltWith, set } from './named-games-support';
 
-/**
- * Names the id function cannot tell apart. `toId` keeps letters and digits, so a Chinese or Japanese
- * name has the id "" and a decorated name loses its decoration; two such bodies of one side would share an id, and a
- * quote or a backslash in a name would break the team in the stream's JSON line. Holdout games with exactly these names
- * lost positions (gen9doublesou-2693607366, gen9doublesou-2695281966,
- * gen9vgc2025regh-2437382000, gen9vgc2026regi-2574882651, gen9vgc2026regi-2575764780 and one more): the lead was
- * another body than the replay's, or the reconstruction died before the first turn.
- *
- * The oracle is the replay's own log: a game the simulator plays itself (team preview picks the leads, a body comes in
- * from the bench) is rebuilt from its spectator log as the app does, and every body the simulator brings in must come in
- * with the details the game wrote, in the same order, on the same turn, under the game's own name: the build leaves out
- * only a name that is a species of the side (team-identity.ts, dropAmbiguousNicknames), and the lookups compare the exact
- * name (team-order.ts, sameBodyName). Singles and doubles.
- */
-
 function rebuilt(format: string, log: string) {
   const { p1Team, p2Team } = buildTeamsFromReplay(log);
   return rebuiltWith(format, log, p1Team, p2Team);

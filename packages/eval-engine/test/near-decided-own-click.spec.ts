@@ -4,17 +4,8 @@ import { unansweredMons } from '../src/eval-function';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The near-decided stage names the mon whose own click removes the standing foe and who then clears the
- * rest itself ("Own active, own click"). A rule that lets any teammate clear the rest named Magnezone behind Clefable's
- * Moonblast (573756 t71) and wrote "Kingambit stood one 94% roll from clearing the rest" about Basculegion's Wave Crash
- * (Champions VGC 2695803506 t2). The scenes: a fast Tauros lands a 95 % Crush Claw on a
- * 1-HP Alakazam whose Psychic would kill it if Alakazam acted first.
- */
-
 const level = { level: 50 };
 const clicker = (): PokemonSet => set('Tauros', ['crushclaw'], level);
-// A 1-HP Gengar dies to Alakazam's Psychic, so it never reads as a decided sweep of the whole board.
 const ghostClearer = (): PokemonSet => set('Gengar', ['shadowball'], level);
 
 function scene(format: string, p2: PokemonSet[], clickerHp: (maxhp: number) => number): Battle {
@@ -28,7 +19,6 @@ function scene(format: string, p2: PokemonSet[], clickerHp: (maxhp: number) => n
 }
 
 describe('the near stage names the clicker, who clears the rest itself', () => {
-  // Behind Alakazam stands a Ghost that Crush Claw cannot touch: only Gengar clears it.
   const ghostBehind = (): PokemonSet[] => [set('Alakazam', ['psychic'], level), set('Dusknoir', ['splash'], level)];
 
   test('singles: a click that only unlocks a teammate\'s sweep is no near-decided', () => {
@@ -40,8 +30,6 @@ describe('the near stage names the clicker, who clears the rest itself', () => {
   });
 
   test('a clicker that clears the rest itself keeps the stage and records the click as the played choice writes it', () => {
-    // Behind Alakazam a 1-HP Machamp only bulks up. The poisoned Tauros at 20 % survives the one turn the rest takes, not
-    // the two the whole board takes, so the board reads near-decided rather than decided.
     const harmlessBehind = (format: string): Battle => {
       const battle = scene(format, [set('Alakazam', ['psychic'], level), set('Machamp', ['bulkup'], level)], maxhp => Math.floor(maxhp / 5));
       battle.sides[0].pokemon[0].setStatus('psn');

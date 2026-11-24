@@ -5,15 +5,6 @@ import { analyzeTurn, type SideAnalysis } from '../src/analysis';
 import { chanceRolled, rolledSides } from '../src/turn-analysis/luck';
 import type { EvalResult, KoOddsInfo, RankedChoice } from '../src/types';
 
-/**
- * The luck ledger splits into what the turn rolled
- * and what the engine re-read. Detection reads the turn's protocol: each
- * dice marker favors the side opposing the body the dice went against, and
- * every hit of a move on an opposing body is kept with its target and
- * whether it took the body's last HP, so a played line's KO odds can be
- * checked against what happened.
- */
-
 const mon = (name: string, speciesForme: string, isActive: boolean) => ({
   name, speciesForme, hp: 100, maxhp: 100, hpPercent: 100,
   status: '', fainted: false, isActive, boosts: {}, moves: [],

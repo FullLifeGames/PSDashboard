@@ -10,14 +10,6 @@ import type { PlayedTurn } from '../src/played';
 import type { EvalMatrix, EvalResult, RankedChoice } from '../src/types';
 import { battleOf } from './power-oracle';
 
-/**
- * A cell the planner calls "none" has no PRICED roll. The planner prices the
- * accuracy and the kill range of a hit; Body Slam's paralysis, Scald's burn, Earth Power's drop and every other secondary
- * effect with a chance under 100 sit in a "none" cell and may have rolled. A turn without its protocol reads the cell as
- * "no priced roll" when a move of the played pair carries such an effect: no answer, so the sentences keep their ungated
- * wording. The chance is read from the Dex.
- */
-
 const row = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: null });
 const names: [string, string] = ['Alpha', 'Beta'];
 
@@ -26,7 +18,6 @@ const NONE: Cell = { visits: 20, verified: false, plan: 'none' };
 const ONE_CLASS: Cell = { visits: 20, verified: false, plan: 'events', classes: [{ key: 'hit-nokill', weight: 1 }] };
 const ROLL: Cell = { visits: 20, verified: false, plan: 'events', classes: [{ key: 'hit-nokill', weight: 0.7 }, { key: 'miss', weight: 0.3 }] };
 
-/** A one-row singles turn: p1 clicked `p1Move`, p2 clicked `p2Move`, the played cell is `cell`. */
 function singlesTurn(p1Move: string, p2Move: string, cell: Cell) {
   const p1Id = `move ${toID(p1Move)}`;
   const p2Id = `move ${toID(p2Move)}`;
@@ -39,7 +30,6 @@ function singlesTurn(p1Move: string, p2Move: string, cell: Cell) {
   return analyzeTurn({ turn: 4, result, played, playedOutcome: 0.05, scoreBefore: 0.05, scoreAfter: 0.3, actives: { p1: null, p2: null, gen: 9 } });
 }
 
-/** The doubles twin: both sides click two moves (`p1Moves`, `p2Moves`), the played cell is `cell`. */
 function doublesTurn(p1Moves: [string, string], p2Moves: [string, string], cell: Cell) {
   const id = (moves: [string, string]) => moves.map(move => `move ${toID(move)}`).join(', ');
   const label = (moves: [string, string]) => moves.join(' + ');
@@ -118,7 +108,6 @@ describe('the chance is read from the Dex, and the Dex agrees with the simulator
     for (const move of moves) expect(`${move.id} ${unpriced(move.id)}`).toBe(`${move.id} ${chancy(move)}`);
   });
 
-  /** Over 40 seeds a Snorlax uses `moveId` on a Blissey: whether the target got the status in some seeds and not in others. */
   function statusSeeds(moveId: string): number {
     const set = (species: string, moves: string[]): PokemonSet => ({
       name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',

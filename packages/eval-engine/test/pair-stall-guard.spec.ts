@@ -5,13 +5,7 @@ import { planTimeFallback } from '../src/pair/guards';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The pair plan sends a cell to the plain mean before anything is drawn when a move's success is rolled (a Protect used again after
- * a Protect). The guard reads the Dex: a self-targeted stalling move with a volatile is the Protect family. Wide Guard, Quick Guard
- * and Mat Block are not in it: the simulator never rolls them (their onTry asks only that someone acts after them). Held against the
- * simulator: every move that stops hits is played with a stall volatile on its user over eight seeds, in both rule sets
- * (Scarlet/Violet and the Champions mod).
- */
+// Wide Guard, Quick Guard and Mat Block never roll in the simulator: their onTry only asks that someone acts after.
 
 await loadSimMods('gen9championsou');
 
@@ -30,7 +24,7 @@ describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex', ru
   const succeeded = (battle: Battle): boolean =>
     battle.log.some(line => line.startsWith('|move|p1a')) && !battle.log.some(line => line.startsWith('|-fail|p1a'));
 
-  /** `stalled` sets the stall counter to 27 (three Protects in a row). */
+  // `stalled` sets the stall counter to 27: three Protects in a row.
   function turn(moveId: string, seed: string, stalled: boolean): Battle {
     const battle = board(moveId, seed);
     if (stalled) for (let uses = 0; uses < 3; uses++) battle.sides[0].active[0]!.addVolatile('stall');
@@ -39,7 +33,6 @@ describe.each(RULES)('$name: the stall guard of the pair plan reads the Dex', ru
     return battle;
   }
 
-  /** The simulator's answer: the move works on every seed without the counter and fails on some seed with it. */
   function rolledInSim(moveId: string): boolean {
     if (!SEEDS.every(seed => succeeded(turn(moveId, seed, false)))) return false;
     return SEEDS.some(seed => !succeeded(turn(moveId, seed, true)));

@@ -6,12 +6,6 @@ import { boundaryEvent } from '../src/ko-odds';
 import { classChildren, speedTie } from '../src/search/outcome-children';
 import { SEARCH_SEEDS } from './seed-streams';
 
-/**
- * Outcome children on demand. The boundary event's kill-roll
- * counts, the class path with forced draws, the empirical grouping, and
- * the speed-tie split.
- */
-
 function makeSet(name: string, species: string, moves: string[], level = 100): PokemonSet {
   return {
     name, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
@@ -35,7 +29,6 @@ function makeBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]
   return battle;
 }
 
-/** Sets the first active's HP per side (null keeps full HP) and serializes. */
 function serializeAt(battle: Battle, hp: [number | null, number | null]): string {
   hp.forEach((value, index) => { if (value !== null) battle.sides[index].active[0]!.sethp(value); });
   return JSON.stringify(State.serializeBattle(battle));
@@ -69,7 +62,6 @@ describe('boundary event kill rolls', () => {
   });
 });
 
-// Both at 1 HP (the solver test's shape): Thunder kills on a hit, Close Combat kills for sure after a miss, so Thunder is the only priced event.
 const thunderAtOne = () => createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [1, 1]));
 const TREE_OPTS = { baseSeeds: [SEARCH_SEEDS[0]], forcedCap: 6 };
 const weights = (children: { key: string; weight: number }[]) => Object.fromEntries(children.map(child => [child.key, Number(child.weight.toFixed(6))]));
@@ -95,15 +87,11 @@ describe('classChildren', () => {
     const drawn = classChildren(root, 'move thunder', 'move closecombat', { ...TREE_OPTS, stopAtForcedSwitch: true })!;
     const kill = drawn.children.find(child => child.key === 'p1:hit-kill')!;
     expect(kill.pendingSwitch).toBe(true);
-    // The miss lets Close Combat take Jolteon: p1's switch request opens instead.
     expect(drawn.children.find(child => child.key === 'p1:miss')!.pendingSwitch).toBe(true);
     expect(positionBattle(drawn.children.find(child => child.key === 'p1:miss')!.position).sides[0].pokemon[0].fainted).toBe(true);
   });
 
   test('a knock-out only a crit reaches gets a crit representative', () => {
-    // Thunderbolt against a Machamp whose HP sits above every non-crit roll but under the crit rolls:
-    // the first HP from the top of the non-crit range where no normal roll kills and a crit roll still does.
-    // Jolteon at 1 HP keeps Close Combat a sure kill (no second event).
     const eventAt = (hp: number) => {
       const root = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [1, hp]));
       const battle = positionBattle(root);

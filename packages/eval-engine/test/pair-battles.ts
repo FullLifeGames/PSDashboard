@@ -3,11 +3,6 @@ import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, type SimPosition } from '../src/forward-model';
 
-/**
- * Helpers for the doubles pair plan: the anchor position (VGC
- * 2634199230 turn 5, rebuilt over the bank's app build) with its three cells,
- * and a builder for small doubles battles.
- */
 const ANCHOR = JSON.parse(readFileSync(
   new URL('./fixtures/positions/gen9championsvgc2026regmbbo3-2634199230-t5.json', import.meta.url), 'utf-8',
 )) as { serialized: string };
@@ -16,9 +11,7 @@ export const anchorRoot = (): SimPosition => createRootPosition(ANCHOR.serialize
 
 /** The played pair of turn 5: Play Rough misses Incineroar on seed 1,2,3,4 and Flare Blitz kills Sinistcha. */
 export const PLAYED = ['move lifedew, move playrough 2', 'move matchagotcha, move flareblitz 1'] as const;
-/** Matcha Gotcha into both p1 bodies; nothing of p1 attacks, Incineroar leaves. */
 export const SPREAD = ['move lifedew, move swordsdance', 'move matchagotcha, switch 3'] as const;
-/** No roll at all: status moves against two switches. */
 export const QUIET = ['move lifedew, move swordsdance', 'switch 3, switch 4'] as const;
 
 export function pairSet(name: string, species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet {
@@ -30,7 +23,6 @@ export function pairSet(name: string, species: string, moves: string[], extra: P
   };
 }
 
-/** A doubles custom game past team preview (every set in team order); `setup` may change the battle before it is serialized. */
 export function doublesRoot(p1: PokemonSet[], p2: PokemonSet[], setup?: (battle: Battle) => void): SimPosition {
   const battle = new Battle({
     formatid: toID('gen9doublescustomgame'),

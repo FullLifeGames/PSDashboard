@@ -6,15 +6,8 @@ import { submittableChoice } from '../src/forward/request-moves';
 import { doublesRoot, pairSet } from './pair-battles';
 import { SEEDS } from './sim-fast-helpers';
 
-/**
- * A locked doubles slot (rampage, charge release, recharge,
- * Bide, Uproar) gets a request entry with NO target type (pokemon.js
- * getMoves(lockedMove)). By name the sim then assumes 'normal' and demands a
- * target (side.js:397,469: "Outrage needs a target"); by index it takes the
- * missing type and uses the locked target itself (side.js:384,480-492).
- * smogtours-gen9doublesou-913996 turn 6: p1's Dragonite rages since turn 5,
- * every option of the position was rejected and the bank dropped the row.
- */
+// A locked doubles slot gets a request entry with no target type (pokemon.js getMoves(lockedMove)).
+// By name the sim assumes 'normal' and demands a target (side.js:397,469); by index it uses the locked one (:384).
 
 const WALLS = [pairSet('Wall', 'Blissey', ['Splash'], { level: 100 }), pairSet('Wall2', 'Chansey', ['Splash'], { level: 100 })];
 const QUIET = 'move splash, move splash';

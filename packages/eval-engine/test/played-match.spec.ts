@@ -19,16 +19,10 @@ import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-or
 import type { StaticRuleset } from '../src/eval-function';
 import { playedSetupMove, type SideAnalysis } from '../src/analysis';
 
-/**
- * The matchers take the order bound of a body that fell before it acted (optional; absent, both pick as before). Present, they drop the options
- * it rules out before the pick: a move id of `moves`, and a switch when `switchOut` is set. A bound that rules out every option is no proof
- * (the log and the queue disagree), and the pick is the one without it.
- */
 const option = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Reply' });
 const move = (name: string, targetLoc: number | null = null): PlayedAction => ({ kind: 'move', name, tera: false, targetLoc });
 
 describe('doubles: the slot that fell before it acted (replay 2710981835 turn 7)', () => {
-  // Dragonite (slot a) fell to Floette's Dazzling Gleam; Empoleon's Flash Cannon is the logged click of slot b.
   const options = [
     option('move extremespeed 1, move flashcannon 1', 'Extreme Speed→Floette + Flash Cannon→Floette', 0.9),
     option('move protect, move flashcannon 1', 'Protect + Flash Cannon→Floette', 0.8),
@@ -76,7 +70,6 @@ describe('singles: the stay-in phantom of a side that fell before it acted', () 
   const rules = logRules('');
   const result = (...p2: RankedChoice[]): EvalResult => ({ score: 0, interval: 0, depthCompleted: 1, perSide: { p1: [], p2 } });
   const played: PlayedTurn = { p1: move('Psyshock'), p2: null, prevented: { p2: 'faint' } };
-  // Grafaiai (Prankster) fell to Psyshock before it acted: Parting Shot ran at +1 and is out.
   const grafaiai = result(
     option('switch 2', '→ Gholdengo', 0.9),
     option('move partingshot', 'Parting Shot', 0.6),

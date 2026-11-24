@@ -6,21 +6,15 @@ import { foeActsBefore } from '../src/score/unanswered';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The near-decided stage weighs a click by the chance its user still acts. 573756 turn 71: SOULWIND's
- * Clefable has a sure Moonblast against the +4 Garchomp, but Garchomp moves first and its Earthquake kills Clefable 82 % of
- * the time, so "Magnezone stood one sure KO from clearing the rest" described a click that rarely happens. The order of a
- * click against the foe's kill is the move's priority first, then the effective speed (inverted under Trick Room), and an
- * exact speed tie may go to the foe. The sweep plays every Dex move with a priority other than 0 in the rule sets the corpus
- * plays against the simulator's own queue (`comparePriority` on the actions `queue.resolveAction` builds).
- */
+// A click's order against the foe's kill: priority first, then effective speed (inverted under Trick Room);
+// an exact speed tie may go to the foe.
 
 await loadSimMods('gen9championsou');
 
 const SLOW = { nature: 'Brave', evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 0 } };
 const FAST = { nature: 'Jolly', evs: { hp: 4, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 } };
 
-// every generation the near stage reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod
+// Gens 3 to 9 and the Champions mod: boundaryEvent returns nothing for Gens 1 and 2.
 const RULES = [
   { name: 'Generation 3', singles: 'gen3customgame', doubles: 'gen3doublescustomgame' },
   { name: 'Generation 4', singles: 'gen4customgame', doubles: 'gen4doublescustomgame' },
@@ -34,11 +28,6 @@ const RULES = [
 
 describe('the near stage weighs the click by the chance its user acts', () => {
   const attackerSet = (): PokemonSet => set('Tauros', ['doubleedge'], { level: 50, item: 'choiceband' });
-  // The clicker clears the rest itself, so no second sweeper waits. A 95 % Crush Claw kills the 1-HP
-  // Alakazam, whose Psychic kills the attacker when it acts first; behind Alakazam a 1-HP Machamp only bulks up. The
-  // poisoned attacker at 20 % survives the one turn the rest takes, not the two the whole board takes, so the board reads
-  // near-decided rather than decided. The attacker's partner is immune to the foe's move, so the foe never reads decided
-  // and the click's order alone decides.
   const foeSets = (): PokemonSet[] => [
     set('Alakazam', ['psychic'], { level: 50 }),
     set('Machamp', ['bulkup'], { level: 50 }),
@@ -96,7 +85,6 @@ describe('the near stage weighs the click by the chance its user acts', () => {
 describe.each(RULES)('$name: who acts first, the reading against the simulator', rules => {
   const mon = (moves: string[], extra: Partial<PokemonSet>): PokemonSet => set('Snorlax', moves, { level: 100, ...extra });
 
-  /** The simulator's queue: can the foe's action come before mine (a tie counts as possible)? */
   function simFoeFirst(battle: Battle, foeMove: string, myMove: string): boolean {
     const foe = battle.sides[1].active[0]!;
     const mine = battle.sides[0].active[0]!;
@@ -111,7 +99,6 @@ describe.each(RULES)('$name: who acts first, the reading against the simulator',
 
   test('the sweep covers the priority moves of the rule set', () => {
     expect(priorityMoves.length).toBeGreaterThan(15);
-    // The moves with a priority handler of their own are not read from the Dex priority: they stay named, so a new one shows.
     const handlers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && typeof (move as { onModifyPriority?: unknown }).onModifyPriority === 'function')
       .map(move => move.id).sort();
     expect(handlers).toEqual(dex.gen >= 8 ? ['grassyglide'] : []);
@@ -122,7 +109,6 @@ describe.each(RULES)('$name: who acts first, the reading against the simulator',
     ['doubles', rules.doubles],
   ])('%s: every priority move in both seats, at both speeds, at a speed tie and under Trick Room', (_label, format) => {
     const rows: string[] = [];
-    // Trick Room exists from generation 4 on.
     for (const trickRoom of dex.gen >= 4 ? [false, true] : [false]) {
       for (const [mineSet, foeSet] of [[SLOW, FAST], [FAST, SLOW], [SLOW, SLOW]] as const) {
         for (const move of priorityMoves) {

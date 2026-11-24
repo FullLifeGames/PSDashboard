@@ -8,12 +8,7 @@ import { combinedOptionHints, protectorStops, shieldsFromHits, shieldsSide } fro
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * Protect and its kin earn the damage they deny, up to the flinch-sized ceiling of the pair term, the way the side protectors do. A Protect
- * in front of a lone heavy hit would stay at the 0.25 support floor (VGC 2630685175 turn 7: 16th to 42nd of 42 legal combos). The reading
- * comes from the simulator: the shield's own onTryHit, asked from stand-ins that leave the battle alone. The Protect covers its user only
- * (the partner stands outside it), so only the user's share of a spread hit counts. Both rule sets run it, Scarlet/Violet and Pokémon Champions.
- */
+// The Protect covers its user only (the partner stands outside it), so only the user's share of a spread hit counts.
 
 await loadSimMods('gen9championsou');
 
@@ -30,7 +25,7 @@ const RULES: Rules[] = [
 ];
 
 const SUPPORT_FLOOR = 0.25;
-/** The flinch-sized ceiling of a protector's tempo (hints.ts FLINCH_BONUS). */
+// The ceiling is hints.ts FLINCH_BONUS.
 const CEILING = 0.3;
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
@@ -45,7 +40,6 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
   const splash = (species: string, extra: Partial<PokemonSet> = {}) => mon(species, ['splash'], extra);
   const battleWith = (p1: PokemonSet[], p2: PokemonSet[]) => battleOf(rules.format, p1, p2);
 
-  /** p1's slot 1 holds `shield` (and Splash) on `userSpecies`, slot 2 a Blissey; p2's Garchomp holds `attack`. `hp` sets slot 1's HP. */
   function board(shield: string, attack: string, hp?: number, userSpecies = 'Blissey'): Battle {
     const battle = battleWith(
       [mon(userSpecies, [shield, 'splash']), splash('Blissey')],
@@ -59,7 +53,6 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
     battle.choose('p2', `move 1${aimedAt(battle, attack)}, move 1`);
     return battle.sides[0].active[0]!.fainted;
   }
-  /** What the engine's own damage fractions say Protect denies its user: the hit as it lands, capped at the user's HP. */
   function deniedBy(battle: Battle, attack: string, spread: boolean): number {
     const user = battle.sides[0].active[0]!;
     return Math.min(singleMoveFraction(battle.sides[1].active[0]!, user, attack, battle) * (spread ? 0.75 : 1), user.hp / user.maxhp);
@@ -128,7 +121,6 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
     });
 
     test('pair-only KO keeps its full tempo, whatever one hit is worth', () => {
-      // Two Garchomps: each Dragon Claw leaves a high-HP Snorlax standing, together they KO it.
       const pair = battleWith(
         [mon('Snorlax', ['protect', 'splash']), splash('Blissey')],
         [mon('Garchomp', ['dragonclaw', 'splash'], { ability: 'Sand Veil' }), mon('Garchomp', ['dragonclaw', 'splash'], { ability: 'Sand Veil' })]);
@@ -145,7 +137,6 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
     const shields = dex.moves.all().filter(move => playable(move) && shieldsFromHits(dex, move)).map(move => move.id);
     const PROBES = ['tackle', 'surf', 'rockslide', 'aquajet', 'fakeout', 'feint', 'thunderwave'];
 
-    /** A Blissey that opened with `shield` meets a slow foe's `probe` (a probe of higher priority than the shield lands first: no handler runs). */
     const slowFoeBoard = (shield: string, probe: string) =>
       battleWith([mon('Blissey', [shield, 'splash']), splash('Blissey')], [mon('Shuckle', [probe, 'splash']), splash('Shuckle')]);
     function stoppedInSim(shield: string, probe: string): boolean {
@@ -153,8 +144,7 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
       const user = battle.sides[0].active[0]!;
       battle.choose('p1', 'move 1, move 1');
       battle.choose('p2', `move 1${aimedAt(battle, probe)}, move 1`);
-      // The shields of the Protect family log "move: Protect"; a stopped hit leaves the user untouched. Feint logs an activation
-      // of its own when it breaks the shield and then hurts the user, so the activation alone is not the answer.
+      // Feint logs its own activation when it breaks the shield and then hurts the user: no answer alone.
       const activated = battle.log.some(line => /^\|-activate\|p1a: .*\|move: /.test(line));
       return activated && user.hp === user.maxhp && !user.status;
     }
@@ -179,9 +169,6 @@ describe.each(RULES)('$name: Protect in the hints (3a)', rules => {
       expect(seen.some(line => line.endsWith('false'))).toBe(true);
     });
 
-    // The shields that punish a contact hit do it in the handler asked here: King's Shield, Obstruct and Silk Trap lower a stage of the
-    // attacker (a nested object a shallow stand-in shares with the live body), Baneful Bunker and Burning Bulwark try a status through
-    // the live battle (a log line and the effect counter). A leak would sit in the root battle every later hint and every child reads.
     const protectors = dex.moves.all().filter(move => playable(move) && (shieldsFromHits(dex, move) || shieldsSide(dex, move))).map(move => move.id);
 
     test('the sweep holds the Protect family, its contact punishers and the side protectors', () => {

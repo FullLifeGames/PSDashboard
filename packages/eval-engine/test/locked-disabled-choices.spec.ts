@@ -6,23 +6,14 @@ import { applyChoice } from '../src/forward/switches';
 import { serializeBattleStable } from '../src/forward/serialize';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * A Pokemon locked into a move (Outrage, a charge, Uproar) whose move Disable has hit. The request lists the
- * locked entry with no `disabled` key, and the simulator plays it (side.js chooseMove returns the locked move before it reads
- * the disabled flag), but the moveSlot carries `disabled: true`. Slot choices that drop every entry whose id sits in
- * that live-disabled set offer the locked slot nothing, and a doubles side is left with the partner's part alone: "move
- * flashcannon 1" goes to the Charizard in slot a ("Your Charizard doesn't have a move matching flashcannon", Champions VGC
- * gen9championsvgc2026regmbbo3-2680872224, one of 1,445 positions). Held against the simulator: every locked move of every
- * view (Generations 1 to 9, Champions, both doubles rule sets) is played with its slot flagged disabled, and the choices the
- * search offers must name the locked move and be accepted on a copy of the battle.
- */
+// A locked entry has no `disabled` key in the request, and side.js chooseMove returns it before it reads that flag,
+// but the moveSlot carries `disabled: true`.
 
 const SEED: [number, number, number, number] = [1, 2, 3, 4];
 
 const STAYS = mon('Blissey', ['splash']);
 const sturdy = (moves: string[]) => mon('Snorlax', moves);
 
-/** One turn on a board where p1's first body uses `move` against a body that splashes. Null when the move is not playable here. */
 function afterFirstTurn(view: SimView, moveName: string): Battle | null {
   const p1 = view.doubles ? [sturdy([moveName, 'splash']), STAYS, STAYS, STAYS] : [sturdy([moveName, 'splash']), STAYS];
   const p2 = view.doubles ? [STAYS, STAYS, STAYS, STAYS] : [STAYS, STAYS];
@@ -36,7 +27,6 @@ function afterFirstTurn(view: SimView, moveName: string): Battle | null {
   return null;
 }
 
-/** The locked entry of slot a (a request entry with no target key), or null. */
 function lockedEntry(battle: Battle): { id: string; move: string } | null {
   const entry = (battle.sides[0].activeRequest as { active?: { moves?: { id?: string; move: string; target?: unknown }[] }[] } | null)?.active?.[0];
   const first = entry?.moves?.[0];
@@ -63,7 +53,6 @@ describe.each(ALL_VIEWS)('$name: a locked move whose slot Disable flagged stays 
     if (move.id.startsWith('hiddenpower') && move.id !== 'hiddenpower') continue;
     const battle = afterFirstTurn(view, move.name);
     const entry = battle && lockedEntry(battle);
-    // A locked entry whose id has no moveSlot (the recharge turn) cannot be flagged disabled.
     if (battle && entry && battle.sides[0].active[0]!.moveSlots.some(slot => slot.id === entry.id)) locked.push({ move: move.name, id: entry.id, battle });
   }
 
@@ -89,7 +78,7 @@ describe.each(ALL_VIEWS)('$name: a locked move whose slot Disable flagged stays 
     for (const { move, id, battle } of locked) {
       battle.sides[0].active[0]!.moveSlots.find(slot => slot.id === id)!.disabled = true;
       const copy = forkBattle(createRootPosition(serializeBattleStable(battle)), SEED);
-      // A locked entry goes by its index: by name the simulator assumes a target type and asks for a target (submittableChoice).
+      // By index: by name the simulator assumes a target type and asks for a target (submittableChoice).
       const choice = view.doubles ? 'move 1, move splash' : 'move 1';
       if (!copy.choose('p1', choice)) refused.push(`${move}: ${copy.sides[0].choice.error}`);
     }
@@ -101,11 +90,9 @@ describe.each(ALL_VIEWS.filter(view => ['Gen 9', 'Champions', 'Scarlet/Violet do
   '$name: Disable hits a Charizard locked into Outrage (the reported scene)',
   view => {
     const charizard = mon('Charizard', ['outrage', 'earthquake', 'protect', 'splash'], { evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } });
-    // A Normal-type disabler: Outrage hits it (a Fairy takes no hit, so no lock starts), and its Speed stays below the Charizard's.
     const slow = (moves: string[]) => mon('Snorlax', moves, { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 4, spe: 0 } });
     const board = () => {
       const p1 = view.doubles ? [charizard, mon('Empoleon', ['flashcannon', 'icebeam', 'hydropump', 'protect']), STAYS, STAYS] : [charizard, STAYS];
-      // Outrage picks its target at random: the partner must survive the hit, or the turn ends on a forced switch.
       const p2 = view.doubles ? [slow(['disable', 'splash']), slow(['splash']), STAYS, STAYS] : [slow(['disable', 'splash']), STAYS];
       const battle = battleIn(view, p1, p2);
       battle.choose('p1', view.doubles ? 'move outrage, move protect' : 'move outrage');

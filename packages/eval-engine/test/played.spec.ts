@@ -58,8 +58,6 @@ describe('played-action parsing', () => {
   });
 
   test('a cant records WHY the choice never surfaced', () => {
-    // A sleeping mon whose turn is swallowed: the player DID choose; the
-    // report should say sleep ate it, not "could not act".
     const slept = parsePlayedActions([
       '|move|p1a: Vileplume|Sleep Powder|p2a: Rhydon',
       '|cant|p2a: Rhydon|slp',
@@ -91,7 +89,6 @@ describe('played-action parsing', () => {
       '|turn|7',
     ], logRules(''));
     expect(played.p1).toEqual({ kind: 'move', name: 'Draco Meteor', tera: false });
-    // Cryogonal died before acting — p2's chosen action never surfaced.
     expect(played.p2).toBeNull();
     expect(played.prevented?.p2).toBe('faint');
   });
@@ -144,7 +141,6 @@ describe('doubles played-action parsing', () => {
     expect(played.p1Slots?.[0]).toEqual({ kind: 'move', name: 'Moonblast', tera: false, targetLoc: 2 });
     expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
     expect(played.p2Slots?.[0]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
-    // Chien-Pao took damage but never acted — the switch is its chosen action.
     expect(played.p2Slots?.[1]).toEqual({ kind: 'switch', name: 'Urshifu', species: 'Urshifu' });
   });
 
@@ -160,7 +156,7 @@ describe('doubles played-action parsing', () => {
       '|move|p2b: Urshifu|Protect|',
       '|turn|9',
     ]);
-    expect(played.p1Slots?.[0]).toBeNull(); // flinched — choice never surfaced
+    expect(played.p1Slots?.[0]).toBeNull();
     expect(played.p1Slots?.[1]).toEqual({ kind: 'move', name: 'Wood Hammer', tera: true, targetLoc: 1 });
     expect(played.p2Slots?.[0]).toEqual({ kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 });
     expect(played.p2Slots?.[1]).toEqual({ kind: 'move', name: 'Protect', tera: false, targetLoc: null });
@@ -303,7 +299,7 @@ const t25 = (numbers: { score: number; protect: [number, number, number]; lopunn
 describe('655336 t25: the gate at both sets of numbers', () => {
   /** The feedback dump at a2e7c2b: score 0.6958, Protect -0.6779, the switch -0.7343, regret 0.0563. */
   const head = { score: 0.6958, protect: [-0.7263, -0.6224, -0.6779] as [number, number, number], lopunny: [-0.775, -0.7201, -0.7343] as [number, number, number] };
-  /** An earlier feedback dump (0da5ec7 to 8683fa9): score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156. */
+  // An earlier feedback dump (0da5ec7 to 8683fa9): score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156.
   const r70 = { score: 0.3337, protect: [-0.45, -0.3, -0.2773] as [number, number, number], lopunny: [-0.9, -0.7, -0.6929] as [number, number, number] };
 
   test('at the dump of the a2e7c2b engine the turn has no tier and no blame', () => {
@@ -334,7 +330,6 @@ describe('655336 t25: the gate at both sets of numbers', () => {
   });
 
   test('a luck-free window that repays the regret stamps the sack (the form the dump lacks: the position after the pair read 0.139 better for p2)', () => {
-    // The pair's value is what came (own outcome -0.838 against the after score -0.838) and the window reaches over the safe floor by the margin.
     const analysis = t25(head, { scoreAfter: 0.838, futureOutcomes: [0.3, 0.3, 0.3] });
     expect(analysis.p2.tier).toBeUndefined();
     expect(analysis.p2.sacrifice).toMatchObject({ name: 'Lopunny', hazard: true, verified: true });
@@ -541,7 +536,6 @@ describe('a death after the mon\'s own dice-failed action', () => {
     // Older logs carry only the |-miss| line.
     expect(detectSacks(missed.filter(line => !line.includes('[miss]')), sackSnapshot(11), logRules('')))
       .toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'miss' } });
-    // A dice |cant| (full paralysis, flinch, freeze, sleep) is the same shape; Taunt is not dice.
     const paralyzed = ['|cant|p1a: Dauni|par', '|move|p2a: Wall|Body Press|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt', '|faint|p1a: Dauni'];
     expect(detectSacks(paralyzed, sackSnapshot(11), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.11, rolled: 'cant' } });
     const taunted = ['|cant|p1a: Dauni|move: Taunt|Toxic', '|move|p2a: Wall|Body Press|p1a: Dauni', '|-damage|p1a: Dauni|0 fnt', '|faint|p1a: Dauni'];
@@ -552,9 +546,6 @@ describe('a death after the mon\'s own dice-failed action', () => {
   });
 
   test('a rolled death with a knock-out chance is no sack; without odds the feed reading stands', () => {
-    // The played move would have knocked the target out (95% × 1) and the
-    // mon moved first: a hit keeps it alive. The miss killed it, so the
-    // low-cost-trade framing is false — the regret grades as played.
     const rolledResult: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
       perSide: {
@@ -583,7 +574,6 @@ describe('a death after the mon\'s own dice-failed action', () => {
     const rolled = run({ name: 'Garchomp', hpFraction: 0.11, rolled: 'miss' });
     expect(rolled.p1.sacrifice).toBeUndefined();
     expect(rolled.p1.tier).toBe('mistake');
-    // Without the roll the low-HP feed demotes the verdict and frames a sack.
     const fed = run({ name: 'Garchomp', hpFraction: 0.11 });
     expect(fed.p1.sacrifice).toEqual({ name: 'Garchomp', hpFraction: 0.11 });
     expect(fed.p1.tier).toBe('inaccuracy');
@@ -592,8 +582,6 @@ describe('a death after the mon\'s own dice-failed action', () => {
   });
 
   test('labeled doubles odds may be the partner slot\'s: a rolled death stays a feed', () => {
-    // A doubles option's odds name one slot's move and target, which may be the partner's: odds without their attacker read as none, so the
-    // same turn as the rolled case above, with a label on the odds, frames the sack like the case without odds.
     const result: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
       perSide: {

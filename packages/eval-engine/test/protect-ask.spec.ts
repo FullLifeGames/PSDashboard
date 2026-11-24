@@ -10,17 +10,6 @@ import { copyOf, fingerprint, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The engine's Protect readers ask the simulator through the module (src/sim-ask/). Each sweep plays the Dex against the simulator's own
- * answer, with the development check on, so a handler that writes the live battle fails here as `AskLeak`.
- *  - protectorStops (search/hints.ts): every protector of the Dex against one attack of every class the Dex holds (Z and Max
- *    moves, contact and not, every target and priority), the contact punishers included. The simulator's answer is the
- *    protector's own handler run on a copy of the battle with the copy's bodies and the real attack.
- *  - protectBlocks (calc/protect.ts): every ability with a ModifyMove handler against every move of the Dex, in every
- *    generation that has abilities and in the Champions mod. The simulator's answer is the protect flag the move carries
- *    after `runEvent('ModifyMove')` on the attacker.
- */
-
 await loadSimMods('gen9championsou');
 
 beforeAll(() => setAskCheck(true));
@@ -59,7 +48,6 @@ function attackClasses(dex: Battle['dex']): string[] {
 
 const hitData = (...things: object[]) => things.map(thing => JSON.stringify((thing as { moveHitData?: unknown }).moveHitData ?? null));
 
-/** The simulator's answer: the protector's own handler on a copy of the battle, with the copy's bodies and the real attack. */
 function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
   const copy = copyOf(battle);
   const at = (mon: Pokemon) => copy.sides[mon.side.n].pokemon[mon.side.pokemon.indexOf(mon)];
@@ -126,7 +114,7 @@ describe.each(ABILITY_RULES)('$name: protectBlocks reads the protect flag the si
       }
     }
     expect(wrong.slice(0, 10)).toEqual([]);
-    // The sweep sees a real case wherever the generation has one: an ability that takes the protect flag off a move (the Champions mod keeps the flag: its Unseen Fist answers in onHitProtect).
+    // The Champions mod keeps the protect flag on moves: its Unseen Fist answers in onHitProtect.
     if (dex.gen >= 8 && !rules.format.includes('champions')) expect(flagTaken).toBeGreaterThan(0);
   });
 });

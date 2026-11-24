@@ -1,14 +1,6 @@
 import { Dex, TeamValidator } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 
-/**
- * A legal team for any format of the simulator's registry, found the way the simulator itself judges
- * one: a species is a candidate when its own learnset gives four moves of the format's generation and the validator accepts
- * the set alone; a prefix of candidates is kept while the validator accepts the whole team (Monotype, Species Clause and the
- * like are team rules). The helper holds no species or move names: it reads the Dex as the oracle (a spec may).
- */
-
-/** Formats the sweep plays: a user's own team, singles or doubles, no generated team. */
 export function playableFormatIds(): string[] {
   return Dex.formats.all()
     .filter(format => format.effectType === 'Format' && !format.team && (format.gameType === 'singles' || format.gameType === 'doubles'))
@@ -36,11 +28,9 @@ function candidateSet(dex: ReturnType<typeof Dex.forFormat>, speciesId: string, 
   };
 }
 
-/** Two legal teams for the format (the sides play different bodies), or the problems of the closest attempt. */
 export function legalTeams(formatId: string): { p1: PokemonSet[]; p2: PokemonSet[] } | { problems: string[] } {
   const plain = legalTeamsOf(formatId, null);
   if (!('problems' in plain)) return plain;
-  // A team rule that shares a type (Monotype): the same search over the bodies of one type, each type in turn.
   for (const type of Dex.forFormat(Dex.formats.get(formatId)).types.names()) {
     const typed = legalTeamsOf(formatId, type);
     if (!('problems' in typed)) return typed;
@@ -76,7 +66,6 @@ function legalTeamsOf(formatId: string, type: string | null): { p1: PokemonSet[]
       if (used.has(set)) continue;
       const next = [...team, set];
       const whole = validator.validateTeam(clone(next));
-      // A team below the format's size reports the missing bodies only; any other problem drops the candidate.
       if (whole && next.length >= size) { problems = whole; continue; }
       if (whole && whole.some(problem => !/(at least|must bring|have|bring) /i.test(problem))) { problems = whole; continue; }
       team = next;

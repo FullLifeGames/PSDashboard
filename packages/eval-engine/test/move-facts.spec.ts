@@ -6,17 +6,9 @@ import { active, bench, set } from './move-oracle';
 import { battleOf, fingerprint, powerInTurn } from './power-oracle';
 import { ScriptedPRNG } from '../src/forward/scripted-prng';
 
-/**
- * The static prices a move's power as it lands by asking the
- * simulator's own handler of that move (basePowerCallback, the move's
- * onBasePower, Endeavor's damageCallback). Each answer is checked against
- * what the simulator uses in a real turn, read before the turn starts.
- */
-
 const ours = (battle: Battle, attacker: Pokemon, defender: Pokemon, id: string) =>
   landedMove(attacker, defender, battle.dex.moves.get(id), battle);
 
-/** Our answer before the turn, then the simulator's in the turn (p1 slot 1 uses its first move, p2 Splashes). */
 function againstTurn(battle: Battle, id: string, p1 = 'move 1', p2 = 'move 1') {
   const answer = ours(battle, active(battle, 0), active(battle, 1), id);
   const seen = powerInTurn(battle, { p1, p2 }, id);
@@ -109,8 +101,7 @@ describe('power at use asks the simulator', () => {
     expect(expectTurn('gen9customgame', set('Venusaur', ['solarbeam'], { item: 'Power Herb' }), splash('Garchomp'), 'solarbeam', battle => {
       battle.field.setWeather('raindance', 'debug');
     }).powerMult).toBe(0.5);
-    // Psychic Terrain also boosts every Psychic move of a grounded user (its own BasePower handler, a
-    // field effect the static leaves out), so the turn's modifier is read against a plain Psychic.
+    // Psychic Terrain's own BasePower handler boosts a grounded user's Psychic move, which the static leaves out.
     const terrainTurn = (id: string) => {
       const battle = battleOf('gen9customgame', [set('Indeedee', [id])], [splash('Garchomp')]);
       battle.field.setTerrain('psychicterrain', 'debug');
@@ -134,14 +125,12 @@ describe('power at use asks the simulator', () => {
   });
 
   test('a benched carrier and a benched target answer like active ones', () => {
-    // Heavy Metal doubles the weight only while the sim reads the ability; on the bench it would not.
     const metal = battleOf('gen9customgame',
       [set('Pikachu', ['splash']), set('Copperajah', ['heavyslam'], { ability: 'Heavy Metal' })], [splash('Snorlax')]);
     const benched = ours(metal, bench(metal, 0, 1), active(metal, 1), 'heavyslam');
     metal.choose('p1', 'switch 2');
     metal.choose('p2', 'move 1');
     expect(benched).toEqual(ours(metal, active(metal, 0), active(metal, 1), 'heavyslam'));
-    // A benched Choice Scarf target is as fast as an active one.
     const scarf = battleOf('gen9customgame',
       [set('Ferrothorn', ['gyroball'])], [splash('Snorlax'), splash('Weavile', { item: 'Choice Scarf' })]);
     const toBench = ours(scarf, active(scarf, 0), bench(scarf, 1, 1), 'gyroball');
@@ -209,8 +198,6 @@ describe('multi-hit', () => {
       expect(ours(link, 'bulletseed').landing).toBe(powerInTurn(link, { p1: 'move 1', p2: 'move 1' }, 'bulletseed').length);
       const seeds = Array.from({ length: 200 }, (_, index) => `${index + 1},2,3,4`);
       const dice = (id: string) => set('Maushold', [id], { item: 'Loaded Dice' });
-      // Shuckle outlasts ten hits, so every turn counts its hits to the end; a turn whose first hit
-      // misses counts no hit, and the static never prices that roll (no move's accuracy enters it).
       const diceBattle = (id: string) => battleOf('gen9customgame', [dice(id)], [splash('Shuckle')]);
       for (const id of ['bulletseed', 'populationbomb']) {
         const counted = mean(seeds.map(seed => hitsInTurn('gen9customgame', dice(id), splash('Shuckle'), id, seed)).filter(hits => hits > 0));
@@ -231,7 +218,6 @@ describe('multi-hit', () => {
       const accuracy = Number(battle.dex.moves.get('tripleaxel').accuracy) / 100;
       const power = ours(battle, 'tripleaxel');
       expect(power.basePower * (power.landing ?? 1)).toBeCloseTo(powers.reduce((sum, hit, index) => sum + hit * accuracy ** index, 0), 10);
-      // Population Bomb: ten hits at 20, the chain of its 90 % accuracy.
       const bomb = ours(battleOf('gen9customgame', [set('Maushold', ['populationbomb'])], [splash('Snorlax')]), 'populationbomb');
       expect(bomb.basePower * (bomb.landing ?? 1)).toBeCloseTo(20 * Array.from({ length: 10 }, (_, index) => 0.9 ** index).reduce((a, b) => a + b, 0), 10);
     });
@@ -250,7 +236,6 @@ describe('multi-hit', () => {
       expect([ours(two, 'dragondarts', 0).landing, ours(two, 'dragondarts', 1).landing]).toEqual([undefined, undefined]);
       const seen = powerInTurn(two, { p1: 'move 1 1, move 1', p2: 'move 1, move 1' }, 'dragondarts');
       expect(seen.map(hit => hit.target)).toEqual(['Snorlax', 'Garchomp']);
-      // The partner fainted with nobody left to replace it: one foe on the field.
       const lone = battleOf('gen9doublescustomgame', [set('Dragapult', ['dragondarts']), splash('Pikachu')], [splash('Snorlax'), splash('Garchomp')]);
       lone.sides[1].active[1].faint();
       lone.resolveFaints();

@@ -15,15 +15,6 @@ import { set as oracleSet } from './move-oracle';
 import { battleOf as oracleBattleOf } from './power-oracle';
 import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
-/**
- * A seed per cell: fixed seeds roll one number at one draw index in every cell, so a die at draw n comes true in 0 % or 100 %
- * of a search's cells (a 20 % secondary in 73 to 80 % of a singles matrix, a crit at 1.4 % against 4.2 %). Every path reads one
- * list of seeds per cell (slot s of the list is `cellSeed(s, key)`), the key a hash of the saved position and the cell's two
- * choice strings, hashed once per root. Rows: (a) a die at a fixed draw index over 200 cell keys sits inside its binomial band,
- * (b) the four-number form and the prefix of the list, (c) no clash with `treeSeed`, the fixed seeds or another cell, (d) the
- * key reads the game state, not the bench order (649664 t14), is hashed once per root and moves with the cell.
- */
-
 const KEYS = 200;
 const INDEXES = 16;
 const DRAWS = 12;
@@ -32,13 +23,11 @@ const PS = [1 / 24, 0.10, 0.30, 0.90];
 const fixture = (name: string): { serialized: string } =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as { serialized: string };
 
-/** Draw n of the stream the seed starts: the number the simulator compares with a chance. */
 function draws(seed: string): number[] {
   const prng = new PRNG(seed as never);
   return Array.from({ length: DRAWS }, () => prng.random());
 }
 
-/** Key families: 200 distinct cells of three singles roots, of one doubles root, of one VGC root (choice strings of both shapes), and the integers. */
 function families(): Record<string, number[]> {
   const salts = [
     positionSalt(fixture('gen9ou-2658658993-t2').serialized), rootSalt('singles-b'), rootSalt('singles-c'),
@@ -120,7 +109,6 @@ describe('(c) no stream is shared by accident', () => {
           expect(tree.has(seed), `${family} cell ${cell} slot ${index}`).toBe(false);
           expect(SEARCH_SEEDS).not.toContain(seed);
           const first = seen.get(seed);
-          // the families draw from different roots, so a repeat is a clash; the same key in two families (the integers) cannot occur
           expect(first, `${family} cell ${cell} slot ${index} repeats ${first}`).toBeUndefined();
           seen.set(seed, `${family} cell ${cell} slot ${index}`);
         }
@@ -197,7 +185,6 @@ const set = (species: string, moves: string[]): PokemonSet => ({
 });
 const team = () => [set('Garchomp', ['Earthquake']), set('Corviknight', ['Body Press']), set('Primarina', ['Moonblast']), set('Kingambit', ['Kowtow Cleave'])];
 
-/** Four against four with one p2 Pokémon fainted on the bench (a quarter of a side, so the phase signal is not 0). */
 function battleOf(formatid: string): Battle {
   const battle = new Battle({ formatid: formatid as never, seed: '1,2,3,4', p1: { name: 'A', team: team() }, p2: { name: 'B', team: team() } });
   if (battle.sides.some(side => side.requestState === 'teampreview')) battle.makeChoices('team 1234', 'team 1234');
@@ -234,7 +221,6 @@ describe('speed-tie-gen1-par', () => {
   const fast = (species: string, moves: string[]) => set(species, moves, { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } });
   const mover = (log: string[], from: number) => log.slice(from).filter(line => line.startsWith('|move|')).map(line => line.split('|')[2].slice(0, 2));
 
-  /** Starmie (fast) paralyzed by Snorlax's Thunder Wave in turn one; the position after it is the board. */
   function paralyzed(seed: string): Battle {
     const battle = battleOf(FORMAT, [fast('Starmie', ['tackle'])], [fast('Snorlax', ['thunderwave', 'tackle'])], seed);
     battle.makeChoices('move tackle', 'move thunderwave');
@@ -247,7 +233,7 @@ describe('speed-tie-gen1-par', () => {
       for (const seed of ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20', '21,22,23,24']) {
         const battle = paralyzed(seed);
         const [starmie, snorlax] = [battle.sides[0].active[0] as Pokemon, battle.sides[1].active[0] as Pokemon];
-        if (starmie.status !== 'par') continue; // Thunder Wave missed or the move was blocked in this seed
+        if (starmie.status !== 'par') continue;
         expect(starmie.getStat('spe', false, false), seed).toBeLessThan(starmie.getStat('spe', true, true));
         expect(starmie.getActionSpeed(), seed).toBeLessThan(snorlax.getActionSpeed());
         expect(speedTie(battle as never, 'move tackle', 'move tackle'), seed).toBe(false);
@@ -255,7 +241,7 @@ describe('speed-tie-gen1-par', () => {
         const from = battle.log.length;
         battle.makeChoices('move tackle', 'move tackle');
         const order = mover(battle.log, from);
-        if (order.length < 2) continue; // fully paralyzed this turn
+        if (order.length < 2) continue;
         played++;
         expect(order, seed).toEqual(['p2', 'p1']);
       }

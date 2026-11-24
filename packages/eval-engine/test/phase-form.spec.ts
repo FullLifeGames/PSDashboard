@@ -7,12 +7,6 @@ import { phaseFormOf, setStaticForm, staticFormOn } from '../src/score/phase-for
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The model form of the static in standard singles: phase on the two big weights (bodies and matchup, weight plus an addend times
- * the share of fainted mons) and the status fold (statusFix at the weight of bodies). The switch (EVAL_STATIC_FORM=0 or
- * setStaticForm(false)) gives the table's score back exactly.
- */
-
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
 const mon = (species: string, extra: Partial<Parameters<typeof set>[2]> = {}) => set(species, ['splash', 'tackle'], extra);
@@ -24,7 +18,6 @@ const faintedShare = (battle: Battle): number => {
   return all.filter(pokemon => pokemon.fainted || pokemon.hp <= 0).length / all.length;
 };
 
-/** Gliscor with Poison Heal under toxic against a plain team, one foe already fainted. */
 function board(format: string): Battle {
   const doubles = format === DOUBLES;
   const mine = [mon('Gliscor', { ability: 'Poison Heal', item: 'Toxic Orb' }), mon('Garchomp'), mon('Clefable'), mon('Blissey')];
@@ -65,7 +58,6 @@ describe('the tables and the form per family', () => {
     for (const [doubles, ruleset] of [[false, 'champions'], [true, 'standard'], [true, 'vgc'], [true, 'champions']] as const) {
       expect(phaseFormOf(doubles, ruleset)).toBeNull();
     }
-    // A VGC singles game reads the standard singles table, and the form with it.
     expect(phaseFormOf(false, 'vgc')).toBe(form);
   });
 });

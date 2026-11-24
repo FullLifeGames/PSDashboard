@@ -7,31 +7,18 @@ import { drawsByAction, observeDraws, playTurn, prngOf, reconstruct, type Draw }
 import { loadSimMods } from '../src/forward/sim-mods';
 import { compareAlignment } from '../src/hax-alignment';
 
-// a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do
 await loadSimMods('gen9championsou');
 
-/**
- * The first turn of a branch keeps the logged dice of every action the user leaves as it was. The position sits on the seed its
- * turn has in the log, but one stream serves all actions in order: when the faster action's move
- * changes, the slower action would draw later numbers of the stream and lose its logged roll (GPL DzBQ5azlO5l turn 16: Earthquake
- * replaced, Strength Sap rolled 13 where the log has 47). The dice are per action (side, slot and move).
- *
- * The scenes are turns of the five fixtures the dice specs use, one per game type and rule set: the draws of every action are
- * read from the battle's PRNG as the sim calls it, keyed by the move in flight, so the assertions name the numbers and not
- * their effect on a line of the log (a changed faster move also changes the HP the slower hit lands on).
- */
+// One stream serves all actions in order: a changed faster move shifts the draws of the slower action.
 
 interface Scene {
   label: string;
   fixture: string;
   turn: number;
-  /** The faster side's click that replaces the logged one: its side, the slot's position in the side's choice and the click. */
   changed: { side: 'p1' | 'p2'; slot: number; click: string };
-  /** The actions (slot:move) whose draws the log has and the change leaves alone. */
   kept: string[];
-  /** A line a kept action's roll writes in the log (a secondary effect, a critical hit): the rebuilt turn shows it too. */
   marker?: RegExp;
-  /** Whether the seed stream reaches the changed action at the same place with or without the log's numbers (not when a kept action with a priority move acts first and its logged number steers the draws). */
+  // Whether the changed action draws at the same place with or without the log's numbers.
   onSeedPlace: boolean;
 }
 
@@ -59,7 +46,6 @@ async function play(scene: Scene, replaced: boolean, plainSeed = false) {
 
 const values = (draws: Draw[] | undefined) => draws?.map(draw => [draw.from, draw.to, draw.value]);
 
-/** The draws of `wanted` that stand in `seen` in the same order, each matched on its shape and its number. */
 function asSubsequence(wanted: Draw[], seen: Draw[]) {
   const found: Draw[] = [];
   let at = 0;
@@ -88,8 +74,6 @@ describe.each(SCENES)('the first branch turn keeps the logged dice of the action
     const changedSlot = `${scene.changed.side}${'ab'[scene.changed.slot]}`;
     for (const key of scene.kept) {
       expect(logged.byAction.has(key), `${key} acts in the log`).toBe(true);
-      // The logged numbers stand in the order the log has them; a target the change adds (a spread move the log rolled for once)
-      // draws its extra numbers from the seed between them.
       const logs = logged.byAction.get(key)!;
       expect(asSubsequence(logs, changed.byAction.get(key) ?? []), key).toEqual(values(logs));
     }
@@ -107,10 +91,6 @@ describe.each(SCENES)('the first branch turn keeps the logged dice of the action
     }
   });
 
-  // The arrival records the draws of the turn the rebuild plays, the log's dice forced on the hidden dice of seed index 0. A forced
-  // die answers with the number that gives the log's result (a hit is 0) where the plain seed draws its own, and a forced order of a speed tie
-  // changes the shuffles that follow. So the draws are not the plain seed's: the turn is held to the log's block, never worse than the plain
-  // seed's turn (a body the log never shows acting still gets a move filled in).
   test('a turn whose actions all stay as logged plays the block of the log at least as well as the plain seed', { timeout: 300000 }, async () => {
     const logged = await play(scene, false);
     const plain = await play(scene, false, true);

@@ -59,9 +59,6 @@ describe('forced-win prover', () => {
   });
 
   test('a stalling first candidate no longer starves the second: the sure strike goes first, whatever the ranking says', () => {
-    // No greedy scout filters the stalling line out. The position has a sure strike (Seismic Toss kills the Chansey at 1 HP, and the Chansey
-    // has no damaging move), which the proof tries before the ranking and on cells of its own, so Splash first reads the win the Toss-first
-    // ranking reads, at the same cells; the next row holds a position where the ranking still decides.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled', 'Recover'])],
@@ -76,8 +73,6 @@ describe('forced-win prover', () => {
   });
 
   test('with no sure strike the ranking decides which three candidates the proof tries: a winner listed fourth is never tried, listed first it wins', () => {
-    // A foe with a second body takes the strike away (D2 a: only a last standing body), and the Snorlax's Tackle kills the Pikachu at
-    // 1 HP unless the first move does: only Seismic Toss wins, this turn. The proof tries ROOT_CANDIDATES (3) of the ranking.
     const serialized = serializeAt(makeBattle(
       [makeSet('Pika', 'Pikachu', ['Splash', 'Growl', 'Harden', 'Seismic Toss'])],
       [makeSet('Lax', 'Snorlax', ['Tackle']), makeSet('Lax2', 'Snorlax', ['Tackle'])],
@@ -104,7 +99,6 @@ describe('forced-win prover', () => {
     expect(proof.turns).toBe(1);
     expect(proof.caveat).toBe('none');
     expect(proof.open).toEqual({ side: 'p1', moveId: 'thunder', label: 'Thunder', odds: 0.7, kind: 'hit' });
-    // The miss child ends with Machamp's answer: the open branch is a lost game.
     expect(proof.openValue).toBe(-1);
   });
 
@@ -120,8 +114,6 @@ describe('forced-win prover', () => {
   });
 
   test('a position without a line costs the proof its budget and no more', () => {
-    // Protect and Substitute on both sides: no line ends, so the full proof refutes the candidates inside the cell and state
-    // budgets and proves nothing.
     const serialized = serializeAt(makeBattle(
       [makeSet('A', 'Snorlax', ['Protect', 'Substitute'])],
       [makeSet('B', 'Chansey', ['Protect', 'Substitute'])],
@@ -133,8 +125,6 @@ describe('forced-win prover', () => {
   });
 
   test('a two-turn proof against four replies fits the budget', () => {
-    // Seismic Toss twice against a 150-HP Chansey with four harmless moves:
-    // four replies at the root, four children each proving in one more turn.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Splash', 'Growl', 'Tail Whip', 'Defense Curl'])],
@@ -146,10 +136,6 @@ describe('forced-win prover', () => {
   });
 
   test('a class no draw showed inherits the proof of the class that dominates it', () => {
-    // Toxic hits 90% of the time; the inner cells draw three seeds, which
-    // often never miss. A miss of the opponent's move is never better for
-    // them than the hit, so the missing class inherits the hit class's proof
-    // and the two Seismic Tosses prove with the full mass.
     const serialized = serializeAt(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Toxic', 'Splash', 'Growl', 'Tail Whip'])],
@@ -174,9 +160,6 @@ describe('forced-win prover', () => {
   });
 
   test('a surviving defender along the line labels the proof barring a crit', () => {
-    // Thunderbolt kills the Machamp on some rolls and leaves it in range
-    // on the rest; it cannot hurt back (Splash), so both classes prove and
-    // the survived hit, unpriced for a crit, labels the proof.
     const serialized = serializeAt(makeBattle(
       [{ ...makeSet('Jolt', 'Jolteon', ['Thunderbolt']), evs: { hp: 0, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 } }],
       [makeSet('Champ', 'Machamp', ['Splash'])],
@@ -199,7 +182,6 @@ describe('forced-win prover', () => {
   });
 
   test('doubles: a plain-path proof carries the sampled-rolls label', () => {
-    // A doubles field needs two slots per side: the Chansey's partner has fainted.
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Champ2', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -285,9 +267,7 @@ describe('the forced-win proof without the greedy scout', () => {
     expect(proof.caveat).toBe('sampled-rolls');
   });
 
-  // Champions VGC 2694684816 turn 8: 36 of the 100 cells are unpriced faint splits and the production budget ends with no proof (mass 0).
-  // Whether the win is certain by the game is open: the pricing of a split that follows a crit, and the class plan's read of slot a with one
-  // body per side. The row turns red when either lands; the pin then moves to the proof it finds.
+  // The row turns red when the pricing of a split after a crit or the class plan's read of slot a lands: the pin moves.
   test('doubles, Champions VGC 2694684816 turn 8: no proof within the production budget', async () => {
     const board = scene('scout-miss-gen9championsvgc2026regmc-2694684816-t8');
     await loadSimMods('gen9championsdoublescustomgame');
@@ -354,7 +334,6 @@ describe('forced-win-doubles-replies', () => {
     return battle;
   }
 
-  /** Two Machamp tossing two 1-HP Chansey, each Chansey with three single-target attacks: 36 legal p2 combos, no escape. */
   function tossPair(): string {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Champ2', 'Machamp', ['Seismic Toss'])],
@@ -373,12 +352,9 @@ describe('forced-win-doubles-replies', () => {
       expect(replies).toHaveLength(36);
       const line = 'move woodhammer 1, move earthpower 2';
       expect(board.rootOrder[0]).toBe(line);
-      // The simulator: Wood Hammer takes Calyrex-Shadow, Earth Power hits Zamazenta's Protect, and the game goes on.
       const protect = replies.find(reply => reply.label === 'Astral Barrage + Protect');
       expect(protect).toBeDefined();
       expect(p1WinsThisTurn(board.serialized, line, protect!.choice)).toBe(0);
-      // The full proof runs for the three ranked lines against every legal reply, and Zamazenta's Protect escapes each of them, so the proof
-      // holds no mass.
       const proof = proveForcedWin(root, { side: 'p1', rootOrder: board.rootOrder, tera: board.tera, sleepClause: board.sleepClause });
       expect(proof.mass).toBe(0);
     });
@@ -404,7 +380,6 @@ describe('forced-win-doubles-replies', () => {
       expect(proof.mass).toBe(1);
       expect(proof.turns).toBe(1);
       expect(proof.cells).toBeGreaterThanOrEqual(replies.length);
-      // What does not fit the budget proves nothing: 30 cells hold the tree's 12 combos, not the 36 legal replies.
       expect(proveForcedWin(serialized, { ...request, budget: { cells: 30 } }).mass).toBeLessThan(MIN_FORCED_MASS);
     });
 
@@ -426,7 +401,7 @@ describe('forced-win-doubles-replies', () => {
 });
 
 describe('plain-dice-scenes', () => {
-  // Saved roots of corpus games (`fixtures/forced-win/plain-dice-*`) and #145's singles scene: a cell whose draws agree on who faints but a die decides is priced by one child per turned die with the simulator's own chance, 33 in 100 for the confusion self-hit and one in three for a second Protect.
+  // The simulator's own chances: 33 in 100 for the confusion self-hit, one in three for a second Protect.
   interface Scene {
     id: string;
     turn: number;
@@ -464,7 +439,6 @@ describe('plain-dice-scenes', () => {
   });
 
   describe('a repeated Protect is priced at the proving move (doubles)', () => {
-    // the proving move alone: the hold the draws all failed is one third, so no turn proves the win in one turn
     test.each([
       ['Champions VGC 2679549596 turn 7', 'gen9championsvgc2026regmbbo3-2679549596-t7', 'gen9championsdoublescustomgame'],
       ['VGC 2468711188 turn 7', 'gen9vgc2025regj-2468711188-t7', 'gen9doublescustomgame'],
@@ -488,8 +462,6 @@ describe('plain-dice-scenes', () => {
   });
 
   describe('singles scene: a second Spiky Shield holds one time in three', () => {
-    // Chesnaught at 1 HP behind a Protect counter of 1 against a Garchomp that needs one more hit: the shield holds with the chance
-    // the counter gives, and the game decides the rest. The sweep proves the share for every stalling move of every rule set.
     test.each([
       ['Scarlet/Violet', 'gen9customgame', 'standard', 100, undefined],
       ['Champions', 'gen9championscustomgame', 'champions', 50, { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 }],
@@ -514,8 +486,6 @@ describe('plain-dice-scenes', () => {
   });
 
   describe('the tie path: each order plays apart and prices its dice (doubles)', () => {
-    // Snorlax against Snorlax at one speed in the leading slots: the order is a coin flip (a child of one half each), and the confusion
-    // of the first one decides inside each order (the self-hit, `randomChance(33, 100)`). Nobody faints, so the draws agree on the faints.
     test('two orders of one half, the self-hit splits 33 to 67 inside each', async () => {
       await loadSimMods('gen9championsou');
       const slow = { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } };

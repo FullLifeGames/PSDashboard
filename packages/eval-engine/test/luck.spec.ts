@@ -16,11 +16,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { serializeLiveBattle } from '../src/serialize';
 import { reconstruct } from './arrival-turn';
 
-/**
- * The luck step. Boards are small custom games whose bodies the spec sets, so every number is one the
- * simulator shows on that board: an accuracy of the Dex, the one-in-24 crit of Gen 9, a speed tie's one half. Singles and doubles.
- */
-/** Singles 1 v 1: Snorlax (slow) with High Jump Kick (90) against a faster Pikachu with Hydro Pump (80); both fall to any hit. */
 const COIN: Board = {
   format: 'gen9customgame',
   p1: [mon('Snorlax', ['High Jump Kick'])],
@@ -28,7 +23,6 @@ const COIN: Board = {
   prepare: battle => { battle.sides[0].pokemon[0].hp = 1; battle.sides[1].pokemon[0].hp = 1; },
 };
 
-/** Two turns: Seismic Toss (fixed 50) needs two hits on a 100 HP Pikachu, and Hydro Pump (80) kills the 1 HP Snorlax. */
 const TWO_TURNS: Board = {
   format: 'gen9customgame',
   p1: [mon('Snorlax', ['Seismic Toss'])],
@@ -121,7 +115,6 @@ describe('the luck step, singles', () => {
 });
 
 describe('the luck step, a speed tie', () => {
-  /** Two identical Pikachu with one fixed move each: whoever moves first knocks the other out. */
   const TIE: Board = {
     format: 'gen9customgame',
     p1: [mon('Pikachu', ['Tackle'])],
@@ -133,7 +126,7 @@ describe('the luck step, a speed tie', () => {
     const { serialized } = await serializedBoard(TIE);
     const step = luckPath(serialized, REQUEST(side));
     expect(step.status).toBe('found');
-    // Tackle has an accuracy of 100 and the roll does not decide a one-hit-point knock-out: the tie is the only die that prices
+    // Tackle never misses and no roll spares a 1 HP body: only the speed tie prices.
     expect(step.chance).toBeCloseTo(0.5, 12);
     const tie = named(step.line!, 'speed-tie');
     expect(tie).toHaveLength(1);
@@ -143,7 +136,6 @@ describe('the luck step, a speed tie', () => {
 });
 
 describe('the luck step, doubles (2 v 2 bodies: the engine fixture builder cannot start a doubles game with one body)', () => {
-  /** Pikachu with Earthquake and a Flying partner against two Pikachu that only Splash: one at 1 HP, one that survives any plain roll and falls to a crit. */
   const DOUBLES: Board = {
     format: 'gen9doublescustomgame',
     p1: [mon('Pikachu', ['Earthquake']), mon('Pidgeot', ['Splash'])],
@@ -151,7 +143,6 @@ describe('the luck step, doubles (2 v 2 bodies: the engine fixture builder canno
   };
 
   test('(c) a crit that alone knocks the second foe out is the crit die with the chance of its draw', async () => {
-    // the damage of a plain Earthquake at its highest roll, read from the simulator on a copy of the board
     const probe = await serializedBoard(DOUBLES);
     const { playTurnWith } = await import('../src/dice/likeliest');
     const { playOf } = await import('../src/endgame/win-paths/luck-path');
@@ -165,21 +156,19 @@ describe('the luck step, doubles (2 v 2 bodies: the engine fixture builder canno
     expect(damage).toBeGreaterThan(0);
     const board: Board = { ...DOUBLES, prepare: b => { b.sides[1].pokemon[0].hp = 1; b.sides[1].pokemon[1].hp = damage + 1; } };
     const { serialized } = await serializedBoard(board);
-    // one turn: a plain Earthquake at its highest roll leaves the second foe one hit point, so a second turn would win without luck
     const step = luckPath(serialized, REQUEST('p1', { turns: 1 }));
     expect(step.status).toBe('found');
     const crits = named(step.line!, 'crit').filter(entry => 'happens' in entry.die.result && entry.die.result.happens);
     expect(crits).toHaveLength(1);
     expect(crits[0].die.name.targetSlot).toBe('p2b');
     expect(crits[0].chance).toBeCloseTo(1 / 24, 12);
-    // the other dice of the turn (the first foe's crit and the rolls) change nobody's fate: the crit alone prices the path
+    // 1/24 is the Gen 9 crit chance: the crit alone prices the path.
     expect(step.chance).toBeCloseTo(1 / 24, 12);
     expect(new Set(diceOf(step.line!).map(entry => dieKey(entry.die.name))).size).toBe(diceOf(step.line!).length);
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(board, step.line!, seed), 'p1')).toBe(true);
   }, 120_000);
 });
 
-/** Earthquake (spread) against two Pikachu at 1 HP that may Splash or Growl, as the doubles row of `stronger.spec.ts`. */
 const DOUBLES: Board = {
   format: 'gen9doublescustomgame',
   p1: [mon('Pikachu', ['Splash', 'Earthquake']), mon('Pidgeot', ['Splash'])],
@@ -288,7 +277,6 @@ describe('the luck step on the corpus', () => {
     const { step, rebuild } = await run(SCENES[0]);
     expect(step.status).toBe('found');
     const line = step.line!;
-    // the path: the first choices play out (Scald takes Rotom-Wash, devin sends Medicham-Mega in), then Hydro Pump misses and High Jump Kick hits
     const dice = shownDice(line);
     console.info(`649664 t23 for devin: ${line.steps.map(entry => `${entry.p1.label} / ${entry.p2.label}`).join(' > ')} · ${dice.join(' · ')} · this sequence: ${Math.round((step.chance ?? 0) * 1000) / 10} %`);
     expect(line.steps.at(-1)!.p2.label).toBe('High Jump Kick');
@@ -307,7 +295,6 @@ describe('the luck step on the corpus', () => {
 
   test('Champions VGC 2695803506 t10: both sides on their first choice leave juacox300 nothing within three turns, inside the budget', async () => {
     const { step } = await run(SCENES[1]);
-    // Delphox-Mega's first choice is Protect each turn and Kingambit's Sucker Punch fails against it; burn takes Kingambit first
     expect(step.status).toBe('none');
     expect(step.line).toBeUndefined();
     expect(step.spent.cells).toBeLessThan(600);

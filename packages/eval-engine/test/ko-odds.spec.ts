@@ -39,7 +39,6 @@ const actives = (battle: Battle) => ({ atk: battle.sides[0].active[0]!, def: bat
 
 describe('boundaryEvent arithmetic', () => {
   test('a guaranteed fixed-damage KO prices accuracy 1, killFraction 1', () => {
-    // Level-100 Seismic Toss = flat 100 into a level-30 Pikachu (< 100 max HP).
     const battle = makeBattle(
       [makeSet('Machamp', 'Machamp', ['Seismic Toss'], 100)],
       [makeSet('Pikachu', 'Pikachu', ['Tackle'], 30)],
@@ -75,8 +74,6 @@ describe('boundaryEvent arithmetic', () => {
   });
 
   test('crit weighting lifts killFraction strictly between non-crit and crit fractions', () => {
-    // Walk the defender's HP down until the damage range (crit-weighted)
-    // straddles it: killFraction must sit strictly inside (0, 1) there.
     const battle = makeBattle(
       [makeSet('Snorlax', 'Snorlax', ['Body Slam'], 50)],
       [makeSet('Snorlax', 'Snorlax', ['Tackle'], 50)],
@@ -175,7 +172,6 @@ function clicked(root: SimPosition, side: 0 | 1, slot: number): Battle {
   return twin;
 }
 
-/** The first defender HP (in steps) where the twin the simulator clicked shows real odds for the option: a kill, not a sure one. */
 function rootWithOdds(make: (hp: number) => SimPosition, choice: string): SimPosition {
   for (let hp = 10; hp <= 400; hp += 5) {
     const root = make(hp);
@@ -197,7 +193,6 @@ describe('Tera options price their odds on the Tera body', () => {
     const root = rootWithOdds(singles, choice);
     const [odds] = koOddsForOptions(positionBattle(root), 'p1', [choice]);
     expect(odds).not.toBeNull();
-    // The odds are the click's either way; the attacker's species is the one the battle shows (the -Tera forme after the click).
     expect({ ...odds, attacker: undefined }).toEqual({ ...koOddsForOptions(clicked(root, 0, 0), 'p1', [choice])[0], attacker: undefined });
   });
 
@@ -258,7 +253,6 @@ const FORCE = 'move expandingforce 1, move splash';
 const IDLE = 'move splash, move splash';
 const IDLE_ALONE = 'move splash, pass';
 
-/** A doubles battle; `alone` leaves the first foe the only one alive (the second of its two fainted). */
 const doubles = (p1: PokemonSet[], foes: PokemonSet[], setup?: (battle: Battle) => void, alone = false): SimPosition =>
   rootOf('gen9doublescustomgame', p1, foes, battle => {
     if (alone) {
@@ -294,7 +288,6 @@ describe('doubles: the kill table of the hit the simulator plays', () => {
   });
 });
 
-/** A foe HP at which about half of the simulator's normal rolls kill. */
 function halfKilling(damages: readonly number[]): number {
   const hp = [...damages].sort((a, b) => a - b)[8];
   expect(killing(damages, hp)).toBeGreaterThan(0);
@@ -332,7 +325,6 @@ describe('doubles: the option\'s headline names every foe the move hits', () => 
     const [odds] = pairKoOdds(positionBattle(inTerrain), 'p1', [FORCE]);
     expect(odds?.label).toBe('Expanding Force→Chansey');
     expect(odds?.killFraction).toBeCloseTo(fraction(damages.normal, damages.crit, hp), 10);
-    // Outside the terrain it hits only the named foe, which is doomed at 1 HP: no uncertain kill to name.
     const outside = make(battle => { battle.sides[1].active[1]!.sethp(hp); });
     expect(pairKoOdds(positionBattle(outside), 'p1', [FORCE])[0]).toBeNull();
   });

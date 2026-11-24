@@ -4,12 +4,6 @@ import { readGameSeed, checkGameTeams, loadSimMods, startGameLog } from '../src/
 import type { PokemonSet } from '@pkmn/sim';
 import { legalTeams } from './new-game-teams';
 
-/**
- * The seed a new game starts on is set by hand in the dialog, so the engine decides which texts are a seed. The simulator is
- * the oracle: every seed it draws passes and rolls the same dice from the normalized text; a text the simulator would take but
- * never draws (a number above 65535) is refused on purpose.
- */
-
 describe('readGameSeed', () => {
   test('the simulator\'s own draws pass unchanged and roll the same first dice from the normalized seed', () => {
     for (let draw = 0; draw < 1000; draw += 1) {

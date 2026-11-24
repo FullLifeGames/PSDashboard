@@ -13,18 +13,7 @@ import { playClicks, standing, sweepSelection, type Mode } from './dice-fixtures
 import { CHECK_MOVES, CHECKS } from './dice-status-support';
 import { dexOfRules, isCharge, SWEEP_CASES, sameEffects, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 
-// The likeliest result of each die, and a turn played with every die at it (dice/likeliest.ts), over every Dex entry of the kinds that
-// draw a die, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and doubles:
-//   - the live battle stays as it was (`standing`: the fingerprint of every body, the queue and the move in flight);
-//   - the dice the pass lists, replayed through `playForcedTurn` under two other seeds, give the log the pass played. Where a log does
-//     differ, the pass says so (`unnamed` draws or an `unforced` die): a draw no die names, a duration or a target picked at random,
-//     stays with the stream (the log is read as its effects read it: a spread move's `|move|` line names the body the simulator
-//     sampled, which no effect reads, and two bodies of one speed take their end-of-turn damage in a shuffled order, which leaves the
-//     same bodies: `sameEffects`);
-//   - every result is the likeliest by the simulator's own data: an accuracy die takes the Dex's accuracy (a hit above 50), a
-//     secondary the entry's chance, the damage roll its middle step, a hit count a count of the move's range; a status check, a proc,
-//     an end-of-turn die, a first mover and a speed tie as their rows below read them.
-// Plain runs play the fixed sample of every list; DICE_SWEEPS=full plays them whole (the CI job of the dice sweeps).
+// Plain runs play a fixed sample of every list; DICE_SWEEPS=full plays them whole.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -63,13 +52,6 @@ function pass(board: Battle, play: (battle: Battle) => void, row: string): Likel
 
 const OTHERS_PER_ROW = 4;
 
-/**
- * The other-result column. For the dice of a row the pass can turn (`otherResults`: a chance die, a status
- * check, a speed tie, a hit count or a pick; a damage roll through its knock-out boundary): the pinned other result takes (the
- * die is drawn in the likeliest turn and keeps it), and its chance is the simulator's: the chosen result and
- * its others share the draw's own chance or items and sum to one; a roll group's share is the share of rolls on its side of the boundary
- * and its middle step gives the other outcome.
- */
 function checkOthers(board: Battle, play: (battle: Battle) => void, row: string): void {
   const turn = playTurnWith(board, play, []);
   let tried = 0;
@@ -96,7 +78,6 @@ function checkOthers(board: Battle, play: (battle: Battle) => void, row: string)
 }
 
 function checkOther(board: Battle, play: (battle: Battle) => void, entry: LikeliestTurn['dice'][number], other: LikeliestTurn['dice'][number], draw: Draw | undefined, label: string): void {
-  // pinned inside the likeliest turn, as the search pins it: the die is drawn there and keeps the result (`dice` lists only dice the turn drew)
   const pinned = playTurnWith(board, play, [other]).dice.find(item => dieKey(item.die.name) === dieKey(other.die.name));
   expect(pinned?.die.result, `${label}: the other result ${JSON.stringify(other.die.result)} takes`).toEqual(other.die.result);
   expect(other.chance, `${label}: the other result has a chance`).toBeGreaterThan(0);
@@ -117,7 +98,6 @@ function checkOther(board: Battle, play: (battle: Battle) => void, entry: Likeli
 
 const byKind = (turn: LikeliestTurn, kind: string) => turn.dice.filter(entry => entry.die.name.kind === kind);
 
-/** The Dex accuracy of a move as the number the die is compared with: a sure move is 100. */
 const accuracyOf = (move: DexMove): number => (move.accuracy === true ? 100 : move.accuracy);
 
 function checkDie(entry: LikeliestTurn['dice'][number], move: DexMove, board: Battle, mode: Mode, generation: number): void {
@@ -138,7 +118,6 @@ function checkDie(entry: LikeliestTurn['dice'][number], move: DexMove, board: Ba
   }
 }
 
-/** A secondary effect takes the entry's own chance from the offer: it happens above one half. */
 function checkSecondary(entry: LikeliestTurn['dice'][number], move: DexMove, board: Battle, mode: Mode): void {
   const offered = offeredDice(board, 'p1a', choiceOf(move, mode)).find(offer => dieKey(offer.name) === dieKey(entry.die.name));
   if (offered?.chance === undefined || offered.chance === 0.5) return;
@@ -184,8 +163,7 @@ describe.each(SWEEP_CASES)('the likeliest dice of the status checks: $name', ({ 
     const clicks = sweepClicks(mode, dex.moves.get(moveId).target);
     const turn = pass(board, battle => playClicks(battle, clicks), `${rules.name} ${mode} ${check.id} ${moveId}`);
     const dies = byKind(turn, 'status-check').filter(entry => entry.die.name.effectId === check.id);
-    // the Gen 2 thaw falls at the end of the turn; a move that thaws its user (the Dex flag `defrost`) thaws the body whatever the check
-    // says, so the protocol does not show the die's answer there (the pass above held the replay to the log all the same)
+    // Gen 2 thaws at the end of the turn; a move with the flag `defrost` thaws its user whatever the check says.
     if (dies.length === 0 || dex.moves.get(moveId).flags.defrost) return;
     const result = dies[0].die.result;
     const lines = turn.battle.log;

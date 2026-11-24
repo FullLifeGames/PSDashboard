@@ -8,15 +8,7 @@ import { pairKoOdds } from '../src/pair/odds';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * The one-turn odds model prices a move's accuracy from the stage table and its crit from the move's own
- * ratio, and `unpriceable` sends a pair it cannot price to the plain seed average. The guard reads the rule from the
- * simulator's Dex: a holder of an item or ability with a handler on the
- * ModifyAccuracy or ModifyCritRatio event (the holder's own, a foe's, an ally's, the source's or any) is unpriceable. This
- * census walks every item and ability of every generation and the Champions mod (@pkmn/dex strips the handlers, so it
- * reads the simulator's Dex), and each effect with a crit or accuracy handler is either guarded or listed below with the
- * reason it stays out; a handler the test has not seen fails it. The guard's answers leave the live battle as it was.
- */
+// @pkmn/dex strips the handlers, so the census reads the simulator's Dex.
 
 await loadSimMods('gen9championsou');
 
@@ -27,12 +19,10 @@ const RULES: Rules[] = [
 ];
 
 const MODIFIES = /^on(Any|Foe|Ally|Source)?Modify(Accuracy|CritRatio)$/;
-/** A handler of the family that leaves both numbers to the model: the event that skips the roll or blocks the crit. */
 const PRICED = new Set(['onAnyAccuracy', 'onCriticalHit']);
 const FAMILY = /Accuracy|Crit/;
 const NOT_A_HANDLER = /(Priority|SubOrder|Order)$/;
 
-/** The effects that carry a family handler and stay unguarded, each with the reason (played below). */
 const EXCLUDED: Record<string, string> = {
   'ability:noguard': 'moveAccuracy gives a move of a No Guard side accuracy 1, the number the simulator uses',
   'ability:battlearmor': 'the calc gives a crit-proof defender the normal roll for a crit, so the crit-weighted share is exact at any rate',
@@ -70,7 +60,6 @@ function place(mon: Pokemon, found: Pick<Found, 'kind' | 'id'>): void {
 
 const bodies = (battle: Battle) => ({ attacker: battle.sides[0].active[0]!, defender: battle.sides[1].active[0]! });
 
-/** Whether the guard fires with the effect on one seat; the call leaves the battle as it found it. */
 function guardFires(battle: Battle, found: Found, seat: 'attacker' | 'defender'): boolean {
   const { attacker, defender } = bodies(battle);
   const holder = bodies(battle)[seat];
@@ -159,7 +148,6 @@ describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, pla
       (defender as { hp: number }).hp = hp;
       return boundaryEvent(battle, attacker, defender, 'bodyslam');
     };
-    // Where a crit kills and a normal hit does not, a defender that blocks the crit loses the difference.
     let hp = defender.maxhp;
     while (hp > 8 && !((reads(hp)?.critKillRolls ?? 0) > (reads(hp)?.normalKillRolls ?? 0))) hp -= 8;
     expect(hp, 'a straddling HP exists').toBeGreaterThan(8);
@@ -204,7 +192,6 @@ describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer
       return battleOf('gen9doublescustomgame', [mon('Snorlax', ['hydropump', 'splash']), mon('Blissey', ['splash'])], [mon('Pikachu', ['splash']), mon('Chansey', ['splash'])]);
     };
     const option = 'move hydropump 1, move splash';
-    // The foe's HP where Hydro Pump's kill is a roll: its odds are an event for a body without the effect.
     const plain = doubles();
     const foe = plain.sides[1].active[0]!;
     let hp = foe.maxhp;

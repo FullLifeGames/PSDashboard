@@ -3,10 +3,6 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { landedMove } from '../src/score/move-facts';
 import { active, bench, clickTera, set, simUse, singles } from './move-oracle';
 
-/**
- * The rule table answers like the simulator for every active
- * carrier, and like the active body for a benched one.
- */
 const ours = (battle: Battle, attacker: Pokemon, defender: Pokemon, id: string) =>
   landedMove(attacker, defender, battle.dex.moves.get(id), battle);
 

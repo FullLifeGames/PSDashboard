@@ -13,12 +13,8 @@ import { buildChoiceLockContext } from '../src/choice-lock';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { collectForcedSwitchSpecies, getMainChoice, parseTurnBlocks } from '../src/branch/protocol-choices';
 
-/**
- * An Eject Pack or Eject Button switch is the protocol's answer to a request the slot's own item made. The simulator writes `[from]` on a
- * switch only for a move's selfSwitch; an item's switch follows its `|-enditem|` on the slot, so the forced list takes it from there (751407
- * turn 1: Gholdengo instead of Dragonite, and Ogerpon's Knock Off took Gholdengo's Choice Scarf; a holder hit before it acted had the
- * ejection switch sent as its turn's choice).
- */
+// The simulator writes `[from]` on a switch only for a move's selfSwitch; an item's switch (Eject Pack, Eject Button)
+// follows its `|-enditem|` on the slot, so the forced list takes it from there.
 
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
@@ -28,8 +24,6 @@ describe('the forced list reads the switch an item made', () => {
   test('an Eject Pack or Eject Button switch-in joins the forced list', () => {
     const singles = block(fixture('smogtours-gen9ou-751407.json'), 1);
     expect(collectForcedSwitchSpecies(singles.preUpkeep, singles.postUpkeep, 'p2', rulesDex(9))).toEqual(['Dragonite']);
-    // Doubles: Sinistcha's own switch-in is p2's choice; its Eject Button
-    // brings Ninetales-Alola, and the faint replacement after upkeep follows.
     const doubles = block(fixture('gen9vgc2026regi-2630181744.json'), 3);
     expect(collectForcedSwitchSpecies(doubles.preUpkeep, doubles.postUpkeep, 'p2', rulesDex(9)))
       .toEqual(['Ninetales-Alola', 'Sinistcha-Masterpiece']);
@@ -54,11 +48,8 @@ describe('the forced list reads the switch an item made', () => {
   });
 });
 
-/**
- * What the simulator writes around a switch that follows an item line, per generation. An ejection asks for the replacement, so the sim
- * writes the request break (`|`) between the item line and the switch; a Pursuit that pops the Air Balloon of a body on its way out writes
- * the switch right after the item line.
- */
+// An ejection asks for the replacement, so the sim writes the request break (`|`) between the item line and the switch;
+// a Pursuit that pops the Air Balloon of a body on its way out writes the switch right after the item line.
 describe('the simulator\'s own logs: ejection against a Pursuit-time balloon pop', () => {
   const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({
     name: species, species, item, ability, moves, nature: 'Serious', gender: '', level: 100,
@@ -134,7 +125,6 @@ function switchAfterItem(lines: string[], slot: string, item: string): string | 
   return switchLine?.split('|')[3].split(',')[0].trim() ?? null;
 }
 
-/** The live pass the app and the bank run (boundary capture with snapshot correction, choice locks on); `read` sees each listed boundary's board. */
 async function boundaries<T>(replay: Replay, p1Team: PokemonSet[], p2Team: PokemonSet[], turns: number[], read: (battle: Battle) => T) {
   const { snapshots, observations } = parseReplayLogWithObservations(replay.log);
   const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
@@ -182,9 +172,6 @@ describe('the sim brings the body the protocol shows', () => {
   });
 
   test('2658662321: a holder hit before it acted is ejected in the sim; Salt Cure leaves with Hatterene', { timeout: 240000 }, async () => {
-    // Protocol facts: Garganacl's Salt Cure hits Hatterene, its Eject Button
-    // brings Walking Wake. The player's click for Hatterene is unknown; the
-    // ejection switch is no choice of the side.
     const replay = fixture('gen9ou-2658662321.json');
     const { p1Team, p2Team } = builtTeams(replay, [['p2', 'Hatterene', 'Eject Button']]);
     const { seen } = await boundaries(replay, p1Team, p2Team, [3], battle => {
@@ -197,7 +184,6 @@ describe('the sim brings the body the protocol shows', () => {
         hattereneName: body(battle, 1, 'Hatterene').name,
       };
     });
-    // The sim names a body by the replay's own name for it (a nickname).
     const { hattereneName, ...rest } = seen.get(3)!;
     expect(rest).toEqual({ saltCure: hattereneName, ejected: 'Walking Wake', walkingWakeCured: false, hatterene: '' });
   });
@@ -227,7 +213,6 @@ function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
   return battle;
 }
 
-/** The public log: the omniscient |split| secret lines and the sim's timestamps dropped. */
 const publicLines = (log: string[]) =>
   log.filter((line, index, all) => !line.startsWith('|split|') && !all[index - 1]?.startsWith('|split|') && !line.startsWith('|t:|'));
 
@@ -283,7 +268,6 @@ describe('the forced list reads the switch an ability asked for', () => {
       '|switch|p1a: Ferrothorn|Ferrothorn|100/100',
     ];
     expect(collectForcedSwitchSpecies(pursued, [], 'p1', rulesDex(9))).toEqual([]);
-    // Even across a request break: Mummy's Dex entry asks for no switch.
     expect(collectForcedSwitchSpecies([...pursued.slice(0, 3), '|', pursued[3]], [], 'p1', rulesDex(9))).toEqual([]);
   });
 });
@@ -404,8 +388,6 @@ describe('locked-slot-choice', () => {
     });
 
     test('doubles: a choice-locked slot that flinches defaults to its enabled move', async () => {
-      // gen9vgc2026regi-2630452654 turn 4: Miraidon sat locked into Snarl and flinched. No action line, so the rebuild defaulted to `move 1`
-      // (Volt Switch, disabled), the sim rejected the side, and Iron Valiant played Protect instead of its Encore.
       const log = [
         '|gametype|doubles', '|player|p1|Alice||', '|player|p2|Bob||', '|gen|9', '|tier|[Gen 9] Doubles OU',
         '|poke|p1|Blissey, F|', '|poke|p1|Snorlax, M|', '|poke|p1|Hitmontop, M|',
@@ -513,7 +495,6 @@ describe('powered-choices', () => {
 
   const powerLines = (events: string[]) => events.filter(line => /^\|(-zpower\||-start\|p2a: [^|]*\|Dynamax|move\|p2a)/.test(line));
 
-  /** Plays `clicks` for p2's tested body (p1 splashes), then has the rebuild choose the last click again on a board that stands at the start of that turn. */
   function replayLastTurn(gen: 7 | 8, format: Format, tested: PokemonSet, clicks: string[]) {
     const played = make(gen, format, tested);
     const board = make(gen, format, tested);

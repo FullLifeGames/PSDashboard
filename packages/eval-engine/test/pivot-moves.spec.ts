@@ -11,13 +11,8 @@ import { expandPivotPairs, searchOptions } from '../src/search/options';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The Dex sets `selfSwitch` on Teleport from Gen 8 on only; before that it switches nobody (Gen 4 to 7 write `|-fail|`, Gen 1 to 3 write
- * nothing). Revival Blessing carries `selfSwitch` too, but its request revives a fainted ally. The sweep plays every move of every
- * generation and the Champions mod against the simulator: a lead with a living and a fainted bench body uses the move, and the move is a
- * pivot when the battle then asks for a switch of the living lead and accepts a living body. The root matrix and the played-action parser
- * are held to the same answers on the simulator's own logs.
- */
+// The Dex sets `selfSwitch` on Teleport from Gen 8 on only (Gen 4 to 7 write `|-fail|`, Gen 1 to 3 nothing).
+// Revival Blessing carries `selfSwitch` too, but its request revives a fainted ally.
 
 await loadSimMods('gen9championsou');
 
@@ -27,7 +22,6 @@ const RULES: Rules[] = [
   { name: 'Pokémon Champions', gen: 9, format: 'gen9championscustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 } },
 ];
 
-/** The closed census: the moves the simulator lets a living lead pivot with, per generation. A new pivot fails it until listed. */
 const GEN_4 = ['batonpass', 'uturn'];
 const GEN_6 = [...GEN_4, 'partingshot', 'voltswitch'];
 const GEN_8 = [...GEN_6, 'flipturn', 'teleport'];
@@ -38,11 +32,6 @@ const PIVOTS: Record<string, string[]> = {
 };
 const EVERY_PIVOT = [...new Set(Object.values(PIVOTS).flat())].sort();
 
-/**
- * Snorlax leads p1 with `moveId`, Blissey waits alive on its bench and Chansey has fainted (so Revival Blessing has someone to
- * revive); Chansey leads p2 and splashes. `doomed`: the lead has 1 HP and is poisoned, so it faints at the end of the turn
- * unless the move takes it off the field first, and the bench has two living bodies.
- */
 function scene(rules: Rules, moveId: string, doomed = false): Battle {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   const battle = battleOf(rules.format, [mon('Snorlax', [moveId, 'splash']), mon('Blissey', ['splash']), mon('Chansey', ['splash'])], [mon('Chansey', ['splash'])]);
@@ -67,11 +56,6 @@ function simPivots(rules: Rules, moveId: string): boolean {
   return !battle.sides[0].active[0]!.fainted && request?.forceSwitch?.[0] === true && battle.choose('p1', 'switch 2');
 }
 
-/**
- * Doubles: Snorlax and Blissey lead p1 with Chansey alive and Pikachu fainted behind them, the move is Snorlax's (aimed at the
- * foe in slot a when it takes a target). The answer is null when the battle refuses that choice (a move that needs another
- * target, a berry, an ally), true when slot a stays alive, is asked for a switch and takes the living bench body.
- */
 function simPivotsInDoubles(rules: Rules, moveId: string): boolean | null {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   const battle = battleOf(rules.format.replace('customgame', 'doublescustomgame'),
@@ -101,7 +85,6 @@ describe.each(RULES)('$name: every move played against the Dex reading', rules =
     expect(moves.filter(move => isPivotMove(Dex.forGen(rules.gen), move.id)).map(move => move.id).sort()).toEqual(truth);
   });
 
-  // Gen 1 and Gen 2 have no doubles format.
   if (rules.gen >= 3) {
     test('doubles: the same moves pivot, so the reading holds for both game types', () => {
       const answers = moves.map(move => ({ id: move.id, answer: simPivotsInDoubles(rules, move.id) }));
@@ -120,7 +103,6 @@ describe.each(RULES)('$name: every move played against the Dex reading', rules =
   });
 });
 
-/** The first turn as a spectator reads it: the simulator writes each secret line twice (`|split|`), a replay keeps the public one. */
 function publicTurn(battle: Battle): string[] {
   const lines: string[] = [];
   for (let index = battle.log.indexOf('|turn|1') + 1; index < battle.log.length && !battle.log[index].startsWith('|turn|'); index++) {
@@ -134,7 +116,6 @@ describe.each(RULES)('$name: the follow-up switch in the simulator\'s own log', 
   const candidates = [...EVERY_PIVOT, 'revivalblessing'].filter(id => Dex.forGen(rules.gen).moves.get(id).gen <= rules.gen);
 
   test.each(candidates)('%s: the switch after it is its follow-up only when the move pivoted', moveId => {
-    // A pivot is played by a healthy lead (Shed Tail needs half its HP); a move that does not pivot is played by the doomed lead, whose replacement follows.
     const battle = scene(rules, moveId, !PIVOTS[rules.name].includes(moveId));
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');
@@ -151,7 +132,6 @@ describe('the played-action parser names no move the simulator never pivots with
   const targetAfter = (rules: Rules, name: string, between: string[]) =>
     parsePlayedActions([`|move|p1a: Snorlax|${name}|p2a: Chansey`, ...between, '|switch|p1a: Blissey|Blissey|100/100'], gameOf(rules)).p1?.pivotTarget;
 
-  // The parser reads the Dex of the log's generation and mod, so the census is per generation.
   describe.each(RULES)('$name', rules => {
     const every = movesOf(rules, scene(rules, 'tackle'));
 

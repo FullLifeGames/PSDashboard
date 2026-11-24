@@ -15,11 +15,6 @@ vi.mock('../src/search/outcome-children', async importOriginal => {
 });
 import { drawChild } from '../src/search/outcome-children';
 
-/**
- * The plain path of the endgame children reads a damaging pair through several draws of the cell's own seeds and takes their median; a proof
- * books it only when every draw agrees. `PLAIN_DRAWS` in `endgame/children.ts` is the one count for both game types: doubles five, singles three.
- * The scenes below are positions where three seeds agree and book mass 1 and five do not.
- */
 interface Scene {
   id: string;
   turn: number;
@@ -53,7 +48,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid: string
   return JSON.stringify(State.serializeBattle(battle));
 }
 
-/** The draws one plain cell takes: drawChild calls per child (a doubles speed tie draws each order apart). */
 function drawsOf(serialized: string, p1Choice: string, p2Choice: string): { draws: number; plain: boolean } {
   vi.mocked(drawChild).mockClear();
   const result = endgameChildren(createRootPosition(serialized), p1Choice, p2Choice);
@@ -77,11 +71,6 @@ describe('plain draws of the endgame children', () => {
     expect(drawsOf(serialized, 'move splash, move splash', 'move splash, move splash').draws).toBe(1);
   });
 
-  // The root order is empty, so the prover tries the root candidates in its own odds order; the scenes are the bank's positions as the holdout
-  // run builds them.
-  // gen9vgc2025regi-2391814405 turn 9: Player 2 proves a win on three draws and loses the game; five draws prove nothing, and that still holds.
-  // gen9doublesou-2694460841 turn 16: Player 2 won; three draws prove a win in 1 turn, five prove it in 2 turns at mass 0.995 (49 cells; the rest
-  // is a Protect reply the proof does not close), a proof for the side that won the game.
   test('doubles, gen9vgc2025regi-2391814405-t9: three agreeing draws prove nothing once five must agree', async () => {
     const board = scene('gen9vgc2025regi-2391814405-t9');
     await loadSimMods('gen9doublescustomgame');

@@ -15,16 +15,6 @@ import { dexOfRules, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The prover lets the class in which a secondary effect fired take the proof of the class in which it did not, when the effect only helps
- * the side that moved (`endgame/prover-helping.ts`). The rule reads the positions the cell drew, never a name; the sweep holds it to the Dex
- * entry for every move with a boost entry under 100 percent, in every generation and mod the corpus plays: the fired position is the unfired
- * one plus exactly the entry's stages, and the reading says "only helps the mover" exactly when no Speed stage moved (Trick Room, Gyro Ball
- * and Electro Ball turn a slower foe into a gain for it). The reactors are rows: Defiant, Competitive, Contrary, Mirror Armor, a White Herb or
- * an Eject Pack answer the drop with a change the Dex entry does not carry, so the classes keep their proofs; an Opportunist or a Mirror Herb
- * copies the user's gain; a Contrary user turns its gain into a drop. In doubles the cell fold refuses a combined choice (`planCellEvents`),
- * so no class is drawn and the rule never reaches it; the sweep holds that for the same moves.
- */
 await loadSimMods('gen9championsou');
 
 type Entry = { chance?: number; boosts?: Record<string, number>; self?: { boosts?: Record<string, number> } };
@@ -37,7 +27,6 @@ function boostEntries(move: DexMove): Reading[] {
     .map(entry => ({ effectId: secondaryEffectId(entry as never), target: entry.boosts ?? {}, self: entry.self?.boosts ?? {} }));
 }
 
-/** The reading of one entry the Dex gives: only helps the mover when it drops the foe, raises the user, and moves no Speed. */
 const helpsByDex = (entry: Reading): boolean =>
   !('spe' in entry.target) && !('spe' in entry.self) && Object.values(entry.target).every(by => by < 0) && Object.values(entry.self).every(by => by > 0);
 
@@ -58,7 +47,6 @@ function drawCell(battle: Battle, mode: Mode, move: DexMove): Cell {
 const bodies = (battle: Battle) => battle.sides.flatMap(side => side.pokemon);
 const stagesOf = (battle: Battle, side: 0 | 1): Record<string, number> => ({ ...battle.sides[side].active[0]!.boosts });
 
-/** The unfired child and the fired children of a cell: `p1:hit-nokill` and every class that adds effects to it. */
 function classesOf(cell: EndgameChildren) {
   const find = (key: string) => cell.children.findIndex(child => child.key === key);
   const plain = find('p1:hit-nokill');
@@ -72,10 +60,6 @@ function expectedStages(from: Record<string, number>, change: Record<string, num
   return next;
 }
 
-/**
- * Whether the positions differ in nothing but the stages of the bodies and the roll's facts (the damage and the critical hit the roll
- * drew: `moveHitData`, which the simulator reads only inside the move that made it; `moveHitDataIsMoveLocal` below holds that claim).
- */
 function sameButStages(unfired: Battle, fired: Battle): boolean {
   const drop = new Set(['hp', 'lastDamage', 'hurtThisTurn', 'damage', 'damageValue', 'totalDamage', 'boosts', 'log', 'inputLog', 'messageLog', 'sentLogPos', 'sentRequests', 'prng', 'prngSeed', 'turn', 'lastMoveLine', 'hints', 'effectOrder', 'quickClawRoll', 'speed', 'speedOrder', 'moveHitData']);
   const strip = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle), (key, value: unknown) => (drop.has(key) ? undefined : value));
@@ -134,15 +118,9 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
       }
       expect(bodies(battle).length).toBe(before);
     }
-    // Gens 1 and 2 have no kill-range model (), so no cell there draws a class and the rule never reaches them
     expect(witnessed > 0).toBe(rules.generation >= 3);
   });
 
-  /**
-   * The critical hit is a fact of the roll, like the damage, and sits outside the class model (the prover answers "barring a crit",
-   * `prover.ts`). Both classes are drawn through `drawChild` with the die forced, all four pairings of crit and no crit: the positions
-   * differ in the stages the Dex entry names and in nothing else, and the reading follows the Dex whichever child rolled the crit.
-   */
   if (mode === 'singles') test('every move, the crit forced both ways in each class: the reading follows the Dex', () => {
     let witnessed = 0;
     let crits = 0;
@@ -155,7 +133,7 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
       const battle = board(move);
       const root = createRootPosition(JSON.stringify(State.serializeBattle(battle)));
       const choice = clicks(mode, move);
-      if (endgameChildren(root, choice.p1, choice.p2, 6).plain) continue; // no class plan: the rule never reaches the cell
+      if (endgameChildren(root, choice.p1, choice.p2, 6).plain) continue;
       const seed = cellSeeds(root, choice.p1, choice.p2)[0];
       const rootHp = totalHp(positionBattle(root));
       const child = (crit: boolean, fire: boolean) => {
@@ -167,9 +145,7 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
         const unfired = child(unfiredCrit, false);
         const fired = child(firedCrit, true);
         const name = `${move.id} unfired crit ${unfiredCrit} fired crit ${firedCrit}`;
-        // a crit that kills leaves no class "hit, no kill": the row proves nothing there
         if (bodies(unfired).some(body => body.fainted) || bodies(fired).some(body => body.fainted)) { skipped.push(name); continue; }
-        // the foe's stages show the entry (the effect fired) and the user's too; otherwise the two children are the same class
         if (JSON.stringify(stagesOf(fired, 0)) === JSON.stringify(stagesOf(unfired, 0)) && JSON.stringify(stagesOf(fired, 1)) === JSON.stringify(stagesOf(unfired, 1))) { skipped.push(`${name} (no effect)`); continue; }
         const standingBefore = [standing(unfired), standing(fired)];
         expect(`${name} same ${sameButStages(unfired, fired)}`).toBe(`${name} same true`);
@@ -185,7 +161,6 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
   });
 });
 
-/** A row: the foe or the user holds a rule that answers a stage change; `drop` and `gain` give the reading the Dex's rules make of a stat drop on the foe and of a stat gain for the user. */
 interface Reactor { name: string; on: 'foe' | 'user'; ability?: string; item?: string; drop: boolean; gain: boolean }
 const REACTORS: Reactor[] = [
   { name: 'nothing', on: 'foe', drop: true, gain: true },
@@ -215,7 +190,6 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     return rule.exists && (rule.isNonstandard === null || rule.isNonstandard === undefined) && (reactor.on === 'foe' || rules.generation >= 3);
   };
 
-  /** `benchLevel` moves the bench body's level only: another position, so another cell seed. */
   const playRow = (reactor: Reactor, kind: 'drop' | 'gain', benchLevel?: number): void => {
     const move = kinds[kind];
     const holder = { ...(reactor.ability ? { ability: reactor.ability } : {}), ...(reactor.item ? { item: reactor.item } : {}) };
@@ -245,7 +219,6 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     }
   }
 
-  /** The control rows over eight boards that differ in the bench body's level only: a seed that lands a crit on a representative child must not change the reading. */
   const control = REACTORS[0];
   for (const kind of ['drop', 'gain'] as const) {
     for (let level = 0; level < 8; level++) {
@@ -258,20 +231,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
   });
 });
 
-/**
- * The claim behind the crit as a roll fact. A move's `moveHitData` (the crit, the type modifier, the bypass of
- * Protect) is a record of ONE hit: the simulator writes it while the move runs and reads it through `Pokemon.getMoveHitData(move)`
- * with the move in progress, so after the turn nothing reads it and the helping rule may strip it from its comparison (a comment
- * would not hold that; these rows do).
- *  1. Every mention of `moveHitData` in the installed @pkmn/sim and @pkmn/mods builds sits in `getMoveHitData` itself, so every
- *     read of the record, by any handler of any generation or mod, goes through that one method.
- *  2. The method is wrapped and every call books whether its move had already finished (`Battle.clearActiveMove` marks it
- *     finished, the simulator's own end of a move). Every Dex move that deals damage is played for three turns, from both sides,
- *     in every rule set the sweeps play, singles and doubles: no call ever reads a finished move.
- *  3. The wrapper is live: a read of the record of a finished move made by hand is booked.
- * Doubles: the helping rule never reaches a doubles cell (`planCellEvents` refuses a combined choice, the test above); the claim
- * is the simulator's and does not depend on the mode, so row 2 plays both.
- */
+// moveHitData records ONE hit: the simulator reads it only through getMoveHitData, with the move in progress.
 describe('the simulator reads a move\'s hit data only while the move runs', () => {
   const books = { calls: 0, late: [] as string[], finished: new WeakSet<object>(), label: '' };
   const patched = { get: Pokemon.prototype.getMoveHitData, clear: Battle.prototype.clearActiveMove };
@@ -334,7 +294,6 @@ describe('the simulator reads a move\'s hit data only while the move runs', () =
             if (mode === 'singles') battle.makeChoices('move 1', 'move 1');
             else battle.makeChoices(`move 1${aim}, move 1`, `move 1${aim}, move 1`);
           } catch {
-            // a click the simulator refuses (a move that needs an ally target, a fainted body that leaves a switch to make) ends the duel
             if (turn === 0) refused += 1;
             break;
           }
@@ -343,7 +302,6 @@ describe('the simulator reads a move\'s hit data only while the move runs', () =
       expect(moves.length).toBeGreaterThan(0);
       expect(refused * 4).toBeLessThan(moves.length);
       expect(books.late.slice(lateBefore)).toEqual([]);
-      // the rows play the later turns: a record of the first turn stood in `lastMove` while the second turn's handlers ran
       expect(afterAMove).toBeGreaterThan(0);
       if (rules.generation >= 3) expect(books.calls - before).toBeGreaterThan(0);
     });

@@ -3,17 +3,8 @@ import { LAYER_CAPS, failsAgainstStanding } from '../src/search/options';
 import type { positionBattle } from '../src/forward-model';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * search/options.ts drops a field move from the option list while its condition already stands ("clicking it is a pass with a
- * real-looking label", GPL turn 25). The simulator fails three side-condition moves against their standing condition (Crafty
- * Shield, Lucky Chant, Mat Block), and Spikes in Generation 2, where one layer is the cap. Quick Guard and Wide Guard run an
- * `onHitSide` handler and print no failure with their condition standing (it ends within the turn), so the rule leaves them.
- * The simulator's rule (`Side.addSideCondition`) is: a condition that stands and has no restart handler (`onSideRestart`) fails
- * to start again; Spikes and Toxic Spikes have the handler and refuse a layer past their cap, which lives in the handler's code
- * (`LAYER_CAPS`, held here). For every move that sets a side condition, in every view the corpus plays, this spec lays the condition
- * on the side the move acts on (as many layers as the simulator takes), plays the move once and keeps the moves that print a failure
- * where the same turn without the standing condition does not (under the weather a move may need: none, Snow, Hail).
- */
+// Side.addSideCondition fails a standing condition without a restart handler (`onSideRestart`);
+// Spikes and Toxic Spikes have one and refuse a layer past their cap, held here as `LAYER_CAPS`.
 
 type Side = ReturnType<typeof positionBattle>['sides'][number];
 
@@ -25,7 +16,6 @@ const isReal = (view: SimView, id: string): boolean => {
 type Weather = '' | 'snow' | 'hail';
 const WEATHERS: Weather[] = ['', 'snow', 'hail'];
 
-/** A battle where the first Blissey holds `moveId`; `layers` of its condition stand on the side it acts on (none: untouched). */
 function prepared(view: SimView, moveId: string, weather: Weather, layers: number) {
   const move = view.dex.moves.get(moveId);
   const battle = battleIn(view, [mon('Blissey', [moveId, 'splash']), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
@@ -36,7 +26,6 @@ function prepared(view: SimView, moveId: string, weather: Weather, layers: numbe
   return { battle, holder };
 }
 
-/** One turn of `moveId` by the first Blissey; `standing` lays its condition first (as many layers as the simulator takes). */
 function play(view: SimView, moveId: string, standing: boolean, weather: Weather): boolean {
   const { battle } = prepared(view, moveId, weather, standing ? 9 : 0);
   const mark = battle.log.length;
@@ -46,10 +35,9 @@ function play(view: SimView, moveId: string, standing: boolean, weather: Weather
   const moved = turn.findIndex(line => line.startsWith('|move|p1a'));
   if (moved < 0) return false;
   const next = turn.findIndex((line, index) => index > moved && line.startsWith('|move|'));
-  return turn.slice(moved + 1, next < 0 ? undefined : next).some(line => line.startsWith('|-fail|')); // Generation 2 names the target
+  return turn.slice(moved + 1, next < 0 ? undefined : next).some(line => line.startsWith('|-fail|'));
 }
 
-/** Whether the simulator fails the move against its standing condition, but not without it (under some weather it may need). */
 function simulatorFails(view: SimView, moveId: string): boolean {
   return WEATHERS.some(weather => {
     return !play(view, moveId, false, weather) && play(view, moveId, true, weather);
@@ -60,7 +48,6 @@ describe('field moves against a standing condition are read from the Dex and hel
   describe.each(ALL_VIEWS)('$name', view => {
     const setters = [...new Set(view.dex.moves.all().filter(move => isReal(view, move.id) && move.sideCondition).map(move => move.id))].sort();
 
-    /** Moves whose condition has a restart handler: the layered hazards (Generation 2 builds Spikes without one). */
     const restarts = (id: string) => typeof (view.dex.conditions.get(view.dex.moves.get(id).sideCondition!) as unknown as { onSideRestart?: unknown }).onSideRestart === 'function';
 
     const dropped = () => setters.filter(id => {

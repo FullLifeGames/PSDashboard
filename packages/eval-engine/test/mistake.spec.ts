@@ -10,18 +10,6 @@ import { serializeLiveBattle } from '../src/serialize';
 import { searchPosition } from '../src/search/position';
 import { reconstruct } from './arrival-turn';
 
-/**
- * A mistake by the opponent. Both sides play the engine's first choice with every die at its
- * likeliest result; the opponent's lower-ranked choices are tried one at a time, the mildest mistake first, and the first one after
- * which the line wins for the side that lost is the answer, with the chance of the dice it needs. Boards are small custom games:
- * every number is one the simulator shows there. Singles and doubles.
- */
-
-/**
- * Singles 1 v 1: a slow Snorlax at 1 HP (the side that lost) whose Tackle knocks the 1 HP Pikachu out; the faster Pikachu's first choice,
- * Seismic Toss (fixed 50), knocks Snorlax out first, its second choice (a second Seismic Toss slot's twin: Tackle) does too, and only
- * a status move lets Snorlax hit.
- */
 const SLIP: Board = {
   format: 'gen9customgame',
   p1: [mon('Snorlax', ['Tackle'])],
@@ -42,7 +30,6 @@ describe('a mistake by the opponent, singles', () => {
     const { serialized } = await serializedBoard(SLIP);
     const step = mistakeStep(serialized, ASK());
     expect(step.status).toBe('found');
-    // the second choice (Tackle) knocks Snorlax out too: the third, Splash, is the smallest mistake that wins
     expect(step.deviation).toEqual({ turn: 5, label: 'Splash', rank: 3 });
     expect(step.line!.steps).toHaveLength(1);
     expect(step.line!.steps[0].p2.label).toBe('Splash');
@@ -122,11 +109,6 @@ describe('a mistake by the opponent, singles', () => {
 });
 
 describe('a mistake by the opponent, doubles (2 v 2 bodies: the engine fixture builder cannot start a doubles game with one body)', () => {
-  /**
-   * A slow Snorlax at 1 HP with Heat Wave (spread, accuracy 90) and a Pidgeot that only splashes, against two faster Pikachu at 1 HP
-   * that each choose between Seismic Toss and Splash. Heat Wave knocks both foes out, so the side wins only when no foe knocks
-   * Snorlax out first.
-   */
   const DOUBLES: Board = {
     format: 'gen9doublescustomgame',
     p1: [mon('Snorlax', ['Heat Wave']), mon('Pidgeot', ['Splash'])],
@@ -141,7 +123,6 @@ describe('a mistake by the opponent, doubles (2 v 2 bodies: the engine fixture b
     const { serialized } = await serializedBoard(DOUBLES);
     const step = mistakeStep(serialized, REQUEST('p1', { turn: 3 }));
     expect(step.status).toBe('found');
-    // the foes' first choice knocks Snorlax out; a slip that spares it wins when Heat Wave hits both foes (accuracy 90 each)
     expect(step.deviation!.turn).toBe(3);
     expect(step.deviation!.rank).toBeGreaterThan(1);
     expect(step.line!.steps).toHaveLength(1);
@@ -185,9 +166,6 @@ describe('the mistake step on the corpus', () => {
   test.each(SCENES)('$id', async scene => {
     const { step, rebuild, foeRanking } = await run(scene);
     console.info(`${scene.id}: foe ranking ${foeRanking.join(' | ')} -> ${step.status} ${JSON.stringify(step.deviation)} chance ${step.chance} spent ${JSON.stringify(step.spent)} line ${step.line?.steps.map(item => `${item.p1.label} / ${item.p2.label}`).join(' > ')}`);
-    // 649664: BKC's Scald takes Rotom-Wash, devin's Medicham-Mega comes in, and on turn 24 BKC's other choice (Scald where the matrix
-    // ranks Hydro Pump first) leaves Medicham standing for High Jump Kick; 2695803506: Delphox-Mega's Nasty Plot instead of Protect (a
-    // loss of 0.001 on the card) leaves Kingambit's Kowtow Cleave a free turn, and the log-only board has it finish Delphox-Mega
     expect(step.status).toBe('found');
     expect(step.deviation).toEqual(scene.deviation);
     expect(step.chance).toBeGreaterThan(0.5);

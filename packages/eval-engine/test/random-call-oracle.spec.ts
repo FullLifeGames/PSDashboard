@@ -2,16 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { randomCallMoves } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * `randomCallMoves` in ko-odds.ts (read by search/leaf.ts, cell-blend.ts and pair/guards.ts) holds the moves whose result depends on a
- * move chosen elsewhere, so the one-turn model refuses to price them. The Dex marks them with `callsMove`: seven moves (Sleep Talk,
- * Metronome, Assist, Copycat, Mirror Move, Me First and Nature Power; Nature Power is Past in Generation 9, live in Generations 3 to 7).
- * In every view the corpus plays:
- *  - the moves the Dex marks `callsMove`, over all views, are the set (derived from the Dex, no hand list);
- *  - each of them is played, and the simulator writes a `|move|` line "[from] move: <its name>" for the move it called;
- * A move the Dex flags `sleepUsable` (Sleep Talk) is played asleep, the user carries no Tackle (Generation 2 Mirror Move refuses a move the user knows), Mirror Move and Copycat behind a faster foe, Me First ahead of one, Assist with a bench mate.
- */
-
 const real = (view: SimView, id: string): boolean => {
   const move = view.dex.moves.get(id);
   return move.exists && move.isNonstandard !== 'Future';
@@ -23,9 +13,9 @@ const callers = (view: SimView): string[] => view.dex.moves.all()
 function calls(view: SimView, id: string): boolean {
   const name = view.dex.moves.get(id).name;
   const { target, sleepUsable } = view.dex.moves.get(id);
-  const called = new RegExp(String.raw`\[from\](?: move:)? ?${name}(?:\||$)`); // Generations 1 to 3 write "[from] Name", later ones "[from] move: Name"
+  // Generations 1 to 3 write "[from] Name", later ones "[from] move: Name".
+  const called = new RegExp(String.raw`\[from\](?: move:)? ?${name}(?:\||$)`);
   const aimed = ['normal', 'any', 'adjacentFoe'].includes(target);
-  // Several seeds: a Tackle that misses leaves Mirror Move nothing to copy in the older generations.
   for (const [[user, foe], seed] of [['Blissey', 'Snorlax'], ['Snorlax', 'Blissey']].flatMap(pair => ['1,2,3,4', '5,6,7,8', '9,10,11,12'].map(seed => [pair, seed] as const))) {
     const battle = battleIn(view, [mon(user, [id, 'harden']), mon('Blissey', ['tackle']), mon('Blissey', ['tackle'])], [mon(foe, ['tackle']), mon(foe, ['tackle']), mon(foe, ['tackle'])], seed);
     if (sleepUsable) battle.sides[0].active[0].setStatus('slp');

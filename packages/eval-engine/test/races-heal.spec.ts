@@ -6,13 +6,6 @@ import { matchupTerms } from '../src/eval-function';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Who heals and who only drains, and the healer the pressure pins (gen9draft-2058494320, a Swords Dance turn). Drain moves carry
- * the heal flag (Heal Block stops them) but they heal a share of the
- * damage they deal, inside an attack: they are no turn spent healing. A healer under crumbling pressure counts as
- * never attacking only when attacking would not win it the race.
- */
-
 const SINGLES = 'gen9customgame';
 const body = (moves: string[]) => set('Tapu Bulu', moves, { evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 } });
 const duel = (moves: string[], foeMoves: string[] = ['splash']) => battleOf(SINGLES, [body(moves)], [set('Snorlax', foeMoves)]);
@@ -76,7 +69,6 @@ describe('healProfile: a drain move is an attack, not a heal', () => {
       const user = test.sides[0].active[0]!;
       const target = test.sides[1].active[0]!;
       if (id === 'dreameater') target.setStatus('slp');
-      // +6 accuracy: a 90% drain move must not miss on the fixed dice.
       user.boosts.accuracy = 6;
       user.sethp(Math.floor(user.maxhp / 4));
       const [userBefore, targetBefore] = [user.hp, target.hp];
@@ -84,7 +76,6 @@ describe('healProfile: a drain move is an attack, not a heal', () => {
       test.choose('p2', 'move 1');
       return { dealt: targetBefore - target.hp, healed: user.hp - userBefore };
     };
-    // matchagotcha and paraboliccharge hit every adjacent body: in singles that is the one foe.
     for (const move of healFlagged(battle).filter(entry => entry.drain)) {
       const { dealt, healed } = dealing(move.id);
       expect(dealt, move.id).toBeGreaterThan(0);
@@ -96,7 +87,6 @@ describe('healProfile: a drain move is an attack, not a heal', () => {
 describe('raceClocks: a pinned healer attacks when attacking wins it the race', () => {
   const side = (partial: Partial<RaceSide>): RaceSide =>
     ({ hp: 1, frac: 0, residual: 0, healRate: 0, healAbsorb: 0, ppBudget: 64, ...partial });
-  // Shore Up class: rate 1/2, 8 bars of PP fuel.
   const healer = (partial: Partial<RaceSide> = {}) => side({ frac: 0.45, healRate: 0.5, healAbsorb: 4, ...partial });
 
   test('a 5% body in front of a 100% healer under 60% pressure: the healer KOs it at once (before: it never attacked)', () => {
@@ -124,13 +114,11 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
 
   test('a healer the attack race would lose stays pinned: it never attacks and its held PP realize at the pin efficiency', () => {
     const body = side({ hp: 1, frac: 0.6 });
-    // One bar of PP (two heals) cannot bridge the four heals the sequence of the simulator needs, so the held-PP clock stays.
     const clocks = raceClocks(body, healer({ healAbsorb: 1 }));
     expect(clocks.effFracB).toBe(0);
     expect(clocks.turnsB).toBe(Infinity);
     // 1 + 1 x (1/2 / 0.6) bars under 0.6 per turn.
     expect(clocks.turnsA).toBe(Math.ceil((1 + 1 * (0.5 / 0.6)) / 0.6 - 1e-9));
-    // With four bars of PP the sequence of the simulator is shorter: five hits, four heals.
     expect(raceClocks(body, healer({ healAbsorb: 4 })).turnsA).toBe(5);
   });
 
@@ -161,7 +149,6 @@ describe('raceClocks: a pinned healer attacks when attacking wins it the race', 
   });
 
   test('a pinned healer with too few heal PP for the sequence keeps the held-PP clock', () => {
-    // Two heals (one bar of PP) cannot bridge the four heals the 60% sequence needs: the PP-bound clock stays.
     expect(raceClocks(side({ hp: 0.05, frac: 0.6 }), side({ hp: 1, frac: 0, healRate: 0.5, healAbsorb: 1, ppBudget: 16 })).turnsA).toBe(4);
   });
 

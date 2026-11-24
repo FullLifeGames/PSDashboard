@@ -2,14 +2,8 @@ import { Battle, Teams, toID } from '@pkmn/sim';
 import type { Pokemon, PokemonSet } from '@pkmn/sim';
 import type { MoveAtUse } from '../src/move-use';
 
-/**
- * Small battles and the simulator's own reading of a
- * move at use (the oracle). The oracle follows battle-actions.js useMoveInner
- * (the move's ModifyType, its ModifyMove for an allow-list of handlers that
- * only write the move copy, the ModifyType event) plus the power callback. It
- * is exact for ACTIVE bodies only: on the bench the sim switches abilities and
- * items off, which is why the engine never asks it.
- */
+// Follows battle-actions.js useMoveInner.
+// Exact for active bodies only: on the bench the sim switches abilities and items off.
 const MODIFY_MOVE_ALLOW = new Set(['weatherball', 'terrainpulse', 'terablast', 'terastarstorm', 'hiddenpower']);
 
 export function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet {
@@ -21,7 +15,6 @@ export function set(species: string, moves: string[], extra: Partial<PokemonSet>
   };
 }
 
-/** A battle past team preview, every set in team order, first set leading. */
 export function singles(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
   const battle = new Battle({
     formatid: toID(format),
@@ -36,7 +29,6 @@ export function singles(format: string, p1: PokemonSet[], p2: PokemonSet[]): Bat
   return battle;
 }
 
-/** One side clicks Tera on its first move slot (a Splash); the other side Splashes. */
 export function clickTera(battle: Battle, side: 0 | 1) {
   battle.choose(side === 0 ? 'p1' : 'p2', 'move 1 terastallize');
   battle.choose(side === 0 ? 'p2' : 'p1', 'move 1');
@@ -45,7 +37,7 @@ export function clickTera(battle: Battle, side: 0 | 1) {
 export const active = (battle: Battle, side: 0 | 1): Pokemon => battle.sides[side].active[0];
 export const bench = (battle: Battle, side: 0 | 1, index: number): Pokemon => battle.sides[side].pokemon[index];
 
-/** The -ate / Normalize boost the BasePower event applies (sim abilities.js and mods/gen6). */
+// The -ate / Normalize boost the BasePower event applies (sim abilities.js and mods/gen6).
 function boostOf(gen: number, ability: string): number {
   if (ability === 'normalize') return gen >= 7 ? 4915 / 4096 : 1;
   return gen === 6 ? 5325 / 4096 : 4915 / 4096;

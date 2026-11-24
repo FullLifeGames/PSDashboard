@@ -10,24 +10,12 @@ import { CHAMPIONS, mon, playClicks, RULES, type Mode, type Rules } from './dice
 import { sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * The PP a move has left. A move at 0 PP in the game ranked first in the rebuilt battle (Revival Blessing, 1 PP, used once and offered
- * again): a Leppa Berry the log rules out, or a turn the rebuild played differently, leaves a slot at the wrong count. The snapshot carries
- * the PP the log shows spent (`ppUsed`, read by @pkmn/client); the snapshot correction sets each own move slot to the simulator's maximum
- * minus that count.
- *
- * The sweep plays every Dex move with a base PP of 8 or less in every rule set the corpus plays (Generations 1 to 9 and the Champions
- * mod), singles and doubles: up to three turns on a board where the body uses the move, parsed from the spectator log and checked against
- * the simulator's own slot. The rows after the sweep are the reported scenes: Revival Blessing, Pressure (two PP per use), a Leppa Berry
- * restore, Spite and Eerie Spell.
- */
 await loadSimMods('gen9championsou');
 
 const LOW_PP = 8;
 // Struggle is never a slot of a body: it appears when every slot is empty, and the client leaves it out of the count.
 const lowPp = (move: DexMove): boolean => move.pp > 0 && move.pp <= LOW_PP && move.id !== 'struggle';
 
-/** The spectator log (the public half of every `|split|` pair), closed by a turn line so the parser takes the last boundary. */
 function spectatorLog(battle: Battle): string {
   const out: string[] = [];
   for (let index = 0; index < battle.log.length; index++) {
@@ -91,7 +79,6 @@ const slotsOf = (battle: Battle): Map<string, { pp: number; maxpp: number }> =>
 
 const rebuilt = (battle: Battle): Battle => deserializeBattleExact(serializeLiveBattle(battle));
 
-/** Drifts the named moves (all of the body's when none is named); a move the log never shows keeps the count the simulator gave it. */
 function setPp(battle: Battle, pp: 'full' | 'empty', names?: string[]): void {
   const ids = names?.map(toId);
   for (const slot of [...bodyOf(battle).baseMoveSlots, ...bodyOf(battle).moveSlots]) {
@@ -137,7 +124,6 @@ function driftProblems(truth: Battle, snapshot: TurnSnapshot, moveNames: string[
   return problems;
 }
 
-/** Whether the ranking of the corrected rebuild offers a move the simulator disables (the truth's own request decides). */
 function offersDisabled(truth: Battle, moveIds: string[]): string[] {
   const request = truth.sides[0].activeRequest;
   if (truth.ended || !request || !('active' in request) || !request.active) return [];
@@ -259,13 +245,8 @@ describe.each(MODS)('Pressure, Spite and Eerie Spell (%s)', (_label, rules) => {
   });
 });
 
-/**
- * The client's Pressure count has a Generation 3 branch, because the log of that generation does not always show the foe's
- * ability: a foe whose species can only have Pressure charges it, a foe whose species can have it beside another ability leaves the count a
- * range. `getPressurePP` of parser-state.ts reads the generation from the client's Dex; this row holds that read to the simulator in
- * Generation 3, singles and doubles, against a species with the one ability (Zapdos), and one with two (Aerodactyl: Rock Head or Pressure,
- * played with each).
- */
+// The client's Pressure count has a Gen 3 branch (getPressurePP): a foe that can only have Pressure charges it,
+// one that can have another ability leaves the count a range.
 const GEN3: Rules = RULES.find(rules => rules.generation === 3)!;
 const PRESSURE_FOES: { label: string; species: string; ability: string; perUse: number; exact: boolean }[] = [
   { label: 'a species that can only have Pressure', species: 'Zapdos', ability: 'pressure', perUse: 2, exact: true },
@@ -281,7 +262,6 @@ describe.each(['singles', 'doubles'] as const)('Pressure in Generation 3, %s', m
     expect(slot.pp).toBe(slot.maxpp - 2 * perUse);
     const snapshot = snapshotOf(board.battle);
     expect(readingProblem(snapshot, board.battle, 'Overheat')).toBeNull();
-    // the single-ability species charges two PP per use whatever the log shows; the other leaves a range around the simulator's count
     if (exact) expect(snapshot.p1.pokemon[0].ppUsed).toMatchObject({ Overheat: 4 });
     else expect(snapshot.p1.pokemon[0].ppUsed?.Overheat).not.toBeUndefined();
     expect(driftProblems(board.battle, snapshot, ['Overheat'])).toEqual([]);

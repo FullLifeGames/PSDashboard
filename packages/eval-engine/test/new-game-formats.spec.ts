@@ -8,13 +8,7 @@ import { checkGameTeams, loadSimMods, startGameLog } from '../src/index';
 import { SWEEPS_FULL } from './dice-fixtures';
 import { legalTeams, playableFormatIds } from './new-game-teams';
 
-/**
- * A new game starts from two teams in the format the user picks. The sweep plays every format the
- * simulator lists for a user's own team (singles or doubles, no generated team) after the Champions mod loads: each one starts
- * from two legal teams, and what the app needs of the start reads from the simulator's own battle (the header log, the game
- * type, the team preview, the picked team size, the level the format gives). A plain run plays the families the app measures
- * plus every sixth format; `DICE_SWEEPS=full` plays all of them. The simulator is the oracle throughout (AGENTS.md).
- */
+// A plain run plays the families the app measures plus every sixth format; DICE_SWEEPS=full plays all of them.
 
 const FAMILIES = [
   'gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9customgame', 'gen9doublescustomgame', 'gen9bssregi', 'gen9championsou',
@@ -31,7 +25,6 @@ beforeAll(async () => {
 
 const NAMES: [string, string] = ['Player 1', 'Player 2'];
 
-/** The team as the simulator's validator leaves it (the server plays this copy): it sets each level the format gives. */
 function validated(formatId: string, team: PokemonSet[]): PokemonSet[] {
   const copy = JSON.parse(JSON.stringify(team)) as PokemonSet[];
   expect(TeamValidator.get(formatId).validateTeam(copy)).toBeNull();
@@ -105,7 +98,7 @@ describe('a game starts from two legal teams in every playable format', () => {
         const chosen = new Battle({ formatid: id as never, seed: [1, 2, 3, 4], p1: { name: 'a', team: Teams.pack(validated(id, teams.p1)) }, p2: { name: 'b', team: Teams.pack(validated(id, teams.p2)) } });
         const branch = new Battle({ formatid: branchFormat as never, seed: [1, 2, 3, 4], p1: { name: 'a', team: Teams.pack(start.teams.p1) }, p2: { name: 'b', team: Teams.pack(start.teams.p2) } });
         const read = (battle: Battle) => battle.sides.flatMap(side => side.pokemon.map(pokemon => JSON.stringify({
-          species: pokemon.species.id, level: pokemon.level, stats: pokemon.storedStats, maxhp: pokemon.maxhp, // The validator names Gen 1 and 2's missing ability 'No Ability'; a battle without it reads ''.
+          species: pokemon.species.id, level: pokemon.level, stats: pokemon.storedStats, maxhp: pokemon.maxhp,
           ability: pokemon.baseAbility === 'noability' ? '' : pokemon.baseAbility, item: pokemon.item,
         })));
         const differing = read(chosen).findIndex((row, index) => row !== read(branch)[index]);
@@ -193,7 +186,6 @@ describe('scenes of the report', () => {
         const own = Object.values(entry.abilities).filter(Boolean);
         const foreign = dex.abilities.all().find(ability => ability.exists && !ability.isNonstandard && !own.includes(ability.name))!;
         const set = (ability: string) => garchomp({ species: entry.name, name: entry.name, ability, moves: ['Tackle'] });
-        // Two bodies per side: a Doubles Custom Game asks for a team of two.
         const result = await checkGameTeams(id, { p1: own.flatMap(ability => [set(ability), set(own[0])]), p2: [set(foreign.name), set(own[0])] });
         if (result.p1.length !== 0) failures.push(`${id} ${entry.name}: own ability refused (${result.p1[0]})`);
         if (result.p2.length === 0) failures.push(`${id} ${entry.name}: ${foreign.name} accepted`);

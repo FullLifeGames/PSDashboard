@@ -8,13 +8,6 @@ import { floorCells, linePass, linePassQuota, wantedCells, LINE_PASS_MAX } from 
 import { LINE_MIN_VISITS, lineFrom, type Node } from '../src/search/mcts-node';
 import type { EvalSettings, MctsTreeStats } from '../src/types';
 
-/**
- * The line pass. After a tree has its result, its cell statistics and its ranking,
- * extra iterations aimed at the rows whose lines the card shows give the second turn of a line the visits it needs. They write below
- * the root only, so every statistic outside `rowLines` is what the tree without the pass shipped. Real boards, singles and doubles
- * (VGC and Champions boards are doubles trees too: the code has no game-type branch; the app specs name the families).
- */
-
 const sets = (names: [string, string[]][]): PokemonSet[] => names.map(([species, moves]) => ({
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
   evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
@@ -40,7 +33,6 @@ const BOARDS = [['singles', SINGLES], ['doubles', DOUBLES]] as const;
 
 const withoutLines = (stats: MctsTreeStats): Omit<MctsTreeStats, 'rowLines'> => { const { rowLines, ...rest } = stats; void rowLines; return rest; };
 
-/** How many rows of a side hold a line of two turns or more. */
 const longRows = (stats: MctsTreeStats, side: 'p1' | 'p2'): number => Object.values(stats.rowLines![side]).filter(list => list.some(line => line.length >= 2)).length;
 
 describe('the settings key', () => {
@@ -151,7 +143,6 @@ describe('the pass on a searched root', () => {
   });
 });
 
-// those cells are never ones the first phase wants, so the lines of the plain rows do not change
 describe.each(BOARDS)('the floor cells of a %s tree', (_name, serialized) => {
   const root = mctsRoot(serialized, BASE);
   const stats = mctsTreeSearch(serialized, { ...BASE, keepPlayed: { p1: { kind: 'move', name: 'Bulk Up' } } }, 0);

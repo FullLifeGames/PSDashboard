@@ -12,13 +12,8 @@ import { killCount } from '../src/pair/kill-table';
 import { checkedRolls, drawTurn, rootOf, rollSet } from './calc-roll-oracle';
 import { calcSingleDamageRange } from '../src/damage-calc';
 
-/**
- * The HP a percent sighting stands for is the middle of the HPs the simulator's own display (getHealth) shows as that percent. Gen 7 and
- * later round the percent up, Champions rounds it down, and a Gen 6 game without the HP Percentage Mod shows 48 pixels. The checker holds
- * sightedHp against getHealth itself, over every maximum HP from 50 to 700 and every shown value, and the corrections against a battle that
- * played the hit (battle G is the game, battle A the simulator's own run with another seed). The engine runs a VGC game on the Doubles OU
- * format (a Champions VGC game on the Champions doubles format), so those two formats carry the VGC rows.
- */
+// getHealth rounds the percent up from Gen 7 and down in Champions;
+// a Gen 6 game without the HP Percentage Mod shows 48 pixels.
 await loadSimMods('gen9championsou');
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -30,7 +25,6 @@ const set = (species: string, moves: string[], level = 50): PokemonSet => ({
 interface Case {
   label: string;
   format: string;
-  /** The denominator the game shows: 100 for percentages, 48 for the pixels of a Gen 6 game without the percent rule. */
   scale: 100 | 48;
   champions?: boolean;
 }
@@ -58,7 +52,6 @@ const bodyAt = (battle: Battle, maxhp: number): HpDisplayBody & { hp: number } =
   return body as unknown as HpDisplayBody;
 };
 
-/** The display mode of the replay's server: percent on the 100 scale, pixels on 48, never the exact HP a custom game reports. */
 function inReplayMode(battle: Battle, scale: 100 | 48): void {
   battle.reportExactHP = false;
   battle.reportPercentages = scale === 100;
@@ -91,9 +84,7 @@ describe('sightedHp against the simulator getHealth', () => {
           body.hp = maxhp;
           const hp = sightedHp(body, { hp: shown, maxhp: shape.scale });
           expect(hp, `${shape.format} max ${maxhp} shown ${shown}`).not.toBeNull();
-          // It shows exactly the percent (checker: the simulator's own display) ...
           expect(hps, `${shape.format} max ${maxhp} shown ${shown} -> ${hp}`).toContain(hp);
-          // ... and it is the middle of all HPs that show it.
           expect(Math.abs(2 * hp! - (hps[0] + hps[hps.length - 1])), `${shape.format} max ${maxhp} shown ${shown} -> ${hp}`).toBeLessThanOrEqual(1);
           checked++;
         }
@@ -129,7 +120,6 @@ describe('sightedHp against the simulator getHealth', () => {
     const body = bodyAt(battle, 300);
     expect(sightedHp(body, { hp: 0, maxhp: 100 })).toBeNull();
     expect(sightedHp(body, { hp: 101, maxhp: 100 })).toBeNull();
-    // The game shows exact HP here (not 100 or 48): the display of the body is percent, so there is no match.
     expect(sightedHp(body, { hp: 250, maxhp: 311 })).toBeNull();
     expect(sightedHp(body, { hp: 24, maxhp: 48 })).toBeNull();
   });
@@ -341,8 +331,6 @@ describe('champions-roll-oracle', () => {
       expect(dex.items.get('garchompite').exists).toBe(true);
     });
 
-    // Singles' screens halve the damage; the pair plan's kill table prices a doubles field only (singles never ask it), so the
-    // singles screen scene runs through the damage preview, which reads the singles field.
     for (const game of ['singles', 'doubles'] as const) {
       for (const scene of SCENES.filter(candidate => game === 'doubles' || candidate !== SCENES[3])) {
         test(`${game}: ${scene.name} lies on the kill table at the drawn roll`, () => {

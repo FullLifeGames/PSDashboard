@@ -5,15 +5,6 @@ import { checkGameTeams, loadSimMods, startGameLog } from '../src/index';
 import { SWEEPS_FULL } from './dice-fixtures';
 import { legalTeams, playableFormatIds } from './new-game-teams';
 
-/**
- * A pasted set without an ability. The simulator plays such a set with no ability at all (the packed team writes "-" for it), while the
- * team knowledge guesses the species' first ability. Start fills the gap once, from the format's own Dex (the first ability of the
- * species that the format allows, as Showdown's team import and its packed-team reader take the first one; `new-game-ability-fill.spec.ts`
- * holds the banned-slot-0 species), writes it into the saved team, and the team check names it before Start ("<species> has no ability:
- * plays <ability>."). Generations 1 and 2 have no abilities and fill nothing. The sweep reads each format's Dex as the oracle and plays
- * the filled battle in the simulator.
- */
-
 const FAMILIES = [
   'gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9customgame', 'gen9doublescustomgame', 'gen9bssregi', 'gen9championsou',
   'gen9championsvgc2026regmc', 'gen9championscustomgame', 'gen8ou', 'gen4ou', 'gen2ou', 'gen1ou', 'gen3ou', 'gen7doublesou', 'gen9balancedhackmons',
@@ -66,7 +57,6 @@ describe('a pasted set without an ability', () => {
       const plain = await startGameLog({ format: id, p1Team: blank(base.p1), p2Team: base.p2 });
       const filled = await startGameLog({ format: id, p1Team: blank(base.p1), p2Team: base.p2, fillAbilities: true });
       probed += 1;
-      // what the simulator does with the blank set as pasted: no ability
       if (plain.bodies.p1.some(body => body.ability !== '')) failures.push(`${id}: the simulator plays an ability for a blank set (${plain.bodies.p1.map(body => body.ability)})`);
       for (const [index, species] of names(base.p1).entries()) {
         const expected = dex.gen >= 3 ? dex.species.get(species).abilities['0'] : '';
