@@ -4,11 +4,6 @@ import { terrainIdFromSnapshot, weatherIdFromSnapshot } from './field-ids.ts';
 import { typeAtUse, typesUnderTera } from './state.ts';
 import type { PokemonStatTable, SimBattle, SimPokemon } from './types.ts';
 
-/**
- * The quick picker's move types from a throwaway battle of the snapshot body (no battle at hand), asked as the live picker asks
- * (`typeAtUse`, `typesUnderTera`): Weather Ball and Terrain Pulse need the field, the -ate family, Liquid Voice and Normalize the ability.
- */
-
 /** What the type a move lands with depends on, for a body read off a snapshot. */
 export interface SnapshotTypeBody {
   species: string;
@@ -25,16 +20,14 @@ export interface SnapshotTypeBody {
 /** The question to the twin battle: the body, its candidate abilities, the field and the moves to type. */
 export interface SnapshotTypeQuery {
   gen: number;
-  /** A Pokémon Champions game: the mod's battle, which exists once the mod is loaded. */
   champions: boolean;
   body: SnapshotTypeBody;
-  /** The abilities the body may have: the revealed one, else the guessed set's, else the species'; empty where the generation has none. */
+  /** The revealed ability, else the guessed set's, else the species'; empty where the generation has none. */
   abilities: readonly string[];
-  /** The snapshot's field by the client's display names ("Sun", "Electric"); empty strings for none. */
+  /** The snapshot's field by the client's display names ("Sun", "Electric"); '' for none. */
   field: { weather: string; terrain: string };
   /** The Tera type the picker's toggle clicks; null where the picker offers no Tera. */
   clickTera: string | null;
-  /** The move names the picker lists. */
   moves: readonly string[];
 }
 
@@ -47,7 +40,6 @@ export interface SnapshotMoveType {
 const NO_EVS: PokemonStatTable = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const ALL_31: PokemonStatTable = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 
-/** The most answers kept; a replay holds a dozen bodies, so the bound only guards a long session of many replays. */
 const MEMO_LIMIT = 500;
 const memo = new Map<string, ReadonlyMap<string, SnapshotMoveType> | null>();
 
@@ -56,7 +48,6 @@ function remember(key: string, answer: ReadonlyMap<string, SnapshotMoveType> | n
   memo.set(key, answer);
 }
 
-/** The weather and the terrain the snapshot shows, set on the twin; what the twin's own switch-in ability started goes. */
 function setField(battle: Battle, field: SnapshotTypeQuery['field']): void {
   const weather = weatherIdFromSnapshot(field.weather, battle.dex);
   const terrain = terrainIdFromSnapshot(field.terrain, battle.dex);
@@ -77,23 +68,19 @@ function setOf(query: SnapshotTypeQuery, ability: string): PokemonSet {
   };
 }
 
-/** The foe of the twin: the body's own species (it exists in the generation and the mod), with no ability and no item. */
 function foeOf(species: string): PokemonSet {
   return {
     name: 'Foe', species, item: '', ability: 'No Ability', moves: ['splash'], nature: 'Hardy', evs: NO_EVS, ivs: ALL_31, level: 100, gender: '',
   };
 }
 
-/** The twin battle of the body with one ability, or throws where the simulator cannot build it. */
 function twinOf(format: string, query: SnapshotTypeQuery, ability: string): Battle {
   const battle = twinBattle(format, { p1: { name: 'Body', team: [setOf(query, ability)] }, p2: { name: 'Foe', team: [foeOf(query.body.species)] } });
   setField(battle, query.field);
-  // A body that terastallized before the snapshot has its Tera type now; the labels below are for the click still to come.
   if (query.body.teraType) battle.actions.terastallize(battle.sides[0].active[0]);
   return battle;
 }
 
-/** What the simulator says for the twin with one ability; null where the twin cannot be built. */
 function readTwin(format: string, query: SnapshotTypeQuery, ability: string): ReadonlyMap<string, SnapshotMoveType> | null {
   try {
     const battle = twinOf(format, query, ability);
@@ -114,13 +101,12 @@ function readTwin(format: string, query: SnapshotTypeQuery, ability: string): Re
   }
 }
 
-/** One twin per (body, ability, field, click, moves), remembered; a failure is remembered too once the mod it needs is loaded. */
 function readOne(query: SnapshotTypeQuery, ability: string): ReadonlyMap<string, SnapshotMoveType> | null {
-  // The Champions mod loads on demand: before it is there no battle can come up (no format), and the next build asks again.
+  // The Champions mod loads on demand: until then there is no format, and the next build asks again.
   const format = twinFormat(query.gen, query.champions);
   if (!format) return null;
   const { body } = query;
-  // The key holds only what the twin is built from: a caller may hand over a whole info, whose HP and stages change every turn.
+  // Only what the twin is built from: a whole info's HP and stages change every turn.
   const key = JSON.stringify([
     format, body.species, body.item ?? '', body.level ?? 100, body.gender ?? '', body.ivs ?? null, body.hpType ?? '', body.teraType ?? '',
     ability, query.field, query.clickTera, query.moves,
@@ -135,9 +121,9 @@ function readOne(query: SnapshotTypeQuery, ability: string): ReadonlyMap<string,
 const same = (a: SnapshotMoveType | undefined, b: SnapshotMoveType | undefined): boolean =>
   !!a && !!b && a.type === b.type && a.typeUnderTera === b.typeUnderTera;
 
-/** The type each listed move lands with for the snapshot body, as the simulator reads it; null where no twin can be built. */
+/** The type each listed move lands with for the snapshot body, as the simulator reads it; null where no twin builds. */
 export function snapshotMoveTypes(query: SnapshotTypeQuery): ReadonlyMap<string, SnapshotMoveType> | null {
-  // Every candidate ability gets its own twin; a move whose candidates disagree or that the Dex does not know is left out (the caller keeps its catalog type).
+  // A move whose candidates disagree, or that the Dex does not know, is left out; the caller keeps its catalog type.
   const reads = (query.abilities.length > 0 ? query.abilities : ['']).map(ability => readOne(query, ability));
   if (reads.some(read => read === null)) return null;
   const [first, ...others] = reads as ReadonlyMap<string, SnapshotMoveType>[];

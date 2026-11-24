@@ -53,11 +53,11 @@ export interface BranchSwitchOption {
   hp: string;
   hpPercent: number;
   fainted: boolean;
-  /** The slot's Pokémon is held: the simulator refuses any switch from it this turn. Absent on a forced replacement. */
+  /** Held: the simulator refuses any switch from it this turn; absent on a forced replacement. */
   trapped?: boolean;
 }
 
-/** The calc's reading of a simulator body: stats, set, status, boosts and the volatile facts the damage formulas use. */
+/** The calc's reading of a simulator body: stats, set, status, boosts and the volatile facts damage formulas use. */
 export interface SimPokemonInfo {
   name: string;
   species: string;
@@ -77,21 +77,15 @@ export interface SimPokemonInfo {
   ivs?: PokemonStatTable;
   gender?: string;
   teraType?: string;
-  /** Types a Stellar Pokémon has already spent its one-time boost on (the sim's stellarBoostedTypes). */
   stellarBoostedTypes?: string[];
-  /** The stat Protosynthesis or Quark Drive raises, as the simulator's volatile names it. */
   boostedStat?: string;
-  /** Supreme Overlord's count of fallen allies, as its ability state keeps it. */
   alliesFainted?: number;
-  /** The side's fallen so far (side.totalFainted), the count Last Respects powers up by. */
   totalFainted?: number;
-  /** The hits the body took (timesAttacked), the count Rage Fist powers up by. */
   timesAttacked?: number;
   hpType?: string;
   hpPower?: number;
   /** 'champions' on a body of a Champions battle: its evs hold Stat Points, which the calc reads as EVs. */
   mod?: string;
-  /** A Tatsugiri inside its Dondozo (the simulator's `commanding` volatile); the simulator passes its slot. */
   commanding?: boolean;
   boosts: Record<string, number>;
   level: number;
@@ -115,7 +109,7 @@ export interface BranchSlotModifiers {
   zMoves: (string | null)[];
 }
 
-/** What the pickers read off a position: moves, switches, bodies, field, force-switch flags and the pending choices per side. */
+/** What the pickers read off a position: moves, switches, bodies, field, force-switch flags, pending choices. */
 export interface BranchSimState {
   p1Moves: BranchMoveOption[];
   p1MovesBySlot: BranchMoveOption[][];
@@ -155,19 +149,18 @@ export interface BranchRuntime {
   streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
   log: string[];
   choiceErrors: BranchChoiceErrorLog;
-  /** True when the overall reconstruction deadline was hit before the target turn. */
+  /** The reconstruction deadline was hit before the target turn. */
   timedOut: boolean;
-  /** Per-block hax alignment: chosen seed + the truly emitted block's score. */
   haxAlignment: TurnAlignmentRecord[];
 }
 
-/** The count and last text of choice rejections, which arrive as `|error|` sideupdates on the per-player streams, never on the omniscient one. */
+/** The count and last text of choice rejections (`|error|` sideupdates of the player streams, not the omniscient). */
 export interface BranchChoiceErrorLog {
   count: number;
   last: string | null;
 }
 
-/** The result of an execute; `dice` reports what the simulator did with the dice the user forced, for a turn that carried one. */
+/** The result of an execute; `dice` reports what the simulator did with the dice the user forced. */
 export type BranchExecuteResult =
   | { ok: true; dice?: DiceReport }
   | { ok: false; error: string };

@@ -19,7 +19,7 @@ export interface ReplayData {
 export interface PokemonSnapshot {
   name: string;
   speciesForme: string;
-  /** The species the body entered with, only while it wears a Transform copy (`speciesForme` then reads the copied species). */
+  /** The species the body entered with, only while it wears a Transform copy (`speciesForme` is the copy). */
   baseSpeciesForme?: string;
   hp: number;
   maxhp: number;
@@ -38,15 +38,14 @@ export interface PokemonSnapshot {
   sleepTurns?: number;
   /** Index in the side's active row, only for an active body. */
   slot?: number;
-  /** The stat Protosynthesis or Quark Drive raises, as @pkmn/client's volatile keeps it (`atk`, `def`, `spa`, `spd`, `spe`); absent without the boost. */
+  /** The stat Protosynthesis or Quark Drive raises, as @pkmn/client's volatile keeps it; absent without the boost. */
   boostedStat?: string;
   /** Supreme Overlord's count of fallen allies, from the client's `fallenN` volatile; absent without it. */
   fallen?: number;
-  /** The hits the body took, as @pkmn/client counts them (Rage Fist's count); absent at none. */
   timesAttacked?: number;
   /**
-   * The PP the log shows spent, by move name, as @pkmn/client counts it (Pressure's extra point included, a Leppa or Mystery Berry restore taken
-   * off); a pair is the range when the log leaves Pressure open. The body's own moves only, never the copies a Transform holds. Absent means no information.
+   * The PP the log shows spent, by move name, as @pkmn/client counts it (Pressure's extra point included, a Leppa or
+   * Mystery Berry restore taken off); a pair is the range while Pressure is open. Own moves only, no Transform copy's.
    */
   ppUsed?: Record<string, number | [number, number]>;
 }
@@ -78,7 +77,7 @@ export interface TurnSnapshot {
   log: string[];
 }
 
-/** One clean, direct damaging hit seen in the protocol, with the context to recompute it; crits, multi-hits, Helping Hand and [from] damage are excluded. */
+/** One clean damaging hit from the protocol with its context; no crits, multi-hits, Helping Hand, [from] damage. */
 export interface DamageObservation {
   // Doubles give one observation per target of a move.
   attackerSpecies: string;
@@ -87,7 +86,7 @@ export interface DamageObservation {
   moveId: string;
   /** Damage dealt as a fraction of the defender's max HP (HP-bar precision). */
   observedFraction: number;
-  /** The hit took the defender's remaining HP (|-damage|...|0 fnt): the recorded fraction is a LOWER BOUND on the damage, not a reading. */
+  /** The hit took the defender's remaining HP (|-damage|...|0 fnt): the fraction is a LOWER BOUND on the damage. */
   lethal: boolean;
   attackerBoosts: Record<string, number>;
   defenderBoosts: Record<string, number>;
@@ -95,79 +94,67 @@ export interface DamageObservation {
   /** Screens up on the DEFENDER's side at the moment of the hit. */
   screens: string[];
   weather: string;
-  /** The battle was not singles (the `|gametype|` line decides, not the format name): the calculator prices the hit on a Doubles field. */
+  /** The battle was not singles (`|gametype|` decides, not the format name): the calculator prices a Doubles field. */
   doubles?: boolean;
   /**
-   * The move line named `[spread]`: the simulator cut the damage to 0.75, even when only one target took it (the other protected). A spread move
-   * without the mark hit its only target at full damage.
+   * The move line named `[spread]`: the simulator cut the damage to 0.75, even when only one target took it (the other
+   * protected). A spread move without the mark hit its only target at full damage.
    */
   spread?: boolean;
-  /** The side of the defender: the other side unless a spread move hit the attacker's partner. Absent reads as the other side. */
+  /** The defender's side: the other one unless a spread move hit the attacker's partner; absent reads as the other. */
   defenderSide?: 'p1' | 'p2';
   /**
-   * The item id the client battle shows each mon holding at the hit: '' when it holds none or the log never showed it. An item that ended inside
+   * The item id the client shows each mon holding at the hit: '' when none or never shown. An item that ended inside
    * the very move before its damage line (a weakening berry, a gem) still counts.
    */
   attackerItem?: string;
   defenderItem?: string;
-  /** The item differs from the one the mon came in with (used up, knocked off, stolen, swapped): '' then means gone, not unseen. */
+  /** The item differs from the one the mon came in with (used up, knocked off, stolen, swapped): '' then means gone. */
   attackerItemChanged?: boolean;
   defenderItemChanged?: boolean;
-  /**
-   * The stat an active Protosynthesis or Quark Drive raises and the stat stages the Pokémon had when the ability activated: the simulator picks
-   * the highest stat there. Absent when the ability is not active at the hit.
-   */
+  /** The stat an active Protosynthesis or Quark Drive raises and the stages at activation; absent when inactive. */
   attackerParadox?: ParadoxReading;
   defenderParadox?: ParadoxReading;
-  /** The move's name as the `|move|` line prints it: the calculator keys Weather Ball, Terrain Pulse, Techno Blast and Multi-Attack on it, not the id. */
+  /** The move's name as the `|move|` line prints it: Weather Ball, Terrain Pulse, Techno Blast key on it. */
   moveName?: string;
-  /** The terrain id the client battle shows at the hit ('' none). */
   terrain?: string;
-  /** The type each side Terastallized to, as the client names it; absent when it has not. */
   attackerTera?: string;
   defenderTera?: string;
   /**
-   * The HP texts the log showed for the defender of a knockout (`lethal`): before the hit and, when the hit left it standing (Sturdy, Focus Sash:
-   * `survivedAtOne`), after it, so a knockout reads the real HP the display rounding allows (`hp-display.ts`). Absent on a hit that did not knock out.
+   * The HP texts the log showed for the defender of a knockout (`lethal`): before the hit and, when it survived
+   * (Sturdy, Focus Sash: `survivedAtOne`), after it (`hp-display.ts`). Absent on a hit that did not knock out.
    */
   defenderShown?: { before: HpText; after?: HpText };
-  /** Each side's HP as a fraction of its maximum before the hit: Multiscale needs full HP, Eruption and Water Spout scale with it. */
+  /** Each side's HP as a fraction of its maximum before the hit (Multiscale, Eruption and Water Spout read it). */
   attackerHp?: number;
   defenderHp?: number;
-  /** The fallen Supreme Overlord counted when the attacker came in (the `fallenN` start line of the ability); absent at none. */
+  /** The fallen Supreme Overlord counted when the attacker came in (the `fallenN` start line); absent at none. */
   attackerFallen?: number;
   /**
-   * The ability id the client shows each side with at the hit (revealed by the log, or changed by it: Trace, Skill Swap); absent
-   * when the log never showed it. `Suppressed` is set when Gastro Acid, Neutralizing Gas or an ended ability took it away.
+   * The ability id the client shows each side with at the hit (revealed or changed: Trace, Skill Swap); absent when
+   * never shown. `Suppressed` is set when Gastro Acid, Neutralizing Gas or an ended ability took it away.
    */
   attackerAbility?: string;
   defenderAbility?: string;
   attackerSuppressed?: boolean;
   defenderSuppressed?: boolean;
-  /** The attacker's ability is on, as its own volatile shows (Flash Fire after the absorbed hit, Slow Start, Unburden). */
   attackerAbilityOn?: boolean;
   /**
-   * What the log shows besides the two Pokémon that the calculator reads off the field (ids, sorted): Helping Hand and Charge on
-   * the attacker, an attacker's ally with Battery, Power Spot or Steely Spirit, a defender's ally with Friend Guard, a Ruin or Aura
-   * ability on the field, Gravity, Magic Room, Wonder Room. Absent at none.
+   * What the calculator reads off the field besides the two Pokémon (ids, sorted): Helping Hand, Charge, an ally with
+   * Battery, Power Spot, Steely Spirit or Friend Guard, a Ruin or Aura ability, Gravity, Magic Room, Wonder Room.
    */
   fieldFacts?: string[];
   /**
-   * The living partner of each side at the hit, doubles only: its species forme, the ability the client shows it with (`ability`, empty when
-   * suppressed), and `unrevealed` when the log never showed the ability. The solver reads the field abilities of a partner whose ability the log
-   * hid from the Dex (a species with one ability) or from its built set.
+   * The living partner of each side at the hit, doubles only: its species forme, the ability the client shows it with
+   * (`ability`, empty when suppressed), and `unrevealed` when the log never showed the ability.
    */
   attackerAlly?: AllyReading;
   defenderAlly?: AllyReading;
-  /**
-   * The history a move's power can read, only when above zero: the fainted members of the attacker's side (Last Respects) and the hits the
-   * attacker took (Rage Fist), as the client battle holds them at the damage line.
-   */
+  /** A move power's history, only when above zero: the side's fainted (Last Respects), hits taken (Rage Fist). */
   attackerFainted?: number;
   attackerTimesAttacked?: number;
-  /** The defender's status before the hit: Hex and Venoshock double against it, Marvel Scale lifts Defense under it. */
   defenderStatus?: string;
-  /** The turn's order at the hit, only when true: the defender switched in this turn (Stakeout), and every other active Pokémon had moved (Analytic). */
+  /** Only when true: the defender switched in this turn (Stakeout); `lastToMove`: all others had moved (Analytic). */
   defenderNewlyIn?: boolean;
   lastToMove?: boolean;
 }
@@ -178,13 +165,12 @@ export interface AllyReading {
   unrevealed?: boolean;
 }
 
-/** What the log shows of an active Protosynthesis or Quark Drive: the stat the client names and the stages the simulator read it at. */
 export interface ParadoxReading {
   stat: StatId;
   stages: Record<string, number>;
 }
 
-/** The effectiveness reading of one typeless "Hidden Power" hit (`neutral`: no marker), the type evidence the builder filters candidates with. */
+/** The effectiveness reading of one typeless "Hidden Power" hit (`neutral`: no marker), the builder's type evidence. */
 export interface HiddenPowerEvidence {
   attackerSide: 'p1' | 'p2';
   attackerSpecies: string;
@@ -192,20 +178,20 @@ export interface HiddenPowerEvidence {
   marker: 'super' | 'resisted' | 'immune' | 'neutral';
 }
 
-/** A same-turn move order the log PROVED (`first` acted before `second` at equal priority); the spread solver holds it as a hard speed constraint. */
+/** A same-turn move order the log PROVED (`first` before `second` at equal priority): a hard speed constraint. */
 export interface SpeedOrderObservation {
-  // The proof holds when no priority move, paralysis, Tailwind, Trick Room, speed stage or same-turn switch-in is in play.
+  // Holds when no priority move, paralysis, Tailwind, Trick Room, speed stage or same-turn switch-in is in play.
   firstSide: 'p1' | 'p2';
   firstSpecies: string;
   secondSide: 'p1' | 'p2';
   secondSpecies: string;
   turn: number;
-  /** The Choice Scarf each mover held that turn, for a mon whose Scarf came or went: the race is read with it, not with the set's item. */
+  /** The Choice Scarf each mover held that turn, for a mon whose Scarf came or went: the race uses it. */
   firstScarf?: boolean;
   secondScarf?: boolean;
   /** The second mover fell before acting: its chosen move, and so its priority, never showed. */
   knockOut?: true;
-  /** The mover was transformed: it raced on this Pokémon's Speed with its own item (the simulator's Transform copies the target's stats). */
+  /** The mover was transformed: it raced on this Pokémon's Speed with its own item (Transform copies stats). */
   firstCopied?: { side: 'p1' | 'p2'; species: string };
   secondCopied?: { side: 'p1' | 'p2'; species: string };
 }
@@ -217,7 +203,7 @@ export type StatId = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 /** One number per stat: EVs, or IVs where a field says so. */
 export type PokemonEvs = Record<StatId, number>;
 
-/** A move of a Pokemon with its knowledge source, the probability of a guess and the provenance label the panel shows. */
+/** A move of a Pokemon with its knowledge source, the probability of a guess and the panel's provenance label. */
 export interface PokemonMoveInfo {
   name: string;
   source: Exclude<KnowledgeSource, 'unknown'>;
@@ -246,10 +232,8 @@ export interface PokemonEvsInfo {
 
 /** One side of a logged hit, as it stood when the move landed. */
 export interface HitParty {
-  /** The forme that took part (a Mega, Terapagos-Terastal). */
   species: string;
   level: number;
-  /** The Tera type when terastallized. */
   tera?: string;
   boosts: Record<string, number>;
   status: string;
@@ -263,18 +247,16 @@ export interface HitParty {
   itemChanged: boolean;
   /** 'M', 'F' or '' (genderless or unknown): Rivalry reads it. */
   gender: string;
-  /** Its side's fainted Pokémon at the hit (Supreme Overlord). */
   alliesFainted: number;
-  /** Ability states the calculator cannot see by itself: an active Flash Fire, Slow Start, Protosynthesis or Quark Drive stat, a Charge. */
+  /** Ability states the calculator cannot see: Flash Fire, Slow Start, Protosynthesis or Quark Drive stat, a Charge. */
   flashFire: boolean;
   slowStart: boolean;
   boostedStat: string;
   charged: boolean;
 }
 
-/** One clean hit a Pokémon dealt, as the log shows it: what the damage judge needs to recompute it with the calculator, in singles and doubles. */
+/** One clean hit a Pokémon dealt, as the log shows it: what the damage judge needs to recompute it. */
 export interface LoggedHit {
-  // The inference collects it with its own @pkmn/client walk; crits, multi-hit moves and [from]-attributed damage stay out.
   move: string;
   attacker: HitParty;
   defender: HitParty & { side: 'p1' | 'p2' };
@@ -284,10 +266,8 @@ export interface LoggedHit {
   lowerBound: boolean;
   weather: string;
   terrain: string;
-  /** Reflect, Light Screen and Aurora Veil on the defender's side. */
   screens: string[];
   helpingHand: boolean;
-  /** The defender came in this turn (Stakeout). */
   defenderNew: boolean;
   doubles: boolean;
   /** The move line names its spread targets ([spread]): the calculator's spread factor applies. */
@@ -301,10 +281,7 @@ export interface LoggedHit {
   format: string;
 }
 
-/**
- * A move of the set that the log proves without naming it: a Z-move or a Max move shows the type of its base move and never the base move.
- * `attack` asks for a damaging move of `type`; `status` asks for any status move, the base of Max Guard.
- */
+/** A set move the log proves without naming it (a Z or Max move shows its base's type). */
 export type OpenMove = { kind: 'attack'; type: string } | { kind: 'status' };
 
 /** What the app knows of one Pokemon of a side, each field with its knowledge source. */
@@ -325,32 +302,23 @@ export interface RevealedPokemonInfo {
   level: number;
   gender: string;
   /**
-   * The name the replay gave this body: its first `switch`, `drag` or `replace` line, else an Open Team Sheet's name field. Unset when the name
-   * is the species' own, or the species of another body of the side (a lookup by name would find the wrong body), or when the replay never named
-   * the body (team preview carries no nickname).
+   * The name the replay gave this body (first `switch`, `drag` or `replace` line, else an Open Team Sheet's). Unset if
+   * it is the species' own or another body's (a lookup by name would find the wrong one), or never given.
    */
   nickname?: string;
-  /**
-   * The shiny flag of the body's details in those lines, or the sheet's. Unset when no line showed the body: team preview strips the flag, so an
-   * unrevealed body reads as not shiny to the simulator, as the log would have it.
-   */
+  /** The shiny flag of the body's details lines or the sheet; unset when no line showed it (team preview strips it). */
   shiny?: boolean;
   /**
-   * The log showed the body with no gender although its species has one (a fixed one included): the game ran it as genderless (a set that says
-   * `N`). A set without a gender makes the simulator draw one, so the build says `N` for such a body.
+   * The log showed the body with no gender although its species has one: the game ran it as genderless (set `N`).
+   * A set without a gender makes the simulator draw one, so the build says `N` for such a body.
    */
   noGender?: boolean;
-  /**
-   * Values DISPROVEN by protocol evidence (toId'd) — hazard damage rules out
-   * Magic Guard, rocks chip rules out Heavy-Duty Boots, a landed Ground move
-   * rules out Levitate. Rule-outs beat guesses, never revealed/manual/sheet.
-   */
+  /** Values DISPROVEN by protocol evidence (toId'd); rule-outs beat guesses, never revealed, manual or sheet values. */
   ruledOut?: { abilities: string[]; items: string[] };
-  /** The clean hits this Pokémon dealt: the damage judge reads them against its item candidates. */
   hits?: LoggedHit[];
   /**
-   * A body the log never showed, guessed from the format's teammate statistics because the side's `|teamsize|` says it has more bodies than it
-   * showed (a game without team preview). The panel marks it "not revealed"; an edit drops the flag.
+   * A body the log never showed, guessed from the format's teammate statistics because `|teamsize|` says the side has
+   * more bodies (no team preview). The panel marks it "not revealed"; an edit drops the flag.
    */
   standIn?: true;
 }

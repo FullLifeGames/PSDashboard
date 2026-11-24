@@ -11,12 +11,11 @@ import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { RolledCopyParams } from '../../lib/rolled-copy-stage';
 
-/** Played-pair matching with the KO'd-before-acting stand-in: a side that never got to act prices its pair through the phantom
- *  (analysis.ts). Both sides read the order bound the result carries (`playedBounds`); a result cached without bounds matches without them. */
+/** Played-pair matching with the KO'd-before-acting stand-in (analysis.ts); both sides read `playedBounds`. */
 export const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null, rules: GameRules): RankedChoice | null =>
   matchPlayedSide(result, side, played, result.playedBounds) ?? phantomStayIn(result, side, played, rules, result.playedBounds?.[side]?.[0]);
 
-/** Eval-layer lifecycle guard: a failure is a gap only while the turn is scoreless; a failing later pass never talks over an earlier score. */
+/** A failure is a gap only while the turn is scoreless; a failing later pass never talks over an earlier score. */
 export function recordEvalError(
   evalErrors: (string | null)[], scores: (number | null)[], turn: number, error: unknown,
 ): void {
@@ -32,7 +31,7 @@ export interface GraphSweepParams {
   to?: number;
   tera: TeraAllowance;
   sleepClause?: boolean;
-  /** The replay's generation and mod, for the Dex reads of the sweep (the stay-in phantom's move priorities). */
+  /** For the Dex reads of the sweep (the stay-in phantom's move priorities). */
   rules: GameRules;
   ruleset: StaticRuleset;
   /** The sweep runs over a new game: positions come from its record, not a replay's guessed sets. */
@@ -40,8 +39,7 @@ export interface GraphSweepParams {
   doubles: boolean;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
-  /** Single-pass acquisition of ALL positions (index = turn - 1), preferred over acquireFor: one reconstruction, invoked once on
-   *  the first cache miss. `onPosition` streams each position as it is captured. */
+  /** Single-pass capture of ALL positions (index = turn - 1), preferred over acquireFor; called on the first miss. */
   acquireAll?(
     report: (turn: number, target: number) => void,
     onPosition?: (turn: number, serialized: string) => void,
@@ -52,14 +50,14 @@ export interface GraphSweepParams {
   /** Turn 0: the serialized team-preview position, or null without preview. Full-game sweeps only. */
   acquirePreview?(): Promise<string | null>;
   playedLeads?: { p1: string[] | null; p2: string[] | null };
-  /** Guessed-item mons per side with their usage-plausible alternative items (rule-outs applied): the probes' search space. Absent = no probing. */
+  /** Guessed-item mons per side with plausible alternative items (rule-outs applied); absent = no probing. */
   sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
-  /** This replay's store-key prefix (evalStorePrefix): the run reads every persisted eval under it once, not one read per turn. */
+  /** This replay's store-key prefix (evalStorePrefix): the run reads every persisted eval under it once. */
   storePrefix?: string;
-  /** The protocol's replacement request rounds (full-game sweeps only), priced at the captured position under the key of replacementKeyFor. */
+  /** Replacement request rounds (full-game sweeps only), priced at the captured position by `replacementKeyFor`. */
   replacementRounds?: ReplacementRound[];
   replacementKeyFor?(turn: number, ordinal: number): string;
-  /** The biggest roll played the other way (full-game sweeps only). Absent = no stage, and the graph keeps the flip of the sweep before it. */
+  /** The biggest roll played the other way (full-game sweeps only); absent = no stage, the graph keeps its flip. */
   rolledCopy?: RolledCopyParams;
 }
 
@@ -102,7 +100,6 @@ export interface TurnEngine {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
   mode: EngineMode;
-  /** false marks a sketch that skips the forced-win prover (see EvalSettings.prove). */
   prove?: boolean;
 }
 
@@ -119,8 +116,7 @@ export interface TurnStageArgs {
 export const aborted = (env: SweepEnv) => env.runRef.current !== env.runId;
 export const isCancelled = (err: unknown) => err instanceof Error && err.message === 'cancelled';
 
-/** One awaited stage under the run's cancellation contract: a run that changed hands or a cancelled worker call ends the turn with
- *  'abort'; any other failure keeps the stage's null result. The run is checked again after the await, since it can change hands. */
+/** One awaited stage under the run's cancellation contract: a changed run or a cancelled call ends it with 'abort'. */
 export async function guardedStage<T>(env: SweepEnv, run: () => Promise<T>): Promise<T | null | 'abort'> {
   let value: T | null = null;
   try {
