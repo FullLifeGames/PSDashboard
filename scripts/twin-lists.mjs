@@ -1,17 +1,4 @@
-// The twin detector. AGENTS.md, Rules for the code: one rule lives in one module and every other place imports
-// it; a deliberate copy gets a spec that compares the two. A twin is a list of 3 or more string literals that stands in two or
-// more files with the same names (the stat names in four files, Reflect / Light Screen / Aurora Veil in five).
-//
-//   node scripts/twin-lists.mjs [--near] [--json] [--root <dir>] [--baseline <file>]
-//
-// Exit 1 when a pair (list, file) is not in scripts/twin-baseline.json while the list stands in 2 or more files. The baseline only
-// shrinks (scripts/update-name-baseline.mjs): a group that lost a file passes, a group down to one file is no twin. A deliberate
-// copy takes the comment `// twin-ok: <path of the spec that compares the copies>` on the line above the list; the spec must exist.
-// --near prints lists with a Jaccard overlap of 0.7 or more (both with 4 or more names) and never fails: a copy with one more
-// element is no twin to the check, and editing one element of a list must not fail a lane. --json prints the groups.
-//
-// A list is an array expression of string literals only (also inside `new Set([...])`); call arguments and type unions are not
-// lists here. Test files are left out: the folders are packages/*/src and src.
+// The twin detector: a list of 3 or more string literals that stands in two or more files with the same names.
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,16 +12,15 @@ const NEAR_MIN_NAMES = 4;
 
 const toID = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-// A file without an opening bracket followed by three strings and two commas cannot hold a list of 3 strings: the cheap
-// test keeps the parser (the cost of the check) off most files. A string is read whole, so one that holds a bracket
-// passes ('[object Map]' in sim-ask/isolated.ts slipped an older pattern); comments between elements pass.
+// A cheap test keeps the parser off files that cannot hold a list of 3 strings; a string is read whole, so one that
+// holds a bracket passes, and so do comments between elements.
 const STR = String.raw`(?:'[^'\n]*'|"[^"\n]*"|` + '`[^`]*`)';
 const GAP = String.raw`(?:\s|\/\/[^\n]*\n|\/\*[\s\S]*?\*\/)*`;
 const MAY_HOLD_LIST = new RegExp(String.raw`\[${GAP}${STR}${GAP},${GAP}${STR}${GAP},${GAP}${STR}`);
 
 const STATEMENT = /(Statement|Declaration|PropertyDefinition)$/;
 
-/** Every node of a parsed file with `parent` set (the same walk as the name census, kept local to stay a plain function). */
+// The walk of name-census.mjs, kept local so this file stays a plain function.
 function* nodesOf(root) {
   const stack = [root];
   while (stack.length) {
@@ -52,7 +38,6 @@ function* nodesOf(root) {
   }
 }
 
-/** Lines whose comment may carry the twin-ok of a list: above the list and above its statement. */
 function commentLines(node) {
   const lines = [node.loc.start.line - 1];
   for (let up = node.parent; up; up = up.parent) {
@@ -64,7 +49,6 @@ function commentLines(node) {
   return lines;
 }
 
-/** `[{ line, key, names, exempt }]`: the lists of a parsed file. */
 function listsOf(ast, root) {
   const marks = new Map();
   for (const comment of ast.comments ?? []) {
@@ -104,7 +88,7 @@ export function placesOf(root, folders = TWIN_FOLDERS, { prefilter = true } = {}
 
 const filesOf = spots => [...new Set(spots.map(spot => spot.file))].sort();
 
-/** `{ "<key>": ["<file>", ...] }` for every list of `places` (`placesOf`) that stands in 2 or more files; `twinsOf` reads the places itself. */
+/** `{ "<key>": ["<file>", ...] }` for every list of `places` that stands in 2 or more files. */
 export function groupsOf(places) {
   const groups = {};
   for (const [key, spots] of [...places].sort(([a], [b]) => (a < b ? -1 : 1))) {
@@ -118,7 +102,6 @@ export function twinsOf(root, folders = TWIN_FOLDERS) {
   return groupsOf(placesOf(root, folders));
 }
 
-/** The messages for every pair (list, file) of a group of 2 or more files that the baseline lacks. */
 export function newTwins(root, baseline, folders = TWIN_FOLDERS) {
   const messages = [];
   for (const [key, spots] of placesOf(root, folders)) {
@@ -138,7 +121,6 @@ export function newTwins(root, baseline, folders = TWIN_FOLDERS) {
   return messages.sort();
 }
 
-/** `[{ jaccard, left, right }]`: lists with an overlap of 0.7 or more that are no twins; report only. */
 export function nearPairs(root, folders = TWIN_FOLDERS) {
   const places = placesOf(root, folders);
   const keys = [...places.keys()].sort();

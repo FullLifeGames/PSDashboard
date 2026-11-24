@@ -1,5 +1,4 @@
-// The engine bench: forward-model and search throughput, printed to the console. It is no test, so it stays out of the suite: run it with
-// `npm run bench:eval` (vitest.bench.config.ts). EVALUATION.md, "5. Measuring the engine", names the command.
+// The engine bench: forward-model and search throughput, printed to the console; run it with `npm run bench:eval`.
 import { test } from 'vitest';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
@@ -60,7 +59,6 @@ test('measures forward-model and search throughput', { timeout: 300000 }, () => 
 
   const forks = 50;
 
-  // Stage split: where does a fork's time actually go?
   const serialized = root.serialized;
   const deserializeStart = performance.now();
   for (let i = 0; i < forks; i++) State.deserializeBattle(serialized);

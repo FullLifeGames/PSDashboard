@@ -1,19 +1,4 @@
 // Proof that an edit moved comments and whitespace only.
-//
-//   node scripts/comment-only-diff.mjs <base> [--head <rev>] [paths or globs...]
-//
-// Compares every changed .ts, .tsx, .mts, .cts, .js, .mjs, .cjs, .jsx and .css file between <base> and --head (default: the working
-// tree), restricted to the git pathspecs given (a glob like 'packages/eval-engine/src/score/**' works). Exit 0 when every file
-// differs only in comments and whitespace, exit 1 with the file and the first difference otherwise. Added and deleted files fail.
-//
-// What "only in comments and whitespace" means, file by file:
-//   1. The tokens, read by the compiler's syntax tree, are equal in text, and so is the line break before each token (a joined line
-//      after `return` or before `++` fails). A `{/* c */}` JSX child is no token, and the JSX text around it folds as React folds it.
-//   2. The comments that code reads (lib: `readByCode`) are byte for byte equal and keep their place among the tokens: `// oracle:`
-//      marker lines (and the block of comments above their declaration), eslint directives, `@ts-expect-error` and its kin,
-//      `@vitest-environment`, coverage pragmas, triple-slash references, shebangs, legal headers. A `-next-line` directive and
-//      `@ts-expect-error` keep the line count to the next token.
-//   3. A stylesheet differs only in comments and whitespace; its legal comments stay.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -22,7 +7,6 @@ import { isCss, readByCode, readCss, readSource, scriptKindOf } from './comment-
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The code-read comments of a stream of items, with the number of tokens before each: what must stay put. */
 function pragmasOf(items) {
   const found = [];
   for (const item of items) {
@@ -97,7 +81,7 @@ function compareCss(before, after) {
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 
-/** The files that differ between `base` and `head` (the working tree when `head` is undefined), with their status letter. */
+/** Files that differ between `base` and `head` (undefined: the working tree), with their status letter. */
 export function changedFiles({ base, head, paths = [], cwd = ROOT }) {
   const args = ['diff', '--name-status', '--no-renames', base, ...(head ? [head] : []), '--', ...paths];
   return git(args, cwd).split('\n').filter(Boolean).map(line => {

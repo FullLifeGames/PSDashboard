@@ -1,12 +1,4 @@
-// A fold or a split keeps every row. Compares two lists from `rows-collect.mjs` by project and full row name, ignoring the file,
-// as multisets, and prints the rows lost, the rows gained and the file each came from.
-// Usage: node scripts/rows-compare.mjs <before.json> <after.json> [--map <table.json>] [--expect-lost <names.json>] [--expect-gained <names.json>]
-// Exit 1 when a row is lost or gained. `--expect-lost` reads a JSON array of "<project> | <row name>" (one entry per row, repeated for a row
-// counted twice) that a cut removes on purpose: exit 0 only when exactly those rows are lost and none is gained. `--expect-gained` is its mirror
-// for rows a change adds on purpose: exit 0 only when exactly those rows are gained and none is lost. With both flags, exactly the named rows are lost and exactly the named rows are gained.
-// Collect both lists with the same DICE_SWEEPS value.
-// The table maps renamed rows from before to after: { "rows": { "<old name>": "<new name>" }, "prefixes": { "<old start>": "<new start>" } }.
-// An exact row wins; else the longest prefix that the old name starts with. A table entry that matches no row is an error (exit 2).
+// Compares two row lists of rows-collect.mjs by project and full row name; a fold or a split keeps every row.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 

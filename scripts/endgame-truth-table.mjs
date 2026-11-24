@@ -1,9 +1,4 @@
-// The endgame truth table: per estimator, Brier and mean
-// absolute error against the solver's exact value on the exactly solved
-// positions, sign agreement, the coverage line (solved / capped / unpriced
-// / loop / out of scope), and the decided reference (how many decided
-// positions the solver puts at or beyond 0.8 for the decided side).
-//   node scripts/endgame-truth-table.mjs <dump.jsonl> [<dump.jsonl> ...]
+// The endgame truth table: per estimator, Brier, mean error and sign agreement against the solver's exact value.
 import { readFileSync } from 'node:fs';
 
 const paths = process.argv.slice(2);

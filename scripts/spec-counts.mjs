@@ -1,10 +1,4 @@
-// The spec-count ratchet (AGENTS.md "What earns a test", rule 5): the number of spec files per test project only falls,
-// or grows with a named new module.
-//
-//   node scripts/spec-counts.mjs          check: exit 1 when a project holds more spec files than spec-count-ratchet.json
-//
-// `node scripts/update-lint-ratchet.mjs` writes the baseline from the tree and lowers it after a cut; it refuses to raise a count
-// unless `--allow-raise` names a new module (a new source module, a new sweep or a new browser flow; the pull request says which).
+// The spec-count ratchet (AGENTS.md "What earns a test", rule 5): the spec files per test project only fall.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const SPEC_COUNT_FILE = path.join(ROOT, 'spec-count-ratchet.json');
 
-/** The folder of each test project: the four Vitest projects of vitest.config.ts, then the four Playwright suites. */
+/** One folder per test project: the Vitest projects of vitest.config.ts and the Playwright suites. */
 export const SPEC_PROJECTS = {
   app: 'test/regression',
   'replay-core': 'packages/replay-core/test',
@@ -34,12 +28,10 @@ function specFiles(dir) {
   return count;
 }
 
-/** Spec files per project under `root`. */
 export function countSpecs(root = ROOT) {
   return Object.fromEntries(Object.entries(SPEC_PROJECTS).map(([project, dir]) => [project, specFiles(path.join(root, dir))]));
 }
 
-/** The counts of the baseline file (empty when the file is missing). */
 export function currentBaseline(file = SPEC_COUNT_FILE) {
   return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
 }

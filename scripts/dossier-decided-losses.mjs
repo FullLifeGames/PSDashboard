@@ -1,12 +1,4 @@
-// Every calibration position whose decided side LOST, classified from the rest of the protocol:
-//   node scripts/dossier-decided-losses.mjs .calibration/<run>/merged.jsonl > <report>.md
-// --held lists the losses among the sweeps the bar holds (the dump's decidedHeld field) instead of every sweep.
-// Replays come from the fit-corpus cache or the replay server (cached
-// under .calibration/replays/). Classes: roll (crit / miss / full-para /
-// freeze / flinch against the sweeper before it fainted), pair (the
-// sweeper fainted to a pair the clocks called won: no roll line before its
-// faint), unplayed (the sweeper was switched out or never attacked before
-// the loss), forfeit (a forfeit or timer line), unclear.
+// Every calibration position whose decided side lost, classified from the rest of the protocol.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { load } from './calibration-lib.mjs';
 
@@ -18,7 +10,6 @@ if (!path) {
   process.exit(1);
 }
 
-/** The replay's JSON: the fit-corpus cache, else the bench's own cache, else the replay server (cached). */
 async function replayJson(id) {
   const fit = `.fit-corpus/${id}.json`;
   if (existsSync(fit)) return JSON.parse(readFileSync(fit, 'utf8'));

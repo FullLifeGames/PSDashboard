@@ -1,8 +1,4 @@
 // The protection rule for a test cut, on two coverage-final.json files of the same source.
-// Usage: node scripts/cov-compare.mjs <before coverage-final.json> <after coverage-final.json> <repo root> [--list]
-// Prints per package (app src, eval-engine, replay-core) statements, branches, functions and lines, before and after, and every
-// item the before run covered that the after run leaves uncovered (file and line). Exits 1 on any loss, 2 when the statement maps
-// differ (a source file changed between the runs: the comparison is void, not a pass), 3 on a usage error.
 // Lines follow istanbul's rule: a line counts once, covered when a statement that starts on it ran.
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';

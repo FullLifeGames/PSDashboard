@@ -1,11 +1,5 @@
 // Moves the @pkmn release train to one version in every workspace manifest.
-//
-//   node scripts/upgrade-pkmn.mjs [version] [--dry-run]      (npm run upgrade:pkmn -- [version])
-//
-// eval-engine's speed layer copies classes of one @pkmn/sim version and checks no hash in the browser, so
-// @pkmn/sim and @pkmn/mods stay pinned exactly; @pkmn/dex and @pkmn/data follow the same release as ^version.
-// Without a version the registry's latest @pkmn/sim is taken. The script rewrites the manifests, runs
-// npm install and prints the checks a simulator change needs before it ships; --dry-run prints the plan only.
+// @pkmn/sim and @pkmn/mods stay exact (the speed layer copies one simulator's classes); dex and data take ^version.
 import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +11,6 @@ export const PKMN_EXACT = ['@pkmn/sim', '@pkmn/mods'];
 export const PKMN_TRAIN = ['@pkmn/dex', '@pkmn/data'];
 const SECTIONS = ['dependencies', 'devDependencies', 'peerDependencies'];
 
-/** The checks a new simulator needs before it ships, as the script prints them after the upgrade. */
 export function upgradeChecks(version) {
   return [
     '',
@@ -30,7 +23,6 @@ export function upgradeChecks(version) {
   ].join('\n');
 }
 
-/** The manifest with the train moved to `version`; the input stays as it is. */
 export function planPkmnUpgrade(manifest, version) {
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error(`upgrade-pkmn: ${version} is no plain release (x.y.z)`);
   const next = structuredClone(manifest);

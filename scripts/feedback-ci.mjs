@@ -1,17 +1,4 @@
-// Runs the feedback corpus in GitHub Actions.
-//
-//   node scripts/feedback-ci.mjs --name <name> [--runs 3] [--commit <ref>] [--reuse] [--dry-run]
-//
-// The script builds a run commit on top of the measured commit that adds exactly one file, .feedback-run.json (the same
-// throwaway-index method as scripts/bank-ci.mjs), pushes it as the one branch feedback/<name> to the repository's URL with an
-// explicit refspec (never a tag, never --force, refused when the branch exists), waits for the workflow
-// .github/workflows/feedback.yml, downloads the artifact of every run into .calibration/feedback-<name>/run<i>/, prints the
-// verdict of the compare job, compares the downloaded dumps again with the module the job uses, and deletes the branch with
-// --force-with-lease, so a branch that moved is never deleted. It refuses a dirty tree and reads the diff of the measured commit
-// against origin/master for secrets before the push.
-//
-// --reuse prints the folder of a downloaded run of the same measured commit and the same run count and starts nothing.
-// --dry-run builds and checks the run commit and stops before the push.
+// Runs the feedback corpus in GitHub Actions on a run commit that adds only .feedback-run.json; refuses a dirty tree.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,29 +8,23 @@ import { collectRun, gitText, secretFindings, waitForRun } from './bank-ci.mjs';
 import { ARTIFACT_PREFIX, CONFIG_FILE, compareRuns, validateRunConfig } from './feedback-run-config.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-/** The repository by URL, as every push of this project goes (AGENTS.md: the push does not depend on a remote's name). */
+/** The repository by URL: a push never depends on a remote's name (AGENTS.md). */
 export const REPO_URL = 'https://github.com/FullLifeGames/PSDashboard.git';
-/** The workflow's display name (`name:` of .github/workflows/feedback.yml): GitHub resolves a file name only on the default branch. */
+/** `name:` of feedback.yml; GitHub resolves a file name only on the default branch. */
 export const WORKFLOW_NAME = 'Feedback';
-/** The compare job of feedback.yml (`name:` of the job `compare`). */
 export const COMPARE_JOB = 'Compare the runs';
 const PUBLIC_BASE = 'origin/master';
 const CI_RECORD = 'ci.json';
 const git = gitText;
 
-/** The refspec of the push: exactly the run commit onto the one branch feedback/<name>. */
 export const pushRefspec = (sha, name) => `${sha}:refs/heads/feedback/${name}`;
 
 /** The git arguments that delete feedback/<name> only while it still points at the run commit. */
 export const deleteArgs = (sha, name) => ['push', `--force-with-lease=refs/heads/feedback/${name}:${sha}`, REPO_URL, `:refs/heads/feedback/${name}`];
 
-/** The folder of a downloaded run. */
 export const runFolder = (root, name) => join(root, '.calibration', `feedback-${name}`);
 
-/**
- * The run commit: the measured commit's tree plus .feedback-run.json, its parent the measured commit. Built in a throwaway
- * index (GIT_INDEX_FILE), so the repository's own index and working tree stay untouched.
- */
+/** Measured tree plus .feedback-run.json, built in a throwaway index so the repository's own index stays untouched. */
 export function buildRunCommit(root, measured, config) {
   const text = `${JSON.stringify({ name: config.name, runs: config.runs }, null, 2)}\n`;
   const blob = git(root, ['hash-object', '-w', '--stdin'], { input: text }).trim();
@@ -59,7 +40,6 @@ export function buildRunCommit(root, measured, config) {
   }
 }
 
-/** A downloaded successful run of the same measured commit and run count: its folder, or null. */
 export function findReuse(calibrationDir, measured, config) {
   if (!existsSync(calibrationDir)) return null;
   for (const entry of readdirSync(calibrationDir).sort().reverse()) {
@@ -74,17 +54,14 @@ export function findReuse(calibrationDir, measured, config) {
   return null;
 }
 
-/** The Feedback run of `sha` among the runs `gh run list --json databaseId,headSha,url,workflowName` lists, or null. */
 export function pickRun(runs, sha) {
   return runs.find(entry => entry.headSha === sha && entry.workflowName === WORKFLOW_NAME) ?? null;
 }
 
-/** The compare job's verdict among the jobs of `gh run view --json jobs`: its conclusion, or null when it is not there. */
 export function compareVerdict(jobs) {
   return jobs.find(job => job.name === COMPARE_JOB)?.conclusion ?? null;
 }
 
-/** Wall minutes of every job of `gh run view --json jobs`: one line each, for the report. */
 export function jobTimes(jobs) {
   return jobs.map(job => {
     const started = Date.parse(job.startedAt ?? '');
@@ -131,13 +108,11 @@ async function runOf(sha, name) {
   throw new Error(`no run of the ${WORKFLOW_NAME} workflow for ${sha} after five minutes`);
 }
 
-/** What waitForRun asks of GitHub: a watch that never blocks for long and the run's status. No artifact list: the run's own status ends it. */
 const waitDeps = () => ({
   watch: runId => execFileSync('gh', ['run', 'watch', String(runId), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit', timeout: 3 * 60 * 1000 }),
   view: runId => JSON.parse(gh(['run', 'view', String(runId), '--json', 'status,conclusion,jobs'])),
 });
 
-/** Downloads the artifact of every run that has one; returns the indices it got. */
 function downloadRuns(runId, config) {
   const out = runFolder(ROOT, config.name);
   const got = [];
@@ -152,7 +127,6 @@ function downloadRuns(runId, config) {
   return got;
 }
 
-/** The folders of the downloaded runs, as compareRuns reads them. */
 function readDownloaded(out, got) {
   const folders = new Map();
   for (const index of got) {

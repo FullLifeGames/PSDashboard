@@ -1,14 +1,5 @@
-// Which rule-bearing populations do the replays of the project contain, and how many replays carry each? A
-// population with few or no replays is one in which a rule error is invisible to every measurement.
-//
-//   node scripts/corpus-coverage.mjs [--bank <run folder>] [--columns fixtures,fit,bank] [--json] [--root <dir>]
-//
-// Three columns. The fixtures: every .json with a `log` string under the test and e2e fixture folders (one replay once, however many
-// folders hold it). The fit corpus: .fit-corpus/*.json. The bank: the unique ids of a run's merged.jsonl (--bank
-// .calibration/r72-base), read from the fit corpus or the fixtures when a replay stands there and fetched from
-// replay.pokemonshowdown.com into the OS temp folder otherwise (never into .calibration); offline it prints "bank: N ids, not fetched".
-// Rows: generation, game type, protocol features, and move classes. A move class is a property of the Dex move (`stallingMove`,
-// `callsMove`, ...), counted through the `|move|` lines of a log, so the script types no move name.
+// Counts the replays that carry each rule-bearing population: generation, game type, protocol feature, move class.
+// A move class is a Dex move property, counted through the `|move|` lines of a log, so the script types no move name.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -30,7 +21,6 @@ export const FIXTURE_FOLDERS = [
 const GENERATIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 const GAME_TYPES = ['singles', 'doubles', 'VGC', 'Champions', 'Custom Game'];
 
-/** Protocol features: a label and a test on the parsed log (lines without carriage returns) and the raw text. */
 const FEATURES = [
   ['Z-move (zeffect)', ({ lines }) => lines.some(line => line.includes('[zeffect]'))],
   ['Dynamax', ({ lines }) => lines.some(line => /^\|-start\|[^|]*\|Dynamax/.test(line))],
@@ -45,7 +35,6 @@ const FEATURES = [
   ['CRLF line endings', ({ text }) => text.includes('\r\n')],
 ];
 
-/** Move classes: a label and a test on a Dex move, by property. */
 const MOVE_CLASSES = [
   ['stalling move (Protect family)', move => !!move.stallingMove],
   ['calls another move', move => !!move.callsMove],
@@ -85,22 +74,16 @@ function gameTypeOf(lines) {
   return gametype === 'doubles' ? 'doubles' : 'singles';
 }
 
-/** The facts of one log that the rows read. */
 function readLog(text) {
   const lines = text.split(/\r?\n/);
   const parts = lines.map(line => line.split('|'));
-  // [kind, ident, details, ...] of every switch and drag line
   const switches = parts.filter(p => p[1] === 'switch' || p[1] === 'drag').map(p => p.slice(1));
   const moves = new Set();
   for (const p of parts) if (p[1] === 'move' && p[3]) moves.add(p[3]);
   return { text, lines, switches, moves };
 }
 
-/**
- * Counts, over replays given as log texts, how many replays carry each population.
- * Returns { total, groups: { generation, 'game type', 'protocol feature', 'move class' } }, each group a map of label to the
- * number of replays; every label is present, with 0 when no replay carries it.
- */
+/** Per group (generation, game type, protocol feature, move class): label to replay count, 0 when none carries it. */
 export function coverageOf(logs) {
   const groups = {
     generation: Object.fromEntries([...GENERATIONS.map(gen => [`Gen ${gen}`, 0]), ['unknown', 0]]),
@@ -157,7 +140,6 @@ export function fixtureLogs(root = ROOT) {
   return logs;
 }
 
-/** The logs of .fit-corpus; empty when the folder is absent. */
 export function fitCorpusLogs(root = ROOT) {
   const dir = path.join(root, '.fit-corpus');
   if (!existsSync(dir)) return [];
@@ -178,7 +160,7 @@ export function bankIds(runFolder) {
   return [...ids].filter(id => typeof id === 'string').sort();
 }
 
-/** The logs of a run's replays: from the fit corpus or a fixture when one stands there, else fetched into the OS temp folder. */
+/** The logs of a run's replays: fit corpus or fixture first, else fetched into the OS temp folder. */
 export async function bankLogs(runFolder, root = ROOT, { fetcher = fetch } = {}) {
   const ids = bankIds(runFolder);
   const cache = path.join(os.tmpdir(), 'ps-dashboard-bank-replays');

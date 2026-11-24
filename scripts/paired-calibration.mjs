@@ -1,24 +1,5 @@
 // Paired engine-vs-engine analysis over EVAL_CALIBRATION_DUMP files.
-// Usage: node scripts/paired-calibration.mjs <a.jsonl> <b.jsonl>
-// Each side may name several dumps joined by commas (the doubles verdict reads the bank's dump together with the holdout's).
-// `--b-field gameValue` reads side B's root game value as its score (one run pairs its game value against its score).
-// Quick runs: a run made with EVAL_CALIBRATION_FRACTION=0.25 holds a stratified quarter of the replays of a full run, the same rows for
-// those replays, so it pairs against a full base on the rows both dumps hold (the join below). When the run.json beside either dump
-// records a fraction under 1, the header names the fraction of each side, the pairing count and its share of A, and what the fixed K
-// comes from: pairedBands fits K on all of A, so give the full base as A; ownKBands fits K on the pairs. A quick pair has fewer
-// replays, so its bands run wider than a full pair's and a resolved row can flip in the full pair: it screens a change early, and the
-// full pair decides.
-// Joins the two dumps on id#turn (identical positions only), reproduces the
-// harness aggregates for each side, prints the verdict table with error bars
-// (paired Brier deltas under the A side's K, 90 % band from a bootstrap over
-// replays; pooled rows decide, phase cells warn), then the same table with each
-// side under its own K per game type and phase (a pure rescale reads nought there), shows the disagreement structure, and
-// computes counterfactual hybrid lines (file A early, file B once
-// faintedFraction crosses a threshold) plus score blends. The math lives in
-// scripts/calibration-lib.mjs, which replicates the fit-helpers.ts
-// methodology exactly (pooled constant-K logistic fit via 500-iteration GD,
-// Brier under that K), so numbers here are comparable to the printed sweep
-// output.
+// The math lives in scripts/calibration-lib.mjs, which replicates fit-helpers.ts so numbers match the printed sweep.
 import {
   asScore, bandLines, filterQuality, load, ownKBands, pairedBands, record, right, takeFieldArgs, takeQualityArg,
 } from './calibration-lib.mjs';

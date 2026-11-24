@@ -1,22 +1,4 @@
 // The tier census of feedback dump folders.
-//   node scripts/tier-census.mjs <folder> [<folder>...]        counts per replay, per game type and in total
-//   node scripts/tier-census.mjs --moved <base> <next>         the turns whose verdict moved between two folders
-// A folder holds the feedback-full-<id>.json dumps of one feedback run
-// (FEEDBACK_DUMP=1 npm run test:feedback). The bank grades the bar, not the
-// move verdicts: every weight or K change reads this census next to the
-// move verdicts: every weight or K change reads this census next to the
-// paired bank. The count alone is not the verdict (a total held at 38/2/0 -> 32/2/1 while the expert golden gained a blunder), so
-// --moved names every turn behind a changed number.
-//
-// Reading rules the numbers carry with them:
-// - A side-turn without a matched played action ("unmatched") can never get a
-//   tier. It is counted, not divided away: a change that loses matches would
-//   otherwise shrink the denominator and leave the rate flat.
-// - Doubles grades are coarser than singles grades. The graded best comes
-//   from a restricted set of pair choices, and where a slot's action never
-//   showed (flinch, sleep) the regret is a charitable lower bound: "partial".
-// - The game type comes from the replay fixture's |gametype| line and is
-//   cross-checked against the dump's own doubles marks; a disagreement throws.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -25,7 +7,7 @@ export const TIERS = ['inaccuracy', 'mistake', 'blunder'];
 const DUMP_PREFIX = 'feedback-full-';
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'test', 'e2e-feedback', 'fixtures');
 
-/** getReplayGameType of @fulllifegames/replay-core, to the letter (test/regression/tier-census.spec.ts holds the two equal). */
+/** getReplayGameType of @fulllifegames/replay-core, to the letter (tier-census.spec.ts holds the two equal). */
 export function gameTypeOfLog(log) {
   const raw = log?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
   return raw ? raw.toLowerCase().replace(/[^a-z0-9]+/g, '') : null;
@@ -39,13 +21,11 @@ export function gameTypeFromDump(dump) {
   return doubles ? 'doubles' : 'singles';
 }
 
-/** The game type of one dump: the fixture log decides, the dump's own marks must agree. */
 export function resolveGameType(id, dump, fixtures = FIXTURES) {
   const fromDump = gameTypeFromDump(dump);
   const fixture = join(fixtures, `${id}.json`);
   if (!existsSync(fixture)) return fromDump;
   const fromLog = gameTypeOfLog(JSON.parse(readFileSync(fixture, 'utf8')).log);
-  // A dump without analyses (a sweep that ended below the report threshold) carries no marks to check against.
   const marks = (dump.analyses ?? []).some(Boolean);
   if (fromLog !== null && marks && fromLog !== fromDump) {
     throw new Error(`${id}: the fixture log says ${fromLog}, the dump reads ${fromDump}`);
@@ -57,7 +37,7 @@ const emptyCount = () => ({
   turns: 0, sides: 0, unmatched: 0, inaccuracy: 0, mistake: 0, blunder: 0, partial: 0, riskPaidOff: 0, attribution: {},
 });
 
-/** Counts of one dump. Tiers are read at analyses[i].p1/p2.tier only: nested tiers (sensitivity alternatives, report rows) are not verdicts. */
+/** Counts of one dump; tiers are read at analyses[i].p1/p2.tier only, nested tiers are not verdicts. */
 export function censusOfDump(dump) {
   const count = emptyCount();
   for (const analysis of dump.analyses ?? []) {
@@ -89,7 +69,6 @@ const dumpIds = folder => readdirSync(folder)
   .map(name => name.slice(DUMP_PREFIX.length, -'.json'.length)).sort();
 const readDump = (folder, id) => JSON.parse(readFileSync(join(folder, `${DUMP_PREFIX}${id}.json`), 'utf8'));
 
-/** One folder: id -> { gameType, ...counts }. */
 export function censusOfFolder(folder, fixtures = FIXTURES) {
   const games = new Map();
   for (const id of dumpIds(folder)) {
@@ -155,7 +134,7 @@ export function movedTurns(baseDump, nextDump) {
 
 const regretText = value => (value === null ? 'n/a' : value.toFixed(3));
 
-/** The printed moved listing between two folders; replays present in only one folder are named, never skipped silently. */
+/** The printed moved listing between two folders; a replay present in only one folder is named, never skipped. */
 export function movedLines(baseFolder, nextFolder, fixtures = FIXTURES) {
   const baseIds = dumpIds(baseFolder);
   const nextIds = dumpIds(nextFolder);

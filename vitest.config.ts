@@ -1,17 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
-/**
- * The Node and jsdom suites in one runner, four projects: the app's own specs
- * plus the integration and measurement-chain specs under test/regression/, each
- * package's suite under packages/<name>/test/ (also runnable alone:
- * npm test -w packages/<name>), and the app suite under test/ui/ (components and
- * hooks with Testing Library on jsdom, `npm run test:ui`). The browser suites
- * (e2e, feedback, build smoke) stay on Playwright.
- *
- * The workspace packages resolve to their sources, as in vite.config.ts and
- * the tsconfig paths: a test never sees a package's dist/.
- */
+// Packages resolve to their sources, as in vite.config.ts and the tsconfig paths: a test never sees a dist/.
 const workspaceSource = (name: string) => fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url));
 
 const project = (name: string, include: string, extra: Record<string, unknown> = {}) => ({
@@ -19,8 +9,7 @@ const project = (name: string, include: string, extra: Record<string, unknown> =
   test: { name, include: [include], ...extra },
 });
 
-// The includes are relative to the repository root; a package's own test
-// script passes --root ../.. so the same config serves it from its directory.
+// Includes are relative to the repository root: a package's own script passes --root ../.. to share this config.
 export default defineConfig({
   resolve: {
     alias: {
@@ -30,11 +19,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    // Reconstruction and search pins replay whole games; the heaviest tests
-    // raise their own timeout in the test options.
     testTimeout: 60_000,
     hookTimeout: 60_000,
-    // `npm run test:coverage` only; a plain run collects none.
     coverage: {
       provider: 'v8',
       include: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
@@ -50,8 +36,7 @@ export default defineConfig({
       project('ui', 'test/ui/**/*.spec.{ts,tsx}', {
         environment: 'jsdom',
         setupFiles: [fileURLToPath(new URL('./test/ui/setup.ts', import.meta.url))],
-        // The two features behind a flag (src/lib/feature-flags.ts) are off in every build; their specs run with both on,
-        // and the specs of the off state switch one off with `vi.stubEnv`.
+        // Both feature flags are off in every build; specs of the off state switch one off with `vi.stubEnv`.
         env: { VITE_FEATURE_GAME_REVIEW: '1', VITE_FEATURE_OPPONENT_READS: '1' },
       }),
     ],

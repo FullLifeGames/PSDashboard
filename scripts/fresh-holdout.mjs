@@ -1,21 +1,4 @@
-// Draws a holdout family of rated ladder games that no measurement has read. The old VGC holdout (scripts/build-fit-holdout.mjs) is the
-// reference; this draw takes games from the same formats and seasons that no tracked file, no local note and no .fit-corpus file names,
-// so a reading on them is a third sample next to the bank and the old holdout.
-//
-// The draw rule:
-//   - the public replay search, sort=rating, pages 1 to 20 of each format (50 rows a page);
-//   - rows of the main server only (id "<format>-<digits>"; dawn-, smogtours-, china- never enter), with a numeric
-//     rating at or above --min-rating (1500), whose id no known set holds;
-//   - the formats in the order of FRESH_FORMATS, inside a format by rating, highest first, then by id;
-//   - at most one game per player pair over the whole draw (the earlier format keeps a pair);
-//   - a game passes when its replay has a winner among its players, at least 6 turns and a rating at the floor;
-//     a game that fails leaves the next in line to enter; the quota of a format ends its walk.
-// Every game becomes one set "<family>|<player>|<player>" of the holdout manifest, appended after the old sets
-// (test/regression/fixtures/fit-holdout-manifest.json); the replays land in .fit-corpus/ and never in the fit
-// corpus's manifest. The pure core is exported for test/regression/fresh-holdout.spec.ts.
-//
-// Run: node scripts/fresh-holdout.mjs --family vgc2 --fetch-listing
-//      node scripts/fresh-holdout.mjs --family vgc2 --listing .calibration/fresh-holdout/listing-<date>.json [--dry-run]
+// Draws a holdout family of rated ladder games that no measurement has read.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
@@ -31,10 +14,6 @@ const MIN_RATING = 1500;
 const MIN_TURNS = 6;
 const HQ_RATING = 1700;
 
-/**
- * The formats in the draw's order with their quotas: the old holdout's seven formats at three times its games, then gen9vgc2025regj, a
- * format the old holdout never held, kept apart.
- */
 export const FRESH_FORMATS = [
   { format: 'gen9vgc2026regi', quota: 264 },
   { format: 'gen9vgc2026regf', quota: 195 },
@@ -71,7 +50,6 @@ export function eligibleRows(listing, known, { format, minRating = MIN_RATING })
   return sorted.filter(row => !seen.has(row.id) && seen.add(row.id));
 }
 
-/** The ordered candidates per format; the listing's own order never matters. */
 export function drawCandidates(listing, known, { formats = FRESH_FORMATS, minRating = MIN_RATING } = {}) {
   return formats.map(({ format, quota }) => ({
     format,
@@ -82,10 +60,7 @@ export function drawCandidates(listing, known, { formats = FRESH_FORMATS, minRat
   }));
 }
 
-/**
- * Walks each format's candidates in order and keeps a game when its pair is free and `check(game)` passes (it may be
- * async), until the quota. A pair is taken only by a game that enters; a failed check frees nothing and takes nothing.
- */
+/** Keeps a game when its pair is free and `check(game)` passes, until the quota; a failed check takes no pair. */
 export async function takeChecked(lists, check) {
   const taken = new Set();
   const result = [];
@@ -111,7 +86,6 @@ export async function takeChecked(lists, check) {
   return result;
 }
 
-/** Whether a downloaded replay can serve: a winner among its players, enough turns and a rating at the floor. */
 export function checkReplay(data, { minTurns = MIN_TURNS, minRating = MIN_RATING } = {}) {
   const winner = data.log?.match(/^\|win\|(.+)$/m)?.[1]?.trim();
   const turns = (data.log?.match(/^\|turn\|/gm) ?? []).length;
@@ -119,10 +93,7 @@ export function checkReplay(data, { minTurns = MIN_TURNS, minRating = MIN_RATING
     && typeof data.rating === 'number' && data.rating >= minRating;
 }
 
-/**
- * The manifest with a new family appended after its old sets (which stay byte for byte). `drawn` records the rule
- * of each appended family, so scripts/build-fit-holdout.mjs keeps it. A family drawn once is never drawn again.
- */
+/** The manifest with `family` appended after its old sets (byte for byte); a family drawn once is never drawn again. */
 export function appendFamily(manifest, family, games, description) {
   if (manifest.sets.some(set => set.family === family)) throw new Error(`family ${family} is already drawn; a holdout is drawn once`);
   const held = new Set(manifest.sets.flatMap(set => set.ids));
@@ -138,7 +109,6 @@ export function appendFamily(manifest, family, games, description) {
   return { ...manifest, sets: [...manifest.sets, ...added], drawn: { ...manifest.drawn, [family]: description } };
 }
 
-// The command line: network, files and git.
 
 const sleep = ms => new Promise(resolvePromise => setTimeout(resolvePromise, ms));
 async function fetchJson(url) {
@@ -152,7 +122,7 @@ function argValue(name, fallback) {
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
 
-/** Pages the replay search of each format by rating; 51 rows come back a page and the 51st only marks another page. */
+// 51 rows come back a page; the 51st only marks another page.
 async function fetchListing(formats) {
   const rows = [];
   for (const { format } of formats) {
@@ -168,7 +138,6 @@ async function fetchListing(formats) {
   return rows;
 }
 
-/** The ids a draw must not take: tracked files at HEAD, local notes under docs/, and every file of .fit-corpus/. */
 function knownIds() {
   const known = new Set();
   let grep = '';

@@ -1,11 +1,4 @@
 // The JSON reports of the three "Browser flows" parts, merged and read.
-//
-//   node scripts/merge-playwright-reports.mjs [--out <merged.json>] <report.json>...
-//
-// Playwright's JSON reporter writes one file per run; each part of the Browser flows job writes its own. This script
-// sums their stats, prints each part's wall time (the reporter's `stats.duration`), the slowest spec files and tests
-// and every test that did not pass, and writes the merged report when `--out` is given. The part number comes from a
-// `part-<n>` in the report's path (the artifact folders of the aggregate job), else from the order of the arguments.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -47,7 +40,6 @@ export function mergeReports(reports) {
 
 const seconds = ms => (ms / 1000).toFixed(1).padStart(7);
 
-/** The text the aggregate job prints. */
 export function describeMerged(merged) {
   const tests = testsOf(merged);
   const perFile = new Map();

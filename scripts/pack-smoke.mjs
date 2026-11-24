@@ -1,16 +1,4 @@
-/**
- * Installs the packed workspace packages into a throwaway Node project and
- * runs the README examples there, the way a consumer would.
- *
- *   npm run pack:smoke            # or: node scripts/pack-smoke.mjs [--keep]
- *
- * Steps: publish-packages.mjs packs every package with the release manifest
- * (version synced, caret ranges); a consumer project installs the tarballs
- * plus the sim family linked from this repository's node_modules (no
- * registry); both examples run against the fixture replay; a NodeNext
- * TypeScript consumer type-checks against the shipped declarations. --keep
- * leaves the temp directory behind for inspection.
- */
+// Installs the packed workspace packages into a throwaway Node project and runs the README examples there.
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,7 +32,7 @@ const keep = process.argv.includes('--keep');
 const started = Date.now();
 const elapsed = () => `${((Date.now() - started) / 1000).toFixed(1)}s`;
 
-/** npm is a .cmd shim on Windows, which Node only runs through a shell; everything else spawns directly. */
+// npm is a .cmd shim on Windows, which Node runs only through a shell.
 const quote = arg => (/[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
 
 function run(command, args, options = {}) {
@@ -70,9 +58,8 @@ try {
   mkdirSync(consumer);
   writeFileSync(join(consumer, 'package.json'), JSON.stringify({ name: 'pack-smoke-consumer', private: true, type: 'module' }, null, 2) + '\n');
   const peerDirs = PEERS.map(name => resolve(root, 'node_modules', name));
-  // --install-links=false links the peers instead of copying them (their own
-  // dependencies then resolve from this repository); --ignore-scripts skips
-  // the peers' monorepo prepare scripts, which cannot run outside their tree.
+  // --install-links=false links the peers, so their dependencies resolve from this repository;
+  // --ignore-scripts skips the peers' monorepo prepare scripts, which cannot run outside their tree.
   run('npm', ['install', '--no-audit', '--no-fund', '--no-package-lock', '--install-links=false', '--ignore-scripts', ...tarballs, ...peerDirs], { cwd: consumer, stdio: 'inherit' });
   const installed = readFileSync(join(consumer, 'node_modules/@fulllifegames/eval-engine/package.json'), 'utf8');
   const manifest = JSON.parse(installed);

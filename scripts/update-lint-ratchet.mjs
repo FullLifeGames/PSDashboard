@@ -1,20 +1,4 @@
 // Regenerates eslint.ratchet.mjs, the size/complexity worklist.
-//
-// The ratchet has two layers: target values every file should meet, and a
-// per-file pin for each legacy file that is still above a target. A pin sits
-// at the file's current measured worst (line caps rounded up to the next 10
-// so a small bugfix does not wedge), which means the file can only shrink.
-// After refactoring, rerun this script: pins tighten or disappear. The script
-// refuses to raise a pin or add a new one unless --allow-raise is passed,
-// because a raise means a file grew past the gate.
-//
-// It also writes spec-count-ratchet.json, the spec files per test project: counts fall with the tree and rise only with --allow-raise,
-// for a new source module, a new sweep or a new browser flow that the pull request names.
-//
-// And comment-ratchet.json, the comment baselines (scripts/comment-counts.mjs): history lines per source file and comment lines per project, which fall with the
-// clean-up and rise only with --allow-raise.
-//
-// Usage: node scripts/update-lint-ratchet.mjs [--allow-raise]
 
 import { ESLint } from 'eslint';
 import { existsSync, writeFileSync } from 'node:fs';

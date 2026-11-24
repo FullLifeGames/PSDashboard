@@ -1,15 +1,5 @@
-// Records Smogon data files as feedback-harness fixtures:
-//   node scripts/record-smogon-fixtures.mjs /sets/gen8ou.json /sets/gen8ubers.json ...
-//   node scripts/record-smogon-fixtures.mjs --from-cache .smogon-cache /stats/gen9doublesou.json ...
-// Fetches each path through the data hosts (data.pkmn.cc, then the GitHub
-// Pages mirror), writes test/e2e-feedback/fixtures/smogon/<pathKey>.json, or a
-// <pathKey>.404 marker when the file is absent on both hosts. Same key
-// rule as test/e2e-feedback/hermetic.ts.
-// --from-cache reads the calibration bank's disk cache instead of the network
-// (test/regression/smogon-fetch-cache.ts: one {status, payload} entry per URL), so
-// a replay the bank already measures gets the very inputs the bank measured
-// it with. It never replaces a pin that exists, and it refuses a cached
-// network failure: only a 200 or a 404 is an input.
+// Records Smogon data files as feedback-harness fixtures.
+// It never replaces a pin that exists and refuses a cached network failure: only a 200 or a 404 is an input.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +7,7 @@ import { join } from 'node:path';
 const HOSTS = ['https://data.pkmn.cc', 'https://pkmn.github.io/smogon/data'];
 const DIR = join('test', 'e2e-feedback', 'fixtures', 'smogon');
 const pathKey = path => path.replace(/\/{2,}/g, '/').replace(/[^a-z0-9.]+/gi, '_');
-/** The file name diskCachedSmogonFetcher gives a URL. */
+// The file name diskCachedSmogonFetcher gives a URL.
 const cacheKey = url =>
   `${url.replace(/[^a-z0-9]+/gi, '-').slice(0, 80)}-${createHash('sha1').update(url).digest('hex').slice(0, 12)}.json`;
 
