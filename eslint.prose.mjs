@@ -1,8 +1,4 @@
-// The rule prose/no-dash. The text the app shows is active and dash-free (AGENTS.md, Working with the user): the report's sentence frames
-// (engine prose sources) and every label of src/components carry no em dash, no en dash and no entity of either. The rule reads string
-// literals, template pieces and JSX text; comments are no text and stay out. A lone em dash is the app's empty value (a missing number):
-// as a whole string or as the only child of a JSX element it passes with `emptyValue: true`. A dash piece between expressions in JSX is a
-// sentence joint, not an empty value, and counts. The rule's rows are in test/regression/lint-rules.spec.ts.
+// A lone em dash is the app's empty value (`emptyValue: true`); a dash between JSX expressions counts as a joint.
 const DASH = /[—–]|&mdash;|&ndash;|&#8212;|&#8211;|&#x2014;|&#x2013;/i;
 const EMPTY_VALUE = '—';
 

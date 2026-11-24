@@ -13,9 +13,7 @@ import commentsPlugin from './eslint.comments.mjs'
 import testsPlugin from './eslint.tests.mjs'
 
 export default defineConfig([
-  // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them), and .claude/ holds the local agent
-  // worktrees (foreign checkouts with their own tsconfigs) beside Markdown role files: CI never sees them,
-  // and a local `npm run lint` must read only what CI reads.
+  // docs/ and .claude/ are local and gitignored: CI never sees them, so a local lint must not read them.
   globalIgnores(['dist', 'packages/*/dist', '.remember', 'docs', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
@@ -30,52 +28,42 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
-  // Size and complexity ceilings: targets for everyone, then the generated
-  // shrink-only pins for legacy files (see scripts/update-lint-ratchet.mjs).
   ...ratchetBase,
   ...ratchetOverrides,
-  // Import zones: the package layering as lint errors (see eslint.zones.mjs).
   ...importZones,
-  // Name ratchet: no new Dex name literal in the package sources (see eslint.names.mjs and scripts/name-baseline.json).
   {
     files: ['packages/*/src/**/*.ts'],
     plugins: { names: namesPlugin },
     rules: { 'names/no-new-dex-name': 'error' },
   },
-  // Dex reads: replay-core, eval-engine and the app read rules through the resolver of generation and mod, never the global Dex (see eslint.dex.mjs).
   {
     files: ['packages/replay-core/src/**/*.ts', 'packages/eval-engine/src/**/*.ts', 'src/**/*.{ts,tsx}'],
     ignores: ['packages/replay-core/src/rules-dex.ts'],
     plugins: { dex: dexPlugin },
     rules: { 'dex/no-global-dex-read': 'error' },
   },
-  // History in comments: counted per file against comment-ratchet.json, which only falls (see eslint.comments.mjs).
   {
     files: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
     plugins: { comments: commentsPlugin },
     rules: { 'comments/no-history': 'error' },
   },
-  // History in the comments of tests, scripts and root configs: a warning until the comment pass cleans them, then an error like the sources.
   {
     files: ['**/*.{ts,tsx,mjs,js,cjs}'],
     ignores: ['packages/*/src/**', 'src/**', 'test/regression/eval-calibration.spec.ts'],
     plugins: { comments: commentsPlugin },
     rules: { 'comments/no-history': 'warn' },
   },
-  // Shape of comments: width, two lines, one-line JSDoc on an export, no JSDoc on a local declaration (see eslint.comments.mjs).
   {
     files: ['**/*.{ts,tsx,mjs,js,cjs}'],
     ignores: ['test/regression/eval-calibration.spec.ts'],
     plugins: { comments: commentsPlugin },
     rules: { 'comments/shape': ['warn', { localDoc: 'forbid' }] },
   },
-  // History in test titles and spec file names (see eslint.tests.mjs).
   {
     files: ['test/**/*.{ts,tsx}', 'packages/*/test/**/*.ts'],
     plugins: { tests: testsPlugin },
     rules: { 'tests/no-history': 'error' },
   },
-  // Dash rule: the report's prose sources and every label of src/components carry no em or en dash (see eslint.prose.mjs).
   {
     files: [
       'packages/eval-engine/src/prose/{clauses,phrases,line}.ts',

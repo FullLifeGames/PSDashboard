@@ -53,11 +53,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # The nightly sits at the root; every release keeps a frozen copy under its tag, rebuilt from its zip.
       - name: Assemble nightly and release channels
         env:
           GH_TOKEN: ${{ github.token }}
-          # The hand-updated production deployment, linked from /versions/; nothing here writes to it.
           PS_PRODUCTION_URL: https://fulllifegames.com/Tools/PSDashboard/
         run: |
           mkdir -p site

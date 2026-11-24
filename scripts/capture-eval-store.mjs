@@ -1,12 +1,6 @@
 import { spawn } from 'node:child_process';
 
-/**
- * Captures the saved engine results the browser specs seed (test/e2e/eval-store.ts, test/e2e-capture/). It runs the
- * analysis of every capture once in the browser on a dev server (feature flags on, as in the e2e suite) and writes the IndexedDB records
- * to test/e2e/fixtures/eval-store/. Run it when a spec says "fixture stale", then commit the files.
- *
- *   node scripts/capture-eval-store.mjs [--dev-port <n>] [--only <replay id or file name>]
- */
+// Captures the saved engine results the browser specs seed; run it when a spec says "fixture stale", commit the files.
 const args = process.argv.slice(2);
 let port = process.env.PS_DEV_PORT ?? '5177';
 let only = null;

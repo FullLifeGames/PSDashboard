@@ -14,7 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Limits stand at about twice the healthy time: a runner 1.6 times slower cancelled jobs at 30 min and hid red rows.
   node:
     name: Node suites
     runs-on: ubuntu-24.04
@@ -35,7 +34,6 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # The engine project runs in the two jobs below, once with the speed layer forced off and once forced on.
       - name: Run the Node suites
         run: npx vitest run --project app --project replay-core --project ui
 
@@ -93,8 +91,6 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # The other specs that read DICE_SWEEPS=full; workflows.spec.ts holds the lists and the nine required contexts.
-  # A new sweep spec goes into the part with the least time; a part stays under 25 minutes of wall time.
   full-sweeps:
     name: Full sweeps, the other specs, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
@@ -168,8 +164,6 @@ jobs:
           DICE_SWEEPS: full
           SPECS: ${{ matrix.files }}
 
-  # Three parts side by side; the job "Browser flows" after them stays the one required check.
-  # The workflows spec holds every e2e file in one part: a new file goes into the part with the least seconds.
   browser:
     name: Browser flows, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
@@ -248,14 +242,13 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # Two workers, half of the 4 vCPUs: three ran slower and turned play-out-finish.spec.ts red.
+      # Two workers, half of the 4 vCPUs: three ran slower and turned a live-search row red.
       - name: Run the browser flows of part ${{ matrix.part }}
         run: npm run test:e2e -- --reporter=dot,json $SPECS
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
           SPECS: ${{ matrix.files }}
 
-      # The slowest files and tests of the part; the JSON report is kept on every run.
       - name: List the slowest browser specs and tests
         if: always()
         run: test -f playwright-report.json && node scripts/merge-playwright-reports.mjs playwright-report.json || true

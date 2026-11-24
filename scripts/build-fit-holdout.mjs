@@ -1,35 +1,18 @@
-// The holdout of the weight-fitting corpus. One third of the corpus's SETS (the games two players
-// play against each other in one format family, so a Bo3 never splits) in every family the calibration bank
-// cannot judge on its own (Doubles OU, Scarlet/Violet VGC, Champions VGC, Champions OU) leaves the fit for
-// good and becomes a test bank: the calibration harness reads it with EVAL_CALIBRATION_SOURCE=holdout and the
-// fit (test/regression/eval-fit.spec.ts) drops every holdout id. The bank's own doubles tranche holds 36 Doubles OU
-// and 10 VGC games and no Champions game; its 15 games with Screens or Trick Room decide every doubles verdict.
-//
-// The selection is a pure function of the committed corpus manifest and the cached replays' player names:
-// FNV-1a of "<family>|<sorted player ids>", modulo 3, equal to 0. Writes
-// test/regression/fixtures/fit-holdout-manifest.json (COMMITTED, like the corpus manifest).
-//
-// A family that scripts/fresh-holdout.mjs drew (vgc2) is not a function of the corpus and never comes back
-// from it, so a rebuild keeps the sets of every family it does not draw, in their order after the rebuilt sets, and
-// the manifest's `drawn` notes with them.
-//
-// Run: node scripts/build-fit-holdout.mjs
+// Draws the fit corpus's holdout: a third of the sets of every held-out family, chosen by a hash of family and players.
+// A family drawn by scripts/fresh-holdout.mjs (vgc2) is no function of the corpus: a rebuild keeps its sets and notes.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CORPUS = 'test/regression/fixtures/fit-corpus-manifest.json';
 const OUT = 'test/regression/fixtures/fit-holdout-manifest.json';
 const CACHE_DIR = '.fit-corpus';
-/** The formats held out: every doubles format and every Pokémon Champions format (singles included). */
 const HOLDOUT_FORMAT = /doubles|vgc|champions/;
 
-/** The family of a held-out format: Champions VGC, Champions OU, Scarlet/Violet VGC or Doubles OU. */
 function familyOf(format) {
   if (/champions/.test(format)) return /vgc/.test(format) ? 'championsvgc' : 'championsou';
   return /vgc/.test(format) ? 'vgc' : 'doublesou';
 }
 
-/** The families this script draws from the fit corpus (familyOf above); any other family in the manifest is kept. */
 const OWN_FAMILIES = ['championsou', 'championsvgc', 'doublesou', 'vgc'];
 
 const playerId = name => name.toLowerCase().replace(/[^a-z0-9]/g, '');

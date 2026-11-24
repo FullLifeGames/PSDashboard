@@ -1,27 +1,5 @@
 // Fingerprints of calibration runs, the reuse of a finished base, and the quick-tier header of the paired script.
-//
-// Two runs on the same inputs give the same rows. scripts/run-calibration.mjs writes the fingerprint into run.json; with --reuse it prints
-// the folder of a finished run that carries the same one and starts nothing. computeFingerprint hashes these inputs:
-//
-//   format     the version of this recipe, so a changed recipe never matches an older run
-//   node       process.version, platform and arch
-//   trees      the git ids at HEAD of FINGERPRINT_PATHS: tree ids for folders, blob ids for files
-//   installed  sha256 of node_modules/.package-lock.json, npm's record of the installed packages
-//   caches     .smogon-cache and .fit-corpus: file count, bytes and one sha256 over every name, size and content
-//   env        the run's env plus the ambient EVAL_*, CALIB_*, NODE_OPTIONS and NODE_ENV variables, without the two
-//              keys the runner sets per slice (RUNNER_OWNED)
-//
-// The caches are hashed by content: a payload edited in place keeps its name and often its size, which a hash of names and sizes misses.
-// The slice count is no input: each replay belongs to one slice, so the merged rows come out the same.
-//
-// A tree with an uncommitted change under the inputs gets a value that names HEAD, not the files on disk. The
-// runner marks its run dirty, such a run never serves as a base, and a dirty tree never reuses (decideReuse).
-// A run that adds entries to .smogon-cache records the cache it leaves behind, because the entries it fetched produced its rows. A change
-// of any other input during the run marks it unstable. A run that lost replays to HTTP errors is incomplete. A run without a fingerprint
-// never matches.
-//
-// Everything under test/regression/ is an input, so a ledger block booked into test/regression/eval-calibration.spec.ts
-// changes the value although it changes no behavior. Commits that touch only docs or AGENTS.md keep it.
+// A dirty tree's value names HEAD, not the files on disk, so a dirty run never serves as a base (decideReuse).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -37,7 +15,6 @@ export const FINGERPRINT_PATHS = [
   'vitest.config.ts', 'vite.config.ts', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json',
 ];
 
-/** The untracked data folders the rows depend on: the pinned Smogon payloads and the fit corpus's replays. */
 export const CACHE_DIRS = ['.smogon-cache', '.fit-corpus'];
 const SMOGON_CACHE = '.smogon-cache';
 const INSTALLED_LOCK = join('node_modules', '.package-lock.json');
@@ -50,14 +27,13 @@ const DIRTY_LIMIT = 20;
 
 const byCode = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** JSON with the keys of every object in code unit order, so equal data gives equal text. */
 export function canonicalJson(value) {
   return JSON.stringify(value, (_key, inner) => (inner && typeof inner === 'object' && !Array.isArray(inner)
     ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => byCode(a, b)))
     : inner));
 }
 
-/** The variables a slice sees that can move the rows: the ambient levers, then the run's own env on top, keys sorted. */
+/** The variables a slice sees that can move the rows: ambient levers, the run's env on top, keys sorted. */
 export function leverEnv(ambient, explicit) {
   const out = {};
   const take = (source, keep) => {
@@ -70,11 +46,7 @@ export function leverEnv(ambient, explicit) {
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => byCode(a, b)));
 }
 
-/**
- * The relative names of the files a folder holds for the bank, in code unit order, with `/` between parts. A `.tmp`
- * file is a sibling process's half-written entry (test/regression/smogon-fetch-cache.ts) that no reader opens, so it
- * stays out. scripts/bank-data.mjs packs exactly these files.
- */
+/** The sorted files a folder holds for the bank; a `.tmp` file is a sibling's half-written entry and stays out. */
 export function dataFileNames(dir) {
   const names = [];
   const walk = (current, prefix) => {
@@ -99,19 +71,13 @@ export function dataFileNames(dir) {
   return names.sort(byCode);
 }
 
-/**
- * File count, bytes and one sha256 over every name, size and content of a folder's files (dataFileNames), in code
- * unit order of the relative names; null when the folder is absent.
- */
+/** Count, bytes and one sha256 over names, sizes and content (an edit in place keeps name and size); null if absent. */
 export function hashDirectory(dir) {
   if (!existsSync(dir)) return null;
   return hashFiles(dir, dataFileNames(dir));
 }
 
-/**
- * hashDirectory's recipe over the given relative names of `dir` (sorted here): what a folder that holds exactly these
- * files hashes to. A name that cannot be read is skipped, as in hashDirectory.
- */
+/** hashDirectory's recipe over the given names of `dir`; a name that cannot be read is skipped, as there. */
 export function hashFiles(dir, names) {
   const hash = createHash('sha256');
   let files = 0;
@@ -138,7 +104,7 @@ function hashFile(path) {
   }
 }
 
-/** Git runs with the repository's own folder as the ceiling, so a stray .git above the checkout is never read. */
+// The ceiling is the repository's own folder, so a stray .git above the checkout is never read.
 function git(root, args) {
   return execFileSync('git', args, {
     cwd: root,
@@ -150,7 +116,6 @@ function git(root, args) {
   });
 }
 
-/** The id of each path at HEAD (a tree id for a folder, a blob id for a file); null for a path HEAD lacks. */
 function treeIds(root, paths) {
   const found = {};
   for (const record of git(root, ['ls-tree', '-z', 'HEAD', '--', ...paths]).split('\0')) {
@@ -160,10 +125,7 @@ function treeIds(root, paths) {
   return Object.fromEntries(paths.map(path => [path, found[path] ?? null]));
 }
 
-/**
- * The paths under the inputs with an uncommitted change: edited, staged, removed or untracked (a file the
- * .gitignore names does not count). --no-optional-locks keeps the status from writing the index while a run goes.
- */
+// --no-optional-locks: the status must not write the index while a run goes.
 function dirtyPathsOf(root, paths) {
   const records = git(root, ['--no-optional-locks', 'status', '--porcelain=v1', '-z', '--untracked-files=all', '--', ...paths])
     .split('\0').filter(Boolean);
@@ -179,12 +141,7 @@ function dirtyPathsOf(root, paths) {
 
 const nodeInfo = () => ({ version: process.version, platform: process.platform, arch: process.arch });
 
-/**
- * The fingerprint of the inputs as they stand: { value, dirty, dirtyPaths, commit, inputs, problem }.
- * `env` is the run's own env (the DEFAULT_ENV merged with --env and --tranche, plus EVAL_CALIBRATION=1),
- * `ambient` the environment the slices inherit, `slices` the run's slice count (a base serves only runs with its own count). Without a
- * readable HEAD, value is null and the tree counts as dirty.
- */
+/** The inputs' fingerprint, value null without a readable HEAD; `env` the run's env, `ambient` the inherited one. */
 export function computeFingerprint({
   root, env, ambient = process.env, node = nodeInfo(), paths = FINGERPRINT_PATHS, cacheDirs = CACHE_DIRS, slices = null,
 }) {
@@ -220,11 +177,7 @@ export function computeFingerprint({
 
 export const shortValue = value => (value ? value.slice(0, 12) : 'none');
 
-/**
- * What run.json keeps of a run's fingerprint, from the one taken before the slices start and the one after they
- * end. The value is the end one: it names the Smogon cache the run leaves behind, which holds every entry it
- * fetched. `stable` is false when any other input moved during the run; `dirty` when either end was dirty.
- */
+/** What run.json keeps of the start and end fingerprints: `value` is the end one, `stable` false if an input moved. */
 export function fingerprintRecord(start, end) {
   if (start.value === null || end.value === null) {
     return { value: null, dirty: true, stable: false, problem: start.problem ?? end.problem };
@@ -242,10 +195,7 @@ export function fingerprintRecord(start, end) {
   };
 }
 
-/**
- * The quick tier's share (EVAL_CALIBRATION_FRACTION, test/regression/bank-universe.ts reads it the same way):
- * unset or empty is the whole universe, anything else must be a number above 0 and at most 1.
- */
+/** The quick tier's share: unset or empty is the whole universe, else a number above 0 and at most 1. */
 export function parseFraction(raw) {
   if (raw === undefined || raw === null || String(raw).trim() === '') return 1;
   const fraction = Number(raw);
@@ -255,7 +205,7 @@ export function parseFraction(raw) {
   return fraction;
 }
 
-/** The fraction a run's run.json records: its own field, else its env, else the whole universe; null for a junk value. */
+/** The fraction a run.json records: its field, else its env, else the whole universe; null for a junk value. */
 export function runFraction(run) {
   if (typeof run?.fraction === 'number') return run.fraction;
   try {
@@ -265,7 +215,6 @@ export function runFraction(run) {
   }
 }
 
-/** Every subfolder of the calibration folder with a readable run.json, by name. */
 export function readRuns(calibrationDir) {
   if (!existsSync(calibrationDir)) return [];
   const runs = [];
@@ -283,10 +232,6 @@ export function readRuns(calibrationDir) {
 
 const lineCount = text => text.split(/\r?\n/).filter(line => line.trim()).length;
 
-/**
- * A run that can serve as a base: clean, settled, complete (every slice green, no replay lost to an HTTP error),
- * and its merged dump on disk with the hash and row count run.json recorded, next to its summary.
- */
 function isBase({ dir, run }) {
   const fingerprint = run.fingerprint;
   if (!fingerprint || typeof fingerprint.value !== 'string' || fingerprint.dirty !== false || fingerprint.stable !== true) return false;
@@ -304,7 +249,7 @@ function isBase({ dir, run }) {
 const unionOf = (a, b) => [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])].sort(byCode);
 const shown = value => (value === undefined ? 'unset' : value);
 
-/** The input groups in which two fingerprints differ, as short phrases (a path, `node`, a cache, or an env key with both values). */
+/** The input groups where two fingerprints differ, as short phrases (path, `node`, cache, env key with both values). */
 export function explainMismatch(current, other) {
   const differs = [];
   const same = (a, b) => canonicalJson(a) === canonicalJson(b);
@@ -320,14 +265,7 @@ export function explainMismatch(current, other) {
   return differs;
 }
 
-/**
- * Whether a finished run under the calibration folder can stand in for a run with this fingerprint.
- *   { action: 'reuse', dir, name, run, matches }   the newest finished run with the same value
- *   { action: 'run', reason: 'unavailable' }        git could not read the inputs
- *   { action: 'run', reason: 'dirty', dirtyPaths }  an uncommitted change under the inputs: a dirty tree never reuses
- *   { action: 'run', reason: 'no-match', nearest }  nearest is the finished run with the fewest differing input groups
- *                                                   ({ dir, name, run, differs }), absent when no finished run has a fingerprint
- */
+/** Reuse the newest finished run with the same value, else `run` with a reason; a dirty tree never reuses. */
 export function decideReuse({ fingerprint, calibrationDir }) {
   if (fingerprint.value === null) return { action: 'run', reason: 'unavailable', detail: fingerprint.problem };
   if (fingerprint.dirty) return { action: 'run', reason: 'dirty', dirtyPaths: fingerprint.dirtyPaths };
@@ -342,7 +280,6 @@ export function decideReuse({ fingerprint, calibrationDir }) {
   return { action: 'run', reason: 'no-match', nearest: ranked[0] };
 }
 
-/** The fractions the run.json files beside a dump (or beside each of several dumps joined by commas) record. */
 function sideFractions(path) {
   const found = [];
   for (const one of path.split(',')) {
@@ -356,11 +293,7 @@ function sideFractions(path) {
   return found;
 }
 
-/**
- * The header lines scripts/paired-calibration.mjs adds when a side ran the quick tier (its run.json records a
- * fraction below 1): the fraction of each side, the pairing count and its share of A, and what the fixed K comes from.
- * Two full runs, or dumps without run.json, give no lines.
- */
+/** The header lines paired-calibration.mjs adds when a side ran the quick tier; two full runs give none. */
 export function quickTierLines({ aPath, bPath, aRows, pairs, replays }) {
   const a = sideFractions(aPath);
   const b = sideFractions(bPath);

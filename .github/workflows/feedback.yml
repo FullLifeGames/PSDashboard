@@ -1,6 +1,5 @@
 name: Feedback
 
-# The feedback drift run: a push of feedback/<name> runs one whole `npm run test:feedback` per matrix job.
 # Security as bank.yml: only a push to feedback/** starts it; read-only token, .feedback-run.json is untrusted input.
 # Pinned to ubuntu-24.04 and Node 24.21.0 like bank.yml; workflows.spec.ts pins these properties.
 
@@ -43,7 +42,6 @@ jobs:
     name: Run ${{ matrix.index }}
     needs: config
     runs-on: ubuntu-24.04
-    # A healthy run takes about 27 minutes; the harness caps one game at 35.
     timeout-minutes: 120
     strategy:
       fail-fast: false

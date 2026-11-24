@@ -1,9 +1,5 @@
-// Shared aggregation over calibration dumps (EVAL_CALIBRATION_DUMP JSONL, one sample per line: id, turn, tranche, phase, gameType, score,
-// faintedFraction, p1Won, decided: the root's decided-sweep side or null, decidedHeld: that side where the finished score holds the sweep).
-// Three consumers: the harness prints the same aggregate lines, scripts/run-calibration.mjs merges slice dumps and summarizes them,
-// scripts/paired-calibration.mjs joins two dumps. The math replicates test/regression/fit-helpers.ts exactly (pooled constant-K logistic
-// fit via 500-iteration gradient descent from 1.5, Brier under that K), and compareSamples is the summation order the harness sorts into
-// before it aggregates, so a merged summary matches the single-process printout character for character.
+// Shared aggregation over calibration dumps (JSONL, one sample per line): harness, run-calibration, paired-calibration.
+// The math replicates test/regression/fit-helpers.ts exactly, and compareSamples is the order the harness sums in.
 import { readFileSync } from 'node:fs';
 
 const sigmoid = z => 1 / (1 + Math.exp(-z));
@@ -23,17 +19,11 @@ export function fitConstantK(samples) {
 export const brier = (samples, k) =>
   samples.reduce((sum, s) => sum + (probOf(s, k) - (s.won ? 1 : 0)) ** 2, 0) / samples.length;
 
-/**
- * Reads one JSONL dump, or several joined by commas in order (the doubles verdict reads the bank's dump together with the holdout's);
- * blank lines are skipped.
- */
+/** Reads one JSONL dump, or several joined by commas in order; blank lines are skipped. */
 export const load = path => path.split(',').flatMap(one =>
   readFileSync(one, 'utf8').split('\n').filter(line => line.trim()).map(line => JSON.parse(line)));
 
-/**
- * `--a-field <name>` and `--b-field <name>` read another number of a side's dump as its score (the root's solved `gameValue`), so one
- * bank run pairs its game value against its score; the flags leave the rest of argv in order.
- */
+/** Takes `--a-field <name>` and `--b-field <name>` (another number of a side's dump as its score) out of argv. */
 export function takeFieldArgs(argv) {
   let rest = argv;
   const fields = { aField: null, bField: null };
@@ -63,14 +53,12 @@ export function compareSamples(a, b) {
 
 export const sortSamples = samples => [...samples].sort(compareSamples);
 
-/** Concatenates slice dumps into one sorted sample list. */
 export function mergeDumps(paths) {
   const all = [];
   for (const path of paths) all.push(...load(path));
   return sortSamples(all);
 }
 
-/** The compact paired-analysis line: sign accuracy per phase and gametype, Brier per phase, sizes, K. */
 export function record(samples, label) {
   const pct = subset => subset.length === 0 ? ' -' :
     (100 * subset.filter(right).length / subset.length).toFixed(0);
@@ -84,12 +72,7 @@ export function record(samples, label) {
   console.log(`${label.padEnd(46)} ${cells}  brier ${briers.join('/')}  n ${ns} (total ${samples.length}, K ${k.toFixed(2)})`);
 }
 
-/**
- * The harness's printed aggregate, line for line (the block after the replay
- * loop in test/regression/eval-calibration.spec.ts): sign accuracy and mean
- * |score| per phase, sign accuracy per gametype, the fitted K per pool,
- * Brier per phase under the pooled K, and the confidence buckets.
- */
+/** The harness's printed aggregate, line for line (the block after the replay loop of eval-calibration.spec.ts). */
 export function summarize(samples) {
   const lines = [];
   const asOutcome = s => ({ score: s.score, won: s.p1Won });
@@ -126,7 +109,6 @@ export function summarize(samples) {
     return inPhase.length === 0 ? '-' : brier(inPhase, pooledK).toFixed(4);
   }).join('/');
   const pct = subset => (100 * subset.filter(right).length / subset.length).toFixed(0);
-  // The hq tranche and the luck-adjusted view, same K as the full bank.
   const hq = samples.filter(s => s.quality === 'hq');
   if (hq.length > 0) lines.push(`hq: n=${hq.length} sign-accuracy=${pct(hq)}% brier early/mid/late=${briers(hq)}`);
   const clean = samples.filter(s => !s.luckAgainstFavored);
@@ -141,7 +123,7 @@ export function summarize(samples) {
       `favored-side-wins=${(100 * correct / inBucket.length).toFixed(0)}%`,
     );
   }
-  // The decided sweep's named side, over every sweep and over the sweeps the bar holds (heldDecided); older dumps carry no held field.
+  // Older dumps carry no held field.
   const namedShare = key => {
     const named = samples.filter(sample => sample[key]);
     const won = named.filter(sample => (sample[key] === 'p1') === sample.p1Won).length;
@@ -170,13 +152,12 @@ const BAND_VIEWS = [
   ['hq', s => s.quality === 'hq'],
   ['luck-adjusted', s => !s.luckAgainstFavored],
 ];
-// Pooled rows first: a verdict reads them, the phase cells below are warnings only.
 const BAND_CELLS = [
   ...['all', 'singles', 'doubles'].map(gameType => [gameType, 'all']),
   ...['all', 'singles', 'doubles'].flatMap(gameType => ['early', 'mid', 'late'].map(phase => [gameType, phase])),
 ];
 
-/** One row: the paired mean and its band from resampling REPLAYS (a replay's positions share one outcome). */
+// Resamples REPLAYS, not positions: a replay's positions share one outcome.
 function bandRow(cell, { draws, seed, level }) {
   const byGame = new Map();
   for (const pair of cell) {
@@ -204,7 +185,7 @@ function bandRow(cell, { draws, seed, level }) {
   return bandOf(mean, means, { n: cell.length, games: games.length, moved, level, zero: 0 });
 }
 
-/** Mean, band, spread and reading of one row from its bootstrap means; a band within `zero` of nought reads unresolved. */
+// A band within `zero` of nought reads unresolved.
 function bandOf(mean, means, { n, games, moved, level, zero }) {
   const bp = value => value * 10000;
   const draws = means.length;
@@ -221,16 +202,8 @@ function bandOf(mean, means, { n, games, moved, level, zero }) {
   };
 }
 
-/**
- * One K by Newton on the weighted log-likelihood, run to a standstill:
- * fitPhaseK of test/regression/fit-helpers.ts with k1 = 0. The 500 gradient steps
- * of fitConstantK stop short on a small cell; here each side gets the K that
- * fits it best, so neither keeps an unfinished fit. A step that raises the
- * loss is halved. K stays in [0, 50]: a cell where every sign is right has
- * no finite maximum, and a score that runs against the outcomes earns no
- * credit by flipping its sign.
- * `weights[i]` counts how often sample i was drawn (1 for a plain fit).
- */
+// Mirrors fitPhaseK of fit-helpers.ts with k1 = 0, run to a standstill (fitConstantK stops short on a small cell).
+// K stays in [0, 50]: a cell where every sign is right has no finite maximum.
 const K_MAX = 50;
 
 function fitWeightedK(scores, wins, weights, start) {
@@ -267,7 +240,6 @@ function fitWeightedK(scores, wins, weights, start) {
   return k;
 }
 
-/** The plain fit of `{ score, won }` samples: every weight 1, started where fitConstantK starts. */
 export function fitKToStandstill(samples) {
   return fitWeightedK(samples.map(s => s.score), samples.map(s => (s.won ? 1 : 0)), samples.map(() => 1), 1.5);
 }
@@ -275,7 +247,6 @@ export function fitKToStandstill(samples) {
 const GAME_TYPES = ['singles', 'doubles'];
 const PHASES = ['early', 'mid', 'late'];
 
-/** A row's pairs split by game type and phase, as flat arrays the bootstrap weights by replay. */
 function ownKCells(cell, gameIndex) {
   const cells = [];
   for (const gameType of GAME_TYPES) {
@@ -295,7 +266,6 @@ function ownKCells(cell, gameIndex) {
   return cells;
 }
 
-/** Sum of the paired squared-error deltas and the drawn count over the cells, each side under its own K per cell. */
 function ownKSum(cells, counts) {
   let sum = 0;
   let n = 0;
@@ -314,10 +284,9 @@ function ownKSum(cells, counts) {
   return { sum, n };
 }
 
-/** Below this many bp a band counts as nought: the two fits stop 1e-10 apart, not at the same bit. */
+// The two fits stop 1e-10 apart, not at the same bit, so a band below this many bp counts as nought.
 const OWN_K_ZERO_BP = 0.001;
 
-/** One row under own K: every draw resamples the row's replays and refits each cell's K, so the band carries the fit's noise too. */
 function ownKRow(cell, { draws, seed, level }) {
   const gameIndex = new Map();
   for (const pair of cell) if (!gameIndex.has(pair.id)) gameIndex.set(pair.id, gameIndex.size);
@@ -337,7 +306,6 @@ function ownKRow(cell, { draws, seed, level }) {
   return bandOf(point.sum / point.n, means, { n: cell.length, games, moved, level, zero: OWN_K_ZERO_BP / 10000 });
 }
 
-/** Per side, the K of every game type and phase in the pairs (null where a cell is empty). */
 function ownKs(pairs) {
   const cells = ownKCells(pairs, new Map(pairs.map(pair => [pair.id, 0])));
   const side = key => Object.fromEntries(GAME_TYPES.map(gameType => [gameType, Object.fromEntries(PHASES.map(phase =>
@@ -345,11 +313,7 @@ function ownKs(pairs) {
   return { a: side('kA'), b: side('kB') };
 }
 
-/**
- * The verdict table with error bars: paired Brier deltas B minus A under ONE fixed K (the A side's pooled fit), per view, game type
- * and phase, each with a band from a paired bootstrap over replays. Every row seeds its own generator, so a row's numbers do not
- * depend on which other rows exist.
- */
+/** Paired Brier deltas B minus A under one fixed K (A's pooled fit), per view, game type and phase, with bands. */
 export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
   const key = s => `${s.id}#${s.turn}`;
   const bByKey = new Map(b.map(s => [key(s), s]));
@@ -361,7 +325,6 @@ export function pairedBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 }
   return { k, joined: pairs.length, draws, level, rows };
 }
 
-/** Every view, game type and phase that holds a pair, each row computed by `rowOf` on its cell. */
 function bandRows(pairs, rowOf) {
   const views = BAND_VIEWS.filter(([view]) => view !== 'hq' || pairs.some(pair => pair.sample.quality === 'hq'));
   const rows = [];
@@ -375,11 +338,7 @@ function bandRows(pairs, rowOf) {
   return rows;
 }
 
-/**
- * The second verdict table: the same rows, but each side scores under its own K per game type and phase, fitted on the row's own
- * positions and refit in every bootstrap draw. Under one fixed K the bank pays for scale (rescaling doubles per phase alone reads
- * -35 bp); here a pure rescale reads nought, and only a better order of the positions within a cell reads as a gain.
- */
+/** The same rows, each side under its own K per game type and phase, refit in every draw: a rescale reads nought. */
 export function ownKBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } = {}) {
   const key = s => `${s.id}#${s.turn}`;
   const bByKey = new Map(b.map(s => [key(s), s]));
@@ -389,10 +348,8 @@ export function ownKBands(a, b, { draws = 2000, seed = 20260919, level = 0.9 } =
   return { ownK: true, k: ownKs(pairs), joined: pairs.length, draws, level, rows };
 }
 
-/** A shift this small is no harm even where its band clears zero: few moved positions resolve a single basis point. */
 export const HARM_MIN_BP = 5;
 
-/** What the table says as a verdict: pooled rows decide, phase cells only warn, and harm needs size. */
 export function bankVerdict(result) {
   const worse = row => row.reading === 'B worse';
   const sized = row => row.meanBp >= HARM_MIN_BP;
@@ -404,7 +361,6 @@ export function bankVerdict(result) {
   };
 }
 
-/** The printed verdict table; the last line is the verdict sentence. */
 export function bandLines(result) {
   const signed = value => {
     const rounded = Math.round(value);
@@ -442,7 +398,6 @@ export function bandLines(result) {
 /** Samples of one quality tranche ('hq' or 'std'); dumps without a quality pass through untouched. */
 export const filterQuality = (samples, quality) => quality ? samples.filter(s => s.quality === quality) : samples;
 
-/** Pulls `--quality <hq|std>` out of an argv list. */
 export function takeQualityArg(argv) {
   const index = argv.indexOf('--quality');
   if (index < 0) return { argv, quality: null };

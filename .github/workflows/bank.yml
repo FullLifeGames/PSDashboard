@@ -1,9 +1,7 @@
 name: Bank
 
-# The calibration bank: a push of bank/<name> runs its slices; the merge job joins them into one run folder.
 # Security: only a push to bank/** starts it; read-only token, no secret, .bank-run.json is untrusted input.
 # Pinned to ubuntu-24.04: an image that changes under a run would change rows by luck.
-# workflows.spec.ts pins these properties.
 
 on:
   push:

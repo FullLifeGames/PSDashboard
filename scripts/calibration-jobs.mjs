@@ -1,16 +1,10 @@
 // CI jobs of a calibration run.
-//
-// A run of N slices splits into jobs: each job runs a range of the slices (run-calibration.mjs --slice-range a..b
-// --slices N) and leaves its slice dumps with a job.json (no run.json, so --reuse never mistakes a job for a run).
-// --merge checks that a set of job folders makes one complete run (same slice count, env, fraction, commit and
-// fingerprint; every slice exactly once) and writes a run folder that reads like a local run: merged.jsonl,
-// summary.txt and a run.json in the shape run-calibration.mjs writes. Slices are independent (one replay belongs to
-// exactly one slice), so the merged rows equal a run of all slices in one process.
+// A job leaves a job.json and no run.json, so --reuse never mistakes a job for a run.
 import { canonicalJson } from './calibration-fingerprint.mjs';
 
 const byCode = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-/** The range "a..b" of --slice-range as [a, b] with 0 <= a <= b < slices; throws with the reason otherwise. */
+/** The range "a..b" of --slice-range as [a, b] with 0 <= a <= b < slices; throws otherwise. */
 export function parseSliceRange(raw, slices) {
   const match = /^(\d+)\.\.(\d+)$/.exec(String(raw ?? '').trim());
   if (!match) throw new Error(`--slice-range expects a..b (the first and the last slice index), got "${raw}"`);
@@ -21,12 +15,10 @@ export function parseSliceRange(raw, slices) {
   return [first, last];
 }
 
-/** The slice indices of a range, in order. */
 export function sliceIndices([first, last]) {
   return Array.from({ length: last - first + 1 }, (_, offset) => first + offset);
 }
 
-/** The job.json of a job: the run's identity (slices, env, fraction, commit, fingerprint) and its own slices. */
 export function jobRecord({ commit, startedAt, finishedAt, slices, sliceRange, env, fraction, results, fingerprint }) {
   return {
     kind: 'job',
@@ -50,11 +42,7 @@ const RUN_IDENTITY = [
   ['fingerprint', job => job.fingerprint?.value ?? null],
 ];
 
-/**
- * Checks that `jobs` ([{ name, job }], job = a parsed job.json) make one complete run and returns its slice count.
- * Throws with the problems found: a folder without a job's record, jobs of different runs, a slice twice, a slice
- * missing.
- */
+/** Checks that `jobs` ([{ name, job }]) make one complete run; returns its slice count, throws with the problems. */
 export function checkJobs(jobs) {
   if (jobs.length === 0) throw new Error('--merge needs at least one job folder');
   const foreign = jobs.filter(({ job }) => job?.kind !== 'job' || !Array.isArray(job.sliceRange)).map(({ name }) => name);
@@ -80,11 +68,7 @@ export function checkJobs(jobs) {
   return slices;
 }
 
-/**
- * The run.json of the merged run, in the shape of a local run's, and the count of slices that failed or left no
- * dump. `present` holds the indices whose dump the merge found; a failed slice keeps the run incomplete, as in a
- * local run.
- */
+/** The run.json of the merged run, as a local run writes it, and the count of slices that failed or left no dump. */
 export function mergedRunRecord(jobs, { samples, mergedSha256, finishedAt, present }) {
   const first = jobs[0].job;
   const results = jobs.flatMap(({ job }) => job.results).sort((a, b) => a.index - b.index);

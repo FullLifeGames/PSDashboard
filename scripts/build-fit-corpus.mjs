@@ -1,19 +1,9 @@
-// Builds the manifest-pinned fitting corpus for the eval weight fit
-// (test/regression/eval-fit.spec.ts). Two tranches:
-//  - tournament: Smogon tournament replays via the ReplayScouter static data
-//    (fulllifegames.com/Tools/TournamentTeams): cleanest outcome labels.
-//  - ladder: top-rated replays from the replay search API.
-// Writes test/regression/fixtures/fit-corpus-manifest.json (COMMITTED, pins the
-// corpus so fits are reproducible; run-to-run corpus drift poisons
-// comparisons) and caches replay JSONs in .fit-corpus/ (gitignored).
-//
-// Run: node scripts/build-fit-corpus.mjs
+// Builds the fitting corpus of the weight fit: its manifest is committed, the replay cache in .fit-corpus/ is not.
 
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SCOUTER_BASE = 'https://fulllifegames.com/Tools/TournamentTeams/Tournaments';
-// Per-tier tournament replay archives (thousands of smogtours games each).
 const TOURNAMENT_THREADS = [
   3766306, // (2023-current) RU Tournament Replays
   3718010, // SS OU Tournament Replays
@@ -24,18 +14,13 @@ const TOURNAMENT_THREADS = [
   3768371, // (2020-2022 Archive) RU Tournament Replays
   3768373, // (2017-2019 Archive) RU Tournament Replays
 ];
-// Doubles/VGC replay threads scraped DIRECTLY from the Smogon forums —
-// the ReplayScouter cache only carries threads someone already requested.
-// NPA 15 (VGC 2026 Reg M-A, Bo3) weeks 1-9 + finals, plus the Official
-// Smogon Doubles Tournament replay threads (gen9doublesou).
+// Doubles/VGC threads scraped directly from the Smogon forums: the ReplayScouter cache holds only requested threads.
 const SMOGON_DOUBLES_THREADS = [
   3781957, 3782292, 3782626, 3782999, 3783387, // NPA 15 weeks 1-5
   3783695, 3784363, 3784687, 3785004, 3785603, // NPA 15 weeks 6-9 + finals
   3778554, // Official Smogon Doubles Tournament - Replays and Usage Stats
   3781999, // OSDT VI Play-In (replays required)
 ];
-// Gen9 SINGLES tournament threads: the fit's gen9-singles tranche was under-powered (~105 games vs 405 oldgen) while the app targets
-// gen9, and the matchup term carries 4x more outcome signal in gen9 than in old gens.
 const SMOGON_SINGLES_THREADS = [
   3718664, // SV OU Official Tournament Replays (SPL/OST/WCoP archive)
   3779021, // UWC Replay Thread (Ubers World Cup, gen9ubers-heavy)
@@ -45,9 +30,7 @@ const FORMAT_FILTER = /^gen\d(ou|uu|ru|nu|ubers|doublesou|vgc|champions)/;
 const DOUBLES_FORMAT = /doubles|vgc|champions/;
 const GEN9_SINGLES_FORMAT = /^gen9(ou|uu|ru|nu|ubers)/;
 const PER_FORMAT_CAP = 30;
-// The doubles tranche is the corpus's scarce resource: cap far higher.
 const DOUBLES_PER_FORMAT_CAP = 150;
-// Gen9 singles: the app's home turf, so power the tranche properly.
 const GEN9_SINGLES_PER_FORMAT_CAP = 300;
 const LADDER_PER_FORMAT = 25;
 const MANIFEST_PATH = 'test/regression/fixtures/fit-corpus-manifest.json';
@@ -78,7 +61,6 @@ async function tournamentTranche() {
           const id = replay.Id ?? replay.id;
           const format = (replay.FormatId ?? replay.formatId ?? '').toLowerCase();
           if (!id || !format || seen.has(id)) continue;
-          // Singles + doubles main formats only; skip randoms and odd metas.
           if (!FORMAT_FILTER.test(format)) continue;
           seen.add(id);
           const bucket = byFormat.get(format) ?? [];
@@ -97,7 +79,6 @@ async function tournamentTranche() {
   return [...byFormat.values()].flat();
 }
 
-/** Replay links scraped straight from paginated Smogon threads. */
 async function smogonThreadTranche() {
   const byFormat = new Map();
   const seen = new Set();
@@ -114,8 +95,7 @@ async function smogonThreadTranche() {
       }
       let found = 0;
       for (const html of pages) {
-        // Official tournament replays carry a room prefix (smogtours-gen9ou-…)
-        // (the id is one or more dash-joined segments before the number).
+        // Official tournament replays carry a room prefix (smogtours-gen9ou-…): dash-joined segments before the number.
         for (const match of html.matchAll(/replay\.pokemonshowdown\.com\/((?:[a-z0-9]+-)+\d+[a-z0-9-]*)/g)) {
           const id = match[1];
           const format = id.replace(/^smogtours-/, '').split(/-\d{4,}/)[0];
@@ -142,8 +122,7 @@ async function ladderTranche() {
   const entries = [];
   for (const format of LADDER_FORMATS) {
     try {
-      // The search endpoint returns newest public replays for the format;
-      // sort by rating client-side (the API's own sort params are unstable).
+      // The API's own sort params are unstable: sort by rating client-side.
       const rows = await fetchJson(`https://replay.pokemonshowdown.com/search.json?format=${format}`);
       const list = (Array.isArray(rows) ? rows : rows.replays ?? [])
         .filter(row => row.id)
@@ -179,9 +158,7 @@ async function download(replays) {
   console.log(`downloaded ${fetched} new replays (${failed} failed)`);
 }
 
-// The manifest is append-only: existing entries stay pinned (corpus drift
-// poisons run-to-run comparisons); `--expand` merges newly discovered
-// replays on top and re-pins.
+// Append-only manifest: existing entries stay pinned; `--expand` merges newly discovered replays and re-pins.
 const expand = process.argv.includes('--expand');
 const existing = existsSync(MANIFEST_PATH)
   ? JSON.parse(readFileSync(MANIFEST_PATH, 'utf-8')).replays

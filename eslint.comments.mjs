@@ -1,5 +1,3 @@
-// The rules comments/no-history (history per file against comment-ratchet.json) and comments/shape (size of comments).
-// Both read scripts/comment-lib.mjs; comments that code reads count for neither.
 import path from 'node:path';
 import { historyHits, shapeHits } from './scripts/comment-lib.mjs';
 import { commentBaseline, ROOT } from './scripts/comment-counts.mjs';

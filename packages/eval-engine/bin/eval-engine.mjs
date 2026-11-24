@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-// The command line of @fulllifegames/eval-engine:
-//   npx @fulllifegames/eval-engine check-engine <url> [--budget <ms>] [--origin <origin>]...
-// It sends the shipped sample positions (singles, doubles, VGC) to an engine endpoint and checks every
-// answer as PS Dashboard reads it, the time against the budget, and CORS for the pages that host the app.
+// Checks an engine endpoint against the shipped sample positions: answer, time against the budget, and CORS.
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { checkEngine } from '../dist/index.js';
