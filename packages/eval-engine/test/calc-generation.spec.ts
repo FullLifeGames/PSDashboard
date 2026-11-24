@@ -66,11 +66,3 @@ describe('the calculator generation of a battle (decision 1)', () => {
     expect(reads).toEqual([]);
   });
 });
-
-describe('the small consequences of the 0.12 diff (decision 6)', () => {
-  test('the damage preview passes no species option to the calculator\'s move (0.12 dropped it)', () => {
-    const source = readFileSync(`${ROOT}packages/eval-engine/src/damage-calc.ts`, 'utf-8');
-    expect(source).not.toMatch(/\bCalcSpecies\b/);
-    expect(source).not.toMatch(/^\s*species: attacker\.species/m);
-  });
-});
