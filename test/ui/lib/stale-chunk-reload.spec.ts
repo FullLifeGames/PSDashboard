@@ -1,12 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { installStaleChunkReload, STALE_CHUNK_RELOAD_KEY } from '../../../src/lib/stale-chunk-reload';
 
-/**
- * After a deploy a page built before it asks for chunks that are gone ("Error loading .../assets/opponent-inferrer-DmwVZADz.js" until a hard reload). Vite's preload
- * helper raises `vite:preloadError` for a failed lazy import; the page reloads once to fetch the new index.html, and a second failure within the guard shows the
- * error instead of reloading in a loop.
- */
-
 function memoryStorage(): Storage {
   const items = new Map<string, string>();
   return {
@@ -45,7 +39,6 @@ describe('a lazy chunk that fails to load after a deploy', () => {
     const storage = memoryStorage();
     const first = setup(storage);
     first.fail();
-    // The reloaded page installs its own handler and fails again 20 seconds later.
     const second = setup(storage, 1_020_000);
     expect(second.fail()).toBe(false);
     expect(second.reload).not.toHaveBeenCalled();

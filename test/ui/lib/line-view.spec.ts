@@ -3,7 +3,6 @@ import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, typ
 import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, replacementWords, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/** The data under the Lines section: per player the engine's line and the played line (one line for a player who played the engine's move); chips only for dice that could have gone the other way; the tooltip of ▶ Play lists every forced die. */
 const singles: LineViewContext = { turn: 20, playerNames: SINGLES_NAMES, doubles: false, rules: { gen: 9, mod: undefined } };
 const doubles: LineViewContext = {
   turn: 4, playerNames: DOUBLES_NAMES, doubles: true, rules: { gen: 9, mod: undefined },
@@ -22,7 +21,6 @@ describe('lineBlocks', () => {
     ]);
   });
 
-  // The played line of a body that never acted is the line of its stand-in; the head does not say it was played.
   test('the head of a line of a body knocked out before it moved says staying in, never that it was played', () => {
     const asNever = { ...singles, neverActed: { p2: true } };
     expect(lineBlocks([playedLine], asNever)[0].role).toBe('staying in: Hyper Voice');
@@ -34,10 +32,8 @@ describe('lineBlocks', () => {
   test('chips name the dice that could have gone the other way and nothing quiet (3a)', () => {
     const [block] = lineBlocks([singlesLine], singles);
     const chips = block.rows.map(row => row.sides.map(side => side.chips));
-    // Hydro Pump hits at 80 percent shows; its crit that does not come and Moonblast's unlanded drop stay quiet
     expect(chips[0]).toEqual([[], ['Hydro Pump: hits (80%)']]);
     expect(chips[1]).toEqual([[], []]);
-    // the knock-out that depends on the roll shows, with the rolls that hold it, on the player who rolls it
     expect(chips[2]).toEqual([['Brave Bird: KO (10 of 16 rolls)'], []]);
   });
 
@@ -114,7 +110,6 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     expect(single.rows[0].sides[0].chips).toEqual(['Rock Slide: hits (90%)']);
   });
 
-  // A Protect that fails at 67 percent decided the turn (2630685175 T7); its chip shows, in singles and in doubles.
   const stallOn = (line: EvalLine, side: 'p1' | 'p2', at: number, slot: string): EvalLine => {
     const die: ForcedDie = { name: { slot, moveId: 'protect', kind: 'stalling', effectId: 'protect' }, result: { happens: false } };
     const [first, ...later] = line.steps;
@@ -136,7 +131,6 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     const replacement: LineStep = { ...stepWith([roll]), replacement: 'p1' };
     const [block] = lineBlocks([lineOf([pivot, replacement])], doubles);
     expect(block.tooltip.split('\n').slice(1)).toEqual(['T4: Wood Hammer: no crit (96%)']);
-    // a line that opens with a replacement files it under the graded turn
     const [opening] = lineBlocks([lineOf([replacement])], doubles);
     expect(opening.tooltip.split('\n').slice(1)).toEqual(['T4: Wood Hammer: no crit (96%)']);
   });
@@ -147,8 +141,7 @@ describe('lineBlocks: the tester\'s smaller items', () => {
     expect(block.tooltip.split('\n')[1]).toBe('T4: Weather Ball: damage roll 9 (KO in 9 of 16 rolls)');
   });
 
-  // A forced roll on the side that does not knock out read "KO (1 of 16 rolls)". The chip says what the forced roll does, read against the
-  // boundary the simulator found (`ko`): rolls from `of - rolls` up knock out.
+  // Rolls from `of - rolls` up knock out, read against the boundary the simulator found (`ko`).
   test.each([
     ['roll 9 of a move that knocks out in 1 of 16 rolls', 8, 1, 'Vacuum Wave: no KO (15 of 16 rolls)', 'T4: Vacuum Wave: damage roll 9 (no KO in 15 of 16 rolls)'],
     ['the highest roll of that move', 15, 1, 'Vacuum Wave: KO (1 of 16 rolls)', 'T4: Vacuum Wave: damage roll 16 (KO in 1 of 16 rolls)'],
@@ -206,7 +199,6 @@ describe('why a line ends', () => {
   });
 });
 
-/** A line that has a row value shows both numbers; the sentence comes only when they differ. */
 describe('both numbers on a line', () => {
   const endOf = (line: EvalLine) => winPctText(line.end, line.endFainted);
 
@@ -216,11 +208,9 @@ describe('both numbers on a line', () => {
     expect(block.row).toBe('23%');
     expect(block.end).toBe(`row 23%, this line ends at ${endOf(singlesLine)}`);
     expect(block.differs).toBe(true);
-    // the played line reads the played row, not the engine's
     const [played] = lineBlocks([playedLine], { ...singles, rowValues: { p2: { engine: '23%', played: '40%' } } });
     expect(played.row).toBe('40%');
     expect(played.end).toBe(`row 40%, this line ends at ${endOf(playedLine)}`);
-    // a line that holds both roles is the engine's row
     const [both] = lineBlocks([bothRolesLine], { ...singles, rowValues: { p1: { engine: '11%', played: '12%' } } });
     expect(both.row).toBe('11%');
   });
@@ -251,10 +241,7 @@ describe('both numbers on a line', () => {
   });
 });
 
-/**
- * A row at 100% (or 0%) is one where every answer and die ends the game (`winPercent` shows exactly 100 only for an ended evaluation); the line stops
- * before the game ends, so its end is the estimate of the position it stops at. The sentence is added only where such a row stands.
- */
+// `winPercent` shows exactly 100 only for an ended evaluation; a line stops before the game ends.
 describe('the sentences under a section of lines', () => {
   const block = (row: string | null, endPct: string) => lineBlocks([singlesLine], { ...singles, ...(row ? { rowValues: { p2: { engine: row } } } : {}) })
     .map(item => ({ ...item, endPct }))[0];
@@ -267,7 +254,6 @@ describe('the sentences under a section of lines', () => {
     expect(rows(at('23%'))).toEqual([LINE_DIFFERS_SENTENCE]);
     expect(rows(at('100%'))).toEqual([LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE]);
     expect(rows(at('0%'))).toEqual([LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE]);
-    // a row that prints as its line's end has nothing to explain, whatever the number
     const same = lineBlocks([line], { ...ctx, rowValues: { p1: { engine: lineBlocks([line], ctx)[0].endPct }, p2: { engine: lineBlocks([line], ctx)[0].endPct } } });
     expect(rows(same)).toEqual([]);
   });
@@ -278,7 +264,6 @@ describe('the sentences under a section of lines', () => {
   });
 });
 
-/** A line names the rank of the answer it meets in the search's merged ranking. */
 describe('the answer a line meets', () => {
   const ranked = (...p1: string[]) => ({ p1, p2: ['Hydro Pump', 'Hyper Voice'] });
 
@@ -293,7 +278,6 @@ describe('the answer a line meets', () => {
   });
 
   test('a pivot\'s pair rows stand for the bare move a line names', () => {
-    // the line meets "Draining Kiss"; the ranking holds "Draining Kiss → Mew" at place 2: the answer is that row, not an unranked one
     expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Surf', 'Draining Kiss → Mew', 'Draining Kiss → Corviknight') })[0].reply)
       .toEqual({ label: 'Draining Kiss', rank: "Tzon's second choice in this search", off: true });
     expect(lineBlocks([singlesLine], { ...singles, ranks: ranked('Draining Kiss → Mew', 'Surf') })[0].reply)
@@ -312,7 +296,6 @@ describe('the answer a line meets', () => {
   });
 
   test('the answer of the other side is read for either side\'s line: player 1\'s line meets player 2\'s answer', () => {
-    // bothRolesLine is Tzon's line; its answer is Pepitopalotin's Hydro Pump
     expect(lineBlocks([bothRolesLine], { ...singles, ranks: ranked('Surf') })[0].reply).toEqual({ label: 'Hydro Pump', rank: "Pepitopalotin's top choice", off: false });
     expect(lineBlocks([bothRolesLine], { ...singles, ranks: { p1: [], p2: ['Surf', 'Hydro Pump'] } })[0].reply?.rank).toBe("Pepitopalotin's second choice in this search");
   });
@@ -334,10 +317,6 @@ describe('the answer a line meets', () => {
   });
 });
 
-/**
- * In Hard mode the bracket names the reply that hurts the line's choice most by those words (not by the choice's own label: a switch read as "hurts → Clefable",
- * a joint choice ran to fifty characters), and a reply that is a pivot's pair ("Draining Kiss → Mew") is the bare move the line meets.
- */
 describe('the reply the search rates lowest, in the bracket', () => {
   const ranks = { p1: ['Draining Kiss', 'Surf'], p2: ['Hydro Pump', 'Hyper Voice'] };
   const worst = (label: string, basis: 'cell' | 'punisher' = 'cell', cell: string | null = basis === 'cell' ? '49%' : null) => () => ({ label, basis, cell });
@@ -372,7 +351,6 @@ describe('the reply the search rates lowest, in the bracket', () => {
   });
 });
 
-/** A doubles replacement whose other slot needs no body carries "pass" in the engine's label; the words of a line leave it out. */
 describe('a replacement names the bodies that come in, not the slot that passes', () => {
   const withPass: typeof doublesLine = {
     ...doublesLine,

@@ -3,7 +3,6 @@ import type { DamageResult } from '@fulllifegames/eval-engine';
 import { tileBars, tileTarget } from '../../../src/lib/dock-tile';
 import { moveOption, targetOption } from '../fixtures/sim-state';
 
-/** The bars under a move tile and the target a tile click takes. */
 const result = (minPercent: number, maxPercent: number, koChance = ''): DamageResult =>
   ({ moveName: 'Flare Blitz', minPercent, maxPercent, range: `${minPercent}% - ${maxPercent}%`, koChance });
 

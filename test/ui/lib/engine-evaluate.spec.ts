@@ -13,7 +13,6 @@ const choices = {
 };
 const executor = { choices: vi.fn(async () => choices) };
 
-/** A fetch stand-in that records the request and answers with what the test names. */
 function serve(answer: (request: EngineRequest) => { status?: number; body: unknown }) {
   const seen: EngineRequest[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {

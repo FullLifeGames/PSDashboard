@@ -11,7 +11,7 @@ import { gameReviewEnabled, opponentReadsEnabled } from '../../../src/lib/featur
 import { evalGraph, evalResult, gameReport } from '../fixtures/eval-result';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 
-/** Both flags are off unless a build sets its env variable to 1 or true; the ui project's vitest config switches both on for the specs of the two features, so each row stubs the variable it reads. */
+// The ui project's vitest config switches both flags on, so each row stubs the variable it reads.
 afterEach(() => vi.unstubAllEnvs());
 
 const flags = [
@@ -37,12 +37,6 @@ describe.each(flags)('the flag %s', (_name, variable, enabled) => {
   });
 });
 
-/**
- * With the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), the Setup menu has no checkbox "Opponent reads my move", the dock
- * has no note "Opponent reads your move" with "Turn off", and no title names the reply rule, even when the caller still passes the setting
- * as on (the stored hardMode of an earlier nightly). The two components do not depend on the game type; the dock row runs on both models
- * only through its empty slot lists.
- */
 describe('Setup menu with the flag off', () => {
   beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
 
@@ -96,8 +90,6 @@ describe('the Setup checkbox with its flag on and the Game review flag off', () 
     expect(title).not.toMatch(/Game review/);
   });
 });
-
-/** With VITE_FEATURE_GAME_REVIEW off (the default of every build) the report view shows the cards and the graph and nothing of the Game review. */
 
 const names: [string, string] = ['Alice', 'Bob'];
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };

@@ -6,11 +6,7 @@ import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog } from '
 import { loadSimMods } from '@fulllifegames/eval-engine';
 import { pickerStateFromSerialized, pickerStateFromSnapshot } from '../../../src/lib/picker-state';
 
-/**
- * The pickers on a Champions game. The stored picker revives a recorded position on the Champions mod (the picker module is only ever lazy-loaded and
- * nothing before it loads the mod), and every picker marks a Champions body, whose evs hold Stat Points, so the damage preview reads them as
- * EV = 8·SP − 4 with every IV 31 (the engine's calc-champions.spec.ts holds that against the simulator).
- */
+// Champions evs hold Stat Points: damage reads EV = 8·SP − 4 with every IV 31 (calc-champions.spec.ts checks it).
 const fixture = <T>(name: string) =>
   JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', name), 'utf-8')) as T;
 const position = (id: string) => fixture<{ serialized: string }>(`${id}.position.json`).serialized;

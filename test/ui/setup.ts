@@ -2,27 +2,20 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach } from 'vitest';
 import { cleanup, configure } from '@testing-library/react';
 
-// The suite runs its files in parallel next to reconstructions and searches;
-// a hook that lazy-loads a module can take longer than Testing Library's
-// one-second default to settle under that load.
+// Files run in parallel next to reconstructions and searches; a lazy-loading hook can pass the one-second default.
 configure({ asyncUtilTimeout: 5_000 });
 
-// jsdom lays nothing out, so the combo box's "keep the highlight in view" is a
-// no-op here (and would otherwise throw on the missing method).
+// jsdom lays nothing out: the combo box's "keep the highlight in view" is a no-op here.
 Element.prototype.scrollIntoView ??= () => {};
 
-// jsdom has no layout observer either; the evaluation graph measures its
-// width through one and keeps its default width when nothing reports.
+// jsdom has no layout observer; the evaluation graph keeps its default width when nothing reports.
 globalThis.ResizeObserver ??= class {
   observe() {}
   unobserve() {}
   disconnect() {}
 };
 
-// Testing Library unmounts on its own only when the runner exposes global
-// hooks; Vitest does not, so every test unmounts here. jsdom keeps one window
-// per test file, so the preferences and picker toggles the hooks persist in
-// localStorage are wiped between tests as well.
+// Testing Library unmounts on its own only with global hooks; jsdom keeps one window per file: wipe localStorage too.
 afterEach(() => {
   cleanup();
   localStorage.clear();

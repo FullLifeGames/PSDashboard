@@ -29,7 +29,6 @@ const outcome = (overrides: Partial<ReconstructOutcome> = {}): ReconstructOutcom
   choiceErrors: { count: 0, last: null }, ...overrides,
 });
 
-/** A worker that streams one position per boundary and lands on the target turn; `final` overrides the outcome. */
 function streamingWorker(final: (job: ReplayJobRequest) => Partial<ReconstructOutcome> = () => ({})) {
   return fakeReplayWorkerClient((request): ReplayJobResponse[] => {
     if (request.type !== 'reconstruct') return [];
@@ -65,7 +64,6 @@ describe('usePositionSource', () => {
     expect(job).toMatchObject({ format: getBranchSimulatorFormat(replayData), targetTurn: 3, mode: 'replay', replayLog: replayData.log, bringOnly: null });
     expect(job.p1Team.length).toBeGreaterThan(0);
 
-    // The streamed boundaries and the target are stored; a second acquire never reaches the worker.
     await waitFor(() => expect(result.current.getExact(2)).toBe('pos-2'));
     expect(result.current.getExact(3)).toBe('pos-3');
     await expect(result.current.acquireExact(3, report)).resolves.toBe('pos-3');
@@ -119,7 +117,6 @@ describe('usePositionSource', () => {
     expect(onDiagnostic).toHaveBeenCalledWith(expect.stringMatching(/ended at turn 2 although the real game continued/));
   }, 30_000);
 
-  // Only a sweep that asks gets the replacement requests, and they reach its callback with the point intact.
   test('acquireAll asks the worker for the replacement requests only when it has a consumer, and hands them on', async () => {
     const point = { turn: 1, ordinal: 0, forced: { p1: [0], p2: [] }, played: { p1: ['Toxapex'], p2: [] } };
     const { client, requests } = fakeReplayWorkerClient((request): ReplayJobResponse[] => (request.type === 'reconstruct'
@@ -162,17 +159,12 @@ describe('usePositionSource', () => {
   }, 60_000);
 });
 
-/**
- * A short-side game plays every world of its unknown bodies: the source reconstructs each world's main line, hands out the heaviest world's
- * positions and registers the siblings of each one (the worker client reads them) before it hands the position out; a sibling never enters the exact store.
- */
 describe('usePositionSource with the worlds of a short side', () => {
   const world = (guess: string, weight: number): BringWorld =>
     ({ p1: ['Alpha', 'Beta', guess], p2: ['Gamma', 'Delta', 'Eps'], guessed: { p1: 1, p2: 0 }, weight });
   const WORLDS = [world('K', 0.6), world('N', 0.3), world('R', 0.1)];
   const guessOf = (request: ReplayJobRequest) => (request as Extract<ReplayJobRequest, { type: 'reconstruct' }>).job.bringOnly?.p1.at(-1) ?? 'none';
 
-  /** A worker whose positions name their world: `pos-<turn>-<guess>`; a world named in `failing` answers with an error. */
   function worldWorker(failing: string[] = [], points: ReplayJobResponse[] = []) {
     return fakeReplayWorkerClient((request): ReplayJobResponse[] => {
       if (request.type !== 'reconstruct') return [];
@@ -228,7 +220,6 @@ describe('usePositionSource with the worlds of a short side', () => {
     clearWorldPositions();
     const { client, requests } = worldWorker();
     const { result } = renderHook(() => usePositionSource(withWorlds(client)));
-    // The branch start stores the heaviest world's position of its turn without siblings (`acquireRuntime`).
     result.current.storeExactPosition(2, 'pos-2-K');
     expect(worldPositionsOf('pos-2-K')).toBeNull();
     await expect(result.current.acquireExact(2, vi.fn())).resolves.toBe('pos-2-K');
@@ -278,10 +269,8 @@ const entry = (turnNumber: number, extra: Partial<BranchHistoryEntry>): BranchHi
 });
 const move = (name: string) => ({ kind: 'move' as const, moveId: name.toLowerCase(), moveName: name });
 
-/** A game of two played turns, as a saved record holds it: entries without positions, lines from a rebuild. */
 async function twoTurnGame(format = 'gen9ou'): Promise<NewGameRecord> {
   const start = await startedRecord(format);
-  // a doubles format plays two slots a side; the VGC game brings four of its six and leads two of them
   const doubles = format !== 'gen9ou';
   const slots = (name: string) => (doubles ? [move(name), move(name)] : [move(name)]);
   const lead = doubles
@@ -336,7 +325,6 @@ describe('usePositionSource for a new game', () => {
     expect(requests).toEqual([]);
   });
 
-  /** The hook over one record with a mutable sets fingerprint, the way `useExactPositions` swaps its store on a new identity. */
   function sourceOf(record: NewGameRecord) {
     const data = gameReplayData(record);
     const snapshots = parseReplayLog(data.log);

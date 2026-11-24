@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSmogonUsageStats } from '../../../src/hooks/useSmogonUsageStats';
 
-/** A data.pkmn.cc stats file: fractional shares per species. */
 const statsFile = (species: Record<string, { moves: Record<string, number>; items?: Record<string, number> }>) => ({
   pokemon: Object.fromEntries(Object.entries(species).map(([name, entry]) => [name, {
     count: 1000, abilities: { Pressure: 1 }, items: entry.items ?? { Leftovers: 0.8 }, moves: entry.moves, spreads: { 'Jolly:0/252/0/0/4/252': 0.6 },
@@ -12,7 +11,6 @@ const statsFile = (species: Record<string, { moves: Record<string, number>; item
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 const missing = () => new Response('', { status: 404 });
 
-/** Answers the stats files by their path below the host; everything else is absent. */
 function stubStats(files: Record<string, unknown>) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
@@ -27,7 +25,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// The stats fetcher caches per format for the life of the module, so every test reads a different format.
+// The fetcher caches per format for the life of the module, so every test reads a different format.
 describe('useSmogonUsageStats', () => {
   test('without a format nothing loads', () => {
     const fetchMock = stubStats({});
@@ -48,7 +46,6 @@ describe('useSmogonUsageStats', () => {
     expect(result.current.error).toBeNull();
     const stats = result.current.stats!;
     expect(stats.format).toBe('gen8ou');
-    // The format's own file wins for Garchomp; Ubers only adds the species OU lacks.
     expect(stats.pokemon.garchomp.moves.map(move => move.value)).toEqual(['Earthquake', 'Scale Shot']);
     expect(stats.pokemon.garchomp.moves[0].probability).toBe(0.9);
     expect(stats.pokemon.kyogre.moves[0]).toMatchObject({ value: 'Origin Pulse', probability: 0.95 });
@@ -89,7 +86,6 @@ describe('useSmogonUsageStats', () => {
   });
 
   test('a load cut short by a format change is not remembered: back on the format, the stats load', async () => {
-    // Scene: replay in format X, a replay in Y before X's stats arrive, then X again (VGC: doubles sets hang on it).
     let firstAsk = true;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -136,7 +132,6 @@ describe('useSmogonUsageStats', () => {
   });
 
   test('after a failure the next replay of the same format asks again', async () => {
-    // A second replay keeps the format, so only the replay key tells the hook a new load happened.
     let online = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       if (!online) throw new TypeError('Failed to fetch');
@@ -168,7 +163,6 @@ describe('useSmogonUsageStats', () => {
       { initialProps: { formatid: 'gen3nu', replay: 'gen3nu-1' } },
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    // Still loading: the second replay must not cut the running load short.
     rerender({ formatid: 'gen3nu', replay: 'gen3nu-2' });
     release();
     await waitFor(() => expect(result.current.stats?.pokemon.golem).toBeDefined());

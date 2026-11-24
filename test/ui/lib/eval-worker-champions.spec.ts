@@ -3,11 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EvalWorkerRequest, EvalWorkerResponse } from '@fulllifegames/eval-engine';
 
-/**
- * The evaluation worker revives a Champions position on the Champions mod: nothing in the worker's own module graph loads the mod before the first
- * message, so the worker loads it from the position itself before any search, else the position fails as a battle without its mod. The worker
- * module runs on this thread over a stand-in for its global scope.
- */
+// The worker loads the Champions mod from the position itself: nothing in its module graph does it first.
 const posted: EvalWorkerResponse[] = [];
 const scope = {
   onmessage: null as ((event: MessageEvent<EvalWorkerRequest>) => Promise<void>) | null,
@@ -23,7 +19,6 @@ beforeAll(async () => {
   await import('../../../src/workers/eval-worker');
 });
 
-/** The final answer of one message (progress and partials skipped). */
 async function answer(request: Record<string, unknown>): Promise<EvalWorkerResponse | undefined> {
   posted.length = 0;
   await scope.onmessage?.({ data: request as unknown as EvalWorkerRequest } as MessageEvent<EvalWorkerRequest>);

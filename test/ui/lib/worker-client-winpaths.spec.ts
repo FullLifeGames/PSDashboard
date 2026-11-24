@@ -6,8 +6,6 @@ import {
 } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../../src/lib/eval/worker-client';
 
-/** The on-demand job runs on a worker of its own: it never queues behind a sweep's search, a cancel of the sweep leaves it, and its cancel leaves the sweep. Steps arrive one by one, the answer of a finished job is kept for the next open, and the job's message is generic (`job`, `jobStep`, `jobResult`). */
-
 const workers: FakeWorker[] = [];
 
 class FakeWorker {
@@ -65,7 +63,6 @@ describe('the win-paths job in the client', () => {
     const job = jobWorkers();
     expect(job).toHaveLength(1);
     expect(pool).not.toContain(job[0]);
-    // the sweep's cancel ends its busy workers and not the job's
     client.cancel();
     expect(pool.filter(worker => worker.posted.length > 0).every(worker => worker.terminated)).toBe(true);
     expect(job[0].terminated).toBe(false);
@@ -94,7 +91,6 @@ describe('the win-paths job in the client', () => {
     expect(seen.map(item => item.kind)).toEqual(['stronger']);
     job.say({ type: 'jobStep', id: job.posted[0].id, step: { kind: 'winPaths', step: step('luck') } });
     expect(seen).toHaveLength(1);
-    // the sweep: not terminated, not rejected
     await Promise.resolve();
     expect(poolWorkers().some(worker => worker.terminated)).toBe(false);
     expect(settled).not.toHaveBeenCalled();
@@ -147,7 +143,6 @@ describe('the win-paths job in the client', () => {
     await expect(client.winPaths('{"position":1}', { ...REQUEST }, 'standard', { onStep: item => seen.push(item) })).resolves.toEqual(all);
     expect(seen).toEqual(all.steps);
     expect(jobWorkers()).toHaveLength(1);
-    // another position, another rule set or another request asks again
     client.winPaths('{"position":2}', REQUEST, 'standard').catch(() => undefined);
     client.winPaths('{"position":1}', REQUEST, 'vgc').catch(() => undefined);
     client.winPaths('{"position":1}', { ...REQUEST, side: 'p1' }, 'standard').catch(() => undefined);
@@ -176,7 +171,6 @@ describe('the win-paths job in the client', () => {
   });
 });
 
-/** The real worker module on this thread: the job's steps come back in the ruled order, one message each, then the result. */
 const answered: EvalWorkerResponse[] = [];
 const askers = new Map<number, RealWorker>();
 const scope = {

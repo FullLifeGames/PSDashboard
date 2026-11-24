@@ -21,7 +21,6 @@ const withMega: BranchSlotModifiers = { ...NO_MODIFIERS, canMegaEvo: true };
 const withZ: BranchSlotModifiers = { ...NO_MODIFIERS, zMoves: [null, 'Inferno Overdrive', null, null] };
 
 type Sides = { p1: BranchSlotModifiers[]; p2: BranchSlotModifiers[] };
-/** The panel's toggles over one position; `p1A` reads P1's first slot. */
 function renderToggles(initial: Sides) {
   const hook = renderHook((sides: Sides) => useGimmickToggles(sides.p1, sides.p2), { initialProps: initial });
   return { ...hook, p1A: () => hook.result.current.gimmickFor('p1', 0) };
@@ -97,7 +96,6 @@ describe('useGimmickToggles', () => {
     expect([hook.result.current.gimmickFor('p1', 0).modifier, hook.result.current.gimmickFor('p1', 1).modifier,
       hook.result.current.gimmickFor('p2', 0).modifier]).toEqual([null, null, null]);
     expect(hook.result.current.teraBySlot).toEqual({ p1: [null, null], p2: [null] });
-    // Back on the old position the toggles stay released: an arming belongs to the visit, not to the turn.
     hook.rerender({ key: 'r1:main:2' });
     expect(hook.result.current.gimmickFor('p1', 0).modifier).toBeNull();
   });
@@ -133,7 +131,6 @@ describe('useGimmickToggles', () => {
       expect(slotOf(1).heldBy, pick.kind).toEqual({});
       act(() => slotOf(1).toggle('terastallize'));
       expect(slotOf(1).modifier, pick.kind).toBe('terastallize');
-      // P1A's armed Tera gives way, so a new pick there cannot carry a second Tera.
       expect(slotOf(0), pick.kind).toMatchObject({ modifier: null, modifierAvailable: false, heldBy: { terastallize: 'P1B' } });
       expect(hook.result.current.teraBySlot.p1, pick.kind).toEqual([null, 'Fire']);
     }
@@ -150,7 +147,6 @@ describe('useGimmickToggles', () => {
   });
 });
 
-/** With a pick standing on a slot (the seed or the user's), the gimmick toggle edits that pick instead of arming the next click; a slot without a move pick keeps the armed toggle. */
 describe('useGimmickToggles on a slot with a move pick', () => {
   const flare = { kind: 'move' as const, moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 1 };
   const spore = { kind: 'move' as const, moveId: 'spore', moveName: 'Spore' };
@@ -170,7 +166,6 @@ describe('useGimmickToggles on a slot with a move pick', () => {
     expect(result.current.gimmickFor('p1', 0).modifier).toBeNull();
     act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
     expect(edits).toEqual([['p1', 0, { ...flare, modifier: 'terastallize' }]]);
-    // the caller stores the edited pick; the toggle reads it back
     rerender({ now: { p1: [{ ...flare, modifier: 'terastallize' }, null], p2: [] } });
     expect(result.current.gimmickFor('p1', 0)).toMatchObject({ modifier: 'terastallize', modifierAvailable: true });
     act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
@@ -181,7 +176,6 @@ describe('useGimmickToggles on a slot with a move pick', () => {
   test('an edit never arms the toggle for the next click', () => {
     const { result, rerender } = renderEditing({ p1: [flare, null], p2: [] });
     act(() => result.current.gimmickFor('p1', 0).toggle('terastallize'));
-    // the pick goes away (a switch replaces it): nothing stays armed behind it
     rerender({ now: { p1: [switchPick, null], p2: [] } });
     expect(result.current.gimmickFor('p1', 0).modifier).toBeNull();
   });
@@ -256,13 +250,11 @@ describe('useMovePool', () => {
   });
 });
 
-/** The pool follows the game's format. The oracles are the mod's own Dex and the team editor's reader `getMovePool`, never a move name. */
 describe('useMovePool follows the format', () => {
   beforeAll(async () => {
     await loadSimMods('gen9championsou');
   });
 
-  // Singles (Champions OU) and doubles (Champions VGC) both.
   describe.each(['gen9championsou', 'gen9championsvgc2026regmcbo3'])('%s', format => {
     test('the pool is the mod\'s, and lacks a move the Generation 9 pool has', async () => {
       const species = 'Garchomp';
@@ -279,7 +271,6 @@ describe('useMovePool follows the format', () => {
     }, 30_000);
   });
 
-  // A National Dex draft (singles) and a doubles draft league: the simulator's pool of a Past species.
   describe.each(['gen9natdexdraft', 'gen9doublesdraftleague'])('%s', format => {
     test('Dracovish is offered Fishious Rend, and only with the format', async () => {
       const { result, rerender } = renderHook((id: string) => useMovePool('Dracovish', 9, id), { initialProps: format });
@@ -324,7 +315,6 @@ const SCENES: { kind: BranchMoveModifier; format: string; p1: PokemonSet[] }[] =
     set('Necrozma-Dusk-Mane', ['Sunsteel Strike'], { item: 'Ultranecrozium Z' }), set('Necrozma-Dawn-Wings', ['Moongeist Beam'], { item: 'Ultranecrozium Z' })] },
 ];
 
-/** The command the picker sends for P1: each slot's first move into the first foe, with the slot's gimmick toggle. */
 function commandFor(current: Battle, state: BranchSimState, gimmicks: { modifier: BranchMoveModifier | null; modifierAvailable: boolean }[]) {
   const choices: BranchSlotChoice[] = state.p1MovesBySlot.map((moves, slot) => moveChoiceFor(moves[0], moves[0].targetOptions[0]?.targetLoc, {
     ...gimmicks[slot], moves, modifiers: state.p1ModifiersBySlot[slot],

@@ -2,8 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { notationDice, type DiceReport, type DieReport, type DieWords, type ForcedDie } from '@fulllifegames/eval-engine';
 import { diceMarksOf, markText, sideMarkTexts, turnDiceMarks } from '../../../src/lib/branch-dice-marks';
 
-/** What the history rows and the share links say about a turn's forced dice: labels from `notationDice`, each die on the side that holds it, a die without effect says so. A turn that paused for a switch has two entries; the row reads the joined report once. */
-
 const words: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
 const die = (slot: string, kind: 'accuracy' | 'secondary', happens: boolean): ForcedDie =>
   ({ name: { slot, moveId: 'airslash', targetSlot: slot[1] === '1' ? 'p2a' : 'p1a', kind, ...(kind === 'secondary' ? { effectId: 'flinch' } : {}) }, result: { happens } });

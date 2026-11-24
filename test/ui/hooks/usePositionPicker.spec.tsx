@@ -6,7 +6,6 @@ import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
 import type { PlayedAtPosition } from '../../../src/lib/played-pick';
 import { simState } from '../fixtures/sim-state';
 
-/** The recorded positions resolve when the test says so: each serialized string names its picker state and the battle it was read from. */
 const pending = new Map<string, (state: BranchSimState, battle?: unknown) => void>();
 const benches: unknown[] = [];
 vi.mock('../../../src/lib/picker-state', () => ({
@@ -45,9 +44,7 @@ describe('usePositionPicker', () => {
   });
 
   test('while the viewed position resolves, the panel keeps what it showed last, as stale', async () => {
-    // Scene: one turn back from the tip of a turn-0 variation showed another position's picker (Mienshao's moves) for about 40 ms until
-    // turn 3 (Kyurem) resolved; a click there would choose a move of a Pokémon not on the field, and without a stand-in the history below
-    // jumped by the panel's height (585 px) for two frames.
+    // Without the stand-in the picker showed another position's moves for 40 ms and the history jumped for two frames.
     const shown = (current: { pickerSimState: BranchSimState | null }) => current.pickerSimState?.p1Active?.name;
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), {
       initialProps: args({ viewingVariation: false, viewTurn: 1 }),
@@ -57,7 +54,6 @@ describe('usePositionPicker', () => {
     await waitFor(() => expect(result.current.positionPicker?.simState.p1Active?.name).toBe('Mienshao at turn 2'));
     expect(result.current.pickerStale).toBe(false);
 
-    // At the tip the panel shows the live sim; one turn back it keeps that state, stale, until turn 3 lands.
     rerender(args({ viewTurn: 4, liveTip: true }));
     expect(result.current.positionPicker).toBeNull();
     expect(result.current.pickerStale).toBe(false);
@@ -78,8 +74,6 @@ describe('usePositionPicker', () => {
   });
 
   test('a stored position hands the panel the battle it was read from, for the dice offers', async () => {
-    // The chips ask the simulator which dice a move draws, so a viewed replay position needs its battle. Only a position that
-    // resolved from a recorded capture has one; the live tip has the branch's own, and a stand-in has none that belongs here.
     const stored = { turn: 12 };
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true }) });
     expect(result.current.getPickerBattle).toBeUndefined();
@@ -88,19 +82,15 @@ describe('usePositionPicker', () => {
     await land('viewed-3', stateFor('Kyurem at turn 3'), stored);
     await waitFor(() => expect(result.current.getPickerBattle).toBeDefined());
     expect(result.current.getPickerBattle!()).toBe(stored);
-    // the hook hands out one function per battle, so the panel's effect does not ask again on every render
     const first = result.current.getPickerBattle;
     rerender(args({ viewTurn: 3, viewingVariation: false, serializedAtView: 'viewed-3', getExact: () => 'viewed-3' }));
     expect(result.current.getPickerBattle).toBe(first);
-    // another viewed position that has not landed has no battle: the stand-in shows the last picker, stale
     rerender(args({ viewTurn: 2, viewingVariation: false, serializedAtView: 'viewed-2', getExact: () => 'viewed-2' }));
     expect(result.current.pickerStale).toBe(true);
     expect(result.current.getPickerBattle).toBeUndefined();
   });
 
   test('the replay\'s log goes with the battle of a main line position, and with no other', async () => {
-    // The turn a main line position stands at is the turn the replay shows, so the chips read the log's dice from its lines. A
-    // position inside a variation is no turn of the replay, and an unresolved position has no battle to read them for.
     const replayData = { log: 'the replay log' } as unknown as Args['replayData'];
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true, replayData }) });
     expect(result.current.pickerReplayLog).toBeUndefined();
@@ -115,7 +105,6 @@ describe('usePositionPicker', () => {
   });
 
   test('a viewed position that cannot be shown ends the stand-in: the panel goes empty, not stale for good', async () => {
-    // A variation position without a capture resolves to no picker: the stand-in must not stay on screen, inert, while the pointer stands there.
     const { result, rerender } = renderHook((props: Args) => usePositionPicker(props), { initialProps: args({ viewTurn: 4, liveTip: true }) });
     rerender(args({ viewTurn: 3, serializedAtView: null }));
     await waitFor(() => expect(result.current.pickerStale).toBe(false));
@@ -151,7 +140,6 @@ describe('usePositionPicker', () => {
     });
 
     test('the swap from the snapshot picker to the exact position gives an untouched slot its target', async () => {
-      // The snapshot picker lists no targets, so its seed carries none; the exact position lists them and the same slot re-seeds.
       const approximate = simState('doubles');
       approximate.p1MovesBySlot[0] = approximate.p1MovesBySlot[0].map(option => ({ ...option, targetOptions: [] }));
       const targetOf = (current: ReturnType<typeof usePositionPicker>) => {

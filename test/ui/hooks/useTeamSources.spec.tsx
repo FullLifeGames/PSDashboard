@@ -62,7 +62,6 @@ describe('useHpResolver', () => {
     expect(result.current.replayGenNumber).toBe(6);
     expect(result.current.hpResolverFor('p1')).toBeUndefined();
     await waitFor(() => expect(result.current.hpResolverFor('p1')).toBeDefined());
-    // p1's evidence rules Ice out; p2 has no evidence and takes the usage top.
     expect(result.current.hpResolverFor('p1')!('Manectric')).toBe('Hidden Power Grass');
     expect(result.current.hpResolverFor('p2')!('Manectric')).toBe('Hidden Power Ice');
   });
@@ -99,7 +98,6 @@ describe('useSpreadSolve', () => {
 
     await result.current.getInferredSpreads();
     expect(requests).toHaveLength(1);
-    // cachedOnly hands the standing solution out and never starts one.
     await expect(result.current.getInferredSpreads(undefined, undefined, { cachedOnly: true })).resolves.toBe(solved);
   });
 

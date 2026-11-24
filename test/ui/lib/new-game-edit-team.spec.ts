@@ -3,8 +3,6 @@ import { readTeamPaste } from '../../../src/lib/new-game/start';
 import { teamOfInfo } from '../../../src/lib/new-game/edit-team';
 import { infoOfTeam } from '../../../src/hooks/useNewGame';
 
-/** Edit Player converts the editor's team info back to the sets the record holds: a team goes to the stats panel's info and back unchanged in every field the simulator plays (species, item, ability, moves, nature, EVs, IVs, level, Tera type). */
-
 const TEAM = `Garchomp (M) @ Rocky Helmet
 Ability: Rough Skin
 Level: 50

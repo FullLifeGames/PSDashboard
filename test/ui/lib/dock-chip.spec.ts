@@ -63,7 +63,6 @@ describe('chipPlaceholder', () => {
     expect(chipPlaceholder({ ...base, forceSwitch: true })).toBe('choose a replacement');
     expect(chipPlaceholder({ ...base, nobodyLeft: true })).toBe('fainted · no one left');
   });
-  // Urshifu fainted while Incineroar's Parting Shot asked for a switch; the bench held four bodies.
   test('a fainted slot that is not asked while its partner switches out waits for that switch; it does not claim an empty bench', () => {
     expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: true })).toBe('fainted · waits for the switch');
     expect(chipPlaceholder({ ...base, nobodyLeft: true, partnerSwitching: false })).toBe('fainted · no one left');

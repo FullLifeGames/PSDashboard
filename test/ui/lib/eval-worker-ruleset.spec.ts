@@ -3,7 +3,6 @@ import { Battle, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import { serializeLiveBattle, type EvalWorkerRequest, type EvalWorkerResponse } from '@fulllifegames/eval-engine';
 
-/** A search message without a rule set answers an error instead of the standard weights, so a path that forgets the replay's rule set fails loudly. One test per message type; the worker module runs on this thread over a stand-in for its global scope. */
 const posted: EvalWorkerResponse[] = [];
 const scope = {
   onmessage: null as ((event: MessageEvent<EvalWorkerRequest>) => Promise<void>) | null,
@@ -32,7 +31,6 @@ beforeAll(async () => {
   serializedBattle = serializeLiveBattle(battle);
 });
 
-/** The final answer of one message (progress and partials skipped). */
 async function answer(request: Record<string, unknown>): Promise<EvalWorkerResponse | undefined> {
   posted.length = 0;
   await scope.onmessage?.({ data: request as unknown as EvalWorkerRequest } as MessageEvent<EvalWorkerRequest>);

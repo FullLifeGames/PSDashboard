@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { NewGameRecord } from '../../../src/lib/new-game/record';
 import { MAX_SAVED_GAMES, gameKey, listGames, loadGame, onGameEvicted, saveGame, type SavedGameRow } from '../../../src/lib/new-game/store';
 
-/** The 21st saved game first pushes out the games without a played turn, then the oldest one, and says which game went. The store reads only the index row of a record, so a stand-in record is enough; both game types play through the same store. */
 const stand = (n: number, turns: number, format = '[Gen 9] OU'): NewGameRecord => ({
   recordVersion: 1, id: `newgame-${n}`, format: format === '[Gen 9] OU' ? 'gen9ou' : 'gen9doublesou', formatName: format,
   players: [`P${n}`, `Q${n}`], turns, seed: '1,2,3,4', updatedAt: new Date(Date.UTC(2026, 10, 1, 0, n)).toISOString(),
@@ -14,7 +13,6 @@ beforeEach(() => localStorage.clear());
 
 describe('the 20-game store', () => {
   test('without a played turn goes first: the oldest game with no turn leaves, not the oldest game', () => {
-    // game 1 is the oldest and has turns; game 2 has none
     for (let n = 1; n <= MAX_SAVED_GAMES; n += 1) expect(saveGame(stand(n, n === 2 ? 0 : 5))).toBe(true);
     const gone: SavedGameRow[][] = [];
     const off = onGameEvicted(rows => gone.push(rows));

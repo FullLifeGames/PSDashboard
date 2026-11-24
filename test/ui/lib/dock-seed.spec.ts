@@ -7,8 +7,6 @@ import { mergeChoices, seedChoices } from '../../../src/lib/dock-seed';
 import type { PlayedAtPosition, PlayedPick } from '../../../src/lib/played-pick';
 import { NO_MODIFIERS, simState } from '../fixtures/sim-state';
 
-/** Each slot starts with the choice the viewed line played, but only one the picker offers (a listed, enabled move, a living bench Pokémon, a target the move lists, a gimmick the slot has); what the picker lacks leaves the slot empty with the played pick kept for the chip's note. */
-
 const move = (name: string, extra: Partial<PlayedPick> = {}): PlayedPick => ({ kind: 'move', name, ...extra });
 const doublesAt = (p1: (PlayedPick | null)[], p2: (PlayedPick | null)[] = [null, null]): PlayedAtPosition => (
   { p1: p1.find(Boolean) ?? null, p2: p2.find(Boolean) ?? null, p1Slots: p1, p2Slots: p2 });
@@ -25,7 +23,6 @@ describe('seedChoices, doubles', () => {
   });
 
   test('a move that takes no target seeds without one, whatever the log named', () => {
-    // Protect lists no targets in the fixture; the log names the first foe for a spread move too.
     expect(seedChoices(doublesAt([move('Protect', { targetLoc: 1 }), null]), state).p1[0].choice)
       .toEqual({ kind: 'move', moveId: 'protect', moveName: 'Protect' });
   });
@@ -131,7 +128,6 @@ describe('mergeChoices', () => {
   });
 });
 
-/** A spread move takes no target: the log names the first foe for Rock Slide, and the seed drops it, so the command the dock sends is one the simulator takes. */
 describe('a spread move run through resolveSideChoices and the simulator', () => {
   const STATS = { hp: 0, atk: 252, def: 0, spa: 252, spd: 0, spe: 0 };
   const set = (species: string, moves: string[]): PokemonSet => ({
@@ -165,8 +161,6 @@ describe('a spread move run through resolveSideChoices and the simulator', () =>
     expect(resolved.ok).toBe(true);
     if (resolved.ok) expect(make().choose('p1', resolved.command), resolved.command).toBe(true);
 
-    // The executor drops a target the move does not take (shouldAppendTargetLoc), so the stray loc would have cost nothing at
-    // Execute; the simulator itself refuses it, and the chip would have shown "→ P2A" for a move that hits both foes.
     const withTarget: BranchSlotChoice[] = [{ ...seeded[0]!, targetLoc: 1 } as BranchSlotChoice, seeded[1]!];
     const stray = resolveSideChoices(battle as never, 'p1', withTarget, required);
     expect(stray.ok && resolved.ok && stray.command).toBe(resolved.ok && resolved.command);

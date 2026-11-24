@@ -6,7 +6,6 @@ import {
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
-/** An iframe stand-in whose window records every message the hooks post. */
 function frame() {
   const postMessage = vi.fn();
   const iframeRef = { current: { contentWindow: { postMessage } } as unknown as HTMLIFrameElement } as FrameRef;
@@ -51,14 +50,12 @@ describe('useReplayBlobUrl', () => {
   });
 });
 
-/** A message the way the frame's tracker posts it: `source` is the posting window. */
 function postFromFrame(source: unknown, data: unknown) {
   const event = new MessageEvent('message', { data });
   Object.defineProperty(event, 'source', { value: source });
   act(() => { window.dispatchEvent(event); });
 }
 
-// The side the frame shows near reaches the app through `ps-side`, from its own window only.
 describe('useSideReports', () => {
   test('forwards the side its own frame reports and nothing else', () => {
     const { iframeRef } = frame();
@@ -71,7 +68,6 @@ describe('useSideReports', () => {
     postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side', side: 'p1' });
     expect(onSideChange).toHaveBeenLastCalledWith('p1');
 
-    // Another window (a dying document, another frame), a side that is no side, a missing side and other messages.
     postFromFrame({}, { type: 'ps-side', side: 'p2' });
     postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side', side: 'p3' });
     postFromFrame(iframeRef.current?.contentWindow, { type: 'ps-side' });
@@ -170,7 +166,6 @@ describe('useSeekTurn', () => {
   });
 
   test('a live frame that reports ready stops its retries: a late retry would cut short a turn its appends play', () => {
-    // A new variation's first turn plays in from an append right after ready.
     vi.useFakeTimers();
     const { iframeRef, postMessage } = frame();
     const lastReportedTurnRef = { current: null as number | null };
@@ -199,14 +194,12 @@ describe('useSeekRequests', () => {
     expect(postMessage).toHaveBeenCalledTimes(3);
     expect(postMessage.mock.calls.every(([message]) => (message as { id?: number }).id === 2)).toBe(true);
 
-    // The same request re-rendered (same object, as the app's state keeps it) changes nothing.
     rerender(bump);
     act(() => vi.advanceTimersByTime(2000));
     expect(postMessage).toHaveBeenCalledTimes(6);
   });
 });
 
-/** The frame's bridge reports ready, as the replay document does once its battle exists. */
 function reportReady(iframeRef: FrameRef) {
   const event = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
   Object.defineProperty(event, 'source', { value: iframeRef.current?.contentWindow });
@@ -220,15 +213,13 @@ describe('useLiveAppend', () => {
   };
 
   test('lines appended before the frame reports ready wait for it and then go out as one append', () => {
-    // After one turn back and a new choice the frame reloaded for the rebuilt line, and the new turn's lines went out while the embed script
-    // still loaded: nothing listened yet, so the frame never showed the turn.
+    // The frame reloads for the rebuilt line; lines posted before its embed script has loaded reach nobody.
     const { iframeRef, postMessage } = frame();
     const { rerender } = renderHook((props: Parameters<typeof useLiveAppend>[0]) => useLiveAppend(props), { initialProps: { ...base, iframeRef, log: LOG } });
     rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp`, liveAppendMode: 'play', liveAppendTurn: 2 });
     rerender({ ...base, iframeRef, log: `${LOG}\n|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp\n|turn|3`, liveAppendMode: 'play', liveAppendTurn: 2 });
     expect(postMessage).not.toHaveBeenCalled();
 
-    // Another frame's ready message changes nothing; this frame's sends every waiting line at once.
     const other = new MessageEvent('message', { data: { type: 'ps-replay-ready' } });
     act(() => { window.dispatchEvent(other); });
     expect(postMessage).not.toHaveBeenCalled();
@@ -238,7 +229,6 @@ describe('useLiveAppend', () => {
       type: 'ps-append-log', lines: ['|move|p2a: Ferrothorn|Leech Seed|p1a: Garchomp', '|turn|3'], seekTurn: 2, followEnd: false, playFromTurn: 2,
     }, '*');
 
-    // A new document waits for its own ready message.
     rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3`, blobUrl: 'blob:test/2' });
     rerender({ ...base, iframeRef, log: `${LOG}\n|turn|3\n|turn|4`, blobUrl: 'blob:test/2' });
     expect(postMessage).toHaveBeenCalledTimes(1);

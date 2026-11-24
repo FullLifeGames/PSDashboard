@@ -76,7 +76,6 @@ describe('useTeamKnowledge', () => {
     expect(result.current.setsFingerprint).not.toBe(JSON.stringify([null, null, '']));
   });
 
-  // A panel that opens before the first solve would show and export the usage guesses.
   test.each(['editor', 'sets panel'] as const)('the %s opens when the first spread solve has settled, and closes at once', async kind => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>(resolve => { release = resolve; });
@@ -138,7 +137,6 @@ describe('useTeamKnowledge', () => {
     expect(result.current.editedP1Info).toBeNull();
     expect(wired.onTeamsEdited).not.toHaveBeenCalled();
     expect(localStorage.getItem(`ps-replay-interceptor:sets:${replayData.id}`)).toBeNull();
-    // a refused text reaches nobody
     act(() => { outcome = result.current.applySetsText('Garchomp @ Leftovers\n- Earthquake', route); });
     expect(outcome).toMatch(/No side headers found/);
     expect(route).toHaveBeenCalledTimes(1);
@@ -156,7 +154,6 @@ describe('useTeamKnowledge', () => {
     expect(outcome).toBe('Load a replay first.');
   });
 
-  // The import names what the game cannot use and applies nothing until the text is fixed.
   describe.each(['singles', 'doubles'] as const)('a sets import with values the game does not have (%s)', kind => {
     test('is refused with every value named, and nothing is applied or stored', async () => {
       const fixture = replayFixture(kind);
@@ -219,7 +216,6 @@ describe('useTeamKnowledge', () => {
   });
 });
 
-/** A game without team preview where a side showed fewer bodies than its |teamsize|: Gen 4 OU stands for singles, a simulator-made Gen 4 Doubles OU log for doubles. */
 describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () => {
   const fixture = (name: string) => JSON.parse(readFileSync(`test/regression/fixtures/${name}.json`, 'utf-8'));
   const sceneLog: string = fixture('smogtours-gen4ou-544639').log;
@@ -288,10 +284,6 @@ describe('useTeamKnowledge, stand-ins for the bodies a side never showed', () =>
   });
 });
 
-/**
- * A game whose format generates its team fills the bodies a side never showed from the format's random-set file (`setAssumptions.assumptions.randomSets`):
- * Gen 3 Random Battle for singles, Gen 9 Random Doubles for doubles, logs the simulator played (`packages/replay-core/test/fixtures/random-*.json`).
- */
 describe.each([
   { label: 'Gen 3 Random Battle', id: 'gen3randombattle-1', missing: 3 },
   { label: 'Gen 9 Random Doubles Battle', id: 'gen9randomdoublesbattle-11', missing: 2 },
@@ -351,7 +343,6 @@ function mountSession(make: () => TeamKnowledgeInputs) {
   const hook = renderHook(() => useTeamKnowledge(make()));
   return {
     ...hook,
-    /** The teams the stats panel and the build read. */
     shown: () => ({ p1: hook.result.current.effectiveP1Info, p2: hook.result.current.effectiveP2Info }),
     edit: (side: 'p1' | 'p2', item: string) => act(() => {
       const current = side === 'p1' ? hook.result.current.effectiveP1Info : hook.result.current.effectiveP2Info;
@@ -458,7 +449,6 @@ describe.each(['singles', 'doubles'] as const)('an edited set survives a reload 
 describe('a browser storage that throws', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  // The records of this feature are the ones under test: other stores of the app (the team paste) read storage on their own terms.
   test('the app still loads, edits and saves for the session', () => {
     const { inputs, replayData } = scene('singles');
     const mine = (key: string) => key === teamEditsKey(replayData.id) || key === `ps-replay-interceptor:sets:${replayData.id}`;

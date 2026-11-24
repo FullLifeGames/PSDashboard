@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import { useScrollFade } from '../../../src/hooks/useScrollFade';
 
-/** A scrolling list fades at its foot while more follows: the hook writes `data-more="true"` from the scroll position and size, never through React state. */
 type Geometry = { scrollTop: number; clientHeight: number; scrollHeight: number };
 const geometry: Geometry = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };
 

@@ -3,8 +3,6 @@ import type { EvalLine, EvalMatrix, EvalResult, MatrixCell, RankedChoice } from 
 import { winPctText } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup, worstReply } from '../../../src/lib/worst-reply';
 
-/** The reply that hurts a move most, as the app reads it. The cell choice is the engine's `worstAnswer` (its own spec holds the matrices); here the app's part: the reply as the ranked row the pickers map, the fallbacks (the row's floor, then the opponent's best row) and the choice of the lines. Singles and doubles boards. */
-
 const ranked = (choice: string, label: string, punishedBy: string | null = null): RankedChoice => ({ choice, label, worstCase: 0, expected: 0, ev: 0, punishedBy });
 const solid: MatrixCell = { visits: 20, verified: false };
 const thin: MatrixCell = { visits: 2, verified: false };
@@ -30,7 +28,7 @@ describe('worstReply', () => {
 
   test('the reply carries the value of its cell from the row\'s own side (wp-units): p1 reads the cell, p2 its negative', () => {
     expect(worstReply(single, 'p1', single.perSide.p1[0])?.value).toBeCloseTo(-0.4);
-    // p2's Mew row: the cells of its column are 0.1 and -0.1 in p1's view, so p1's Surf (0.1) is the lowest for p2 at -0.1
+    // p2's Mew row: its column holds 0.1 and -0.1 in p1's view, so p1's Surf (0.1) is the lowest for p2 at -0.1
     expect(worstReply(single, 'p2', single.perSide.p2[2])?.value).toBeCloseTo(-0.1);
   });
 
@@ -97,7 +95,6 @@ describe('worstLookup', () => {
   });
 });
 
-/** The card's rows of a pivot are pairs ("U-turn → Keldeo"), and the lines of a tree name the move alone ("U-turn": the follow-up is a step of its own). The lookup finds the row of a bare move among its pairs (the best ranked pair, the one the line's follow-up resembles), and a reply that is a pair stands for its bare move. */
 describe('worstLookup with a pivot\'s pair rows (singles)', () => {
   const pairs = result(['Pursuit', 'Knock Off'], ['U-turn → Tyranitar', 'U-turn → Keldeo', '→ Excadrill'], [[0.1, -0.3, 0.2], [0.3, 0.2, 0.1]], [[solid, solid, solid], [solid, solid, solid]]);
   const lookup = worstLookup(pairs);

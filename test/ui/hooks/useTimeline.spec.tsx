@@ -8,7 +8,6 @@ import { INTERLUDE_CASES } from '../fixtures/variation-interludes';
 const { snapshots } = replayFixture('singles');
 const maxTurn = snapshots.length;
 
-/** One executed variation entry; `kind: 'forced'` marks a forced interlude that consumes no turn. */
 const entry = (turnNumber: number, extra: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
   turnNumber, p1Choice: 'move earthquake', p2Choice: 'move leechseed', serializedPosition: `pos-${turnNumber}`,
   p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [],
@@ -65,18 +64,14 @@ describe('useTimeline', () => {
       liveEvalView: true, evalViewKey: 'variation:4', serializedAtView: 'pos-3',
     });
 
-    // Turn 3's position is the one after the forced interlude that followed entry 2.
     act(() => result.current.navigateTo({ turn: 3, line: 'variation' }));
     expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, liveTip: false, serializedAtView: 'forced' });
 
-    // Turn 2 is the shared prefix: no variation position exists there, the
-    // pointer lands on the main line while the line intent stays sticky.
     act(() => result.current.navigateTo({ turn: 2, line: 'variation' }));
     expect(result.current).toMatchObject({ viewTurn: 2, viewLine: 'variation', viewingVariation: false, evalViewKey: 'main:2' });
   });
 
   test('the pointer knows whether it followed an executed turn or the user moved it', () => {
-    // The branch frame plays a turn in only when the pointer followed that turn.
     const { result, rerender, base } = setup();
     act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
     expect(result.current.followedPlay).toBe(false);
@@ -99,28 +94,23 @@ describe('useTimeline', () => {
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
     expect(result.current).toMatchObject({ viewTurn: 4, followedPlay: true });
 
-    // Inside the variation: a set edit rebuilds the same history into new objects.
     act(() => result.current.navigateTo({ turn: 3, line: 'variation' }));
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
     expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', followedPlay: false });
 
-    // On the main line: the same rebuild leaves the pointer on its main turn.
     act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)] });
     expect(result.current).toMatchObject({ viewTurn: 2, viewLine: 'main', followedPlay: false });
 
-    // An executed turn still follows to the new tip.
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3), entry(4)] });
     expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
 
-    // A variation that ends and a new one with the same span follows again.
     act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
     rerender({ ...base, branching: false, variationStartTurn: null, history: [] });
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3), entry(4)] });
     expect(result.current).toMatchObject({ viewTurn: 5, viewLine: 'variation', followedPlay: true });
   });
 
-  // Stop hands the view back; the turn still in flight lands after it and must not drag the pointer to the tip.
   describe('a turn that lands after the view was handed back', () => {
     const running = (history: BranchHistoryEntry[], executing: boolean, base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 2, history, executing });
@@ -129,7 +119,6 @@ describe('useTimeline', () => {
       const { result, rerender, base } = setup();
       rerender(running([entry(2), entry(3)], true, base));
       expect(result.current.viewTurn).toBe(4);
-      // The play-out stops with a third turn in flight and hands the view back (a navigation, as the interrupt does).
       act(() => {
         result.current.holdTipFollow();
         result.current.navigateTo({ turn: 3, line: 'variation' }, { seek: true, internal: true });
@@ -161,14 +150,11 @@ describe('useTimeline', () => {
     });
   });
 
-  // T0 is a side trip. The arrow forward returns to the line the user came from.
   describe('turn 0 as a side trip', () => {
     const leadVariation = (base: TimelineInputs): TimelineInputs =>
       ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0), entry(1), entry(2)] });
 
     test('a new game from T0 with the same span follows its tip once the start asks for it; a rebuild of the span stays on T0', () => {
-      // Champions VGC 2646618972: back on T0, the same picks played again kept the key "0:1", so the pointer stayed on the lead picker while
-      // the new game stood at turn 1.
       const { result, rerender, base } = setup();
       const leadGame = (): TimelineInputs => ({ ...base, branching: true, variationStartTurn: 0, history: [entry(0)] });
       rerender(leadGame());
@@ -191,7 +177,6 @@ describe('useTimeline', () => {
       act(() => result.current.handleGraphSelectLine(0));
       expect(result.current).toMatchObject({ viewT0: true, viewLine: 'variation', viewingVariation: false, liveTip: false, evalViewKey: 'main:1' });
 
-      // The bar's forward arrow at T0 asks for turn 1 on the stored line.
       act(() => result.current.navigateTo({ turn: 1, line: result.current.viewLine }));
       expect(result.current).toMatchObject({ viewT0: false, viewTurn: 1, viewLine: 'variation', viewingVariation: true });
     });
@@ -217,7 +202,6 @@ describe('useTimeline', () => {
     rerender({ ...base, branching: true, variationStartTurn: 2, history });
     act(() => result.current.navigateTo({ turn: 2, line: 'main' }));
 
-    // A refused execute: the rebuild emptied the variation, then the old one came back.
     rerender({ ...base, branching: true, variationStartTurn: 2, history: [] });
     act(() => {
       result.current.restorePointer({ turn: 2, line: 'main' }, { startTurn: 2, length: 2 });
@@ -240,7 +224,6 @@ describe('useTimeline', () => {
     expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'main', viewingVariation: false, analysisTurn: 3 });
     expect(interruptPlayOut).toHaveBeenCalled();
 
-    // Turn 0 from the main line: the lead picker opens and the analysis follows it.
     act(() => result.current.handleGraphSelectLine(0));
     expect(result.current).toMatchObject({ viewT0: true, analysisTurn: 0, viewTurn: 3 });
 
@@ -253,7 +236,6 @@ describe('useTimeline', () => {
     act(() => result.current.handleReplayTurn(2));
     expect(result.current.viewTurn).toBe(2);
 
-    // A programmatic seek to turn 3 opens a window in which the embed still echoes the old turn.
     act(() => result.current.navigateTo({ turn: 3, line: 'main' }));
     act(() => result.current.handleReplayTurn(2));
     expect(result.current.viewTurn).toBe(3);
@@ -268,7 +250,6 @@ describe('useTimeline', () => {
     expect(result.current.viewTurn).toBe(3);
   });
 
-  // Inside a variation the frame's own Last turn / Next turn move the pointer as on the main line.
   describe('the branch frame\'s own navigation', () => {
     const variation = (length: number, base: TimelineInputs) => ({
       ...base, branching: true, variationStartTurn: 2, history: Array.from({ length }, (_, index) => entry(2 + index)),
@@ -279,13 +260,11 @@ describe('useTimeline', () => {
       rerender(variation(3, base));
       expect(result.current).toMatchObject({ viewTurn: 5, viewingVariation: true });
 
-      // The frame opens at the turn before the tip and plays it in: that report is the app's own doing.
       act(() => result.current.handleReplayTurn(4));
       expect(result.current.viewTurn).toBe(5);
       act(() => result.current.handleReplayTurn(5));
       expect(result.current.viewTurn).toBe(5);
 
-      // Now a report is the user's: Last turn, Last turn, Next turn.
       act(() => result.current.handleReplayTurn(4));
       expect(result.current).toMatchObject({ viewTurn: 4, viewLine: 'variation', viewingVariation: true, followedPlay: false });
       act(() => result.current.handleReplayTurn(3));
@@ -295,9 +274,6 @@ describe('useTimeline', () => {
     });
 
     test('the frame landing on the tip spends the play, so a rebuild after it plays nothing in again', () => {
-      // A set edit at the tip rebuilt the variation, the new frame document opened at the turn before the tip to play it in again (followedPlay
-      // still held from the executed turn), and its landing there moved the pointer off the tip onto the main line. The play is spent once the
-      // frame lands on the tip it followed.
       const { result, rerender, base } = setup();
       rerender(variation(3, base));
       expect(result.current).toMatchObject({ viewTurn: 5, followedPlay: true });
@@ -314,11 +290,8 @@ describe('useTimeline', () => {
       act(() => result.current.handleReplayTurn(5));
       expect(result.current.viewTurn).toBe(3);
       act(() => result.current.handleReplayTurn(3));
-      // The branch frame's turn 2 is the variation's start turn (it shows the variation's own moves, the main replay's turn 2 does not): the
-      // pointer stays on the variation at its first covered turn.
       act(() => result.current.handleReplayTurn(2));
       expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', viewingVariation: true });
-      // A turn before the start still leaves for the main line.
       act(() => result.current.handleReplayTurn(1));
       expect(result.current).toMatchObject({ viewTurn: 1, viewingVariation: false });
     });
@@ -335,7 +308,6 @@ describe('useTimeline', () => {
     });
   });
 
-  // The variation's ended tip is an end position like the main line's.
   describe('an ended variation', () => {
     afterEach(() => { vi.useRealTimers(); });
 
@@ -345,19 +317,15 @@ describe('useTimeline', () => {
       rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
       expect(result.current).toMatchObject({ viewTurn: 4, viewingVariation: true, atVariationEnd: true });
 
-      // The echo guard of the executed turn lapsed (20 s); the frame stays on the last played turn.
       vi.setSystemTime(Date.now() + 30_000);
       act(() => result.current.handleReplayTurn(3));
       expect(result.current.viewTurn).toBe(4);
 
-      // Going back with the frame's own button is the user's: the frame's turn 2 is the start turn, and the pointer takes the first covered turn.
       act(() => result.current.handleReplayTurn(2));
       expect(result.current).toMatchObject({ viewTurn: 3, viewingVariation: true, atVariationEnd: false });
     });
 
     test('the frame landing on the last played turn ends the guard: Last turn right after the end moves the pointer', () => {
-      // An ended tip never reports its own turn, so the guard waiting for the tip held every report until it lapsed, and the user's first Last
-      // turn after the game ended did nothing. At an ended variation the frame lands on the last played turn: that ends the guard.
       const { result, rerender, base } = setup();
       rerender({ ...base, branching: true, variationStartTurn: 2, history: [entry(2), entry(3)], variationEnded: true });
       expect(result.current).toMatchObject({ viewTurn: 4, atVariationEnd: true });
@@ -406,7 +374,6 @@ describe('useTimeline', () => {
   });
 });
 
-/** The timeline reads a history with replacements on both sides by one rule: the span, the tip and the recorded position of every pointer turn count real turns. */
 describe.each(INTERLUDE_CASES)('useTimeline over a history with interludes, $name', ({ history, startTurn, settledAt, turns }) => {
   const tip = startTurn + turns;
 
@@ -438,7 +405,6 @@ describe.each(INTERLUDE_CASES)('useTimeline over a history with interludes, $nam
 describe('useTimeline.frame', () => {
   const { snapshots } = replayFixture('singles');
 
-  /** One executed variation entry (the timeline reads its count, not its content). */
   const entry = (turnNumber: number): BranchHistoryEntry => ({
     turnNumber, p1Choice: 'move earthquake', p2Choice: 'move leechseed', serializedPosition: `pos-${turnNumber}`,
     p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [],
@@ -453,8 +419,6 @@ describe('useTimeline.frame', () => {
     return { ...hook, base };
   }
 
-  // The finish of a play-out leaves the frame where it stands, and the pointer takes its turn. The tip-follow's guard drops the frame's
-  // reports during the run; the timeline remembers the last one.
   describe("the pointer takes the frame's turn without a seek", () => {
     const variation = (length: number, base: TimelineInputs, extra: Partial<TimelineInputs> = {}) => ({
       ...base, branching: true, variationStartTurn: 2, history: Array.from({ length }, (_, index) => entry(2 + index)), ...extra,
@@ -466,12 +430,11 @@ describe('useTimeline.frame', () => {
       rerender(variation(3, base)); // start 2, tip 5, guard on turn 5
       const navSeek = result.current.navSeek;
       act(() => result.current.handleReplayTurn(3));
-      expect(result.current.viewTurn).toBe(5); // dropped while the run holds the tip
+      expect(result.current.viewTurn).toBe(5);
       act(() => result.current.navigateTo({ turn: 5, line: 'variation' }, toFrame));
       expect(result.current).toMatchObject({ viewTurn: 3, viewLine: 'variation', viewingVariation: true, followedPlay: false });
-      expect(result.current.navSeek).toBe(navSeek); // no seek: the frame stays where it is
+      expect(result.current.navSeek).toBe(navSeek);
 
-      // The frame plays on: its reports move the pointer again.
       act(() => result.current.handleReplayTurn(4));
       expect(result.current.viewTurn).toBe(4);
     });

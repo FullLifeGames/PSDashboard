@@ -5,7 +5,7 @@ import { EV_STATS, clampEv, evLimitsFor, canonicalMove, withEditedStandIns } fro
 import { getEvLimit } from '../../../src/lib/pokemon-options';
 import { field, revealedPokemon } from '../fixtures/team-info';
 
-/** The editor clamps the EVs of a set by the format's limits: Pokémon Champions replaces EVs by Stat Points (32 per stat, 66 in total), Scarlet/Violet caps the total at 510. The table is checked against the simulator's own team validator. */
+// Pokémon Champions replaces EVs by Stat Points (32 per stat, 66 in total); Scarlet/Violet caps the total at 510.
 
 describe('team-editor-limits', () => {
   const SINGLES_CHAMPIONS = 'gen9championsou';
@@ -51,7 +51,6 @@ describe('team-editor-limits', () => {
     }
   });
 
-  /** A sound Garchomp set carrying the spread; only the EV problems are read. */
   const evProblems = (format: string, evs: number[]): string[] => {
     const set = {
       name: 'Garchomp', species: 'Garchomp', item: 'Life Orb', ability: 'Rough Skin', moves: ['Earthquake'], nature: 'Jolly', gender: '',
@@ -61,7 +60,6 @@ describe('team-editor-limits', () => {
     return (TeamValidator.get(format).validateSet(set, {}) ?? []).filter(problem => /EVs|Stat Points/.test(problem));
   };
 
-  /** The spread the editor ends on when a player types the same number into every stat. */
   function typedEverywhere(format: string, typed: string): number[] {
     const limits = evLimitsFor(format, getEvLimit(format));
     const spread = [0, 0, 0, 0, 0, 0];

@@ -35,7 +35,6 @@ describe('a replay shows its result at its end', () => {
   test('the end position of a replay names the winner of its log and marks the end as a battle; any other turn shows none', () => {
     expect(gameEnd({ ...base, atEndPosition: true, log: won })).toEqual({ winner: 'Alice', battle: true });
     expect(gameEnd({ ...base, atEndPosition: false, log: won })).toBeUndefined();
-    // a branch of the replay keeps its own words (a variation wins, not the battle)
     expect(gameEnd({ ...base, atEndPosition: true, viewingVariation: true, log: won })).toBeUndefined();
   });
 

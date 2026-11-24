@@ -4,7 +4,6 @@ import type { BranchSlotChoice, DieOffer, ForcedDie } from '@fulllifegames/eval-
 import { STATUS_WORDS, applyDie, captionOf, diceTable, pullNotes, resultWord, toggleDie, wordsOf, withDice } from '../../../src/lib/branch-dice';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
-/** The words and the edits of the panel's dice chips; the words come from the battle's own Dex (`battle.dex`), so no move, ability or item name stands in our code. */
 const battle = diceBattle({ p1: [setOf('Noivern', ['airslash', 'splash'], { name: 'Nova' })], p2: [setOf('Snorlax', ['splash'])] });
 const words = wordsOf(battle as never);
 
@@ -24,7 +23,6 @@ describe('words of a die', () => {
     expect(words.effect('self:spa')).toBe('Own Special Attack change');
   });
 
-  // Inside a result a status reads as "no burn" beside "no crit"; stat changes, abilities and items keep their names.
   test('the plain form writes a status or a volatile as a common noun and nothing else', () => {
     for (const [id, word] of Object.entries(STATUS_WORDS)) expect(words.plain?.(id)).toBe(word.toLowerCase());
     expect(words.plain?.('flinch')).toBe('flinch');

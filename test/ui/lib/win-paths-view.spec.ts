@@ -37,12 +37,9 @@ describe('the win-path words', () => {
     expect(single.headline).toBe('Hydro Pump wins within 3 turns in 100 % of the dice whatever Tzon plays.');
     const [pair] = winStepViews([step('stronger', 'found', { chance: 0.25, played: 0.1, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1', playedLabel: 'Protect + Protect' }));
     expect(pair.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 3 turns in 25 % of the dice whatever Mstr_Hawk plays (over sampled rolls). What pixelfrost played, Protect + Protect, wins in 10 % of the dice.');
-    // one row per player and step, the chips of the dice that could have gone the other way
     expect(pair.block?.rows.length).toBeGreaterThan(3);
   });
 
-  // "Played stayed in (KO’d before acting): 4 %." printed the card's description as a choice and a number nobody could relate to a move. The panel
-  // names the played choice in Showdown's words and says what the number is.
   test('step 1 on a body that was knocked out before it moved says so instead of naming a choice', () => {
     const host = { rules: { gen: 9, mod: undefined }, snapshot: { p1: { pokemon: [{ name: 'Tentacruel', isActive: true }] }, p2: { pokemon: [{ name: 'Rotom-Wash', isActive: true }] } } } as unknown as WinPathsViewContext['host'];
     const [view] = winStepViews([step('stronger', 'found', { chance: 0.106, played: 0.04, line: line() })], ctx({ host, playedLabel: 'stayed in (KO’d before acting)', playedNeverActed: true }));
@@ -72,7 +69,6 @@ describe('the win-path words', () => {
     expect(view.headline).toBe('If Tzon had played Scald (its second choice) on turn 24, Pepitopalotin wins: this sequence has 84 %.');
   });
 
-  // 649664 turn 23: "If BKC had played Icy Wind (its third choice) on turn 23. This sequence: 86 %." opened with a fragment.
   test('step 3 is one sentence in singles and in doubles, with or without a chance', () => {
     const deviation = { turn: 23, label: 'Icy Wind', rank: 3 };
     const [singles] = winStepViews([step('mistake', 'found', { chance: 0.86, deviation, line: line() })], ctx());
@@ -81,26 +77,23 @@ describe('the win-path words', () => {
     expect(doubles.headline).toBe('If Mstr_Hawk had played Icy Wind (its third choice) on turn 23, pixelfrost wins: this sequence has 25 %.');
     const [bare] = winStepViews([step('mistake', 'found', { deviation, line: line() })], ctx());
     expect(bare.headline).toBe('If Tzon had played Icy Wind (its third choice) on turn 23, Pepitopalotin wins.');
-    // no slip named: the step keeps the sequence sentence of the luck step
     const [noSlip] = winStepViews([step('mistake', 'found', { chance: 0.5, line: line() })], ctx());
     expect(noSlip.headline).toBe('This sequence: 50 %.');
   });
 
-  // A sequence's number multiplies the dice whose other result would change who faints, and it prices one sequence; a chip also shows a die that
-  // changes nothing, and the stronger play's share adds every winning sequence.
+  // A sequence's number multiplies the dice whose other result would change who faints; the stronger play's share
+  // adds every winning sequence.
   test('a luck or mistake step that found a path carries the note on what its number counts; the other steps do not', () => {
     const found = (kind: WinStep['kind']) => winStepViews([step(kind, 'found', { chance: 0.5, line: line() })], ctx());
     expect(sequenceNote(found('luck'))).toBe('A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.');
     expect(sequenceNote(found('mistake'))).not.toBeNull();
     expect(sequenceNote(found('stronger'))).toBeNull();
     expect(sequenceNote(winStepViews([step('luck', 'none'), step('mistake', 'stopped')], ctx()))).toBeNull();
-    // singles and doubles read the same words
     expect(sequenceNote(winStepViews([step('luck', 'found', { chance: 0.25, line: { ...doublesLine, for: [] } })], ctx({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1' })))).not.toBeNull();
   });
 
   test('chances and ordinals', () => {
     expect([0.0005, 0.004, 0.108, 0.19, 0.2, 0.5175, 1].map(chanceText)).toEqual(['0.1 %', '0.4 %', '10.8 %', '19 %', '20 %', '52 %', '100 %']);
-    // the rank reads as the line heads of the Lines section read it: "second choice", "third choice", then "fourth choice", "11th choice"
     expect([2, 3, 4, 5, 10, 11, 12, 21, 22, 23].map(rankWords)).toEqual(['second choice', 'third choice', 'fourth choice', 'fifth choice', 'tenth choice', '11th choice', '12th choice', '21st choice', '22nd choice', '23rd choice']);
   });
 

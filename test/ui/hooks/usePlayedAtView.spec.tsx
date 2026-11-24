@@ -5,7 +5,6 @@ import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/ev
 import { usePlayedAtView } from '../../../src/hooks/usePositionPicker';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
 
-/** In doubles `parsePlayedActionsDoubles` reads one action per slot (`p1Slots`, `p2Slots`) and leaves `p1`/`p2` empty: the hook must read the slots, on the main line and behind a variation's tip. */
 type Args = Parameters<typeof usePlayedAtView>[0];
 
 const RULES = logRules('|gen|9\n|tier|[Gen 9] OU');
@@ -32,7 +31,7 @@ describe('usePlayedAtView', () => {
       '|move|p1b: Flutter Mane|Moonblast|p2b: Urshifu',
     ];
     const { result } = renderHook(() => usePlayedAtView(args({ doubles: true, snapshots: snapshotsWith(3, log) })));
-    // Each move pick carries the target the log names (1 and 2 are the foe slots of the mover, negative its own side).
+    // Target locs: 1 and 2 are the foe slots of the mover, negative its own side.
     expect(result.current?.p1Slots).toEqual([
       { kind: 'move', name: 'Fake Out', targetLoc: 1 },
       { kind: 'move', name: 'Moonblast', targetLoc: 2 },
@@ -56,7 +55,6 @@ describe('usePlayedAtView', () => {
     const { result } = renderHook(() => usePlayedAtView(args({
       doubles: true, viewingVariation: true, variationSpan: { startTurn: 3 } as Args['variationSpan'], viewTurn: 3, history,
     })));
-    // The recorded choice rides along whole (target, gimmick and dice), for the dock's seed.
     expect(result.current?.p1Slots).toEqual([
       { kind: 'move', name: 'Fake Out', recorded: history[0].p1SlotChoices![0] },
       { kind: 'switch', name: 'Grimmsnarl', species: 'grimmsnarl', recorded: history[0].p1SlotChoices![1] },
@@ -72,7 +70,6 @@ describe('usePlayedAtView', () => {
   });
 
   test('doubles: the target, a spread move without one, and the gimmick of each slot reach the pick (turn dock)', () => {
-    // The dock seeds each chip with what the log played, including the target and the Tera, Mega and Ultra flags.
     const log = [
       '|move|p1a: Greninja|Rock Slide|p2a: Regigigas|[spread] p2a,p2b',
       '|-terastallize|p1b: Conkeldurr|Fighting',

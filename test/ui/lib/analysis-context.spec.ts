@@ -15,7 +15,6 @@ import { replayData as replayOf, replayFixture, type ReplayKind } from '../fixtu
 describe('analysis-context', () => {
   const { replayData, snapshots } = replayFixture('singles');
 
-  /** Every result carries a near-decided roll for p1 (649664 t3 shape: a 90% roll on full teams). */
   const nearResult = (score: number): EvalResult => evalResult('singles', {
     score,
     unanswered: { p1: [], p2: [], nearDecided: { side: 'p1', species: 'Medicham-Mega', odds: 0.9, removes: 'Keldeo' } },
@@ -62,10 +61,7 @@ describe('analysis-context', () => {
     });
   });
 
-  /**
-   * Without a recorded share the fallback counted the six bodies team preview lists per side, where a VGC side brings four (2629703929 t9: the
-   * sweep's 0.5 against the snapshot's 0.333). The protocol's own |teamsize| line names how many each side brought.
-   */
+  // A VGC side brings four of the six bodies team preview lists; the protocol's |teamsize| line names how many.
   describe('the fallback share counts the bodies each side brought', () => {
     const vgc = replayOf('vgc');
     vgc.log = vgc.log.replace('|teampreview\n', '|teampreview|4\n|teamsize|p1|4\n|teamsize|p2|4\n');
@@ -94,7 +90,6 @@ describe('analysis-context', () => {
     });
   });
 
-  /** The walk marks the forced-win sentence spoken whenever it speaks, including a proof under 0.9 whose open event holds the bar down (649664 t24). */
   describe('the report walk speaks the forced-win sentence once', () => {
     test('a proof under 0.9 that speaks on the first turn stays quiet on the next', () => {
       const forcedWin = {
@@ -114,7 +109,6 @@ describe('analysis-context', () => {
     });
   });
 
-  /** The dice markers and move hits are read from the turn's protocol against the pre-turn snapshot, so the luck sentences can tell a roll from a re-read. */
   describe('analyzeTurnAt passes the rolls of the turn', () => {
     test('singles: a crit on turn 1 is a roll for p1, a turn without dice rolled for nobody', () => {
       const critLog = replayData.log.replace('|-damage|p2a: Kingambit|55/100', () => '|-crit|p2a: Kingambit\n|-damage|p2a: Kingambit|55/100');
@@ -185,8 +179,6 @@ describe('the walk speaks a side\'s decided sentence again after the board left 
     expect(walk[5]?.p1.forcedWin?.announce).toBe(true);
   });
 
-  // A proof spoken under the line (mass 0.75, open branch at -0.4, bar 0.65 by applyForcedWin) left no decided zone behind; releasing it on the
-  // next turn made it speak on every turn.
   for (const kind of ['singles', 'vgc'] as const) {
     test(`${kind}: a proof spoken while the bar sits under 0.7 speaks once, not on every turn`, () => {
       const walk = walkOver(kind, [0.65, 0.65, 0.65, 0.65], new Set(), new Set([1, 2, 3, 4]), 0.75);
@@ -257,7 +249,7 @@ describe.each(['singles', 'doubles', 'vgc'] as const)('%s: the delay clause on t
     expect(count(card, 'The winning line is Aqua Jet, which strikes first, with Heat Wave beside it.')).toBe(forcedWin.choiceNames ? 1 : 0);
   });
 
-  // the doubles fixture is two turns long, under the three a report needs; the VGC fixture is the doubles case of the report
+  // The doubles fixture is two turns long, under the three a report needs.
   test.skipIf(kind === 'doubles')('the Game review says it once, in the past tense', () => {
     const walk = computeGameReportData({ replayData, graph, context, winner: 'p1', tendencies: null });
     const summary = walk!.report.summary;

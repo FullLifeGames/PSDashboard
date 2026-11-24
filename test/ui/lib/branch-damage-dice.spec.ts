@@ -5,7 +5,6 @@ import { computePreviewDamage } from '../../../src/lib/branch-damage';
 import { rollsFor } from '../../../src/lib/branch-rolls';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
-/** The damage preview with forced dice: a slot's chosen move lists the damage of each roll step, and a forced crit prices that move (on that target) as a crit. */
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
 function preview(battle: Battle, choices: Picks) {

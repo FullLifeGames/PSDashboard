@@ -3,8 +3,6 @@ import { allTurnEvents, type BiggestRoll, type TurnAnalysis } from '@fulllifegam
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 import { replayFixture } from '../fixtures/replay';
 
-/** The report's walk and the sweep's last stage read one set of analyses: the walk hands the graph's `rollFlip` to the report, and the stage asks the same walk for the roll to play (`namedRollOf`). */
-
 const seen = vi.hoisted(() => ({
   report: [] as unknown[][],
   roll: [] as unknown[][],
@@ -29,7 +27,6 @@ vi.mock('@fulllifegames/eval-engine', async importOriginal => {
 const { buildAnalysisContext, computeGameReportData, namedRollOf, replayWinnerOf } = await import('../../../src/lib/analysis-context');
 
 const { replayData: finished, snapshots } = replayFixture('singles');
-/** The fixture log's win line (if any) goes; the winner is the first player. */
 const replayData = { ...finished, log: `${finished.log.replace(/\n\|win\|.*/, '')}\n|win|${finished.players[0]}` };
 const turns = snapshots.length;
 const scores = evalGraph('singles').scores.slice(0, turns);

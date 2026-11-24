@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { divergenceNoticeFor } from '../../../src/lib/branch-build';
 
-/** The divergence notice is for a replay whose rebuild ended before the branch turn; a variation that carried the game to its end itself (VGC 2630685175 t7, Hard mode) is none. The rule reads the battle's end, not the game type. */
 describe('divergenceNoticeFor', () => {
   const ended = { ended: true, winner: 'Alice', turn: 9 };
 

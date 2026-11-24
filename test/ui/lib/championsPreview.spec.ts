@@ -5,7 +5,7 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { deserializeBattleExact } from '@fulllifegames/eval-engine';
 import { makePreviewAcquire, type TeamBuildSources } from '../../../src/lib/eval-acquire';
 
-/** The turn-0 preview of a Champions replay is built on the main thread (eval-acquire), which loads the Champions mod first; vitest gives this file a module graph of its own, so nothing loaded the mod before. */
+// vitest gives this file a module graph of its own: eval-acquire must load the Champions mod itself.
 const fixture = <T>(name: string) =>
   JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', name), 'utf-8')) as T;
 const replay = fixture<{ id: string; format: string; formatid: string; players: string[]; log: string }>('gen9championsou-2693832490.json');

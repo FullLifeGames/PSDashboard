@@ -6,8 +6,6 @@ import { replayFixture } from '../fixtures/replay';
 import { rolledCopyParams } from '../../../src/lib/rolled-copy-stage';
 import type { RolledCopyJob, RolledCopyOutcome } from '../../../src/lib/replay-jobs/types';
 
-/** The app's half of the sweep's biggest-roll stage: the replay worker plays the copy of the roll's turn (one worker, spawned for the one call and ended after it), the job carries the roll in the report's words, and the copy's cache key sits beside the replay's turn keys. The roll itself is the report's (`namedRollOf`). */
-
 const { replayData, snapshots } = replayFixture('singles');
 const FORMAT = getBranchSimulatorFormat(replayData);
 

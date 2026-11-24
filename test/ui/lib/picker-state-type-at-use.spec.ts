@@ -18,12 +18,6 @@ import { pickerStateFromSnapshot } from '../../../src/lib/picker-state';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * The quick picker labels a move with the type it lands with before any Tera click, as the simulator reads it for the body (the move's own rule, then
- * the ability: Weather Ball under the weather that stands, Terrain Pulse under the terrain, the -ate family, Liquid Voice, Normalize). The snapshot knows
- * the field and the guessed set names the ability, so the picker asks the simulator on a one-Pokémon twin. The checker is the simulator: the same position
- * as a live battle, read through createBranchStateFromBattle.
- */
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 const set = (species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet => ({
@@ -36,7 +30,6 @@ function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: num
     battle.choose('p1', `team ${p1.map((_, index) => index + 1).join('')}`);
     battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
   }
-  // Every active plays a move that needs no target (Splash, else Protect) so a doubles turn runs through.
   const quiet = (team: PokemonSet[], slots: number) => team.slice(0, slots)
     .map(entry => `move ${Math.max(1, entry.moves.findIndex(move => move === 'Splash' || move === 'Protect') + 1)}`).join(', ');
   for (let turn = 0; turn < turns; turn++) {
@@ -46,7 +39,6 @@ function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[], turns: num
   return battle;
 }
 
-/** The viewers' lines of the battle's log, as a replay holds them. */
 function publicLog(battle: Battle): string {
   const lines = battle.log;
   return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
@@ -54,7 +46,6 @@ function publicLog(battle: Battle): string {
 
 const simState = (battle: Battle): BranchSimState => createBranchStateFromBattle(battle, [], {} as never);
 
-/** The quick picker for the battle's position, as the app builds it from the snapshot and the guessed teams (the battle's own sets). */
 function pickerOf(battle: Battle, p1: PokemonSet[], p2: PokemonSet[], gen: number, format: string): BranchSimState {
   const snapshot = parseReplayLogWithObservations(publicLog(battle)).snapshots.at(-1)!;
   return pickerStateFromSnapshot(snapshot, p1, p2, gen, null, { format });
@@ -62,7 +53,6 @@ function pickerOf(battle: Battle, p1: PokemonSet[], p2: PokemonSet[], gen: numbe
 
 type LabelledMove = BranchMoveOption & { typeUnderTera?: string };
 const typesOf = (moves: BranchMoveOption[]) => Object.fromEntries(moves.map(move => [move.name, move.type]));
-/** The moves of the slot as the buttons would label them with the Tera toggle pressed. */
 const clickedTypesOf = (moves: BranchMoveOption[]) => Object.fromEntries((moves as LabelledMove[]).map(move => [move.name, move.typeUnderTera ?? move.type]));
 
 const SHAPES = [
@@ -70,7 +60,6 @@ const SHAPES = [
   { label: 'doubles', format: 'gen9doublescustomgame', doubles: true },
 ] as const;
 
-/** One scene: both teams padded for the shape, the position after `turns` turns of the first moves. */
 function scene(format: string, doubles: boolean, p1Lead: PokemonSet, p2Lead: PokemonSet, turns = 1) {
   const p1 = [p1Lead, ...(doubles ? [set('Gliscor', ['Splash'])] : [])];
   const p2 = [p2Lead, ...(doubles ? [set('Corviknight', ['Splash'])] : [])];
@@ -184,7 +173,6 @@ describe('what the picker does not know it leaves at the catalog type', () => {
   test('a body whose set names no ability and whose species may have two that disagree keeps the catalog type', () => {
     const format = 'gen9customgame';
     const { p1, p2, battle } = scene(format, false, set('Sylveon', ['Hyper Voice', 'Swift'], { ability: 'Pixilate' }), set('Snorlax', ['Splash']));
-    // The guessed team lacks the ability (a species-only guess) and the log never named it.
     const unnamed = p1.map(entry => ({ ...entry, ability: '' }));
     const picker = pickerOf(battle, unnamed, p2, 9, format);
     expect(typesOf(picker.p1MovesBySlot[0])['Hyper Voice']).toBe('Normal');
@@ -227,14 +215,9 @@ describe('snapshot picker, doubles slots', () => {
       }
     }
     expect(wrong).toEqual([]);
-    // The check means something only where the party order and the field order differ.
     expect(reordered, 'a snapshot whose team order differs from its field order').toBeGreaterThan(0);
   }, 120_000);
 
-  /**
-   * Doubles OU 2663093831: the snapshot picker listed P2's actives in party order while the exact position loaded: P2A and P2B swapped at turns 5 and 12.
-   * At turn 15 slot A of both sides fainted with nobody left to come in; the picker keeps two slots a side and leaves slot A empty.
-   */
   test('Doubles OU 2663093831: the slots of turns 5, 12 and 15 as the protocol has them', async () => {
     const replay = JSON.parse(readFileSync('test/e2e-feedback/fixtures/gen9doublesou-2663093831.json', 'utf-8')) as { log: string };
     await loadSimMods('gen9doublesou');
@@ -253,7 +236,7 @@ describe('snapshot picker, doubles slots', () => {
 
 describe('picker-state-hp', () => {
   const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { log: string };
-  // Every body here is built from a Champions log (on a Scarlet/Violet format as well), and its inference reads the mod.
+  // Every body here is built from a Champions log, on a Scarlet/Violet format as well, and its inference reads the mod.
   beforeAll(async () => { await loadSimMods('gen9championsou'); });
   const FORMATS = [
     { label: 'singles', format: 'gen9ou' },
@@ -262,7 +245,6 @@ describe('picker-state-hp', () => {
     { label: 'Champions doubles and VGC', format: 'gen9championsvgc2026regmcbo3' },
   ] as const;
 
-  /** The simulator's body for the set, in the replay's display mode (percent). */
   function simulatedBody(format: string, set: PokemonSet) {
     const battle = new Battle({ formatid: format as never, seed: '1,2,3,4', p1: { name: 'A', team: [set] }, p2: { name: 'B', team: [set] } });
     battle.reportExactHP = false;
@@ -333,7 +315,6 @@ describe('picker-state-sim-facts', () => {
     return battle;
   }
 
-  /** The viewers' lines of the battle's log, as a replay holds them. */
   function publicLog(battle: Battle): string {
     const lines = battle.log;
     return lines.filter((line, index) => !line.startsWith('|split|') && !lines[index - 1]?.startsWith('|split|')).join('\n');
@@ -341,7 +322,6 @@ describe('picker-state-sim-facts', () => {
 
   const simState = (battle: Battle): BranchSimState => createBranchStateFromBattle(battle, [], {} as never);
 
-  /** The quick picker for the battle's position, as the app builds it from the snapshot and the guessed teams (the battle's own sets). */
   function pickerOf(battle: Battle, p1: PokemonSet[], p2: PokemonSet[], gen: number, format: string): BranchSimState {
     const snapshot = parseReplayLogWithObservations(publicLog(battle)).snapshots.at(-1)!;
     return pickerStateFromSnapshot(snapshot, p1, p2, gen, null, { format });
@@ -350,7 +330,6 @@ describe('picker-state-sim-facts', () => {
   const FACTS = ['boostedStat', 'alliesFainted', 'totalFainted', 'hpType', 'hpPower'] as const;
   const factsOf = (info: SimPokemonInfo) => Object.fromEntries(FACTS.map(fact => [fact, info[fact]]));
 
-  /** Every body the picker lists has the five facts of the simulator's reading of the same body (a generation without team preview lists only the revealed bodies). */
   function expectEqualFacts(picker: BranchSimState, simulated: BranchSimState) {
     let compared = 0;
     for (const side of ['p1Pokemon', 'p2Pokemon'] as const) {
@@ -446,7 +425,6 @@ describe('picker-state-sim-facts', () => {
     const terapagos = () => set('Terapagos', ['Splash', 'Tera Starstorm', 'Tera Blast'], { ability: 'Tera Shift', teraType: 'Stellar' });
     const garchomp = () => set('Garchomp', ['Splash', 'Tera Blast', 'Earthquake'], { teraType: 'Fairy' });
 
-    /** The slot's moves in the picker, each named by what the button would show with the toggle pressed. */
     const labels = (moves: BranchMoveOption[]) => Object.fromEntries((moves as LabelledMove[]).map(move => [move.name, move.typeUnderTera ?? move.type]));
     const afterClick = (moves: BranchMoveOption[]) => Object.fromEntries(moves.map(move => [move.name, move.type]));
 

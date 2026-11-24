@@ -2,8 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { parseRequestedTurn, useRequestedTurn } from '../../../src/hooks/useRequestedTurn';
 
-/** `?replay=<id>&turn=<n>`: the app lands on the named turn once, after the replay opened, through the graph's selection (`landOnTurn`); the turn count comes from the loaded snapshots for both game types. */
-
 describe('parseRequestedTurn', () => {
   test('reads a whole number and ignores everything else', () => {
     expect(parseRequestedTurn('7')).toBe(7);

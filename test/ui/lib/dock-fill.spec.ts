@@ -4,8 +4,6 @@ import { engineHoldsForcedBeside, fitsBeside, overlayFill, pickFill, pickFillPar
 import { rankedChoice } from '../fixtures/eval-result';
 import { simState } from '../fixtures/sim-state';
 
-/** The best ranked joint choice whose parts agree with every slot the user touched fills the rest; no agreeing choice leaves the slots empty. */
-
 const fakeOut: BranchSlotChoice = { kind: 'move', moveId: 'fakeout', moveName: 'Fake Out', targetLoc: 2 };
 const flareBlitz: BranchSlotChoice = { kind: 'move', moveId: 'flareblitz', moveName: 'Flare Blitz', targetLoc: 2 };
 const protect: BranchSlotChoice = { kind: 'move', moveId: 'protect', moveName: 'Protect' };
@@ -114,10 +112,8 @@ describe('pickFill, doubles', () => {
     const filled = pickFill('p1', teraRanked, doubles, [touchedTera, null]);
     expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'protect' }));
     expect(filled[1]).not.toHaveProperty('modifier');
-    // A touched slot without a gimmick leaves the engine's Tera in the other slot.
     const plain = pickFill('p1', teraRanked, doubles, [fakeOut, null]);
     expect(plain[1]).toEqual(expect.objectContaining({ moveId: 'spore', modifier: 'terastallize' }));
-    // A different kind of gimmick does not clash.
     const mega = pickFill('p1', teraRanked, doubles, [{ ...fakeOut, modifier: 'mega' }, null]);
     expect(mega[1]).toEqual(expect.objectContaining({ moveId: 'spore', modifier: 'terastallize' }));
   });
@@ -137,7 +133,6 @@ describe('pickFill, doubles', () => {
     const filled = pickFill('p1', switching, doubles, [touched, null]);
     expect(filled[0]).toBeNull();
     expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'spore', targetLoc: 2 }));
-    // The first choice moves in the touched slot, so it disagrees: the lower one decided.
     expect(pickFill('p1', [switching[0]], doubles, [touched, null])).toEqual([null, null]);
   });
 
@@ -160,7 +155,6 @@ describe('pickFill, held slots (the rule against jumping)', () => {
   });
 
   test('a held slot puts no demand on the joint choice: it needs no agreeing part', () => {
-    // Only the third choice moves Protect in the second slot; the held first slot takes no part in the choosing.
     const filled = pickFill('p1', [doublesRanked[2]], doubles, [null, null], [true, false]);
     expect(filled[0]).toBeNull();
     expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'protect' }));
@@ -181,7 +175,6 @@ describe("pickFillParts, the held slot's deferred pick", () => {
     expect(filled[1]).toEqual(expect.objectContaining({ moveId: 'spore', targetLoc: 2 }));
     expect(deferred[0]).toEqual(expect.objectContaining({ moveId: 'fakeout', targetLoc: 1 }));
     expect(deferred[1]).toBeNull();
-    // pickFill is the filled half and nothing else.
     expect(pickFill('p1', doublesRanked, doubles, [null, null], [true, false])).toEqual(filled);
   });
 
@@ -240,7 +233,6 @@ describe('overlayFill (a replay turn: the fill under the draft and over nothing)
     expect(shown?.p1Choices).toEqual([logged, rageowder]);
     expect(shown?.p1Choice).toBe(logged);
     expect(shown?.p2Choices).toEqual([null, null]);
-    // The state it came from stays as it was.
     expect(state.p1Choices).toEqual([logged, null]);
   });
 
@@ -265,7 +257,6 @@ describe('overlayFill (a replay turn: the fill under the draft and over nothing)
 });
 
 describe('engineHoldsForcedBeside', () => {
-  // a bench click sends a replacement at once only when no other forced slot of the turn holds just the engine's pick.
   const marks = (p1: boolean[], p2: boolean[] = [false]) => ({ p1, p2 });
 
   test("doubles, both slots of P1 forced: an engine pick beside holds the click back, the user's own pick does not", () => {
@@ -296,7 +287,6 @@ describe('engineHoldsForcedBeside', () => {
   });
 });
 
-/** The ranked row the picks of a side stand for: the picks as they stand when one row has them all, else the row the fill itself would take beside the user's slots alone; null when no row agrees. */
 describe('rowOfChoices', () => {
   const doubles = simState('doubles');
   const slot = (choices: (BranchSlotChoice | null)[]) => choices;
@@ -316,8 +306,6 @@ describe('rowOfChoices', () => {
   });
 
   test('doubles: a pick that broke the joint choice falls back to the row beside the user\'s own slots', () => {
-    // the fill wrote Spore beside the touched Fake Out; the user then picked Protect in slot 1: Fake Out + Protect is no ranked row,
-    // and the row the fill takes beside Protect... is none that opens with Fake Out, so only the user's slot 1 decides
     const row = rowOfChoices('p1', doublesRanked, doubles, slot([fakeOut, protect]), slot([null, protect]));
     expect(row).toBe(doublesRanked[2]);
   });

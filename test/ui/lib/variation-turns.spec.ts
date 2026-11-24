@@ -12,7 +12,7 @@ import {
 } from '../../../src/lib/variation-turns';
 import { INTERLUDE_CASES } from '../fixtures/variation-interludes';
 
-/** A replacement on both sides is stored as an entry of kind `turn` with the `turnNumber` of the entry before it. Every reader of a variation's history names the same turn for every entry, old stored entries included (the rule reads them by their turnNumber). The expectations are counted by hand in the fixture. */
+// The expectations are counted by hand in the fixture.
 describe.each(INTERLUDE_CASES)('every reader of a history with interludes on both sides, $name', ({
   history, startTurn, settledAt, playedAt, interludes, turns,
 }) => {
@@ -25,7 +25,6 @@ describe.each(INTERLUDE_CASES)('every reader of a history with interludes on bot
     );
     const numbered = rows.map(row => row.variationTurn).filter((turn): turn is number => turn !== null);
     expect(numbered).toEqual(Array.from({ length: turns }, (_, index) => startTurn + index + 1));
-    // the cell of a row names the position after its move, which the interludes that follow it settle
     for (const [turn, index] of Object.entries(settledAt)) {
       const row = rows.find(candidate => candidate.variationTurn === Number(turn));
       if (row) expect(row.settled.serializedPosition).toBe(`pos-${index}`);

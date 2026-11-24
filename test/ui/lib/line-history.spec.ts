@@ -4,7 +4,6 @@ import { isInterlude, turnEntryCount } from '../../../src/lib/variation-turns';
 import { bothRolesLine, doublesLine, singlesLine } from '../fixtures/lines';
 import type { EvalLine } from '@fulllifegames/eval-engine';
 
-/** A line as the history of a variation: the rebuild reads the slot choices (by identity) and the dice that ride on them, the kind and forced side of an interlude, and the turn numbers. */
 describe('lineHistory', () => {
   test('a singles line becomes one turn entry per step, numbered from the start turn, the slot choices and their dice untouched', () => {
     const history = lineHistory(singlesLine, 20);
@@ -17,7 +16,6 @@ describe('lineHistory', () => {
       expect(history[index].p1SlotChoices).toEqual(step.p1.slots);
       expect(history[index].p2SlotChoices).toEqual(step.p2.slots);
     });
-    // the dice are the line's: the accuracy and crit of Hydro Pump ride on p2's slot, the damage roll of the knock-out on p1's
     expect(history[0].p2SlotChoices?.[0]).toMatchObject({ dice: [{ name: { kind: 'accuracy' } }, { name: { kind: 'crit' } }] });
     expect(history[2].p1SlotChoices?.[0]).toMatchObject({ dice: [{ name: { kind: 'damage-roll' }, result: { step: 7 } }] });
     expect(turnEntryCount(history)).toBe(3);
@@ -36,7 +34,6 @@ describe('lineHistory', () => {
     ]);
     expect(history[0].p1SlotChoices).toHaveLength(2);
     expect(history[0].p2SlotChoices).toHaveLength(2);
-    // the replacing side alone holds slot choices: the waiting side has no command
     expect(history[1].p2SlotChoices?.[0]).toMatchObject({ kind: 'switch', pokemonName: 'Zamazenta-Crowned' });
     expect(history[1].p1SlotChoices).toBeUndefined();
     expect(history[1].p1Choice).toBe('—');

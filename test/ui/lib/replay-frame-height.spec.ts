@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { FRAME_HEIGHT_PROPERTY, followContentHeight } from '../../../src/lib/replay-frame-height';
 import { PHONE_CLASS } from '../../../src/lib/replay-phone';
 
-/**
- * In phone mode the frame's height follows its content (the scene, the controls and the log stand in one column) instead of REPLAY_FRAME_HEIGHT; in the desktop
- * layout the property stays unset. The follower observes with the frame document's own `ResizeObserver` (the page's observer watching the frame's body raised
- * "ResizeObserver loop completed with undelivered notifications"), measures the body's box and not the root (`scrollHeight` of the root never falls below the
- * viewport), and writes only when the height changed.
- */
+// The page's own observer on the frame's body raised "ResizeObserver loop completed with undelivered notifications".
 let frameCallback: (() => void) | null = null;
 let pageObservers = 0;
 let observed: unknown[] = [];
@@ -34,7 +29,6 @@ function frame(height: number, phone: boolean) {
   if (phone) root.classList.add(PHONE_CLASS);
   let current = height;
   Object.defineProperty(doc.body, 'offsetHeight', { get: () => current, configurable: true });
-  // The frame window's own observer: the page's global one must stay out of it.
   Object.defineProperty(iframe.contentWindow!, 'ResizeObserver', {
     configurable: true,
     value: class {

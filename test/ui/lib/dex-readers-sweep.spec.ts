@@ -8,11 +8,7 @@ import { pickerStateFromSnapshot } from '../../../src/lib/picker-state';
 import { spriteUrl } from '../../../src/lib/sprite-url';
 import { getAbilityPool, getItemPool } from '../../../src/lib/pokemon-options';
 
-/**
- * The sweep of the app's half: the pickers, the sprite names and the option pools read the Dex of the replay's generation and mod, entry by entry
- * (Snap Trap and Growth differ in the Champions mod). The changed entries come from comparing the mod's Dex with Scarlet/Violet, not from our code;
- * older generations are compared with each generation's own Dex. Each reader runs on a singles and a doubles format of Champions and of Scarlet/Violet.
- */
+// The changed entries (Snap Trap, Growth) come from comparing the mod's Dex with Scarlet/Violet, not from our code.
 await loadSimMods('gen9championsou');
 
 const replay = JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', 'gen9championsou-2693832490.json'), 'utf-8')) as { log: string };
@@ -27,7 +23,6 @@ const championsOf = (format: string) => /champions/.test(format);
 const snapshot = parseReplayLog(replay.log).find(entry => entry.turn === 3)!;
 const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
 
-/** The picker's first body of side one with `species` and the moves, read in the format at the generation. */
 function bodyIn(format: string, gen: number, species: string, moves: string[]) {
   const mon = { ...snapshot.p1.pokemon.find(candidate => !candidate.fainted)!, speciesForme: species, name: species, maxhp: 100, hp: 100, hpPercent: 100, isActive: true, moves };
   const set = { ...p1Team[0], species, name: species, moves } as PokemonSet;
