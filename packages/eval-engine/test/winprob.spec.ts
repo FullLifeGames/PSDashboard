@@ -16,14 +16,11 @@ import {
 } from '../src/winprob';
 import type { StaticRuleset } from '../src/score/weights';
 
-/**
- * The percent display grows surer with the game. The map is sigmoid(K(share) * score) with K = 1.85 up to a fainted share of 0.25, rising by 5 per share to 3.10 at 0.5.
- * The expected values below are written out from that formula, not read back from the function under test.
- */
+// The map is sigmoid(K(share) * score), K = 1.85 up to a fainted share of 0.25, rising by 5 per share to 3.10 at 0.5.
+// The expected values are written out from that formula, not read back from the function under test.
 const kAt = (share: number) => 1.85 + 5 * Math.min(0.25, Math.max(0, share - 0.25));
 const expected = (score: number, share: number) => Math.round(100 / (1 + Math.exp(-kAt(share) * score)));
 const SCORES = [-0.95, -0.6, -0.25, -0.1, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9];
-// Singles: fainted bodies over 12; doubles and VGC bring 8 or 12 (4 of 6 in VGC): both grids.
 const SINGLES_SHARES = Array.from({ length: 11 }, (_, i) => i / 12);
 const DOUBLES_SHARES = Array.from({ length: 9 }, (_, i) => i / 8);
 
@@ -33,7 +30,7 @@ describe('winPercent with the fainted share', () => {
       for (const score of SCORES) expect(winPercent(score, share), `s=${score} share=${share}`).toBe(expected(score, share));
     }
     expect(displayK(0.5)).toBeCloseTo(3.1, 12);
-    expect(displayK(1)).toBeCloseTo(3.1, 12); // capped: a nearly finished game does not claim more
+    expect(displayK(1)).toBeCloseTo(3.1, 12);
   });
 
   test('exact plus and minus one stay literal 100 and 0 at any share', () => {
@@ -176,19 +173,14 @@ describe('win probability mapping', () => {
     expect(winProbability(0.5, false, 0)).toBeCloseTo(1 / (1 + Math.exp(-WINPROB_K.singles.k0 * 0.5)), 10);
     const late = winProbability(0.5, false, 0.8);
     const early = winProbability(0.5, false, 0);
-    // Adopted k1 > 0: the same score claims more late than early.
     if (WINPROB_K.singles.k1 > 0) expect(late).toBeGreaterThan(early);
     expect(winProbability(0, true, 0.5)).toBeCloseTo(0.5, 10);
-    // Corpus-fitted: confidence per point stays >1 at
-    // every phase in both gametypes.
     expect(WINPROB_K.singles.k0).toBeGreaterThan(1);
     expect(WINPROB_K.doubles.k0).toBeGreaterThan(1);
   });
 
-  // Pokémon Champions doubles prices its own scale, fitted on its corpus games in the app's build on
-  // the Champions mod (1.86 + 4.17 × the fainted share). Champions singles keeps the singles K: its fit (1.64 + 4.41)
-  // read the mid game of the Champions OU holdout worse in both tables. Every other rule set keeps the K of its game
-  // type.
+  // Champions doubles: K = 1.86 + 4.17 × fainted share, fitted on its corpus. Champions singles keeps the singles K:
+  // its fit (1.64 + 4.41) read the mid game of the Champions OU holdout worse.
   test('Champions doubles prices its own phase K; Champions singles, standard and VGC keep their game type\'s', () => {
     expect(CHAMPIONS_WINPROB_K.doubles).toEqual({ k0: 1.86, k1: 4.17 });
     expect(CHAMPIONS_WINPROB_K.singles).toEqual(WINPROB_K.singles);
@@ -203,8 +195,6 @@ describe('win probability mapping', () => {
     }
   });
 
-  // Every family resolves its own K entry, so a fit moves one family and no other. The values: VGC doubles equals
-  // standard doubles, Champions singles equals standard singles, and none of them shares an object with another.
   test('the five families hold today\'s K, each in its own entry', () => {
     const today = {
       'standard-singles': { k0: 2.28, k1: 1.49 },
@@ -229,19 +219,12 @@ describe('win probability mapping', () => {
   });
 
   test('wpUnits carries the Jensen effect: variance helps when behind, hurts ahead', () => {
-    // Below 50% the sigmoid is convex: a spread of outcomes beats its mean.
     expect(wpUnits(-0.9) + wpUnits(-0.1)).toBeGreaterThan(2 * wpUnits(-0.5));
-    // Above 50% it is concave: consolidation beats gambling.
     expect(wpUnits(0.9) + wpUnits(0.1)).toBeLessThan(2 * wpUnits(0.5));
     expect(wpUnits(0)).toBeCloseTo(0, 10);
   });
 
   test('winPercent is the calibrated display map: sigmoid(DISPLAY_K·s), ended ±1 literal', () => {
-    // Two-stage calibration, both measured: the leaf sigmoid calibrates
-    // static evals into leaf win-probs; averaging plus equilibrium
-    // selection re-inflates the aggregated ROOT score, and DISPLAY_K
-    // (fit-corpus-trained, grand-bed-graded) prices that back out at the
-    // display boundary.
     expect(winPercent(0)).toBe(50);
     expect(winPercent(0.5)).toBe(Math.round(100 / (1 + Math.exp(-DISPLAY_K * 0.5))));
     expect(winPercent(0.5)).toBeLessThan(75);
@@ -249,12 +232,9 @@ describe('win probability mapping', () => {
     // Exact ±1 is an ENDED evaluation: a finished game displays finished.
     expect(winPercent(1)).toBe(100);
     expect(winPercent(-1)).toBe(0);
-    // An ended row weighted by an equilibrium mix keeps a one-bit rounding
-    // remnant (573756 t139: every reply to Stomping Tantrum ends at 1, the
-    // mix sums to 0.9999999999999999); that is still the finished game.
+    // An ended row weighted by an equilibrium mix keeps a one-bit rounding remnant (0.9999999999999999): still ended.
     expect(winPercent(0.9999999999999999)).toBe(100);
     expect(winPercent(-0.9999999999999999)).toBe(0);
-    // Near-certain but NOT ended stays honestly below 100.
     expect(winPercent(0.999)).toBeLessThan(100);
     expect(winPercent(0.999)).toBeGreaterThan(80);
   });

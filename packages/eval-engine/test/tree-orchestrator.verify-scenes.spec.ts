@@ -31,10 +31,7 @@ import { set } from './move-oracle';
 import { mctsSearch } from '../src/mcts';
 import type { StaticRuleset } from '../src/eval-function';
 
-/**
- * Corpus scenes of the verify step, on positions built like the feedback harness and searched like the app (four trees, verify, prover). The Monte-Carlo reference prices
- * every verified cell by 40 fresh seeds, each child one ply deeper, per class under the plan weights. Flat verdicts (analyzeTurn without the deep check).
- */
+// Reference: Monte-Carlo, 40 fresh seeds per verified cell, each child one ply deeper, classes under the plan weights.
 
 interface Scene {
   id: string;
@@ -45,7 +42,6 @@ interface Scene {
   keepPlayed: EvalSettings['keepPlayed'];
   played: PlayedTurn;
   sacks: Parameters<typeof analyzeTurn>[0]['sacks'];
-  /** The boards (`verify-scenes/`) carry the rule set, the game type and the fainted share the app's dispatch reads. */
   ruleset?: EvalSettings['ruleset'];
   gameType?: 'singles' | 'doubles';
   faintedFraction?: number;
@@ -54,11 +50,9 @@ interface Scene {
 const scene = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Scene;
 
-/** The board the app builds, from `fixtures/verify-scenes/`; `test/regression/verify-scenes-boards.spec.ts` rebuilds it in every run and fails when the app's build moves it. */
 const board = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/verify-scenes/${name}-r89.json`, import.meta.url), 'utf-8')) as Scene;
 
-/** The search of the app's Auto mode at this board: the matrix below the fainted share where the tree starts, the tree above it. */
 async function searchAsApp(position: Scene): Promise<EvalResult> {
   const resolved = autoTurnSettings(position.faintedFraction ?? 0, position.gameType === 'doubles');
   const settings: EvalSettings = {
@@ -84,12 +78,11 @@ function flat(position: Scene, result: EvalResult) {
 }
 
 describe('verify scenes: every class one ply deeper (boards and settings of the app)', () => {
-  // The three rows grade the board the app builds (fixtures/verify-scenes/, kept by test/regression/verify-scenes-boards.spec.ts) with the search the app's Auto mode runs on it
-  // (`searchAsApp`). The references are the Monte-Carlo probe (every verified tree cell re-priced with 24 draws, 40 for 648453, one ply deeper, hashed draw seeds, blocks 1001 and
-  // 5001, answers off). Flat verdicts: the app's deeper re-search of a flagged side (`verifyFlagged`) only acquits, so a flat tier here can be one the card later clears.
+  // References: Monte-Carlo probe, cells re-priced with 24 draws (40 for the gen6 scene), blocks 1001 and 5001.
+  // Flat verdicts: the deeper re-search of a flagged side (`verifyFlagged`) only acquits, so a flat tier may clear.
 
   test('the boards name the share of fainted bodies the engine reads, and Auto picks the search the rows name', () => {
-    // test/regression/verify-scenes-boards.ts keeps its own count of fainted bodies (the barrel does not export the engine's).
+    // test/regression/verify-scenes-boards.ts keeps its own count of fainted bodies (the barrel lacks the engine's).
     const modes = ['smogtours-gen6ou-648453-t13', 'smogtours-gen8ou-573756-t73', 'smogtours-gen9doublesou-912045-t8'].map(name => {
       const position = board(name);
       expect(position.faintedFraction).toBe(battleFaintedFraction(deserializeBattleExact(position.serialized)));
@@ -99,10 +92,8 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test('648453 t13: AcrOne carries no tier (matrix 0.0550; MC 0.0732 and 0.0779 on two seed blocks)', { timeout: 300_000 }, async () => {
-    // Auto runs this turn on the matrix (one body of twelve has fainted: depth 1, three draws), so the row does too. The matrix has no verify cells to re-price; the reference is the
-    // tree's, on the same board: regret 0.0732 (best Hurricane) and 0.0779 (best -> Excadrill), tier none on both blocks, the tree itself 0.0758. The feedback pin of this turn
-    // (truth: AcrOne without a tier, BKC's switch named) holds the same. The pin is 0.065 ± 0.03: the matrix, the tree and both blocks lie inside 0.055 to 0.078, and the band
-    // stops 0.005 under the 0.1 line of an inaccuracy.
+    // Reference on the tree: regret 0.0732 and 0.0779, tier none on both blocks, the tree itself 0.0758.
+    // Pin 0.065 ± 0.03: the matrix, tree and blocks lie inside 0.055 to 0.078, 0.005 under the inaccuracy line.
     const position = board('smogtours-gen6ou-648453-t13');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Hidden Power Ice');
@@ -111,10 +102,8 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test('573756 t73: Body Press carries no tier (0.0100; MC 0.0078 and 0.0077 on two seed blocks)', { timeout: 300_000 }, async () => {
-    // The tree runs this turn (five of twelve fainted), as in the app: score -0.7405, best row -> Toxapex 0.0100 ahead of Body Press, a near tie (U-turn and the switch within
-    // 0.01 of it). The reference reads 0.0078 and 0.0077, best -> Toxapex, tier none. Fire Fang knocks Corviknight out at 95 %; Body Press is the only click that wins the turn on
-    // a miss, which the regret prices (the 5 % miss class). The score also lies past DECIDED_SCORE (0.7), which would soften a tier by one step. The pin is 0.009 ± 0.02 (the
-    // engine and the blocks' mean).
+    // Reference 0.0078 and 0.0077, best -> Toxapex, tier none; the score lies past DECIDED_SCORE (0.7).
+    // Pin 0.009 ± 0.02 (the engine and the blocks' mean).
     const position = board('smogtours-gen8ou-573756-t73');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Body Press');
@@ -123,10 +112,8 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test("912045 t8 (doubles): p1's Blood Moon line carries no tier (0.0088; MC 0.0205 and 0.0435 on two seed blocks)", { timeout: 300_000 }, async () => {
-    // The tree runs this turn (eight of twelve fainted), the answers round on, as in the app. On this board (Ursaluna with the Throat Spray of the recorded usage data) the
-    // engine reads score 0.6987, best row Hyper Voice + Rage Powder, regret 0.0088, tier none: P2's equilibrium puts no weight on the double target into Ursaluna, so the
-    // played line's one hole costs nothing. The reference re-prices the verified cells and reads 0.0205 and 0.0435 (same best row), tier none on both. The three best rows lie
-    // within 0.007 of each other, so the regret is a near tie. The pin is 0.025 ± 0.04 (the engine and the blocks' mean; the band stops 0.035 under the 0.1 line of an inaccuracy).
+    // Reference re-prices the verified cells: 0.0205 and 0.0435 (same best row), tier none; the engine 0.0088.
+    // Pin 0.025 ± 0.04 (the engine and the blocks' mean; the band stops 0.035 under the 0.1 line of an inaccuracy).
     const position = board('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Blood Moon→Okidogi + Matcha Gotcha');
@@ -353,27 +340,21 @@ describe('verify-spread-scenes', () => {
 
   describe('verify scenes: hidden lengths', () => {
     test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.585 ± 0.079)", { timeout: 300_000 }, async () => {
-      // Chi-Yu falls asleep in a third of the draws for one turn only and wakes into the next (0.96 one ply
-      // deeper); the class's first draw slept for three (−0.17) and stood for the whole class.
-      // Protect rows take two of p1's twelve rows and Heat Wave + Flare Blitz→Groudon leaves the list, so the cell is priced through the verify step's own job, Koraidon's
-      // Flare Blitz aimed back at Groudon (target 1). Reference (24 draws on seed blocks 1001 and 5001, answers off): 0.5847 under the classes' weights on both blocks (plain
-      // means 0.585 and 0.595, standard errors 0.078 and 0.079; the hit class reads 0.460 against the engine's 0.333, the miss class 1 on both). The engine reads 0.4871.
-      // Band: 2.5 standard errors (0.079) around the weighted value, 0.39 to 0.78. The reference of the earlier static read 0.5135 on both blocks (plain means 0.516 and 0.526, standard errors 0.092 and 0.094) against the engine's 0.3981.
+      // Reference (24 draws, blocks 1001 and 5001, answers off): 0.5847 under the class weights, SE 0.078 and 0.079.
+      // Band: 2.5 standard errors (0.079) around the weighted value, 0.39 to 0.78; the engine reads 0.4871.
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const local = createLocalTreeExecutor(position.serialized);
       const rounds: EvalCellJob[][] = [];
       const executor: TreeExecutor = { ...local, evalCells: async (jobs, onDone) => { rounds.push(jobs); return local.evalCells(jobs, onDone); } };
       await searchTreesOrchestrated(executor, settingsOf(position));
       const verify = rounds.find(jobs => jobs.length > 0 && jobs.every(job => job.deepen !== undefined && !job.plain))!;
-      // The verify round does not hold this cell; the row prices it through any verify job of the scene (its deepen settings are the scene's), the cell named by its choices.
       const template = verify.find(job => job.p1Choice === 'move heatwave, move flareblitz 2' && job.p2Choice === 'move rockslide, move sleeppowder 1') ?? verify[0];
       const [old] = await local.evalCells([{ ...template, p1Choice: 'move heatwave, move flareblitz 1', p2Choice: 'move rockslide, move sleeppowder 1' }], () => {});
       expect(Math.abs(blendedValue(old) - 0.5847)).toBeLessThan(2.5 * 0.079);
     });
 
-    // The fresh reference (24 draws, seed blocks 1001 and 5001, answers off) grades p1 a mistake on both blocks (0.255 and 0.298) and p2 a mistake (0.267) and an inaccuracy (0.168),
-    // while the engine reads no tier for either side. A pin follows the engine only where the reference carries it, so the test expects the reference and fails until the
-    // distance closes; the day it passes, the marker goes. The engine's regrets are 0.0514 for p1's Heat Wave + Protect and 0.0004 for p2's Protect + Encore→Koraidon; an earlier reference on the same rows read p1 0.326 and 0.299 on 24 draws, 0.280 on 96, and p2 0.016 and 0.010 on 24 draws, 0.147 on 96.
+    // The fresh reference (24 draws, blocks 1001 and 5001) grades p1 a mistake (0.255, 0.298), p2 a mistake (0.267).
+    // test.fails until the engine's distance closes. Engine regrets: 0.0514 (p1), 0.0004 (p2).
     test.fails("2629703929 t8 (VGC): the tiers the fresh reference grades, p1 a mistake and p2 at least an inaccuracy", { timeout: 300_000 }, async () => {
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const analysis = flat(position, await search(position));

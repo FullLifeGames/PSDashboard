@@ -8,11 +8,7 @@ import type { WinPathsRequest } from '../src/endgame/win-paths/types';
 import { branchOf, mon, runTurn, type Commands } from './branch-dice-support';
 import { set } from './move-oracle';
 
-/**
- * Boards of the win-path specs. A board is a fresh game of a custom format whose bodies the spec sets
- * (`prepare`), serialized as the app serializes a live battle; `play` replays a line on a fresh branch of the same board the way the
- * app plays a variation (each step's slot choices resolved on the rebuilt battle, the dice forced from the slot choices).
- */
+/** A custom game set up by `prepare`, serialized like a live battle; `play` replays a line on a fresh branch of it. */
 export interface Board {
   format: string;
   p1: ReturnType<typeof set>[];

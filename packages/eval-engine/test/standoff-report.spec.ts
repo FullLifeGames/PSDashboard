@@ -4,11 +4,6 @@ import { buildGameReport } from '../src/report';
 import { STANDOFF_MIN_TURNS, standoffsOf } from '../src/standoff';
 import type { RankedChoice } from '../src/types';
 
-/**
- * A standoff is a run of at least STANDOFF_MIN_TURNS consecutive analyzed turns in which nobody fainted and nobody switched (573756 turns 79 to 137: two burned
- * Toxapex, p2's PP running out). Inside it shifts, rolls and reads stay out of the key moments and the reads list; graded decisions stay. Singles read playedRaw,
- * doubles the slot lists (a doubles label can carry a switch after another action); without played tracking a switch cannot be seen and the rule stays closed.
- */
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
@@ -26,7 +21,6 @@ const mk = (turn: number, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
 } as TurnAnalysis);
 
 const shift = (turn: number): TurnAnalysis => mk(turn, { scoreBefore: -0.5, scoreAfter: -0.1, swing: 0.4, attribution: 'shift' });
-/** A paid-off read by p1 (a gain, so it stays on the list outside a standoff). */
 const readOf = (turn: number): TurnAnalysis => mk(turn, {
   scoreBefore: -0.5, scoreAfter: -0.3, swing: 0.2, attribution: 'p1-read',
   p1: sideOf({ riskPaidOff: true, riskPayoff: 0.28 }),
@@ -52,7 +46,6 @@ describe('the standoff window', () => {
   });
 
   test('a faint ends the run on its own turn: the faint turn is no standoff turn', () => {
-    // The fainted share changes between turn 6 and 7: turns 1-5 and 7-12 (5 and 6 turns) are no standoff.
     const faint = mk(6, { faintedFractionAfter: 0.875 });
     const after = [7, 8, 9, 10, 11, 12].map(turn => mk(turn, { faintedFraction: 0.875, faintedFractionAfter: 0.875 }));
     expect(standoffsOf(game([faint, ...after]))).toEqual([]);
@@ -136,7 +129,6 @@ describe('the report inside a standoff', () => {
   });
 
   test('the slot of a dropped standoff turn stays empty', () => {
-    // Turns 1-12 are a standoff holding the biggest shift; turns 13-17 are single moments outside it.
     const outside = [13, 14, 15, 16, 17].map(turn => mk(turn, {
       faintedFraction: 0.875, faintedFractionAfter: turn === 17 ? 1 : 0.875,
       scoreBefore: -0.5, scoreAfter: -0.5 + 0.3 + (turn - 13) * 0.01, swing: 0.3 + (turn - 13) * 0.01, attribution: 'shift' as const,
@@ -144,7 +136,6 @@ describe('the report inside a standoff', () => {
     const faint = mk(12, { faintedFractionAfter: 0.875, scoreBefore: -0.5, scoreAfter: -0.5 });
     const big = { ...shift(5), swing: 0.9, scoreAfter: 0.4 };
     const report = buildGameReport([...game([big, faint]), ...outside], names, 'p2');
-    // The faint turn 12 ends the run at 11. The top four by rank are 5, 17, 16, 15; turn 5 is inside the run and drops out.
     expect(turnsOf(report.keyMoments)).toEqual([15, 16, 17]);
   });
 

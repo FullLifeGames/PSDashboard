@@ -12,10 +12,8 @@ import { pairKoOdds } from '../src/pair/odds';
 import { drawTurn, rollSet as setFromTeraClickField, rootOf } from './calc-roll-oracle';
 import { simDamages, killing, type SimDamages } from './sim-rolls';
 
-/** teraClicked must equal what the simulator's own terastallize leaves on a twin of the battle: forme, ability, stages and HP. */
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
-/** The first p1 active of a fresh twin, clicked by the simulator itself, read as a body. */
 function simClicked(make: () => Battle) {
   const twin = make();
   const mon = twin.sides[0].active[0];
@@ -123,14 +121,12 @@ describe('tera-click-field', () => {
       expect(simCleared(rootOf('gen9customgame', [set('Garchomp', ['Earthquake'], { teraType: 'Steel' })], [wall()], rainy))).toBe(false);
       expect(teraClicked(9, armed(chomp), fieldOf(chomp)).abilityOn).toBeUndefined();
 
-      // After the click the body is Terapagos-Stellar: its next use of the body clicks nothing and clears nothing.
       const clicked = teraClicked(9, armed(positionBattle(rootOf('gen9customgame', [terapagos()], [wall()], rainy))), { weather: 'raindance' });
       expect(clicked.species).toBe('Terapagos-Stellar');
       expect(teraClicked(9, { ...clicked, abilityOn: undefined }, { weather: 'raindance' }).abilityOn).toBeUndefined();
     });
   });
 
-  /** The foe's HP at which about half of the sim's normal rolls kill, with the root built at that HP. */
   function halfKilling(make: (hp: number) => SimPosition, damages: SimDamages): { hp: number; root: SimPosition } {
     const hp = [...damages.normal].sort((a, b) => a - b)[8];
     expect(killing(damages.normal, hp)).toBeGreaterThan(0);
@@ -151,7 +147,6 @@ describe('tera-click-field', () => {
       expect(event.critKillRolls).toBe(killing(damages.crit, hp));
       const crit = critRate(9, 1)!;
       expect(event.killFraction).toBeCloseTo((1 - crit) * killing(damages.normal, hp) / 16 + crit * killing(damages.crit, hp) / 16, 10);
-      // Without the click the rain is still there, and the odds differ.
       expect(boundaryEvent(battle, battle.sides[0].active[0], battle.sides[1].active[0], 'hydropump')!.normalKillRolls).not.toBe(event.normalKillRolls);
     });
 
@@ -162,14 +157,12 @@ describe('tera-click-field', () => {
       expect(accuracy && accuracy.kind === 'accuracy' && accuracy.numerator).toBe(70);
       const battle = positionBattle(root);
       expect(boundaryEvent(battle, battle.sides[0].active[0], battle.sides[1].active[0], 'thunder', { attacker: true })!.accuracy).toBe(0.7);
-      // Not clicking: the rain makes Thunder sure.
       expect(boundaryEvent(battle, battle.sides[0].active[0], battle.sides[1].active[0], 'thunder')!.accuracy).toBe(1);
     });
 
     test('the foe\'s Hydro Pump into the clicking Terapagos reads the cleared rain too', () => {
       const rootAt = (hp?: number) => rootOf('gen9customgame', [terapagos()], [blastoise()], battle => { rain(battle); if (hp) battle.sides[0].active[0].sethp(hp); });
       const damages = simDamages(rootAt(), 'move splash terastallize', 'move hydropump', { script: 'p2a:hydropump>p1a', target: { side: 0, slot: 0 } });
-      // The click raises the HP the hit meets; ask the simulator's twin for it.
       const clickedHp = (hp: number) => {
         const twin = positionBattle(createRootPosition(rootAt(hp).serialized));
         twin.actions.terastallize(twin.sides[0].active[0]!);

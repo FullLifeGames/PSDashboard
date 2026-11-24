@@ -4,11 +4,7 @@ import { parseReplayLog, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime } from '../src/branch-engine';
 import { correctBattleFromSnapshot } from '../src/branch/corrections';
 
-/**
- * The sim deletes `terastallized` in its faint block. A body that faints only in the reconstruction (a guessed spread, a damage roll) and is revived by the HP
- * correction would come back without the marker, while its side had already spent the Tera (17 of 833 bank positions stood one Tera body short, none over). The
- * snapshot carries the marker per body at every boundary and drops it on a real faint, so it alone decides.
- */
+// The sim deletes `terastallized` in its faint block; the snapshot carries the marker per body and alone decides.
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 };
@@ -45,18 +41,11 @@ async function rebuilt(format: string, log: string, teams: { p1Team: PokemonSet[
   return { battle: runtime.battleStream.battle!, snapshot };
 }
 
-/**
- * A click the reconstruction never performed: the sim swallowed it (a locked
- * move, Struggle) or answered a rejected choice with its default. The real log
- * carries the |-terastallize| line; dropping it reproduces that sim state, a
- * side whose Tera is still armed. The snapshot stays the full log's.
- */
 const withoutTheClick = (log: string) => log.replace('|-terastallize|p1a: Snorlax|Water\n', '');
 const fullSnapshot = (log: string) => parseReplayLog(log).find(entry => entry.turn === 2)!;
 const teraBudget = (battle: Awaited<ReturnType<typeof rebuilt>>['battle']) =>
   battle.sides[0].pokemon.map(pokemon => pokemon.canTerastallize ?? null);
 
-/** The sim's own faint path, as a guessed spread's damage roll triggers it. */
 function faintInTheRebuild(battle: Awaited<ReturnType<typeof rebuilt>>['battle'], species: string) {
   const body = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === species)!;
   body.hp = 0;
@@ -123,7 +112,6 @@ describe('Tera marker after a reconstruction-only faint', () => {
   test('a benched body gets it back too', async () => {
     const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
     const snorlax = faintInTheRebuild(battle, 'Snorlax');
-    // The protocol saw the Tera body leave the field alive.
     const benched = withEntry(withEntry(snapshot, 'Snorlax', { isActive: false }), 'Gliscor', { isActive: true });
 
     correctBattleFromSnapshot(battle, benched);
@@ -143,11 +131,9 @@ describe('Tera marker after a reconstruction-only faint', () => {
 
     expect(snorlax.terastallized).toBe('Water');
     expect(teraBudget(battle)).toEqual([null, null]);
-    // The rest of BattleActions#terastallize's writes.
     expect([snorlax.addedType, snorlax.knownType, snorlax.apparentType]).toEqual(['', true, 'Water']);
   });
 
-  // The built sets carry the species as the body name, the protocol the nickname.
   test('the entry finds its body by species or by name alone', async () => {
     for (const patch of [{ name: 'Jack Herer' }, { speciesForme: 'Snorlax-Gmax' }]) {
       const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
@@ -160,7 +146,6 @@ describe('Tera marker after a reconstruction-only faint', () => {
   test('an entry that matches two living bodies is left alone', async () => {
     const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
     faintInTheRebuild(battle, 'Snorlax');
-    // This entry names Gliscor by species and Snorlax by name.
     const ambiguous = withEntry(withEntry(snapshot, 'Snorlax', { terastallized: '' }),
       'Gliscor', { terastallized: 'Water', name: 'Snorlax' });
 
@@ -171,8 +156,7 @@ describe('Tera marker after a reconstruction-only faint', () => {
     expect(find('Gliscor').terastallized ?? null).toBe(null);
   });
 
-  // The snapshot decides, never the |-terastallize| line: after a real faint
-  // (and after Revival Blessing) the body carries no Tera in the game either.
+  // After a real faint (and Revival Blessing) the body carries no Tera in the game either.
   test('a body the snapshot shows without the marker stays without it', async () => {
     const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
     const snorlax = faintInTheRebuild(battle, 'Snorlax');
@@ -187,7 +171,6 @@ describe('Tera marker after a reconstruction-only faint', () => {
   test('a second marker never lands on a side that already carries one', async () => {
     const { battle, snapshot } = await rebuilt('gen9ou', singlesLog, singlesTeams);
     const gliscor = battle.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Gliscor')!;
-    // The reconstruction terastallized Snorlax; this snapshot names Gliscor instead.
     const otherBody = withEntry(withEntry(snapshot, 'Snorlax', { terastallized: '' }), 'Gliscor', { terastallized: 'Water' });
 
     correctBattleFromSnapshot(battle, otherBody);
@@ -205,10 +188,7 @@ describe('Tera marker after a reconstruction-only faint', () => {
     expect(snorlax.terastallized ?? null).toBe(null);
   });
 
-  // Ogerpon's and Terapagos's click also changes forme, ability and (Terapagos)
-  // max HP, and the faint block regresses the forme: a bare marker would
-  // leave half a Tera. The marker's loss stays on those bodies; the side's
-  // Tera is spent all the same, or the search offers a second one.
+  // A bare marker on Ogerpon or Terapagos would leave half a Tera (the faint block regresses the forme).
   test('Ogerpon gets no bare marker, but its side goes spent', async () => {
     const log = singlesLog.split('Snorlax, M').join('Ogerpon-Wellspring, F').split('Snorlax').join('Ogerpon')
       .replace('|-terastallize|p1a: Ogerpon|Water\n', '');

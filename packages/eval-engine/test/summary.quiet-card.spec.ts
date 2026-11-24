@@ -6,12 +6,6 @@ import { analyzeTurn, type AnalyzeTurnParams } from '../src/analysis';
 import type { EvalResult, RankedChoice, KoOddsInfo } from '../src/types';
 import { deniedEndSentence } from '../src/denied-end';
 
-/**
- * "A quiet turn." stands only on a card that highlights nothing else. Beside another sentence (a risk sentence, an equilibrium switch, an unanswered entry, a decided
- * or predictive sentence, an inaccuracy note) or a shown hindsight hint on a side row, the card says "Neither side made a mistake." and the badge reads "no mistake".
- * A side with a mistake or blunder tier makes that sentence false: the card then writes no sentence. Singles and doubles share every rule; the labels come from the
- * shared builder (read-against-click-builder.ts).
- */
 
 const NEITHER = 'Neither side made a mistake.';
 const BOTH_BEST = "Both sides played the engine's preferred line.";
@@ -19,10 +13,6 @@ const HINT = 'Against the Protect actually clicked, Earthquake was worth +20% mo
 
 describe.each(GAMES)('%s', (_game, make) => {
   describe.each(READERS)('read by %s', reader => {
-    /**
-     * A quiet card with nothing else on it: an inaccuracy risk whose side lost ground keeps the silent card. The builder's lost-ground side also carries a shown
-     * hindsight hint (2663093831 t1), which the bare card does without.
-     */
     const bare = () => {
       const built = buildScene(make, { reader, kind: 'inaccuracy', playedCell: 0.325, safeCell: 0.454, lostGround: 0.1 });
       const { analysis } = built;
@@ -85,7 +75,6 @@ describe.each(GAMES)('%s', (_game, make) => {
       const side = analysis[reader];
       const patched: TurnAnalysis = { ...analysis, [reader]: { ...side, safeAgainstClick: undefined, riskPaidOff: undefined, tier: 'inaccuracy' } };
       const text = summarizeTurn(patched, names);
-      // The card names the inaccuracy, so it starts with that sentence and never claims that no one erred.
       expect(text).toContain('was an inaccuracy');
       expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
@@ -97,7 +86,6 @@ describe.each(GAMES)('%s', (_game, make) => {
       const { analysis, names } = buildScene(make, { reader, kind: 'gamble', playedCell: 0.189, safeCell: 0.19 });
       expect(analysis.attribution).toBe('quiet');
       const text = summarizeTurn(analysis, names);
-      // The card names the risk; "Neither side made a mistake." gives way (2663093831 t6).
       expect(text).toContain('a risk that went unpunished');
       expect(text).not.toContain(NEITHER);
       expect(text).not.toContain('quiet');
@@ -308,11 +296,8 @@ const names: [string, string] = ['LordEnz', 'Dflo'];
 const ranked = (choice: string, label: string, worstCase: number, expected: number, ev: number, punishedBy: string | null): RankedChoice =>
   ({ choice, label, worstCase, expected, ev, punishedBy });
 
-/**
- * Expert pin smogtours-gen8ou-562428 turn 12: LordEnz's Tapu Bulu at 45% clicks Close Combat into Dflo's Blacephalon, which outspeeds and takes it with Shadow Ball;
- * Dflo switches to Weavile instead, and Close Combat knocks it out on entry. The safe line is the switch to Mandibuzz. The regret is 0.159, an inaccuracy, and the
- * floor given up is 0.159: under the mistake band, which books its risk, and under the gamble's bound of a mistake-sized floor.
- */
+// Expert pin: regret 0.159 (an inaccuracy), floor given up 0.159: under the mistake band and the gamble's bound
+// of a mistake-sized floor.
 describe('an inaccuracy that paid off as a read (562428 t12)', () => {
   const t12 = (overrides: Partial<AnalyzeTurnParams> = {}, closeCombatFloor = 0.014) => {
     const result: EvalResult = {
@@ -346,9 +331,7 @@ describe('an inaccuracy that paid off as a read (562428 t12)', () => {
     const summary = summarizeTurn(analysis, names);
     expect(summary).toContain('LordEnz played Close Combat: a read that paid off, +22% over the safe switch to Mandibuzz');
     expect(summary).toContain('The floor priced in Shadow Ball; switching to Weavile came instead.');
-    // The read speaks for the inaccuracy: no second sentence that calls it one.
     expect(summary).not.toContain('was an inaccuracy');
-    // The credit only: the inaccuracy band keeps no risk label.
     expect(analysis.p1.riskUnpunished).toBeUndefined();
   });
 
@@ -357,7 +340,6 @@ describe('an inaccuracy that paid off as a read (562428 t12)', () => {
     expect(punished.p1.riskPaidOff).toBeUndefined();
     expect(t12({ playedOutcome: 0.2 }).p1.riskPaidOff).toBeUndefined();
     expect(t12({ scoreBefore: -0.75 }).p1.riskPaidOff).toBeUndefined();
-    // A Close Combat that kept the safe line's floor gave nothing up: no read to credit, whatever its regret.
     const noFloor = t12({}, 0.173);
     expect(noFloor.p1.riskPaidOff).toBeUndefined();
   });
@@ -385,7 +367,6 @@ describe('luck-cards', () => {
       expect(reRead).toContain('the estimate moved +12% with no roll behind it');
       expect(reRead).not.toContain('how the turn rolled');
       expect(summarizeTurn(turnWith({ rolledFor: { p1: true, p2: false } }), names)).toContain('how the turn rolled (+12%)');
-      // A roll the other way does not explain a swing toward BKC.
       expect(summarizeTurn(turnWith({ rolledFor: { p1: false, p2: true } }), names)).not.toContain('how the turn rolled');
       expect(summarizeTurn(turnWith({}), names)).toContain('how the turn rolled (+12%)');
     });
@@ -413,7 +394,6 @@ describe('luck-cards', () => {
         ...playing(ranked('switch 4', '→ Cofagrigus', 0.2)), safe: ranked('switch 3', '→ Volcanion', 0.1),
         readCredit: { payoff: 0.31 },
       };
-      // The side holds its ground (−0.05): a credit on a lost turn stays silent.
       const turn = (rolledFor: { p1: boolean; p2: boolean }) =>
         turnWith({ attribution: 'quiet', p1: credit, chanceDelta: -0.15, swing: -0.05, scoreAfter: -0.05, rolledFor });
       expect(summarizeTurn(turn({ p1: false, p2: false }), names)).toContain('On top of that, the estimate moved −8% for BKC with no roll behind it.');
@@ -437,7 +417,6 @@ describe('never-acted-prose', () => {
   const singles = GAMES[0][1];
   const doubles = GAMES[1][1];
 
-  /** The scene's opponent of `reader` p1 is p2: it never acted, and its stand-in is the engine's own pick (655336 t28). */
   function neverActedScene(make: () => ReturnType<typeof singles>, patchBeta: Partial<TurnAnalysis['p2']> = {}, patchAlpha: Partial<TurnAnalysis['p1']> = {}) {
     const { analysis, names } = buildScene(make, { reader: 'p1', kind: 'inaccuracy', playedCell: 0.325, safeCell: 0.454, lostGround: 0.1 });
     const unhinted = (side: TurnAnalysis['p1']): TurnAnalysis['p1'] => ({ ...side, hindsightRead: undefined });

@@ -4,14 +4,6 @@ import { summarizeTurn } from '../src/summary';
 import type { PlayedTurn } from '../src/played';
 import type { EvalMatrix, EvalResult, KoOddsInfo, RankedChoice } from '../src/types';
 
-/**
- * The "True odds" note quotes reply-independent KO odds of a line ("Tera Starstorm kills ~4% of the time"), priced on the board before the turn. When the
- * opponent's actual pair stops that hit (Wide Guard turns Tera Starstorm away, a Protect turns a single hit away) the note must not quote a roll that never
- * happened (VGC 2630685175 turn 7 said it twice). The stop is read from the cell of the line against the click, which the search priced from the simulator's own
- * turn: a cell the planner finds plain (no accuracy roll and no kill range in it) holds no roll of any hit, and a doubles cell lists its events with the move that
- * makes each (`p1b:terastarstorm>p2b=hit-nokill`), so a claim whose attacker slot and move have no event there never landed. A cell the search did not plan, a
- * failed plan, and a claim the cell still lists keep the note, and so does a singles cell holding a roll (its classes name no move).
- */
 
 type Cell = NonNullable<EvalMatrix['cells']>[number][number];
 const PLAIN: Cell = { visits: 20, verified: false, plan: 'none' };
@@ -21,7 +13,6 @@ const events = (...keys: string[]): Cell => ({
   visits: 20, verified: false, plan: 'events',
   classes: keys.map((key, index) => ({ key, weight: index === 0 ? 0.6 : 0.4 / (keys.length - 1) })),
 });
-/** One event of the pair plan as a class key spells it: attacker slot, move, target slot, outcome. */
 const eventKey = (side: 'p1' | 'p2', slot: 'a' | 'b', move: string, targetSlot: 'a' | 'b', outcome: string): string =>
   `${side}${slot}:${move}>${side === 'p1' ? 'p2' : 'p1'}${targetSlot}=${outcome}`;
 
@@ -33,7 +24,6 @@ const names: [string, string] = ['Alpha', 'Beta'];
 
 type Played = PlayedTurn['p1'] | PlayedTurn['p1Slots'];
 interface Scene {
-  /** The own side's lines: the engine's best (rank 0) and the played one (regret 0.12, an inaccuracy). */
   best: Line;
   played: Line;
   click: Line;
@@ -42,12 +32,10 @@ interface Scene {
   clickPlayed: Played;
 }
 
-/** The scene seen from `side`: that side holds [best, played] and the other [click, other]; the cells against the click are the two given. */
 function turn(scene: Scene, side: 'p1' | 'p2', bestCell: Cell, playedCell: Cell): TurnAnalysis {
   const own = [scene.best, scene.played];
   const opp = [scene.click, scene.other];
   const ownRows = side === 'p1';
-  // The own line `ownIndex` against the opponent line `oppIndex`: the clicked column (0) holds the two given cells.
   const cellOf = (ownIndex: number, oppIndex: number): Cell => (oppIndex !== 0 ? SEEN : ownIndex === 0 ? bestCell : playedCell);
   const lines = (rows: boolean) => (rows ? own : opp);
   const matrix: EvalMatrix = {
@@ -72,7 +60,6 @@ function turn(scene: Scene, side: 'p1' | 'p2', bestCell: Cell, playedCell: Cell)
 
 const summaryOf = (analysis: TurnAnalysis): string => summarizeTurn(analysis, names);
 
-/** Singles: Alpha played Scald (kills ~43%) instead of Hydro Pump (a 80% roll into a ~50% kill range), Beta clicked Protect. */
 const singles = (): Scene => ({
   best: { choice: 'move hydropump', label: 'Hydro Pump', ev: 0.30, koOdds: { accuracy: 0.8, killFraction: 0.5 } },
   played: { choice: 'move scald', label: 'Scald', ev: 0.18, koOdds: { accuracy: 1, killFraction: 0.43 } },
@@ -82,7 +69,6 @@ const singles = (): Scene => ({
   clickPlayed: { kind: 'move', name: 'Protect', tera: false },
 });
 
-/** Doubles (the turn-7 shape): the own slot b used Tera Starstorm (kills ~4%) into the opponent's Wide Guard; the best line has it too. */
 const doubles = (): Scene => ({
   best: {
     choice: 'move woodhammer 1, move terastarstorm', label: 'Wood Hammer→Calyrex-Shadow + Tera Starstorm', ev: 0.30,
@@ -158,7 +144,6 @@ describe.each(SIDES)('doubles, seen from %s: a claim is stopped when its attacke
   test('a cell that lists other events but none of the claim\'s attacker and move drops the claim', () => {
     const others = events(eventKey(side, 'a', 'woodhammer', 'a', 'hit-nokill'), eventKey(side, 'a', 'woodhammer', 'a', 'hit-kill'));
     expect(summaryOf(turn(doubles(), side, others, others))).not.toContain('True odds');
-    // The same move in the other slot is not the claim's attacker, and neither is the opponent's slot b.
     const wrongSlot = events(eventKey(side, 'a', 'terastarstorm', 'b', 'hit-nokill'), eventKey(side, 'a', 'terastarstorm', 'b', 'hit-kill'));
     expect(summaryOf(turn(doubles(), side, wrongSlot, wrongSlot))).not.toContain('True odds');
     const theirs = events(eventKey(foe, 'b', 'terastarstorm', 'b', 'hit-nokill'), eventKey(foe, 'b', 'terastarstorm', 'b', 'hit-kill'));
@@ -207,7 +192,6 @@ describe('the paid-off read quotes the click\'s odds the same way', () => {
 const choice = (choiceStr: string, label: string, worstCase: number): RankedChoice =>
   ({ choice: choiceStr, label, worstCase, expected: worstCase, ev: worstCase, punishedBy: 'Reply' });
 
-/** A proof under the spoken mass still speaks on the card when the bar sits at least 0.1 under the proven win; a proof whose open branch wins anyway keeps the bar near the win and stays quiet. */
 describe('the open event of a forced win under 0.9', () => {
   const resultWith = (score: number, forcedWin: EvalResult['forcedWin'], extra: Partial<EvalResult> = {}): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
@@ -284,8 +268,6 @@ describe('predictive-read', () => {
   const names: [string, string] = ['Alpha', 'Beta'];
 
   describe('the predictive read before the click', () => {
-    // The Flying-switch shape: Beta's Earthquake is the obvious click into
-    // Alpha's staying Scald; → Noivern crushes it and loses to Ice Beam.
     const predictive = (options: {
       values?: number[][]; mixes?: { p1: number[]; p2: number[] }; p1First?: 'scald' | 'noivern';
       p1Labels?: string[]; p2Labels?: string[]; p1Choices?: string[]; p2Choices?: string[];
@@ -308,8 +290,6 @@ describe('predictive-read', () => {
         },
       };
     };
-    // Alpha splits evenly between moves and switches (Beta's model of Alpha
-    // stays unsure); Beta mostly attacks.
     const tendencies = { p1: { attackRate: 0.5, switchRate: 0.5, repeatBias: 0 }, p2: { attackRate: 0.8, switchRate: 0.2, repeatBias: 0 } };
     const analyze = (result: EvalResult, extra: Partial<Parameters<typeof analyzeTurn>[0]> = {}) => analyzeTurn({
       turn: 7, result, tendencies,
@@ -351,8 +331,6 @@ describe('predictive-read', () => {
     });
 
     test('the displayed recommendation counts: a null-swapped alternative is no news', () => {
-      // Will-O-Wisp is mechanically null into Heatran; the co-optimal Shadow
-      // Ball displays in its place and is also the answer to Earth Power.
       const result = predictive({
         p1Labels: ['Will-O-Wisp', 'Shadow Ball'], p1Choices: ['move willowisp', 'move shadowball'],
         p2Labels: ['Earth Power', 'Stealth Rock'], p2Choices: ['move earthpower', 'move stealthrock'],
@@ -366,8 +344,6 @@ describe('predictive-read', () => {
     });
 
     test('a doubles matrix speaks the sentence over its pair rows', () => {
-      // The model's status-quo reference reads a pair by its first slot: a
-      // pair that opens with a switch is the switch-out it discounts.
       const analysis = analyze(predictive({
         p1Labels: ['Fake Out + Moonblast', '→ Noivern + Tailwind'], p1Choices: ['move fakeout 1, move moonblast 1', 'switch 3, move tailwind'],
         p2Labels: ['Rock Slide + Knock Off', 'Protect + Trick Room'], p2Choices: ['move rockslide, move knockoff 1', 'move protect, move trickroom'],
@@ -393,7 +369,6 @@ describe('predictive-read', () => {
   });
 
   describe('the hindsight read and the likeliest click', () => {
-    // A wide board on both sides, a shift without a culprit.
     const wide: EvalResult = {
       score: 0.0, interval: 0.3, depthCompleted: 1,
       perSide: {
@@ -429,7 +404,6 @@ describe('predictive-read', () => {
     });
 
     test('a click the opponent model favoured reads as findable', () => {
-      // Beta's model over Alpha's rows favours Earth Power (0.33), and Earth Power came.
       const analysis = clicked('Earth Power', true);
       expect(analysis.p2.hindsightRead?.likeliest).toBeCloseTo(0.33, 1);
       expect(summarizeTurn(analysis, names)).toContain(
@@ -450,7 +424,6 @@ describe('predictive-read', () => {
 });
 
 describe('the read clause names the click with a verb that fits the odds', () => {
-  /** A gamble that paid off (Hydro Pump gave up a mistake-sized floor and landed), with the given odds on the click. */
   const paidRead = (koOdds: KoOddsInfo): string => {
     const tied: EvalResult = {
       score: -0.05, interval: 0.02, depthCompleted: 1,
@@ -514,7 +487,6 @@ describe('the near sentence waits for a quarter of the bodies to fall', () => {
     expect(summarizeTurn(early, names)).not.toContain('from clearing the rest');
     expect(summarizeTurn(at(result, 0.25), names))
       .toContain('Medicham-Mega is one 90% roll from clearing the rest; removing Keldeo leaves no answer behind.');
-    // Without a known share the gate stays off.
     expect(at(result).p2.nearDecided?.announce).toBe(true);
   });
 

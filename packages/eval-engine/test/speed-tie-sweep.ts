@@ -4,22 +4,14 @@ import { battleOf } from './power-oracle';
 import { fingerprint } from '../src/sim-ask';
 import { cheapOracle, SLOT_A } from './speed-tie-oracle';
 
-/**
- * The sweep behind speed-tie-sim.spec.ts. Every Dex entry of a generation (or the Champions mod) that
- * can move the queue's answer, as the holder on either side, against the moves of the Dex, in the speed situations that
- * tie or do not: the cheap oracle of speed-tie-oracle.ts is the simulator's answer, the code under test is held to it.
- * What counts as an entry that can move the answer comes from the Dex, not from a list of names: a handler for the
- * move's priority, for its fractional priority or for the speed (the stat itself is the Pokémon's own; its modifiers
- * are handlers). Quick Claw of Gens 2 and 3 has no handler (the battle rolls it at the turn's start) and joins by id.
- */
 
 type Entry = { id: string; name: string; exists: boolean; gen: number; isNonstandard?: string | null } & Record<string, unknown>;
 const KEYS = ['onModifyPriority', 'onFractionalPriority', 'onModifySpe'];
 const SPEED_ONLY = new Set(['onModifySpe']);
 
-export interface Holder { kind: 'ability' | 'item'; id: string; name: string; /** Moves the entry's speed only. */ speedOnly: boolean }
+export interface Holder { kind: 'ability' | 'item'; id: string; name: string; speedOnly: boolean }
 
-/** Entries of the battle's own Dex (the one that keeps handlers) that can move a priority or a speed. */
+// Quick Claw of Gens 2 and 3 has no handler (the battle rolls it at the turn's start), so it joins by id.
 export function holdersOf(battle: Battle): Holder[] {
   const dex = battle.dex;
   const live = (entry: Entry) => entry.exists && entry.gen <= dex.gen && entry.isNonstandard !== 'Future';
@@ -38,7 +30,6 @@ export function holdersOf(battle: Battle): Holder[] {
 
 interface MoveLike { id: string; exists: boolean; gen: number; isZ?: unknown; isMax?: unknown; priority: number; category: string; type: string; flags: Record<string, unknown>; isNonstandard?: string | null }
 
-/** One move of every kind the handlers can tell apart: category, type, the heal flag, and the priority value. */
 export function moveReps(battle: Battle): { holder: string[]; other: string[] } {
   const dex = battle.dex;
   const moves = (dex.moves.all() as unknown as MoveLike[]).filter(move => move.exists && move.gen <= dex.gen && !move.isZ && !move.isMax && move.isNonstandard !== 'Future');
@@ -77,7 +68,6 @@ export function scenariosOf(battle: Battle): Scenario[] {
   return scenarios;
 }
 
-/** A singles battle, the holder on one side, in a scenario. The other body has no entry. */
 export function sweepBattle(format: string, holder: Holder | null, side: 0 | 1, scenario: Scenario): Battle {
   const body = (extra: Partial<PokemonSet>) => set('Snorlax', ['tackle'], { evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 252 }, ...extra });
   const held = body({
@@ -96,7 +86,6 @@ export const RULE_SETS = [
   { name: 'Champions', format: 'gen9championsou' },
 ];
 
-/** The suite's cut: the generations with their own speed or priority code (1 to 5 carry the Gen 1 to 4 mods and the base rules) and the two newest rule sets. */
 export const SUITE_RULE_SETS = RULE_SETS.filter(rules => ['gen 1', 'gen 2', 'gen 3', 'gen 4', 'gen 5', 'gen 9', 'Champions'].includes(rules.name));
 
 const EQUAL: Scenario = { name: 'equal speed', holderLevel: 100, otherLevel: 100, full: true };
@@ -110,7 +99,6 @@ function sweepConfig(format: string, holder: Holder | null, side: 0 | 1, scenari
   const battle: Battle = sweepBattle(format, holder, side, scenario);
   const before = fingerprint(battle);
   const tieOf = cheapOracle(battle, ...SLOT_A);
-  // A holder that moves only the speed does not read the move: the few priority classes tell it apart.
   const holderMoves = scenario.full && !holder?.speedOnly ? reps.holder : reps.other;
   for (const own of holderMoves) {
     for (const foe of reps.other) {
@@ -125,10 +113,6 @@ function sweepConfig(format: string, holder: Holder | null, side: 0 | 1, scenari
   if (fingerprint(battle) !== before) result.wrong.push(`${label}: the live battle changed`);
 }
 
-/**
- * Every holder in every scenario on either side, every move pair: `speedTie` against the cheap oracle, and the live
- * battle's fingerprint after each configuration. The caller sets the speed-layer mode and the development check.
- */
 export function tieSweep(format: string, speedTie: SpeedTie): TieSweep {
   const probe = sweepBattle(format, null, 0, EQUAL);
   const holders: (Holder | null)[] = [null, ...holdersOf(probe)];
@@ -137,7 +121,6 @@ export function tieSweep(format: string, speedTie: SpeedTie): TieSweep {
   const result: TieSweep = { holders: holders.length, scenarios: scenarios.length, asked: 0, ties: 0, wrong: [] };
   for (const holder of holders) {
     for (const scenario of scenarios) {
-      // Holders that only change the speed run in the equal-speed cases; the others run every scenario.
       if (holder?.speedOnly && !scenario.full) continue;
       for (const side of [0, 1] as const) sweepConfig(format, holder, side, scenario, reps, speedTie, result);
     }

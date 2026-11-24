@@ -8,23 +8,7 @@ import { CHAMPIONS, mon, playClicks, RULES, sweepSelection, type Mode, type Rule
 import { dexOfRules, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * The stand-in for a slot whose action the log never shows. The log of such a turn says the body fainted before it moved or flinched, so the foe's action came first; the
- * click that rebuilds the turn must keep that order. The rebuild fills the click in with the enabled move of the lowest priority (no cut at 0). The oracle is the
- * simulator, on a copy, in every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles everywhere, doubles from Gen 3, VGC (a team of six) in Scarlet/Violet
- * and Champions:
- * - the Dex's priority brackets: each bracket of the rule set's own Dex gets a move the simulator takes as a click; the simulator plays every pair (the body's move, the
- *   faster foe's move) and the table must follow the Dex priority (a lower bracket moves after a higher one, a higher before, a tie goes to the faster foe), the rule the
- *   stand-in reads;
- * - the bodies: every body of one move per bracket, in pairs of brackets with the highest and the lowest bracket behind them, and the bodies of positive brackets only, in
- *   both orders, get a stand-in; against every foe bracket the stand-in moves behind the foe whenever any move of the body would, and it is the lowest bracket (a body of
- *   priority moves only takes the slowest of them);
- * - the reported rows: Fake Out and Protect filled in for a body that never acted, the Assault Vest that disables the status moves.
- * A body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order. Its stand-in is the slowest move that keeps it ahead of every action
- * the log shows after the cant line (and behind those before it); the simulator's own order, on a copy, decides which moves do, against a faster and a slower foe. No move
- * that does both keeps the slowest stand-in; a cant line with no action after it changes nothing (2663093831 t9: Sinistcha's flinch stood before the Shadow Ball).
- * A plain run plays the whole bracket sweep; the Dex census of every move reads a fixed sample, `DICE_SWEEPS=full` every move.
- */
+// A plain run plays the whole bracket sweep; the Dex census of moves reads a fixed sample, `DICE_SWEEPS=full` all.
 await loadSimMods('gen9championsou');
 vi.setConfig({ testTimeout: 600_000 });
 
@@ -33,7 +17,6 @@ afterAll(() => {
   if (process.env.DICE_SWEEP_LOG) writeFileSync(process.env.DICE_SWEEP_LOG, summaries.join('\n') + '\n', 'utf8');
 });
 
-/** The targets whose click needs no more than `move N` (or `move N 1` at a foe in doubles) and whose move the simulator announces. */
 const AIMED = new Set(['normal']);
 const CLICKABLE = new Set(['normal', 'self', 'all', 'allAdjacentFoes', 'allAdjacent', 'scripted']);
 
@@ -45,7 +28,6 @@ const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = RULES.
 
 type Case = typeof CASES[number];
 
-/** The board: the body (Snorlax) with `moves` against the faster foe (Pikachu) with `foeMoves`; doubles add two splashers, VGC a bench of four per side. */
 function boardOf(c: Case, moves: string[], foeMoves: string[], item = '', foeSpecies = 'Pikachu'): Battle {
   const splash = (species: string) => mon(c.rules, { species, moves: ['splash'] });
   const body = { ...mon(c.rules, { species: 'Snorlax', moves, gender: 'M' }), item };
@@ -76,7 +58,7 @@ const clickable = (dex: ReturnType<typeof dexOfRules>): DexMove[] => dex.moves.a
   && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past')
   && CLICKABLE.has(move.target) && !move.flags.charge && !move.flags.futuremove);
 
-/** Whether the simulator takes the move as the body's click (a move with a condition that is not met, Belch, is disabled). */
+// A move with an unmet condition (Belch) is disabled: the simulator refuses it as a click.
 function accepted(c: Case, move: DexMove): boolean {
   const board = boardOf(c, [move.id], ['splash']);
   const probe = copyOf(board);
@@ -92,7 +74,6 @@ function bracketsOf(c: Case): Map<number, string> {
   return out;
 }
 
-/** The stand-in's move id for a body that never shows in the log: the first fragment of the side's choice. */
 function standInOf(c: Case, body: string[], foeMove: string, item = ''): { id: string; choice: string } {
   const board = boardOf(c, body, [foeMove], item);
   const events = [`|move|p2a: Pikachu|${foeMove}|p1a: Snorlax`, ...(c.mode === 'doubles'
@@ -102,7 +83,6 @@ function standInOf(c: Case, body: string[], foeMove: string, item = ''): { id: s
   return { id: board.sides[0].active[0].getMoveRequestData().moves[index - 1].id, choice };
 }
 
-/** The stand-in's move id for a body whose log lines are `events` (a `|cant|` among them): the first fragment of the side's choice. */
 function standInForEvents(c: Case, body: string[], events: string[], foeSpecies = 'Pikachu'): { id: string; choice: string } {
   const board = boardOf(c, body, ['splash'], '', foeSpecies);
   const choice = getMainChoice(events, 'p1', board as never);
@@ -112,7 +92,6 @@ function standInForEvents(c: Case, body: string[], events: string[], foeSpecies 
 
 const CANT = '|cant|p1a: Snorlax|flinch';
 const foeLine = (species: string, move: string): string => `|move|p2a: ${species}|${move}|p1a: Snorlax`;
-/** The faster foe (Pikachu, Snorlax is slower) and the slower one (Shuckle). */
 const FOES = ['Pikachu', 'Shuckle'];
 
 describe.each(CASES)('the stand-in for a slot the log never shows acting: $name', c => {
@@ -150,7 +129,6 @@ describe.each(CASES)('the stand-in for a slot the log never shows acting: $name'
     for (const p of priorities) {
       for (const q of priorities) {
         const got = before(rep(p), rep(q));
-        // the faster foe moves first at the same bracket, so the body moves first only at a higher bracket
         if (got !== p > q) wrong.push(`${rep(p)} (${p}) against ${rep(q)} (${q}): the body moves first = ${got}`);
       }
     }
@@ -252,7 +230,6 @@ describe('the reported rows', () => {
     expect(standInOf(c, ['shadowsneak', 'protect', 'earthquake', 'uturn'], 'shadowsneak').id).toBe('earthquake');
   });
 
-  // A body of priority moves only takes the slowest of them.
   test.each(REPORTED)('a body of priority moves only takes the slowest of them ($name)', ({ c }) => {
     expect(standInOf(c, ['fakeout', 'protect', 'quickattack'], 'quickattack').id).toBe('quickattack');
   });
@@ -261,7 +238,6 @@ describe('the reported rows', () => {
     expect(standInOf(c, ['earthquake', 'avalanche', 'counter', 'protect'], 'earthquake').id).toBe('counter');
   });
 
-  // 2663093831 t9. p1's Sinistcha flinches before p2's Shadow Ball; the slowest stand-in (Trick Room, -7) put it behind.
   test.each(REPORTED)('the flinch stands before a Shadow Ball of a slower body: Trick Room is not the click ($name)', ({ c }) => {
     expect(standInForEvents(c, ['trickroom', 'earthquake'], [CANT, foeLine('Shuckle', 'Shadow Ball')], 'Shuckle').id).toBe('earthquake');
   });
@@ -281,7 +257,7 @@ describe('the reported rows', () => {
   test.each(REPORTED.filter(({ c }) => c.mode === 'doubles'))('an action before and one after the cant line: ahead of the second, behind the first ($name)', ({ c }) => {
     const first = '|move|p2b: Vaporeon|Splash|p2b: Vaporeon';
     expect(standInForEvents(c, ['trickroom', 'earthquake'], [first, CANT, foeLine('Shuckle', 'Shadow Ball')], 'Shuckle').id).toBe('earthquake');
-    // Quick Attack gets ahead of Pikachu but also ahead of the Splash the log shows first: no move does both, the slowest stays
+    // Quick Attack gets ahead of Pikachu and of the Splash the log shows first: no move does both, the slowest stays.
     expect(standInForEvents(c, ['trickroom', 'earthquake', 'quickattack'], [first, CANT, foeLine('Pikachu', 'Shadow Ball')]).id).toBe('trickroom');
   });
 

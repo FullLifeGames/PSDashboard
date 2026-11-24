@@ -7,12 +7,7 @@ import { AskLeak, fingerprint, playOnCopy, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * targetAtUse asks the move's onModifyMove from the Dex through the module's handler call. A sweep over every move of the Dex that has one, in every generation and
- * the Champions mod, in singles and doubles, on three fields, with and without the Tera click: the answer is the one the hand-written stand-in gives (played on a copy),
- * it is the real copy's answer or the Dex target (never a third value), and the live battle is unchanged (the development check of the module fingerprints it around
- * every call). Gens 3 and 4 Beat Up add their volatile to the live attacker through a stand-in; the view keeps it off.
- */
+// Gens 3 and 4 Beat Up add their volatile to the live attacker through a stand-in; the view keeps it off.
 
 await loadSimMods('gen9championsou');
 
@@ -26,10 +21,6 @@ const RULE_SETS = [
   { name: 'Champions doubles', format: 'gen9championsdoublescustomgame', doubles: true },
 ];
 
-/**
- * The hand-written stand-ins (the handler on `{ field, debug }`, the attacker as a prototype view), played on a copy of the board, since they wrote the live
- * attacker in Gens 3 and 4.
- */
 function byHand(live: Battle, moveId: string, tera: boolean): string {
   return playOnCopy(live, new PRNG('1,2,3,4'), battle => {
     const attacker = battle.sides[0].active[0] as Pokemon;
@@ -81,7 +72,6 @@ describe('targetAtUse over every move with an onModifyMove', () => {
             })();
             expect(answer, label).toBe(byHand(battle, id, tera));
             const real = battle.dex.getActiveMove(id);
-            // The real handler, with the real battle behind it, on a copy: what the stand-in is trying to say.
             const onCopy = playOnCopy(battle, new PRNG('1,2,3,4'), (copy): string | null => {
               try {
                 const move = copy.dex.getActiveMove(id);
@@ -107,7 +97,6 @@ describe('targetAtUse over every move with an onModifyMove', () => {
 });
 
 describe('targetAtUse writes nothing to the live attacker', () => {
-  // The two generations whose Beat Up handler adds a volatile to its user in ModifyMove: the question must not leave it.
   test.each([3, 4])('gen %i singles and doubles: Beat Up leaves the volatile off the live body', gen => {
     for (const doubles of [false, true]) {
       const team = (name: string) => Array.from({ length: doubles ? 2 : 1 }, () => set(name, ['tackle', 'splash']));
@@ -125,13 +114,11 @@ describe('targetAtUse writes nothing to the live attacker', () => {
 });
 
 describe('targetAtUse asks the handler once per body, move and click', () => {
-  // An option list of a doubles position asks the same slot move once per option; the reader battle never changes.
   test.each([['gen 9 doubles', 'gen9doublescustomgame'], ['Champions doubles', 'gen9championsdoublescustomgame']])('%s: a repeated question is answered from the first', (_name, format) => {
     const team = (name: string) => [set(name, ['tackle', 'splash']), set(name, ['tackle', 'splash'])];
     const battle = battleOf(format, team('Snorlax'), team('Pikachu'));
     const attacker = battle.sides[0].active[0] as Pokemon;
     const action = { kind: 'move', moveId: 'expandingforce', tera: false, slot: 0, loc: null } as never;
-    // The development check asks a hit again; the question is how the code runs without it.
     setAskCheck(false);
     const asked = vi.spyOn(battle.dex, 'getActiveMove');
     const questions = () => asked.mock.calls.filter(([id]) => id === 'expandingforce').length;
@@ -139,7 +126,6 @@ describe('targetAtUse asks the handler once per body, move and click', () => {
     expect(questions()).toBe(1);
     for (let again = 0; again < 3; again++) expect(targetAtUse(battle, attacker, action)).toBe(first);
     expect(questions()).toBe(1);
-    // The Tera click is its own question, and so is another move; a move without a handler never reaches the stand-in.
     targetAtUse(battle, attacker, { ...(action as object), tera: true } as never);
     expect(questions()).toBe(2);
     expect(targetAtUse(battle, attacker, { ...(action as object), moveId: 'tackle' } as never)).toBe('normal');

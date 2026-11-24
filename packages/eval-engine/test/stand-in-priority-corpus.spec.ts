@@ -7,31 +7,17 @@ import { CHAMPIONS, mon, playClicks, RULES, type Rules } from './dice-fixtures';
 import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * The never-acted conflicts of the corpus as constructed rows with the real bodies. In each row a body that the log never shows
- * acting falls to the foe's action, which the log shows first; taking the first move of the Dex's priority-0 tie would run it ahead
- * of the foe in the simulator (Prankster at +1, Grassy Glide at +1 in Grassy Terrain). The corpus holds 352 such stand-ins in 7,032
- * rebuilt games (singles 21, Doubles OU 94, VGC 195, Champions VGC 50, the rest in Champions OU singles). Every row names its game,
- * turn and slot.
- *
- * A row builds the body with its species, ability, item and moves, and the foe with its species and move, on the rule set of the game
- * (Gen 9 singles or doubles, VGC with its bench, the Champions mod). The test asks `getMainChoice` for the body's stand-in, then plays the
- * turn on a copy under both answers of the dice: the stand-in must act behind the foe (or not at all, the foe knocks it out first), and the
- * base pick (`base`) must act ahead of it, which is the contradiction of the log.
- */
 await loadSimMods('gen9championsou');
 
 type Kind = 'singles' | 'doubles' | 'VGC';
 interface Row {
   name: string;
-  /** The corpus scene: game, turn, slot. */
   scene: string;
   kind: Kind;
   rules: Rules;
   body: { species: string; ability: string; item: string; moves: string[] };
-  /** `fast`: the foe's speed investment of the rebuilt game (252 EVs, a Speed nature), where the plain spread would put the body ahead of it. */
+  /** `fast`: 252 EVs and a Speed nature on the foe, where the plain spread would put the body ahead. */
   foe: { species: string; move: string; fast?: boolean };
-  /** The move the base picked (the first of the Dex's priority-0 tie) and the one the simulator's order picks. */
   base: string;
   expected: string;
   grassy?: boolean;
@@ -59,7 +45,6 @@ const ROWS: Row[] = [
 
 const BENCH = ['Pikachu', 'Chansey', 'Snorlax', 'Blissey'];
 
-/** The board of a row: the body on p1a and the foe on p2a; doubles add two splashers a side, VGC a bench of four. */
 function boardOf(row: Row): Battle {
   const { rules } = row;
   const splash = (species: string) => mon(rules, { species, moves: ['splash'] });
@@ -73,7 +58,6 @@ function boardOf(row: Row): Battle {
   return board;
 }
 
-/** The click of a move: doubles name the foe for a move that takes a target. */
 function clickOf(row: Row, board: Battle, moveId: string, side: 0 | 1): string {
   const moves = board.sides[side].active[0]!.getMoveRequestData().moves;
   const slot = moves.findIndex(move => move.id === moveId) + 1;
@@ -86,7 +70,6 @@ function clickOf(row: Row, board: Battle, moveId: string, side: 0 | 1): string {
 const unseen = (row: Row): string[] =>
   row.kind === 'singles' ? [] : ['|move|p1b: Blissey|Splash|p1b: Blissey', '|move|p2b: Vaporeon|Splash|p2b: Vaporeon'];
 
-/** Whether the body's move stands ahead of the foe's in one turn on a copy: true ahead, false behind or never (knocked out first). */
 function actsFirst(row: Row, board: Battle, bodyMove: string, chance: boolean): boolean {
   const copy = copyOf(board);
   copy.prng = new FixedDice({ chance });

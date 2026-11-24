@@ -37,13 +37,10 @@ interface Fixture { serialized: string; tera?: EvalSettings['tera']; sleepClause
 const fixture = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as Fixture;
 const position = (name: string) => fixture(name).serialized;
-/** A fixture's rule set, named from its replay id as the hosts name it (useEvalView, bankSettings). */
 const rulesetOf = (name: string): StaticRuleset => replayRuleset({ id: name.replace(/-t\d+$/, ''), log: '' });
 const CASES = ['smogtours-gen9ou-749828-t23', 'gen9ou-2658658993-t2', 'gen9doublesou-2663093831-t12'];
-/** Positions whose search runs a verify round (the doubles one after the pair plan's check round). */
 const VERIFYING = ['smogtours-gen6ou-648453-t13', 'gen9doublesou-2663093831-t12'];
 
-/** What the orchestrator asked of its executor: tree offsets in call order, the trees by offset, every cells round, every proof. */
 interface Recording {
   offsets: number[];
   trees: MctsTreeStats[];
@@ -51,10 +48,7 @@ interface Recording {
   proofs: { input: ForcedWinInput; outcome: ForcedWinOutcome | null }[];
 }
 
-/**
- * The local executor with a record of every call. `lastFirst` holds tree 0 back until the other trees
- * are done, so the trees finish in an order other than their seed offsets.
- */
+// `lastFirst` holds tree 0 back until the other trees are done, so they finish out of seed-offset order.
 function recordingExecutor(serialized: string, lastFirst = false, ruleset: StaticRuleset = 'standard'): { executor: TreeExecutor; record: Recording } {
   const local = createLocalTreeExecutor(serialized, ruleset);
   const record: Recording = { offsets: [], trees: [], rounds: [], proofs: [] };
@@ -85,10 +79,7 @@ function recordingExecutor(serialized: string, lastFirst = false, ruleset: Stati
   return { executor, record };
 }
 
-/**
- * The verify round is the first cells round whose jobs all deepen. The pair plan's boundary round before it deepens nothing, the answer round's detection after it is plain,
- * its extension mixes plain and deepened jobs and its re-check deepens again.
- */
+// The verify round is the first cells round whose jobs all deepen.
 const verifyRound = (record: Recording) => record.rounds.find(round => round.jobs.length > 0 && round.jobs.every(job => job.deepen !== undefined && !job.plain));
 
 async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promise<T>): Promise<T> {
@@ -112,12 +103,7 @@ const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): Eval
   };
 };
 
-/**
- * The real orchestrator, read through what it asks of its executor (not through a hand copy of itself): the cases carry keepPlayed and a sleep clause, so dropping the
- * played row, the sleep clause of the verify step, the tree order or the verified input of the prover turns a row red.
- */
 describe('tree orchestration through the executor', () => {
-  // A doubles root asks for plain cells after the verify round, and the prover proves the answered ranking.
   test('the answer round follows the verify round with plain cells, and the prover proves its ranking', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2630685175-t7-played';
     const played = fixture(name);
@@ -127,14 +113,12 @@ describe('tree orchestration through the executor', () => {
     const verifyAt = record.rounds.indexOf(verifyRound(record)!);
     const answers = record.rounds.slice(verifyAt + 1);
     expect(answers.length).toBeGreaterThan(0);
-    // The detection is one plain draw per cell; the extension prices the rows that can decide the ranking as verify cells.
     expect(answers[0].jobs.every(job => job.plain && job.deepen === undefined)).toBe(true);
     expect(answers.every(round => round.jobs.every(job => job.plain || job.deepen !== undefined))).toBe(true);
-    // The prover reads the answered ranking (its near ties by label).
     expect(record.proofs[0].input.rootOrder).toEqual(forcedWinInput(result, settings).rootOrder);
   });
 
-  // The tests count the trees the budget in force runs; with a constant beside the budget the late-finishing run below would wait for trees a smaller budget never starts.
+  // Count the trees the budget in force runs: a constant beside it makes the late run wait for trees never started.
   test('a budget of three trees runs three offsets, whatever order they finish in', { timeout: 120_000 }, async () => {
     configureSearchBudget(parseSearchBudget('trees=3'));
     onTestFinished(() => configureSearchBudget(null));
@@ -157,7 +141,7 @@ describe('tree orchestration through the executor', () => {
   });
 
   test('verifies one ply deeper with the search\'s own Tera and sleep clause; doubles asks the pair plan first', { timeout: 600_000 }, async () => {
-    // The answer round adds its own rounds where it finds an answer (2663093831 turn 12), so the contract runs with the answer round off; its rounds have their own tests.
+    // The answer round adds rounds of its own where it finds an answer, so this contract runs with it off.
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
       const { executor, record } = recordingExecutor(position(name));
@@ -177,7 +161,6 @@ describe('tree orchestration through the executor', () => {
     const name = VERIFYING[0];
     const without = recordingExecutor(position(name));
     await searchTreesOrchestrated(without.executor, settingsOf(name));
-    // The played turn names p1's least visited switch: a row the trees leave out of their support.
     const trees = without.record.trees;
     const visits = (i: number) => trees.reduce((sum, tree) => sum + tree.p1N[i], 0);
     const rare = trees[0].p1Options.map((option, i) => ({ option, i })).filter(entry => entry.option.label.startsWith('→ '))
@@ -186,7 +169,6 @@ describe('tree orchestration through the executor', () => {
     const keepPlayed: EvalSettings['keepPlayed'] = { p1: { kind: 'switch', name: species, species }, p2: null };
     const withPlayed = recordingExecutor(position(name));
     await searchTreesOrchestrated(withPlayed.executor, settingsOf(name, keepPlayed));
-    // keepPlayed reaches the singles options only through slots: the trees are the same.
     expect(withPlayed.record.trees).toEqual(without.record.trees);
     const merged = mergeMctsTrees(withPlayed.record.trees);
     const played = playedIndices(withPlayed.record.trees, merged, keepPlayed);
@@ -200,21 +182,16 @@ describe('tree orchestration through the executor', () => {
   test('the played row joins the verify set (doubles: VGC 2630685175 t7, p1 U-turn + Tera Starstorm)', { timeout: 600_000 }, async () => {
     const name = 'gen9vgc2026regi-2630685175-t7-played';
     const keepPlayed = fixture(name).keepPlayed!;
-    // A VGC position, searched under the VGC rule set (the hand doubles table) as the app searches it.
     expect(rulesetOf(name)).toBe('vgc');
     const { executor, record } = recordingExecutor(position(name), false, rulesetOf(name));
     await searchTreesOrchestrated(executor, settingsOf(name, keepPlayed));
     const merged = mergeMctsTrees(record.trees);
     const played = playedIndices(record.trees, merged, keepPlayed);
     expect(played.p1).toBeDefined();
-    // The trees' own support does not hold the played row on this scene; the played option brings it into the verify round all the same. The singles scene above is the one
-    // that proves the played option adds a row the trees leave out.
     expect(verifyRound(record)!.jobs.some(job => job.i === played.p1)).toBe(true);
   });
 
   test('the matrix reads the verified values and the prover proves the verified result', { timeout: 600_000 }, async () => {
-    // The verify-to-prover contract, with the doubles answer round off (it re-ranks after verify; its own test follows). The contract runs on every scene; the shift of the
-    // prover's input is required of one scene per game type.
     const shifted: string[] = [];
     for (const name of [...VERIFYING, 'smogtours-gen6ou-649664-t14-g1']) {
       const settings = settingsOf(name);
@@ -228,11 +205,9 @@ describe('tree orchestration through the executor', () => {
       expect(record.proofs[0].input, name).toEqual(forcedWinInput(verified, settings));
       if (JSON.stringify(forcedWinInput(verified, settings)) !== JSON.stringify(forcedWinInput(unverified, settings))) shifted.push(name);
       applyForcedWin(verified, record.proofs[0].outcome);
-      // The lines of the turn come after the prover and nothing reads them to score or rank.
       expect(withoutLines(result), name).toEqual(verified);
     }
-    // Required shifts: 649664 t14 g1 for singles (the swap in the tail of p2's bench switches, switch 2 before switch 3, that the Monte-Carlo reference shows: 24 draws, seed
-    // blocks 1001 and 5001, answers off) and 2663093831 t12 for doubles. 648453 t13 shifts on both blocks of the reference, but its verified ranking feeds the prover the unverified root order.
+    // Required: one shifted scene per game type; the Monte-Carlo reference (24 draws, blocks 1001 and 5001) shows it.
     expect(shifted, 'the verified ranking reaches the prover (singles)').toContain('smogtours-gen6ou-649664-t14-g1');
     expect(shifted, 'the verified ranking reaches the prover (doubles)').toContain('gen9doublesou-2663093831-t12');
   });
@@ -285,7 +260,6 @@ const looksLikeCommands = (battle: Parameters<typeof createBranchStateFromBattle
   return resolveSideChoices(battle!, side, slots, required);
 };
 
-/** One line played as a variation on a fresh branch of the scene; the value of the position after its last step, from p1's side. */
 async function playAsVariation(scene: Scene, line: EvalLine, seed: string): Promise<{ value: number; steps: number }> {
   const runtime = await branchOf(scene.format, scene.p1, scene.p2, seed);
   scene.prepare?.(runtime.battleStream.battle!);
@@ -340,7 +314,6 @@ const SCENES: Scene[] = [
 
 const searched = new Map<string, Promise<EvalResult>>();
 
-/** One search per scene and executor: the tests of a scene read the same result. `plain` is the executor without the lines job. */
 function search(scene: Scene, kind: 'lines' | 'plain' | 'pass'): Promise<EvalResult> {
   const key = `${scene.name}|${kind}`;
   if (!searched.has(key)) searched.set(key, searchOnce(scene, kind));
@@ -363,7 +336,7 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
     expect(result.lines, 'the search carries lines').toBeDefined();
     const { lines, ...rest } = result;
     expect(rest, 'the score, the rankings, the matrix and the rest equal the run without the lines job').toEqual(plain);
-    // a row has a line when a tree gave it the visits a line needs: the best rows of a singles search do, a doubles best row may stand on fewer
+    // the best rows of a singles search have a line; a doubles best row may stand on fewer visits than a line needs
     const held = (['p1', 'p2'] as const).filter(side => lines!.some(line => line.side === side && line.for.includes('engine') && line.label === result.perSide[side][0].label));
     expect(held.length, 'a best row holds its line').toBeGreaterThanOrEqual(scene.name.startsWith('singles') ? 2 : 1);
     for (const side of ['p1', 'p2'] as const) {
@@ -409,7 +382,6 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
       if (first.replacement) continue;
       const ranking = result.perSide[other].map(row => row.label);
       const at = ranking.indexOf(first[other].label);
-      // a tree keeps lines against its own top three answers, so the merged top three are the answers a line can meet
       expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeGreaterThanOrEqual(0);
       expect(at, `${line.side} ${line.label}: the answer ${first[other].label} is among the merged top three`).toBeLessThanOrEqual(2);
     }
@@ -430,10 +402,6 @@ describe.each(SCENES)('the lines of a tree search: $name', scene => {
   }, 180_000);
 });
 
-/**
- * A turn holds, beside a row's usual line, the line against the reply that hurts the row most (`versus: 'worst'`) where a tree holds one. Its first answer is the row's
- * `worstAnswer` of the result, it belongs to a row that also has its usual line (same side, label and roles), and the result outside `lines` equals the run without the job.
- */
 describe.each(SCENES)('the line against the reply that hurts most: $name', scene => {
   test.each(['lines', 'pass'] as const)('a worst line meets the row\'s worst answer and sits beside the row\'s usual line (%s)', async kind => {
     const result = await search(scene, kind);
@@ -451,7 +419,6 @@ describe.each(SCENES)('the line against the reply that hurts most: $name', scene
       expect(usual, `${line.side} ${line.label}: the usual line stands beside it`).toBeDefined();
       expect(usual!.steps[0][other].label, 'the worst line is asked for only when the usual one meets another answer').not.toBe(answer!.label);
     }
-    // the usual lines are the lines the job makes without the setting: one per row and role, none of them marked
     const usual = lines!.filter(line => !line.versus);
     expect(new Set(usual.map(line => `${line.side}|${line.label}|${line.for.join()}`)).size).toBe(usual.length);
   }, 120_000);
@@ -468,7 +435,7 @@ describe('tree-partials', () => {
   interface Scene { serialized: string; settings?: { tera: boolean; ruleset: StaticRuleset; sleepClause: boolean }; tera?: EvalSettings['tera']; sleepClause?: boolean }
   const read = (path: string): Scene => JSON.parse(readFileSync(new URL(`./fixtures/${path}`, import.meta.url), 'utf-8')) as Scene;
 
-  /** A lean budget: two trees of 160 iterations, so the one interim result (iteration 150) lies before the end of every tree. */
+  // Two trees of 160 iterations: the one interim result (iteration 150) lies before the end of every tree.
   function leanBudget(): void {
     configureSearchBudget(parseSearchBudget('trees=2,iterations=160'));
     onTestFinished(() => configureSearchBudget(null));
@@ -492,7 +459,6 @@ describe('tree-partials', () => {
     board('singles OU 749828 turn 23 (a tree turn)', 'positions/smogtours-gen9ou-749828-t23.json'),
   ];
 
-  /** The local executor with a log: "partial" when a tree hands its interim result on, "tree-done" when a tree returns, and the fourth argument per offset. */
   function logging(serialized: string, ruleset: StaticRuleset): { executor: TreeExecutor; events: string[]; asked: Map<number, unknown>; partials: EvalResult[] } {
     const local = createLocalTreeExecutor(serialized, ruleset);
     const events: string[] = [];

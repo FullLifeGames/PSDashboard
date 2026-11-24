@@ -5,11 +5,6 @@ import { FirstChoice } from '../src/endgame/win-paths/first-choice';
 import { WinMeter } from '../src/endgame/win-paths/budget';
 import { mon, serializedBoard, type Board } from './win-paths-support';
 
-/**
- * The engine's first choice past the root is the best row of the one-turn matrix. The matrix is the solver at one
- * turn (`solveEndgame` with `turns: 1`), so its value must equal the solver's; the first choice takes the damaging move over a Splash,
- * for both sides, singles and doubles, and a position is priced once.
- */
 const SINGLES: Board = {
   format: 'gen9customgame',
   p1: [mon('Snorlax', ['Splash', 'Seismic Toss'])],
@@ -26,7 +21,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('the first 
     const { serialized } = await serializedBoard(board);
     const matrix = oneTurnMatrix(createRootPosition(serialized, 'standard'))!;
     expect(matrix.cells).toBe(matrix.p1.length * matrix.p2.length);
-    // the solver reads an endgame only (three bodies or fewer): the doubles board has four, so there the matrix stands on its own
+    // the solver reads an endgame only (three bodies or fewer): the doubles board has four, the matrix stands alone
     const solved = solveEndgame(serialized, { turns: 1 }, 'standard');
     if (solved.scope) expect(matrix.value).toBeCloseTo(solved.value, 9);
     else expect(Math.abs(matrix.value)).toBeLessThanOrEqual(1);

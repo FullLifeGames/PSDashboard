@@ -2,22 +2,10 @@ import { describe, expect, test } from 'vitest';
 import { TERA_FORME_SPECIES } from '../src/branch/tera-restore';
 import { DOUBLES_VIEWS, SINGLES_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * `TERA_FORME_SPECIES` in branch/tera-restore.ts names the species whose Terastallization leaves
- * more behind than the marker, so restoring the bare marker on a revived body would leave half a Tera there:
- *  - Ogerpon: the click turns it into its Tera forme and gives it Embody Aspect;
- *  - Terapagos: the click turns it into the Terastal forme (a different ability and maximum HP);
- *  - Morpeko: the click changes nothing at once, but Hunger Switch (its `onResidual` returns when `pokemon.terastallized`) stops
- *    flipping it between Full Belly and Hangry at every turn end.
- * The spec plays every base species of Generation 9, in singles and in doubles (Champions has no Terastallization): the
- * same lead twice over one full turn, once with the Tera click and once without, and keeps the species whose forme, ability
- * or maximum HP at the end of the turn depends on the click. They are the list, and a Tera Morpeko is the one that keeps its
- * forme where the plain Morpeko turns Hangry.
- */
+// Morpeko keeps its forme under Tera: Hunger Switch's `onResidual` returns when `pokemon.terastallized`.
 
 interface Outcome { forme: string; ability: string; maxhp: number }
 
-/** The lead's forme, ability and maximum HP after one turn in which it uses its first move, with or without the Tera click. */
 function afterTurn(view: SimView, species: string, ability: string, click: boolean): Outcome {
   const battle = battleIn(view, [mon(species, ['splash'], { ability }), mon('Blissey', ['splash'])], [mon('Snorlax', ['splash']), mon('Snorlax', ['splash'])]);
   battle.choose('p1', `move 1${click ? ' terastallize' : ''}${view.doubles ? ', move 1' : ''}`);

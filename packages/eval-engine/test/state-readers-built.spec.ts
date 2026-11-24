@@ -6,18 +6,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, type Plugin } from 'vite';
 import { censusOf, type Census } from './state-readers-built-entry';
 
-/**
- * The board key's table of readers comes from `String(handler)` of the simulator's Dex, and the app runs the PRODUCTION BUILD of the simulator: a build that renames
- * properties, folds a branch or inlines a call would key other fields in the browser than in Node, and the hit memo and the end-of-turn memo would answer for boards
- * they should keep apart. The spec bundles `state-readers-built-entry.ts` with the app's vite.config.ts (its minifier, its target, its resolve rules, `keepNames`) and
- * runs the bundle in Node next to the source: per Dex entry of Generations 1 to 9 and the Champions mod, per handler and per consumer, the properties the scan finds,
- * the ids it names and the reads of the simulator's methods must be the same. The Dex entries are those of the bundle's own copy of @pkmn/sim.
- */
+// The Dex entries are those of the bundle's own copy of @pkmn/sim.
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const ENTRY = fileURLToPath(new URL('./state-readers-built-entry.ts', import.meta.url));
 
-/** The census of the entry bundled with the app's build settings; `plugins` are extra, for the control that a rewriting build is seen. */
 async function builtCensus(plugins: Plugin[] = []): Promise<Census> {
   const result = await build({
     root: ROOT,
@@ -50,7 +43,6 @@ function differences(node: Census, built: Census): string[] {
   return out;
 }
 
-/** A build that renames one property wherever it appears: what a property-mangling minifier does to a handler's source. */
 const renameProperty = (from: string, to: string): Plugin => ({
   name: 'rename-property',
   enforce: 'pre',

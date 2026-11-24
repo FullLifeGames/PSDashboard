@@ -18,14 +18,8 @@ import type { EvalResult, EvalSettings } from '../src/types';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The horizon-trend probe reads a decisive cell from its base draws: from each base draw of the cell, the seeds the matrix priced it with, it searches the child one ply and
- * subtracts the child's own leaf; the trend is the mean over the draws. Reading only the FIRST-seed child against the cell's MEAN compares one outcome with the mean of all
- * outcomes (GPL DzBQ5azlO5l turn 13: the first seed was a flinch, the trend +0.54, and the shift of two tied rows put an untied row in front).
- *
- * The scenes are singles with p2's two benched Skarmory identical, so their switch rows tie exactly and the trend layers run on their decisive cells. Gengar's Focus Blast (70 %) is
- * a rolling cell, Shadow Ball (sure) is not.
- */
+// Reading only the first-seed child against the cell's mean compares one outcome with the mean of all outcomes.
+// p2's two benched Skarmory are identical, so their switch rows tie exactly and the trend layers run.
 
 const SETTINGS: EvalSettings = { depth: 1, samples: 3, tera: false, prove: false };
 const PROBE_SETTINGS: EvalSettings = { depth: 1, samples: 1, tera: false };
@@ -40,11 +34,8 @@ const SURE = scene(['shadowball', 'substitute']);
 
 type Trend = (ctx: { root: ReturnType<typeof createRootPosition>; cache: ReturnType<typeof createMatchupCache>; p1Choice: string; p2Choice: string; value: number; first: ReturnType<typeof createRootPosition> }) => number;
 
-/** The first-seed child searched one ply, against the cell's mean (the reading the probe does not make). */
 const todaysProbe: Trend = ({ cache, value, first }) => subSearchDepth1(first.serialized, PROBE_SETTINGS, cache).score - value;
-/** The mean over the cell's first three search seeds of (the child searched one ply) - (the child's own leaf). */
 const drawsProbe: Trend = ({ root, cache, p1Choice, p2Choice }) => {
-  // The cell's first three search seeds.
   const trends = cellSeeds(root, p1Choice, p2Choice).slice(0, 3).map(seed => {
     const child = advancePosition(root, p1Choice, p2Choice, seed);
     return subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
@@ -52,7 +43,6 @@ const drawsProbe: Trend = ({ root, cache, p1Choice, p2Choice }) => {
   return trends.reduce((sum, trend) => sum + trend, 0) / trends.length;
 };
 
-/** The depth-1 root search by hand, the trend layers fed by `trendOf`: the rankings before and after, and the probes it priced. */
 function byHand(serialized: string, trendOf: Trend, samples: 1 | 3 = 3) {
   const order = benchOrder(serialized);
   const root = createRootPosition(order ? order.serialized : serialized);
@@ -81,7 +71,6 @@ describe('the trend probe reads the cell from its base draws', () => {
     const searched = evs(searchPosition(ROLLING, SETTINGS));
     expect(searched).toHaveLength(reference.after.length);
     searched.forEach((ev, index) => expect(ev).toBeCloseTo(reference.after[index], 9));
-    // The layers did run on the rolling cell, and the first-seed reading would have booked another trend there.
     expect(reference.probes).toEqual(['Focus Blast x → Skarmory', 'Focus Blast x → Skarmory']);
     expect(reference.after[0]).not.toBeCloseTo(reference.before[0], 2);
     const old = byHand(ROLLING, todaysProbe);
@@ -92,7 +81,6 @@ describe('the trend probe reads the cell from its base draws', () => {
   test('a cell priced by one draw keeps the single-draw probe: its child is the cell', () => {
     const old = byHand(SURE, todaysProbe);
     expect(old.probes).toEqual(['Shadow Ball x → Skarmory', 'Shadow Ball x → Skarmory']);
-    // The layers did run on the cell, and the cell is priced by its first seed alone: the child against the cell is the child against its own leaf.
     expect(Math.abs(old.after[0] - old.before[0])).toBeGreaterThan(0.02);
     const cell = sampleCell(createRootPosition(SURE), 0, 'move shadowball', 'switch 2', 3, createMatchupCache(), true);
     expect(cell.baseDraws).toBeUndefined();
@@ -138,7 +126,6 @@ describe('the trend probe reads the cell from its base draws', () => {
   });
 
   test('a draw of a speed-tied cell replays its move order: the child is the one the cell priced', () => {
-    // Equal Machamp, p1 at 1 HP: whoever moves first decides whether p1's Close Combat lands before p1 faints.
     const battle = battleOf('gen9customgame', [set('Machamp', ['closecombat', 'bulkup'])], [set('Machamp', ['closecombat', 'bulkup'])]);
     battle.sides[0].active[0]!.sethp(1);
     const root = createRootPosition(JSON.stringify(State.serializeBattle(battle)));
@@ -158,15 +145,13 @@ describe('the trend probe reads the cell from its base draws', () => {
     });
     const trends: number[] = [];
     for (const index of [0, 1, 2]) {
-      const child = advancePosition(root, 'move focusblast', 'move splash', cellSeeds(root, 'move focusblast', 'move splash')[index]); // the cell's slot
+      const child = advancePosition(root, 'move focusblast', 'move splash', cellSeeds(root, 'move focusblast', 'move splash')[index]);
       const expected = subSearchDepth1(child.serialized, PROBE_SETTINGS, cache).score - leafValue(positionBattle(child), cache);
       const answer = await executor.subSearch(job(index));
       expect(answer.trend, `draw ${index}`).toBeCloseTo(expected, 12);
       trends.push(answer.trend!);
     }
-    // A hit and a miss price the next ply differently: the draws are not the same child.
     expect(Math.abs(trends[0] - trends[1])).toBeGreaterThan(0.1);
-    // A job without a draw is the sub-search it was: no trend.
     const plain = await executor.subSearch({ i: 0, j: 0, p1Choice: 'move focusblast', p2Choice: 'move splash', settings: PROBE_SETTINGS });
     expect(plain.trend).toBeUndefined();
   });

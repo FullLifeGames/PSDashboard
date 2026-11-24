@@ -4,19 +4,11 @@ import { wonBy } from '../src/endgame/win-paths/luck-path';
 import { luckPath } from '../src/endgame/win-paths/luck';
 import { mon, REQUEST, serializedBoard, type Board } from './win-paths-support';
 
-/**
- * A luck path or a mistake path may end with both last bodies fainting in one turn.
- * Who wins then is the simulator's call and varies by generation and by what caused it; this file holds no rule of its own. Each row
- * plays one 1 v 1 turn on a fresh battle of a generation (every body at 1 HP, so the move that lands also takes its user down) and
- * compares what the simulator says (`battle.winner`, the order of the `|faint|` lines) with `wonBy`, the reading the win paths use.
- */
+// Who wins a double faint is the simulator's call and varies by generation and cause; no rule of its own here.
 interface Cause { name: string; first: string; second: string; fromGen: number; p1Moves: string[]; p2Moves: string[]; speedFirst: 'p1' | 'p2' }
 const CAUSES: Cause[] = [
-  // recoil: the faster body's Double-Edge takes the foe down and its own last hit point with it
   { name: 'recoil', first: 'p1', second: 'p2', fromGen: 1, p1Moves: ['Double-Edge'], p2Moves: ['Tackle'], speedFirst: 'p1' },
-  // Explosion: the user faints with the move, the foe's body falls to the same blast
   { name: 'Explosion', first: 'p1', second: 'p2', fromGen: 1, p1Moves: ['Explosion'], p2Moves: ['Tackle'], speedFirst: 'p1' },
-  // Destiny Bond: the slower body takes the attacker down with it
   { name: 'Destiny Bond', first: 'p1', second: 'p2', fromGen: 2, p1Moves: ['Tackle'], p2Moves: ['Destiny Bond'], speedFirst: 'p2' },
 ];
 
@@ -43,7 +35,7 @@ describe('both last bodies fall in one turn: the simulator decides, by generatio
         const result = playTurn(gen, cause);
         expect(result.ended).toBe(true);
         expect(result.faints).toHaveLength(2);
-        // what the simulator says at this generation (Showdown: a tie before generation 5, else the side whose body fell last)
+        // Showdown: a tie before Gen 5, else the side whose body fell last.
         const last = result.faints[1] as 'p1' | 'p2';
         const expected = gen >= 5 ? last : null;
         expect(result.winner === '' ? null : result.winner === 'A' ? 'p1' : 'p2').toBe(expected);
@@ -52,7 +44,6 @@ describe('both last bodies fall in one turn: the simulator decides, by generatio
     }
   }
 
-  // the same board through the luck step: the double faint is a win in Gen 9 and none in Gen 4, as the simulator ends it
   test.each([[9, 'found'], [4, 'none']] as const)('gen %i: the luck step finds the recoil win only where the simulator gives it', async (gen, status) => {
     const board: Board = {
       format: `gen${gen}customgame`,

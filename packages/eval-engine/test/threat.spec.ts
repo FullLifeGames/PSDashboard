@@ -11,11 +11,7 @@ import { doublesRoot } from './pair-battles';
 import { hazardEntryFraction } from '../src/score/hazards';
 import { evalFeatures } from '../src/score/features';
 
-/**
- * The matchup memo must be a function of its key. Super Fang, Nature's Madness and Ruination deal half the target's CURRENT HP, the one live-state read inside the
- * memoized threat: a key without it lets the first forked position to ask freeze its HP into the memo for the whole search (the bank would read stale values in a
- * fixed order; the app, where a worker pool splits one matrix, would read a different value run to run).
- */
+// Super Fang, Nature's Madness and Ruination deal half the target's CURRENT HP: the memo key must carry it.
 
 const makeSet = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: '', ability: 'No Ability', moves,
@@ -52,7 +48,6 @@ describe('matchup memo', () => {
       expect(full).toEqual(pairThreat(attacker, defender, battle));
       expect(best(full)).toBeCloseTo(0.5, 2);
 
-      // The same pair later in the search, the defender at a quarter: half of what is LEFT.
       defender.hp = Math.floor(defender.maxhp / 4);
       const low = cached(attacker, defender);
       expect(low).toEqual(pairThreat(attacker, defender, battle));
@@ -60,26 +55,22 @@ describe('matchup memo', () => {
     });
   }
 
-  // The types and the stored stats are live reads of the memoized function too: a turn can change them without touching species, item, ability or the slots.
   test('a type change on either side reaches the memo (Protean, Soak)', () => {
     const battle = makeBattle(makeSet('Meowscarada', ['knockoff', 'flowertrick']), makeSet('Gholdengo', ['shadowball']));
     const attacker = battle.sides[0].active[0];
     const defender = battle.sides[1].active[0];
     const cached = threatGetter(battle, createMatchupCache());
     const before = cached(attacker, defender);
-    // Protean after Flower Trick: pure Grass, Knock Off loses its STAB.
     attacker.setType('Grass');
     expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
     expect(cached(attacker, defender).physical).toBeLessThan(before.physical * 0.8);
-    // Soak on the defender: the Ghost weakness to Knock Off is gone.
     const grass = cached(attacker, defender);
     defender.setType('Water');
     expect(cached(attacker, defender)).toEqual(pairThreat(attacker, defender, battle));
     expect(cached(attacker, defender).physical).not.toBe(grass.physical);
   });
 
-  // A Tera click changes nothing the key carried: the sim keeps `types` at the old types and holds the new one in `terastallized`, so the body before and after
-  // the click would share one entry, in both directions. Under `tera: 'auto'` the app searches both bodies in one tree.
+  // A Tera click leaves `types` at the old types in the sim and holds the new one in `terastallized`.
   test('a Tera click reaches the memo, as attacker and as defender', () => {
     const battle = makeBattle(
       { ...makeSet('Ceruledge', ['splash', 'bitterblade']), teraType: 'Fighting' },
@@ -165,7 +156,6 @@ describe('the memo keys the move answer', () => {
 });
 
 describe('the memo keys the power at use', () => {
-  /** The change must move the answer, and the memo must answer like a fresh reading after it. */
   function missesTheMemo(attacker: PokemonSet, defender: PokemonSet, change: (user: Pokemon, target: Pokemon, battle: Battle) => void) {
     const battle = makeBattle(attacker, defender);
     const [user, target] = [battle.sides[0].active[0], battle.sides[1].active[0]];
@@ -251,13 +241,8 @@ describe('the memo keys the power at use', () => {
   });
 });
 
-/**
- * Body Press reads the user's Defense and Foul Play the target's Attack (the Dex's overrideOffensiveStat and overrideOffensivePokemon), and the key must carry both:
- * Guard Split and Power Split write those stored stats without touching species, item, ability or the slots, so a pair asked before the split would keep its old
- * answer for the whole search. The splits run in the simulator here.
- */
+// Guard Split and Power Split rewrite stored stats without touching species, item, ability or slots.
 describe('the memo keys the stats a move reads off its axis', () => {
-  /** The pair is asked before the turn; after it the memo must answer like a fresh reading, and the answer must have moved. */
   function missesAfter(battle: Battle, attacker: Pokemon, defender: Pokemon, turn: { p1: string; p2: string }, moved: () => boolean) {
     const cached = threatGetter(battle, createMatchupCache());
     const before = cached(attacker, defender);
@@ -308,7 +293,6 @@ describe('the memo keys the stats a move reads off its axis', () => {
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
-/** The simulator's damage in a real turn, the roll pinned to the maximum, a sure hit, no crit. */
 function simDamage(format: string, attacker: PokemonSet[], defender: PokemonSet[], id: string, p1 = 'move 1', p2 = 'move 1'): number {
   const battle = battleOf(format, attacker, defender);
   const prng = new ScriptedPRNG([1, 2, 3, 4], new Map([[`p1:${id}`, { hit: true, crit: false, roll: 0 }]]));
@@ -321,7 +305,7 @@ function simDamage(format: string, attacker: PokemonSet[], defender: PokemonSet[
   return before - target.hp;
 }
 
-/** Our fraction, in HP, against the simulator's damage: the static's formula skips the sim's rounding steps. */
+// The static's formula skips the sim's rounding steps, so the fraction is near the sim's damage, not equal.
 function expectNearSim(format: string, attacker: PokemonSet[], defender: PokemonSet[], id: string, p1?: string, p2?: string) {
   const battle = battleOf(format, attacker, defender);
   const ours = singleMoveFraction(battle.sides[0].active[0], battle.sides[1].active[0], id, battle) * battle.sides[1].active[0].maxhp;
@@ -336,7 +320,6 @@ describe('stat axes from the Dex', () => {
     expectNearSim('gen9customgame', [set('Corviknight', ['bodypress'], { evs: { hp: 0, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 } })], [splash('Snorlax')], 'bodypress');
     expectNearSim('gen9customgame', [set('Espeon', ['psyshock'])], [splash('Blissey')], 'psyshock');
     expectNearSim('gen9customgame', [set('Sableye', ['foulplay'])], [splash('Kingambit')], 'foulplay');
-    // Doubles: Body Press into one foe of two.
     expectNearSim('gen9doublescustomgame',
       [set('Corviknight', ['bodypress'], { evs: { hp: 0, atk: 0, def: 252, spa: 0, spd: 0, spe: 0 } }), splash('Pikachu')],
       [splash('Snorlax'), splash('Garchomp')], 'bodypress', 'move 1 1, move 1', 'move 1, move 1');
@@ -384,7 +367,6 @@ describe('stat axes from the Dex', () => {
       const root = doublesRoot([set('Corviknight', moves), splash('Pikachu')], [splash('Snorlax'), splash('Garchomp')]);
       return combinedOptionHints(root, 'p1', [{ choice: 'move irondefense, move splash', label: '' }])[0];
     };
-    // Two status parts at the support floor each, unless a part buys equity.
     expect(hint(['irondefense', 'bravebird'])).toBe(0.5);
     expect(hint(['irondefense', 'bodypress'])).toBeGreaterThan(0.5);
   });
@@ -407,7 +389,6 @@ describe('stat axes from the Dex', () => {
       espeon.boosts[offense === 'atk' ? 'atk' : 'spa'] = 2;
       expect(boostedFraction(threat, espeon, chomp), id).toBeCloseTo(flat * (180 / 20) * 2, 6);
     }
-    // The override of a setup hint reaches the callback: Calm Mind's +1/+1 is worth 60 power at x1.5.
     const battle = battleOf('gen9customgame', [set('Espeon', ['storedpower'])], [splash('Garchomp')]);
     const [espeon, chomp] = pair(battle);
     const threat = pairThreat(espeon, chomp, battle);
@@ -442,7 +423,6 @@ describe('tera-statics', () => {
     return battle;
   }
 
-  /** p1 clicks Tera on a turn in which nobody deals damage (slot 1 is Splash on both sides). */
   function clickTera(battle: Battle) {
     battle.choose('p1', 'move 1 terastallize');
     battle.choose('p2', 'move 1');
@@ -469,7 +449,6 @@ describe('tera-statics', () => {
       const [gholdengo, dragonite] = [battle.sides[0].active[0], battle.sides[1].active[0]];
       const steelBefore = singleMoveFraction(dragonite, gholdengo, 'ironhead', battle);
       clickTera(battle);
-      // Dragon into Fairy is an immunity, Steel into Fairy is super effective.
       expect(singleMoveFraction(dragonite, gholdengo, 'outrage', battle)).toBe(0);
       expect(singleMoveFraction(dragonite, gholdengo, 'ironhead', battle)).toBeCloseTo(steelBefore * 4, 6);
     });
@@ -495,7 +474,6 @@ describe('tera-statics', () => {
       expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
       clickTera(battle);
       expect(cached(zamazenta, ceruledge)).toEqual(pairThreat(zamazenta, ceruledge, battle));
-      // Body Press deals damage off the user's Defense (the Dex's overrideOffensiveStat), so it keeps its own entry in PairThreat.axes instead of the physical bucket.
       expect(cached(zamazenta, ceruledge).axes?.find(axis => axis.offense === 'def')?.fraction).toBeGreaterThan(0.3);
     });
 
@@ -521,7 +499,6 @@ describe('tera-statics', () => {
         expect(after).toBe(0);
       });
 
-      // Grounding goes through the sim's isGrounded(), which sees Tera.
       test('Spikes already follow the grounding in both directions', () => {
         expect(entryAcrossTheClick('Garchomp', 'Flying', 'spikes')).toEqual({ before: 0.125, after: 0 });
         expect(entryAcrossTheClick('Corviknight', 'Steel', 'spikes')).toEqual({ before: 0, after: 0.125 });
@@ -533,15 +510,13 @@ describe('tera-statics', () => {
         makeSet('Gholdengo', ['splash'], { teraType: 'Poison', item: 'Black Sludge' }),
         makeSet('Blissey', ['splash']),
       );
-      // One full-HP body a side: the bodies term is the holder's item multiplier minus 1.
       expect(evalFeatures(battle).bodies).toBeCloseTo(-0.1, 6);
       clickTera(battle);
       expect(evalFeatures(battle).bodies).toBeCloseTo(0.03, 6);
     });
   });
 
-  // STAB by the game's rules (old type 1.5, Tera type 1.5, both 2.0, Stellar 2.0 and 1.2 on the first use of a type); test/threat.stab-rules.spec.ts holds it
-  // against the damage the simulator deals. Blissey takes Ground and Fire neutrally, so the ratio across the click is the STAB ratio.
+  // STAB by the game's rules (1.5 old or Tera type, 2.0 both, Stellar 2.0 and 1.2): threat.stab-rules.spec.ts holds it.
   describe('STAB follows the Tera click', () => {
     test.each([['Ground', 'earthquake', 2 / 1.5], ['Fire', 'firefang', 1.5], ['Stellar', 'earthquake', 2 / 1.5]])(
       'Tera %s moves %s by x%f', (teraType, move, ratio) => {
@@ -579,7 +554,6 @@ describe('tera-statics', () => {
       return singleMoveFraction(battle.sides[0].active[0], battle.sides[1].active[0], move, battle);
     };
 
-    // gen9doublesou-2660822493 turn 2: Hurricane into Shiftry priced 277 % of its HP, the calc 0.
     test('Wind Rider takes no wind move; Wind Power still does', () => {
       const tornadus = makeSet('Tornadus', ['hurricane']);
       expect(fraction(tornadus, makeSet('Shiftry', ['splash'], { ability: 'Wind Rider' }), 'hurricane')).toBe(0);

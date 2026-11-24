@@ -2,18 +2,12 @@ import { Battle, Dex, Teams } from '@pkmn/sim';
 import * as champions from '@pkmn/mods/champions';
 import { entryReads, methodsOf, tokensOf, type Consumer, type Methods } from '../src/dex-facts/state-readers';
 
-/**
- * The entry of state-readers-built.spec.ts, bundled with the app's Vite configuration: the scan of `dex-facts/state-readers.ts` reads `String(handler)` of the
- * simulator's Dex, and a build that rewrites a handler's source (renamed or removed properties, folded branches) would change what the memos key in the browser and not in Node.
- */
 
-/** What the scan finds in each Dex entry of every generation and the Champions mod: keyed `<dex>|<kind>|<id>|<consumer or event>`, the values sorted. */
 export type Census = Record<string, string[]>;
 
 const KINDS = ['moves', 'abilities', 'items'] as const;
 const SUB_EFFECTS = ['condition', 'self', 'secondary', 'secondaries'] as const;
 
-/** The handler sources of an entry by their path (`onResidual`, `condition.onStart`, `secondaries.0.self.onHit`), through the same sub-effects the scan follows. */
 function handlersOf(entry: Record<string, unknown>, path: string, depth: number, out: Map<string, string>): void {
   for (const key of Object.keys(entry)) {
     const value = entry[key];
@@ -46,7 +40,6 @@ function scanDex(label: string, dex: typeof Dex, methods: Methods, census: Censu
   }
 }
 
-/** The methods of the simulator's body, side and field, with what each reads once closed over the calls of the others. */
 function methodsOfBattle(): Methods {
   const team = Teams.pack([{ name: 'A', species: 'Pikachu', item: '', ability: 'Static', moves: ['splash'], nature: 'Hardy', gender: 'M', evs: {}, ivs: {}, level: 50 } as never]);
   const battle = new Battle({ formatid: 'gen9customgame' as never, seed: [1, 2, 3, 4], p1: { name: 'p1', team }, p2: { name: 'p2', team } });

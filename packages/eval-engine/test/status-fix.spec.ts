@@ -8,11 +8,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * statusFix is the part of the status multiplier of `bodies` that is wrong for a body whose ability changes what the status costs; the right multiplier is played
- * in the simulator (score/status-factor.ts). This spec holds it to whole turns of real battles (HP over a turn, damage dealt and taken, speed) for every ability under
- * every status, on singles, doubles and the Champions mod, and checks the feature on boards of both game types.
- */
 await loadSimMods('gen9championscustomgame');
 
 const SINGLES = 'gen9customgame';
@@ -20,7 +15,6 @@ const DOUBLES = 'gen9doublescustomgame';
 const CHAMPIONS = 'gen9championscustomgame';
 const CHAMPIONS_DOUBLES = 'gen9championsdoublescustomgame';
 const STATUSES = ['brn', 'par', 'psn', 'tox'] as const;
-/** Seeds for a whole turn: a paralysed mon can lose the turn to the dice, so a turn that has to show a hit tries the next seed. */
 const SEEDS: [number, number, number, number][] = [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12], [13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]];
 const PHYSICAL = 'aerialace';
 const SPECIAL = 'aurasphere';
@@ -40,16 +34,14 @@ function turnOn(format: string, ability: string, status: string | null, choice: 
   const champions = isChampions(format);
   const moves = ['splash', PHYSICAL, SPECIAL];
   const mineTeam = [body('Snorlax', ability, moves, champions), ...(doubles ? [body('Snorlax', 'No Ability', moves, champions)] : [])];
-  // A Steel foe cannot be poisoned back by a Poison Touch or a Toxic Chain that the dice let through in one battle and not in the other.
   const foeTeam = [body('Registeel', 'No Ability', moves, champions), ...(doubles ? [body('Registeel', 'No Ability', moves, champions)] : [])];
   const battle = battleOf(format, mineTeam, foeTeam);
   const mine = battle.sides[0].active[0]!;
   const foe = battle.sides[1].active[0]!;
   if (status && (!mine.setStatus(status, null, null, true) || mine.status !== status)) return null;
-  // Both mons stand at 70 % so a terrain's or an ability's heal shows in the turn, and above the half where Berserk and Defeatist change.
+  // 70 % HP: a terrain's heal shows, and Berserk and Defeatist stay on one side of half.
   for (const mon of [mine, foe]) mon.hp = Math.ceil(0.7 * mon.maxhp);
   const speed = mine.getActionSpeed();
-  // The status takes its dice when it is set; the turn plays on the same dice in every battle.
   battle.prng = new PRNG(seed);
   const [mineHp, foeHp] = [mine.hp, foe.hp];
   const pick = (move: string) => (doubles ? `${move}, move 1` : move);
@@ -58,10 +50,6 @@ function turnOn(format: string, ability: string, status: string | null, choice: 
   return { mine: mine.hp - mineHp, foe: foe.hp - foeHp, speed };
 }
 
-/**
- * The seeds of a status's turns: up to three where a plain mon with the status is not stopped by the dice, the same for every ability so the rolls match. An ability
- * can move the draws of a turn (Prankster moves first, Shed Skin rolls at the end), so a channel is read as the median over the seeds, which drops a critical hit of one of them.
- */
 const seeds = new Map<string, number[][]>();
 function seedsOf(format: string, status: string | null): number[][] {
   const key = `${format}|${status}`;
@@ -78,7 +66,6 @@ function seedsOf(format: string, status: string | null): number[][] {
   return usable.length > 0 ? usable : [SEEDS[0]];
 }
 
-/** The six channels of the cost of a status, read from whole turns. Higher is better for the mon in every channel. */
 function playedReading(format: string, ability: string, status: string | null, seedStatus: string | null): Reading | null {
   const readings = seedsOf(format, seedStatus).map(seed => readingOn(format, ability, status, seed));
   if (readings.some(reading => !reading)) return null;
@@ -96,17 +83,15 @@ function readingOn(format: string, ability: string, status: string | null, seed:
   if (!idle || !physOut || !specOut || !physIn || !specIn) return null;
   return {
     residual: idle.mine,
-    // The hit dealt, with what the foe gains or loses in an idle turn (a terrain that heals it) taken out.
     physOut: -(physOut.foe - idle.foe),
     specOut: -(specOut.foe - idle.foe),
-    // The hit taken, with the status damage of the same turn taken out.
     physIn: physIn.mine - idle.mine,
     specIn: specIn.mine - idle.mine,
     speed: idle.speed,
   };
 }
 
-// Whole turns carry the damage rolls (the dice move with the order of the moves and the draws of an ability), up to 15 % of a hit; the abilities move a channel by a third or more.
+// Damage rolls move a whole turn by up to 15 % of a hit; an ability moves a channel by a third or more.
 const tolerance = (value: number) => Math.max(0.18 * Math.abs(value), 3);
 
 function playedRight(format: string, ability: string, status: string, applied: number): number {
@@ -118,7 +103,6 @@ function playedRight(format: string, ability: string, status: string, applied: n
   if (CHANNELS.some(channel => statused[channel] > healthy[channel] + tolerance(healthy[channel]))) return 1;
   const costs = CHANNELS.filter(channel => baseStatused[channel] < baseHealthy[channel] - tolerance(baseHealthy[channel]));
   if (costs.length === 0) return applied;
-  // A cost is the share a channel loses (a burn halves the Attack of any mon), the idle turn's HP and a value of 0 lose the difference.
   const lost = (channel: Channel, from: number, to: number) => (channel === 'residual' || from === 0 ? from - to : 1 - to / from);
   const recovered = costs.map(channel => Math.min(1, Math.max(0, 1 - lost(channel, healthy[channel], statused[channel]) / lost(channel, baseHealthy[channel], baseStatused[channel]))));
   return applied + (1 - applied) * (recovered.reduce((a, b) => a + b, 0) / costs.length);
@@ -126,11 +110,8 @@ function playedRight(format: string, ability: string, status: string, applied: n
 
 const appliedOf = (status: string) => EVAL_WEIGHTS.status[status] ?? 1;
 
-/**
- * The full sweep (EVAL_CHECK_FULL=1) plays every gen 9 ability under four statuses on four formats and takes about six minutes. The default run plays the abilities
- * that change what a status costs, the ones that cut or turn it aside, the dice abilities, every ability the Champions mod changes (read from the two Dex, not
- * listed), and every 16th ability of the Dex as a sample of the plain rest.
- */
+// EVAL_CHECK_FULL=1 plays every Gen 9 ability under four statuses on four formats; the default plays a selection:
+// status-changing abilities, dice abilities, every Champions change, every 16th of the rest.
 const FULL = !!process.env.EVAL_CHECK_FULL;
 const NAMED = [
   'poisonheal', 'guts', 'quickfeet', 'marvelscale', 'magicguard', 'toxicboost', 'flareboost', 'comatose', 'purifyingsalt',
@@ -159,7 +140,6 @@ describe('the status checker: every ability under every status, whole turns of t
     const dex = dexOf(SINGLES);
     expect([dex.moves.get(PHYSICAL).category, dex.moves.get(SPECIAL).category]).toEqual(['Physical', 'Special']);
     expect([dex.moves.get(PHYSICAL).accuracy, dex.moves.get(SPECIAL).accuracy]).toEqual([true, true]);
-    // One foe in doubles too: a spread move would need no target and hit both foes.
     expect([dex.moves.get(PHYSICAL).target, dex.moves.get(SPECIAL).target]).toEqual(['any', 'any']);
   });
 
@@ -176,7 +156,6 @@ describe('the status checker: every ability under every status, whole turns of t
       for (const status of STATUSES) {
         const applied = appliedOf(status);
         const read = statusRight(twin, ability.id, status, applied);
-        // An ability that rolls dice at the end of the turn (Shed Skin) gives back its share in expectation; one turn of real dice shows a cure or none.
         if (statusByChance(twin, ability.id, status)) {
           chance.push(`${ability.id}/${status}`);
           expect(read).toBeGreaterThan(applied);
@@ -226,7 +205,6 @@ function board(format: string, ability: string, status: string | null, mineFirst
 describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles', CHAMPIONS], ['Champions doubles', CHAMPIONS_DOUBLES]])('statusFix, %s', (_name, format) => {
   const twin = removalFormat(board(format, 'No Ability', null));
   const right = (ability: string, status: string) => statusRight(twin, ability, status, appliedOf(status));
-  /** The share of the statused body in the (alive + hp) weight before any status multiplier; every body is at full HP. */
   const share = () => (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp) / (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp);
 
   test('a Gliscor with Poison Heal under toxic is not discounted: the fix is what the multiplier took off', () => {
@@ -280,7 +258,6 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
     expect({ ...skipped, statusFix: all.statusFix }).toEqual(all);
   });
 
-  // Standard singles prices statusFix at the weight of bodies; the other tables hold it at 0.
   test('the score is the sum over every key with a statused Poison Heal body, and only the singles table prices the fix', () => {
     const battle = board(format, 'Poison Heal', 'tox');
     const ruleset = isChampions(format) ? 'champions' : 'standard';
@@ -297,7 +274,6 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES], ['Champions singles',
       const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
       return Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
     };
-    // The sum is the table's: the singles phase form is off here and pinned in phase-form.spec.ts.
     setStaticForm(false);
     expect(evaluatePosition(battle, cache)).toBe(scoreOf(false));
     if (priced) expect(evaluatePosition(battle, cache)).toBeGreaterThan(scoreOf(true));

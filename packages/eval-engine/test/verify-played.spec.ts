@@ -8,11 +8,6 @@ import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } f
 import type { EvalCellJob, EvalSettings, MctsTreeStats } from '../src/types';
 import type { PlayedAction } from '../src/played';
 
-/**
- * The verify step checks the played row and column in both game types, and a doubles tree's boundary cells come from the pair plan: a doubles tree flags no boundary cell
- * on its own (planCellEvents gives up on comma choices), so VGC 2629703929 t13 would never price Flare Blitz's 58 % kill on Solgaleo and p2's winning Psychic Fangs would
- * read as an inaccuracy.
- */
 
 const position = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as {
@@ -23,7 +18,6 @@ describe('the played row and column join the verify set', () => {
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   const cell = (i: number, j: number, visits: number, mean: number) =>
     ({ key: cellKey(i, j), visits, total: mean * (visits + 1) - mean, value: mean, ended: false });
-  // Five p1 rows from a clear best (A) to a clear worst (E); E×X is starved, every other cell is rich and agrees.
   const rows = [[0.5, 0.4], [0.1, 0.1], [0, 0], [-0.3, -0.3], [-0.6, -0.6]];
   const mk = (p1: string[], p2: string[]): MctsTreeStats => ({
     p1Options: p1.map(choice => ({ choice, label: choice })), p2Options: p2.map(choice => ({ choice, label: choice })),
@@ -41,12 +35,11 @@ describe('the played row and column join the verify set', () => {
       const trees = [mk([...p1], [...p2]), mk([...p1], [...p2]), mk([...p1], [...p2])];
       const merged = mergeMctsTrees(trees);
       const pairs = (jobs: EvalCellJob[]) => jobs.map(job => cellKey(job.i, job.j));
-      // E is neither support nor among the ranked top three: the starved-support cells do not reach it without the played focus.
       expect(pairs(starvedSupportCells(trees, merged))).not.toContain(cellKey(4, 0));
       const focus = { played: { p1: 4 } };
       const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus);
       expect(pairs(jobs)).toContain(cellKey(4, 0));
-      expect(pairs(jobs)).not.toContain(cellKey(4, 1)); // rich and agreeing: no job
+      expect(pairs(jobs)).not.toContain(cellKey(4, 1));
       expect(jobs.length).toBeLessThanOrEqual(VERIFY_CELL_CAP);
     });
   }
@@ -116,9 +109,6 @@ describe('doubles boundary cells come from the pair plan', () => {
     for (const job of check.jobs) expect(job.deepen).toBeUndefined();
     for (const job of verify.jobs) expect(job.deepen).toBeDefined();
     expect(verify.jobs.length).toBeLessThanOrEqual(VERIFY_CELL_CAP);
-    // The check round asks exactly the cells the visits leave out; a checked cell the pair plan priced with
-    // classes becomes a boundary cell and a starved-support job, one it did not price stays out of that list
-    // (it may still join by row completion).
     const merged = mergeMctsTrees(doubles.trees);
     const played = playedIndices(doubles.trees, merged, position('gen9vgc2026regi-2629703929-t13').keepPlayed);
     const checks = boundaryCheckCells(doubles.trees, merged, { played });

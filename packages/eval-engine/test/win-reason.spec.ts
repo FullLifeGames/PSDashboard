@@ -36,7 +36,6 @@ describe('win-reason detection', () => {
     ], names, 'p2');
     expect(report.summary).toContain('From turn 3, Kyurem-White cleared everything Alpha had left.');
     expect(report.conversion).toEqual({ kind: 'decided', turn: 3, species: 'Kyurem-White' });
-    // A quiet tip stays bare, and a spoken conversion mutes the close-game fallback.
     expect(report.summary).toContain('tipped for good on turn 1.');
     expect(report.summary).not.toContain('close game');
   });
@@ -45,7 +44,6 @@ describe('win-reason detection', () => {
     ({ playedRaw: null, played: null, best: null, safe: null, regret: 0, decided: { species, announce } });
 
   test('the conversion starts where the bar holds for the winner to the end', () => {
-    // 573756: the bar backed the sweep once at t124, fell back to 0.39, and held from t137 on.
     const report = buildGameReport([
       mk(1, 0.1, -0.75),
       mk(2, -0.75, -0.4, { p2: swept('Zapdos-Galar') }),
@@ -58,7 +56,6 @@ describe('win-reason detection', () => {
   });
 
   test('a turn without a sweep does not break the run while the bar holds', () => {
-    // 648453: proven at t35, no sweep on the board at t37 and t38, the bar at 1.00 throughout.
     const report = buildGameReport([
       mk(1, 0.1, -1),
       mk(2, -1, -1, { p2: { playedRaw: null, played: null, best: null, safe: null, regret: 0, forcedWin: { turns: 3, mass: 1, caveat: 'none', announce: true } } }),
@@ -114,8 +111,6 @@ describe('win-reason detection', () => {
     ], names, 'p2');
     expect(report.summary).not.toContain('forced');
     expect(report.conversion).toBeUndefined();
-    // With the conversion muted nothing else explains this game: the
-    // close-game fallback takes over.
     expect(report.summary).toContain('No single edge decided it');
   });
 
@@ -150,8 +145,6 @@ describe('win-reason detection', () => {
       mk(4, -0.5, -0.8),
     ], names, 'p2');
     expect(report.summary).toContain('tipped for good on turn 2, when Beta\'s read (Flip Turn) paid off.');
-    // A spoken win-path factor takes over the explaining: the clean-play
-    // sentence keeps its praise but drops its matchup-and-variance tail.
     expect(report.summary).toContain('Alpha\'s play was clean.');
     expect(report.summary).not.toContain('matchup and variance');
   });
@@ -173,14 +166,11 @@ describe('win-reason detection', () => {
       mk(3, -0.35, -0.6),
       mk(4, -0.6, -0.85),
     ], names, 'p2');
-    // t2's roll is past the favor boundary (resolution): only t1 is luck.
     expect(report.summary).toContain('The rolls decided it: luck ran Beta\'s way overall (+15%).');
     expect(report.summary).not.toContain('Luck ran');
     expect(report.winPath).toEqual({ factor: 'variance', size: 0.3 });
   });
 
-  // Characterization pin: seeds tell the decisions story, the luck line stays
-  // p1-framed (luck ran toward the loser), and no new sentence fires.
   test('luck toward the loser keeps the plain luck line and seeds mute the giveaway sentence', () => {
     const report = buildGameReport([
       mk(1, 0.1, 0.4, { attribution: 'chance', chanceDelta: 0.3 }),
@@ -240,8 +230,6 @@ describe('win-reason detection', () => {
   });
 
   test('a steady decision-led climb reads as the winner building it, hard-to-spot plays named', () => {
-    // Scores stay clear of 0 mid-slide: a float-exact zero crossing would
-    // move the favor boundary a turn early and shrink the window.
     const step = (turn: number, before: number): TurnAnalysis => mk(turn, before, before - 0.05, {
       decisionDelta: -0.04,
       chanceDelta: -0.01,
@@ -336,14 +324,10 @@ describe('win-reason detection', () => {
 });
 
 describe('dice-anchored luck claims', () => {
-  // Winner p2; diceTurns marks turns whose protocol carries a visible dice
-  // event. The gate is asymmetric: only an actively CONTRADICTING dice
-  // ledger (≥ an inaccuracy the other way) demotes the luck claims;
-  // damage-roll games without visible events keep their luck story.
+  // diceTurns marks turns with a visible dice event. Only a contradicting dice ledger (an inaccuracy or more the other
+  // way) demotes the luck claims; games without visible events keep their luck story.
 
   test('the variance claim needs the visible dice to agree', () => {
-    // The draft game in miniature: the net chance runs toward the winner,
-    // but the only dice turn (a crit) ran against them.
     const report = buildGameReport([
       mk(1, 0.1, 0.35, { attribution: 'chance', chanceDelta: 0.25 }),
       mk(2, 0.35, -0.05, { chanceDelta: -0.36 }),
@@ -353,8 +337,6 @@ describe('dice-anchored luck claims', () => {
     expect(report.summary).not.toContain('The rolls decided it');
     expect(report.summary).toContain('Chance swings favored Beta overall (+24%), while the visible dice favored Alpha.');
     expect(report.summary).not.toContain('Luck ran');
-    // With variance gated off, nothing else explains this tipped game: the
-    // close-game fallback takes over.
     expect(report.winPath).toEqual({ factor: 'close', size: 0 });
   });
 
@@ -378,8 +360,6 @@ describe('dice-anchored luck claims', () => {
   });
 
   test('a contradicted luck line renames itself even without a variance claim', () => {
-    // Luck toward the LOSER, dice toward the winner: no variance factor
-    // either way, but the luck line must not call it luck.
     const report = buildGameReport([
       mk(1, 0.1, 0.4, { chanceDelta: 0.45 }),
       mk(2, 0.4, -0.3, { attribution: 'chance', chanceDelta: -0.15 }),
@@ -400,8 +380,6 @@ describe('dice-anchored luck claims', () => {
   });
 
   test('the tip\'s roll clause needs a visible dice event on the tip turn', () => {
-    // 573756 t70: a chance-attributed tip whose ledger entry is the engine
-    // disagreeing with itself across two evaluations: no die fell.
     const analyses = [
       mk(1, 0.1, 0.05),
       mk(2, 0.05, -0.3, { attribution: 'chance', chanceDelta: -0.35 }),
@@ -417,9 +395,6 @@ describe('dice-anchored luck claims', () => {
 });
 
 describe('denied early end', () => {
-  // Winner p2 (negative scores). Turn 3 holds p2's one-roll sweep
-  // (nearDecided) and the roll visibly fails: the protocol shows a dice
-  // event and the turn's chance runs against p2. The game then runs on.
 
   const nearSide = (playedOver: Partial<NonNullable<TurnAnalysis['p2']['played']>> | null = {}) => ({
     playedRaw: null,
@@ -503,7 +478,6 @@ describe('denied early end', () => {
       names, 'p2', true, new Set([3]));
     expect(otherOdds.summary).toContain('but the roll failed, and the win waited another 9 turns.');
     expect(otherOdds.deniedEnd?.move).toBeUndefined();
-    // Without a played choice no click is proven, so the claim stays unmade.
     const noPlayed = buildGameReport(
       deniedAnalyses(12, { p2: nearSide(null) }),
       names, 'p2', true, new Set([3]));
@@ -512,8 +486,7 @@ describe('denied early end', () => {
   });
 
   test('the claim needs the near stage\'s click in the played choice (2695803506 t2)', () => {
-    // Champions VGC 2695803506 t2: Basculegion's 94 % Wave Crash stood against Incineroar, Basculegion switched out, and
-    // the turn's only rolls were Matcha Gotcha's burns. The near stage reads the first active: the played choice's lead part.
+    // The near stage reads the first active: the played choice's lead part.
     const doublesSide = (choice: string, click: { move: string; target?: number } = { move: 'wavecrash', target: 1 }) => ({
       ...nearSide(), played: ranked(choice, 'Basculegion and Kingambit', -0.5),
       nearDecided: { species: 'Basculegion', odds: 0.94, removes: 'Incineroar', click, announce: false },
@@ -525,17 +498,13 @@ describe('denied early end', () => {
     expect(denied(doublesSide('move protect, move wavecrash 1'))).toBeUndefined();
     expect(denied(doublesSide('move wavecrash 1, move kowtowcleave 2'))?.species).toBe('Basculegion');
     expect(denied(doublesSide('move wavecrash 1 mega, move protect'))?.turn).toBe(3);
-    // A spread move writes no target and reaches the one it would remove.
     expect(denied(doublesSide('move heatwave, move protect', { move: 'heatwave', target: 1 }))?.turn).toBe(3);
-    // Singles: the click is the played move, a switch or another move is none.
     expect(denied(nearSide({ choice: 'switch 2' }))).toBeUndefined();
     expect(denied(nearSide({ choice: 'move bodypress' }))).toBeUndefined();
     expect(denied(nearSide())?.move).toBe('Fire Fang');
   });
 
   test('labeled doubles odds never name the move', () => {
-    // The headline odds of a doubles option may be the partner slot's; "X missed" would name
-    // a roll the near-decided body did not take.
     const labeled = buildGameReport(
       deniedAnalyses(12, { p2: nearSide({ koOdds: { accuracy: 0.95, killFraction: 1, label: 'Heat Wave→Corviknight' } }) }),
       names, 'p2', true, new Set([3]));
@@ -601,7 +570,6 @@ describe('seed-phrase-stopped', () => {
       expect(stopped).not.toBe(open);
       expect(stopped).not.toMatch(/roll into|kills ~|of the time/);
       expect(stopped.startsWith('turn 7 (')).toBe(true);
-      // The recommendation's claim does not enter the seed.
       expect(seedPhrase(turnOf(loser({ hitStopped: { best: true } })), 'p1')).toBe(open);
     });
   });

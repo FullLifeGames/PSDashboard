@@ -26,17 +26,12 @@ import type { Battle } from '@pkmn/sim';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The static weighs its features with the table of the replay's rule set (Pokémon Champions or standard) and game type; the host names the rule set
- * (EvalSettings.ruleset), every search carries it to its leaves through the matchup cache, and executors are bound to one.
- */
 
 const position = (name: string) =>
   (JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as { serialized: string }).serialized;
 const SINGLES = 'gen9ou-2658658993-t2';
 const DOUBLES = 'gen9doublesou-2663093831-t12';
 
-/** Until their own fit the Champions tables copy the standard ones; a test gives them a matchup weight of their own. */
 function withChampionsMatchup<T>(value: number, run: () => T): T {
   const saved = [CHAMPIONS_FEATURE_WEIGHTS.matchup, CHAMPIONS_DOUBLES_FEATURE_WEIGHTS.matchup];
   CHAMPIONS_FEATURE_WEIGHTS.matchup = value;
@@ -84,7 +79,6 @@ describe('static rule set', () => {
     expect(featureWeights(false, 'vgc')).toBe(FEATURE_WEIGHTS);
   });
 
-  // VGC keeps the hand doubles table while Doubles OU takes its fit; a VGC singles game reads the singles table.
   test('a VGC cache weighs doubles by the VGC table and singles by the singles table', () => {
     const doubles = positionBattle(createRootPosition(position(DOUBLES)));
     expect(evaluatePosition(doubles, createMatchupCache('vgc'))).not.toBe(evaluatePosition(doubles, createMatchupCache('standard')));
@@ -115,8 +109,6 @@ describe('static rule set', () => {
         expect(matrix('standard')).toBe(matrixStandard);
       });
     }
-    // Three matrix searches and two trees per game type take 25 s with the speed layer forced off on a quiet
-    // machine (11 s with it on) and run past the default 60 s in the full EVAL_SIM_FAST=0 suite.
   }, 180_000);
 
   test('a local executor serves its cells under the rule set it is bound to', async () => {
@@ -136,10 +128,8 @@ describe('static rule set', () => {
     const standard = (await run('standard')).score;
     const champions = await withChampionsMatchupAsync(FEATURE_WEIGHTS.matchup + 400, async () => (await run('champions')).score);
     expect(champions).not.toBe(standard);
-    // Two orchestrated trees take 80 to 108 s with the speed layer forced off on devbox; 180 s is its neighbour's bound.
   }, 180_000);
 
-  // The greedy replacement after a knock-out (matrix cells, a pivot without a follow-up, prover cells, the repair on deserialization) weighs by the rule set the position carries from its root.
   test('the greedy replacement after a knock-out reads the rule set of its position', () => {
     const serialized = position('gen9ou-2658663776-t2');
     const replacement = (ruleset: StaticRuleset) => {
@@ -173,7 +163,6 @@ const scoreOf = (battle: Battle, weights: Record<keyof EvalFeatures, number>): n
   return Math.tanh((diff / (teamSize * (EVAL_WEIGHTS.alive + EVAL_WEIGHTS.hp))) * EVAL_WEIGHTS.scale);
 };
 
-/** Mirror teams that trade hits at equal speed, so that a doubled speed on one side turns the move order of every race. */
 function board(tailwindOnP1: boolean): Battle {
   const mon = () => set('Garchomp', ['earthquake', 'outrage'], { ability: 'Rough Skin', item: 'Leftovers', evs: { hp: 252, atk: 252, def: 4, spa: 0, spd: 0, spe: 0 } });
   const battle = battleOf(FORMAT, [mon(), mon()], [mon(), mon()]);
@@ -186,9 +175,7 @@ describe('the SV VGC table', () => {
     const w = VGC_DOUBLES_FEATURE_WEIGHTS;
     expect([w.tailwind, w.coverage]).toEqual([0, 0]);
     expect([w.bodies, w.screens, w.matchup, w.trickRoom]).toEqual([177, 48, 169, 54]);
-    // Held at the hand values: hazards (R2 flagged), choice mismatch (hold). The pair cell is 0: its 0/1 gate made the VGC score fall as a foe took damage in 24 of 103 HP series.
     expect([w.hazards, w.choiceMismatch, w.pairFocus]).toEqual([0.75, 40, 0]);
-    // The damped boost column replaces the flat one (REPLACEMENT, 20 of 20 seeds once drops count).
     expect([w.boosts, w.boostsBiting]).toEqual([0, 16]);
     expect([w.sweepFastKo, w.sweepFastChip, w.sweepSlowKo, w.sweepSlowChip, w.pairRedirect, w.statusFix]).toEqual([0, 0, 0, 0, 0, 0]);
   });
@@ -210,14 +197,10 @@ describe('the SV VGC table', () => {
     const fast = board(true);
     const cache = () => createMatchupCache('vgc');
     const [off, on] = [evalFeatures(plain, cache()), evalFeatures(fast, cache())];
-    // The flag is the simulator's side condition.
     expect(off.tailwind).toBe(0);
     expect(on.tailwind).toBe(1);
-    // The matchup already moves with the doubled speed, in the Tailwind side's favour.
     expect(on.matchup).toBeGreaterThan(off.matchup);
-    // The score is the weighted sum at the table, where the flag has no weight.
     expect(evaluatePosition(fast, cache())).toBeCloseTo(scoreOf(fast, VGC_DOUBLES_FEATURE_WEIGHTS), 12);
-    // With a flag weight the same board would read higher (the flag priced the speed twice).
     expect(scoreOf(fast, { ...VGC_DOUBLES_FEATURE_WEIGHTS, tailwind: 68 })).toBeGreaterThan(evaluatePosition(fast, cache()));
     expect(VGC_DOUBLES_FEATURE_WEIGHTS.tailwind).toBe(0);
   });

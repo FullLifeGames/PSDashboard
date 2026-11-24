@@ -45,7 +45,7 @@ describe('effectiveSpeed', () => {
     mon.boosts.spe = 2;
     expect(effectiveSpeed(mon, battle)).toBe(mon.storedStats.spe * 2);
     mon.boosts.spe = -1;
-    expect(effectiveSpeed(mon, battle)).toBe(Math.floor(mon.storedStats.spe / 1.5)); // the sim floors the stage
+    expect(effectiveSpeed(mon, battle)).toBe(Math.floor(mon.storedStats.spe / 1.5));
   });
 
   test('paralysis halves in gen 9, quarters in gen 5, Quick Feet overrides', () => {
@@ -92,9 +92,9 @@ describe('effectiveSpeed', () => {
       [makeSet('B', 'Snorlax', VANILLA)],
     );
     const bird = unburden.sides[0].active[0]!;
-    expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe); // Item noch da
+    expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe);
     bird.useItem(); // the sim's Unburden volatile, not just an empty slot
-    expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe * 2); // verbraucht
+    expect(effectiveSpeed(bird, unburden)).toBe(bird.storedStats.spe * 2);
   });
 
   test('weather abilities double only under their weather', () => {
@@ -103,7 +103,7 @@ describe('effectiveSpeed', () => {
       [makeSet('B', 'Snorlax', VANILLA)],
     );
     const fish = battle.sides[0].active[0]!;
-    expect(effectiveSpeed(fish, battle)).toBe(fish.storedStats.spe); // kein Regen
+    expect(effectiveSpeed(fish, battle)).toBe(fish.storedStats.spe);
     battle.field.setWeather('raindance', battle.sides[1].active[0]!);
     expect(effectiveSpeed(fish, battle)).toBe(fish.storedStats.spe * 2);
   });
@@ -159,8 +159,6 @@ describe('movesFirst', () => {
   });
 
   test('a Choice Scarf flips a real speed order', () => {
-    // Weavile (base 125) vs Talonflame (base 126): bare, Talonflame is faster;
-    // the Scarf turns it around.
     const bare = makeBattle(
       [makeSet('W', 'Weavile', VANILLA)], [makeSet('T', 'Talonflame', VANILLA)],
     );

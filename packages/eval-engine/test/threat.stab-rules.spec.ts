@@ -8,17 +8,11 @@ import { battleOf } from './power-oracle';
 import { createMatchupCache, evaluatePosition, type StaticRuleset, pairThreat, unansweredMons } from '../src/eval-function';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * STAB by the game's rules after a Tera click, held against the damage the simulator deals (modifyDamage: an old type or the Tera type 1.5, both 2.0, Stellar 2.0 on an
- * old type and 1.2 elsewhere on the first use of a type, Adaptability through its own handler; getDamage: a Tera-typed move under 60 power hits as 60).
- */
+// modifyDamage: STAB 1.5 on the old or the Tera type, 2.0 on both, Stellar 2.0 on an old type and 1.2 elsewhere;
+// getDamage: a Tera-typed move under 60 power hits as 60.
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 
-/**
- * Plays the turns (p1's choices; p2 Splashes), the roll of p1's move pinned to the maximum, a sure hit and no
- * crit, and before each turn reads our fraction of that move in HP. Returns [ours, the simulator's damage].
- */
 function turns(format: string, attacker: PokemonSet, defender: PokemonSet, id: string, choices: string[]): [number, number][] {
   const battle = battleOf(format, [attacker], [defender]);
   const prng = new ScriptedPRNG([1, 2, 3, 4], new Map([[`p1:${id}`, { hit: true, crit: false, roll: 0 }]]));
@@ -42,7 +36,6 @@ function expectNear([ours, sim]: [number, number], label: string) {
   expect(Math.abs(ours - sim) / sim, `${label}: ours ${ours.toFixed(1)} against the sim's ${sim}`).toBeLessThan(0.03);
 }
 
-// Level 50: Blissey survives every hit, so the HP it loses is the whole damage.
 const chomp = (teraType: string, move: string) => set('Garchomp', [move], { teraType, level: 50 });
 
 describe('STAB by the rules after a Tera click', () => {
@@ -66,7 +59,6 @@ describe('STAB by the rules after a Tera click', () => {
   });
 
   test('Adaptability asks its own handler: 2.0, 2.25 on the Tera type, nothing for an old type under another Tera type', () => {
-    // Toxapex takes Normal and Ghost moves neutrally and survives them from a level-50 Porygon-Z.
     const zee = (teraType: string, move: string) => set('Porygon-Z', [move], { ability: 'Adaptability', teraType, level: 50 });
     for (const [teraType, move] of [['Normal', 'hypervoice'], ['Ghost', 'hypervoice'], ['Ghost', 'shadowball']]) {
       for (const row of turns('gen9customgame', zee(teraType, move), splash('Toxapex'), move, ['move 1', 'move 1 terastallize'])) {
@@ -80,7 +72,6 @@ describe('STAB by the rules after a Tera click', () => {
       const rows = turns('gen9customgame', chomp(teraType, move), splash('Blissey'), move, ['move 1', 'move 1 terastallize']);
       rows.forEach(row => expectNear(row, `Tera ${teraType} ${move}`));
     }
-    // A multi-hit move: the first hit's damage (its roll pinned) against ours per hit.
     const battle = battleOf('gen9customgame', [chomp('Water', 'watershuriken')], [splash('Blissey')]);
     const prng = new ScriptedPRNG([1, 2, 3, 4], new Map([['p1:watershuriken', { hit: true, crit: false, roll: 0 }]]));
     prng.attach(battle);
@@ -133,7 +124,6 @@ const MODES: Mode[] = [
 
 interface Board { battle: Battle; holder: Pokemon; foe: Pokemon }
 
-/** A Choice Scarf Garchomp (it moves first) against a Snorlax; in doubles each side brings a Splashing partner. */
 function board(mode: Mode, foeMoves: string[]): Board {
   const mine = [set('Garchomp', ['crunch', 'splash'], { item: 'Choice Scarf' }), ...(mode.doubles ? [splash('Clefable')] : [])];
   const theirs = [set('Snorlax', [...foeMoves, 'splash']), ...(mode.doubles ? [splash('Clefable')] : [])];
@@ -141,7 +131,6 @@ function board(mode: Mode, foeMoves: string[]): Board {
   return { battle, holder: battle.sides[0].active[0]!, foe: battle.sides[1].active[0]! };
 }
 
-/** The largest step the wrong way when the body goes down one HP point at a time from its maximum: p1's score rises as p1's body loses HP (`own`), or falls as p2's body loses HP. */
 function worstStep(mode: Mode, battle: Battle, body: Pokemon, own: boolean): { size: number; at: number } {
   const scoreAt = (hp: number): number => {
     body.sethp(hp);
@@ -159,7 +148,6 @@ function worstStep(mode: Mode, battle: Battle, body: Pokemon, own: boolean): { s
 }
 
 describe.each(MODES)('$name', mode => {
-  /** +2 Defense on the holder against a Snorlax whose Crunch it lives through for a while: the stage decides the race in a range of HP only. */
   function defense(): Board {
     const made = board(mode, ['crunch']);
     made.holder.boosts.def = 2;
@@ -167,7 +155,6 @@ describe.each(MODES)('$name', mode => {
     return made;
   }
 
-  /** +2 Attack on the holder against a Snorlax that only splashes: the stage shortens the Crunch's clock while the Snorlax stands high. */
   function attack(): Board {
     const made = board(mode, []);
     made.holder.boosts.atk = 2;
@@ -200,7 +187,6 @@ describe('matchup-helpless-healer', () => {
 
   const JUMP = 1e-3;
 
-  /** `attack` and `strikerHp` set the striker so that its hit stays under the healer's HP: the Champions stat table hits harder. */
   interface Mode { name: string; format: string; ruleset: StaticRuleset; doubles: boolean; attack: number; strikerHp: number }
   const MODES: Mode[] = [
     { name: 'Gen 9 singles', format: 'gen9customgame', ruleset: 'standard', doubles: false, attack: 0, strikerHp: 0.5 },
@@ -210,17 +196,11 @@ describe('matchup-helpless-healer', () => {
   ];
 
   const healer = () => set('Toxapex', ['recover', 'slackoff', 'scald', 'splash']);
-  /** A Choice Scarf Garchomp: it moves first and takes most of a Toxapex with its High Horsepower. */
   const striker = () => set('Garchomp', ['highhorsepower', 'splash'], { item: 'Choice Scarf' });
   const partner = () => set('Clefable', ['splash']);
 
   interface Board { battle: Battle; healer: Pokemon; striker: Pokemon }
 
-  /**
-   * The healer on side `healerSide` against the striker, a poisoned Garchomp (at half HP in Scarlet/Violet: the healer's Scald and the poison
-   * finish it in two turns while the healer holds, in four when it only takes the poison). Every other mon Splashes: a
-   * Clefable beside them in doubles. `benched` puts the healer behind fillers, so it fights from the bench.
-   */
   function board(mode: Mode, healerSide: 0 | 1, benched = false): Board {
     const fillers = Array.from({ length: (mode.doubles ? 2 : 1) - (benched ? 0 : 1) }, partner);
     const withHealer = benched ? [...fillers, healer()] : [healer(), ...fillers];
@@ -234,7 +214,6 @@ describe('matchup-helpless-healer', () => {
     return made;
   }
 
-  /** The largest step the wrong way when the body goes down one HP point at a time from its maximum to a fifth of it: p1's score rises as p1's body loses HP (`own`), or falls as p2's body loses HP. */
   function worstStep(mode: Mode, battle: Battle, body: Pokemon, own: boolean): number {
     const scoreAt = (hp: number): number => {
       body.sethp(hp);
@@ -276,7 +255,7 @@ describe('matchup-helpless-healer', () => {
 
 await loadSimMods('gen9championsou');
 
-// Every generation the profile reads (boundaryEvent returns nothing for generations 1 and 2) and the Champions mod.
+// boundaryEvent returns nothing for Gens 1 and 2, so the rule sets start at Gen 3 plus the Champions mod.
 const RULES = [
   { name: 'Generation 3', format: 'gen3customgame' },
   { name: 'Generation 4', format: 'gen4customgame' },
@@ -290,7 +269,6 @@ const RULES = [
 const STATUSES = ['brn', 'psn', 'tox'] as const;
 
 describe.each(RULES)('$name: a finite tie by a status tick', rules => {
-  // Seismic Toss deals the attacker's level (100) whatever the foe's stats: the hit is exact.
   const board = (status: (typeof STATUSES)[number], foeHp: number, bench: PokemonSet[] = []): Battle => {
     const battle = battleOf(rules.format,
       [set('Jolteon', ['seismictoss'], { level: 100 }), ...bench],
@@ -304,7 +282,6 @@ describe.each(RULES)('$name: a finite tie by a status tick', rules => {
   };
 
   test.each(STATUSES)('%s: the simulator lets the slower foe act before its tick takes it', status => {
-    // A bench keeps the game going when the Earthquake takes the attacker: the end of turn then still runs.
     const battle = board(status, 110, [set('Blissey', ['splash'], { level: 100 })]);
     battle.choose('p1', 'move 1');
     battle.choose('p2', 'move 1');

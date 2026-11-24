@@ -11,27 +11,13 @@ import { dexOfRules } from './dice-sweep-support';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The sweep of the body the log never shows. The simulator's own replacement round can send a bench body onto
- * a slot that the log leaves empty (VGC 2565721987: the simulator knocks out a body at 1 hit point that the log keeps alive, so it
- * forces a replacement the log does not have, and the unshown body stays on the field after the correction revived the log's own).
- * `retireUnshownActives` takes such a body out the way the simulator takes a fainted body out (`takeBodyOut`: the End events of its
- * ability and item run on the field, the fallen-ally count stays, as for an unbrought body), and only where the log's slot is empty.
- *
- * Every ability of the Dex with an End handler is played as the stranger's ability, in every rule set the corpus plays (Gens 3 to 9
- * where abilities exist, and the Champions mod), doubles for the scene and singles for the control (one slot, which the log never
- * leaves empty): the other bodies, both sides, the field and the fallen counts must read as after the simulator's own faint of the
- * stranger. The rest of the rows hold the guards: a body the log shows is never taken out, a disguise is never read as a stranger,
- * a slot the log fills keeps the bench body that the correction displaced (an unrevealed bench body of a bring-all game is alive),
- * and a board that stands as the log does is not touched.
- */
+// The stranger leaves as the simulator's faint takes a body out (`takeBodyOut`: End events of ability and item run).
 
 await loadSimMods('gen9championsou');
 
 const RULE_SETS: Rules[] = RULES.filter(rules => rules.generation >= 3);
 const withEvs = (rules: Rules) => (rules.evs ? { evs: rules.evs } : {});
 
-/** The abilities of a rule set's Dex that carry an End handler: the ones whose end may change something. */
 function endingAbilities(rules: Rules): string[] {
   const dex = dexOfRules(rules);
   return dex.abilities.all()
@@ -40,7 +26,6 @@ function endingAbilities(rules: Rules): string[] {
     .map(ability => ability.name);
 }
 
-/** The abilities with a BeforeSwitchIn handler (Illusion): the Dex's own mark of a body that may show as another. */
 function disguisingAbilities(rules: Rules): string[] {
   const dex = dexOfRules(rules);
   return dex.abilities.all()
@@ -67,11 +52,6 @@ type Bench = 'none' | 'phantom' | 'shown';
 
 interface Scene { battle: SimBattle; snapshot: TurnSnapshot; stranger: Pokemon }
 
-/**
- * The scene in doubles: the log has the witness on p1a and a shown body (Blissey) fainted on p1b, so its second slot is empty. The
- * simulator's board has the stranger on p1b, and behind it `bench`: nothing, a body the log never shows (a phantom) or a living
- * body the log showed (Blissey, revived on the board).
- */
 function doublesScene(rules: Rules, ability: string, bench: Bench): Scene {
   const game = battleOf(rules.doubles!, [witness(rules), plain(rules, 'Blissey')], foes(rules, 'doubles'));
   const snapshot = snapshotOf(game);
@@ -81,7 +61,6 @@ function doublesScene(rules: Rules, ability: string, bench: Bench): Scene {
   const behind = bench === 'phantom' ? [plain(rules, 'Chansey')] : bench === 'shown' ? [plain(rules, 'Blissey')] : [];
   const battle = battleOf(rules.doubles!, [witness(rules), stranger(rules, ability), ...behind], foes(rules, 'doubles'));
   if (bench === 'shown') {
-    // The log has Blissey on p1b alive, fainted at the end of the block: its entry stays alive on the bench of the board.
     Object.assign(fell, { fainted: false, hp: 50, hpPercent: 50, isActive: false });
   }
   return { battle: battle as unknown as SimBattle, snapshot, stranger: battle.sides[0].pokemon[1] };
@@ -94,7 +73,6 @@ function singlesScene(rules: Rules, ability: string): Scene {
 }
 
 const SKIP = new Set(['target', 'source', 'battle', 'side', 'pokemon', 'sourceEffect', 'effect', 'sourceSlot']);
-/** A JSON-safe copy of effect state: the references back to bodies and the battle drop out, everything else stays. */
 const flat = (value: unknown): unknown => JSON.parse(JSON.stringify(value ?? null, (key, entry) => (SKIP.has(key) ? undefined : entry)));
 
 function bodyState(body: Pokemon): unknown {
@@ -105,7 +83,6 @@ function bodyState(body: Pokemon): unknown {
   };
 }
 
-/** Everything the End event of a body can change besides the body: the other bodies, the sides' counters and conditions, the field. */
 function worldState(battle: Battle, removed: Pokemon): unknown {
   return {
     bodies: battle.sides.flatMap(side => side.pokemon).filter(body => body !== removed).map(bodyState),
@@ -115,7 +92,6 @@ function worldState(battle: Battle, removed: Pokemon): unknown {
   };
 }
 
-/** The simulator's own faint of the stranger, with no fallen-ally count: the body was never in the game, as a retired bench body was not. */
 function faintedBySimulator(rules: Rules, ability: string, bench: Bench): unknown {
   const { battle, stranger: holder } = doublesScene(rules, ability, bench);
   const fallen = holder.side.totalFainted;
@@ -135,7 +111,6 @@ describe.each(RULE_SETS.flatMap(rules => (['doubles', 'singles'] as const).map(m
 
     if (mode === 'doubles') {
       test('every ability with an End handler: the stranger on the slot the log leaves empty ends as the simulator ends a fainted body', () => {
-        // A disguise (Illusion has an End handler) is no stranger: its own row below.
         const disguises = disguisingAbilities(rules);
         const wrong = abilities.filter(ability => !disguises.includes(ability)).filter(ability => {
           const scene = doublesScene(rules, ability, 'none');

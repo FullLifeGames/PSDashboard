@@ -15,9 +15,7 @@ const names: [string, string] = ['Alpha', 'Beta'];
 const ranked = (choice: string, label: string, worstCase: number, expected: number, ev: number, punishedBy: string | null): RankedChoice =>
   ({ choice, label, worstCase, expected, ev, punishedBy });
 
-/** Praise without a verdict band: only sides the regret leaves untiered get the new forms; every tiered turn keeps the sack logic to the letter. */
 describe('the stayed feed without a band (573756 t68)', () => {
-  /** p2 leaves Weavile in to die to Body Press: the floor it priced is what came, and the sweep follows. */
   const t68 = (overrides: Partial<AnalyzeTurnParams> = {}, sack: SackInfo = { name: 'Weavile', hpFraction: 0.6, stayed: true }) => {
     const result: EvalResult = {
       score: 0.183, interval: 0, depthCompleted: 1,
@@ -44,7 +42,6 @@ describe('the stayed feed without a band (573756 t68)', () => {
     expect(analysis.p2.tier).toBeUndefined();
     expect(analysis.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.6, stayed: true, verified: true });
     expect(summarizeTurn(analysis, names)).toContain('Beta fed Weavile (60% HP)');
-    // The verdict fields stay as they were: no band, no risk credit, the same attribution.
     expect(analysis.p2.riskPaidOff).toBeUndefined();
     expect(analysis.attribution).toBe('quiet');
   });
@@ -64,7 +61,6 @@ describe('the stayed feed without a band (573756 t68)', () => {
 });
 
 describe('the hazard sack without a band (653785 t19)', () => {
-  /** p1 switches a 22% Weavile into the rocks; it falls before Charizard's Flare Blitz, which hits nothing. */
   const t19 = (overrides: Partial<AnalyzeTurnParams> = {}) => {
     const result: EvalResult = {
       score: -0.045, interval: 0, depthCompleted: 1,
@@ -129,7 +125,6 @@ describe('doubles: the same forms ride on the pair choice', () => {
 });
 
 describe('the read credit without a band (648453 t13)', () => {
-  /** p2 switches Lopunny-Mega in against the Hidden Power Ice; the engine's equilibrium gave the switch no weight. */
   const t13 = (overrides: Partial<AnalyzeTurnParams> = {}, lopunnyWeight = 0) => {
     const result: EvalResult = {
       score: 0.0596, interval: 0, depthCompleted: 1,
@@ -163,7 +158,6 @@ describe('the read credit without a band (648453 t13)', () => {
     expect(analysis.p2.readCredit?.payoff).toBeCloseTo(0.755, 3);
     expect(analysis.p2.readCredit?.payoffTurn).toBe(2);
     expect(summarizeTurn(analysis, names)).toContain('Beta switched to Lopunny-Mega, a read the engine gave no weight: 2 turns later, before the rolls');
-    // Not a risk credit: the attribution, the report's read list and the totals stay as they were.
     expect(analysis.p2.riskPaidOff).toBeUndefined();
     expect(analysis.attribution).toBe('quiet');
     expect(buildGameReport([analysis, analysis, analysis].map((entry, index) => ({ ...entry, turn: 13 + index })), names, 'p2').reads)
@@ -177,7 +171,6 @@ describe('the read credit without a band (648453 t13)', () => {
   });
 
   test('a stamped sacrifice takes no read credit on the same turn', () => {
-    // Had the switch-in fallen to the hazards, the sacrifice stamp would carry the turn instead.
     const stamped = t13({ sacks: { p2: { name: 'Mandy', hpFraction: 0.8, healthy: true, hazard: true } } });
     expect(stamped.p2.sacrifice?.hazard).toBe(true);
     expect(stamped.p2.readCredit).toBeUndefined();
@@ -215,7 +208,6 @@ describe('the read credit on a doubles pair', () => {
     expect(analysis.p1.tier).toBeUndefined();
     expect(analysis.p1.readCredit).toEqual({ payoff: expect.closeTo(0.6, 6), payoffTurn: 2 });
     expect(analysis.p1.riskPaidOff).toBeUndefined();
-    // Measured before the rolls; a roll that moved the side gets its luck tail (2629703929 t1: −7%).
     const rolled = { ...analysis, scoreAfter: -0.03, chanceDelta: -0.13 };
     const summary = summarizeTurn(rolled, names);
     expect(summary).toContain('Alpha played Tailwind and Solar Beam→Groudon, a read the engine gave no weight: 2 turns later, before the rolls,');
@@ -223,10 +215,6 @@ describe('the read credit on a doubles pair', () => {
   });
 });
 
-/**
- * A body the opponent's near-decided click removes is the opponent's way into its sweep, so letting it fall is no win-condition sacrifice (649664 t20:
- * "Medicham-Mega is one sure KO from clearing the rest — removing Lopunny-Mega …", then "BKC fed Lopunny … verified").
- */
 describe('no praise for feeding the body the opponent\'s near sweep removes', () => {
   const stayedFeed = (args: {
     near?: { side: 'p1' | 'p2'; species: string; removes: string };
@@ -287,10 +275,6 @@ describe('no praise for feeding the body the opponent\'s near sweep removes', ()
   });
 });
 
-/**
- * The read credit's gates read the pair's value before the rolls, so its sentence says so, and it names the turn's own luck when the rolls moved the side by an
- * inaccuracy or more (649664 t15: "+16% over the safe Hydro Pump (47% guaranteed)" while devin's bar ended on the floor).
- */
 describe('the read credit says it is measured before the rolls', () => {
   const t13Shape = (scoreAfter: number) => {
     const result: EvalResult = {
@@ -321,14 +305,11 @@ describe('the read credit says it is measured before the rolls', () => {
     expect(summary).toContain('Beta switched to Lopunny-Mega, a read the engine gave no weight: ' +
       '2 turns later, before the rolls, it stood +38% over the safe switch to Bisharp (41% guaranteed).');
     expect(summary).not.toContain('paid off');
-    // A roll under an inaccuracy stays unnamed.
     expect(summary).not.toContain('luck contributed');
   });
 
   test('singles, 649664 t15 shape: when the rolls took the gain back, the luck tail says so for the side', () => {
-    // The side holds its ground here (−0.09); 649664 t15 itself moved +0.016 for devin.
     expect(t13Shape(0.15)).toContain('On top of that, luck contributed −7% for Beta.');
-    // A turn that cost the side at least 0.1 gets no credit at all.
     expect(t13Shape(0.3)).not.toContain('a read the engine gave no weight');
   });
 });
@@ -350,7 +331,6 @@ interface Shape {
 const resultOf = (shape: Shape, cells?: Cells): EvalResult => ({
   score: 0.05, interval: 0.02, depthCompleted: 1,
   perSide: {
-    // The list is ranked: best equilibrium value first, as the search hands it over.
     p1: shape.p1Choices.map((choiceId, i) => rowOf(choiceId, shape.p1Labels[i], shape.p1Ev[i])).sort((a, b) => b.ev - a.ev),
     p2: shape.p2Choices.map((choiceId, j) => rowOf(choiceId, shape.p2Labels[j], -0.05 - j * 0.01)),
   },
@@ -367,12 +347,7 @@ const analyze = (result: EvalResult, played: PlayedTurn) => analyzeTurn({
   turn: 6, result, played, playedOutcome: 0, scoreBefore: 0.05, scoreAfter: 0.0,
 });
 
-/**
- * Doubles: p1 played row 0 ("Icy Wind + Protect") into p2's pair
- * "Protect + Drain Punch" (column 0). Against that column the row
- * "Tackle + Protect" is worth 0.40 more (-0.30 against +0.10), while the
- * equilibrium prices the two rows 0.05 apart.
- */
+// Against column 0, `Tackle + Protect` is worth 0.40 more (-0.30 vs +0.10); the equilibrium rows differ by 0.05.
 const doublesShape = (): Shape => ({
   p1Choices: ['move icywind, move protect', 'move tackle 1, move protect'],
   p1Labels: ['Icy Wind + Protect', 'Tackle→Incineroar + Protect'],
@@ -387,11 +362,7 @@ const doublesShape = (): Shape => ({
   },
 });
 
-/**
- * Singles: p2 played a U-turn, and the matrix lists a pivot only as pair
- * rows ("move uturn > switch 2"). p1 played Iron Head; Earth Power is worth
- * 0.35 more against the pair actually clicked.
- */
+// Against the pair actually clicked, Earth Power is worth 0.35 more than Iron Head.
 const singlesShape = (): Shape => ({
   p1Choices: ['move ironhead', 'move earthpower'],
   p1Labels: ['Iron Head', 'Earth Power'],
@@ -430,7 +401,6 @@ describe('the hindsight read finds the opponent click on both game types', () =>
 
 describe('the read is shown only past the regret and a cell that is not a guess', () => {
   const shapes: [string, () => Shape][] = [['doubles', doublesShape], ['singles', singlesShape]];
-  // The cell of the best own row (row 1) against the clicked column (column 0).
   const cellsWith = (best: { visits: number; verified: boolean }): Cells => [
     [SEEN, SEEN],
     [best, SEEN],
@@ -463,7 +433,6 @@ describe('the read is shown only past the regret and a cell that is not a guess'
     const read = analyze(resultOf(shape, [[SEEN, SEEN], [SEEN, SEEN]]), shape.played).p1.hindsightRead;
     expect(read).toBeDefined();
     expect(read!.shown).toBeUndefined();
-    // The band is one tier step: a regret one hundredth under (gain - band) shows it.
     shape.p1Ev = [0.05, 0.05 + (0.40 - TIER_THRESHOLDS.inaccuracy - 0.01)];
     expect(analyze(resultOf(shape, [[SEEN, SEEN], [SEEN, SEEN]]), shape.played).p1.hindsightRead!.shown).toBe(true);
   });
@@ -507,7 +476,6 @@ describe('the card sentences quote a read only where its cell holds (gate of 12.
       expect(readOf(make, cellsWith({ visits: 7, verified: false }))?.thin).toBe(true);
       expect(readOf(make, cellsWith({ visits: 8, verified: false }))?.thin).toBeUndefined();
       expect(readOf(make, cellsWith({ visits: 2, verified: true }))?.thin).toBeUndefined();
-      // No cells (matrix mode, a result without the field) is matrix grade: it passes.
       expect(readOf(make)?.thin).toBeUndefined();
     });
 
@@ -516,7 +484,6 @@ describe('the card sentences quote a read only where its cell holds (gate of 12.
       const solid = readOf(make, cellsWith(SEEN))!;
       expect(summarizeTurn(card(thin), names)).not.toContain('The read was there');
       expect(summarizeTurn(card(solid), names)).toContain('The read was there for Alpha');
-      // The solid read of the other side speaks even when the thin one has the larger gain.
       const other = { ...solid, gain: solid.gain / 2 };
       const text = summarizeTurn(card({ ...thin, gain: 1 }, other), names);
       expect(text).toContain('The read was there for Beta');
@@ -553,7 +520,6 @@ describe('the merge writes the visits and the verified flag of every cell', () =
       [{ visits: 12, verified: false }, { visits: 2, verified: false }],
       [{ visits: 4, verified: true }, { visits: 0, verified: false }],
     ]);
-    // Index-aligned with the values the equilibrium was solved over.
     expect(merged.matrix!.cells!.length).toBe(merged.matrix!.values.length);
     expect(merged.matrix!.cells![0].length).toBe(merged.matrix!.values[0].length);
     expect(mergeMctsTrees([t1, t2]).matrix!.cells!.flat().some(entry => entry.verified)).toBe(false);

@@ -3,13 +3,6 @@ import type { Battle } from '@pkmn/sim';
 import { UNPRICEABLE_MOVE_IDS } from '../src/ko-odds';
 import { ALL_VIEWS, battleIn, known, mon, type SimView } from './sim-views';
 
-/**
- * `UNPRICEABLE_MOVE_IDS` in ko-odds.ts names the 31 moves whose immediate damage the one-turn model cannot price. The Dex says why for 30 of them, through a field the
- * simulator reads (a charge turn, a future hit, a self-destruct, a damage callback, a callback before the turn, a condition on the turn that fails the move); Beat Up is the
- * one whose reason is only a handler (it counts the party). This spec holds the list to the simulator in every view the corpus plays: each name carries a reason in every
- * view that has the move, the delayed and self-destroying reasons are played, and a damaging move whose Dex entry carries such a reason but stays off the list is named
- * below with its count, so a new Dex move fails here. Deriving the whole class would move scores.
- */
 
 type Reason = 'delayed' | 'self-ko' | 'reactive' | 'turn-order' | 'condition' | 'party';
 
@@ -24,10 +17,9 @@ const reasonOf = (move: ReturnType<SimView['dex']['moves']['get']>): Reason | nu
   return null;
 };
 
-/** Beat Up: its multi-hit count is the party (onModifyMove). The only listed move with no field of the six. */
+// Beat Up: its multi-hit count is the party (onModifyMove), the only listed move with no Dex field of the six.
 const PARTY = new Set(['beatup']);
 
-/** Damaging moves with a reason in some view that the list leaves out: the review candidates. */
 const UNLISTED_WITH_REASON: string[] = [
   // damage callbacks, priced by their own rules (HALVING_MOVES in score/threat.ts, the fixed-damage and Psywave rules)
   'superfang', 'naturesmadness', 'ruination', 'endeavor', 'psywave', 'guardianofalola',

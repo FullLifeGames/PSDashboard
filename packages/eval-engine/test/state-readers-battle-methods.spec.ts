@@ -4,12 +4,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { boardFor } from './board-key-support';
 
-/**
- * A handler that asks the battle for the turn count (`this.getOverflowedTurnCount()`: the Future Sight and the Wish of every generation that has them) reads the
- * battle's `turn`. The method table holds the `Battle` methods that never reach the event dispatch, so the end of the turn is keyed by the turn where such a handler
- * is on the board; `runEvent`, `damage` and `heal` stay out, because with their reads (`event`, `effect`, `activeMove`) every board would read the whole battle.
- * Scene: gen9ou-2658660641#44 (turn 47), a Future Sight that lands from the entry of the turn before; test/residuals.spec.ts holds the memo to the simulator on it.
- */
 
 await loadSimMods('gen9championscustomgame');
 
@@ -24,7 +18,7 @@ describe.each(SWEEP_CASES)('$name', ({ rules, mode }) => {
 
   test('the Future Sight and the Wish of the rule set read the turn at the end of the turn', () => {
     const { dex } = battle;
-    // The older generations count the turns down in the entry's own state instead; the ones that ask the battle for the turn count read it.
+    // Older generations count the turns down in the entry's own state; the others read the battle's turn.
     const asksTheBattle = (entry: object): boolean => JSON.stringify(entry, (_key, value) => (typeof value === 'function' ? String(value) : value)).includes('getOverflowedTurnCount');
     const entries = [dex.conditions.get('futuremove'), dex.moves.get('wish')].filter(entry => entry.exists && asksTheBattle(entry));
     if (rules.generation >= 8 || rules.name.startsWith('Champions')) expect(entries.length).toBeGreaterThan(0);
