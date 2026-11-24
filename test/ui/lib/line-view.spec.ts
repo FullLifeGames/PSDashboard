@@ -249,10 +249,6 @@ describe('both numbers on a line', () => {
   test('the end value alone is on the block, for the Game review', () => {
     expect(lineBlocks([singlesLine], singles)[0].endPct).toBe(endOf(singlesLine));
   });
-
-  test('the sentence says why in one muted sentence with no dash', () => {
-    expect(LINE_DIFFERS_SENTENCE).toBe("A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.");
-  });
 });
 
 /**

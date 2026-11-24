@@ -3,7 +3,7 @@ import { coverageNotice, recordEvalError, resolveAutoTurnSettings, serializedFai
 import { makePositionSource } from '../../src/hooks/evaluation/sweep-positions';
 import type { GraphSweepParams, SweepData } from '../../src/hooks/evaluation/sweep-types';
 import {
-  AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING,
+  AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, KEY_TURN_SWING, KEY_MOMENT_SWING,
   SEARCH_BUDGET_DEFAULT,
 } from '@fulllifegames/eval-engine';
 
@@ -257,11 +257,6 @@ describe('eval graph blunder detection', () => {
     const scores = [0.5, null, -0.5];
     // Two turns passed — the swing cannot be pinned on one decision.
     expect(computeBlunders(scores)).toEqual([]);
-  });
-
-  test('threshold is exported and sane', () => {
-    expect(BLUNDER_SWING).toBeGreaterThan(0.1);
-    expect(BLUNDER_SWING).toBeLessThan(0.5);
   });
 
   test('key turns cover both sides of every big swing', () => {

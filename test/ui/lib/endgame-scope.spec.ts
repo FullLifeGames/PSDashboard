@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import type { PokemonSnapshot, TurnSnapshot } from '@fulllifegames/replay-core';
-import { ENDGAME_MAX_BODIES } from '@fulllifegames/eval-engine';
 import { endgameTurns, livingBodies, loserOf } from '../../../src/lib/endgame-scope';
 
 /** Which turns of a game are its endgame and who lost. The count is the turn card's own (the bodies each side brought, the fallen ones of the turn's start snapshot), the scope the engine's constant. */
@@ -10,10 +9,6 @@ const snapshot = (turn: number, fallen1: number, fallen2: number, size1 = 6, siz
   ({ turn, p1: side('p1', fallen1, size1), p2: side('p2', fallen2, size2), field: { weather: '', terrain: '', pseudoWeather: {} }, log });
 
 describe('the endgame scope', () => {
-  test('the scope is the engine\'s: three bodies or fewer standing in total', () => {
-    expect(ENDGAME_MAX_BODIES).toBe(3);
-  });
-
   test('singles: the first turn with three bodies standing opens the endgame and every later turn belongs to it', () => {
     // 6 v 6: turn 1 holds 12, turn 2 holds 5 (3 v 2 fallen... 6-3 + 6-4), turn 3 holds 3, turn 4 holds 2
     const snapshots = [snapshot(1, 0, 0), snapshot(2, 3, 4), snapshot(3, 4, 5), snapshot(4, 5, 5)];

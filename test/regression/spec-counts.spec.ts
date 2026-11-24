@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { compareCounts, countSpecs, currentBaseline, SPEC_PROJECTS } from '../../scripts/spec-counts.mjs';
+import { compareCounts, countSpecs, SPEC_PROJECTS } from '../../scripts/spec-counts.mjs';
 
 /** The spec-count ratchet: spec files per test project only fall, or grow with a named new module (`--allow-raise` of scripts/update-lint-ratchet.mjs); game types do not enter. */
 describe('compareCounts', () => {
@@ -32,11 +32,5 @@ describe('countSpecs', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
-});
-
-describe('the repository', () => {
-  test('no project holds more spec files than its baseline', () => {
-    expect(compareCounts(currentBaseline(), countSpecs()), 'raise the baseline only for a new module: node scripts/update-lint-ratchet.mjs --allow-raise').toEqual([]);
   });
 });

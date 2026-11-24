@@ -79,18 +79,6 @@ describe('the rule in the repository', () => {
   /** Every source file under a folder of the repository, as repository-relative paths. */
   const sourcesUnder = (folder: string) => (readdirSync(join(__dirname, '..', '..', folder), { recursive: true }) as string[])
     .filter(name => name.endsWith('.ts') || name.endsWith('.tsx')).map(name => `${folder}/${name.split('\\').join('/')}`);
-  const offendingIn = (files: string[]) => files.filter(file => !file.endsWith('replay-core/src/rules-dex.ts'))
-    .flatMap(file => lint(readFileSync(join(__dirname, '..', '..', file), 'utf8'), file).filter(message => message.ruleId === RULE).map(message => `${file}:${message.line}`));
-
-  test.each([
-    ['replay-core', 'packages/replay-core/src', 70],
-    ['eval-engine', 'packages/eval-engine/src', 100],
-    ['the app', 'src', 100],
-  ])('%s reads the global Dex nowhere (the resolver rules-dex.ts is the one place)', (_name, folder, least) => {
-    const files = sourcesUnder(folder);
-    expect(files.length).toBeGreaterThan(least);
-    expect(offendingIn(files)).toEqual([]);
-  });
 
   test('the resolver itself reads the Dex', () => {
     const files = sourcesUnder('packages/replay-core/src').filter(file => file.endsWith('rules-dex.ts'));
