@@ -8,14 +8,11 @@ import type { ForcedDie } from '../src/dice/types';
 import { seedOf, type Mode, type Rules } from './dice-fixtures';
 import { dieOf, forcedOn, monOf, SWEEP_CASES, sweepBoard, sweepClicks, sweepTargets } from './dice-sweep-support';
 
-// The panel shows, for every step of the damage roll, the damage the calculator gives; a forced crit switches the numbers to the crit's.
-// The simulator is the oracle: a turn that forces the step (and the crit) deals the damage the calculator lists for it, in every rule
-// set and game type, on every target on its own.
 await loadSimMods('gen9championsou');
 
 const SEED = seedOf(3);
 
-/** The calculator takes one Special stat in Gens 1 and 2 (the games have one): the boards give the two the same EVs there. */
+// The calculator takes one Special stat in Gens 1 and 2: the boards give the two the same EVs there.
 const board = (rules: Rules, move: string, mode: Mode): Battle => sweepBoard(
   rules.generation <= 2 ? { ...rules, evs: { hp: 252, atk: 252, def: 0, spa: 252, spd: 252, spe: 0 } } : rules, move, mode, SEED,
 );
@@ -69,9 +66,8 @@ describe.each(SWEEP_CASES)('the calculator rolls: $name', ({ rules, mode }) => {
 });
 
 describe.each(SWEEP_CASES)('the calculator rolls of a multi-hit move: $name', ({ rules, mode }) => {
-  // The calculator's Champions data (its generation 0) lacks the mod's Past multi-hit moves (`modOverrides` in calc/move.ts copies
-  // the power, type, category, flags and target), so the Champions preview prices one hit of Double Kick and Fury Attack. Only the
-  // preview reads it (the engine's prices take the simulator's hit count); the rows stand as `fails` and turn red once the calculator prices the mod's moves.
+  // The calculator's Champions data lacks the mod's Past multi-hit moves (`modOverrides`, calc/move.ts): the rows are
+  // `fails` and turn red once it prices them.
   const rowTest = rules.name === 'Champions' ? test.fails : test;
   rowTest.each([{ move: 'doublekick', hits: 2 }, { move: 'furyattack', hits: 3 }])('$move: every hit takes the step, the damage is the sum', ({ move, hits }) => {
     const battle = board(rules, move, mode);

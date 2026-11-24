@@ -8,19 +8,9 @@ import { EFFECT_SPORE, hitDie, labelOf, mentions, PROCS, present, procBoard, typ
 import { sweepSelection } from './dice-fixtures';
 import { forcedOn, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-/**
- * The phantom procs: an ability or an item that draws a chance when its holder is hit (Cute Charm, Static, Flame Body, Poison Point,
- * Cursed Body, Effect Spore, the attacker's Poison Touch and Toxic Chain, the Focus Band) is a die the log shows only when it came
- * true. The forced turn answers the dice the log shows and leaves the rest to the hidden dice of the frozen seed, so a seed that says
- * yes gave a body a Cute Charm infatuation, a burn or a paralysis the game never showed (573756: Conscripts carried `attract` from
- * turn 2 to 10). The faint step forces such a die not to happen unless the log shows its effect on the hit. This sweep plays every
- * proc the census knows in every rule set the corpus plays, singles and doubles: the log's turn is the turn with the proc forced to
- * the log's answer, and the forced turn of another seed must show the same.
- */
 await loadSimMods('gen9championsou');
 
 const LOG_SEED = '31,41,59,26';
-/** Seeds whose hidden dice differ from the log: the search takes the first ones that show the proc (or not) without being forced. */
 const POOL = sweepSelection(Array.from({ length: 40 }, (_, index) => `${index * 3 + 1},${index * 7 + 2},${index * 11 + 5},${index * 13 + 9}`), 'pool');
 const WITNESSES = 2;
 const ALL: Proc[] = [...PROCS, EFFECT_SPORE];
@@ -87,7 +77,6 @@ describe.each(SWEEP_CASES)('a proc the log shows: $name', ({ rules, mode, name }
       battle.prng.setSeed(seed as never);
       return battle;
     };
-    // the log's turn: a seed whose dice give the proc on the forced hit (Effect Spore of Gens 3 and 4 also picks its status, so the proc is not forced)
     const shownBy = POOL.find(seed => {
       const turn = forcedOn(board(seed), clicks, [hitDie(proc.move)]);
       return mentions(turn.battle, turn.start, label);
@@ -98,7 +87,6 @@ describe.each(SWEEP_CASES)('a proc the log shows: $name', ({ rules, mode, name }
     const expected = extractProtocolEvents(lines);
     for (const seed of POOL.slice(0, 4)) {
       const result = faintStep({ battle: board(seed), expected, seed: seed as never, choices: clicks, lines }, [hitDie(proc.move)]);
-      // a seed whose hidden dice leave the log's Focus Band out ends the game early: the seed search takes that block, nothing is forced
       if (result.dice === null) continue;
       expect(result.dice.filter(isProcDie), `${name} ${proc.id} seed ${seed}: the log's proc is not forced away`).toEqual([]);
     }

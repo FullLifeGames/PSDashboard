@@ -25,12 +25,6 @@ vi.mock('../src/branch/entry-effects.ts', async importOriginal => {
   };
 });
 
-/**
- * correctActivesFromProtocol takes the lines of a block, and a caller that cut a CRLF log at '\n' hands it lines that end in '\r'. The
- * readers behind the door see LF only. Every reader trims or matches through toId, so the board comes out the same; the door keeps
- * that true for the next reader that anchors a pattern at the line end.
- */
-
 const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({
   name: species, species, item, ability, moves, nature: 'Serious', gender: '', level: 100,
   evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 0, spe }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },

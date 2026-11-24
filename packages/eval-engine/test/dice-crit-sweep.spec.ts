@@ -10,9 +10,6 @@ import {
   sweepTargets, VGC_RULES, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Every damaging move that can crit (no fixed damage, no OHKO, no damage callback, no sure crit), with the accuracy forced to hit so the crit
-// is drawn, forced to crit and not to, against the protocol's `|-crit|` line. The rows without a chance: a move that always crits, fixed
-// damage, a target that blocks the crit, a sure crit by the crit stage.
 await loadSimMods('gen9championsou');
 
 const damageCallback = (move: DexMove): boolean => !!(move as unknown as { damageCallback?: unknown }).damageCallback;
@@ -61,7 +58,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = f
         : problemOf(shown, happens, critsOf(battle, start, slot), missesOf(battle, start, slot));
       verdicts.push({ slot, report: shown, problem });
     }
-    // a move that picks one target draws for that one only
     const settled = picksOne(move.target) && verdicts.some(verdict => verdict.report.took !== 'no-draw' && !verdict.problem);
     for (const verdict of verdicts) {
       if (settled && verdict.report.took === 'no-draw') continue;
@@ -91,7 +87,6 @@ describe.each(SWEEP_CASES)('the crit sweep: $name', ({ rules, mode, name }) => {
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the crit sweep, a team of six: $name', ({ rules, name }) => {
-  // every tenth move keeps the row short; the dice behave as in doubles, the row exists because VGC counts on its own
   const { moves, skipped } = sweepMoves(rules, canCrit);
   const some = moves.filter((_, index) => index % 10 === 0);
   const tally: Tally = newTally();

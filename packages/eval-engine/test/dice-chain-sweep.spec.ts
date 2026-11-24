@@ -15,10 +15,6 @@ import {
   type DexMove,
 } from './dice-sweep-support';
 
-// A move whose every hit rolls its own accuracy (the Dex flag `multiaccuracy`: Triple Axel, Triple Kick, Population Bomb) draws one accuracy
-// die per hit, and the log shows only the hits that landed (`|-hitcount|`), never a miss for a later hit. The die of a later hit carries `hit`,
-// the simulator's own `move.hit` (2 and up); the first hit keeps its name. Gens 1 and 2 have none (the Gen 2 mod clears the flag). Skill Link and
-// Loaded Dice delete the flag, so no hit die is named or drawn. Only accuracy carries a hit.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -97,7 +93,6 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
         const accuracies = keys.filter(key => kindOfKey(key) === 'accuracy' && key.includes(':p2a:'));
         const named = accuracies.map(hitOfKey).filter((hit): hit is number => hit !== null).sort((a, b) => a - b);
         const fainted = lines.some(line => /^\|faint\|p2a/.test(line));
-        // the first hit keeps its plain name; hits 2..k landed; the next hit drew its roll and missed unless the foe was gone
         const expected = k === 0 ? [] : [...Array.from({ length: k - 1 }, (_, index) => index + 2), ...(k < hits && !fainted ? [k + 1] : [])];
         expect(named, `${move.id} seed ${seed}: the log shows ${k} of ${hits} hits`).toEqual(expected);
         expect(keys.filter(key => hitOfKey(key) !== null && kindOfKey(key) !== 'accuracy'), `${move.id} seed ${seed}: only accuracy carries a hit`).toEqual([]);
@@ -144,7 +139,6 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
         expect(hitcounts(lines), `${move.id}: hit ${hit} forced to miss`).toEqual([hit - 1]);
         expect(missesOf(broken.battle, broken.start, 'p2a'), `${move.id}: a later miss writes no |-miss|`).toBe(0);
         expect(broken.report.forced[0].took, `${move.id} hit ${hit}: ${broken.report.forced[0].reason}`).toBe('applied');
-        // the report reads the hit count: the die of the hit that missed is applied, a later hit of the chain was never rolled
         expect(broken.report.forced[1].took, `${move.id} hit ${hit}: ${broken.report.forced[1].reason}`).toBe('applied');
         if (hit < hits) {
           const later = forcedOn(board, clicks, [yes(move.id), hitDie(move.id, hit, false), hitDie(move.id, hit + 1, true)]);
@@ -155,11 +149,9 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
       const every = forcedOn(board, clicks, [yes(move.id), ...Array.from({ length: hits - 1 }, (_, index) => hitDie(move.id, index + 2, true))]);
       expect(hitcounts(every.battle.log.slice(every.start)), `${move.id}: every hit forced to land`).toEqual([hits]);
       expect(every.report.forced.map(report => report.took), `${move.id}: every hit forced to land`).toEqual(Array(hits).fill('applied'));
-      // a hit die alone leaves the first hit to the stream: it never moves a hit before it
       const first = forcedOn(board, clicks, [hitDie(move.id, 2, false)]);
       const counts = hitcounts(first.battle.log.slice(first.start));
       expect(first.report.forced[0].took === 'no-draw' ? counts.length === 0 : counts.length === 1 && counts[0] === 1, `${move.id}: a lone hit die`).toBe(true);
-      // a plain miss draws no later hit: the hit die is never drawn
       const no = forcedOn(board, clicks, [{ ...yes(move.id), result: { happens: false } }, hitDie(move.id, 2, true)]);
       expect(missesOf(no.battle, no.start, 'p2a'), `${move.id}: a plain no`).toBeGreaterThan(0);
       expect(hitcounts(no.battle.log.slice(no.start)), `${move.id}: a plain no`).toEqual([]);
@@ -188,8 +180,7 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the accuracy 
   });
 });
 
-// The offer names the accuracy die of each later hit, so the panel can offer a chip for it. Read from the move after `ModifyMove` (Skill
-// Link and Loaded Dice have deleted the flag by then), from the Dex's own `multiaccuracy` and `multihit`.
+// Read from the move after `ModifyMove`: Skill Link and Loaded Dice have deleted the flag by then.
 describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer names a die per hit: $name', ({ rules, mode, vgc }) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
   const choiceOf = (move: DexMove) => ({ kind: 'move' as const, moveId: move.id, moveName: move.name, ...(mode === 'doubles' ? { targetLoc: 1 } : {}) });
@@ -251,8 +242,6 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3))('the offer nam
   function clicksOf(move: DexMove) { return sweepClicks(mode, move.target); }
 });
 
-// Champions OU 2692379905 turn 2: Meowscarada's Triple Axel hit Garchomp twice and the third hit missed. The panel can set that hit: the
-// offer names it, and forcing it plays the hit the game never rolled.
 describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple Axel', () => {
   const board = () => outfitBoard(CHAMPIONS, 'singles', { species: 'Meowscarada', moves: ['tripleaxel'], ability: 'Protean' }, { species: 'Garchomp', ability: 'Rough Skin', item: 'Rocky Helmet' });
   const clicks = { p1: 'move 1', p2: 'move 1' };
@@ -267,13 +256,10 @@ describe('the scene of Champions OU 2692379905 turn 2: the third hit of Triple A
     const turn = forcedOn(board(), clicks, [yes('tripleaxel'), hitDie('tripleaxel', 2, true), hitDie('tripleaxel', 3, happens)]);
     expect(hitcounts(turn.battle.log.slice(turn.start))).toEqual([count]);
     expect(turn.battle.log.slice(turn.start).some(line => line.startsWith('|faint|p2a')), 'Garchomp faints on hit 3 only').toBe(happens);
-    // a fainted target's `|-hitcount|` line names the side (`p2: Garchomp`), and the report still reads it: every hit die is applied
     expect(turn.report.forced.map(shown => `${shown.took} ${shown.reason ?? ''}`.trim())).toEqual(['applied', 'applied', 'applied']);
   });
 });
 
-// The chain rule lives in `chain.ts` once. A count of k landed hits stands for hits 2 to k landing and, when the move has a hit k + 1, that
-// hit missing; `chainCount` reads the count back from the per-hit results.
 describe.each(RULES.filter(rules => rules.generation >= 3).map(rules => [rules.name, rules] as const))('the chain rule: %s', (_name, rules) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
   const action = (moveId: string, count: number): LoggedAction => ({ slot: 'p1a', moveId, hitCounts: { p2a: count } }) as unknown as LoggedAction;
@@ -346,8 +332,7 @@ describe('the report of a hit die reads the hit count of its target', () => {
   });
 });
 
-// The die of a later hit the simulator never drew reads what the game did to the chain, in the lines it wrote: an `-activate` of an
-// ability that answers a hit (Toxic Debris, Rough Skin) is no blocker of the later hits.
+// An `-activate` of an ability that answers a hit (Toxic Debris, Rough Skin) is no blocker of the later hits.
 describe('the report of a later hit the simulator never drew reads the chain from the protocol', () => {
   const board = sweepBoard(RULES[9], 'tripleaxel', 'singles', '1,2,3,4', false, FAST);
   const move = '|move|p2a: Weavile|Triple Axel|p1a: Glimmora';

@@ -63,10 +63,8 @@ describe('the engine protocol ("1a 2a 3a 4a 5a 6a")', () => {
       expect(built.state).toBe(fixture.serialized);
       expect(built.budgetMs).toBe(4000);
       expect(built.options.p1.map(option => option.id)).toEqual(options.p1.map(option => option.choice));
-      // The spectator log: the public lines up to the turn, no |split| secrets.
       expect(built.log).toContain(`|turn|${fixture.turn}`);
       expect(built.log.some(line => line.startsWith('|split|'))).toBe(false);
-      // Each side's request as the simulator would send it.
       expect((built.requests.p1 as { side?: { id?: string } } | null)?.side?.id).toBe('p1');
       expect((built.requests.p2 as { side?: { id?: string } } | null)?.side?.id).toBe('p2');
     }

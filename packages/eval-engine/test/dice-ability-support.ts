@@ -4,12 +4,6 @@ import { copyOf } from '../src/sim-ask/copy';
 import type { Mode, Rules } from './dice-fixtures';
 import { dexOfRules, monOf, outfitBoard } from './dice-sweep-support';
 
-/**
- * The boards of the ability and item procs, of the end of the turn, and of Effect Spore. A proc is an ability or an item whose handler
- * draws a chance when its holder is hit (or, for the holder's own hit, when it hits): the die belongs to the move in flight, and the
- * witness is a protocol line that names the ability or the item.
- */
-
 export interface Proc {
   id: string;
   kind: 'abilities' | 'items';
@@ -30,10 +24,8 @@ export const PROCS: Proc[] = [
   { id: 'focusband', kind: 'items', holder: 'target', move: 'tackle', lethal: true },
 ];
 
-/** Effect Spore: its draw gives a status as well as a yes or a no, so its results are learned (its own sweep). */
 export const EFFECT_SPORE: Proc = { id: 'effectspore', kind: 'abilities', holder: 'target', move: 'tackle' };
 
-/** The ids of every proc, the die kind of the census named: the census holds this list to the simulator's own handlers. */
 export const PROC_IDS: string[] = [...PROCS, EFFECT_SPORE].map(proc => proc.id);
 
 export function present(rules: Rules, kind: 'abilities' | 'items', id: string): boolean {
@@ -44,7 +36,6 @@ export function present(rules: Rules, kind: 'abilities' | 'items', id: string): 
 
 export const nameOf = (rules: Rules, kind: 'abilities' | 'items', id: string): string => dexOfRules(rules)[kind].get(id).name;
 
-/** The label the protocol writes for the effect: `ability: Static`, `item: Focus Band`. */
 export const labelOf = (rules: Rules, kind: 'abilities' | 'items', id: string): string => `${kind === 'abilities' ? 'ability' : 'item'}: ${nameOf(rules, kind, id)}`;
 
 export function procBoard(rules: Rules, mode: Mode, proc: Proc): Battle {
@@ -58,10 +49,6 @@ export const hitDie = (moveId: string): ForcedDie => ({ name: { slot: 'p1a', mov
 
 export const mentions = (battle: Battle, start: number, label: string): boolean => battle.log.slice(start).some(line => line.includes(label));
 
-/**
- * The oracle for a proc's chance: the chance the simulator itself passes to `randomChance` while the effect's handler runs (`battle.effect`
- * is the ability or the item), read from a plain turn under a spy over the battle's stream. A seed whose turn never reaches the handler (a miss) gives nothing.
- */
 export function chanceOfEffect(board: Battle, clicks: { p1: string; p2: string }, effectId: string, play: (battle: Battle, clicks: { p1: string; p2: string }) => void): number[] {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();
@@ -81,10 +68,6 @@ export function chanceOfEffect(board: Battle, clicks: { p1: string; p2: string }
   return seen;
 }
 
-/**
- * One die of the end of the turn: a holder (and, for Healer, the ally it cures) whose handler draws at the Residual event. `setup` puts the
- * position the handler needs (a status to shed, a berry to harvest); `witness` is the protocol line that shows the effect.
- */
 export interface EndRow {
   id: string;
   kind: 'abilities' | 'condition';
@@ -115,7 +98,7 @@ export const END_ROWS: EndRow[] = [
     id: 'healer', kind: 'abilities', targetSlot: 'p1b', doubles: true, setup: board => void monOf(board, 'p1b').setStatus('par'),
     witness: rules => new RegExp(`^\\|-activate\\|p1a: [^|]*\\|${escape(labelOf(rules, 'abilities', 'healer'))}`),
   },
-  // Gen 2 thaws a frozen body at the end of the turn (a draw of the condition); later generations draw it before the body moves
+  // Gen 2 thaws a frozen body at the end of the turn (a draw of the condition); later generations draw before it moves
   {
     id: 'frz', kind: 'condition', only: rules => rules.generation === 2, setup: board => void monOf(board, 'p1a').setStatus('frz'),
     witness: () => /^\|-curestatus\|p1a: [^|]*\|frz/,
@@ -129,5 +112,4 @@ export function endBoard(rules: Rules, mode: Mode, row: EndRow): Battle {
   return board;
 }
 
-/** The ids of the dice of the end of the turn the rows play: the census holds this list to the simulator's handlers. */
 export const END_IDS: string[] = END_ROWS.map(row => row.id);

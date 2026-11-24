@@ -8,13 +8,6 @@ import { playClicks, standing, sweepSelection, SWEEPS_FULL, type Mode, type Rule
 import { clicksAccepted, dexOfRules, forcedOn, isCharge, isDelayed, SWEEP_CASES, sweepMoves, VGC_RULES, type DexMove } from './dice-sweep-support';
 import { bentScene, ofKind, pickBoard, pickClicks, publicHalf, recorded } from './dice-pick-support';
 
-// The simulator samples a foe for every click that names no target (`getRandomTarget`), and a spread move such as Earthquake or a
-// field move such as Spikes gets one too, but `getMoveTargets` ignores it: the sample cannot change the turn, so the note "The click
-// cannot force random targets. The seed decides them." must not stand under such a line. For every rule set with doubles (Gens 3 to
-// 9 and Champions), doubles and VGC, every Dex move that reaches the sweep: the user's click that names no target (a spread or field
-// move clicked plain) and the click an Encore bends (any move), the die of the user's move forced to each standing foe. A move whose
-// two plays show the same log (the target field of the `|move|` line aside) and the same bodies is a move whose sample changes
-// nothing; the Dex targets of such moves must be exactly `AIM_FREE_TARGETS`, the rule the line's note reads.
 await loadSimMods('gen9championsou');
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
@@ -24,7 +17,6 @@ const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
 const FOES = ['p2a', 'p2b'];
 const pick = (moveId: string): DieName => ({ slot: 'p1a', moveId, kind: 'random-target' });
 
-/** A log without its clock, and without the target field of the user's `|move|` lines (a spread move names the body that was sampled). */
 const effects = (lines: readonly string[]): string =>
   publicHalf(lines).filter(line => !line.startsWith('|t:|')).map(line => {
     if (!line.startsWith('|move|')) return line;
@@ -46,7 +38,6 @@ function sampleChanges(board: Parameters<typeof forcedOn>[0], clicks: { p1: stri
   return plays[0] !== plays[1];
 }
 
-/** The first three damaging moves and the first status move of every Dex target (so the plain run meets each target, and a move that aims shows it) and the sample every sweep plays. */
 function chosen(moves: readonly DexMove[]): DexMove[] {
   const first = new Map<string, DexMove[]>();
   for (const move of moves) {
@@ -71,7 +62,6 @@ function scenesOf(input: { rules: Rules; mode: Mode; vgc: boolean }, move: DexMo
     if (bent) { scenes.push(bent); break; }
   }
   if (move.target === 'scripted') {
-    // the faster foe hits the user before the scripted move: a physical hit and a special hit (the moves of every generation)
     for (const attack of ['tackle', 'watergun']) {
       const board = pickBoard({ rules, mode, vgc, attacker: [move.id], foe: [attack, 'splash'] });
       const clicks = pickClicks(mode, 'move 1', 'move 1 1');
@@ -101,7 +91,6 @@ describe('what the simulator does with a sampled random target: the Dex targets 
     const problems: string[] = [];
     for (const [target, entry] of drawn) {
       if (AIM_FREE_TARGETS.has(target) && entry.differing.length > 0) problems.push(`${target}: the sample changed the turn of ${entry.differing.join(', ')}, the rule says it cannot`);
-      // a target whose drawn moves are all status moves with no effect on a foe in these scenes (Me First, Doodle) has no row to prove: it takes the simulator's default branch of `getMoveTargets`, as `normal` does
       if (!AIM_FREE_TARGETS.has(target) && entry.damaging > 0 && entry.differing.length === 0) problems.push(`${target}: no move of ${entry.same.join(', ')} changed with its sample, the rule says it does`);
     }
     expect(problems).toEqual([]);
@@ -150,7 +139,6 @@ describe('the scene rows: which line carries the note', () => {
     expect(sampleDecides('randomNormal', { call: 'sample', items: ['p2a', 'p2b'] })).toBe(true);
     expect(sampleDecides('normal', { call: 'sample', items: ['p2b'] })).toBe(false);
     for (const [target, draw] of [hit('allAdjacent', ['p2a', 'p2b']), hit('allAdjacentFoes', ['p2a', 'p2b']), hit('foeSide', ['p2a', 'p2b'])]) expect(sampleDecides(target, draw)).toBe(false);
-    // a draw that is no sample reads as one that can matter
     expect(sampleDecides('normal', undefined)).toBe(true);
   });
 

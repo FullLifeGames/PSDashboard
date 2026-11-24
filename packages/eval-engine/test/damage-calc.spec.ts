@@ -12,7 +12,6 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { set as setFromDamageCalcHitCounts } from './move-oracle';
 import { battleOf, powerInTurn } from './power-oracle';
 
-/** The preview's damage of a multi-hit move is the sum of its hits, as the calc sums them (Result.range); its KO text is the calc's verdict over all the hits (Result.kochance). */
 const gen9 = Generations.get(9);
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
@@ -51,7 +50,6 @@ describe('multi-hit moves in the damage preview', () => {
     const result = calcSingleDamageRange(urshifu, tusk, move('Surging Strikes'));
     expect(result.minPercent).toBe(pct(min, tusk.maxhp));
     expect(result.maxPercent).toBe(pct(max, tusk.maxhp));
-    // The weakest three hits beat the strongest one twice over.
     const oneHitMax = Math.max(...(direct.damage as number[][])[0]);
     expect(result.minPercent).toBeGreaterThan(2 * pct(oneHitMax, tusk.maxhp));
   });
@@ -95,10 +93,7 @@ describe('multi-hit moves in the damage preview', () => {
   });
 });
 
-/**
- * A move whose hit count the simulator draws (2 to 5 hits, or Population Bomb under Loaded Dice) shows every count it can land, each priced
- * by the calc; the counts and their chances are the simulator's (35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10).
- */
+// The simulator's hit counts and chances: 35/35/15/15 from gen 5 on, Loaded Dice 4 or 5 and 4 to 10.
 describe('multi-hit moves with a drawn hit count', () => {
   const breloom = mon('Breloom');
   const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
@@ -119,7 +114,6 @@ describe('multi-hit moves with a drawn hit count', () => {
     const maushold = mon('Maushold', { item: 'Loaded Dice' });
     const bomb = calcSingleDamageRange(maushold, blissey, move('Population Bomb'));
     expect([bomb.minPercent, bomb.maxPercent]).toEqual(spanOf(maushold, blissey, 'Population Bomb', 4, 10));
-    // Without Loaded Dice the ten hits stay the calc's own count: the preview reads a move that connects.
     const plain = calcSingleDamageRange(mon('Maushold'), blissey, move('Population Bomb'));
     expect([plain.minPercent, plain.maxPercent]).toEqual(spanOf(mon('Maushold'), blissey, 'Population Bomb', 10, 10));
   });
@@ -148,16 +142,13 @@ describe('multi-hit moves with a drawn hit count', () => {
   });
 
   test("without an OHKO: the fewest hits' guaranteed verdict holds for every count, else a possible KO in the fewest uses", () => {
-    // At 486 HP two hits guarantee a 3HKO, and every larger count a 2HKO.
     const at486 = { ...blissey, hp: 486 };
     expect(calcDirect(breloom, at486, 'Bullet Seed', gen9, 2).kochance(false).text).toBe('guaranteed 3HKO');
     expect(calcSingleDamageRange(breloom, at486, move('Bullet Seed')).koChance).toBe('guaranteed 3HKO');
-    // At full HP two hits may need four uses, five hits always take two: two uses can do it, not always.
     expect(calcSingleDamageRange(breloom, blissey, move('Bullet Seed')).koChance).toBe('possible 2HKO');
   });
 });
 
-/** The result carries the distribution per hit count, each count with the simulator's chance and its own calc range. */
 describe('the per-count distribution of a drawn hit count', () => {
   const breloom = mon('Breloom');
   const blissey = mon('Blissey', { evs: { ...STATS, hp: 252, def: 252 } });
@@ -278,13 +269,11 @@ describe('damage-calc-hit-counts', () => {
       const seeds = Array.from({ length: 280 }, (_, index) => `${index + 1},2,3,4`);
       for (const id of ['bulletseed', 'populationbomb']) {
         const dice = set('Maushold', [id], { item: 'Loaded Dice' });
-        // Shuckle outlasts ten hits; a turn whose first hit misses lands none and is left out.
         const counted = seeds.map(seed => hitsInTurn('gen9customgame', dice, splash('Shuckle'), id, seed)).filter(hits => hits > 0);
         const mirrored = hitCounts(rulesDex(9), gear('Maushold', '', 'Loaded Dice'), id)!;
         const seen = shares(counted);
         expect(seen.map(entry => entry.hits), id).toEqual(mirrored.map(entry => entry.hits));
         for (const [index, entry] of seen.entries()) {
-          // Three standard errors of a share over this many turns.
           const tolerance = 3 * Math.sqrt(mirrored[index].chance * (1 - mirrored[index].chance) / counted.length);
           expect(Math.abs(entry.chance - mirrored[index].chance), `${id} ${entry.hits} hits`).toBeLessThan(tolerance);
         }

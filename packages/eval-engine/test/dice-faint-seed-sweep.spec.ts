@@ -7,14 +7,6 @@ import { dexOfRules, forcedOn, SWEEP_CASES, sweepBoard, sweepClicks } from './di
 import type { ForcedDie } from '../src/dice/types';
 import { sweepSelection, type Mode } from './dice-fixtures';
 
-/**
- * The dice the module names are forced from the log, and the rest of the turn plays under the hidden dice of one seed. A die no `DieKind`
- * names (a sleep duration, the move that Metronome calls, the lock of Outrage) falls to that seed, and under seed index 0 it can miss the log.
- * The faint step then tries seeds 1 to 15 of `ALIGNMENT_SEEDS` and returns the seed with the turn: perfect where one seed fits, otherwise the
- * best by (ended, faint, soft). The scene: Snorlax uses Metronome, whose called move is a sample no die names, in every rule set the corpus
- * plays; the forced list is empty. Where seed 0 plays another turn, the step must return a seed under which the turn is the log's turn.
- */
-
 await loadSimMods('gen9championsou');
 
 const CAP = 16;

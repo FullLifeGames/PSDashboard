@@ -90,15 +90,11 @@ describe('read-aware risk phrasing', () => {
         }
         : {}),
     });
-    // Recover is an unpunished risk (regret 0.25); when the opponent model's
-    // best response IS Recover, the risk was a read.
     expect(at().p2.riskUnpunished).toBe(true);
     expect(at().p2.riskWasRead).toBeFalsy();
     expect(at('Recover').p2.riskWasRead).toBe(true);
     expect(at('→ Dragapult').p2.riskWasRead).toBeFalsy();
-    // The id match is authoritative: labels are for humans, ids for machines, so a mismatched label must not break the read match...
     expect(at('Mislabeled', 'move recover').p2.riskWasRead).toBe(true);
-    // ...and a mismatched id must not be rescued by a matching label.
     expect(at('Recover', 'move protect').p2.riskWasRead).toBeFalsy();
   });
 });
@@ -111,7 +107,6 @@ describe('sensitivity probes', () => {
       playedOutcome: 0.0, scoreBefore: 0.1, scoreAfter: -0.25,
       sensitivity: { p2: [{ species: 'Heatran', item: 'Leftovers', playedEv: -0.06, bestEv: -0.05 }] },
     });
-    // Un-probed: regret 0.25 = mistake. Under the probe: regret 0.01 = none.
     expect(analysis.p2.tier).toBeUndefined();
     expect(analysis.p2.sensitivity).toEqual({
       species: 'Heatran',
@@ -127,7 +122,7 @@ describe('sensitivity probes', () => {
       sensitivity: { p2: [{ species: 'Heatran', item: 'Choice Specs', playedEv: -0.9, bestEv: 0.2 }] },
     });
     expect(analysis.p2.tier).toBe('mistake');
-    expect(analysis.p2.sensitivity).toBeUndefined(); // no tier change ⇒ no hinge claim
+    expect(analysis.p2.sensitivity).toBeUndefined();
   });
 });
 
@@ -149,15 +144,12 @@ describe('sacrifice detection', () => {
       '|-damage|p1a: Dauni|0 fnt|[from] Stealth Rock',
       '|faint|p1a: Dauni',
     ];
-    // The switch-in fell to the rocks before acting, so the low-HP feed also carries the hazard mark.
     expect(detectSacks(events, sackSnapshot(9), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09, hazard: true } });
     expect(detectSacks(events, sackSnapshot(45), logRules(''))).toEqual({});
     expect(detectSacks(events, null, logRules(''))).toEqual({});
   });
 
   test('a healthy body switched in and fainted the same turn is a simplification-sack candidate', () => {
-    // GPL turn 35: the winner feeds a 46%-HP Salazzle into Knock Off. The entry HP comes from the switch line itself (pre-chip), and the
-    // candidate is marked healthy; the verdict layer decides whether the position justifies the framing.
     const events = [
       '|switch|p1a: Relous|Salazzle, F|116/253',
       '|move|p2a: Knocker|Knock Off|p1a: Relous',
@@ -178,7 +170,6 @@ describe('sacrifice detection', () => {
   });
 
   test('a mid-HP faint that stayed in since turn start is a stay-and-die candidate', () => {
-    // 573756 t68: Weavile stays in, clicks Knock Off, dies to Body Press.
     const events = [
       '|move|p1a: Dauni|Knock Off|p2a: Wall',
       '|-damage|p1a: Dauni|0 fnt',
@@ -187,15 +178,12 @@ describe('sacrifice detection', () => {
     expect(detectSacks(events, sackSnapshot(46), logRules(''))).toEqual({
       p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.46, stayed: true },
     });
-    // Dragged in this turn = not a deliberate stay; below the low-HP threshold = shape 1; absent from the snapshot = no claim.
     expect(detectSacks(['|drag|p1a: Dauni|Uxie, L50|120/182', '|faint|p1a: Dauni'], sackSnapshot(66), logRules(''))).toEqual({});
     expect(detectSacks(['|faint|p1a: Dauni'], sackSnapshot(9), logRules(''))).toEqual({ p1: { name: 'Dauni', species: 'Uxie', hpFraction: 0.09 } });
     expect(detectSacks(['|faint|p1a: Ghost'], sackSnapshot(46), logRules(''))).toEqual({});
   });
 
   test('a faint-prevented side gets a charitable stay-in phantom (priority moves excluded)', () => {
-    // GPL turns 14 and 36: the victim provably chose a MOVE (a switch would have resolved before the attack) and every priority-0 move
-    // is outcome-equivalent; a priority choice would have preempted the KO, so it cannot represent what happened.
     const result: EvalResult = {
       score: 0.2, interval: 0.05, depthCompleted: 1,
       perSide: {
@@ -227,7 +215,6 @@ describe('sacrifice detection', () => {
       scoreAfter: 0.55,
       actives: { p1: null, p2: null, gen: 9 },
     });
-    // The engine's switch was worth 0.3 more than the best outcome-equivalent move: a mistake, whichever move was hidden behind it.
     expect(analysis.p2.neverActed).toBe(true);
     expect(analysis.p2.played?.label).toContain('stayed in');
     expect(analysis.p2.tier).toBe('mistake');
@@ -314,7 +301,6 @@ describe('sacrifice detection', () => {
       scoreAfter: -0.1,
       sacks: { p1: { name: 'Uxie', hpFraction: 0.09 } },
     });
-    // Regret 0.2 = mistake; the sack demotes one band and replaces the risk label.
     expect(analysis.p1.sacrifice).toEqual({ name: 'Uxie', hpFraction: 0.09 });
     expect(analysis.p1.tier).toBe('inaccuracy');
     expect(analysis.p1.riskUnpunished).toBeFalsy();
@@ -343,14 +329,11 @@ describe('sacrifice detection', () => {
       scoreAfter: -0.3,
       sacks: { p1: { name: 'Uxie', hpFraction: 0.09 } },
     });
-    // Regret 0.45 = blunder band: tier and grading stay, no neutral sack framing.
     expect(analysis.p1.tier).toBe('blunder');
     expect(analysis.p1.sacrifice).toBeUndefined();
   });
 
   test('a floor-realized feed whose windowed payoff clears the margin grades as a sacrifice', () => {
-    // 573756 t68 in miniature: the realized outcome lands on the priced floor (the player accepted the known worst case and got it),
-    // the punishing reply WAS clicked, and the payoff over the safe floor arrives inside the window.
     const feedResult: EvalResult = {
       score: 0.17, interval: 0.05, depthCompleted: 2,
       perSide: {
@@ -376,32 +359,26 @@ describe('sacrifice detection', () => {
         p1: { kind: 'move', name: 'Body Press', tera: false },
         p2: { kind: 'move', name: 'Knock Off', tera: false },
       },
-      // p1-perspective: the feed looks bad NOW (0.42 => p2-own -0.42) and pays off in the window (-0.31 => p2-own +0.31).
+      // p1-perspective: the feed looks bad NOW (0.42 => p2-own -0.42), pays off in the window (-0.31 => p2-own +0.31).
       playedOutcome: 'playedOutcome' in over ? over.playedOutcome! : 0.42,
       futureOutcomes: over.futureOutcomes ?? [-0.1, -0.31, null],
       scoreBefore: 0.17,
       scoreAfter: 0.31,
       sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
     });
-    // Both gates pass AND the payoff repays the full regret with the read margin on top (peak 0.31 - safe floor -0.154 = 0.464 >=
-    // 0.32 + 0.1): the line reached what the engine's best promised, so no verdict band sticks (573756 t68: payoff 0.4415, regret 0.2661).
+    // Peak 0.31 - safe floor -0.154 = payoff 0.464 >= regret 0.32 + margin 0.1.
     const verified = run({});
     expect(verified.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true, verified: true });
     expect(verified.p2.tier).toBeUndefined();
     expect(verified.p2.riskUnpunished).toBeFalsy();
-    // Margin cleared but the regret NOT repaid (peak own 0.1 => payoff 0.254 in [0.1, 0.42)): the sack framing holds at one-band demotion.
     const demoted = run({ futureOutcomes: [-0.1, -0.05, null] });
     expect(demoted.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true });
-    expect(demoted.p2.tier).toBe('inaccuracy'); // regret 0.32: mistake, demoted
-    // An ev above the floor does not disqualify: what matters is that the REALIZED outcome landed on the priced worst case, so the
-    // feed turn's own rolls contributed nothing positive (573756 t68 post-race: ev −0.207, floor −0.378, realized −0.378).
+    expect(demoted.p2.tier).toBe('inaccuracy');
     // Regret 0.196 (mistake band), payoff 0.464 ≥ 0.196 + 0.1: verifies.
     const spread = run({ playedEv: -0.35 });
     expect(spread.p2.sacrifice).toEqual({ name: 'Weavile', hpFraction: 0.8, stayed: true, verified: true });
     expect(spread.p2.tier).toBeUndefined();
-    // An outcome ABOVE the floor is the turn's own luck (own -0.30 vs floor -0.42: the rolls bailed the line out).
     expect(run({ playedOutcome: 0.30 }).p2.sacrifice).toBeUndefined();
-    // Payoff gate: no window value beats the safe floor by the margin (p1-perspective 0.3 => p2-own -0.3; peak -0.3 - (-0.154) < 0.1).
     expect(run({ futureOutcomes: [0.3, 0.3, 0.3] }).p2.sacrifice).toBeUndefined();
     expect(run({ playedOutcome: null, futureOutcomes: [] }).p2.sacrifice).toBeUndefined();
   });
@@ -427,7 +404,6 @@ describe('sacrifice detection', () => {
       scoreBefore: 0.17, scoreAfter: 0.31,
       sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
     });
-    // Regret 0.52 = blunder band: the feed framing must not apply.
     expect(analysis.p2.tier).toBe('blunder');
     expect(analysis.p2.sacrifice).toBeUndefined();
   });
@@ -442,8 +418,6 @@ describe('turn analysis assembly', () => {
   });
 
   test('a side that played a clearly worse option gets the decision blame', () => {
-    // playedOutcome 0.0 keeps p2's payoff (+0.05 over the safe floor −0.05)
-    // inside the neutral band: an unpunished risk, still a decision turn.
     const analysis = analyzeTurn({
       turn: 20,
       result,
@@ -470,7 +444,6 @@ describe('turn analysis assembly', () => {
       scoreAfter: -0.25,
     });
 
-    // Own outcome +0.2 vs safe floor −0.05: the read won +0.25, a good play.
     const paid = at(-0.2);
     expect(paid.p2.riskUnpunished).toBe(true);
     expect(paid.p2.riskPaidOff).toBe(true);
@@ -478,14 +451,11 @@ describe('turn analysis assembly', () => {
     expect(paid.attribution).toBe('p2-read');
     expect(paid.p1.riskUnpunished).toBeUndefined();
 
-    // Payoff +0.05 sits in the neutral band: risk, not a good play yet.
     const neutral = at(0.0);
     expect(neutral.p2.riskUnpunished).toBe(true);
     expect(neutral.p2.riskPaidOff).toBeUndefined();
     expect(neutral.attribution).toBe('p2-decision');
 
-    // Own outcome −0.2 vs floor −0.05: worse than the safe guarantee even
-    // with the read coming true: a plain misplay.
     const behind = at(0.2);
     expect(behind.p2.riskUnpunished).toBeUndefined();
     expect(behind.attribution).toBe('p2-decision');
@@ -510,8 +480,6 @@ describe('turn analysis assembly', () => {
   });
 
   test('a knife-edge payoff within the noise epsilon still earns the paid-off credit', () => {
-    // 648453 t20: the pinned paid-off read sat 0.0006 over the margin; a static-eval repricing moved the safe guarantee by +0.0033 and
-    // flipped the credit. Payoffs within RISK_PAYOFF_EPSILON below the margin keep the credit; clearly-below payoffs stay uncredited.
     const tied: EvalResult = {
       score: -0.05, interval: 0.02, depthCompleted: 1,
       perSide: {
@@ -536,15 +504,12 @@ describe('turn analysis assembly', () => {
     expect(knifeEdge.p2.riskPaidOff).toBe(true);
     expect(knifeEdge.p2.riskPayoff).toBeCloseTo(0.09, 10);
     expect(knifeEdge.attribution).toBe('p2-read');
-    // Payoff 0.07 sits below margin − epsilon: no credit.
     const below = at(-0.11);
     expect(below.p2.riskPaidOff).toBeUndefined();
     expect(below.attribution).toBe('quiet');
   });
 
   test('a no-regret gamble that beats the safe guarantee reads as paid off', () => {
-    // Draft turn 50 shape: the played switch TIES the engine pick by EV (regret ~0, so no tier), but its floor gave up mistake-sized
-    // safety vs the safe line. The punisher never came and the outcome beat the safe guarantee: the report says the read paid off.
     const tied: EvalResult = {
       score: -0.05, interval: 0.02, depthCompleted: 1,
       perSide: {
@@ -564,7 +529,6 @@ describe('turn analysis assembly', () => {
       scoreAfter: -0.14,
     });
 
-    // Own outcome +0.19 vs the safe floor +0.04: payoff +0.15 ≥ the margin.
     const paid = at(-0.19);
     expect(paid.p2.tier).toBeUndefined();
     expect(paid.p2.riskPaidOff).toBe(true);
@@ -572,7 +536,6 @@ describe('turn analysis assembly', () => {
     expect(paid.p2.riskUnpunished).toBeUndefined();
     expect(paid.attribution).toBe('p2-read');
 
-    // Payoff +0.01: inside the neutral band: the turn stays quiet.
     const neutral = at(-0.05);
     expect(neutral.p2.riskPaidOff).toBeUndefined();
     expect(neutral.attribution).toBe('quiet');
@@ -581,8 +544,6 @@ describe('turn analysis assembly', () => {
     expect(unknown.p2.riskPaidOff).toBeUndefined();
     expect(unknown.p2.riskUnpunished).toBeUndefined();
 
-    // A small floor give-up is not a gamble: an ordinary attack that went
-    // well must not earn read praise (chattiness guard).
     const smallGap: EvalResult = {
       ...tied,
       perSide: {
@@ -600,9 +561,6 @@ describe('turn analysis assembly', () => {
     });
     expect(ordinary.p2.riskPaidOff).toBeUndefined();
 
-    // The payoff window is for softening flagged risks: an UNTIERED gamble grades on its immediate outcome only, or the opponent's
-    // follow-up choices (and the rolls) would be credited to the gamble (GPL turn 35: Knock Off praised for a swing the winner's
-    // deliberate sack produced).
     const delayed = analyzeTurn({
       turn: 50, result: tied,
       played: { p1: { kind: 'move', name: 'Iron Head', tera: false }, p2: { kind: 'switch', name: 'Heatran', species: 'Heatran' } },
@@ -610,8 +568,6 @@ describe('turn analysis assembly', () => {
     });
     expect(delayed.p2.riskPaidOff).toBeUndefined();
 
-    // No praise out of an already-lost position: in garbage time every move
-    // is a "gamble" and outcome noise credits it.
     const lost: EvalResult = {
       ...tied,
       score: 0.75,
@@ -630,8 +586,6 @@ describe('turn analysis assembly', () => {
     });
     expect(garbage.p2.riskPaidOff).toBeUndefined();
 
-    // Playing the engine's own pick is covered by the ✓ chip: no read
-    // credit on top even when the floor was scary.
     const gambleBest: EvalResult = {
       ...tied,
       perSide: {
@@ -665,7 +619,6 @@ describe('turn analysis assembly', () => {
   });
 
   test('regret is measured against equilibrium EV, not the floor', () => {
-    // The played line has a scary floor (-0.3) but nearly full equilibrium value: floor-regret would cry 0.3, the honest ev-regret is 0.05.
     const evResult: EvalResult = {
       score: 0.1, interval: 0, depthCompleted: 1,
       perSide: {
@@ -714,9 +667,6 @@ describe('turn analysis assembly', () => {
   });
 
   test('a flinched slot still grades charitably against consistent combos', () => {
-    // p2 slot b flinched (|cant| settles it as null): the combo can't match
-    // exactly, but Rock Slide was observed: grade against the BEST combo the
-    // visible slot still allows, never blaming the hidden choice.
     const doublesResult: EvalResult = {
       score: 0, interval: 0, depthCompleted: 1,
       perSide: {
@@ -815,8 +765,6 @@ describe('turn analysis assembly', () => {
       scoreBefore,
       scoreAfter: null,
     });
-    // Already lost (own −0.8): the 0.2 mistake reads as an inaccuracy and
-    // stops driving the attribution; the 0.45 blunder softens to a mistake.
     expect(at(0.2, -0.8).p1.tier).toBe('inaccuracy');
     expect(at(0.2, -0.8).attribution).toBe('quiet');
     expect(at(-0.05, -0.8).p1.tier).toBe('mistake');
@@ -834,8 +782,6 @@ describe('turn analysis assembly', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     });
-    // Shallow regret 0.25 flags Recover; at depth+1 the played pair is only
-    // 0.05 (own) behind the best pair: the verdict is cleared.
     const cleared = at({ p2: { playedDeep: -0.1, bestDeep: -0.15 } });
     expect(cleared.p2.regret).toBeCloseTo(0.05, 10);
     expect(cleared.p2.verifiedAtDepth).toBe(true);
@@ -884,9 +830,6 @@ describe('turn analysis assembly', () => {
   });
 
   test('a big swing with no culprit is a shift, not a quiet turn', () => {
-    // Both sides played the engine's move, and neither the decision part
-    // (+0.11) nor the chance part (+0.14) crosses its own threshold, but
-    // the total swing (+0.25) is anything but quiet.
     const analysis = analyzeTurn({
       turn: 19,
       result,
@@ -910,7 +853,7 @@ describe('turn analysis assembly', () => {
       scoreAfter: -0.4,
       playedTracking: false,
     });
-    expect(big.attribution).toBe('shift'); // never 'unclear': nothing was mis-parsed
+    expect(big.attribution).toBe('shift');
     expect(big.playedTracking).toBe(false);
     expect(big.p1.best?.choice).toBe('move dracometeor');
 
@@ -962,7 +905,6 @@ describe('turn analysis assembly', () => {
       scoreAfter: null,
     });
     expect(analysis.swing).toBeNull();
-    // p1's 0.15 regret (7.5% win prob) sits below the wp-unit mistake band: reported as a number, not a decision flag; p2's 0.25 is.
     expect(analysis.p1.regret).toBeCloseTo(0.15, 10);
     expect(analysis.p2.regret).toBeCloseTo(0.25, 10);
     expect(analysis.p2.regret).toBeGreaterThanOrEqual(REGRET_THRESHOLD);
@@ -1000,18 +942,15 @@ describe('doubles combined matching', () => {
       { kind: 'switch', name: 'Mushy', species: 'Amoonguss' },
     ])).toBe('move moonblast 1, switch 3');
 
-    // Spread part accepts any protocol target; Tera label splits correctly.
     expect(match([
       { kind: 'move', name: 'Dazzling Gleam', tera: false, targetLoc: 1 },
       { kind: 'move', name: 'Fake Out', tera: true, targetLoc: 1 },
     ])).toBe('move dazzlinggleam, move fakeout 1 terastallize');
 
-    // Wrong target → no match (a fully observed combo never matches loosely).
     expect(match([
       { kind: 'move', name: 'Moonblast', tera: false, targetLoc: 1 },
       { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 },
     ])).toBeNull();
-    // A prevented slot (null) matches charitably against consistent combos.
     expect(match([null, { kind: 'move', name: 'Fake Out', tera: false, targetLoc: 1 }]))
       .toBe('move moonblast 2, move fakeout 1');
   });
@@ -1112,7 +1051,6 @@ describe('pivot pair matching', () => {
 });
 
 describe('narrative signals', () => {
-  /** Two p1 attacks vs three p2 options; p2's equilibrium leans the switch. */
   const conditionalResult = (p2Choices?: string[]): EvalResult => ({
     score: 0.05, interval: 0.02, depthCompleted: 1,
     perSide: {
@@ -1149,7 +1087,6 @@ describe('narrative signals', () => {
 
   test('viableCount counts options within an inaccuracy of best', () => {
     const analysis = analyzeTurn(conditionalParams(conditionalResult()));
-    // p1: 0.05 and 0.04 both within 0.1. p2: −0.05 and −0.06 within 0.1; Splash is not.
     expect(analysis.p1.viableCount).toBe(2);
     expect(analysis.p2.viableCount).toBe(2);
   });
@@ -1207,8 +1144,6 @@ describe('narrative signals', () => {
     expect(analysis.p2.hindsightRead!.response).toBe('→ Heatran');
     expect(analysis.p2.hindsightRead!.against).toBe('Iron Head');
     expect(analysis.p2.hindsightRead!.gain).toBeCloseTo(0.28, 10);
-    // p1 vs the Splash actually clicked: Earth Power 0.35 over Iron Head 0.30:
-    // a 0.05 edge is not a read; below the mistake band the signal stays off.
     expect(analysis.p1.hindsightRead).toBeUndefined();
   });
 
@@ -1243,8 +1178,6 @@ describe('narrative signals', () => {
   });
 
   test('a switch into a held mon names the standing holder', () => {
-    // 648453 t13: every bench answer dies on arrival, only the standing
-    // active holds the pair: the signal carries the holder's species.
     const result = conditionalResult(['move recover', 'switch 5', 'move splash']);
     result.unanswered = { p1: [], p2: [], p2Entry: [{ species: 'Heatran', heldBy: 'Skarmory' }] };
     const analysis = analyzeTurn({
@@ -1258,10 +1191,6 @@ describe('narrative signals', () => {
   });
 
   test('the report walk speaks each stage once per mon', () => {
-    // The game report names a mon's entry sentence only on its FIRST entry
-    // (573756: ten Zapdos-Galar entries, ten identical sentences). The walk
-    // passes the already-spoken keys in; the per-turn card passes nothing
-    // and keeps the sentence on every turn.
     const spoken = conditionalResult(['move recover', 'switch 5', 'move splash']);
     spoken.unanswered = { p1: [], p2: ['Heatran'] };
     const params = {
@@ -1277,8 +1206,6 @@ describe('narrative signals', () => {
     });
     expect(muted.p2.unanswered).toBeUndefined();
 
-    // A DIFFERENT stage is a new statement, not a repetition: a spoken
-    // held-pair sentence does not mute the later, stronger no-answer one.
     const other = analyzeTurn({
       ...params,
       unansweredSeen: new Set([unansweredSeenKey('p2', { species: 'Heatran', heldBy: 'Skarmory' })]),
@@ -1386,8 +1313,6 @@ describe('narrative signals', () => {
 });
 
 describe('the decided sweep at the analysis layer', () => {
-  // 573756 t134–138: the board state (one mon clears the rest in sequence) attaches to its owning side on EVERY decided turn (display
-  // layers re-book the resolution prose from it) while the announcement sentence is spoken once per game report.
   const decidedResult = (score = -0.8): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
     perSide: {
@@ -1405,7 +1330,7 @@ describe('the decided sweep at the analysis layer', () => {
     },
     playedOutcome: -0.2,
     scoreBefore: -0.2,
-    scoreAfter: -0.85, // the turn keeps the decided line (an after-score under it quiets the sentence)
+    scoreAfter: -0.85,
     ...extra,
   });
 
@@ -1419,7 +1344,7 @@ describe('the decided sweep at the analysis layer', () => {
 
   test('the near-decided roll carries odds and target, keyed apart from decided', () => {
     const nearResult = (): EvalResult => {
-      const result = decidedResult(-0.2); // no bar floor on the near stage (573756 t73 stands at 0.596)
+      const result = decidedResult(-0.2);
       result.unanswered = {
         p1: [], p2: [],
         nearDecided: { side: 'p2', species: 'Garchomp', odds: 0.95, removes: 'Corviknight' },

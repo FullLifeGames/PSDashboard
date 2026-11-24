@@ -7,13 +7,6 @@ import { boostedFraction, pairThreat, singleMoveFraction } from '../src/score/th
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The doubles hints see the active pair: two attacks on one foe count more than the same attacks on two foes when only the pair
- * KOs; a redirection move is priced as the partner's damage it covers; a Protect that denies the foes a KO only the pair can make
- * carries a tempo term. The orderings are held against the simulator: the same turns are played there. Singles hints stay what they
- * are (the terms live in the combined path only).
- */
-
 const FORMAT = 'gen9doublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
@@ -62,7 +55,6 @@ describe('pair focus: two slots on one foe', () => {
     const same = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 1');
     const split = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 2');
     expect(same).toBeGreaterThan(split);
-    // Each attack on its own: the split combo is the plain sum of its two fractions.
     const mon = battle.sides[0].active[0]!;
     const fraction = singleMoveFraction(mon, battle.sides[1].active[0]!, 'thunderbolt', battle);
     expect(split).toBeCloseTo(2 * fraction, 10);
@@ -87,7 +79,6 @@ describe('pair focus: two slots on one foe', () => {
   });
 });
 
-/** The simulator's own answer to "does this move turn a foe's single-target hit away from the partner". */
 function redirectedInSim(moveId: string): boolean {
   const build = () => battleOf(FORMAT,
     [set('Blissey', [moveId, 'splash'], { ability: 'No Ability' }), set('Blissey', ['splash'])],
@@ -127,14 +118,13 @@ describe('redirection', () => {
     expect(claimed.map(move => move.id).sort()).toEqual(['followme', 'ragepowder']);
     for (const move of moves) {
       const seen = redirectedInSim(move.id);
-      // Ally Switch lands the user in the partner's slot, a swap of places that the same probe sees as a hit on the user.
+      // Ally Switch lands the user in the partner's slot, a swap the same probe sees as a hit on the user.
       if (move.id === 'allyswitch') continue;
       expect(`${move.id} ${seen}`).toBe(`${move.id} ${redirectsFoes(dex, move)}`);
     }
   });
 });
 
-/** Whether the simulator's Tackle from the foe is stopped by `moveId` on the user (the log's own "move: <name>" activation). */
 function stopsHitInSim(moveId: string): boolean {
   const battle = battleOf(FORMAT,
     [set('Blissey', [moveId, 'splash']), set('Blissey', ['splash'])],
@@ -150,7 +140,6 @@ describe('Protect tempo and Fake Out', () => {
     const moves = dex.moves.all().filter(move => playable(move) && move.stallingMove && move.target === 'self');
     expect(moves.length).toBeGreaterThan(5);
     for (const move of moves) {
-      // Endure only keeps the user at 1 HP when a hit would KO: a Tackle at full HP shows no activation.
       expect(`${move.id} ${stopsHitInSim(move.id)}`).toBe(`${move.id} ${shieldsFromHits(dex, move)}`);
     }
   });
@@ -172,7 +161,6 @@ describe('Protect tempo and Fake Out', () => {
       return before - mon.hp;
     })();
     const hp = Math.floor(hit * 1.35);
-    // From the simulator: both foes hit slot 1 and it faints; one alone does not.
     const turn = (p2: string) => {
       const battle = build(hp)();
       battle.choose('p1', 'move 1, move 1');
@@ -186,8 +174,6 @@ describe('Protect tempo and Fake Out', () => {
     const threatened = protector();
     threatened.sides[0].active[0]!.sethp(hp);
     expect(hintOf(threatened, 'p1', 'move protect, move splash')).toBeGreaterThan(hintOf(threatened, 'p1', 'move splash, move splash'));
-    // A healthy Snorlax in front of two Dragon Claws earns the damage the Protect denies (protect-tempo-hints.spec.ts); with no
-    // damaging foe there is nothing to deny and the Protect stays the floor.
     const idleFoes = battleOf(FORMAT, [set('Snorlax', ['splash', 'protect']), splash('Blissey')], [splash('Garchomp'), splash('Garchomp')]);
     expect(hintOf(idleFoes, 'p1', 'move protect, move splash')).toBeCloseTo(hintOf(idleFoes, 'p1', 'move splash, move splash'), 10);
   });

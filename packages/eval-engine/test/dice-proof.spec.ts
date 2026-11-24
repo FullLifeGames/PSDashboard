@@ -11,12 +11,6 @@ import { moverBoard, moverClicks, moversOf, tieBoard, tieClicks } from './dice-o
 import { CHECKS } from './dice-status-support';
 import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks } from './dice-sweep-support';
 
-// A stand-in that calls a Dex handler proves the live battle unchanged (AGENTS.md). Five functions of the module ask the simulator a
-// question on a copy of the battle: `offeredDice` (the move's own `ModifyMove` and the `ModifySecondaries` event), `probeCheck` (a
-// condition's `BeforeMove` handler), `offeredOrderDice` (the natural turn), `readsStartRoll` (the action speed with the roll flipped)
-// and `learnHitCount` (forced turns on copies). Each row reads the `standing` of the battle (`fingerprint` over every body, plus the
-// turn, the roll, the queue and the move in flight) before and after the question, in every rule set and game type, for each kind of
-// question.
 await loadSimMods('gen9championsou');
 
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
@@ -24,7 +18,6 @@ const choiceOf = (moveId: string, target: string, mode: Mode) => ({
   kind: 'move' as const, moveId, moveName: moveId, ...(mode === 'doubles' && NEEDS_AIM.has(target) ? { targetLoc: 1 } : {}),
 });
 
-/** A plain hit, a spread move, a move with a secondary, a multi-hit move: one of each kind of die the offer reads before the move runs. */
 const OFFER_MOVES = ['tackle', 'rockslide', 'thunderbolt', 'furyattack'];
 
 describe.each(SWEEP_CASES)('the questions leave the battle as it was: $name', ({ rules, mode }) => {
@@ -77,7 +70,6 @@ describe.each(SWEEP_CASES)('the questions leave the battle as it was: $name', ({
     const clicks = sweepClicks(mode, move.target);
     const play = (battle: Parameters<typeof playClicks>[0]) => playClicks(battle, clicks);
     const die: ForcedDie & { result: { hits: number } } = { name: { slot: 'p1a', moveId: 'furyattack', kind: 'hit-count' }, result: { hits: 4 } };
-    // the accuracy is forced to hit, so the count is drawn whatever the seed gives
     const hit: ForcedDie = { name: { slot: 'p1a', moveId: 'furyattack', targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: true } };
     const before = standing(board);
     const script = learnHitCount({ live: board, forced: [hit, die], record: naturalTurn(board, play).record, play, fork: prng => prng.clone(), die });

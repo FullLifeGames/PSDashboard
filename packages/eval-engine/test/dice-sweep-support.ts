@@ -9,25 +9,16 @@ import { CHAMPIONS, mon, playClicks, RULES, stableLog, sweepSelection, type Mode
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The boards and the bookkeeping the three sweeps (accuracy, crit, damage roll) share. One case is a rule set, a game type and a
- * move: Snorlax uses the move against a Vaporeon (a pure Water type: no type immunity of any generation reaches it), the other
- * bodies splash. Every Dex read goes through `rulesDex`.
- */
-
 export type DexMove = ReturnType<ReturnType<typeof rulesDex>['moves']['get']>;
 
 export const dexOfRules = (rules: Rules) => (rules === CHAMPIONS ? rulesDex(0) : rulesDex(rules.generation));
 
-/** The rule sets and game types the sweeps play: Gens 1 and 2 in singles, Gens 3 on and Champions in singles and doubles. */
 export const SWEEP_CASES: { rules: Rules; mode: Mode; name: string }[] = RULES.flatMap(rules =>
   (rules.doubles ? ['singles', 'doubles'] as const : ['singles'] as const).map(mode => ({ rules, mode, name: `${rules.name} ${mode}` })));
 
-/** Moves that reach a foe: the others (a side, the field, the user, an ally) draw no accuracy or crit against a foe. */
 const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent', 'randomNormal', 'scripted']);
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
 
-/** Every move a rule set plays (no Z or Max moves, past moves stay) that the sweep's predicate keeps and a foe can be the target of (`whole`: the whole list, for a sweep that picks its own sample). */
 export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true, whole = false): { moves: DexMove[]; skipped: number } {
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
@@ -36,14 +27,8 @@ export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesO
   return { moves: whole ? reaching : sweepSelection(reaching, 'moves'), skipped: all.length - reaching.length };
 }
 
-/** The rule sets VGC plays (Scarlet/Violet and Champions doubles): a team of six per side. */
 export const VGC_RULES: Rules[] = RULES.filter(rules => rules.doubles && (rules.generation === 9));
 
-/**
- * The board of a case: Snorlax with the move leads side p1, a Vaporeon leads side p2, in doubles a Blissey and a second Vaporeon
- * splash beside them. `vgc` gives each side a team of six (the four behind the leads splash). The custom game takes the whole team
- * into the battle: it asks for no team preview here, so nobody is left at home.
- */
 export function sweepBoard(rules: Rules, moveId: string, mode: Mode, seed = '1,2,3,4', vgc = false, species = 'Snorlax'): Battle {
   const attacker = mon(rules, { species, moves: [moveId], gender: 'M' });
   const vaporeon = mon(rules, { species: 'Vaporeon', moves: ['splash'] });
@@ -63,16 +48,12 @@ export function sweepBoard(rules: Rules, moveId: string, mode: Mode, seed = '1,2
   return battle;
 }
 
-/**
- * The two sides' clicks: the attacker uses its move (aimed at the first foe when it needs a target), the rest splash. A body
- * locked into the second turn of a charge move takes no target (the simulator refuses one).
- */
+/** A body locked into the second turn of a charge move takes no target: the simulator refuses one. */
 export function sweepClicks(mode: Mode, target: string, locked = false): { p1: string; p2: string } {
   if (mode === 'singles') return { p1: 'move 1', p2: 'move 1' };
   return { p1: `move 1${NEEDS_AIM.has(target) && !locked ? ' 1' : ''}, move 1`, p2: 'move 1, move 1' };
 }
 
-/** The slots a move can draw for, each forced on its own: the aimed foe, both foes of a spread move, the ally too when the move reaches everybody. */
 export function sweepTargets(mode: Mode, target: string): string[] {
   if (mode === 'singles') return ['p2a'];
   if (target === 'allAdjacentFoes' || target === 'randomNormal' || target === 'scripted') return ['p2a', 'p2b'];
@@ -80,29 +61,19 @@ export function sweepTargets(mode: Mode, target: string): string[] {
   return ['p2a'];
 }
 
-/** A move that picks its target or its draws at random: one of the slots shows it, the others legitimately draw nothing. */
 export const picksOne = (target: string): boolean => target === 'randomNormal' || target === 'scripted';
 
-/** A move of two turns (a charge): the first turn plays plain, the forced die belongs to the second. */
 export const isCharge = (move: DexMove): boolean => !!move.flags.charge;
 
-/**
- * A future move lands two turns later in the end-of-turn residual, when no move is in flight. The module names no die for it in the
- * turn it starts: the sweeps hold that the report says `no-draw` with that reason and the protocol shows no miss.
- */
 export const isDelayed = (move: DexMove): boolean => !!move.flags.futuremove;
 
-/**
- * Whether the simulator takes the clicks on this board: a move with a condition that is not met (Belch before a berry is
- * eaten) is disabled and its click refused, so no turn and no die exist for it.
- */
+/** A move with an unmet condition (Belch before a berry is eaten) is disabled and its click refused. */
 export function clicksAccepted(board: Battle, clicks: { p1: string; p2: string }): boolean {
   const probe = copyOf(board);
   probe.prng ??= board.prng.clone();
   return probe.choose('p1', clicks.p1) && probe.choose('p2', clicks.p2);
 }
 
-/** One forced turn on a copy of the board; the board stays at its turn so the next answer starts from the same place. */
 export function forcedOn(board: Battle, clicks: { p1: string; p2: string }, forced: ForcedDie[]): { report: DiceReport; battle: Battle; start: number } {
   const live = copyOf(board);
   // the speed layer's copy leaves the stream to its asker
@@ -118,14 +89,13 @@ export const turnLines = (battle: Battle, start: number, prefix: string): string
 
 const slotOfIdent = (ident: string | undefined): string | undefined => ident?.split(':')[0].trim();
 
-/** The `|-miss|` lines of the turn about a slot: Gens 3 and up name the target, Gens 1 and 2 only the user (so every miss counts there). */
+/** Gens 3 and up name the target on a `|-miss|` line, Gens 1 and 2 only the user (so every miss counts there). */
 export const missesOf = (battle: Battle, start: number, slot: string): number =>
   turnLines(battle, start, '|-miss|').filter(line => { const target = line.split('|')[3]; return target === undefined || slotOfIdent(target) === slot; }).length;
 
 export const critsOf = (battle: Battle, start: number, slot: string): number =>
   turnLines(battle, start, '|-crit|').filter(line => slotOfIdent(line.split('|')[2]) === slot).length;
 
-/** A reason that names a protocol line or says what the user did instead; the generic sentence of a die the module should have named is the failure. */
 export const explained = (reason: string | undefined): boolean =>
   !!reason && /did not use|did not run|did nothing|lands two turns later|shows "|always crits|cannot miss|removed the secondary|fixed hit count|no stall draw/.test(reason);
 
@@ -136,12 +106,7 @@ export function monOf(battle: Battle, slot: string): Pokemon {
   return battle.sides[slot[1] === '1' ? 0 : 1].active[slot[2] === 'a' ? 0 : 1];
 }
 
-/**
- * The damage a body loses when the simulator itself draws `raw` for every damage roll of the turn: the oracle of the roll
- * sweeps and of the answer spec. The turn plays on a copy with a PRNG that answers the draws inside `battle.randomizer`
- * (Gens 3 and up; a crit chance of 1 in 16 draws `random(16)` too, so the script call decides) or the
- * `random(217, 256)` of Gens 1 and 2 with the raw value, and the stream for everything else.
- */
+/** A crit chance of 1 in 16 draws `random(16)` too, so the damage roll is told by its script call (Gens 3 and up). */
 export function damageAtRaw(board: Battle, clicks: { p1: string; p2: string }, slot: string, raw: number): number {
   const shape = genShape(board.gen).roll;
   const battle = copyOf(board);
@@ -169,7 +134,6 @@ export function damageAtRaw(board: Battle, clicks: { p1: string; p2: string }, s
   return target.maxhp - target.hp;
 }
 
-
 export interface SecondaryEntry {
   chance?: number;
   status?: string;
@@ -185,12 +149,6 @@ function boostShown(rows: string[][], slot: string, stats: string[]): boolean {
   return rows.some(row => (row[1] === '-boost' || row[1] === '-unboost') && slotIn(row[2]) === slot && stats.includes(row[3]));
 }
 
-/**
- * The independent witness of the secondary sweep: whether the protocol of the turn shows the effect of a secondary entry. A status is
- * `|-status|`, a flinch is the `|cant|` line of the target, another condition a `|-start|`, a boost or a drop a `|-boost|` or
- * `|-unboost|` of the entry's stat on the target (on the user for a `self` entry). An entry with none of these (a handler that
- * picks the effect) shows by any of the lines that start something on the target.
- */
 export function effectShown(battle: Battle, start: number, entry: SecondaryEntry, targetSlot: string, userSlot: string): boolean {
   const rows = linesOf(battle, start);
   if (entry.status) return rows.some(row => row[1] === '-status' && slotIn(row[2]) === targetSlot && row[3] === entry.status);
@@ -213,10 +171,6 @@ export function outfitBoard(
   );
 }
 
-/**
- * The log of a turn as its effects read it: the stable log, without the target field of the `|move|` line of a move that ignores the
- * foe the simulator sampled for it (`AIM_FREE_TARGETS`: a spread move names the sampled body there, and no effect reads it).
- */
 export function effectLog(battle: Battle): string {
   return stableLog(battle).split('\n').map(line => {
     if (!line.startsWith('|move|')) return line;
@@ -225,11 +179,7 @@ export function effectLog(battle: Battle): string {
   }).join('\n');
 }
 
-/**
- * Whether two plays of a turn did the same: the same log (`effectLog`), or the same lines in another order that leave the same bodies
- * (the end-of-turn damage of two bodies of one speed lands in an order the simulator shuffles with its stream, from Generation 5 on:
- * Poison Gas poisons both foes of a doubles board, and the two poison ticks swap places under another seed).
- */
+/** From Gen 5 the end-of-turn damage of bodies of one speed is shuffled: two poison ticks may swap places. */
 export function sameEffects(a: Battle, b: Battle): boolean {
   const left = effectLog(a);
   const right = effectLog(b);

@@ -10,9 +10,6 @@ import {
 import { playClicks, sweepSelection } from './dice-fixtures';
 import { forcedOn, monOf, newTally, outfitBoard, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-// Every proc (a contact ability, Cursed Body, Poison Touch, Toxic Chain, the Focus Band) in every rule set the Dex gives it, singles and
-// doubles, forced to happen and not to, on three seeds; the witness is the protocol line that names the ability or the item. The die is named
-// by the holder's slot, the move, the body that was hit and the ability's or the item's id.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;

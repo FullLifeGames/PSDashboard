@@ -1,12 +1,6 @@
 import type { Battle } from '@pkmn/sim';
 import { monOf } from './dice-sweep-support';
 
-/**
- * The status checks the status sweep and the offer spec play: one check is a condition put on the attacker (side p1, slot p1a) and
- * the protocol lines that show the body going on (`yes`) or being stopped (`no`).
- */
-
-/** A move of each kind the check precedes: physical, spread, a status move, a move that thaws its user (read from the Dex flag). */
 export const CHECK_MOVES = ['tackle', 'rockslide', 'splash', 'flamewheel'];
 
 export interface Check {

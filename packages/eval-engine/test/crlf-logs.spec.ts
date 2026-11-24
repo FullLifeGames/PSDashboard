@@ -15,14 +15,6 @@ import { allTurnEvents, detectSacks, parseLeadSpecies, parsePlayedActions, parse
 import { serializeLiveBattle } from '../src/serialize';
 import { parseRevealedTeraSpecies, resolveTeraPreference } from '../src/tera';
 
-/**
- * A log with Windows line endings reads like the same log with LF at every exported function that takes a log. Split at '\n', every
- * line keeps its '\r': the lead reader found no `|start`, the turn reader no `|turn|N`, and the click behind an Encore compared
- * "Encore\r" with "Encore". replay-core normalizes once at each of its doors (packages/replay-core/src/line-endings.ts); this package does
- * the same with its own copy, because replay-core's barrel does not export that helper. The fixtures are real replays, singles and
- * doubles, each read from its LF text and its CRLF twin. The Encore scenes are the rebuild's synthetic logs (runtime.active-correction.spec.ts).
- */
-
 const lfOf = (text: string) => text.replace(/\r\n?/g, '\n');
 const crlfOf = (text: string) => lfOf(text).replace(/\n/g, '\r\n');
 const withCr = (lines: string[]) => lines.map(line => `${line}\r`);
@@ -80,12 +72,6 @@ describe('the readers of a log read a CRLF log like the LF log', () => {
   }
 });
 
-/**
- * The readers that take a turn's lines instead of the log sit on the barrel, and a caller that splits a CRLF log at '\n' hands them
- * lines that still end in '\r': detectSacks found no faint (its pattern ends at the line end), detectRolls flipped the KO flag of a
- * hit and a dice marker, parsePlayedActions printed the reason "flinch\r", and diceEventTurns dropped turns. The app never hands a '\r'
- * in (allTurnEvents and the snapshots cut their lines from a normalized log); a library user can. Each reader settles the line endings at its own door.
- */
 describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on each line', () => {
   for (const [name, file] of Object.entries(FIXTURES)) {
     const lf = lfOf(replayOf(file).log);
@@ -106,7 +92,6 @@ describe('the readers of a turn\'s lines tolerate the "\\r" a CRLF log leaves on
       });
       const index = turns.map(lines => (lines ? withCr(lines) : lines));
       expect(diceEventTurns(index)).toEqual(diceEventTurns(turns));
-      // The comparison is no empty one: the LF lines hold sacks and hits for the CRLF lines to agree with.
       expect(seen.sackTurns).toBeGreaterThan(0);
       expect(seen.hits).toBeGreaterThan(0);
     });
@@ -144,7 +129,6 @@ const mon = (species: string, ability: string, moves: string[], spe: number): Po
   evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe }, ivs, level: 100, teraType: 'Normal',
 });
 
-/** The Encore scene of runtime.active-correction.spec.ts: the Encore lands before its target moves, so the click behind it is the encored move. */
 const encoreTurns = (target: string, user: string) => [
   '|turn|1',
   `|move|${target}: Snorlax|Protect|${target}: Snorlax`, `|-singleturn|${target}: Snorlax|Protect`,
@@ -209,7 +193,6 @@ describe('reconstructBranchRuntime and adoptSerializedRuntime read a CRLF replay
     const lf = await rebuild(scene, scene.log);
     const crlf = await rebuild(scene, crlfOf(scene.log));
     const target = lf.runtime.battleStream.battle!.sides[0].pokemon.find(pokemon => pokemon.species.name === 'Snorlax')!;
-    // The lock of the scene: the rebuild plays the Encore as the protocol shows it, and the body stays locked into Protect on turn 4.
     expect(target.volatiles['encore']?.move).toBe('protect');
     expect(withoutTimestamps(crlf.runtime.log)).toEqual(withoutTimestamps(lf.runtime.log));
     expect(crlf.runtime.choiceErrors.count).toBe(lf.runtime.choiceErrors.count);

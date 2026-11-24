@@ -12,8 +12,6 @@ import {
 } from './dice-fixtures';
 import { damageAtRaw as oracleDamage } from './dice-sweep-support';
 
-// A chance answers yes or no; a die with no way to give an answer keeps the natural result and says so; the damage roll's step runs
-// from the lowest damage up in every generation; and a forced-dice PRNG with nothing forced plays byte for byte the plain PRNG.
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: 12 }, (_, index) => seedOf(index));
@@ -50,7 +48,6 @@ describe('a chance draw answers yes or no', () => {
       const no = answerDie('accuracy', { happens: false }, chance(numerator, denominator), 9);
       expect(yes).toEqual({ value: 0, chance: numerator / denominator });
       expect(no).toEqual({ value: denominator - 1, chance: numerator / denominator });
-      // the simulator's own reading of the value, PRNG#randomChance: random(denominator) < numerator
       expect((yes as { value: number }).value < numerator).toBe(true);
       expect((no as { value: number }).value < numerator).toBe(false);
     }
@@ -84,7 +81,6 @@ describe('a chance draw answers yes or no', () => {
     const range: Draw = { call: 'random', from: 1, to: 4 };
     expect(answerDie('hit-count', { hits: 3 }, range, 2)).toEqual({ value: 3 });
     expect(answerDie('hit-count', { hits: 4 }, range, 2)).toEqual({ noChance: true });
-    // a random(m) with no upper end holds a count the draw alone does not name: the learner answers it
     expect(answerDie('hit-count', { hits: 5 }, { call: 'random', from: 7 }, 9)).toBeNull();
   });
 
@@ -120,7 +116,7 @@ describe.each(cases)('forced accuracy: $rules.name $mode', ({ rules, mode }: { r
     for (const seed of SEEDS) {
       const no = forcedTurn(rules, TACKLE, mode, seed, [{ name: { ...kick('accuracy'), moveId: 'tackle' }, result: { happens: false } }]);
       const note = no.prng.notes.get(dieKey({ ...kick('accuracy'), moveId: 'tackle' }));
-      // Gen 2 turns a 100 percent move into accuracy 255 and draws nothing; Gens 5 and up draw chance(100, 100); the older ones draw below 100.
+      // Gen 2 turns a 100 percent move into accuracy 255 and draws nothing; Gens 5 and up draw chance(100, 100).
       if (!note) continue;
       expect(note.noChance, `${rules.name} ${seed}`).toBe(missLines(no.battle) === 0);
     }
@@ -147,7 +143,6 @@ describe.each(cases)('the damage roll runs from the lowest damage up: $rules.nam
   const damageAtRaw = (seed: string, raw: number): number => oracleDamage(boardOf(rules, STRENGTH, mode, seed)!, clicksOf(STRENGTH, mode), 'p2a', raw);
 
   test('step 0 deals the least damage of the raw values, the top step the most, and no step deals less than the one before', () => {
-    // a seed whose turn hits without a crit: the roll is the only die that then moves the damage
     const seed = SEEDS.find(candidate => {
       const plain = boardOf(rules, STRENGTH, mode, candidate)!;
       playClicks(plain, clicksOf(STRENGTH, mode));

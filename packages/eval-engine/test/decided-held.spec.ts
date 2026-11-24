@@ -56,8 +56,6 @@ describe('the held sweep at the analysis layer and in prose', () => {
   });
 
   test('a sweep the bar does not back stays off the analysis', () => {
-    // 649664 t15-t22: Medicham-Mega named for p2 while the bar leaned to p1;
-    // 573756 t92-t136: the right side named, the bar between 0.33 and 0.60.
     expect(analysisAt(0.2, 0.15).p2.decided).toBeUndefined();
     expect(analysisAt(-0.6, -0.65).p2.decided).toBeUndefined();
     expect(analysisAt(-0.7, -0.75).p2.decided).toEqual({ species: 'Zapdos-Galar', announce: true });
@@ -101,7 +99,6 @@ describe('the decided sweep needs the bar on real positions', () => {
   });
 
   test('749828 t23 (singles): the sweep names Primarina for p1, the bar reads p2, nothing is held', { timeout: 120000 }, async () => {
-    // Aqua Jet lends its first strike to Primarina's best move while Rillaboom's Grassy Glide goes first under the terrain; the prover proves p2, and p2 won.
     const result = await search(load('smogtours-gen9ou-749828-t23.json'));
     expect(result.unanswered?.decided?.side).toBe('p1');
     expect(result.score).toBeLessThan(0);

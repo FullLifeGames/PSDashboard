@@ -9,9 +9,6 @@ import {
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-// The report of a forced turn: `applied` when the protocol shows the answer, `no-draw` when the simulator never drew the die,
-// `no-chance` when the draw cannot give the answer, `blocked` when the draw ran and the effect did not land. Every row reads the
-// report next to the protocol's own lines.
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: 8 }, (_, index) => seedOf(index));
@@ -50,7 +47,6 @@ describe.each(cases)('the report of a forced accuracy: $rules.name $mode', ({ ru
     for (const seed of SEEDS) {
       const { report, battle } = forcedReport(boardOf(rules, TACKLE, mode, seed)!, TACKLE, mode, [{ name: name('tackle', 'accuracy'), result: { happens: false } }]);
       const hit = lines(battle, '|-miss|').length === 0;
-      // Gen 2 draws no accuracy for a 100 percent move (accuracy 255): the die never ran, whatever the answer
       const sure = rules.generation === 2 ? 'no-draw' : 'no-chance';
       expect(report.took === sure, `${rules.name} ${seed} ${report.took}`).toBe(hit);
       if (hit) expect(report.reason).toBeTruthy();

@@ -9,12 +9,8 @@ import { watchBattle } from '../src/dice/watch';
 import { mon, RULES, seedOf, stableLog, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-// A forced die changes the number of draws of the turn (a forced hit after a natural miss adds a crit and a roll). The other
-// actions of the turn keep the dice the natural turn drew for them, the first action's own new dice fall from the stream, and the
-// stream after the turn stands where the natural turn leaves it.
 await loadSimMods('gen9championsou');
 
-/** Pikachu (fast) kicks, Snorlax (slow) tackles; in doubles Blissey tackles Chansey and Chansey tackles Blissey. */
 function board(rules: Rules, mode: Mode, seed: string): Battle {
   const pikachu = mon(rules, { species: 'Pikachu', moves: ['megakick', 'splash'] });
   const snorlax = mon(rules, { species: 'Snorlax', moves: ['tackle', 'splash'], gender: 'M' });
@@ -30,9 +26,7 @@ function turn(battle: Battle, clicks: { p1: string; p2: string }): void {
   if (!battle.choose('p1', clicks.p1) || !battle.choose('p2', clicks.p2)) throw new Error(`choice refused ${JSON.stringify(clicks)}`);
 }
 
-/** The action blocks of the last turn's log: from a `|move|` line to the next one (the last block ends at the upkeep). */
 function segments(battle: Battle): string[] {
-  // a game that ended in the turn writes no `|turn|` line after it
   const lines = battle.log.slice(battle.log.lastIndexOf(`|turn|${battle.ended ? battle.turn : battle.turn - 1}`) + 1).filter(line => !line.startsWith('|t:|'));
   const blocks: string[] = [];
   for (const line of lines) {
@@ -85,7 +79,6 @@ describe.each(cases)('the stream of a forced turn: $label', ({ rules, mode, late
       expect(report.forced[0].took).toBe('applied');
       if (streamOnlyDiffers === 0) streamOnlyDiffers += streamOnly(rules, mode, seed, later, natural) ? 1 : 0;
     }
-    // the check bites: without the record and the reset the same forced die moves the other actions or the seed
     expect(streamOnlyDiffers, 'the stream alone would have moved something').toBeGreaterThan(0);
   });
 
@@ -93,7 +86,6 @@ describe.each(cases)('the stream of a forced turn: $label', ({ rules, mode, late
     for (const seed of seedsWhere(rules, mode, later, true, 2)) {
       const { live } = pair(rules, mode, seed, later);
       playForcedTurnOn(live, mode, [accuracy(true)]);
-      // reference: a plain PRNG whose first draw of the turn (the kick's accuracy) answers 0, the stream going on as it is
       const reference = board(rules, mode, seed);
       if (later) turn(reference, REST[mode]);
       const inner = reference.prng;
@@ -148,7 +140,6 @@ function playForcedTurnOn(live: Battle, mode: Mode, forced: ForcedDie[]) {
   return report;
 }
 
-/** True when the same forced die, answered from the stream alone (no record, no reset), moves another action or the seed. */
 function streamOnly(rules: Rules, mode: Mode, seed: string, later: boolean, natural: Battle): boolean {
   const battle = board(rules, mode, seed);
   if (later) turn(battle, REST[mode]);
@@ -166,7 +157,6 @@ function streamOnly(rules: Rules, mode: Mode, seed: string, later: boolean, natu
 
 describe.each(RULES.map(rules => ({ rules })))('the first turn of a branch over logged dice: $rules.name singles', ({ rules }: { rules: Rules }) => {
   test('the logged dice of the action the user leaves alone survive a forced die, and the seed ends where the natural turn ends', () => {
-    // The dice of Snorlax's tackle under seed A, as the log of a played turn would carry them.
     const key = 'p2a:tackle';
     const logged = new Map<string, { from: number | undefined; to: number | undefined; value: number }[]>();
     const loggedBattle = board(rules, 'singles', seedOf(40));

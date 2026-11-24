@@ -8,11 +8,8 @@ import { EFFECT_SPORE, hitDie, present, procBoard } from './dice-ability-support
 import { playClicks } from './dice-fixtures';
 import { forcedOn, SWEEP_CASES, sweepClicks } from './dice-sweep-support';
 
-// Gens 3 and 4 draw a chance and then pick the status with a `sample` over the three words (two dice: the proc and its `:option`). Gens 5
-// and on draw one number from 0 to 99 and the script compares it with thresholds: below the first it puts the target to sleep, below the
-// second it paralyses, below the third it poisons, and above them nothing happens. The module keeps no thresholds: it plays the turn on
-// copies with raw answers and reads the status from the protocol (learn.ts). This sweep plays all 100 raw numbers on a spy and holds that
-// each status is one run of numbers.
+// Gens 3 and 4 draw a chance and then `sample` the status (two dice); Gens 5 and on draw one number from 0 to 99
+// against thresholds: sleep, paralysis, poison.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -25,16 +22,12 @@ const WORDS = ['slp', 'par', 'psn'];
 const why = (report: DieReport): string => `${report.took}: ${report.reason ?? 'no reason'}`;
 const dieOf = (effectId: string, result: ForcedDie['result']): ForcedDie => ({ name: { slot: 'p1a', moveId: 'tackle', targetSlot: 'p2a', kind: 'ability-proc', effectId }, result });
 
-/**
- * The status the protocol shows on the attacker (the spore lands on the body that hit), or null. The sleep of Gens 3 and 4 is
- * written without the ability's label, so the line is read by the body.
- */
+// The sleep of Gens 3 and 4 is written without the ability's label, so the line is read by the body.
 function statusShown(battle: Battle, start: number): string | null {
   const line = battle.log.slice(start).find(candidate => candidate.startsWith('|-status|p1a'));
   return line ? line.split('|')[3] : null;
 }
 
-/** The status the simulator gives when Effect Spore's `random(100)` comes out as `raw`. */
 function statusAtRaw(board: Battle, clicks: { p1: string; p2: string }, raw: number): string | null {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();
@@ -97,13 +90,11 @@ describe.each(SWEEP_CASES.filter(({ rules }) => present(rules, 'abilities', 'eff
   }
 
   test('a status the target cannot take is blocked, not reported as given', () => {
-    // the spore lands on the attacker: a burnt attacker keeps its status and the effect's line does not follow
     const burnt = board();
     burnt.sides[0].active[0]!.setStatus('brn');
     const { report } = forcedOn(burnt, clicks, single
       ? [hitDie('tackle'), dieOf('effectspore', { option: 'par' })]
       : [hitDie('tackle'), dieOf('effectspore', { happens: true }), dieOf('effectspore:option', { option: 'par' })]);
-    // Gens 5 and on: no number gives a status the attacker cannot take (the learner finds none); Gens 3 and 4: the pick draws and the line does not follow
     const last = report.forced[report.forced.length - 1];
     expect(last.took, why(last)).toBe(single ? 'no-chance' : 'blocked');
   });

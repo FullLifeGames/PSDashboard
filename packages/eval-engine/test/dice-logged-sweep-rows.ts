@@ -6,31 +6,17 @@ import type { Mode, Rules } from './dice-fixtures';
 import { dexOfRules, picksOne, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { clickedOf, moveScene, scan, witnessesWanted, type Scan, type Scene } from './dice-logged-sweep-support';
 
-/**
- * What the specs of the logged sweep share (`dice-logged-sweep.spec.ts`, the crit specs, `dice-logged-secondary.spec.ts`). The doubles
- * crits of the 18 cases (`SWEEP_CASES`) split in two halves by their measured time; a rule set that joins `RULES` lands in the second half.
- * The scene helpers and the scan live in `dice-logged-sweep-support.ts`.
- */
 export const WANT = witnessesWanted();
 export const summaries: string[] = [];
 
-/** Writes the summaries where `DICE_SWEEP_LOG` points; a split part adds its own suffix. */
 export function writeSummaries(part?: string): void {
   const logPath = process.env.DICE_SWEEP_LOG;
   if (logPath) writeFileSync(part ? `${logPath}.${part}` : logPath, summaries.join('\n') + '\n', 'utf8');
 }
 
-/**
- * A move aimed at a random foe in doubles (Thrash, Struggle): the simulator picks the target from the stream (a `pick` of the census, out
- * of the module's scope) and the log names the one it picked. A forced turn on another seed can hit the other foe; the alignment reads
- * bodies by side and species, so two foes of one species hide the difference and the sweep leaves these moves out.
- */
+// A move aimed at a random foe in doubles picks its target from the stream; the alignment reads bodies by
+// side and species, so two foes of one species hide the difference and the sweep leaves these moves out.
 const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && picksOne(move.target);
-/**
- * The moves the full sweep (`DICE_SWEEPS=full`) found that `loggedDice` cannot repeat, each group with its cause. The main rows leave
- * them out; one known row per group plays them and stays red until the reader or a die covers the cause. Names stand here because
- * the sweep's oracle is the simulator's own log of each move; the code that fixes a cause reads the Dex, not these ids.
- */
 export const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },
@@ -73,7 +59,6 @@ const KINDS = {
   crit: { keep: (move: DexMove) => move.category !== 'Status', channels: ['crits'] },
 } as const;
 
-/** The rule sets whose doubles crits `dice-logged-crit-doubles-a.spec.ts` plays (about 660 of the 1,200 s under `DICE_SWEEPS=full`); the others are part b's. */
 const CRIT_DOUBLES_A = ['Champions', 'Gen 8', 'Gen 5', 'Gen 4'];
 type SweepCase = typeof SWEEP_CASES[number];
 export const CRIT_CASES: Record<'singles' | 'doublesA' | 'doublesB', SweepCase[]> = {
@@ -90,11 +75,9 @@ export function registerKindRows(cases: SweepCase[], kinds: (keyof typeof KINDS)
     for (const kind of kinds) {
       const spec = KINDS[kind];
       test(`${kind}: every move that draws one`, () => {
-        // a crit comes once in 16 to 24 draws: its seeds scan wider than the other kinds'
         const result = sweepMovesOf(kind, rules, mode, spec.keep, move => moveScene(rules, mode, move, { channels: spec.channels, kind, pool: kind === 'crit' ? 40 : undefined, options: options(move) }));
         expect(result.failures).toEqual([]);
         expect(result.witnesses, 'the sweep found a seed pair the log repairs').toBeGreaterThan(0);
-        // a crit the other seed shows against a hit the log missed has no crit die in the log: the log names it where the move hit
         expect(result.named, 'the log names the die').toBeGreaterThan(0);
       });
     }

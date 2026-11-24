@@ -8,14 +8,6 @@ import { loggedDice } from '../src/dice/logged-results';
 import { loggedOptions } from '../src/dice/turn';
 import { aimOf, bentScene, ofKind, pickBoard, pickClicks, publicHalf, recorded, type Recorded } from './dice-pick-support';
 
-// The simulator draws a random target in two places that the log shows and the rebuild does not read. A move
-// that picks its foe at random (the Dex target `randomNormal`: Outrage, Thrash, Petal Dance, Uproar, Raging Fury, Struggle) draws it
-// in `getTarget`, and a move that an Encore bent to the last one (`OverrideAction`) draws it in `runMove`, both through
-// `getRandomTarget`, which samples the standing foes in doubles (`side.randomFoe`) and takes the one foe of singles without a draw.
-// For every rule set with doubles (Gens 3 to 9 and Champions), doubles and VGC (a team of six), and for singles as the control:
-// (a) every Dex move with the target `randomNormal`; (b) every one-target move the user clicked another move over, when the faster
-// foe's Encore lands first. The natural turn on a copy names one `random-target` die of the user and the move, its sample holds
-// the standing foes, forcing each foe makes the move line name it, and the battle the question came from stays as it was.
 await loadSimMods('gen9championsou');
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
@@ -41,8 +33,7 @@ function checkPicked(board: ReturnType<typeof pickBoard>, clicks: { p1: string; 
     const { report, battle, start } = forcedOn(board, clicks, [forced]);
     const aimed = aimOf(battle.log.slice(start), 'p1a', moveId);
     const took = report.forced[0]?.took;
-    // a move that turns itself on the user after `ModifyMove` (Curse of a body that is no Ghost) or fails before its target shows (Fling
-    // with no item) names no foe on its line: the die was drawn and forced, the effect did not show
+    // Curse of a non-Ghost (turns on the user after `ModifyMove`) and Fling with no item name no foe on their line.
     const named = aimed !== undefined && FOES.includes(aimed);
     if (named && aimed !== foe) problems.push(`forcing ${foe}: the move line names ${aimed}`);
     if (named && took !== 'applied') problems.push(`forcing ${foe}: ${took} (${report.forced[0]?.reason}) although the line names ${aimed}`);
@@ -52,11 +43,6 @@ function checkPicked(board: ReturnType<typeof pickBoard>, clicks: { p1: string; 
   return problems;
 }
 
-/**
- * The log reader answers the draw: the lines of a turn that forced `foe` give a die of the same key whose answer is that foe (a
- * reader told that the game draws a random target, as `loggedOptions` tells it), and playing the board with the reader's die makes
- * the move line name the foe again.
- */
 function readBack(board: ReturnType<typeof pickBoard>, clicks: { p1: string; p2: string }, lines: readonly string[], moveId: string, foe: string): string[] {
   const key = dieKey(pick('p1a', moveId));
   const read = loggedDice(lines, { randomTargets: true }).find(die => dieKey(die.name) === key);
@@ -130,7 +116,6 @@ describe.each(CASES)('an Encore that bends a click draws the target of the bent 
       if (!played) continue;
       const turn = recorded(played.board, played.clicks);
       if (!bent(turn.lines, move.id)) {
-        // nothing bent the click: the Splash of the user draws no target
         if (ofKind(turn, 'random-target').length > 0) problems.push(`${move.id}: a target die without a bent click`);
         continue;
       }
@@ -142,7 +127,6 @@ describe.each(CASES)('an Encore that bends a click draws the target of the bent 
       problems.push(...checkPicked(played.board, played.clicks, turn, move.id).map(problem => `${move.id}: ${problem}`));
     }
     expect(problems).toEqual([]);
-    // the full sweep bends a click for a good part of the Dex moves: a sweep that bent none proved nothing
     if (SWEEPS_FULL) expect(bends).toBeGreaterThan(20);
   });
 });

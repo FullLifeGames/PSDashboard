@@ -12,20 +12,11 @@ import { cellSeeds } from '../src/search/root-quantile';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * The share of a flipped child. `pricedGroup` plays the recorded turn once with each chance die answered the other way; the flipped
- * branch is worth the chance of that answer times the chances of the other deciding dice that branch drew, never one the branch did
- * not reach: Champions VGC 2682637901 turn 6, a failed second Protect lets Aqua Jet end the game before Volcarona's paralysis die
- * (1 in 8) is rolled, so its share is 2/3, not 7/12. `FlippedTurn.drawn` names the dice a flipped branch drew again; the plain
- * path's `delaySplit` prices a split of the faints or the end that the recorded dice explain (a repeated Protect), for the prover's
- * delay rule only.
- */
 interface Scene { serialized: string; ruleset: 'champions' | 'standard' }
 const scene = (name: string): Scene => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), 'utf-8')) as Scene;
 const SCENE_1 = ['forced-win/scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6', 'forced-win-delay/champions-vgc-2682637901-t6-bank'];
 const OWN = 'move heatwave, move aquajet 1';
 
-/** The position after Raichu's first Protect (sure): Raichu carries the stall volatile, the second Protect rolls one in three. */
 async function afterFirstProtect(name: string): Promise<SimPosition> {
   await loadSimMods('gen9championsdoublescustomgame');
   const board = scene(name);
@@ -78,7 +69,6 @@ describe.each(SCENE_1)('Champions VGC 2682637901 turn 6, the second Protect agai
 });
 
 describe('two dice that both fall in every branch keep the product of the other die\'s recorded chance', () => {
-  // two bodies that each roll a die of their own in every branch: the share of a flipped branch is its chance times the other die's held chance
   test('a paralysed attacker against a confused one: the flipped shares are other times held, as before P2', async () => {
     await loadSimMods('gen9championsou');
     const snorlax = (moves: string[]) => set('Snorlax', moves, { evs: { hp: 252, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 } });

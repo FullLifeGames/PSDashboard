@@ -3,13 +3,6 @@ import { Generations, Pokemon } from '@smogon/calc';
 import { calcSingleDamageRange } from '../src/damage-calc';
 import type { BranchMoveOption, SimPokemonInfo } from '../src/branch-engine';
 
-/**
- * damage-calc.ts `shieldedBy` asks protectBlocks (calc/protect.ts) before the calc sees the partner's Protect. Only a smart-target move
- * (Dragon Darts) reaches it, and only in doubles, with the defender's partner on the field. Dragon Darts into Snorlax with Garchomp
- * (Dragon-weak) behind it: with no partner pick one dart goes to each, so the preview prices one hit on Snorlax; when the partner's pick
- * shields it (Protect, going first), both darts land on Snorlax. Stubbed to "Protect does not stop it" the preview is back at one dart.
- * body.spec.ts holds protectBlocks itself against real battles.
- */
 const blocks = vi.hoisted(() => ({ forced: undefined as boolean | undefined }));
 vi.mock('../src/calc/protect.ts', async importOriginal => {
   const actual = await importOriginal<typeof import('../src/calc/protect')>();

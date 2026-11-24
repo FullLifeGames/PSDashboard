@@ -1,11 +1,6 @@
 import { readFileSync, readdirSync } from 'fs';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-/**
- * The full dice sweeps run only with `DICE_SWEEPS=full`: without it `sweepSelection` hands every sweep the same small sample of its
- * list, so a plain run and the CI jobs of the engine project stay light and still play every sweep.
- */
-
 async function fixtures(mode: string | undefined) {
   vi.resetModules();
   // no variable is an empty one: a run that sets DICE_SWEEPS=full for the whole process leaves these rows as they are

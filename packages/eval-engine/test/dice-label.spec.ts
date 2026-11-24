@@ -3,8 +3,6 @@ import { rulesDex } from '@fulllifegames/replay-core';
 import { dieLabel, type DieWords } from '../src/dice/die-label';
 import { DIE_KINDS, type DieKind, type DieName, type ForcedDie } from '../src/dice/types';
 
-/** One text per forced die for history rows, shares, frame lines and chips; names come from a reader the caller hands in. */
-
 const WORDS: DieWords = { move: id => `Move ${id}`, effect: id => `Effect ${id}`, slot: slot => `Body ${slot}` };
 const name = (kind: DieKind, extra: Partial<DieName> = {}): DieName => ({ slot: 'p1a', moveId: 'tackle', targetSlot: 'p2a', kind, ...extra });
 const label = (die: ForcedDie): string => dieLabel(die, WORDS);

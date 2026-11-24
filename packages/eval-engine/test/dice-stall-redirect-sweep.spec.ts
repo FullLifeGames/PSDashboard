@@ -6,17 +6,6 @@ import { mon, playClicks, sweepSelection } from './dice-fixtures';
 import { sweepClicks, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * A stalling move the body did not click. VGC 2630452654 turn 4: Calyrex clicked Astral Barrage, Iron Valiant's faster Encore made it
- * repeat Protect, and the second Protect failed (`|-fail|`). The reader must name the stalling die for a move the body did not click
- * too: otherwise the forced rebuild lets that Protect succeed, leaves a stall counter of 9 on the body and prices every later
- * "+ Protect" of the game on it ("Protect: fails (89%)" at turn 5, where the game's Protect was sure).
- *
- * The simulator is the oracle: for every stalling move of every generation and mod the corpus plays (singles everywhere, doubles from
- * Gen 3) the move is used once, then the log of its second use is read twice, once with the click on the move and once with the click
- * on another move of the body (the Encore case: the log shows the move, the click was Splash). The dice the reader names must be the
- * same, and a second use that failed must be among them (a failure the sweep never saw would prove nothing).
- */
 await loadSimMods('gen9championsou');
 vi.setConfig({ testTimeout: 900_000 });
 
@@ -38,7 +27,6 @@ describe.each(SWEEP_CASES)('a stalling move the log shows and the body did not c
       ? battleOf(rules.singles, [attacker], [vaporeon], seed)
       : battleOf(rules.doubles!, [attacker, mon(rules, { species: 'Blissey', moves: ['splash'] })], [vaporeon, mon(rules, { species: 'Vaporeon', moves: ['splash'] })], seed);
     playClicks(battle, first);
-    // the click on another move of the body: Splash, the second move (the aim of the first fragment goes with it)
     const other = { p1: first.p1.replace(/^move 1( 1)?/, 'move 2'), p2: first.p2 };
     const asClicked = loggedOptions(battle, first);
     const asRedirected = loggedOptions(battle, other);
@@ -54,7 +42,6 @@ describe.each(SWEEP_CASES)('a stalling move the log shows and the body did not c
     for (const move of moves) {
       for (const seed of sweepSelection(SEEDS, 'seeds')) {
         const { named, clicked, redirected } = run(move, seed);
-        // the simulator draws nothing for this second use (no condition offered): nothing to compare
         if (!named) continue;
         if (clicked.some(die => 'happens' in die.result && !die.result.happens)) failedUses++;
         if (JSON.stringify(redirected) !== JSON.stringify(clicked)) failures.push(`${move.id} ${seed}: clicked ${JSON.stringify(clicked)} / redirected ${JSON.stringify(redirected)}`);

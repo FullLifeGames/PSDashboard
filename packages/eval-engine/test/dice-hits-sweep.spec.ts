@@ -8,12 +8,6 @@ import {
   type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// The hit count sweep, singles and doubles. A move with a range of hits (Fury Attack, Double Slap, Triple Kick in Gen 2) takes every
-// count of its range forced, the accuracy forced to hit, and the report is held against the protocol's `|-hitcount|` line. A move
-// with a fixed count (Double Kick) and Skill Link draw no count: the report says no-draw with the fixed number. A move whose every
-// hit rolls its own accuracy (Triple Axel, Population Bomb) takes the accuracy die for every hit: yes gives every hit, no a miss
-// before the first. Loaded Dice makes a count of two or three unreachable (no-chance) and a count from four reachable, by a second
-// draw the learner finds.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -37,7 +31,6 @@ const countDie = (move: string, hits: number): ForcedDie => ({ name: { slot: 'p1
 const hitcounts = (lines: string[]): number[] => lines.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3]));
 const countsOf = (battle: Parameters<typeof missesOf>[0], start: number): number[] => hitcounts(battle.log.slice(start));
 
-/** The first click the move needs: a charge move plays its first turn plain. */
 function readyBoard(rules: Rules, mode: Mode, move: DexMove, species = FAST) {
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', false, species);
   let clicks = sweepClicks(mode, move.target);

@@ -6,14 +6,9 @@ import { dexOfRules } from './dice-sweep-support';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/** The boards the two order specs share: bodies of equal speed for the tie, a slow holder against a fast body for the die that lets a holder act first. */
-
 const slotOfIdent = (ident: string): string => ident.split(':')[0].trim();
 
-/**
- * The slots of the bodies that used a move, in the order of the `|move|` lines (a move another move calls is no action; Gen 4
- * writes the move of a Quick Claw holder with `[from] item:`, which is the holder's own action).
- */
+/** A move another move calls is no action; Gen 4 writes a Quick Claw holder's own move with `[from] item:`. */
 export function moveOrder(battle: Battle, start: number): string[] {
   return battle.log.slice(start).map(line => line.split('|'))
     .filter(row => row[1] === 'move' && !row.some(field => field.startsWith('[from]') && !field.startsWith('[from] item:')))
@@ -42,7 +37,6 @@ export const FIRST_MOVERS: FirstMover[] = [
   { id: 'quickdraw', label: 'Quick Draw', kind: 'abilities', outfit: { ability: 'Quick Draw' }, activate: /^\|-activate\|p1a: [^|]*\|ability: Quick Draw/ },
 ];
 
-/** The first movers a rule set has: Quick Claw from Gen 2, Quick Draw from Gen 8. */
 export function moversOf(rules: Rules): FirstMover[] {
   const dex = dexOfRules(rules);
   return FIRST_MOVERS.filter(mover => {
@@ -53,7 +47,6 @@ export function moversOf(rules: Rules): FirstMover[] {
 
 export const moverDie = (mover: FirstMover, happens: boolean): ForcedDie => ({ name: { slot: 'p1a', moveId: '', kind: 'move-first', effectId: mover.id }, result: { happens } });
 
-/** A slow holder (Snorlax) facing a fast body (Pikachu): both use a move of priority 0, the holder goes second unless its die lets it go first. */
 export function moverBoard(rules: Rules, mode: Mode, mover: FirstMover | null, seed: string): Battle {
   const outfit = { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), item: mover?.outfit.item ?? '', ability: mover?.outfit.ability ?? 'No Ability' };
   const holder = set('Snorlax', ['tackle'], { ...outfit, gender: 'M' });

@@ -8,10 +8,6 @@ import {
   VGC_RULES, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Every move of every rule set with a numeric accuracy, singles and doubles (a spread move: every target on its own), forced to hit and
-// forced to miss, held against the protocol's own lines. A draw that cannot give the answer (a 100 percent move forced to miss) says
-// `no-chance` and the hit shows; a move the simulator drew an accuracy for but the module did not name fails the sweep (its report would
-// read `no-draw`, or `no-chance` with no chance behind it). The rows with no chance and a VGC row (a team of six) close it.
 await loadSimMods('gen9championsou');
 
 function problemOf(report: DieReport, happens: boolean, misses: number, move: DexMove, rules: Rules): string | null {
@@ -19,7 +15,7 @@ function problemOf(report: DieReport, happens: boolean, misses: number, move: De
     case 'applied': return (happens ? misses === 0 : misses >= 1) ? null : `applied but the protocol shows ${misses} misses`;
     case 'blocked': return happens && misses === 0 && report.reason ? null : `blocked: ${why(report)} (${misses} misses)`;
     case 'no-chance': {
-      // a sure draw (chance of one), a move that cannot miss (no draw), or Gen 2's 100 percent moves, which draw nothing
+      // a sure draw (chance of one), a move that cannot miss (no draw), or Gen 2's 100 percent moves: they draw nothing
       const sure = (report.chance ?? 0) >= 1 || move.accuracy === true || (rules.generation === 2 && move.accuracy === 100);
       return misses === 0 && sure && !!report.reason ? null : `no-chance: chance ${report.chance}, ${misses} misses, ${why(report)}`;
     }
@@ -60,7 +56,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = f
         : problemOf(shown, happens, misses, move, rules);
       verdicts.push({ slot, report: shown, problem });
     }
-    // a move that picks one target draws for that one only: the others are no draw
     const settled = picksOne(move.target) && verdicts.some(verdict => verdict.report.took !== 'no-draw' && !verdict.problem);
     for (const verdict of verdicts) {
       if (settled && verdict.report.took === 'no-draw') continue;
@@ -120,7 +115,6 @@ describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, 
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the accuracy sweep, a team of six: $name', ({ rules, name }) => {
-  // every tenth move keeps the row short; the dice behave as in doubles, the row exists because VGC counts on its own
   const { moves, skipped } = sweepMoves(rules, move => typeof move.accuracy === 'number');
   const some = moves.filter((_, index) => index % 10 === 0);
   const tally: Tally = newTally();

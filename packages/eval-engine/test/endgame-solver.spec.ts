@@ -44,11 +44,7 @@ const serialize = (battle: Battle): string => JSON.stringify(State.serializeBatt
 
 describe('endgame key', () => {
   test('two move orders reaching the same board share one key, different PP do not', () => {
-    // Setup moves without chance: Iron Defense, Swords Dance, Swords Dance
-    // equals Swords Dance, Iron Defense, Swords Dance (same PP, same
-    // boosts, same last move, which stays in the key because Choice lock,
-    // Encore, and Torment read it); seeds differ on purpose so the key
-    // provably ignores the PRNG, the turn counter, and the log.
+    // The seeds differ on purpose: the key must ignore the PRNG, the turn counter and the log.
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Scizor', 'Scizor', ['Swords Dance', 'Iron Defense'])],
       [makeSet('Magikarp', 'Magikarp', ['Splash'])],
@@ -68,8 +64,7 @@ describe('endgame key', () => {
 
 describe('endgame children', () => {
   test('a deterministic pair yields one child with weight 1 and no unpriced flag', () => {
-    // Chansey, not Blissey: Blissey ties Machamp on base speed, which is a
-    // priced order split of its own (the next tests cover it).
+    // Chansey, not Blissey: Blissey ties Machamp on base speed, a priced order split of its own.
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
@@ -116,7 +111,6 @@ describe('endgame children', () => {
     for (const side of battle.sides) side.active[1]!.faint();
     battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
-    // The first legal option of each side: the solver uses searchOptions, the test only needs one valid pair.
     const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
     const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
     const { children, unpriced } = endgameChildren(root, p1Choice, p2Choice);
@@ -128,7 +122,6 @@ describe('endgame children', () => {
       [makeSet('Jolt', 'Jolteon', ['Thunder'])],
       [makeSet('Champ', 'Machamp', ['Close Combat'])],
     );
-    // Both at 1 HP like the weights test above: every hit kills, the miss lets Machamp answer.
     for (const side of battle.sides) side.active[0]!.sethp(1);
     const { children, plain } = endgameChildren(createRootPosition(serialize(battle)), 'move thunder', 'move closecombat');
     expect(plain).toBe(false);
@@ -153,7 +146,6 @@ describe('endgame children', () => {
     expect(children[0].share).toBe(1);
     expect(children[0].key).toBeUndefined();
   });
-  // Machamp and Blissey share their speed; the order of Seismic Toss and Soft-Boiled is a coin.
   test('a doubles speed tie prices each order as a plain child of one half', () => {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],

@@ -8,11 +8,6 @@ import {
   clicksAccepted, dexOfRules, dieOf, explained, forcedOn, missesOf, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// The stalling sweep and the power rows. Every move with the Dex's `stallingMove` is used twice in a row; the second use draws
-// whether it succeeds, forced to succeed and to fail, held against the `|-fail|` line. The first use draws nothing: a forced die
-// there is no draw. A move that fails before the draw (a move that works on the first turn only) reads no draw with the protocol's
-// line. The power rows follow: a chance that changes a move's power, read from the Dex's handler as calc/fickle.ts does, forced to
-// happen and not to, held against the handler's own `|-activate|` line and against the damage.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';

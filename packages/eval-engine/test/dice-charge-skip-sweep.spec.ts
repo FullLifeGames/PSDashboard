@@ -12,15 +12,10 @@ import { clicksAccepted, dexOfRules, forcedOn, sweepMoves, type DexMove } from '
 import { set } from './move-oracle';
 import { fingerprint } from './power-oracle';
 
-// A charge move that skips its charge turn fires at once, so its dice belong to the turn of the click. For every Dex move with the flag
-// `charge`, under each skip the simulator knows (the move's weather, Primordial Sea and Desolate Land, Power Herb, Mega Sol) and each block of a
-// skip (Utility Umbrella, Cloud Nine and Air Lock, Klutz, Embargo, Magic Room): a move that charged offers no dice; a move that fired offers
-// every die the natural turn drew on a copy and none the simulator never draws.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
-/** The kinds of die the offer covers (a charge turn draws none of them). */
 const OFFERED_KINDS = new Set(['accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'stalling', 'power']);
 
 interface Outfit { ability?: string; item?: string }
@@ -116,7 +111,6 @@ function naturalTurn(board: Battle, clicks: { p1: string; p2: string }, moveId: 
     watch.uninstall();
   }
   const lines = copy.log.slice(start);
-  // a move the weather or the field stops (Dive under Desolate Land) fails with a line of the user and runs nothing
   const ran = !lines.some(line => /^\|-(fail|notarget)\|p1a/.test(line));
   return { keys: [...recording.record.keys()].filter(key => key.startsWith(`p1a:${moveId}:`)), charged: chargingOf(copy.sides[0].active[0], moveId), ran };
 }
@@ -162,7 +156,6 @@ function exercise(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, move: De
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
   for (const key of natural.keys) {
     const [, , target, kind] = key.split(':');
-    // a die the state cannot name before the hit stays unoffered: a self effect set in the move's own `onTryHit`, an accuracy aimed at the user
     const lateSelf = kind === 'self-effect' && typeof (dexOfRules(rules).moves.get(move.id) as unknown as { onTryHit?: unknown }).onTryHit === 'function';
     if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && target !== 'p1a') problems.push(`fires, but the offer lacks ${key}`);
   }
@@ -175,7 +168,6 @@ function exercise(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, move: De
   return problems;
 }
 
-/** Every charge move the rule set plays, through the shared selection (a plain run plays a sample; `DICE_SWEEPS=full` plays all). The reported scenes below name their moves. */
 const chargeMoves = (rules: Rules): DexMove[] => sweepMoves(rules, move => !!move.flags.charge, false).moves;
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = RULES.flatMap(rules => [
@@ -238,7 +230,6 @@ describe('the reported scenes', () => {
   });
 
   test('the sweep saw both outcomes', () => {
-    // read after the rows above ran: both a move that fired and a move that charged stood in the sweep
     expect(sum.fired).toBeGreaterThan(0);
     expect(sum.charged).toBeGreaterThan(0);
   });

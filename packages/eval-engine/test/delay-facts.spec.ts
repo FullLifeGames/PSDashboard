@@ -8,12 +8,6 @@ import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 import { mon } from './dice-fixtures';
 
-/**
- * The facts (`endgame/delay-facts.ts`) drop the PP of every slot, a slot's `used` flag, the last-move group, the entry counters' exact values
- * and the switch-in order, because a held turn writes them and no later turn reads them, unless an entry on the board reads them. The Dex
- * entries that read each dropped field are pinned as lists per rule set: a new reader in an updated simulator fails here and has to be
- * classified before the facts may drop its field. The sweep rows over the rule sets are in `delay-facts-sweep.spec.ts`.
- */
 await loadSimMods('gen9championsou');
 
 const DEXES = RULES.map(rules => dexOfRules(rules));
@@ -65,12 +59,6 @@ describe('the counter reads that survive the clamp to 0 or 1', () => {
   ] as const)('%s keeps the exact count', (text, field) => expect(readsCountExactly(text, field)).toBe(true));
 });
 
-/**
- * The source scan. `FIELD_TOKENS` is this spec's own list of what to look for (independent of the module's patterns): a mention that is no
- * comment and no plain assignment. A line sits in the handler of a Dex entry when the entry it is inside is detected for that field;
- * every other line is core code of the simulator (the move runner, the Pokemon class, the Gen 1 to 3 scripts, the Champions mod's
- * Pokemon) and is pinned by file with its count.
- */
 describe('the simulator reads a dropped field only where the facts keep it (source scan)', () => {
   const require = createRequire(import.meta.url);
   const roots = ['@pkmn/sim', '@pkmn/mods'].map(name => {
@@ -80,9 +68,7 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
   });
   const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(item =>
     item.isDirectory() ? files(`${dir}/${item.name}`) : item.name.endsWith('.js') ? [`${dir}/${item.name}`] : []);
-  /** The builds the corpus plays: the base data, the mods of Gens 1 to 8, the simulator's core and the Champions mod (the Let's Go, Stadium and BDSP mods are not played). */
   const PLAYED = /^@pkmn\/sim:(data\/(?!mods\/)|data\/mods\/gen[1-8]\/|sim\/)|^@pkmn\/mods:champions\/index\.js$/;
-  /** Text, the species data, the team tools and the stream's protocol input: no code of a played turn. */
   const NOT_TURN_CODE = /text|formats-data|pokedex|learnsets|aliases|tags|rulesets|natures|typechart|random|teams|tools|battle-stream|dex-|team-validator/;
   const sources = roots.flatMap(({ name, root }) => files(root.replace(/\/$/, '')).map(path => ({ file: `${name}:${path.slice(root.length)}`, lines: readFileSync(path, 'utf8').split('\n') })))
     .filter(source => PLAYED.test(source.file) && !NOT_TURN_CODE.test(source.file));
@@ -117,22 +103,6 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
     return count;
   }
 
-  /**
-   * What the pinned core reads are (reviewed against the installed 0.10.15 builds):
-   *  - pp: `Pokemon.deductPP`, the Gen 1 and Gen 3 PP scripts and the move runner's `deductPP` call; the reads of "no PP left" (`pp <= 0`
-   *    disables a move, Struggle follows) in `getMoves`, the Z-move request, the stalemate test of Gen 1 and `calculatePP`. The margin
-   *    (`stallMargin`) keeps the own clicks above zero, and a foe slot that reaches zero only takes an option from the foe. The Champions
-   *    lines are the mod's own PP table at load.
-   *  - used: `Pokemon.deductPP` and `clearVolatile`/switch-in writing the flag (Last Resort is the one reader, flagged above).
-   *  - last: the writers of the group (`moveUsed`, `gotAttacked`, `clearVolatile`, the damage bookkeeping of `spreadDamage`/`damage`), the
-   *    move runner's `cantusetwice` test and `endTurn`'s disable of it (entries with that flag are treated as readers), `getLockedMove`'s
-   *    target location (entries with `onLockMove` are treated as readers), `getLastAttackedBy`/`getLastDamagedBy` themselves (their
-   *    callers are flagged by name), Gen 1's `useMove` (Mirror Move is flagged), `EmergencyExit`'s `hurtThisTurn` (reset every turn),
-   *    and the Gen 4 switch-in that copies the last move to the new body (the same group).
-   *  - speedOrder: written in `runSwitch` right before the SwitchIn event, the one event that reads it (row below).
-   *  - activeTurns, activeMoveActions: the resets and increments only (every read is flagged safe by the clamp or an entry).
-   *  - calls: the move runner, the queue and the Gen 1 and 2 scripts: the machinery that entries with `useMove` and `insertChoice` reach.
-   */
   const PINNED_CORE: Record<string, Record<string, number>> = {
     pp: { 'champions/index.js': 3, 'd/mods/gen1/scripts.js': 9, 'd/mods/gen2/scripts.js': 1, 'd/mods/gen3/scripts.js': 2, 'sim/battle-actions.js': 5, 'sim/battle.js': 4, 'sim/pokemon.js': 13 },
     used: { 'd/mods/gen1/scripts.js': 1, 'sim/battle-actions.js': 1, 'sim/pokemon.js': 1 },
@@ -226,15 +196,12 @@ describe('an entry on the board keeps the field it reads', () => {
 });
 
 describe('a body that has fainted keeps no entry on the board unless a revive is possible', () => {
-  // Champions VGC 2682637901 turn 6: the foe's fallen Whimsicott carries Encore, a reader of PP and of the last move; counted as an entry on
-  // the board it kept the PP of every standing body a fact, and no held Protect was ever a delay there.
   describe.each(RULES.filter(rules => rules.generation >= 2))('$name', rules => {
     const dex = dexOfRules(rules);
     const playable = (move: ReturnType<typeof dex.moves.get>): boolean => move.exists && move.gen <= dex.gen && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past');
     const reader = dex.moves.all().filter(playable).sort((a, b) => (a.id < b.id ? -1 : 1)).find(move => readsOfEntry(dex, 'move', move.id).pp);
     const reviver = dex.moves.all().filter(playable).sort((a, b) => (a.id < b.id ? -1 : 1)).find(move => !!(move as { slotCondition?: string }).slotCondition);
 
-    /** A fallen second body of side p2 that knows `reader`, and a first body of side p1 that knows `tackle` and, with `revives`, a move that sets a slot condition. */
     function board(revives: boolean): ReturnType<typeof battleOf> {
       const moves = revives && reviver ? ['tackle', reviver.id] : ['tackle', 'splash'];
       const battle = battleOf(rules.singles, [mon(rules, { species: 'Snorlax', moves })], [mon(rules, { species: 'Vaporeon', moves: ['splash'] }), mon(rules, { species: 'Blissey', moves: [reader!.id] })]);
@@ -266,8 +233,7 @@ describe('a body that has fainted keeps no entry on the board unless a revive is
 });
 
 describe('the facts are a string, so they do not depend on the order of the state\'s keys', () => {
-  // `EVAL_SIM_FAST=0` copies a battle through the simulator's own state, which lists the keys of a body's volatiles in another order than the live
-  // board did; two boards that hold the same volatiles must read as one
+  // `EVAL_SIM_FAST=0` copies a battle through the simulator's own state, which lists volatile keys in another order.
   test.each(RULES.filter(rules => rules.generation >= 4))('$name: the same volatiles listed in the other order give equal facts', rules => {
     const board = (): ReturnType<typeof battleOf> => {
       const battle = battleOf(rules.singles, [mon(rules, { species: 'Snorlax', moves: ['tackle'] })], [mon(rules, { species: 'Vaporeon', moves: ['splash'] })]);

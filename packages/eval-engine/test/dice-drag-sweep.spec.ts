@@ -9,10 +9,6 @@ import { clicksAccepted, dexOfRules, forcedOn, SWEEP_CASES, sweepMoves, VGC_RULE
 import { loggedDice } from '../src/dice/logged-results';
 import { draggedIn, ofKind, pickBoard, pickClicks, publicHalf, recorded, sweepItems, type Recorded } from './dice-pick-support';
 
-// A drag (Roar, Whirlwind, Dragon Tail and Circle Throw by the Dex flag `forceSwitch`, and an item whose holder drags the attacker out when
-// it is hit: found by playing every Dex item on a hit and keeping those under which `dragIn` ran) brings in a body that `getRandomSwitchable`
-// samples from the bench. The module names the draw as a `drag` die of the dragged-out slot; forcing each body makes the `|drag|` line name
-// it. Gens 2 to 9 and Champions (Gen 1 has no drag), a bench of two or more in every case (VGC: four).
 await loadSimMods('gen9championsou');
 
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = [
@@ -49,7 +45,6 @@ function checkDragged(board: Battle, clicks: { p1: string; p2: string }, turn: R
   return problems;
 }
 
-/** The log reader answers the draw: the lines of a turn that brought `body` into `slot` give the slot's drag die with that body's name, and playing the board with it brings the same body in again. */
 function readBack(board: Battle, clicks: { p1: string; p2: string }, slot: string, body: string, lines: readonly string[]): string[] {
   const read = loggedDice(lines).find(die => dieKey(die.name) === dieKey(drag(slot)));
   if (!read) return [`${slot} forced ${body}: the reader names no drag die`];
@@ -99,7 +94,6 @@ describe.each(CASES)('a drag draws a die: $name', ({ rules, mode, vgc }) => {
     expect(standing(board), 'the question leaves the battle as it was').toBe(before);
   });
 
-  // an item whose holder drags the attacker out: no item is named, the spy finds them by the hit that runs `dragIn`
   const items = sweepItems(rules);
   test('the items that drag the attacker out', () => {
     const problems: string[] = [];
@@ -131,7 +125,6 @@ describe.each(CASES.filter(entry => entry.rules.generation >= 3 && entry.mode ==
     const clicks = pickClicks(mode, 'move 1 1');
     const turn = recorded(board, clicks);
     expect(draggedIn(turn.lines).map(line => line.slot)).toEqual(['p2a']);
-    // the natural drag brings the Porygon2 (the seed's draw) or the Chansey; the forced rows below bring the Porygon2 whichever it is
     expect(ofKind(turn, 'drag').map(([key]) => key)).toEqual([dieKey(drag('p2a'))]);
     expect(ofKind(turn, 'random-target')).toEqual([]);
     const forced = forcedOn(board, clicks, [{ name: drag('p2a'), result: { option: 'Porygon2' } }]);

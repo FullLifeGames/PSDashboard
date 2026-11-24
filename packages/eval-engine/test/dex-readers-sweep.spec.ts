@@ -10,13 +10,6 @@ import { detectStreakOdds } from '../src/streaks';
 import { nullMoveReason } from '../src/null-moves';
 import { ALL_VIEWS } from './sim-views';
 
-/**
- * The Dex a reader gets is the Dex of the game: the Champions mod's for a Champions game, the generation's own for an older one. This half
- * reads the changed entries (found by packages/replay-core/test/dex-readers-sweep.spec.ts, which compares the raw mod data with Scarlet/Violet)
- * through eval-engine's readers: the calculator's move (23 power and 2 type changes of the mod's 159), the dice markers (5 changed
- * accuracies, 4 changed secondary effects), the lists the engine keeps per Dex, and the older generations' readers. Red proof by hand: with
- * `dexOfCalc` replaced by the Generation 9 Dex the Champions rows fail, with `rulesDex(gen, mod)` in dice-events.ts replaced by `rulesDex(gen)` the dice rows fail.
- */
 await loadSimMods('gen9championsou');
 
 const mod = rulesDex(9, CHAMPIONS_MOD);
@@ -51,7 +44,6 @@ describe('the calculator reads the move of the game', () => {
 });
 
 describe('the dice markers read the move of the game', () => {
-  // A status line right after the move: a roll when the move's accuracy is under 100 or its secondary effect chance is.
   const rolls = (name: string, doubles: boolean, mods: typeof CHAMPIONS_MOD | undefined) => {
     const target = doubles ? 'p2b: Blissey' : 'p2a: Blissey';
     return diceEventTurns([[], [`|move|p1a: Garchomp|${name}|${target}`, `|-status|${target}|brn`]], 9, mods).has(1);

@@ -1,11 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { deniedEndSentence } from '../src/denied-end';
 
-/**
- * At odds 1 the denied early end has no roll that could fail, yet the sentence said "one sure KO ... but the roll failed". The Champions
- * VGC census game shows it (2695803506 turn 2: Kingambit one sure KO from clearing the rest); the knock-out never came.
- */
-
 const denied = { turn: 73, side: 'p2' as const, species: 'Garchomp', removes: 'Corviknight', turnsRemaining: 66 };
 
 describe('a sure knock-out that never came is no failed roll', () => {
@@ -14,7 +9,6 @@ describe('a sure knock-out that never came is no failed roll', () => {
     expect(winner).toContain('Garchomp stood one sure KO from clearing the rest, but the KO never came');
     expect(winner).not.toContain('roll failed');
     expect(deniedEndSentence({ ...denied, odds: 1 }, 'p1', 'LordEnz')).not.toContain('roll failed');
-    // A real roll keeps its words.
     expect(deniedEndSentence({ ...denied, odds: 0.9 }, 'p2', 'SOULWIND')).toContain('but the roll failed');
   });
 

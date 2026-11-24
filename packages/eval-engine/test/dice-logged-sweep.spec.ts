@@ -16,19 +16,7 @@ import { clickedOf, moveScene, powerMoves, scan, type Scan, type Scene } from '.
 import { GAPS, registerKindRows, summaries, sweepMovesOf, total, WANT, writeSummaries } from './dice-logged-sweep-rows';
 import { battleOf } from './power-oracle';
 
-/**
- * The sweep of the log reader, the simulator as oracle: for every Dex entry of every kind of die the log names, in every generation
- * and mod the corpus plays (Gens 1 to 9, the Champions mod; singles everywhere, doubles from Gen 3), a turn plays under one seed and
- * writes a log; the dice `loggedDice` reads from it, forced on the same board under another seed, must give the log's turn
- * (`scoreAlignment` perfect). A plain run plays the fixed sample of each list, `DICE_SWEEPS=full` every entry. The crit and secondary
- * rows are in the sibling specs; the helpers they share are in `dice-logged-sweep-rows.ts`.
- *
- * KNOWN (`test.fails`): the causes the full sweep found in the reader (`GAPS`); each has a plain row that holds the sweep finds a
- * seed pair to repair, so a row never goes green because it played nothing. Moves aimed at a random foe in doubles stay out (see
- * `randomAim`).
- */
 await loadSimMods('gen9championsou');
-// a full sweep plays every Dex move of a rule set in one test (about two minutes for the crits of a doubles cell)
 vi.setConfig({ testTimeout: 900_000 });
 
 afterAll(() => writeSummaries());
@@ -37,10 +25,6 @@ const multihitOf = (move: DexMove): number | number[] | undefined => (move as un
 const multiAccuracy = (move: DexMove): boolean => !!(move as unknown as { multiaccuracy?: boolean }).multiaccuracy;
 const stalling = (move: DexMove): boolean => !!(move as unknown as { stallingMove?: boolean }).stallingMove;
 
-/**
- * The moves the full sweep found the reader missed, each group with its cause. One plain row per group plays them through every
- * rule set that has them, so the main rows' sample cannot leave them out; a group moves to `GAPS` when a rule set shows it again.
- */
 const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rules, mode: Mode) => boolean }[] = [
   { cause: 'the status line of the secondary carries "[from] move:" (the move itself), which the reader skipped as an effect of something else', moves: ['relicsong', 'wickedtorque'], modes: ['singles', 'doubles'] },
   { cause: 'the second hit of a move that picks its target names it in |-anim| only (Dragon Darts in doubles)', moves: ['dragondarts'], modes: ['singles', 'doubles'] },
@@ -50,8 +34,6 @@ const FIXED: { cause: string; moves: string[]; modes: Mode[]; when?: (rules: Rul
 
 registerKindRows(SWEEP_CASES, ['accuracy']);
 
-// Known gaps (see GAPS), one row per cause over every rule set that has its moves: the sweep finds seed pairs the log would repair, and the forced
-// turn repairs none of them (somewhere). Where a rule set does not show the cause (Tri Attack has no secondary in Gen 1) its pairs just pass.
 describe.each(SWEEP_CASES)('the moves the reader once missed hold on another seed: $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   for (const { cause, moves: ids } of FIXED.filter(entry => entry.modes.includes(mode) && (entry.when?.(rules, mode) ?? true))) {
@@ -110,14 +92,10 @@ describe.each(SWEEP_CASES)('the logged hit count gives the log\'s turn: $name', 
     expect(result.witnesses > 0 || sweepMoves(rules, move => multi(move) && Array.isArray(multihitOf(move))).moves.length === 0).toBe(true);
   });
 
-  // A later hit of a multi-accuracy move (Triple Axel, Triple Kick) is a die of its own: it carries its `hit`, and the reader writes
-  // hits 2 to the count as yes and the next hit as no from the Dex's hit count (`hitsIn`). Without it a chain that broke after two
-  // hits came back as an accuracy yes and three hits.
   const chain = sweepMoves(rules, multiAccuracy).moves.length > 0;
   const hitsIn = (log: string[]): number => Math.max(0, ...log.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3])));
   const rows = () => sweepMovesOf('multi-accuracy', rules, mode, multiAccuracy, move => {
     const longest = Math.max(0, ...[multihitOf(move)].flat().map(Number));
-    // a witness is a chain the log shows broken (fewer hits than the move's most) that the other seed plays another way
     const scene = moveScene(rules, mode, move, { channels: ['hitCounts'], kind: 'hit-count', options: options(move) });
     return scene && {
       ...scene, pool: 60, differs: (log: string[], natural: string[]) => hitsIn(log) > 0 && hitsIn(log) < longest && hitsIn(log) !== hitsIn(natural),
@@ -166,7 +144,6 @@ describe.each(SWEEP_CASES)('the logged status checks give the log\'s turn: $name
   });
 });
 
-/** Two Snorlax on equal Speed: the simulator shuffles who moves first. */
 function tieScene(rules: Rules, mode: Mode): Scene {
   const side = (rest: string[]) => [mon(rules, { species: 'Snorlax', moves: ['tackle'], gender: 'M' }), ...rest.map(species => mon(rules, { species, moves: ['splash'] }))];
   return {
@@ -189,7 +166,6 @@ describe.each(SWEEP_CASES)('the logged speed tie gives the log\'s turn: $name', 
 
 const failsOf = (lines: string[], slot: string): number => lines.filter(line => line.startsWith('|-fail|') && line.split('|')[2].startsWith(slot)).length;
 
-/** A stalling move used twice in a row: the second use is the logged turn, the first plays plain on both seeds. */
 function stallScene(rules: Rules, mode: Mode, move: DexMove): Scene | null {
   const first = sweepClicks(mode, move.target);
   const probe = moveScene(rules, mode, move, { channels: [], options: {} });
@@ -199,20 +175,16 @@ function stallScene(rules: Rules, mode: Mode, move: DexMove): Scene | null {
     playClicks(battle, first);
     return battle;
   };
-  // the condition the first use left on the user, as the app reads it from the offers of the body's click (`loggedOptions`)
   const { stalling } = loggedOptions(board('1,2,3,4'), first);
   return {
     board,
     clicks: first, options: { clicked: clickedOf(move.id, mode), secondariesOf: secondariesIn(dexOfRules(rules)), ...(stalling ? { stalling } : {}) },
-    // a failed second use writes `|-fail|` only: no channel of the alignment sees it, so the two logs decide the witness
     channels: [], kind: 'stalling',
     differs: (log, naturalLog) => failsOf(log, 'p1a') !== failsOf(naturalLog, 'p1a'),
     extra: (log, forcedLog) => failsOf(log, 'p1a') === failsOf(forcedLog, 'p1a') ? null : `the log shows ${failsOf(log, 'p1a')} fails of the user, the forced turn ${failsOf(forcedLog, 'p1a')}`,
   };
 }
 
-// The log shows a second Protect that failed as `|-fail|`: `loggedDice` names the stalling die for it (2629703929 turn 10: the base
-// was perfect by seed luck, the plain forced turn broke it); the caller names the condition that makes the move draw.
 describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $name', ({ rules, mode }) => {
   const { moves } = sweepMoves(rules, stalling, false);
   let played: { failures: string[]; sum: Scan } | null = null;
@@ -245,8 +217,6 @@ describe.each(SWEEP_CASES)('the logged stalling die gives the turn of the log: $
 
 describe('the kinds the log may show and the reader does not name: the census of the ledger', () => {
   const named: readonly DieKind[] = ['accuracy', 'crit', 'secondary', 'self-effect', 'hit-count', 'status-check', 'speed-tie', 'stalling', 'random-target', 'drag'];
-  // damage-roll is no reader kind: the faint step forces it from a search, the log shows the HP only
-  // the two kinds that sample a body (`random-target`, `drag`) are reader kinds; their sweeps are `dice-random-target-sweep.spec.ts` and `dice-drag-sweep.spec.ts`
   const unnamed = DIE_KINDS.filter(kind => !named.includes(kind) && kind !== 'damage-roll');
 
   test('the kinds that stay unnamed, with their Dex entries and the corpus turns that carry the event', () => {
@@ -277,8 +247,6 @@ describe('the kinds the log may show and the reader does not name: the census of
   });
 });
 
-// The offer names a die per later hit of a multi-accuracy move, and `loggedOptions` reads the accuracy targets of a click from the
-// offer for a move the log writes with no target. The list stays one entry per target (the reconstruction plays it, ADR 0022).
 describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the accuracy targets of a click are one per target for a multi-accuracy move: $name', ({ rules, mode }) => {
   const { moves } = sweepMoves(rules, multiAccuracy);
 

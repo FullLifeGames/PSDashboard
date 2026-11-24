@@ -5,10 +5,6 @@ import { secondariesIn } from '../src/dice/secondaries';
 import { secondaryEffectId } from '../src/dice/recognize';
 import type { SecondaryEntry } from '../src/dice/types';
 
-/**
- * `secondariesIn(dex)` is what the first turn's log reader takes from the Dex (the effect ids of a move's secondaries that carry a
- * chance below 100); it lives beside `recognize.ts`, which names the ids.
- */
 await loadSimMods('gen9championsou');
 
 const GENS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0] as const;

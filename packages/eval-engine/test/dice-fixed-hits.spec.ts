@@ -6,14 +6,10 @@ import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, type Mode, type Rules } from './dice-fixtures';
 import { clicksAccepted, dexOfRules, outfitBoard, SWEEP_CASES, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 
-// A holder whose ability or item fixes the hit count of a variable multi-hit move (Skill Link, Loaded Dice) gets one row without a choice: a die
-// of the kind `hit-count` with the one count the simulator plays and `fixedBy`, the name from the Dex. The oracle plays the turn on copies with
-// six seeds and reads `|-hitcount|`: the offer names a fixed count exactly when every played count is one value, over every ability and item
-// with an `onModifyMove` handler (the only entries that can rewrite a move) and every variable move (a range of hits, or `multiaccuracy`).
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
-// sixteen unrelated seeds from a linear congruence: a chain of per-hit accuracy rolls (90 %) lands every hit on all of them with chance 0.7 %
+// sixteen unrelated seeds from a linear congruence: 90 % per-hit accuracy rolls land every hit on all: 0.7 %
 const SEEDS = Array.from({ length: 16 }, (_, index) => [1, 2, 3, 4].map((_, part) => (Math.imul(index * 4 + part + 1, 2654435761) >>> 0) % 1000003));
 const variable = (move: DexMove): boolean => {
   const { multihit, multiaccuracy } = move as unknown as { multihit?: number | number[]; multiaccuracy?: boolean };
@@ -67,7 +63,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the off
         const fixed = offeredDice(board, 'p1a', choiceOf(move)).filter(offer => offer.fixedBy !== undefined);
         const counts = playedCounts(board, clicks);
         const label = `${move.id} with ${holder.name}`;
-        // the simulator plays one count on every seed exactly when the offer names it
         const one = counts.length >= 6 && new Set(counts).size === 1 && counts[0] >= 2;
         expect(fixed.length, `${label}: counts ${JSON.stringify(counts)}`).toBe(one ? 1 : 0);
         if (fixed.length === 0) continue;
@@ -77,7 +72,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the off
         expect(fixed[0].results, label).toEqual([{ hits: counts[0] }]);
       }
     }
-    // Skill Link fixes every variable move
     if (holders.some(holder => holder.id === 'skilllink')) expect(named.get('skilllink'), 'rows of Skill Link').toBe(moves.length);
   });
 });

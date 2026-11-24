@@ -10,12 +10,6 @@ import {
   sweepMoves, sweepTargets, VGC_RULES, type DexMove, type SecondaryEntry, type Tally,
 } from './dice-sweep-support';
 
-// The secondary sweep. Every move with a secondary entry, singles and doubles with every target on its own, each entry its own die
-// (Fire Fang's burn and flinch), the accuracy forced to hit so the entry is drawn, then the entry forced to happen and not to. The
-// attacker is faster than the foe so a flinch can land. The report is held against an independent witness of the protocol
-// (`effectShown`). The rule rows follow: King's Rock and Razor Fang add a flinch, Serene Grace doubles the chance the report names,
-// Shield Dust, Covert Cloak and Sheer Force remove the entries (`no-draw` with the reason), a Substitute takes the hit. The self
-// effect with a chance closes the file.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -34,7 +28,6 @@ const secondaryOf = (moveId: string, slot: string, entry: SecondaryEntry) => ({
   ...dieOf(moveId, slot, 'secondary'), effectId: secondaryEffectId(entry),
 });
 
-/** What the witness cannot tell: an entry it cannot see, and a self effect that a second target's draw can also give. */
 interface Blind { opaque: boolean; shared: boolean }
 
 function noChanceProblem(report: DieReport, happens: boolean, shown: boolean, blind: Blind): string | null {
@@ -44,7 +37,6 @@ function noChanceProblem(report: DieReport, happens: boolean, shown: boolean, bl
   return (sure || never) && report.reason ? null : `no-chance: chance ${report.chance}, effect ${shown}, ${why(report)}`;
 }
 
-/** The problem with a report of a forced secondary, or null when the report and the protocol agree. */
 function problemOf(report: DieReport, happens: boolean, shown: boolean, blind: Blind): string | null {
   switch (report.took) {
     case 'applied': return happens === shown ? null : `applied but the protocol ${shown ? 'shows' : 'shows no'} effect`;
@@ -68,7 +60,6 @@ function forceEntry({ mode, move, board, clicks, tally }: Case, entry: Secondary
     tally.cases++;
     const shown = effectShown(battle, start, entry, slot, 'p1a') && missesOf(battle, start, slot) === 0;
     const blind: Blind = {
-      // an entry whose effect the protocol does not show by a standard line (a handler, a condition with no start line)
       opaque: id === 'effect' || (!!entry.volatileStatus && id !== 'flinch'),
       shared: !!entry.self && sweepTargets(mode, move.target).length > 1,
     };
@@ -77,7 +68,6 @@ function forceEntry({ mode, move, board, clicks, tally }: Case, entry: Secondary
       : problemOf(forced, happens, shown, blind);
     verdicts.push({ slot, report: forced, problem });
   }
-  // a move that picks one target draws for that one only
   const settled = picksOne(move.target) && verdicts.some(verdict => verdict.report.took !== 'no-draw' && !verdict.problem);
   const problems: string[] = [];
   for (const verdict of verdicts) {
@@ -123,7 +113,6 @@ describe.each(SWEEP_CASES)('the secondary sweep: $name', ({ rules, mode, name })
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the secondary sweep, a team of six: $name', ({ rules, name }) => {
-  // every tenth move keeps the row short; the dice behave as in doubles, the row exists because VGC counts on its own
   const { moves, skipped } = sweepMoves(rules, move => entriesOf(move).length > 0);
   const some = moves.filter((_, index) => index % 10 === 0);
   const tally: Tally = newTally();
@@ -152,7 +141,6 @@ const has = (rules: Rules, kind: 'items' | 'abilities', id: string): boolean => 
 };
 
 const FLINCH: SecondaryEntry = { chance: 10, volatileStatus: 'flinch' };
-/** How often each rule row played (a row that returns early for a rule set the item or ability does not exist in is no row there). */
 const played = new Map<string, number>();
 const play = (row: string): void => void played.set(row, (played.get(row) ?? 0) + 1);
 
@@ -215,7 +203,6 @@ describe.each(SWEEP_CASES)('the secondary rules: $name', ({ rules, mode }) => {
       const shown = effectShown(battle, start, entry, 'p2a', 'p1a');
       expect(shown, `${rules.name} ${happens}`).toBe(false);
       expect(report.forced[1].took === 'applied' && happens, why(report.forced[1])).toBe(false);
-      // a forced no that nothing contradicts is plainly applied; every other answer says why it did not show
       if (!(report.forced[1].took === 'applied' && !happens)) expect(report.forced[1].reason, `${rules.name} ${happens} ${report.forced[1].took}`).toBeTruthy();
     }
   });

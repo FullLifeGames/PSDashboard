@@ -10,11 +10,6 @@ import { dieKey } from '../src/dice/types';
 import { branchOf, mon } from './branch-dice-support';
 import { reconstruct } from './arrival-turn';
 
-/**
- * The chips at a viewed replay position: the picker's battle came back from serialization without the first turn's `LoggedRollPRNG`,
- * so the log's dice come from the replay's own lines (`loggedDiceAt`, no seed search) and must name the same dice as `loggedTurnDice`
- * after a branch started at that turn.
- */
 await loadSimMods('gen9championsou');
 
 const feedback = (name: string): ReplayData =>

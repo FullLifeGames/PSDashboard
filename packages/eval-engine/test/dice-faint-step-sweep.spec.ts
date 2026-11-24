@@ -8,13 +8,6 @@ import { extractProtocolEvents, isPerfectAlignment, scoreAlignment } from '../sr
 import { dieOf, forcedOn, monOf, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
 import type { Mode, Rules } from './dice-fixtures';
 
-/**
- * The scene is a one-hit knockout that only the top of the damage roll gives: Snorlax hits a Vaporeon whose hit points equal the hardest hit.
- * Two logs come from it: in the first the log's roll knocked the Vaporeon out and the hidden dice of another seed leave it standing; in the
- * second the other way round. The faint step must find a roll step under which the forced turn is the log's turn (a perfect score), for the 16
- * steps of Gens 3 and up and the 39 values of Gens 1 and 2 alike, in at most 16 plays.
- */
-
 const isPlainShape = (move: DexMove): boolean =>
   move.category === 'Physical' && move.type === 'Normal' && move.target === 'normal' && move.accuracy === 100
   && move.basePower >= 60 && move.basePower <= 100 && move.priority === 0;
@@ -86,8 +79,6 @@ describe.each(SWEEP_CASES)('the faint step finds the roll that gives the knockou
       expect(isPerfectAlignment(scoreAlignment(expected, events(hitPoints, result.dice!, seed))), `${rules.name} seed ${seed}`).toBe(true);
     }
   });
-  // The log's turn also holds a soft mismatch no die mends (here a flinch the log shows and the simulator never plays). No step set is
-  // perfect then, but the one that gives the log's faint stands, and the seed search that follows finds nothing strictly better.
   test.each([
     { direction: 'the log knocks the Vaporeon out, the hidden dice leave it standing', hp: () => lost(lastStep), logStep: lastStep, naturalFaints: false },
     { direction: 'the log leaves the Vaporeon standing, the hidden dice knock it out', hp: () => lost(0) + 1, logStep: 0, naturalFaints: true },

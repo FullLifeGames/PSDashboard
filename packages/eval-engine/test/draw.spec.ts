@@ -27,20 +27,13 @@ import { sampleCell } from '../src/search/cell-sampler';
 import { Battle, State, Teams, toID } from '@pkmn/sim';
 import type { AccuracyRecord, RollRecord } from '../src/pair/prng';
 
-/**
- * The doubles trees key their root draws. A tree draws a root cell once at its first visit; the draw runs under the pair recorder
- * (`drawKeyed`), `readPattern` names its class the way the sampler names its own, and the key goes into the tree's root book
- * (`keyedAdvance`, `pair/tree-key.ts`). Rows: (a) identity with the plain advance, (b) the key equals the sampler's class key, (c) a
- * guarded cell and a cell without an uncertain event book no key and the singles keys stay, (d) the merge prices each class by the
- * trees that drew it, (e) the clones of a keyed draw equal the plain draw's.
- */
 await loadSimMods('gen9championsou');
 
 const cache = createMatchupCache();
 const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20'];
 const stampless = (log: readonly string[]): string[] => log.filter(line => !line.startsWith('|t:|'));
 const SPEED = { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } } as const;
-// Two targets whose speeds stay apart after a paralysis: Snorlax at half speed would tie with a Munchlax in the residual order, and so would a Dragonite at 50.
+// Snorlax at half speed would tie with a Munchlax in the residual order, and so would a Dragonite at 50.
 const slow = () => [pairSet('Slow1', 'Snorlax', ['Rest', 'Protect']), pairSet('Slow2', 'Chansey', ['Rest', 'Protect'])];
 
 async function keyedModule(): Promise<typeof import('../src/pair/tree-key')> {
@@ -53,13 +46,11 @@ function blendOf(root: SimPosition, p1: string, p2: string): CellBlend {
   return blend;
 }
 
-/** The blend, or null when the sampler prices the cell by its fallback (a cell's own seeds can reach a read the plan refuses). */
 function blendIfPlanned(root: SimPosition, p1: string, p2: string): CellBlend | null {
   const cell = pairCellSample(root, p1, p2, 3, cache);
   return cell.kind === 'sample' && cell.sample.blend ? cell.sample.blend : null;
 }
 
-// Extrasensory (a flinch of one in ten), Thunderbolt (a paralysis of one in ten) and a plain 80 percent move (a miss class).
 const BOARDS = {
   flinch: {
     root: () => doublesRoot([pairSet('Fast', 'Aerodactyl', ['Extrasensory', 'Protect'], SPEED), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])], slow()),
@@ -92,7 +83,6 @@ describe('(a) the keyed draw is the plain advance with its dice written down', (
         if (plain.pendingSwitch) pending++;
       }
     }
-    // the board does reach the forced switch under the tree's rule, or the row proves nothing about it
     if (stop) expect(pending).toBeGreaterThan(0);
   });
 
@@ -126,8 +116,8 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       for (let iteration = 0; iteration < 40; iteration++) {
         const drawn = keyedAdvance(owner, root, cellKey(0, 0), p1, p2, treeSeed(iteration, 1));
         expect(drawn).not.toBeNull();
-        // The hashed seeds reach a paralysed target that cannot move on the same turn (a read the pair plan falls back on,
-        // `cant:par`), which the five lattice seeds never drew in forty iterations: such a draw books no key.
+        // The hashed seeds reach a paralysed target that cannot move on the same turn (`cant:par`, a read the pair plan
+        // falls back on), which the five lattice seeds never drew in forty iterations: such a draw books no key.
         if (drawn!.classKey === null) {
           expect(drawn!.log.some(line => line.startsWith('|cant|')), `iteration ${iteration}`).toBe(true);
           continue;
@@ -152,7 +142,6 @@ describe('(b) the key of a keyed draw is the sampler\'s class key', () => {
       let planned = 0;
       for (const cell of keyed) {
         const [i, j] = [Math.floor(cell.key / 10_000), cell.key % 10_000];
-        // Thunderbolt / Rest is a cell whose own seeds reach a paralysed read, so the sampler falls back and has no blend.
         const blend = blendIfPlanned(root, stats.p1Options[i].choice, stats.p2Options[j].choice);
         if (!blend) continue;
         planned++;
@@ -196,7 +185,6 @@ describe('(c) a guarded cell and a cell without an uncertain event book no key; 
       const board = rootOf(battleOf('gen9customgame', [set('Blissey', ['waterfall'])], [set('Snorlax', ['thunder'])]));
       const stats = mctsTreeSearch(board.serialized, settings, 0);
       const keys = new Set(stats.cells.map(cell => cell.classKey).filter(Boolean));
-      // the planner's keys: the two sides' outcomes joined with `|` (no pair-plan key has that shape)
       expect(keys.size).toBeGreaterThan(0);
       for (const key of keys) expect(String(key)).toMatch(/^(hit-nokill|hit-kill|miss|none)[^=]*\|(hit-nokill|hit-kill|miss|none)/);
     } finally {
@@ -214,7 +202,6 @@ describe('(d) the merge prices each class of four keyed doubles trees by its own
     visits: 42, depth: 2, rootValue: 0.5, cells, result: emptyResult,
   });
   const cell = (visits: number, mean: number, classKey: string) => ({ key: cellKey(0, 0), visits, total: mean * (visits + 1) - (-0.1), value: -0.1, ended: false, classKey });
-  // Thunderbolt in miniature: the plain hit (0.9) and the paralysis (0.1), both open. The keys are the pair plan's.
   const blend = { firstLeaf: -0.1, classes: [
     { key: 'p1a:thunderbolt>p2a=hit-nokill', weight: 0.9, leafSum: 0.6, count: 3, hasFirst: true, ended: false },
     { key: 'p1a:thunderbolt>p2a=hit-nokill+par', weight: 0.1, leafSum: -3, count: 3, hasFirst: false, ended: false },
@@ -249,7 +236,6 @@ describe('(e) the clones of a keyed draw equal the plain draw\'s', () => {
     const root = board.root();
     const [p1, p2] = board.choices;
     const owner = {};
-    // the first call builds the pair state (the battle's copy for the reader's own questions): a cost of the cell, not of a draw
     keyedAdvance(owner, root, cellKey(0, 0), p1, p2, SEARCH_SEEDS[0]);
     for (const seed of SEEDS) {
       const plain = clones(() => advancePositionWithLog(root, p1, p2, seed as never, { stopAtForcedSwitch: true }));
@@ -259,11 +245,6 @@ describe('(e) the clones of a keyed draw equal the plain draw\'s', () => {
   });
 });
 
-/**
- * The four trees of one search draw each root cell by quantile (`search/root-quantile.ts`): tree k answers a die of chance p so that
- * floor(4p) to ceil(4p) of the four trees see it come true, where the seeds of the stream gave 0 to 4. A cell is checked when it
- * holds the board's attack and the foe does not protect; its class key is read per tree.
- */
 describe('(f) a real search draws its root cells by quantile: a die of chance p comes true in floor(4p) or ceil(4p) of four trees', () => {
   const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
   const ironHead = { move: 'ironhead', chance: 0.3, token: '+flinch' };
@@ -332,7 +313,6 @@ describe('(f) a real search draws its root cells by quantile: a die of chance p 
       withBudget(() => {
         const found = keysPerCell(board(die.move).serialized, die.move, () => true);
         expect(found.size).toBeGreaterThan(0);
-        // a singles key joins the sides' outcomes p1 first: the die belongs to the first part
         expectStrata(found, die, key => key.split('|')[0]);
       });
     });
@@ -400,8 +380,8 @@ describe('(f) a real search draws its root cells by quantile: a die of chance p 
 });
 
 describe('(g) a root row reads the same through its marginals and through its cells', () => {
-  // The merge corrects the visit mean of the top row and column by the cells of a keyed class mix: that holds only while
-  // the row's visits and totals ARE the sums of its cells.
+  // The merge corrects the visit mean of the top row and column by the cells of a keyed class mix: that holds
+  // only while the row's visits and totals ARE the sums of its cells.
   const settings = { depth: 1 as const, samples: 1 as const, tera: false as const, mode: 'mcts' as const, prove: false };
   const boards = {
     doubles: () => doublesRoot([pairSet('Fast', 'Aerodactyl', ['Iron Head', 'Protect'], SPEED), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])], slow()).serialized,
@@ -495,8 +475,6 @@ describe('the recording dice', () => {
     // Mawile stands at 84/125 on the root; Life Dew heals a quarter (31) before Matcha Gotcha lands.
     expect(mawile.snapshot.defender.hp).toBe(115);
     expect(mawile.snapshot.spreadHit).toBe(true);
-    // The roll falls inside its move's window: the last |move| line before it is p2a's Matcha Gotcha
-    // (the first target's |-resisted| line already stands between them).
     const moveLine = drawn.log.slice(0, mawile.logIndex).reverse().find(line => line.startsWith('|move|'));
     expect(moveLine).toMatch(/^\|move\|p2a: Sinistcha\|Matcha Gotcha\|/);
   });

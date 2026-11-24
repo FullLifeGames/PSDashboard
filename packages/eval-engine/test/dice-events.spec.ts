@@ -8,13 +8,6 @@ import { winDeltaText } from '../src/winprob';
 import type { SideAnalysis, TurnAnalysis } from '../src/analysis';
 import type { KoOddsInfo, RankedChoice } from '../src/types';
 
-/**
- * The dice markers of a turn count a roll only where the move rolled. The oracle is the simulator (real logs of real battles) and its Dex:
- * a sure crit (`willCrit`), a status from a move whose accuracy and status chance are 100 (Thunder Wave in Gen 6) and a hazard status on a
- * switch-in are no roll; Hypnosis, Scald's burn and an ability status still are. The replay's generation reaches detectRolls and
- * diceEventTurns as an optional parameter; without it the markers read as before the generation gate.
- */
-
 type Kind = 'singles' | 'doubles';
 const ALL_31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const set = (species: string, moves: string[], ability = 'Pressure'): PokemonSet => ({
@@ -55,7 +48,6 @@ function attackLog(kind: Kind, move: string, seed: number, format = FORMAT[kind]
       [[`move ${id} 1, move protect`, 'move splash, move splash']], seed);
 }
 
-/** Dice the premise must not carry besides its own (a full paralysis after the status would be a roll of its own). */
 const OTHER_DICE = /^\|(cant|-miss)\|/;
 
 function logWith(make: (seed: number) => string[], marker: RegExp, seeds = 400, reject = OTHER_DICE): string[] | null {
@@ -120,7 +112,6 @@ describe.each<Kind>(['singles', 'doubles'])('status, %s', kind => {
   });
 
   test('Hypnosis (accuracy under 100) and Scald\'s burn (30%) still roll; the status lands on the target, so the user is favored', () => {
-    // The sleeper's own |cant| is a marker of its own, so the status line is read alone.
     const sleep = logWith(seed => statusLog(FORMAT[kind], 'Hypnosis', seed), /^\|-status\|p2a: Blissey\|slp/, 200, /^\|-miss\|/);
     expect(sleep).not.toBeNull();
     expect(detectRolls(sleep!.filter(line => !line.startsWith('|cant|')), null, 9).favored).toEqual({ p1: true, p2: false });
@@ -227,7 +218,7 @@ describe.each<Kind>(['singles', 'doubles'])('attacker slot, %s', kind => {
   });
 });
 
-/** A move whose secondary names only its chance picks the status in a handler (Tri Attack, Dire Claw; Generation 9 holds `{ chance: 20 }`), so it is a dice source like a secondary with a status. The oracle is the Dex entry of each move. */
+// A move whose secondary names only its chance picks the status in a handler (Tri Attack, Dire Claw): a dice source.
 describe('a status a handler picks is a roll', () => {
   const gen9 = Dex.forGen(9);
   const secondariesOf = (id: string) => {
@@ -254,7 +245,6 @@ describe('a status a handler picks is a roll', () => {
     const scald = gen9.moves.get('scald');
     expect(secondariesOf('scald').some(effect => effect.status !== undefined && (effect.chance ?? 100) < 100)).toBe(true);
     expect(rolls(scald.name, kind, 9)).toBe(true);
-    // The Dex holds a damaging move that always lands a status: accuracy sure and the secondary at 100 %.
     const sure = gen9.moves.all().find(move => (move.accuracy === true || move.accuracy >= 100)
       && secondariesOf(move.id).length > 0 && secondariesOf(move.id).every(effect => effect.status !== undefined && effect.chance === 100));
     expect(sure).toBeDefined();

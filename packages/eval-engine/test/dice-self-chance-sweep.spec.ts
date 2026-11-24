@@ -7,18 +7,7 @@ import { playClicks } from './dice-fixtures';
 import { dexOfRules, sweepMoves, SWEEP_CASES, type DexMove } from './dice-sweep-support';
 import { clickedOf, moveScene, scan, witnessesWanted } from './dice-logged-sweep-support';
 
-/**
- * The sweep of the move's own chance to move its user (`move.self.chance`). The simulator is the oracle: `selfDrops`
- * (`battle-actions.js`) draws the chance once per move, not once per target, for a move without `multihit` (`move.selfDropped`), so a
- * doubles turn of a spread move shows one gain line or none, never one per struck foe. For every Dex move with a `self.chance` entry
- * in every generation and mod the corpus plays (Gens 1 to 9, the Champions mod; singles everywhere, doubles from Gen 3), turns play
- * under many seeds and write logs:
- * - the Dex census: no such move has `multihit`;
- * - the oracle: a log never shows more than one gain line of the user for one use, and shows one gain on both seeds' sides of the die;
- * - the reader: a log with at least one gain gives the die "yes", a log with none gives "no", whatever the number of struck foes;
- * - the forced turn on another seed repeats the log's turn (`scoreAlignment` perfect) in every pair the other seed would change.
- * A plain run plays a fixed sample of each list, `DICE_SWEEPS=full` every entry.
- */
+// `selfDrops` (battle-actions.js) draws `self.chance` once per move, not once per target, without `multihit`.
 await loadSimMods('gen9championsou');
 vi.setConfig({ testTimeout: 900_000 });
 
@@ -82,7 +71,6 @@ describe.each(SWEEP_CASES)('the move\'s own chance to move its user reads once p
     summaries.push(`self-chance ${rules.name} ${mode}: ${moves.length} moves, ${reaching.length} reach a foe, ${spreadOnce} firings against two struck foes, ${witnesses} witnesses, ${failures.length} failures; ${rows.join('; ')}`);
     expect(failures).toEqual([]);
     if (reaching.length > 0) expect(witnesses, 'the sweep found a seed pair the log repairs').toBeGreaterThan(0);
-    // the spread move fires once for both struck foes in doubles
     if (mode === 'doubles' && reaching.some(move => move.target === 'allAdjacentFoes')) expect(spreadOnce, 'a doubles turn with the gain against two struck foes').toBeGreaterThan(0);
   });
 });

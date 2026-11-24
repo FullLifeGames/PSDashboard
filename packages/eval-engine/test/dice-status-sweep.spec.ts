@@ -8,17 +8,7 @@ import { playClicks, sweepSelection, type Mode, type Rules } from './dice-fixtur
 import { attacker, CHECK_MOVES, CHECKS, started, type Check } from './dice-status-support';
 import { dexOfRules, forcedOn, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, type Tally } from './dice-sweep-support';
 
-// The status checks of the attacker. The simulator draws them inside the attacker's own action, in `BeforeMove`, before the move
-// runs: full paralysis, the thaw, the infatuation and the confusion check (its self-hit rolls its own damage). Every check, in
-// every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and doubles, with each of a few moves (a physical one, a
-// spread one, a status move, a move that thaws its user), forced to happen and not to. The witness is the protocol: `|cant|` for a
-// stop, `|-curestatus|` for a thaw, `|-damage|` with `[from] confusion` for the self-hit, the body's own `|move|` when it goes on.
-//
-// "Happens" is what the body does: yes lets it go on (the paralysed body moves, the frozen body thaws, the infatuated body moves,
-// the confused body does not hit itself), no stops it. The simulator writes the draw's polarity its own way (the confusion check
-// lets the body go on when the chance comes true up to Gen 6 and hits it from Gen 7), so the module reads the polarity from the
-// condition's handler (status-probe.ts) and this sweep reads it from a plain turn whose draw a spy answers "true". The reported
-// chance is the chance of the answer. The Gen 2 thaw falls at the end of the turn, Gen 1 has none.
+// Confusion's draw: when the chance comes true the body goes on up to Gen 6 and hits itself from Gen 7.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -32,12 +22,6 @@ const shows = (battle: Battle, start: number, pattern: RegExp): boolean => battl
 const dieOf = (moveId: string, effectId: string, happens: boolean): ForcedDie => ({ name: { slot: 'p1a', moveId, kind: 'status-check', effectId }, result: { happens } });
 const why = (report: DieReport): string => `${report.took}: ${report.reason ?? 'no reason'}`;
 
-/**
- * The oracle for the chance of the answer "the body goes on": the chance the simulator itself passes to `randomChance` while
- * the check's own handler runs (event `BeforeMove`, effect the condition), read from a plain turn under a spy over the battle's
- * stream; and which way the draw goes, read from a second turn whose draw the spy answers "true" (the body's own `|move|`
- * follows or not). Null when the simulator draws no such chance.
- */
 function chanceOf(board: Battle, clicks: { p1: string; p2: string }, effectId: string): number | null {
   const first = spy(board, clicks, effectId, undefined);
   if (first.seen === null) return null;
@@ -100,7 +84,7 @@ function judge({ label, shown, happens, defrosts, oracle, check, battle, start }
     return [];
   }
   if (defrosts && !happens) {
-    // Gens 3 and 4 draw the thaw for such a move too; a draw that keeps the body frozen is overruled by the move: blocked
+    // Gens 3 and 4 draw the thaw for such a move too; a draw that keeps the body frozen is overruled: blocked
     if (shown.took !== 'blocked' || !/move followed/.test(shown.reason ?? '')) return [`${label}: ${why(shown)}`];
     tally.blocked++;
     return [];
@@ -129,7 +113,6 @@ describe.each(SWEEP_CASES)('the status check sweep: $name', ({ rules, mode, name
   test('the sweep exercised the checks', () => {
     summaries.push(`${name}: ${checks.length} checks ${JSON.stringify({ ...tally, bad: undefined, unexercised: undefined })}`);
     expect(tally.applied).toBeGreaterThan(checks.length * 4);
-    // from Gen 5 on the move that thaws its user is a die that is never drawn; Gens 3 and 4 draw it and the move overrules a no
     if (rules.generation >= 5) expect(tally.noDraw).toBeGreaterThan(0);
     else if (rules.generation >= 3) expect(tally.blocked).toBeGreaterThan(0);
   });
@@ -161,7 +144,6 @@ describe.each(SWEEP_CASES)('the confusion self-hit rolls its own damage: $name',
     expect(low.reports[0].took, why(low.reports[0])).toBe('applied');
     summaries.push(`${name}: self-hit loss ${low.loss}`);
     if (rules.generation <= 2) {
-      // Gens 1 and 2 have no self-hit roll: the die of it is never drawn
       expect(low.reports[1].took, why(low.reports[1])).toBe('no-draw');
       return;
     }

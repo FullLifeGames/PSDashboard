@@ -2,11 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { loggedDice } from '../src/dice/logged-results';
 import { tieName } from '../src/dice/types';
 
-/**
- * Found by `choice-lock.spec.ts` (smogtours-gen9ou-752301, turn 1): two Landorus tie in speed, the foe Taunts first and the other body
- * is stopped by the Taunt it just got (`|cant|`). The log shows who acted first only through that `|cant|` line, so the order die
- * has to read a stopped body as an action of the queue too.
- */
 describe('the order die reads a body the log stops as an action of the queue', () => {
   const tie = (first: string) => ({ name: tieName('p1a', 'p2a'), result: { first } });
 

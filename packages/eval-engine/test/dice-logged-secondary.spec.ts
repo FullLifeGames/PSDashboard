@@ -6,9 +6,7 @@ import { dexOfRules, SWEEP_CASES, sweepMoves, type DexMove } from './dice-sweep-
 import { clickedOf, moveScene, type Scene } from './dice-logged-sweep-support';
 import { sweepMovesOf, writeSummaries } from './dice-logged-sweep-rows';
 
-/** The secondary and self-effect rows of the logged sweep; the accuracy rows, the small groups and the census are in `dice-logged-sweep.spec.ts`. */
 await loadSimMods('gen9championsou');
-// a full sweep plays every Dex move of a rule set in one test
 vi.setConfig({ testTimeout: 900_000 });
 
 afterAll(() => writeSummaries('secondary'));
@@ -39,7 +37,6 @@ describe.each(SWEEP_CASES)('the logged secondaries and self effects give the log
     expect(result.witnesses > 0 || sweepMoves(rules, keep).moves.length === 0).toBe(true);
   });
 
-  // Serene Grace doubles the chances, Sheer Force removes the secondaries: the log shows what the simulator rolled under the outfit
   for (const outfit of [{ ability: 'serenegrace' }, { ability: 'sheerforce' }]) {
     test(`secondary under ${outfit.ability}`, () => {
       if (!has('abilities', outfit.ability)) return;

@@ -11,18 +11,8 @@ import {
 import { forcedOn, SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-// The order of the turn. Two dice decide who moves first inside one priority bracket: the speed tie (a shuffle of the move actions
-// that tie in speed; Gens 8 and 9 shuffle a pair several times in one turn) and the die that lets one body act first (Quick Claw,
-// Quick Draw). Every rule set the corpus plays, singles and doubles.
-//
-// The tie: bodies of equal speed (the same species with the same set) all use Tackle. One pair of them is forced to go in each of
-// the two orders on several seeds, the witness is the order of the `|move|` lines; in doubles the four bodies give six pairs, and
-// one row forces a whole order of the four. Every other action's dice and the stream after the turn stay the natural ones.
-//
-// The first-mover die: a slow body holds the item or the ability, a fast body faces it, both use a move of priority 0. Forced to
-// happen, the holder moves first; forced not to, it moves last even on a seed where the natural draw would have let it go first.
-// Gen 4 draws in `BeforeTurn`, Gens 5 to 9 and Champions in `FractionalPriority`; Gens 2 and 3 draw the roll once at the start of
-// each turn, the simulator reads it from `battle.quickClawRoll` in the action speed.
+// Gen 4 draws in `BeforeTurn`, Gens 5 to 9 and Champions in `FractionalPriority`; Gens 2 and 3 draw the roll once
+// at the start of each turn (`battle.quickClawRoll` in the action speed).
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -121,7 +111,6 @@ describe.each(SWEEP_CASES)('the speed tie: $name', ({ rules, mode, name }) => {
   });
 });
 
-
 function naturalActivates(board: Battle, mover: FirstMover, rules: Rules): boolean {
   const battle = copyOf(board);
   battle.prng ??= board.prng.clone();
@@ -133,7 +122,6 @@ function naturalActivates(board: Battle, mover: FirstMover, rules: Rules): boole
 
 const SEED_POOL = Array.from({ length: 160 }, (_, index) => [1, 2, 3, 4].map(offset => (index + 1) * 7 + offset).join(','));
 
-/** Up to `want` seeds where the natural draw does (or does not) let the holder go first. */
 function seedsWhere(rules: Rules, mode: Mode, mover: FirstMover, activates: boolean, want: number): string[] {
   const found: string[] = [];
   for (const seed of SEED_POOL) {
@@ -186,7 +174,6 @@ describe.each(SWEEP_CASES)('the first-mover die: $name', ({ rules, mode, name })
 describe.each(RULES.filter(rules => rules.generation === 2 || rules.generation === 3))('the roll of Gens 2 and 3 is read from the battle: $name', rules => {
   test.each(['singles', 'doubles'] as const)('%s: a forced die that adds draws leaves the next turn\'s roll as the natural turn gave it', mode => {
     if (mode === 'doubles' && !rules.doubles) return;
-    // Mega Kick misses a quarter of the time: forced to hit on a natural miss it draws a crit and a damage roll more
     const attacker = mon(rules, { species: 'Snorlax', moves: ['megakick'], gender: 'M' });
     const foe = mon(rules, PIKACHU(['splash']));
     let compared = 0;

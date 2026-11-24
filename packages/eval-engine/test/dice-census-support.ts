@@ -2,7 +2,6 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import type { DieKind } from '../src/dice/types';
 
-/** The scan and the classes of the census (dice-census.spec.ts), shared with the ability sweep, which holds every die of scope here to a proc it plays. */
 const require = createRequire(import.meta.url);
 const simRoot = join(dirname(require.resolve('@pkmn/sim')), '..');
 
@@ -43,11 +42,7 @@ function handlersOf(value: unknown, path: string, out: [string, string][], depth
   for (const [key, inner] of Object.entries(value)) handlersOf(inner, path ? `${path}.${key}` : key, out, depth + 1);
 }
 
-/**
- * The abilities and items whose handlers read `battle.activeMove`, directly or through a volatile they add whose condition does (a Choice
- * item adds `choicelock`). The simulator sets the move in flight in `runMove` before `BeforeMove` and `ModifyMove`, so a stand-in that
- * raises such a handler on a copy must set it too. `throwing` marks the entries that throw "Battle.activeMove is null" when it is not set.
- */
+// The simulator sets `battle.activeMove` in `runMove` before BeforeMove and ModifyMove: a stand-in must set it too.
 export function activeMoveReaders(): { kind: 'abilities' | 'items'; id: string; throwing: boolean }[] {
   const sourceOf = (value: unknown, depth = 0): string => {
     if (typeof value === 'function') return value.toString();
@@ -86,7 +81,6 @@ export function scan(): Map<string, Set<string>> {
       if (!table || typeof table !== 'object') continue;
       for (const [id, entry] of Object.entries(table)) {
         const rows: [string, string][] = [];
-        // data tables: a move's own draws belong to the move sweeps; its nested conditions (infatuation) are conditions. The Champions bundle is scanned whole.
         if (tableName === 'Moves' && !source.whole) {
           handlersOf((entry as { condition?: unknown })?.condition, 'condition', rows);
         } else {
@@ -104,10 +98,6 @@ export function scan(): Map<string, Set<string>> {
 }
 
 export type Scope = 'action' | 'turn-order' | 'end-of-turn' | 'out';
-/**
- * `kind` is the kind of die the module names for the draw (a `DieKind`), or `pick` and `duration` for the draws that stay out. `open` marks a
- * draw in scope that no kind names yet: the reason says why and what the user sees (nothing is offered, the draw follows the stream).
- */
 export interface Class { scope: Scope; kind: DieKind | 'pick' | 'duration'; calls: string[]; open?: string }
 
 const proc = (...calls: string[]): Class => ({ scope: 'action', kind: 'ability-proc', calls });
@@ -118,7 +108,6 @@ const pick = (...calls: string[]): Class => ({ scope: 'out', kind: 'pick', calls
 const duration = (...calls: string[]): Class => ({ scope: 'out', kind: 'duration', calls });
 
 export const CLASSES: Record<string, Class> = {
-  // a proc of the move's hit: the holder was hit (DamagingHit) or hit (the source's DamagingHit)
   'abilities/cursedbody/onDamagingHit': proc('randomChance(3, 10)'),
   'abilities/cutecharm/onDamagingHit': proc('randomChance(1, 3)', 'randomChance(3, 10)'),
   'abilities/effectspore/onDamagingHit': proc('random(100)', 'randomChance(1, 10)', 'randomChance(3, 10)', "sample(['slp', 'par', 'psn'])"),
@@ -140,7 +129,6 @@ export const CLASSES: Record<string, Class> = {
   'conditions/par/onBeforeMove': check('randomChance(1, 4)', 'randomChance(1, 8)', 'randomChance(63, 256)'),
   'moves/attract/condition.onBeforeMove': check('randomChance(1, 2)'),
   'conditions/stall/onStallMove': { scope: 'action', kind: 'stalling', calls: ['randomChance(1, 2 ** 32)', 'randomChance(1, counter)', 'randomChance(counter, 255)'] },
-  // the Champions bundle's own hit loop: the count of a multi-hit move and the accuracy of each hit of a multi-accuracy move
   'scripts/actions/hitStepMoveHitLoop': {
     scope: 'action', kind: 'hit-count',
     calls: [
@@ -148,7 +136,6 @@ export const CLASSES: Record<string, Class> = {
       'sample([2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5])', 'sample([2, 2, 2, 3, 3, 3, 4, 5])',
     ],
   },
-  // draws in scope that no kind names yet
   'moves/allyswitch/condition.onRestart': {
     scope: 'action', kind: 'stalling', calls: ['randomChance(1, counter)'],
     open: 'a second Ally Switch in a row succeeds with a falling chance; the draw runs under Restart, not StallMove, and the move has no stallingMove flag',
@@ -161,7 +148,6 @@ export const CLASSES: Record<string, Class> = {
     scope: 'action', kind: 'secondary', calls: ['randomChance(Math.ceil(secondary.chance * 256 / 100) - 1, 256)'],
     open: 'Gen 1 draws a secondary effect against a Substitute inside the Substitute handler, which the secondary rule skips',
   },
-  // out: a random pick (which one, never whether)
   'abilities/forewarn/onStart': pick('sample(warnMoves)'),
   'abilities/moody/onResidual': pick('sample(stats)'),
   'abilities/pickup/onResidual': pick('sample(pickupTargets)'),
@@ -169,7 +155,6 @@ export const CLASSES: Record<string, Class> = {
   'conditions/twoturnmove/onStart': pick('sample(attacker.foes(true))'),
   'items/starfberry/onEat': pick('sample(stats)'),
   'moves/direclaw/secondary.onHit': pick('sample(["psn", "par", "slp"])'),
-  // out: a duration die (GLOSSARY.md), drawn when the condition starts
   'conditions/confusion/onStart': duration('random(2, 6)', 'random(min, 6)'),
   'conditions/lockedmove/durationCallback': duration('random(2, 4)'),
   'conditions/lockedmove/onStart': duration('random(2, 4)'),
