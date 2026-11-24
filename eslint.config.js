@@ -10,6 +10,7 @@ import namesPlugin from './eslint.names.mjs'
 import dexPlugin from './eslint.dex.mjs'
 import prosePlugin from './eslint.prose.mjs'
 import commentsPlugin from './eslint.comments.mjs'
+import testsPlugin from './eslint.tests.mjs'
 
 export default defineConfig([
   // docs/ holds Markdown and the local, gitignored probes (copies of old sources among them), and .claude/ holds the local agent
@@ -53,6 +54,12 @@ export default defineConfig([
     files: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
     plugins: { comments: commentsPlugin },
     rules: { 'comments/no-history': 'error' },
+  },
+  // History in test titles and spec file names (see eslint.tests.mjs).
+  {
+    files: ['test/**/*.{ts,tsx}', 'packages/*/test/**/*.ts'],
+    plugins: { tests: testsPlugin },
+    rules: { 'tests/no-history': 'warn' },
   },
   // Dash rule: the report's prose sources and every label of src/components carry no em or en dash (see eslint.prose.mjs).
   {

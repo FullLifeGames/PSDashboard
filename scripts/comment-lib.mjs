@@ -1,5 +1,6 @@
 // The one reader of comments for the comment tools: scripts/comment-only-diff.mjs (proof that an edit moved no code),
-// scripts/comment-counts.mjs (the comment ratchet) and eslint.comments.mjs (the rule comments/no-history).
+// scripts/comment-counts.mjs (the comment ratchet), eslint.comments.mjs (the rule comments/no-history) and, for the history
+// patterns, eslint.tests.mjs (the rule tests/no-history).
 //
 // A comment that code reads is never history and never changes in a comment-only edit: `// oracle:` markers (they name the spec that holds the list; one spec still reads its own),
 // eslint directives, TypeScript and test-runner pragmas, triple-slash references, shebangs and legal headers. `readByCode` is the
@@ -239,9 +240,9 @@ export function commentsOf(text, fileName) {
 }
 
 /**
- * History in a comment: a round, a ruling, a gate, a date, a T-number, an issue or pull request number, a word that tells what the
- * code was ("used to", "formerly"). Each pattern has a name for the rule's message; the comment lines it finds are counted once.
- * The sources of the repository's own rule: AGENTS.md "Rules for the code", comments.
+ * History in a comment: a round, a ruling, a gate, a date, a T-number, an issue or pull request number, a branch name, a plan
+ * or gate code, a word that tells what the code was ("used to", "formerly"). Each pattern has a name for the rule's message; the
+ * comment lines it finds are counted once. The sources of the repository's own rule: AGENTS.md "Rules for the code", comments.
  */
 export const HISTORY_PATTERNS = [
   ['round', /\b(?:round|Round|Runde)s?\s+\d+/],
@@ -249,11 +250,17 @@ export const HISTORY_PATTERNS = [
   ['gate', /\buser gate\b|\bgate\s+\d+[a-z]?\b|\bgate\s+[A-Z]\d/],
   ['date', /\b\d{1,2}\.\d{1,2}\.20\d\d\b|\b20\d\d-\d\d-\d\d\b/],
   ['T-number', /\bT\d{2,3}[a-z]?\b/],
-  ['issue', /(?:^|[\s(])#\d{2,4}\b|\b(?:issue|PR|pull request)\s+#?\d+\b/i],
-  ['lane', /\blane [A-Z]\b/],
+  ['issue', /(?:^|[\s(\[,;])#\d{2,4}\b|\b(?:issue|PR|pull request)\s+#?\d+\b/i],
+  ['lane', /\blane [A-Z]\d?\b/],
+  ['branch', /\br\d{2,3}[a-z]?\b/],
+  ['plan-code', /\bD\d{1,2}[a-z]?\b|\b[A-Z]\d{1,2}[a-z]\b|\b(?:NG|FT|FB|SB|WP)-?\d{1,2}[a-z]?\b/],
+  ['trail', /\b(?:decision|question|finding)\s+[A-Z]?\d+[a-z]?\b|\breview of wave\b|\bfinal review\b/i],
   ['past', /\bused to\b|\bformerly\b|\bpreviously\b|\bsince round\b|\bbefore round\b|\b(?:was|were) (?:removed|replaced|dropped|renamed|moved)\b/],
   ['decision', /\buser (?:ruled|ruling|decided|asked|okayed|reported)\b|\bruled by the user\b/],
 ];
+
+/** The patterns a test title is held to: the history patterns without the wording of the comment rule ("used to" and the user's decisions are game facts in a title). */
+export const TITLE_HISTORY_PATTERNS = HISTORY_PATTERNS.filter(([name]) => name !== 'past' && name !== 'decision');
 
 /** The text a history pattern reads on one comment line: delimiters and leading asterisks off. */
 const lineText = line => line.replace(/^\s*(?:\/\/+|\/\*+|\*+\/?)\s?/, '').replace(/\*\/\s*$/, '');
