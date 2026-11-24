@@ -59,7 +59,7 @@ export default defineConfig([
   {
     files: ['test/**/*.{ts,tsx}', 'packages/*/test/**/*.ts'],
     plugins: { tests: testsPlugin },
-    rules: { 'tests/no-history': 'warn' },
+    rules: { 'tests/no-history': 'error' },
   },
   // Dash rule: the report's prose sources and every label of src/components carry no em or en dash (see eslint.prose.mjs).
   {

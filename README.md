@@ -98,7 +98,7 @@ npm run dev              # local Vite server
 
 | Command | What it checks |
 | --- | --- |
-| `npm run lint` | ESLint with size and complexity ceilings, import zones, the name ratchet, the comment and spec-file ratchets and the dash rule for the text the app shows |
+| `npm run lint` | ESLint with size and complexity ceilings, import zones, the name ratchet, the comment and spec-file ratchets, the rule for test titles and spec file names and the dash rule for the text the app shows |
 | `npm run build` | the production bundle |
 | `npm run build:packages` | compiles both packages to their `dist/` |
 | `npm run bench:eval` | the engine bench: forward-model and search throughput on a six against six position, printed to the console (outside the suite) |
