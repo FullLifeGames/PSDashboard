@@ -1,27 +1,18 @@
 import { AUTO_MCTS_FAINTED_FRACTION } from '../types.ts';
 
-/**
- * Every search budget the app and the bank run on, as one object. A measurement switch without a UI knob picks a form:
- * EVAL_SEARCH_BUDGET under Node, the localStorage key ps-replay-interceptor:search-budget in the browser (stamped on every worker
- * message). Syntax: a comma list of key=value over the default, read left to right (trees, iterations, early-depth, early-samples,
- * tree-from for both game types or with a singles- or doubles- prefix for one, lead-depth, lead-samples).
- */
+// A measurement switch: EVAL_SEARCH_BUDGET under Node, localStorage ps-replay-interceptor:search-budget in the browser.
 
 /** The auto mode of one game type: below treeFrom the matrix, at or above it the tree. */
 export interface AutoSplit {
-  /** Matrix depth of auto turns below treeFrom. */
   earlyDepth: 1 | 2 | 3;
-  /** Draws per cell of auto turns below treeFrom (five fixed seeds). */
   earlySamples: 1 | 3 | 5;
   /** Fainted fraction from which auto turns run the tree. */
   treeFrom: number;
 }
 
-/** Every search budget a measurement varies: trees, iterations, the auto split per game type and the team-preview lead. */
+/** Every search budget a measurement varies: trees, iterations, the auto split per game type, the team-preview lead. */
 export interface SearchBudget {
-  /** Trees of the tree search (root parallelization). */
   trees: number;
-  /** Iterations per tree. */
   iterations: number;
   singles: AutoSplit;
   doubles: AutoSplit;
@@ -29,7 +20,7 @@ export interface SearchBudget {
   lead: { depth: 1 | 2 | 3; samples: 1 | 3 | 5 };
 }
 
-/** The default budget: doubles run the tree from the first turn, singles the three-draw matrix until a quarter of all bodies fell (the tree read early singles turns narrower). */
+/** The default: doubles run the tree from turn one, singles the three-draw matrix until a quarter of bodies fell. */
 export const SEARCH_BUDGET_DEFAULT: SearchBudget = {
   trees: 4, iterations: 600,
   singles: { earlyDepth: 1, earlySamples: 3, treeFrom: AUTO_MCTS_FAINTED_FRACTION },
@@ -40,7 +31,6 @@ export const SEARCH_BUDGET_DEFAULT: SearchBudget = {
 type Rule = { accepts(value: number): boolean; set(budget: SearchBudget, value: number): void };
 
 const isDepth = (value: number) => value === 1 || value === 2 || value === 3;
-/** Draws stay within the five fixed seeds. */
 const isDraws = (value: number) => value === 1 || value === 3 || value === 5;
 const isFraction = (value: number) => value >= 0 && value <= 1;
 
@@ -50,7 +40,6 @@ const SPLIT_RULES: Record<string, { field: keyof AutoSplit; accepts(value: numbe
   'tree-from': { field: 'treeFrom', accepts: isFraction },
 };
 
-/** Each switch key: the values it accepts and the field(s) it sets. */
 const RULES: Record<string, Rule> = {
   trees: { accepts: value => Number.isInteger(value) && value >= 1 && value <= 64, set: (budget, value) => { budget.trees = value; } },
   iterations: { accepts: value => Number.isInteger(value) && value >= 50 && value <= 20_000, set: (budget, value) => { budget.iterations = value; } },
@@ -101,7 +90,7 @@ export function searchBudget(): SearchBudget {
 }
 
 const splitTag = (split: AutoSplit) => `${split.earlyDepth}.${split.earlySamples}.${split.treeFrom}`;
-/** Field by field, so key order never makes two equal budgets differ. */
+// Field by field, so key order never makes two equal budgets differ.
 const budgetTag = (budget: SearchBudget) =>
   `t${budget.trees}-i${budget.iterations}-s${splitTag(budget.singles)}-d${splitTag(budget.doubles)}-l${budget.lead.depth}.${budget.lead.samples}`;
 
@@ -111,7 +100,6 @@ export function searchBudgetTag(): string {
   return tag === budgetTag(SEARCH_BUDGET_DEFAULT) ? '' : tag;
 }
 
-/** The auto mode at one position of a game type: its early matrix below its treeFrom, the tree at or above. */
 export function autoTurnSettings(faintedFraction: number, doubles: boolean): { depth: 1 | 2 | 3; samples: 1 | 3 | 5; mode: 'matrix' | 'mcts' } {
   const split = doubles ? searchBudget().doubles : searchBudget().singles;
   return faintedFraction >= split.treeFrom

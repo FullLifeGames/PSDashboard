@@ -3,14 +3,9 @@ import {
   type RankedChoice,
 } from '../types.ts';
 
-/**
- * Ranked rows within PROVER_NEAR_TIE (score units) of the top of their group form one near tie. The prover tries the first three
- * candidates of its root order, and two estimates of one root can rank a near tie either way; inside a near tie the order goes by
- * label, so noise cannot pick the candidates.
- */
+/** Score units within which ranked rows are one near tie; inside it the prover's root order goes by label. */
 export const PROVER_NEAR_TIE = 0.02;
 
-/** The prover's root order: the ranking's order, each near tie by label (a group ends PROVER_NEAR_TIE below its top). */
 function proverRootOrder(rows: RankedChoice[]): string[] {
   const order: string[] = [];
   let group: RankedChoice[] = [];
@@ -26,7 +21,7 @@ function proverRootOrder(rows: RankedChoice[]): string[] {
   return order;
 }
 
-/** The prover's contract with a finished search: the input for the prover, sim-free so the main thread can build it and apply the bar for the pool path. */
+/** The prover's input from a finished search; sim-free, so the main thread can build it for the pool path. */
 export function forcedWinInput(result: EvalResult, settings: EvalSettings): ForcedWinInput {
   return {
     score: result.score,
@@ -40,7 +35,7 @@ export function forcedWinInput(result: EvalResult, settings: EvalSettings): Forc
 
 interface SerializedBodies { ended?: boolean; sides?: { pokemon?: { fainted?: boolean }[] }[] }
 
-/** Sim-free mirror of the prover's trigger for the main thread: true wherever the sim-side check could fire, false only where a worker round trip would return nothing. */
+/** Sim-free mirror of the prover's trigger: false only where a worker round trip would return nothing. */
 export function forcedWinPossible(serializedBattle: string, input: ForcedWinInput): boolean {
   const named = Boolean(input.unanswered?.decided || input.unanswered?.nearDecided);
   if (named && Math.abs(input.score) >= PROVER_SCORE_FLOOR) return true;
@@ -56,7 +51,7 @@ export function forcedWinPossible(serializedBattle: string, input: ForcedWinInpu
   return living[0] + living[1] <= ENDGAME_MAX_BODIES || (living[0] === 1 && living[1] === 1);
 }
 
-/** Moves the score by the proof (mass toward the proven side, the rest at the open branch's static); a proof at exactly MIN_FORCED_MASS (a coin flip) moves none. */
+/** Moves the score by the proof; a proof at exactly MIN_FORCED_MASS (a coin flip) moves none. */
 export function applyForcedWin(result: EvalResult, outcome: ForcedWinOutcome | null): void {
   if (!outcome || outcome.proof.mass < MIN_FORCED_MASS) return;
   const { side, proof } = outcome;

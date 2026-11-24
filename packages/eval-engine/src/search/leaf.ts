@@ -7,14 +7,11 @@ import { actionsTie } from '../sim-ask/index.ts';
 import type { RollScripts } from '../forward/scripted-prng.ts';
 import { wpUnits } from '../winprob.ts';
 
-/** The search's value space and its chance schedule: the seeds, the leaf value in win-prob units, the phase signal, roll sensitivity. */
 
-/**
- * Base draws per cell: slots below `settings.samples` and below this count are drawn first; the rest of a cell's list is its probe slots.
- */
+/** Base draws per cell: slots below this count and `settings.samples` draw first, the rest are probe slots. */
 export const BASE_DRAWS = 5;
 
-/** A murmur-style 32-bit finalizer: integer arithmetic only, so the browser and Node agree to the bit. */
+// Integer arithmetic only, so the browser and Node agree to the bit.
 function mix32(x: number): number {
   let h = x >>> 0;
   h ^= h >>> 16; h = Math.imul(h, 0x7feb352d);
@@ -23,7 +20,7 @@ function mix32(x: number): number {
   return h >>> 0;
 }
 
-/** The finalizer and a text hash (FNV-1a over the UTF-16 units, integer arithmetic only) for the modules that key a draw by hash. */
+/** The finalizer and a text hash (FNV-1a over UTF-16 units) for the modules that key a draw by hash. */
 export const hash32 = mix32;
 export function hashText(text: string): number {
   let h = 0x811c9dc5;
@@ -31,13 +28,7 @@ export function hashText(text: string): number {
   return h >>> 0;
 }
 
-/**
- * The seed a tree cell draws at creation: a hash of (seedOffset, iteration). Fixed seeds in one arithmetic progression of the Gen 5
- * LCG state make a die come true in 0, 1 or 2 of five streams, never in a tenth of them at random (a 10 % paralysis in one seed's
- * cells at 74 % and in the others at 2 %). A tree expands at most one cell per iteration, so (offset, iteration) names the expansion
- * and needs no cell key. The four 16-bit words come from a chain of the finalizer, none zero. The sampler, the matrix search, the
- * verify round and the endgame children read a cell's own list (`cellSeeds`).
- */
+/** The seed a tree cell draws at creation: a hash of (seedOffset, iteration), which names the expansion. */
 export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
   let h = mix32((Math.imul(seedOffset + 1, 0x9e3779b1) ^ Math.imul(iteration + 1, 0x85ebca6b)) >>> 0);
   const words: number[] = [];
@@ -48,14 +39,7 @@ export function treeSeed(iteration: number, seedOffset: number): PRNGSeed {
   return words.join(',') as PRNGSeed;
 }
 
-/**
- * The seed a cell reads at slot `index` of its list. One fixed list for every cell gives them all the same stream, so a die at one
- * draw index comes true in none or in all of them (a 20 % secondary in 73 to 80 % of a singles matrix). The paths share one list per
- * cell: the matrix's first child is the verify round's, the trend probe rebuilds the matrix's child. `key` is the cell's hash
- * (`cellHash` of the position's key and the two choice strings, `search/root-quantile.ts`). Two 32-bit lanes (one of the key and
- * the slot each, a bijection of 32 bits) make the map from (slot, key) to the seed one to one up to the zero guard, and the lanes'
- * constants keep the streams apart from `treeSeed`'s. Integer arithmetic only: the browser and Node agree to the bit.
- */
+/** The seed a cell reads at slot `index` of its list; `key` is its hash (`cellHash`, search/root-quantile.ts). */
 export function cellSeed(index: number, key: number): PRNGSeed {
   const a = mix32((key ^ Math.imul(index + 1, 0x85ebca6b) ^ 0x165667b1) >>> 0);
   const b = mix32((key ^ Math.imul(index + 1, 0x9e3779b1) ^ 0x27d4eb2f) >>> 0);
@@ -85,11 +69,7 @@ export function battleFaintedFraction(battle: ReturnType<typeof positionBattle>)
   return total > 0 ? fainted / total : 0;
 }
 
-/**
- * The one place the sigmoid applies: every leaf becomes win-prob units (2p-1), so cell averages, the equilibrium solve and regret
- * live in probability space, in every engine mode. Ended battles clamp to exact +-1; the last pair is priced by its race
- * (last-pair.ts) after the sigmoid; the sigmoid reads the phase K of the matchup cache's rule set.
- */
+/** The one place the sigmoid applies: every leaf becomes win-prob units (2p-1); ended battles clamp to exact +-1. */
 export function leafValue(battle: ReturnType<typeof positionBattle>, matchupCache: MatchupCache): number {
   const raw = evaluatePosition(battle, matchupCache);
   if (battle.ended) return raw > 0 ? 1 : raw < 0 ? -1 : 0;
@@ -103,11 +83,7 @@ const choiceMoveIds = (choice: string): string[] => choice.split(',')
   .filter(tokens => tokens[0] === 'move')
   .map(tokens => tokens[1]);
 
-/**
- * Singles only: the simulator's queue meets both sides' moves at equal priority and speed, so it flips a coin for the order. The
- * queue itself answers (sim-ask/action-order.ts), so Prankster, Gale Wings, Triage, Stall, Quick Claw and the speed rules of every
- * generation count as the simulator counts them.
- */
+/** Singles only: whether the simulator's queue flips a coin for the order, as it answers (sim-ask/action-order.ts). */
 export function speedTie(battle: ReturnType<typeof positionBattle>, p1Choice: string, p2Choice: string): boolean {
   if (battle.gameType !== 'singles') return false;
   const ids = [choiceMoveIds(p1Choice)[0], choiceMoveIds(p2Choice)[0]];

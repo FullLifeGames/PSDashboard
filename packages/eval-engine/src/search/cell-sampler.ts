@@ -15,33 +15,24 @@ import {
   drawPlain, firstDraw, outcomeGroups, stateGroups, stateRuleFor, type PlainDraw, type StateGroup, type VerifyDraws,
 } from './verify-cell.ts';
 
-/** One matrix cell's value from seeded sims: the plain seed average, or the analytic class blend on root boundary cells. */
 
-/**
- * One sampled root cell: its value, whether it ended, the first-seed child and the blend when one applied; class children and outcome
- * groups serve the verify step.
- */
+/** One sampled root cell: its value, whether it ended, the first-seed child and the blend when one applied. */
 export interface CellSample extends VerifyDraws {
   value: number;
   ended: boolean;
   firstChild: SimPosition;
   blend?: CellBlend;
   diagnostic?: KoOddsMismatch;
-  /**
-   * The base draws behind `value`, the draws the horizon-trend probe replays: the leading search seeds the cell was drawn with
-   * (a speed-tied cell: both move orders). Absent for a cell of one draw of the first seed, whose child the probe takes for the cell.
-   */
+  /** The leading search seeds the cell was drawn with (a speed-tied cell: both orders); absent for one draw. */
   baseDraws?: CellDraw[];
 }
 
-/** The leading search seeds a cell drew, as the cell reports them; nothing for the one draw every cell has. */
 const leadingDraws = (count: number): { baseDraws?: CellDraw[] } =>
   (count > 1 ? { baseDraws: Array.from({ length: count }, (_, index) => ({ index })) } : {});
 
-/** The base draws of a boundary cell: `samples` leading seeds, at least the first. */
 const blendBaseDraws = (samples: number): number => Math.max(1, Math.min(samples, BASE_DRAWS));
 
-/** A verify cell without a plan prices `plainDraws` natural draws (the first one reused when given) and hands on their outcome groups and states. */
+/** A verify cell without a plan prices `plainDraws` natural draws and hands on their outcome groups and states. */
 export function plainVerifySample(
   root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first?: PlainDraw,
 ): CellSample {
@@ -51,10 +42,6 @@ export function plainVerifySample(
   return { value, ended: draws[0].ended, firstChild: draws[0].child, outcomes: outcomeGroups(draws) };
 }
 
-/**
- * The verify pool of a plain cell. A cell the sampler draws once (no accuracy roll, no faint) draws the game type's pool too, and
- * keeps its one draw unless the pool shows a second outcome or a second state (a sure-hit Spore's sleep counter, Scald's burn); null then.
- */
 function verifyPool(
   root: SimPosition, p1Choice: string, p2Choice: string, plainDraws: number, matchupCache: MatchupCache, first: PlainDraw, drawsMore: boolean,
 ): CellSample | null {
@@ -63,19 +50,14 @@ function verifyPool(
   return drawsMore || pool.outcomes!.length > 1 || pool.outcomes![0].groups ? pool : null;
 }
 
-/**
- * The analytic weight of unreached classes from which on a blend cell prices as the mean of its draws. A class a few draws miss
- * by chance has weight at or below 0.197 (a crit class of 0.06 to 0.19 stays out of 16 draws up to 18 % of the time at 0.1, 3 % at
- * 0.2); from 0.207 up the model has a gap. 0.2 is the line, and a real class of that weight is out of 16 draws only 3 % of the time.
- */
+// A chance miss of 16 draws leaves a class of weight 0.197 or less out; from 0.207 up the model has a gap.
+/** The analytic weight of unreached classes from which on a blend cell prices as the mean of its draws. */
 export const MISSING_WEIGHT_CUT = 0.2;
 
-/** One seeded child; with `scripts` the dice of the named moves answer as the script says (a tied cell's move order). */
 function advanceChild(root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, scripts?: RollScripts): SimPosition {
   return scripts ? advancePositionWithLog(root, p1Choice, p2Choice, seed, { scripts }).child : advancePosition(root, p1Choice, p2Choice, seed);
 }
 
-/** The plain seed average (no analytic blend): one sim unless a KO or a roll makes seeds diverge. */
 function plainCellSample(
   root: SimPosition,
   rootBattle: ReturnType<typeof positionBattle>,
@@ -92,7 +74,6 @@ function plainCellSample(
   const firstChild = first?.child ?? advanceChild(root, p1Choice, p2Choice, seeds[0], scripts);
   const firstBattle = positionBattle(firstChild);
   const ended = firstBattle.ended;
-  // Averaging wp-units averages win probabilities across rolls: the KO-boundary roll groups carry their true value ("30% this crit wins").
   let sum = first?.leaf ?? leafValue(firstBattle, matchupCache);
   const rollMoves = rollSensitivePair(rootBattle, p1Choice, p2Choice);
   const draws = ended
@@ -115,7 +96,6 @@ interface Draw {
   log: string[];
   leaf: number;
   ended: boolean;
-  /** The secondary dice of the draw, when the cell records them. */
   dice?: SecondaryRecord[];
 }
 
@@ -126,21 +106,17 @@ interface ClassEntry {
   ended: boolean;
   /** The class's first draw: the child the verify step deepens. */
   child: SimPosition;
-  /** Every draw of the class, the plan's in order, then the verify pool's. */
   draws: Draw[];
 }
 
-/** The mean over every draw of the cell (the plan's base draws and the chase to the budget). */
 function allDrawsSample(draws: Draw[]): CellSample {
   const value = draws.reduce((sum, draw) => sum + draw.leaf, 0) / draws.length;
   return { value, ended: draws[0].ended, firstChild: draws[0].child };
 }
 
-/** One seeded draw with its protocol log and leaf value. */
 function drawCell(
   root: SimPosition, p1Choice: string, p2Choice: string, seed: PRNGSeed, matchupCache: MatchupCache, scripts?: RollScripts, record = false,
 ): Draw {
-  // A cell with a secondary die draws under a `DiceSink`, and the draw keeps the dice it saw.
   const sink = record ? new DiceSink(scripts) : null;
   const given = sink ?? scripts;
   const { child, log } = advancePositionWithLog(root, p1Choice, p2Choice, seed, given ? { scripts: given } : undefined);
@@ -148,7 +124,6 @@ function drawCell(
   return { child, log, leaf: leafValue(battle, matchupCache), ended: battle.ended, ...(sink ? { dice: sink.secondaries } : {}) };
 }
 
-/** Books a draw into its outcome class; false when the draw fits no analytically expected class. */
 function classifyDraw(
   classes: Map<string, ClassEntry>,
   expected: Map<string, number>,
@@ -168,7 +143,6 @@ function classifyDraw(
   return true;
 }
 
-/** The diagnostic for analytically expected classes no draw reached, or undefined when none is missing. */
 function unreachedDiagnostic(
   expected: Map<string, number>, classes: Map<string, ClassEntry>, missing: string[], p1Choice: string, p2Choice: string,
 ): KoOddsMismatch | undefined {
@@ -180,7 +154,6 @@ function unreachedDiagnostic(
   };
 }
 
-/** The analytically weighted class means, the blend payload, and the diagnostic for unsampled classes. */
 function blendFromClasses(
   expected: Map<string, number>,
   classes: Map<string, ClassEntry>,
@@ -196,7 +169,7 @@ function blendFromClasses(
   for (const [key, weight] of expected) {
     const cls = classes.get(key);
     if (!cls) continue;
-    const normalized = weight / weightTotal; // 1.0 total when nothing is missing
+    const normalized = weight / weightTotal;
     value += normalized * (cls.leafSum / cls.count);
     blendClasses.push({ key, weight: normalized, leafSum: cls.leafSum, count: cls.count, hasFirst: cls.hasFirst, ended: cls.ended });
   }
@@ -215,10 +188,7 @@ function blendFromClasses(
   };
 }
 
-/**
- * Every class's draws for the verify step, the plan's own first and then the rest of the `plainDraws` natural seeds read with the
- * plan's reader. A pool draw that reads into no planned class is left out; the pool never changes the plan's classes, weights or means.
- */
+// A pool draw that reads into no planned class is left out: the pool never changes the plan's classes or weights.
 function classPools(
   root: SimPosition, events: CellEvent[], p1Choice: string, p2Choice: string, plainDraws: number,
   matchupCache: MatchupCache, classes: Map<string, ClassEntry>, drawnBySeed: Map<string, Draw>,
@@ -234,12 +204,6 @@ function classPools(
   return pools;
 }
 
-/**
- * A cell with a secondary die draws every class the base draws missed once, by script (the plan's miss, kill and effect classes
- * alike), and never chases them with probe seeds: a chase for a 3 percent class costs up to 13 more draws. A class with an effect
- * under the mass floor stays unpriced. A script is a request: the draw books into the class the log shows, and only when that class
- * is expected and still open; the retry with the edge roll runs when the first attempt missed its class.
- */
 function forceMissingClasses(
   root: SimPosition, events: CellEvent[], first: 'p1' | 'p2', expected: Map<string, number>, classes: Map<string, ClassEntry>,
   draws: Draw[], p1Choice: string, p2Choice: string, matchupCache: MatchupCache, scripts?: RollScripts,
@@ -257,11 +221,9 @@ function forceMissingClasses(
   }
 }
 
-/** Probe seeds for the classes the base draws missed (a cell without a secondary die); false when a draw fits no expected class. */
 function chaseMissingClasses(
   expected: Map<string, number>, classes: Map<string, ClassEntry>, draws: Draw[], drawSeed: (seed: PRNGSeed) => void, events: CellEvent[], seeds: readonly PRNGSeed[],
 ): boolean {
-  // The probe seeds are slots 5 on of the cell's list.
   for (
     let slot = BASE_DRAWS;
     [...expected.keys()].some(key => !classes.has(key)) && draws.length < BOUNDARY_DRAW_BUDGET && slot < seeds.length;
@@ -273,10 +235,6 @@ function chaseMissingClasses(
   return true;
 }
 
-/**
- * Blend path: draw with logs, classify children into outcome classes, weight the class means analytically (a 43% kill roll
- * cannot sample 5/5 and grade certain). Any deviation from the fold's occurrence model falls back to the plain seed average.
- */
 function blendCellSample(
   root: SimPosition,
   events: CellEvent[],
@@ -312,7 +270,6 @@ function blendCellSample(
   for (let index = 0; index < draws.length; index++) {
     if (!classifyDraw(classes, expected, events, draws[index], index === 0)) return fallback();
   }
-  // Chase analytically-expected classes the base draws missed; a cell with a secondary die forces them by script instead.
   if (record) forceMissingClasses(root, events, first, expected, classes, draws, p1Choice, p2Choice, matchupCache, scripts);
   else if (!chaseMissingClasses(expected, classes, draws, drawSeed, events, seeds)) return fallback();
 
@@ -320,8 +277,7 @@ function blendCellSample(
   let weightTotal = 0;
   for (const [key, weight] of expected) if (classes.has(key)) weightTotal += weight;
   if (weightTotal <= 0) return fallback();
-  // A large unreached weight is a state effect the board before the turn cannot see (a Weakness Policy that turns the survive-survive
-  // class into a kill): renormalised classes would price the cell as if the effect did not exist, so the draws price it.
+  // A large unreached weight is a state effect the board cannot see (Weakness Policy): renormalising would drop it.
   if (missing.reduce((sum, key) => sum + expected.get(key)!, 0) >= MISSING_WEIGHT_CUT) {
     const diagnostic = unreachedDiagnostic(expected, classes, missing, p1Choice, p2Choice);
     return plainDraws ? { ...fallback(), diagnostic } : { ...allDrawsSample(draws), diagnostic };
@@ -330,16 +286,11 @@ function blendCellSample(
   return blendFromClasses(expected, classes, weightTotal, missing, draws, p1Choice, p2Choice, pools);
 }
 
-/**
- * The two move orders of a tied cell, each priced with its own order scripted, as one cell at one half each. Class keys carry the
- * order prefix (`p1:hit-kill`), as the pair plan's tie cells and the tree's booked root keys write them; a cell whose order priced
- * without a blend keeps the mean alone.
- */
+// Class keys carry the order prefix (`p1:hit-kill`), as the pair plan's tie cells and the tree's root keys write them.
 function mixOrders(first: CellSample, second: CellSample): CellSample {
   const mixed: CellSample = { value: (first.value + second.value) / 2, ended: first.ended && second.ended, firstChild: first.firstChild };
   const diagnostic = first.diagnostic ?? second.diagnostic;
   if (diagnostic) mixed.diagnostic = diagnostic;
-  // The trend probe replays both orders, each with the draws its own price was drawn with.
   const ordered = (order: 'p1' | 'p2', sample: CellSample): CellDraw[] => (sample.baseDraws ?? [{ index: 0 }]).map(draw => ({ ...draw, first: order }));
   mixed.baseDraws = [...ordered('p1', first), ...ordered('p2', second)];
   if (!first.blend || !second.blend) return mixed;
@@ -351,12 +302,8 @@ function mixOrders(first: CellSample, second: CellSample): CellSample {
   return mixed;
 }
 
-/**
- * Damage-roll grouping: a cell where nothing fainted is roll-insensitive, so one sim suffices. Cells where a KO happened get the
- * full seed spread, and so do cells whose pair carries an accuracy roll or a random-call move (Sleep Talk). A child that ended the
- * game is exact only when no such roll was involved: a 90%-accurate Overheat priced as a certain +1.00 off one seed that hit, so
- * terminal roll cells take at least three seeds, even in single-sample sweeps. Doubles root cells are priced by the pair plan.
- */
+// A child that ended the game is exact only without an accuracy or random roll: such cells take at least three seeds.
+/** Prices one cell: one sim where nothing fainted, the full seed spread where a KO or an accuracy roll is in play. */
 export function sampleCell(
   root: SimPosition,
   rootFainted: number,
@@ -368,24 +315,19 @@ export function sampleCell(
   plainDraws?: number,
 ): CellSample {
   const rootBattle = positionBattle(root);
-  // A doubles root cell takes the pair plan (pair/sampler.ts); a cell without events there continues the plain path with its draw.
   if (blendRoot && rootBattle.gameType === 'doubles') {
     const pair = pairCellSample(root, p1Choice, p2Choice, samples, matchupCache, plainDraws);
     if (pair.kind === 'sample') return pair.sample;
     if (pair.kind === 'plain') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, pair.first, plainDraws);
   }
   const plan = blendRoot ? planCellEvents(rootBattle, p1Choice, p2Choice) : null;
-  // A guard the plan cannot fold (a paralyzed attacker, a Substitute, a pivot) is chance of its own, and so is a tied cell, whose
-  // order the verify pass draws naturally and cannot script: a verify cell draws them all.
   const tied = blendRoot && speedTie(rootBattle, p1Choice, p2Choice);
   if (plainDraws && (plan?.kind === 'fail' || tied)) return plainVerifySample(root, p1Choice, p2Choice, plainDraws, matchupCache);
   const price = (scripts?: RollScripts): CellSample => {
     if (plan?.kind !== 'events') return plainCellSample(root, rootBattle, rootFainted, p1Choice, p2Choice, samples, matchupCache, undefined, plainDraws, scripts);
     const blended = blendCellSample(root, plan.events, p1Choice, p2Choice, samples, matchupCache, plainDraws, scripts);
-    // A root cell reports the base draws behind it (a verify cell has its own pool of natural draws).
     return plainDraws ? blended : { ...blended, ...leadingDraws(blendBaseDraws(samples)) };
   };
-  // A tied singles cell is priced once per move order and mixed at one half.
   if (tied && !plainDraws) {
     const orders = tieOrderScripts(p1Choice, p2Choice);
     return mixOrders(price(orders.p1), price(orders.p2));

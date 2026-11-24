@@ -6,23 +6,16 @@ import { leafValue } from './leaf.ts';
 import { optionHints } from './hints.ts';
 import { searchOptions } from './options.ts';
 
-/**
- * The MCTS node machinery: node creation, the decoupled UCB pick under progressive widening, the principal variation and lines, the
- * tree-informed root matrix.
- */
 
 const EXPLORATION = 0.8;
-/** The visits a cell needs for the principal variation (the summary's ", then ..." prose reads it, and the corpus pins that prose). */
+// The summary's ", then ..." prose reads this value, and the feedback corpus pins that prose.
 const PV_MIN_VISITS = 8;
 /** The visits a cell needs for a row's line: a thinner read of the tree than the principal variation's. */
 export const LINE_MIN_VISITS = 4;
 const PV_MAX_STEPS = 3;
 
-/**
- * Progressive widening: a node exposes only its strongest-by-hint unvisited options, and the window grows with the node's visits.
- * Forcing every unvisited option through a visit first eats the iterations of a doubles 16x16 root before UCB can discriminate.
- * Hints are static (optionHints), so the order is deterministic; the window reaches every option asymptotically.
- */
+// Hints are static, so the order is deterministic; forcing every option through a visit would eat a doubles root.
+/** Progressive widening: a node exposes its strongest-by-hint unvisited options, the window growing with its visits. */
 export const WIDENING_BASE = 4;
 export const WIDENING_VISITS_PER_SLOT = 8;
 export const wideningWindow = (count: number, visits: number): number =>
@@ -37,10 +30,7 @@ export interface Node {
   kind: 'decision';
   position: SimPosition;
   ended: boolean;
-  /**
-   * A turn boundary (or game end), against a mid-turn node at an open forced-switch request where one side picks its replacement and the
-   * other waits. Depth counts boundaries only.
-   */
+  /** A turn boundary or game end, against a mid-turn node at a forced-switch request; depth counts boundaries only. */
   boundary: boolean;
   value: number;
   p1Options: ChoiceOption[];
@@ -72,7 +62,6 @@ export function makeNode(
     position,
     ended,
     boundary,
-    // same wp-unit value space as the matrix mode
     value: leafValue(battle, matchupCache),
     p1Options,
     p2Options,
@@ -122,11 +111,7 @@ function heaviestCell(node: Node, min: number): { key: number; child: Node } | n
   return best && bestVisits >= min ? { key: bestKey, child: best } : null;
 }
 
-/**
- * The option a side plays at a node when a line reads it by value: the best mean (p1's view for both sides: p1 the highest, p2 the
- * lowest) among the options with `min` visits and a quarter of the node's most visited option; ties go to the more visited option,
- * then to the hint order. -1 when no option qualifies.
- */
+// Best mean (p1's view for both sides) among options with `min` visits and a quarter of the top one's; -1 when none.
 function bestOption(n: number[], w: number[], order: number[], maximize: boolean, min: number): number {
   const most = Math.max(0, ...n);
   let best = -1;
@@ -139,11 +124,7 @@ function bestOption(n: number[], w: number[], order: number[], maximize: boolean
   return best;
 }
 
-/**
- * The step of a line at a node read by value: the joint cell of each side's best option (`bestOption`) when that cell holds `min`
- * visits, else the node's heaviest cell. The decoupled search spreads a node's visits over near-equal options, so the most visited
- * cell can belong to an option that is worse by its own mean (a turn where Roost drew more visits than Dragon Claw).
- */
+// The decoupled search spreads visits over near-equal options, so the most visited cell can be worse by its own mean.
 function valueCell(node: Node, min: number): { key: number; child: Node } | null {
   const i = bestOption(node.p1N, node.p1W, node.p1Order, true, min);
   const j = bestOption(node.p2N, node.p2W, node.p2Order, false, min);
@@ -158,13 +139,7 @@ const stepAt = (node: Node, key: number, child: Node): TreeLineStep => ({
   p1: node.p1Options[Math.floor(key / 10_000)].label, p2: node.p2Options[key % 10_000].label, visits: child.visits,
 });
 
-/**
- * The line the tree holds from one cell of `root` on: the cell itself, then each node's most visited cell while it has `min` visits
- * (the principal variation's 8 unless a caller asks for the lines' own), at most `PV_MAX_STEPS` steps. Each step names both sides'
- * choices by label (the labels survive the bench order, the choice strings below the root do not translate) and the visits of its
- * cell. Without a first cell the line starts at `root`'s own most visited cell, the principal variation. `byValue` reads each later
- * node by its options' means (`valueCell`); the rows' lines ask for it, the principal variation and the line pass do not.
- */
+/** The line the tree holds from one cell of `root`: each node's top-visited cell with `min` visits, to PV_MAX_STEPS. */
 export function lineFrom(root: Node, first?: number, min: number = PV_MIN_VISITS, byValue = false): TreeLineStep[] {
   const steps: TreeLineStep[] = [];
   let current: Node = root;
@@ -229,13 +204,7 @@ function linesOfRow(root: Node, first: RowCell, byColumn: Map<number, RowCell> |
   return lines;
 }
 
-/**
- * The lines of every root row that holds one, by side and row label. A row's first line starts at the cell against the opponent's
- * top row (`tops`: the labels of each side's best rows in this tree's own ranking, best first) when that cell has the visits a line
- * needs, else at the row's most visited cell. The row also keeps a line against the tree's second and third top answer when its cell
- * there holds the visits, so the donors of a row can choose the answer the merged ranking puts first. A cell that is already a line
- * of the row is not kept twice; a row whose cells all lack the visits (`LINE_MIN_VISITS`) has no line. The tree is only read.
- */
+/** The lines of every root row that holds one, by side and row label; the tree is only read. */
 export function rowLines(
   root: Node, tops: { p1: readonly string[]; p2: readonly string[] }, min: number = LINE_MIN_VISITS, floors?: Partial<Record<Side, Record<string, string>>>,
 ): RowLines {
@@ -274,11 +243,7 @@ function withFloorLines(root: Node, out: RowLines, cells: Record<Side, SideCells
   return kept ? { ...out, floor } : out;
 }
 
-/**
- * Tree-informed root cell: the mean of every leaf value backed through the cell (a child's own p1W marginals sum to its pass-through
- * reward; its creation-time static covers the expansion pass) blended with one extra static-prior visit, so a single wild playout
- * cannot own a cell. Unexpanded cells fall back to the root static.
- */
+// The mean of the leaves backed through the cell plus one static-prior visit, so one wild playout cannot own a cell.
 function treeCellValue(root: Node, i: number, j: number): number {
   const child = root.children.get(cellKey(i, j));
   if (!child) return root.value;

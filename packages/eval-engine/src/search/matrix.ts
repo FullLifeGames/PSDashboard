@@ -5,9 +5,7 @@ import type { CellBlend, CellDraw, EvalResult, KoOddsMismatch, SearchProgress } 
 import { countFainted } from './leaf.ts';
 import { sampleCell } from './cell-sampler.ts';
 
-/** The root matrix over both option lists, and the memoized alpha/beta passes the pruned depth-1 sub-search runs over it. */
 
-/** The progress, partial-result and stop hooks a search calls. */
 export interface SearchCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
@@ -18,11 +16,9 @@ export interface SearchCallbacks {
 export interface Matrix extends ValueMatrix {
   /** children[i][j]: first-seed child position (kept for deepening). */
   children: SimPosition[][];
-  /** cellKey(i, j) → analytic class blend (root boundary cells only). */
   blends: Map<number, CellBlend>;
-  /** Boundary cells whose analytic classes went unsampled (probe budget). */
   diagnostics: KoOddsMismatch[];
-  /** cellKey(i, j) → the base draws behind the cell, where it has more than the first seed's (the trend probe replays them). */
+  /** cellKey(i, j) to the base draws behind the cell, where it has more than the first seed's. */
   baseDraws: Map<number, CellDraw[]>;
 }
 
@@ -119,7 +115,6 @@ export function maximinRows(
   return { v1, bestI, bestIPunish };
 }
 
-/** Pass B: v2 = min_j max_i with beta cutoffs, reusing the memo. */
 export function minimaxColumns(
   cellValue: (i: number, j: number) => number,
   rows: number,

@@ -2,24 +2,14 @@ import { cellKey } from '../rank.ts';
 import { expandCell, type ExpansionContext, type RootClassBook } from './expansion.ts';
 import { pick, type Node } from './mcts-node.ts';
 
-/**
- * One iteration of the tree is two halves: the descent through the existing cells by decoupled UCB with one expansion, and the
- * backpropagation of the leaf along the joint path. The tree's loop (`mcts.ts`) starts at the root and the line pass
- * (`search/line-pass.ts`) at a root cell's child, so the same code serves both.
- */
 
-/** One joint step of the descent: a node and the cell (i, j) chosen in it. */
 export interface PathStep {
   node: Node;
   i: number;
   j: number;
 }
 
-/**
- * Selection: descend through existing children via decoupled UCB, expanding at most one child. Returns the joint path, the leaf
- * value the descent ended on, and the depth it reached. `from` starts the descent below the root (the path then holds no root
- * step; the root's class book is never read).
- */
+/** Descends by decoupled UCB, expanding at most one child; `from` starts below the root (no root step in the path). */
 export function selectAndExpand(
   root: Node, iteration: number, seedOffset: number, ctx: ExpansionContext, book: RootClassBook | undefined, from: Node = root,
 ): { path: PathStep[]; leaf: number; depth: number } {
@@ -38,7 +28,6 @@ export function selectAndExpand(
     const key = cellKey(i, j);
     const existing = node.children.get(key);
     if (!existing) {
-      // Expansion (search/expansion.ts): one outcome per cell, from the iteration-rotated seed.
       const expanded = expandCell(node, i, j, iteration, seedOffset, ctx, node === root ? book : undefined);
       node.children.set(key, expanded.child);
       expanded.child.visits += 1;
@@ -52,7 +41,6 @@ export function selectAndExpand(
   return { path, leaf, depth };
 }
 
-/** Backpropagation along the joint path. */
 export function backpropagate(path: PathStep[], leaf: number): void {
   for (const step of path) {
     step.node.visits += 1;

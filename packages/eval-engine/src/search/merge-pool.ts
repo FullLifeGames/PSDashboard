@@ -1,16 +1,9 @@
 import type { MctsTreeStats } from '../types.ts';
 
-/** One tree's cell stats in the merge (sim-free, like the merge). */
 export type TreeCell = MctsTreeStats['cells'][number];
 
-/**
- * A keyed root cell: the tree cells of one matrix cell that each drew one outcome class (`classKey`) and booked the plan's chance of
- * it (`classWeight`). With two or more classes among the trees the cell reads the Dex's mix, `sum_c w_c m_c / sum_c w_c`, where
- * `m_c = sum (total + value) / sum (visits + 1)` over the trees of class c, instead of the visit pool (the trees' draws, not the
- * dice, would weigh the classes). `visits` and `total` are the sums of the keyed trees that did not end the game: what their row and
- * column marginals hold (draw.spec.ts (g)), so the visit mean of the score can swap their totals for `visits * value`. Null with
- * fewer than two classes.
- */
+// m_c = sum (total + value) / sum (visits + 1) over the trees of class c; a visit pool would weigh classes by draws.
+/** A keyed root cell's value as the mix `sum_c w_c m_c / sum_c w_c`; null with fewer than two classes. */
 export function keyedCell(cells: readonly TreeCell[]): { value: number; visits: number; total: number } | null {
   const classes = new Map<string, { weight: number; total: number; visits: number }>();
   let visits = 0;
@@ -40,10 +33,7 @@ export const keyedCellValue = (cells: readonly TreeCell[]): number | null => key
 
 interface PoolEntry { mean: number; weight: number; visits: number }
 
-/**
- * One tree's contribution to a root cell's continuation pool: a cell joins when it did not end the game and (with a class key) drew
- * that class, or carries no recorded class while `acceptUnkeyed` (the one-open-class shape). Null when the tree does not join.
- */
+/** One tree's share of a cell's pool: not ended, class drawn (or none recorded while `acceptUnkeyed`); else null. */
 export function cellContribution(cell: TreeCell | undefined, classKey: string | undefined, acceptUnkeyed: boolean): PoolEntry | null {
   if (!cell) return null;
   if (cell.ended) return null;

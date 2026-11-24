@@ -1,15 +1,11 @@
 import type { PlayedBounds } from '../played.ts';
 import type { EvalChoiceOption, EvalResult, KoOddsInfo, KoOddsMismatch, UnansweredProfile } from '../types.ts';
 
-/**
- * The root's narrative payload shared by every search path: kill odds per option, mismatch diagnostics, the unanswered-mon profile. Pure,
- * no sim imports (main-thread safe).
- */
+/** The root's narrative payload shared by every search path; pure, no sim imports (main-thread safe). */
 
-/** Per-option kill odds keyed by choice string, one map per side. */
 export type KoOddsMaps = { p1: Map<string, KoOddsInfo | null>; p2: Map<string, KoOddsInfo | null> };
 
-/** Index-aligned odds arrays → choice-keyed maps (rows are ranked, so rows match by choice string). */
+/** Index-aligned odds arrays to choice-keyed maps: rows are ranked, so they match by choice string. */
 export function koOddsMapsFor(
   p1Options: EvalChoiceOption[],
   p2Options: EvalChoiceOption[],
@@ -32,7 +28,6 @@ export function attachKoOdds(target: EvalResult, maps: KoOddsMaps | null): void 
   }
 }
 
-/** A profile with anything to say: an open list, a switch-in stage, a decided sweep, or a near stage. */
 export const hasUnansweredContent = (unanswered: UnansweredProfile): boolean =>
   unanswered.p1.length > 0 || unanswered.p2.length > 0 ||
   (unanswered.p1Entry?.length ?? 0) > 0 || (unanswered.p2Entry?.length ?? 0) > 0 ||
@@ -42,11 +37,10 @@ export interface RootPayload {
   diagnostics: KoOddsMismatch[];
   koOddsMaps: KoOddsMaps | null;
   unanswered: UnansweredProfile | null | undefined;
-  /** The order bound of the played turn's fallen bodies, read with the root battle. */
   playedBounds?: PlayedBounds | undefined;
 }
 
-/** Diagnostics, then kill odds, then the profile, then the played bound: the order every partial result gets them in. */
+/** Attaches in the order every partial result gets them: diagnostics, kill odds, profile, played bound. */
 export function attachRootPayload(target: EvalResult, payload: RootPayload): void {
   if (payload.diagnostics.length > 0) target.koDiagnostics = payload.diagnostics;
   attachKoOdds(target, payload.koOddsMaps);

@@ -11,25 +11,21 @@ import { makeNode, type Node } from './mcts-node.ts';
 import { keyedAdvance } from '../pair/tree-key.ts';
 import { speedTie, treeSeed } from './leaf.ts';
 
-/**
- * How a tree cell expands: one child per cell, fixed by one outcome of the simulator. The seed is `treeSeed(iteration, seedOffset)`,
- * so sibling trees diverge; a root cell also books the class its draw showed (`RootClassBook`). The tree holds no chance nodes
- * (ADR 0023): chance is priced at the root cells by the cell sampler and the pair plan, and the merge weighs the classes the trees drew.
- */
+/** A tree cell expands to one child from one simulator outcome, seeded by treeSeed(iteration, seedOffset); ADR 0023. */
 export interface ExpansionContext {
   tera: TeraAllowance;
   matchupCache: MatchupCache;
   sleepClause?: boolean;
 }
 
-/** Root bookkeeping: the planned events per root cell (one calc each) and the drawn class of single-child boundary cells. */
+/** Root bookkeeping: the planned events per root cell and the drawn class of single-child boundary cells. */
 export interface RootClassBook {
   battle: Battle;
   events: Map<number, CellEvent[] | null>;
   keys: Map<number, string>;
-  /** The plan's chance of each booked class, beside its key (the merge weighs a keyed cell by it). */
+  /** The plan's chance of each booked class; the merge weighs a keyed cell by it. */
   weights: Map<number, number>;
-  /** The tree's place among the search's trees; set only for a tree inside the budget's tree count, where the root draws spread their dice. */
+  /** The tree's place among the search's trees; set only inside the budget's tree count, where draws spread dice. */
   quantiles?: { salt: number; offset: number; trees: number };
 }
 
@@ -52,17 +48,11 @@ function rootEvents(book: RootClassBook, key: number, p1Choice: string, p2Choice
   return events;
 }
 
-/** The side whose move line the log shows first (the sampler's order prefix of a tied cell), null when neither moved. */
 function movedFirst(log: string[]): 'p1' | 'p2' | null {
   const line = log.find(entry => entry.startsWith('|move|p1a:') || entry.startsWith('|move|p2a:'));
   return line ? (line.startsWith('|move|p1a:') ? 'p1' : 'p2') : null;
 }
 
-/**
- * A doubles root cell has no analytic plan, so it draws under the pair recorder and names its class the way the pair plan names the
- * sampler's. Null for a singles root and for a cell the pair plan never reads (the caller draws plainly). The tree below the root
- * stays flat and unkeyed.
- */
 function doublesRootChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook, key: number,
   quantiles?: DieQuantiles,
@@ -78,10 +68,6 @@ function doublesRootChild(
   return { child: made, leaf: made.value, boundary: made.boundary };
 }
 
-/**
- * Books the class one singles root draw showed, with its weight: the sampler's chance of the class, as the fold gives it for the
- * order this log shows, and half of it in a tied cell, whose two orders the sampler prices at one half each.
- */
 function bookDrawnClass(
   book: RootClassBook, key: number, events: CellEvent[], log: string[], dice: SecondaryRecord[] | undefined, tied: () => boolean,
 ): void {
@@ -94,27 +80,15 @@ function bookDrawnClass(
   if (weight !== null) book.weights.set(key, order ? weight / 2 : weight);
 }
 
-/**
- * The sink of a singles root draw: the quantiles when the tree spreads its dice (a doubles cell the pair plan never reads keeps the
- * stream), else the secondary-dice recorder.
- */
 function drawSink(quantiles: DieQuantiles | undefined, book: RootClassBook | undefined, recording: boolean): DiceSink | null {
   if (quantiles && book?.battle.gameType !== 'doubles') return new QuantileSink(quantiles);
   return recording ? new DiceSink() : null;
 }
 
-/**
- * One child from a plain advance; a root boundary cell records the drawn class from the log. A tied singles cell's sampler classes
- * carry the order (`p1:hit-kill|none`), so the drawn class names the order the coin flip gave this tree, and the merge finds the
- * class its pool belongs to. A root cell with a secondary die draws under a recording sink, so the drawn class names the effects whose
- * die came true (`hit-nokill+brn`), as the sampler's classes do; the tree below the root stays flat. A doubles root cell books the
- * pair plan's key.
- */
 function singleChild(
   node: Node, p1Choice: string, p2Choice: string, seed: PRNGSeed, ctx: ExpansionContext, book: RootClassBook | undefined, key: number,
 ): Expanded {
   const events = book ? rootEvents(book, key, p1Choice, p2Choice) : null;
-  // Inside the budget's tree count, tree k answers the named dice of this root draw by quantile.
   const q = book?.quantiles;
   const quantiles = q ? new RootQuantiles(cellHash(q.salt, p1Choice, p2Choice), q.offset, q.trees) : undefined;
   const keyed = book && !events ? doublesRootChild(node, p1Choice, p2Choice, seed, ctx, book, key, quantiles) : null;
@@ -129,7 +103,7 @@ function singleChild(
   return { child: made, leaf: made.value, boundary: made.boundary };
 }
 
-/** The child one cell of the tree expands to: one outcome of the simulator, with its leaf value and whether it opens a boundary. */
+/** The child one cell expands to: one simulator outcome with its leaf value and whether it opens a boundary. */
 export function expandCell(
   node: Node, i: number, j: number, iteration: number, seedOffset: number, ctx: ExpansionContext, book?: RootClassBook,
 ): Expanded {

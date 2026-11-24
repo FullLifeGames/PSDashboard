@@ -5,7 +5,6 @@ import type { CellBlend, EvalResult, EvalSettings } from '../types.ts';
 
 export interface DeepeningState {
   matrix: ValueMatrix;
-  /** cellKey to analytic class blend (root boundary cells only). */
   blends: Map<number, CellBlend>;
   /** Pre-deepening statics: the trend baseline. */
   staticValues: number[][];
@@ -13,7 +12,7 @@ export interface DeepeningState {
   pvByCell: Map<number, PvStep[]>;
 }
 
-/** Books one deepened cell: a blended cell re-blends through the first-seed child's class, so one deepened branch never overwrites the mixture. */
+/** Books one deepened cell; a blended cell re-blends through the first-seed child's class, never overwritten. */
 export function recordDeepenedCell(
   state: DeepeningState,
   i: number,
@@ -36,22 +35,15 @@ export function recordDeepenedCell(
   }
 }
 
-/**
- * The turn search of a forced root's cell (search/forced-root.ts): depth 1 over the child's own option lists, the root's draws per
- * cell, no prover, and none of the root's played-turn hints (they name the root's actions, which mean nothing one turn on).
- */
+/** Settings of a forced root cell's turn search: depth 1, the root's draws, no prover, no played-turn hints. */
 export function turnSettings(settings: EvalSettings): EvalSettings {
   return { ...settings, depth: 1, keepPlayed: undefined, prove: false };
 }
 
-/** The level a forced root's turn searches book as: the root's own matrix is level 1, the turn after it level 2. */
+/** The level a forced root's turn searches book as (the root's own matrix is level 1). */
 export const FORCED_ROOT_LEVEL = 2;
 
-/**
- * Books one cell of a forced root by the turn search of its child. The turn search is the cell's horizon: the trend layers read a
- * cell's trend as the shift one more ply would make, and here that ply is the turn already played, so the cell books trend 0.
- * Otherwise the layers fold the whole gap between the arrival static and the turn value into the tied leaders again.
- */
+/** Books one forced-root cell by the turn search of its child, trend 0: the turn already played is the horizon. */
 export function recordTurnCell(state: DeepeningState, i: number, j: number, sub: EvalResult): void {
   recordDeepenedCell(state, i, j, sub, FORCED_ROOT_LEVEL, new Set<number>());
   state.trendMap.set(cellKey(i, j), 0);
