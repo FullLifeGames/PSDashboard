@@ -122,6 +122,9 @@ A line that starts with the engine's best choice for a player, the opponent answ
 **Played line**:
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
+**Graded turn**:
+A turn on which a side's card prints an inaccuracy, a mistake or a blunder. A side without a played row or an engine row has no grade, and a mistake or blunder that the card replaces by a sacrifice or a read that paid off is not graded. The Game review lists graded turns, the graph marks them, and the early lines stage searches them.
+
 **Game review**:
 The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2, with a line under the graph that names each shape. A game that reached its endgame adds an Endgame row for the player who lost. Release 1.2.0 ships it switched off, behind `VITE_FEATURE_GAME_REVIEW` (`src/lib/feature-flags.ts`, off in every build); with the flag off the section, the marks and the line that names them are not drawn. It returns in 1.2.1.
 
