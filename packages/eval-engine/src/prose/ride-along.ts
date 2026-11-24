@@ -7,13 +7,9 @@ import {
 
 type PlayerNames = [string, string];
 
-/** What a ride-along note judges, by its words: an unpunished risk or a light inaccuracy. */
 export type NamedJudgement = 'risk' | 'inaccuracy';
 
-/**
- * The first note of a side: a sack, a read credit or a held risk (the last two only on a side that kept ground), else the
- * inaccuracy. `judged` names a risk or an inaccuracy, the two a quiet card may not follow with "Neither side made a mistake."
- */
+// `judged` names a risk or an inaccuracy, the two a quiet card may not follow with "Neither side made a mistake."
 function sideNote(
   name: string, side: SideAnalysis, ownLuck: number | null, rolled: boolean, praised: boolean,
 ): { text: string; judged?: NamedJudgement } | null {
@@ -29,10 +25,7 @@ function sideNote(
   return inaccuracy ? { text: inaccuracy, judged: 'inaccuracy' } : null;
 }
 
-/**
- * The notes that ride along on any attribution, p1 before p2 per kind. A sack replaces the inaccuracy note its demoted tier would
- * otherwise produce; the decision clauses only speak at mistake level and up. Returns the sentences and the judgements they name.
- */
+/** A sack replaces the inaccuracy note its demoted tier would give; decision clauses speak only from mistake up. */
 export function rideAlongOf(analysis: TurnAnalysis, playerNames: PlayerNames): { sentences: string[]; judged: NamedJudgement[] } {
   const sentences: string[] = [];
   const judged: NamedJudgement[] = [];

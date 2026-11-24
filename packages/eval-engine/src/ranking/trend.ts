@@ -2,25 +2,15 @@ import type { EvalResult } from '../types.ts';
 import { cellKey, type ValueMatrix } from './matrix.ts';
 import { MIN_TREND_WEIGHT, tieGroups, TREND_MARGIN, type TieRow } from './ties.ts';
 
-/** The horizon-trend layers over tied rows: value extrapolation and the ordering-only tiebreak, both on the mix-weighted one-ply trend. */
-
-/**
- * A cell's trend is the mean over its base draws of (the child's sub-search score minus the child's own leaf); one shared sum
- * order, so the sync search and the orchestrator book the same bits.
- */
+/** The mean of a cell's trends in one shared sum order, so the sync search and the orchestrator book the same bits. */
 export function meanTrend(trends: number[]): number {
   return trends.reduce((sum, trend) => sum + trend, 0) / trends.length;
 }
 
-/** Extrapolation strength: the observed bleed or build continues λ more plies. */
 const TREND_LAMBDA = 0.5;
-/**
- * Shifts below this stay unapplied: single-seed trend probes carry sampling noise on this scale, and decided positions tie
- * structurally with near-zero trends; folding noise into values would churn every endgame ranking the pruned sub-search path must mirror.
- */
+// Shifts below this stay unapplied: single-seed trend probes carry sampling noise on this scale.
 const TREND_SHIFT_FLOOR = 0.005;
 
-/** Terminal cells count 0 and a punisher's mix weight floors at MIN_TREND_WEIGHT; null when a cell is unpriced (probe budget or stop) or no weight accrues. */
 function rowTrendValue(row: TieRow, matrix: ValueMatrix, trends: Map<number, number>, oppMix: number[]): number | null {
   let weightSum = 0;
   let weighted = 0;
@@ -35,7 +25,6 @@ function rowTrendValue(row: TieRow, matrix: ValueMatrix, trends: Map<number, num
   return weighted / weightSum;
 }
 
-/** The λ-scaled shift per tied row; null when any row's trend is unpriced (the group forfeits whole). */
 function groupShifts(
   group: TieRow[],
   matrix: ValueMatrix,
@@ -53,7 +42,6 @@ function groupShifts(
   return shifts;
 }
 
-/** Shifts one tied row's cells (clamped to the wp-unit range) and its ranked entry; false when the row is not in the matrix. */
 function applyRowShift(matrix: ValueMatrix, side: 'p1' | 'p2', row: TieRow, shift: number): boolean {
   const own = side === 'p1'
     ? matrix.p1Options.findIndex(option => option.choice === row.entry.choice)
@@ -68,7 +56,6 @@ function applyRowShift(matrix: ValueMatrix, side: 'p1' | 'p2', row: TieRow, shif
       matrix.values[i][own] = Math.max(-1, Math.min(1, matrix.values[i][own] + shift));
     }
   }
-  // Ranked entries read in the OWN side's perspective.
   const ownShift = side === 'p1' ? shift : -shift;
   row.entry.ev += ownShift;
   row.entry.expected += ownShift;
@@ -76,14 +63,7 @@ function applyRowShift(matrix: ValueMatrix, side: 'p1' | 'p2', row: TieRow, shif
   return true;
 }
 
-/**
- * Folds the one-ply trend of the tied leading rows into their values (corrected = deep + λ·trend), so a stall that bleeds under
- * lookahead separates from a building switch by value. The equilibrium is deliberately not re-solved: re-solving lets the game
- * absorb the correction (a boosted row re-weights the opponent toward its punishers; every λ in {0.25, 0.5, 1.0} measured
- * self-defeating). Under fixed mixes the row-uniform shift adds a constant to the opponent's EVs, so their comparisons are
- * untouched; the score, mixes and gameValue stay. A group with any unpriced decisive cell forfeits whole (terminal cells price
- * as trend 0). Returns true when anything shifted.
- */
+/** Folds the one-ply trend of the tied rows into their values; the equilibrium is deliberately not re-solved. */
 export function applyTrendExtrapolation(
   matrix: ValueMatrix,
   result: EvalResult,
@@ -112,10 +92,7 @@ export function applyTrendExtrapolation(
   return applied;
 }
 
-/**
- * Trends in the group's own perspective (a p2 row reads the p1-perspective trend negated); null when any row is unpriced, since a partial
- * comparison is the asymmetry to avoid.
- */
+// Own-perspective trends; null when any row is unpriced, since a partial comparison is the asymmetry to avoid.
 function groupRowTrends(
   group: TieRow[],
   matrix: ValueMatrix,
@@ -131,11 +108,7 @@ function groupRowTrends(
   return rowTrend;
 }
 
-/**
- * When the leading rows tie within TIE_EPSILON, the one-ply trend of their decisive cells tells a line that builds from one that
- * bleeds. Reorders only the tied prefix by mix-weighted own-perspective trend; every trend is 1-ply-vs-static (mixed ply counts
- * inside a comparison are the depth-asymmetry trap). EVs, cell values and the score never move.
- */
+/** Reorders the tied prefix by own-perspective trend; every trend is 1-ply vs static (mixed depths are the trap). */
 export function applyTrendTiebreak(
   matrix: ValueMatrix,
   result: EvalResult,

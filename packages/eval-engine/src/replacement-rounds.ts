@@ -1,14 +1,11 @@
-/** The replacement requests of a replay, read from the protocol alone (`test/replacement-capture-sweep.spec.ts` holds the capture hook to this read); no sim imports. */
+// replacement-capture-sweep.spec.ts holds the capture hook to this read of the protocol.
 
-/** One request round: the slots a knockout leaves open when its first replacement enters, and the species the log sends in. */
 export interface ReplacementRound {
-  /** The block's turn: the knockout turn. The replacement stands on the board of the next one. */
+  /** The knockout turn; the replacement stands on the board of the next one. */
   turn: number;
   /** The block's n-th request round, from 0. */
   ordinal: number;
-  /** The slot indexes the round refills, per side, in slot order. */
   slots: { p1: number[]; p2: number[] };
-  /** The species the log sends in, per side, in log order. */
   species: { p1: string[]; p2: string[] };
 }
 

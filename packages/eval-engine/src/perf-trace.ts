@@ -1,6 +1,3 @@
-// Wall-clock stage collector for the graph sweep (main thread only): it always collects and reports only when localStorage
-// 'ps-replay-interceptor:perf' is '1'.
-
 const FLAG_KEY = 'ps-replay-interceptor:perf';
 
 interface PerfStage {
@@ -11,7 +8,7 @@ interface PerfStage {
 export interface PerfSummary {
   label: string;
   totalMs: number;
-  /** Stages may overlap in wall time (acquisition streams positions while searches run), so their sum can exceed totalMs; the total is the truth. */
+  /** Stages may overlap in wall time, so their sum can exceed totalMs; totalMs is the truth. */
   stages: Record<string, PerfStage>;
   counters: Record<string, number>;
 }
@@ -30,14 +27,12 @@ export function perfEnabled(): boolean {
   }
 }
 
-/** Starts a fresh collection window (one graph sweep). */
 export function perfReset(): void {
   stages.clear();
   counters.clear();
   startedAt = now();
 }
 
-/** Adds one timed run of a stage, in milliseconds. */
 export function perfAdd(stage: string, ms: number): void {
   const entry = stages.get(stage);
   if (entry) {
@@ -48,12 +43,10 @@ export function perfAdd(stage: string, ms: number): void {
   }
 }
 
-/** Adds to a named counter. */
 export function perfCount(name: string, by = 1): void {
   counters.set(name, (counters.get(name) ?? 0) + by);
 }
 
-/** Times one awaited stage; the failure path is charged like the success path. */
 export async function perfSpan<T>(stage: string, run: () => Promise<T>): Promise<T> {
   const start = now();
   try {
@@ -63,7 +56,7 @@ export async function perfSpan<T>(stage: string, run: () => Promise<T>): Promise
   }
 }
 
-/** Times one synchronous block, for main-thread compute sites where the span is blocked main-thread time (async spans measure waiting). */
+/** Times a synchronous block: blocked main-thread time, where `perfSpan` measures waiting. */
 export function perfSync<T>(stage: string, run: () => T): T {
   const start = now();
   try {
@@ -82,7 +75,7 @@ export function perfSummary(label: string): PerfSummary {
   };
 }
 
-/** Prints the collected stages to the console and mirrors them on window.__EVAL_PERF__; flag-gated. */
+/** Prints the stages to the console and mirrors them on window.__EVAL_PERF__; flag-gated. */
 export function perfReport(label: string): void {
   if (!perfEnabled()) return;
   const summary = perfSummary(label);

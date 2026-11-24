@@ -1,19 +1,11 @@
-/** What one hit of a move costs its attacker: the shape that score/contact.ts answers and score/contact-price.ts prices into a race, kept apart so neither imports the other. */
-
-/** One status (or an item taken over) that a hit can leave on the attacker. */
 export interface StatusCost {
-  /** The status id the simulator gives (`brn`, `par`, `psn`, `slp`, ...), or `item:<id>` for an item the foe's hit passed on. */
+  /** The status id the simulator gives (`brn`, `par`, ...), or `item:<id>` for an item the foe's hit passed on. */
   status: string;
-  /** The chance per hit that the hit leaves it, from the played dice. */
   chance: number;
-  /** The HP it takes per turn, as a share of the attacker's max HP: the end of the turn played with it, minus without. */
+  /** Per turn, as a share of the attacker's max HP: the end of the turn played with it, minus without. */
   chip: number;
-  /** The share of its damage the attacker's move still deals while it carries it (a burn halves a physical move: 0.5). */
+  /** Share of its damage the attacker's move still deals while it carries it (a burn halves a physical move: 0.5). */
   output: number;
-  /**
-   * The share of its turns the attacker still moves on, turn by turn after the hit landed it (`acts[0]` is the next turn), for a
-   * status that takes turns and not HP (paralysis, sleep, freeze). Absent when every turn is a move. It has MAX_PRICED_HITS entries.
-   */
   acts?: readonly number[];
 }
 
@@ -21,9 +13,8 @@ export interface StatusCost {
 export const MAX_PRICED_HITS = 8;
 
 export interface HitCost {
-  /** The HP the hit takes, as a share of the attacker's max HP: the foe's item and ability, the move's recoil, the attacker's own item. */
+  /** The share of the attacker's max HP the hit takes: the foe's item and ability, the move's recoil, its own item. */
   chip: number;
-  /** The statuses the hit can leave, each with its chance. */
   statuses: readonly StatusCost[];
 }
 

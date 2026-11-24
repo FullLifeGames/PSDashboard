@@ -10,22 +10,11 @@ import { residualReader, type Residuals } from './residuals.ts';
 import { hitReader, type HitReader } from './contact.ts';
 import { stageStands } from './switch-out.ts';
 
-/** `boostsBiting`: `boosts` with every standing stage damped by the share of living foes it bites. */
+// A stage bites a foe when the foe leaves it alone and it moves the 1v1 race within BITE_TURNS (score/boost-race.ts).
+// Not a foe that plays Unaware (ModifyBoost) or can take the stages away. A drop counts while its holder can't leave.
 
-// A stage bites a foe when the foe leaves it alone and the stage moves the 1v1 race of the pair within BITE_TURNS in favour of the
-// side it helps (score/boost-race.ts). It does not bite a foe that plays Unaware (the simulator's own ModifyBoost answers), that can
-// click a move that takes the stages away (`removesStages`), or that a wall holds anyway.
-// The foes in front of the holder gate the whole stage: while a foe on the field can take the stages away or KOs the holder before it
-// acts, no foe counts for a boost; while a foe on the field wins the race within the horizon, or the holder does not win it against
-// one (a wall it needs six turns for), no foe off the field counts for any stage.
-// A drop counts only while its holder cannot switch out (score/switch-out.ts): the simulator clears every stage of a body that
-// leaves, so a holder that can leave carries its drop for a turn (the engine had read a -1 Special Attack as lasting and expected
-// the holder to flee). A trapped holder, or one with no living bench, keeps the value; the drop still weakens its hits this turn.
-
-/** The value of one standing stage: sign, stat weight, schedule and status discount of the boosts term. */
 export function stageValue(active: Pokemon, stat: string, stage: number): number {
   const statusDiscount = EVAL_WEIGHTS.boostStatusDiscount[active.status] ?? 1;
-  // Defensive stages read at half the offensive weight.
   const statWeight = stat === 'atk' || stat === 'spa' || stat === 'spe' ? 1 : 0.5;
   const magnitude = EVAL_WEIGHTS.boostSchedule[Math.min(Math.abs(stage), 6)];
   return Math.sign(stage) * statWeight * magnitude * statusDiscount;
@@ -37,12 +26,11 @@ const body = (species: string, moves: string[]): PokemonSet => ({
   level: 100, gender: '',
 });
 
-/** The format of the twin battle that answers for `battle`: a singles custom game of its generation, on the Champions mod when the battle runs on it. */
+/** The twin battle's format: a singles custom game of the battle's generation, on the Champions mod where it runs. */
 export function removalFormat(battle: Battle): string {
   return `gen${battle.gen}${isChampionsSimFormat(battle.format.id) ? 'champions' : ''}customgame`;
 }
 
-/** Whether the stages of a boosted mon are gone after a foe clicks the move at it, played once on a twin battle. */
 function playedRemoval(format: string, moveId: string, benched: boolean): boolean {
   try {
     const target = () => body('Chansey', ['tackle']);
@@ -70,11 +58,7 @@ function playedRemoval(format: string, moveId: string, benched: boolean): boolea
 
 const removals = new Map<string, boolean>();
 
-/**
- * Whether a move takes the positive stages off a boosted mon, as the simulator plays it (Haze, Clear Smog, Freezy Frost, Topsy-Turvy,
- * Heart Swap, and the moves that drag the mon out, those only with a bench behind it). The Dex carries no flag for the removals, so
- * the answer is a played twin battle, once per twin format, move and bench (`format` comes from `removalFormat`).
- */
+/** Whether a move removes raised stages: the Dex has no flag for it, so a twin battle plays it (per format, move). */
 export function removesStages(format: string, moveId: string, benched: boolean): boolean {
   const key = `${format}|${moveId}|${benched}`;
   let removed = removals.get(key);
@@ -88,14 +72,8 @@ export function removesStages(format: string, moveId: string, benched: boolean):
 const stagedStats = (mine: Pokemon): (keyof BoostsTable)[] =>
   (Object.keys(mine.boosts) as (keyof BoostsTable)[]).filter(stat => mine.boosts[stat]);
 
-/** A shield is a Defense or Special Defense stage, whose damage reduction the race prices. */
 const shieldStat = (stat: keyof BoostsTable): boolean => stat === 'def' || stat === 'spd';
 
-/**
- * Whether the stage of one stat bites the foe of this pair: the foe leaves it standing and it moves the race (accuracy and
- * evasion bite by the stage the foe leaves them). A positive stage also bites when it takes the foe's win away, whatever the
- * holder's own clock (`stageShields`).
- */
 function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): boolean {
   const { stages } = pair;
   if (!stages.mineHitting[stat] && !stages.mineDefending[stat]) return false;
@@ -104,10 +82,8 @@ function statBites(pair: PairRace, stat: keyof BoostsTable, drop: boolean): bool
   return stageBites(pair.held, without, drop, pair.full) || (shieldStat(stat) && stageShields(pair.held, without, drop, pair.full));
 }
 
-/** What the foes on the field leave of a holder's stages: boosts at all, and any stage for the foes off the field. */
 interface Gate { boosts: boolean; bench: boolean }
 
-/** The bench opens behind a front foe the holder wins within the horizon, and behind one that a standing stage takes the win from (`shielded`). */
 function frontGate(front: Pokemon[], removers: ReadonlySet<Pokemon>, raceWith: (foe: Pokemon) => PairRace, shielded: (pair: PairRace) => boolean): Gate {
   const gate: Gate = { boosts: true, bench: true };
   for (const foe of front) {
@@ -150,10 +126,7 @@ function holderBites(
   return value;
 }
 
-/**
- * One side's standing stages, each valued as `boosts` values it and counted for the share of living foes it bites. `idle`
- * names the bodies that never act (score/boost-race.ts, idleHolders): a foe among them hits with no raised attack.
- */
+/** `idle` names the bodies that never act (idleHolders in boost-race.ts): such a foe hits with no raised attack. */
 export function boostBiteValue(
   side: Side, sideIndex: 0 | 1, battle: Battle, threat: ThreatOf, residuals: Residuals = residualReader(battle),
   hits: HitReader = hitReader(battle), idle: ReadonlySet<Pokemon> = idleHolders(battle, threat),

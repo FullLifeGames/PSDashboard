@@ -4,8 +4,6 @@ import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
 import { cameInstead, choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
-/** The per-side clauses of the turn summary; each returns null when it has nothing to say. */
-
 function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
   const came = opponent.played ? `; ${cameInstead(opponentName, opponent)}` : '';
@@ -21,10 +19,6 @@ function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, op
     `${winDeltaText(side.riskPayoff ?? 0)} over the safe ${choiceNoun(side.safe.label)} (${winPctText(side.safe.worstCase, side.faintedFraction)} guaranteed).${priced}${click}`;
 }
 
-/**
- * The safe line did as well or better against the reply that came (`safeAgainstClick` without `riskPaidOff`); the one place for
- * these words. A gap that rounds to 0% reads "did as well".
- */
 export function heldRiskClause(name: string, side: SideAnalysis): string | null {
   const held = side.safeAgainstClick;
   if (!held || side.riskPaidOff || !side.played || !side.safe) return null;
@@ -39,7 +33,6 @@ export function heldRiskClause(name: string, side: SideAnalysis): string | null 
     `Against it the safe ${choiceNoun(side.safe.label)} ${versus}.${click}`;
 }
 
-/** One slot's choice was never visible (flinch, sleep), so the combo shown is the best consistent one. */
 const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
   side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
 
@@ -53,7 +46,7 @@ export function sideClause(name: string, side: SideAnalysis, opponent: SideAnaly
 const lineOf = (choice: { line?: { p1: string; p2: string }[] }) =>
   choice.line && choice.line.length > 0 ? `, then ${formatLine(choice.line)}` : '';
 
-/** Neutral framing: the engine's line is "safe", not "better", because maximin's guarantee only holds the current assessment. */
+// Neutral framing: "safe", not "better", because maximin's guarantee only holds the current assessment.
 function unpunishedReadClause(
   name: string,
   side: SideAnalysis,
@@ -74,7 +67,7 @@ function unpunishedReadClause(
     `The engine's safe line was ${phrase(safe.label)} (${winPctText(safe.worstCase, side.faintedFraction)} guaranteed)${lineOf(safe)}.${why}${caveat}${oddsNote(side)}`;
 }
 
-/** A null-swapped recommendation drops the PV line and the why clause: both belong to the true best. */
+// A null-swapped recommendation drops the PV line and the why clause: both belong to the true best.
 function punishedMisplayClause(
   name: string,
   side: SideAnalysis,
@@ -95,7 +88,7 @@ function punishedMisplayClause(
 }
 
 function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
-  if (side.sacrifice) return null; // the sack note carries the turn instead
+  if (side.sacrifice) return null;
   if ((side.tier !== 'mistake' && side.tier !== 'blunder') || !side.played || !side.best) return null;
   const difference = diffChoices(side.played, side.best);
   const why = difference ? ` The difference: ${difference}.` : '';
@@ -110,11 +103,10 @@ function mistakeClause(name: string, side: SideAnalysis, opponent: SideAnalysis,
   return punishedMisplayClause(name, side, side.played, side.best, why, caveat);
 }
 
-/** Praise on the card, never a verdict. `rolled` false (no roll went the residual's way) words the rider's swing as one with no roll behind it. */
+/** Praise, never a verdict; `rolled` false words the rider's swing as one with no roll behind it. */
 export function readCreditClause(name: string, side: SideAnalysis, ownLuck: number | null, rolled = true): string | null {
   const credit = side.readCredit;
   if (!credit || !side.played || !side.safe) return null;
-  // The gates read the pair's value before the rolls, so the sentence says so.
   const when = credit.payoffTurn
     ? `${credit.payoffTurn === 1 ? 'one turn later' : `${credit.payoffTurn} turns later`}, before the rolls,`
     : 'before the rolls,';
@@ -128,7 +120,6 @@ export function readCreditClause(name: string, side: SideAnalysis, ownLuck: numb
     `${partialNote(side, 'credited')}${luck}`;
 }
 
-/** The ride-along form of `heldRiskClause`; a mistake or blunder speaks through `sideClause` instead. */
 export function heldRiskNote(name: string, side: SideAnalysis): string | null {
   if (side.tier === 'mistake' || side.tier === 'blunder') return null;
   const clause = heldRiskClause(name, side);
@@ -136,7 +127,6 @@ export function heldRiskNote(name: string, side: SideAnalysis): string | null {
 }
 
 export function inaccuracyClause(name: string, side: SideAnalysis): string | null {
-  // A risk with `safeAgainstClick` speaks through `heldRiskClause`, not here.
   if (side.tier !== 'inaccuracy' || side.riskPaidOff || side.safeAgainstClick || !side.played || !side.best) return null;
   const shown = displayBest(side);
   return `${name}'s ${phrase(side.played.label)} was an inaccuracy; ` +
@@ -146,7 +136,6 @@ export function inaccuracyClause(name: string, side: SideAnalysis): string | nul
 
 export function forcedClause(name: string, side: SideAnalysis): string | null {
   if (!side.forcedMix) return null;
-  // The conditional already told this story: one equilibrium mention is enough.
   if (side.conditional?.mixLabel === side.forcedMix.label) return null;
   const base = `The equilibrium all but commits ${name} to ${phrase(side.forcedMix.label)} ` +
     `here (${Math.round(side.forcedMix.weight * 100)}%)`;
@@ -156,7 +145,7 @@ export function forcedClause(name: string, side: SideAnalysis): string | null {
     : `${base}, but ${cameInstead(name, side)}.`;
 }
 
-/** Neutral framing, no blame vocabulary: the engine cannot see the intent (Trick absorption, momentum), only the cost. */
+/** Neutral framing, no blame: the engine cannot see the intent (Trick absorption, momentum), only the cost. */
 export function sackClause(name: string, side: SideAnalysis): string | null {
   const sentence = sackSentence(name, side);
   const others = side.sacrifice?.alsoFell;
@@ -186,7 +175,6 @@ function sackSentence(name: string, side: SideAnalysis): string | null {
     : `${name} sacked ${side.sacrifice.name} (${pct}% HP): a low-cost trade, not graded as a misplay.`;
 }
 
-/** A multi-turn expectation, never a grade. */
 export function streakClause(name: string, side: SideAnalysis): string | null {
   if (!side.streakOdds) return null;
   const streak = side.streakOdds;
@@ -200,7 +188,6 @@ export function streakClause(name: string, side: SideAnalysis): string | null {
   return `${name}'s ${nth} ${streak.moveLabel} into ${streak.defenderSpecies}: ${streak.event} fishing compounds to ~${pct}% across the streak.`;
 }
 
-/** Names the split so the reader knows the grade depends on hidden information, not on the engine's confidence. */
 export function sensitivityClause(name: string, side: SideAnalysis): string | null {
   if (!side.sensitivity) return null;
   const alternatives = side.sensitivity.alternatives
@@ -209,7 +196,6 @@ export function sensitivityClause(name: string, side: SideAnalysis): string | nu
   return `${name}'s verdict hinges on ${side.sensitivity.species}'s item (${alternatives}).`;
 }
 
-/** `heldBy` names the one standing mon still holding the pair; the unanswered entry is board logic, not a verdict. */
 export function unansweredClause(side: SideAnalysis): string | null {
   if (!side.unanswered) return null;
   if (side.unanswered.heldBy) {

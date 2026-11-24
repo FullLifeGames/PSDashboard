@@ -1,4 +1,4 @@
-/** Pure ranking math over a computed value matrix, with no @pkmn/sim import so the main bundle can rank worker-computed values. */
+/** Pure ranking math over a computed value matrix; no @pkmn/sim import, so the main bundle can rank worker values. */
 
 export { cellKey, reblendValue, TOP_EXPANSION } from './ranking/matrix.ts';
 export type { PvStep, Ranked, ValueMatrix } from './ranking/matrix.ts';

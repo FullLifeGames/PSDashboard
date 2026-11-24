@@ -4,20 +4,9 @@ import { playResiduals, slotsOf } from './residuals.ts';
 import { damageOf } from './status-factor.ts';
 import { MAX_PRICED_HITS, NO_COST, type HitCost, type StatusCost } from './contact-cost.ts';
 
-/** Plays one hit of a move on copies of the board and reads what it costs the attacker; the simulator's own move use runs, so nothing here knows a name. */
+// Dice are quantiles: every draw of one hit answers the same u, on the grid u = (k + 1/2) / 20, so a chance fires in
+// exactly the share of the grid below its chance. Each hit is played at full HP: the chip is the effect, not a rest.
 
-// The dice are quantiles: every draw of one played hit answers the same quantile u of its range (random(n) is floor(u * n), a
-// chance of n in d fires when u < n / d), and the hit is played on the grid u = (k + 1/2) / 20. A chance event then fires in
-// exactly the share of the grid below its chance (Flame Body's 30% reads as 30%), and damage rolls and hit counts average over
-// their range. Two probes (u = 0.075 and 0.925) come first: when the hit leaves the same status (or none) in both and the move
-// does not roll its hit count, the hit is deterministic and the mean of the probes is its cost; otherwise the other 18 points are
-// played too.
-// Each hit is played at full HP on both sides and with the other bodies on the field at full HP too: the chip is the amount of
-// the effect, not what a body at low HP has left, and a recoil is read on a hit that does not run into the foe's last HP (the
-// race counts the hit that finishes it as free, score/contact-price.ts). A benched body is put on the field of the copy for the
-// hit, as the static asks the simulator about benched bodies everywhere else.
-
-/** The points of the grid, the two probes at its ends that decide whether the hit rolls anything, and the middle one. */
 const GRID = 20;
 const PROBES = [1, 18];
 const MIDDLE = 9;
@@ -25,16 +14,12 @@ const quantileOf = (index: number): number => (index + 0.5) / GRID;
 
 const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 
-/** A board with the pair ready for a hit: both on the field of a copy, both at full HP. */
 interface Setup { copy: Battle; attacker: Pokemon; defender: Pokemon }
 
 const counterpart = (battle: Battle, copy: Battle, pokemon: Pokemon): Pokemon =>
   copy.sides[battle.sides.indexOf(pokemon.side)].pokemon[pokemon.side.pokemon.indexOf(pokemon)];
 
-/**
- * Puts a benched body in the place of its side's first live active, the way a switch does it in the simulator (team order,
- * positions, active list), without the events of a switch-in: the body then answers every event of the field as an active one.
- */
+// Seats a benched body as the simulator's switch does (team order, positions, active list), without switch-in events.
 function bringIn(pokemon: Pokemon): void {
   if (pokemon.isActive) return;
   const { side } = pokemon;
@@ -53,11 +38,7 @@ function bringIn(pokemon: Pokemon): void {
   side.active[slot] = pokemon;
 }
 
-/**
- * `neutral` strips the pair of everything that could change a hit: no item and no ability, and a foe of the typeless type, which
- * every move hits for its plain damage. What a move costs its user on such a pair is its own cost (recoil, a self-destruct, a
- * charge it pays), whatever the Dex lists as its fields.
- */
+// `neutral`: no item, no ability, a foe of the typeless type, so what a move costs its user is its own cost.
 function prepare(battle: Battle, attacker: Pokemon, defender: Pokemon, neutral = false): Setup {
   const copy = copyOf(battle);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
@@ -88,11 +69,8 @@ interface Run {
 
 const SPREAD = new Set(['allAdjacentFoes', 'allAdjacent']);
 
-/**
- * One move use of the attacker on the defender: it hits (accuracy sure, and the move's own precondition off: a Sucker Punch that
- * waits for the foe's attack, a Fake Out for the first turn, a Poltergeist for an item; the races price the damage of these moves
- * as hit), and a spread move hits the one foe of the pair (a 1v1 race).
- */
+// The hit is sure and the move's own precondition is off (Sucker Punch, Fake Out, Poltergeist): races price these.
+// A spread move hits the one foe of the pair (a 1v1 race).
 function strike({ copy, attacker, defender }: Setup, moveId: string): void {
   const move = copy.dex.getActiveMove(moveId);
   move.accuracy = true;
@@ -101,7 +79,6 @@ function strike({ copy, attacker, defender }: Setup, moveId: string): void {
   copy.actions.useMove(move, attacker, { target: defender });
 }
 
-/** The attacker uses the move on the defender (a charge move strikes on its second turn), on a fresh copy, with every draw answering `quantile`. */
 function playRun(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, quantile: number, neutral = false): Run {
   const setup = prepare(battle, attacker, defender, neutral);
   const { copy } = setup;
@@ -118,7 +95,7 @@ function playRun(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: s
     return done;
   }) as Battle['heal'];
   strike(setup, moveId);
-  // A move that charges first (Fly, Dig, Skull Bash) strikes on the second turn: the move finds its own volatile there and goes on.
+  // A charging move (Fly, Dig, Skull Bash) strikes on its second turn: the move finds its own volatile there.
   if (mine.volatiles['twoturnmove'] && !setup.defender.fainted) strike(setup, moveId);
   const label = mine.status !== status ? mine.status : (mine.item && mine.item !== item ? `item:${mine.item}` : '');
   return { lost: Math.max(0, hp - mine.hp + healed) / mine.maxhp, label, setup };
@@ -129,25 +106,20 @@ function endOfTurn({ copy, attacker }: Setup): number {
   return playResiduals(copy, bodies)[bodies.indexOf(attacker)] ?? 0;
 }
 
-/** Whether the attacker moves on each of its next turns with the status the hit left on it, played on a copy with every draw answering `quantile`. */
 function turnsActed(run: Run, moveId: string, quantile: number): boolean[] {
   const copy = copyOf(run.setup.copy);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
   const attacker = counterpart(run.setup.copy, copy, run.setup.attacker);
   const defender = counterpart(run.setup.copy, copy, run.setup.defender);
   copy.prng = new FixedDice({ quantile });
-  // The status is put on again under the dice of this play: the hit's own draws decided that it lands, and a sleep's length or a
-  // paralysis's turn would answer the same low quantile every time.
+  // The status is put on again under this play's dice: the hit's own draws would give the same low quantile every time.
   attacker.clearStatus();
   attacker.setStatus(run.label, defender);
   const move = copy.dex.getActiveMove(moveId);
   return Array.from({ length: MAX_PRICED_HITS }, () => !!copy.runEvent('BeforeMove', attacker, defender, move));
 }
 
-/**
- * The share of its next turns the attacker moves on with the status the hit left (BeforeMove of the simulator, the grid of
- * quantiles), turn by turn; undefined where the status never stops a move at the two probes (a burn, a poison).
- */
+// undefined where the status never stops a move at the two probes (a burn, a poison).
 function actsOf(run: Run, moveId: string): number[] | undefined {
   try {
     const probes = PROBES.map(point => turnsActed(run, moveId, quantileOf(point)));
@@ -159,11 +131,6 @@ function actsOf(run: Run, moveId: string): number[] | undefined {
   }
 }
 
-/**
- * What a status (or an item taken over) the hit left costs the attacker: the loss per turn it adds at the end of the turn
- * (against a copy of the board before the hit), the share of its damage the same move still deals (the simulator's damage with
- * and without the status), and the turns the status takes.
- */
 function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: number; output: number; acts?: number[] } {
   const { copy, attacker, defender } = run.setup;
   let output = 1;
@@ -179,10 +146,7 @@ function costOfLabel(run: Run, moveId: string, baseline: () => number): { chip: 
   return { chip: endOfTurn(run.setup) - baseline(), output, ...(acts ? { acts } : {}) };
 }
 
-/**
- * Whether the move costs its user HP by itself, played once on a pair stripped of items, abilities and typing (finds Chloroblast, which the
- * Dex does not list); not memoized.
- */
+/** Whether the move costs its user HP by itself, found by playing it on a bare pair (Chloroblast has no Dex field). */
 export function hurtsItsUser(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string): boolean {
   try {
     return playRun(battle, attacker, defender, moveId, quantileOf(MIDDLE), true).lost > 0;
@@ -194,7 +158,7 @@ export function hurtsItsUser(battle: Battle, attacker: Pokemon, defender: Pokemo
 const deterministic = (probes: readonly Run[], rollsHits: boolean): boolean =>
   !rollsHits && probes.every(run => run.label === probes[0].label);
 
-/** The cost of one hit, played on copies of `battle` (not memoized, not filtered); NO_COST where the play fails, `onRun` is told of every copy played. */
+/** One hit played on copies, unmemoized, unfiltered; NO_COST where the play fails; `onRun` hears copies. */
 export function playHit(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, onRun?: () => void): HitCost {
   try {
     const rollsHits = !!battle.dex.moves.getByID(moveId as ID).multihit;

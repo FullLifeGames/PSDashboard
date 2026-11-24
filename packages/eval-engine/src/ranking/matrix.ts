@@ -1,7 +1,5 @@
 import type { CellBlend, EvalMatrix, RankedChoice } from '../types.ts';
 
-/** The value matrix the ranking runs over, the ranked record it produces, and the cell helpers every consumer shares; sim-free. */
-
 interface RankOption {
   choice: string;
   label: string;
@@ -32,10 +30,7 @@ export type PvStep = { p1: string; p2: string };
 /** The key of matrix cell (i, j) in the maps of captured lines; assumes fewer than 10,000 columns. */
 export const cellKey = (i: number, j: number) => i * 10_000 + j;
 
-/**
- * Re-blends a boundary cell after deepening: the sub-search score replaces the first-seed child's leaf in its outcome class, every
- * other class keeps its sampled mean and analytic weight. Writing the sub-score into the cell instead would erase the blend.
- */
+/** Re-blends a boundary cell: the sub-score replaces the first-seed leaf in its class, never the whole cell. */
 export function reblendValue(blend: CellBlend, subScore: number): number {
   let value = 0;
   for (const cls of blend.classes) {

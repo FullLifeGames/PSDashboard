@@ -7,30 +7,16 @@ import { hitKeyReader, Interner } from './memo-keys.ts';
 export { NO_COST };
 export type { HitCost, StatusCost };
 
-// What one hit of a move costs the attacker, read from the simulator and memoized under everything the hit reads.
-//
-// The cost is the HP the hit takes from the attacker (the foe's item and ability on a contact hit, the move's recoil, the
-// attacker's own item) and the chance of each status it leaves. A hit is played only where something could cost
-// (score/contact-filter.ts, held to the simulator over the whole Dex by test/contact-prefilter.spec.ts); what the simulator does
-// with the pair (contact at all, Protective Pads, Magic Guard, immunities) is left to the played hit.
-//
-// Not priced: stat drops a contact hit gives (Gooey, Tangling Hair, Cotton Down), the halved Speed of a paralysis, a Perish Song,
-// an ability swapped by Mummy or Wandering Spirit, the Aftermath of a foe the hit KOs, the stat changes of the move on its user
-// (Close Combat).
+// Not priced: stat drops a contact hit gives (Gooey, Tangling Hair), halved paralysis Speed, Perish Song, Mummy swaps,
+// Aftermath, the move's own stat changes on its user (Close Combat). Hits play where contact-filter.ts finds a cost.
 
-/** For tests: the pairs played, the readings answered from the memo, the copies played, the pairs that could not cost, the moves probed. */
 export const hitStats = { plays: 0, hits: 0, runs: 0, free: 0, probes: 0 };
 
-/** A long session starts the memo over when it has grown past this many pairs. */
 const MEMO_LIMIT = 20_000;
 const memo = new Map<string, HitCost>();
-/** The numbers the memo's keys hold for the keys of the boards and bodies (score/memo-keys.ts); it starts over with the memo. */
 const interner = new Interner();
 
-/**
- * For probes: what the memo and the interner of this process hold (entries and characters of the memo's keys, the interned texts).
- * @public A probe hook that no spec and no source file calls; the memory probes under docs/perf/probes read it (knip skips it by this tag).
- */
+/** @public A probe hook that no spec or source calls; docs/perf/probes read it (knip skips it by this tag). */
 export function hitMemoSize(): { entries: number; keyChars: number; interned: number; internedChars: number } {
   let keyChars = 0;
   for (const key of memo.keys()) keyChars += key.length;
@@ -38,7 +24,6 @@ export function hitMemoSize(): { entries: number; keyChars: number; interned: nu
   return { entries: memo.size, keyChars, interned: entries, internedChars: chars };
 }
 
-/** For tests and probes: forget the memo. */
 export function resetHitMemo(): void {
   memo.clear();
   interner.reset();
@@ -46,24 +31,20 @@ export function resetHitMemo(): void {
 
 const onProbe = (): void => { hitStats.probes++; };
 
-/** For tests: whether anything in the pair could cost the attacker when it uses the move (score/contact-filter.ts). */
 export function hitMayCost(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string): boolean {
   const known = factsOf(battle);
   return mayCost(known, battle, attacker, defender, moveOf(known, battle, moveId), onProbe);
 }
 
-/** For tests: the cost of one hit as the simulator plays it, with no filter and no memo. */
 export function playedHit(battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string): HitCost {
   return playHit(battle, attacker, defender, moveId);
 }
 
-/** The reading function of one battle: the cost of a hit of `moveId` from `attacker` on `defender` (null where the body has no damaging move). */
+/** `moveId` is null where the body has no damaging move. */
 export type HitReader = (attacker: Pokemon, defender: Pokemon, moveId: string | null) => HitCost;
 
-/** A reader for one evaluation: it keeps the keys of the bodies it has seen; the memo is the process's. */
 export function hitReader(battle: Battle): HitReader {
   const known = factsOf(battle);
-  // Half of the readers never meet a pair that could cost: the key reader is made when the first one does.
   let keyOf: ReturnType<typeof hitKeyReader> | undefined;
   return (attacker, defender, moveId) => {
     if (!moveId) return NO_COST;
@@ -79,7 +60,7 @@ export function hitReader(battle: Battle): HitReader {
       return cost;
     }
     if (memo.size >= MEMO_LIMIT) {
-      // The numbers of the old key belong to the interner's last generation: the key is made again after the start over.
+      // The old key's numbers belong to the interner's last generation: the key is made again after the start over.
       resetHitMemo();
       key = keyOf(attacker, defender, moveId);
     }

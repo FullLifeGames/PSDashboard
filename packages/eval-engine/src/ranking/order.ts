@@ -2,8 +2,6 @@ import type { EvalMatrix, EvalResult, RankedChoice } from '../types.ts';
 import { cellKey, type PvStep, type Ranked, type ValueMatrix } from './matrix.ts';
 import { solveMatrixGame, type MatrixSolution } from './solve.ts';
 
-/** Ranking over a value matrix: rows priced by the equilibrium, the result record, the PV lines and the expansion cells. */
-
 function rankRows(matrix: ValueMatrix, solution: MatrixSolution, rootValue: number): RankedChoice[] {
   const { p1Options, p2Options, values } = matrix;
   return p1Options.map((option, i) => {
@@ -32,7 +30,7 @@ function rankRows(matrix: ValueMatrix, solution: MatrixSolution, rootValue: numb
   }).sort((a, b) => b.ev - a.ev || b.worstCase - a.worstCase);
 }
 
-/** p2's columns in p2's own perspective: p2's worst case is the p1 maximum, negated. */
+// p2's own perspective: its worst case is the p1 maximum, negated.
 function rankColumns(matrix: ValueMatrix, solution: MatrixSolution, rootValue: number): RankedChoice[] {
   const { p1Options, p2Options, values } = matrix;
   return p2Options.map((option, j) => {
@@ -76,7 +74,6 @@ function solvedMatrixOut(matrix: ValueMatrix, solution: MatrixSolution): EvalMat
 export function rankFromMatrix(matrix: ValueMatrix, rootValue: number): Ranked {
   const { p1Options, p2Options, values } = matrix;
 
-  // `ev` is the expected value against the opponent's equilibrium mixture; `worstCase` (the floor) stays as the safety column.
   const solved = p1Options.length > 0 && p2Options.length > 0;
   const solution = solved ? solveMatrixGame(values) : { value: rootValue, p1Mix: [], p2Mix: [] };
 
@@ -105,7 +102,6 @@ export function toResult(ranked: Ranked, depthCompleted: number): EvalResult {
   };
 }
 
-/** Attaches captured PV lines to every ranked entry whose worst-case cell the deepening search expanded. */
 export function attachLines(matrix: ValueMatrix, ranked: Ranked, pvByCell: Map<number, PvStep[]>): void {
   const byChoiceP1 = new Map(matrix.p1Options.map((option, index) => [option.choice, index]));
   const byChoiceP2 = new Map(matrix.p2Options.map((option, index) => [option.choice, index]));
@@ -130,7 +126,6 @@ export function attachLines(matrix: ValueMatrix, ranked: Ranked, pvByCell: Map<n
   }
 }
 
-/** The cells that decide the ranking: each side's top choices with their punishing replies, deduped, capped; ended cells are exact and skipped. */
 export function selectExpansionCells(matrix: ValueMatrix, ranked: Ranked, cap: number): [number, number][] {
   const { p1Options, p2Options } = matrix;
   const byChoiceP1 = new Map(p1Options.map((option, index) => [option.choice, index]));

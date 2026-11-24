@@ -2,19 +2,12 @@ import type { TurnAnalysis } from '../analysis.ts';
 import { playedBest } from './phrases.ts';
 import type { NamedJudgement } from './ride-along.ts';
 
-/**
- * The words of a quiet turn, in one place: the estimate moved less than a mistake band and no one earned a grade. A card that
- * names an inaccuracy or a risk gives that sentence way. The badge text lives in `src/components/eval-badges.ts`.
- */
 export const QUIET_TURN = 'A quiet turn.';
 export const QUIET_TURN_BEST = "A quiet turn: both sides played the engine's preferred line.";
 export const NEITHER_MISTAKE = 'Neither side made a mistake.';
 export const BOTH_BEST = "Both sides played the engine's preferred line.";
 
-/**
- * A body knocked out before it moved played nothing, so "both sides played" would credit it with a move. Names the side that moved
- * when it played the engine's line and the other never acted.
- */
+// A body knocked out before it moved played nothing: "both sides played" would credit it with a move.
 function onlyMoverBest(analysis: TurnAnalysis, playerNames: [string, string]): string | null {
   const sides = [['p1', playerNames[0]], ['p2', playerNames[1]]] as const;
   const idle = sides.filter(([key]) => analysis[key].neverActed === true);
@@ -23,10 +16,8 @@ function onlyMoverBest(analysis: TurnAnalysis, playerNames: [string, string]): s
   return playedBest(analysis[mover[0]]) ? mover[1] : null;
 }
 
-/** How a quiet card speaks: the quiet sentence alone, as `no-mistake`, `silent` (a side has a mistake tier), or a concrete `risk` or `inaccuracy` sentence. */
 export type QuietVoice = 'alone' | 'no-mistake' | 'silent' | 'risk' | 'inaccuracy';
 
-/** A hindsight hint that a side row shows (`SideRow.tsx`). */
 export function hintShown(analysis: TurnAnalysis): boolean {
   return [analysis.p1, analysis.p2].some(side => side.hindsightRead?.shown === true && !!side.hindsightRead.line);
 }

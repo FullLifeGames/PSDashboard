@@ -1,29 +1,21 @@
 import type { EvalResult, RankedChoice } from '../types.ts';
 import { cellKey, type ValueMatrix } from './matrix.ts';
 
-/** Tied leading rows: the coin-flip prefix the static ranking cannot split, their decisive cells, and the probe cells the trend layers price. */
-
-/** Rows within this of the top EV are a coin flip the static ranking cannot split. */
 export const TIE_EPSILON = 0.02;
-/** A tie is reordered only when the trend separation is meaningful. */
 export const TREND_MARGIN = 0.02;
-/** Widest tied prefix examined per side. */
 const TIE_GROUP_CAP = 3;
-/** Mix-weight floor so a 0%-mix punisher still counts a little. */
 export const MIN_TREND_WEIGHT = 0.05;
 
 export const GIMMICK_TOKENS = new Set(['terastallize', 'mega', 'ultra']);
 
-/** The choice minus its gimmick markers: 'move x terastallize, move y' → 'move x, move y'. */
 export const coreOf = (choice: string) => choice.split(',').map(part =>
   part.trim().split(' ').filter(token => !GIMMICK_TOKENS.has(token)).join(' ')).join(', ');
 
 export interface TieRow {
   side: 'p1' | 'p2';
   entry: RankedChoice;
-  /** This entry's position in the ranked list — reorders write back into these slots. */
+  /** This entry's position in the ranked list; reorders write back into these slots. */
   listIndex: number;
-  /** The cells that decide this row: its punisher and the opponent's modal reply. */
   cells: [number, number][];
 }
 
@@ -47,7 +39,6 @@ function modalIndex(oppMix: number[]): number {
   return modal;
 }
 
-/** p1 rows fear the column minimum, p2 columns the row maximum (values are p1-perspective throughout). */
 function decisiveCells(matrix: ValueMatrix, side: 'p1' | 'p2', own: number, modal: number): [number, number][] {
   const against = side === 'p1' ? matrix.values[own] : matrix.values.map(row => row[own]);
   let punish = 0;
@@ -58,10 +49,7 @@ function decisiveCells(matrix: ValueMatrix, side: 'p1' | 'p2', own: number, moda
     (side === 'p1' ? [own, opp] : [opp, own]) as [number, number]);
 }
 
-/**
- * A gimmick variant tied with its own core is a resource-spend question, not stall-vs-progress, so only the first row per core
- * enters (the plain-first convention). A side whose entries cannot all be mapped back to options yields no group.
- */
+/** A gimmick variant tied with its own core is a resource-spend question, so only the first row per core enters. */
 export function tieGroups(matrix: ValueMatrix, result: EvalResult): TieRow[][] {
   const mixes = result.matrix?.mixes;
   if (!mixes) return [];
@@ -87,7 +75,6 @@ export function tieGroups(matrix: ValueMatrix, result: EvalResult): TieRow[][] {
   return groups;
 }
 
-/** The decisive cells of tied rows that are neither terminal nor already priced in `trends`. */
 export function selectTieProbeCells(
   matrix: ValueMatrix,
   result: EvalResult,

@@ -4,21 +4,14 @@ import { livingMons, threatGetter, type MatchupCache } from './threat.ts';
 import { raceClocks, raceSide } from './races.ts';
 import { expectedRate, unansweredMons } from './unanswered.ts';
 
-// The last pair: once each side is down to one living body, the leaf takes the race winner's side instead of the material static.
-
-/**
- * The race winner's value in win-prob units: LAST_PAIR_BASE plus LAST_PAIR_PER_TURN per turn of clock margin, capped at LAST_PAIR_CAP.
- * The static is the wrong instrument here (an 89 % HP burned Toxapex with no damaging move read 53 % against a 19 % Choice Band
- * Zapdos-Galar; the trees read 3 %); the race clocks already price heal PP, residuals and PP budgets. Mutual walls (both clocks
- * infinite) keep the static.
- */
+/** The race winner's value: base plus a step per turn of clock margin, capped; mutual walls keep the static. */
 export const LAST_PAIR_BASE = 0.6;
 export const LAST_PAIR_PER_TURN = 0.1;
 export const LAST_PAIR_CAP = 0.9;
 const MARGIN_CAP = 3;
 
 let sweepVariant = false;
-/** Variant B switch (default off): a lone sweeper the decided-sweep profile sees clearing the other side races the standing enemy too. */
+/** Variant B (default off): a lone sweeper the decided-sweep profile sees clearing the other side races the foe too. */
 export function setLastPairSweep(on: boolean): void {
   sweepVariant = on;
 }
@@ -46,7 +39,6 @@ function pairRace(battle: Battle, a: Pokemon, b: Pokemon, cache?: MatchupCache):
   return { winner: aWins ? 0 : 1, margin };
 }
 
-/** Variant B: the race against the standing enemy sets the margin. */
 function sweepRace(battle: Battle, p1: Pokemon[], p2: Pokemon[], cache?: MatchupCache): LastPairRace | null {
   const decided = unansweredMons(battle, cache).decided;
   if (!decided) return null;
@@ -56,7 +48,6 @@ function sweepRace(battle: Battle, p1: Pokemon[], p2: Pokemon[], cache?: Matchup
   const standing = theirs.find(mon => mon.isActive);
   if (!standing) return null;
   const race = decided.side === 'p1' ? pairRace(battle, mine[0], standing, cache) : pairRace(battle, standing, mine[0], cache);
-  // The sweep profile vouches for the rest.
   return race && race.winner === (decided.side === 'p1' ? 0 : 1) ? race : null;
 }
 
