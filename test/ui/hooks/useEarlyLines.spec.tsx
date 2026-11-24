@@ -7,19 +7,12 @@ import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 import { singlesLine } from '../fixtures/lines';
 
-/**
- * After the game report, one tree search per graded early singles turn keeps the lines. The hook asks for the turns the report
- * grades (matrix results without lines), one at a time, writes only `lines`, and stops with a new sweep, a new replay or the user's
- * Stop. In Auto the stage covers every graded turn, tree turns and doubles included, with the line pass in the search's settings; a
- * result is done when it carries the pass.
- */
 const MATRIX: TurnEvalSettings = { depth: 1, samples: 3, mode: 'matrix' };
 const TREE: TurnEvalSettings = { depth: 1, samples: 1, mode: 'mcts' };
 const played: PlayedTurn = { p1: { kind: 'move', name: 'Stone Edge' }, p2: { kind: 'move', name: 'Leech Seed' } };
 const LINES = [singlesLine as EvalLine];
 const PASSED = 300;
 
-/** Turns 3 and 7 graded on matrix results, turn 5 not graded, turn 12 graded on a tree result (which holds the sweep's own lines). */
 function graphOfGame(): { graph: EvalGraphState; analyses: (TurnAnalysis | null)[] } {
   const analyses: (TurnAnalysis | null)[] = Array.from({ length: 12 }, () => null);
   analyses[2] = turnAnalysis(3, { p1: misplayedSide('mistake') });
@@ -46,7 +39,6 @@ function setup(overrides: Partial<EarlyLinesInputs> = {}, searched?: (settings: 
   const cancel = vi.fn();
   const attachLines = vi.fn((turn: number, base: EvalResult, lines: EvalLine[], key: string) => {
     void key;
-    // the graph in the hook's hands: one result replaced, every other field kept
     const results = [...current.results];
     results[turn - 1] = { ...base, lines, linePass: PASSED };
     current = { ...current, results };
@@ -70,7 +62,6 @@ describe('useEarlyLines', () => {
     expect(run.calls.map(call => call.turn)).toEqual([3, 7, 12]);
     expect(run.calls[0].settings).toMatchObject({ mode: 'mcts', depth: 1, samples: 1, linePass: 300, keepPlayed: played, lineRows: { p1: ['Earthquake'], p2: ['Leech Seed'] }, lineReplies: { p1: ['Leech Seed'], p2: ['Earthquake'] } });
     expect(run.attachLines.mock.calls.map(call => [call[0], call[2], call[3]])).toEqual([[3, LINES, 'key-3'], [7, LINES, 'key-7'], [12, LINES, 'key-12']]);
-    // the base of each attach is the stored result the search was asked for
     expect(run.attachLines.mock.calls[0][1]).toBe(run.initial.results[2]);
     expect(run.attachLines.mock.calls[1][1]).toBe(run.initial.results[6]);
     expect(run.attachLines.mock.calls[2][1]).toBe(run.initial.results[11]);
@@ -83,7 +74,6 @@ describe('useEarlyLines', () => {
     const after = run.graph().results[2]!;
     expect(after).toEqual({ ...graph.results[2]!, lines: LINES, linePass: PASSED });
     expect(run.graph().results[11]).toEqual({ ...graph.results[11]!, lines: LINES, linePass: PASSED });
-    // the turn nobody grades keeps its result
     expect(run.graph().results[4]).toEqual(graph.results[4]);
   });
 
@@ -127,7 +117,6 @@ describe('useEarlyLines', () => {
     await new Promise(resolve => setTimeout(resolve, 30));
     expect(run.attachLines).not.toHaveBeenCalled();
     expect(run.searchLines).toHaveBeenCalledTimes(1);
-    // the sweep ends: the turns that have not had the pass are searched again
     run.setRunning(false);
     await waitFor(() => expect(run.attachLines).toHaveBeenCalledTimes(3));
   });
@@ -191,7 +180,6 @@ describe('useEarlyLines', () => {
       let release: (() => void) | undefined;
       const gate = new Promise<void>(resolve => { release = resolve; });
       const run = setup({}, async () => { await gate; return LINES; });
-      // before the first search even starts (the effect's own await): the stage is already named active
       expect(handle()).toMatchObject({ active: true, done: 0, total: 3 });
       await waitFor(() => expect(run.searchLines).toHaveBeenCalledTimes(1));
       expect(handle()?.active).toBe(true);
@@ -239,8 +227,6 @@ describe('useEarlyLines', () => {
     });
   });
 
-  // The card of a turn that is about to get its lines must not say "the matrix pass keeps none. Analyze the position with MCTS": the
-  // stage names the turns it will search and the sweep says lines may follow.
   describe('lineComing: what a turn without lines waits for', () => {
     test('a graded turn the stage has not reached (matrix or tree) waits for the stage; one it has searched, or one nobody grades, waits for nothing', async () => {
       let release: (() => void) | undefined;

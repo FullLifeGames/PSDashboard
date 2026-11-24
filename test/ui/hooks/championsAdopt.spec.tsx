@@ -8,11 +8,7 @@ import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
 import type { ReconstructOutcome } from '../../../src/lib/replay-jobs/types';
 import { fakeReplayWorkerClient } from '../fixtures/worker';
 
-/**
- * The branch view adopts a worker's position on the main thread (usePositionSource), which loads the Champions mod first for a
- * Champions replay. The file runs in a module graph of its own (vitest isolates files) and with a stored position, so no
- * reconstruction in this realm loads the mod for it.
- */
+// Vitest isolates files and the position is stored: no reconstruction in this realm has loaded the Champions mod.
 const fixture = <T,>(name: string) =>
   JSON.parse(readFileSync(join('packages', 'eval-engine', 'test', 'fixtures', 'champions', name), 'utf-8')) as T;
 const replay = fixture<{ id: string; format: string; formatid: string; players: string[]; log: string }>('gen9championsou-2693832490.json');

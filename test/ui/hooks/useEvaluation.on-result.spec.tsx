@@ -3,8 +3,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { EvalResult } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/** `onResult` of `EvaluateParams` fires after a search, a stored hit and a memory hit; a superseded, cancelled or failed run calls nothing. */
-
 const script = vi.hoisted(() => ({
   evaluate: null as null | (() => Promise<EvalResult>),
   stored: null as null | { result: EvalResult },

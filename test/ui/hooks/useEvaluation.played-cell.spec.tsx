@@ -4,10 +4,6 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings, MatrixCell, PlayedAction, PlayedTurn } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/**
- * In tree mode the played pair is priced with the root's own cell of the merged matrix. The depth-1 `evalPair` sub-search stays only for
- * a matrix turn, a cell no tree visited and a result without cells.
- */
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
   pairCalls: 0,
@@ -44,7 +40,6 @@ const DOUBLES_TURN: PlayedTurn = {
   p2Slots: [move('Taunt', 2), move('Wood Hammer', 1)],
 };
 
-/** A tree result: every cell carries its visits (the fixture's matrix has no `cells`, as a matrix-mode result). */
 function treeResult(kind: 'singles' | 'doubles', visits: (i: number, j: number) => number, verified = false): EvalResult {
   const base = evalResult(kind);
   const matrix = base.matrix!;

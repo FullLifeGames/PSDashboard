@@ -75,7 +75,6 @@ describe('useEngineController', () => {
     expect(approximate.p2ActiveSlots[0]?.species).toBeTruthy();
     expect(result.current.engine.playedAtView?.p1?.kind).toMatch(/move|switch/);
 
-    // The dwell rebuild lands the exact position and the pickers upgrade in place.
     await waitFor(() => expect(result.current.engine.positionPicker?.source).toBe('stored'), { timeout: 60_000 });
     expect(result.current.ctx.positions.getExact(2)).not.toBeNull();
     expect(result.current.engine.acquire.exactAcquiringTurn).toBeNull();

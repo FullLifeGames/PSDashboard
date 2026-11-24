@@ -5,12 +5,6 @@ import type { ReplayJobRequest, ReplayJobResponse } from '../../../src/lib/repla
 
 type EvalScript = (request: EvalWorkerRequest) => EvalWorkerResponse[];
 
-/**
- * The evaluation pool's Worker, scripted: `FakeWorker.answer` maps every
- * request to the responses the worker posts back (in order, one microtask
- * apart). The pool creates one instance per worker slot; `instances` lets a
- * test count spawns and terminations.
- */
 export class FakeWorker {
   static instances: FakeWorker[] = [];
   static answer: EvalScript = () => [];
@@ -50,7 +44,6 @@ export class FakeWorker {
   }
 }
 
-/** Installs the fake as the global Worker for the current test and returns the class for scripting. */
 export function installFakeWorker(answer?: EvalScript): typeof FakeWorker {
   FakeWorker.reset();
   if (answer) FakeWorker.answer = answer;
@@ -60,11 +53,6 @@ export function installFakeWorker(answer?: EvalScript): typeof FakeWorker {
 
 type ReplayScript = (request: ReplayJobRequest) => ReplayJobResponse[] | Promise<ReplayJobResponse[]>;
 
-/**
- * A replay worker client over a scripted WorkerLike: every job request is
- * answered with the responses the script returns (ids filled in). The
- * client's own queueing, cancellation, and respawn logic stays real.
- */
 export function fakeReplayWorkerClient(script: ReplayScript) {
   const requests: ReplayJobRequest[] = [];
   let spawns = 0;
@@ -89,12 +77,6 @@ export function fakeReplayWorkerClient(script: ReplayScript) {
   return { client, requests, spawnCount: () => spawns };
 }
 
-/**
- * A replay worker client whose "worker" is the real job handler running on
- * the test's own thread: reconstructions and spread solves happen for real,
- * only the thread boundary is gone. For the controller layers, which need
- * positions that adopt into live branches.
- */
 export function realReplayWorkerClient() {
   const requests: ReplayJobRequest[] = [];
   const spawn = (): WorkerLike => {

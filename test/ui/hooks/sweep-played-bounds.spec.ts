@@ -3,11 +3,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, PlayedBounds, PlayedTurn, RankedChoice } from '@fulllifegames/eval-engine';
 import { matchOrPhantom } from '../../../src/hooks/evaluation/sweep-types';
 
-/**
- * The sweep's played-pair match (a fresh result, a cache hit's backfill, the verify and sensitivity probes all call
- * `matchOrPhantom`) reads the order bound the result carries. A result stored before the field existed has none and matches without it.
- * The store keeps the result by structured clone (IndexedDB), so the clone below is the cache hit.
- */
+// The store keeps results by structured clone (IndexedDB): the clone below is the cache hit.
 const row = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Reply' });
 const rules = logRules('');
 

@@ -98,10 +98,6 @@ describe('useEvaluation preferences: Hard mode', () => {
   });
 });
 
-/**
- * With VITE_FEATURE_OPPONENT_READS off, a stored `hardMode: true` is read as unset by every reader and no search request carries it.
- * One row covers both game types; the search row's position is a doubles one on purpose.
- */
 describe('useEvaluation preferences: Opponent reads my move behind its flag', () => {
   beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
   afterEach(() => vi.unstubAllEnvs());
@@ -229,7 +225,6 @@ describe('useEvaluation single position', () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
     act(() => result.current.setEngineOverride({ depth: 1, samples: 1, mode: 'matrix' }));
-    // Four of six bodies fainted: auto would route to the tree here.
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'a' }));
     await waitFor(() => expect(result.current.status).toBe('done'));
     expect(script.calls[0].settings).toMatchObject({ depth: 1, samples: 1, mode: 'matrix' });
@@ -300,7 +295,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(graph.scores).toEqual([0, 0.1, 0.2]);
     expect(graph.results.map(entry => entry?.score)).toEqual([0, 0.1, 0.2]);
     expect(graph.settings).toEqual([{ depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }]);
-    // A fixed engine never needs the fainted fraction; only auto routing reads it.
     expect(graph.faintedFractions).toEqual([null, null, null]);
     expect(graph.evalErrors).toEqual([null, null, null]);
     expect(graph.notice).toBeNull();
@@ -363,7 +357,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(result.current.graph.results).toHaveLength(2);
     expect(result.current.graph.played).toHaveLength(2);
     expect(result.current.graph.rollFlip ?? null).toBeNull();
-    // a later sweep of the grown game starts from the kept turns' length, not from the stale tip
     act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), turns: 4 }));
     await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
     expect(result.current.graph.scores).toHaveLength(4);
@@ -401,7 +394,6 @@ describe('useEvaluation whole-game sweep', () => {
     const singles = await sweepOf(false);
     expect(singles.settings).toEqual([matrix, matrix, tree]);
     expect(singles.faintedFractions).toEqual([0, 1 / 6, 2 / 6]);
-    // Doubles keep the tree from the first turn under the same form.
     expect((await sweepOf(true)).settings).toEqual([tree, tree, tree]);
   });
 
@@ -409,7 +401,6 @@ describe('useEvaluation whole-game sweep', () => {
     const tree = { depth: 1, samples: 1, mode: 'mcts' };
     const early = { depth: 1, samples: 3, mode: 'matrix' };
     const sweepOf = async (doubles: boolean) => {
-      // The team-preview position, told apart from turn 1's by a marker field.
       const preview = JSON.stringify({ preview: true, ...JSON.parse(doubles ? doublesPosition(0) : position(0)) });
       const { result } = renderHook(() => useEvaluation());
       act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));

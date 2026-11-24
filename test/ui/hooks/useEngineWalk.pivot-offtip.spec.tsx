@@ -8,10 +8,6 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import type { AppController } from '../../../src/hooks/useAppController';
 
-// An engine line with a pivot, clicked off the tip of a variation, must play the switch as it does at the tip, not stop at the
-// pivot's replacement ("Choose a replacement", the other side "(waiting)"). The walk below runs over the real controller and a
-// scripted search: the search answers with the pivot line on a normal position and with the one-sided replacement on a position that
-// waits for it.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
@@ -58,7 +54,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A loaded replay with a variation from turn 2 that knows U-turn and has played two turns by hand. */
 async function variationWithPivot() {
   const replay = singlesReplay();
   const { result } = renderHook(() => useAppController());
@@ -77,7 +72,8 @@ async function variationWithPivot() {
     const sim = result.current.ctx.branch.simState!;
     const quiet = sim.p1MovesBySlot[0].find(move => move.name === 'Swords Dance')!;
     act(() => result.current.ctx.branch.setChoice('p1', { kind: 'move', moveId: toId(quiet.name), moveName: quiet.name }, 0));
-    const reply = sim.p2MovesBySlot[0].find(move => move.name === 'Sucker Punch')!; // fails against a status move: the quiet turns hurt nobody
+    // Sucker Punch fails against a status move: the quiet turns hurt nobody.
+    const reply = sim.p2MovesBySlot[0].find(move => move.name === 'Sucker Punch')!;
     act(() => result.current.ctx.branch.setChoice('p2', { kind: 'move', moveId: toId(reply.name), moveName: reply.name }, 0));
     const before = result.current.ctx.branch.history.length;
     await act(async () => { await result.current.handleExecuteTurn(); });

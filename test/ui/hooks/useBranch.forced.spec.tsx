@@ -12,13 +12,6 @@ import { turnDiceMarks, sideMarkTexts } from '../../../src/lib/branch-dice-marks
 
 const mon = (species: string, moves: string[]) => setOf(species, moves, { level: 50 });
 
-/**
- * A forced replacement the engine filled waits for Execute. The branch records a pick
- * without its follow-ups (`recordChoice`: no command is sent although the replacing side is complete), and `executePending`
- * sends the forced replacement the dock holds, or the turn when no replacement is open. A bench click (`setChoice`) still sends
- * at once. Singles and doubles, on the pivot scenes of the dice pause rows below (a Volt Switch pauses the turn
- * for the replacement of one side).
- */
 const SCENES = [
   {
     kind: 'singles', format: 'gen9ou',
@@ -93,8 +86,6 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
     expect(result.current.history[1].kind).toBe('forced');
   }, 180_000);
 
-  // The bench click publishes its pick before the send goes out, so the dock's chip shows the clicked body (and
-  // Execute reads "Executing...") for the moments the send takes, not "choose a replacement" or the engine's earlier pick.
   test('a click on the bench publishes the clicked body while the send is under way', async () => {
     const result = await atForcedPosition();
     const forcedSlot = result.current.simState!.p1ForceSwitches.findIndex(Boolean);
@@ -125,12 +116,6 @@ describe.each(SCENES)('the branch at a forced replacement, $kind', scene => {
   }, 180_000);
 });
 
-/**
- * Doubles with both slots of P1 forced: Garchomp's Explosion also faints the ally Magikarp, so P1 owes
- * two replacements. The branch holds both recorded picks without sending anything (the dock records the click while the other
- * slot holds only the engine's pick), and `executePending` then sends the side's command once. A single slot of one side is
- * covered above; singles have one slot per side, so the rule has nothing to hold back there.
- */
 describe('the branch at a forced replacement of both slots of one side, doubles', () => {
   const p1 = [mon('Garchomp', ['explosion']), mon('Magikarp', ['splash']), mon('Clefable', ['protect']), mon('Snorlax', ['protect'])];
   const p2 = [mon('Blissey', ['protect']), mon('Chansey', ['protect']), mon('Skarmory', ['protect'])];
@@ -175,13 +160,7 @@ describe('the branch at a forced replacement of both slots of one side, doubles'
   }, 180_000);
 });
 
-
-/**
- * The scene of the e2e case `turn-dock-forced` (the hand-written Doubles OU replay `gen9doubles-forced-test`). Two
- * Mementos faint both bodies of P1 whatever the dice roll, as long as neither foe protects: Memento's accuracy is 100 and the user
- * faints when it hits. The case above takes a corpus turn whose two faints depend on the damage rolls, and the sim never asked for both
- * replacements there. The sim asks P1 for two replacements here, and P2 for none.
- */
+// Memento (accuracy 100) faints its user on a hit, so both of P1 go whatever the dice roll unless a foe protects.
 describe('two Mementos force both slots of P1 and no slot of P2, doubles', () => {
   const p1 = [mon('Pikachu', ['memento', 'quickattack', 'protect']), mon('Eevee', ['memento', 'quickattack', 'protect']),
     mon('Raichu', ['thunderbolt']), mon('Jolteon', ['thunderbolt']), mon('Vaporeon', ['scald']), mon('Flareon', ['flamecharge'])];
@@ -210,7 +189,6 @@ function fixture(kind: ReplayKind) {
   return { replayData, snapshots, p1Team, p2Team };
 }
 
-/** A recorded entry whose move the rebuilt team no longer knows (a set edit removed it). */
 const brokenEntry = (turnNumber: number, slots = 1) => ({
   turnNumber, kind: 'turn' as const, p1Choice: 'move 1', p2Choice: 'move 1', p1Active: null, p1ActiveSlots: [], p2Active: null,
   p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [],
@@ -281,8 +259,6 @@ describe('useBranch', () => {
     expect(result.current.executeError).toBeNull();
     expect(result.current.history).toHaveLength(1);
     expect(result.current.history[0]).toMatchObject({ turnNumber: 2, kind: 'turn', p1Choice: expect.stringMatching(/^move /) });
-    // The recorded position is the one after the turn: either turn 3 or, after a
-    // knock-out, the same turn waiting on a forced replacement.
     const after = result.current.simState!;
     expect(JSON.parse(result.current.history[0].serializedPosition!).turn).toBe(after.turnNumber);
     expect(after.turnNumber === 3 || after.p1ForceSwitch || after.p2ForceSwitch).toBe(true);
@@ -383,7 +359,6 @@ describe('useBranch', () => {
     });
     expect(result.current.simState?.p1Choices).toEqual([toBench, toBench]);
     await act(async () => { await result.current.executeTurn(); });
-    // The duplicate is caught before the sim sees it: nothing executes, nothing errors.
     expect(result.current.history).toHaveLength(0);
     expect(result.current.executeError).toBeNull();
     expect(result.current.simState?.turnNumber).toBe(1);
@@ -455,16 +430,14 @@ describe('useBranch-dice-lines', () => {
       const log = result.current.simState!.log;
       expect(log.some(line => line.startsWith(MESSAGE))).toBe(false);
       if (tookOf(result.current).took !== 'applied') {
-        // the move draws no miss here (a sure hit): the line says the die had no effect
         expect(entry.dieLines!.map(line => line.text)).toEqual([expect.stringMatching(/^Forced miss had no effect/)]);
         return;
       }
       expect(entry.dieLines).toHaveLength(1);
       const { at, text } = entry.dieLines![0];
       expect(text).toMatch(/^Forced: .+ misses, \d+(\.\d)? %$/);
-      // the chance printed is the miss's own: the report holds the simulator's chance of the hit, the line names its complement
+      // The report holds the hit's chance; the line names its complement.
       expect(text.endsWith(`, ${Math.round((1 - tookOf(result.current).chance!) * 1000) / 10} %`)).toBe(true);
-      // the line stands where the die decided: the next line of the shown log is the miss it caused
       expect(log[at].startsWith('|-miss|')).toBe(true);
       const frame = frameOf(result.current);
       expect(frame[frame.indexOf(`|-message|${text}`) + 1].startsWith('|-miss|')).toBe(true);
@@ -476,10 +449,8 @@ describe('useBranch-dice-lines', () => {
       const lines = result.current.history[0].dieLines!;
       expect(lines).toHaveLength(1);
       expect(lines[0].text).toMatch(/^Forced zzz had no effect: /);
-      // The history row and the share link read the marks of the same report
       expect(result.current.history[0].diceMarks).toEqual({ p1: [{ label: expect.stringContaining('zzz'), noEffect: expect.any(String) }], p2: [] });
       const log = result.current.simState!.log;
-      // before the end of the turn: the next shown line closes it
       expect(['upkeep', 'turn', 'win', 'tie']).toContain(log[lines[0].at]?.split('|')[1]);
       const frame = frameOf(result.current);
       expect(frame.filter(line => line.startsWith(MESSAGE))).toHaveLength(1);
@@ -576,8 +547,6 @@ describe.each(SCENES)('a turn that pauses for a switch, $kind', scene => {
     expect(forcedLines(again)).toEqual(lines);
   }, 180_000);
 
-  // The viewer plays `finalLog` without a simulator, so the display lines must be in it, and the turn's choice carries the labels of both
-  // dice once.
   test('a share link carries the display lines in its log and the labels of both dice on the turn, and the viewer shows them', async () => {
     const current = await play();
     const finalLog = branchFrameLog(current.simState!.log, current.history.flatMap(entry => entry.dieLines ?? []));

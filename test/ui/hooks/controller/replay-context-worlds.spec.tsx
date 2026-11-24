@@ -7,13 +7,7 @@ import { doublesReplay } from '../../fixtures/replay';
 import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
 
-/**
- * The app's format meta reads the worlds of a short-side game. A side that brought more bodies than it fielded
- * gives one world per guess, weighted by the usage counts of the format's statistics; the heaviest world is the one the user plays
- * (`bringOnlyLists` carries its guess, the bench lists its body). A game that brought all it could, a pinned game and a bring-all
- * game give no worlds. Doubles (VGC, Champions VGC) and singles (Battle Stadium Singles) run the same
- * code; the rows below play both.
- */
+// The heaviest world is the one the user plays; `bringOnlyLists` carries its guess.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));
 const usage = vi.hoisted(() => ({ stats: null as SmogonUsageStats | null }));
 vi.mock('../../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
@@ -30,12 +24,9 @@ const statsOf = (counts: [string, number][]): SmogonUsageStats => ({
 });
 
 const fixture = (file: string) => JSON.parse(readFileSync(`test/e2e/fixtures/${file}`, 'utf-8')) as ReplayData;
-/** Champions VGC 2625939941: P1 fielded Farigiraf, Basculegion, Lopunny and never the fourth (Ceruledge, Ninetales-Alola or Kingambit). */
 const championsShort = () => fixture('dock-championsvgc-2625939941.json');
-/** Champions VGC 2623421463: both sides fielded all four. */
 const championsPinned = () => fixture('dock-championsvgc-2623421463.json');
 
-/** Battle Stadium Singles, bring 3 of 6: P1 fielded Garchomp and Gholdengo, P2 all three. */
 const BSS_MONS = ['Garchomp', 'Gholdengo', 'Kingambit', 'Dragonite', 'Corviknight', 'Glimmora'];
 const bssShort = (): ReplayData => ({
   id: 'synthetic-bss', formatid: 'gen9battlestadiumsinglesregh', format: '[Gen 9] Battle Stadium Singles Regulation H',
@@ -77,7 +68,6 @@ describe('the worlds of a short-side game in the format meta', () => {
     expect(worlds.reduce((sum, world) => sum + world.weight, 0)).toBeCloseTo(1, 12);
     expect(worlds[0].weight).toBeGreaterThan(worlds[1].weight);
     expect(worlds.every(world => world.guessed.p1 === 1 && world.guessed.p2 === 0)).toBe(true);
-    // The user plays the heaviest world: its four bodies, the guess last and marked as one.
     expect(meta.bringOnlyLists).toEqual({ p1: worlds[0].p1, p2: worlds[0].p2, guessed: { p1: 1, p2: 0 } });
     expect(meta.bringOnlyLists?.p1).toHaveLength(4);
     expect(meta.bringOnlyLists?.p1.slice(0, 3).sort()).toEqual(['Basculegion', 'Farigiraf', 'Lopunny']);

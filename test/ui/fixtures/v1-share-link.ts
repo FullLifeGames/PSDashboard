@@ -1,9 +1,4 @@
-/**
- * A `#branch=` share link as the v1 app built it: the replay 450650, branched at turn 17 with Stone Edge
- * for Landorus-Therian and played three turns, sets named for their species, `finalLog` framed by the v1 `branchFrameLog`
- * (the simulator's lines rewritten into the replay's nicknames and flags). Generated once from the v1 code; the current code never
- * rewrites a carried log, so the link must play as it did.
- */
+/** A v1 `#branch=` share link, generated once from the v1 code: the current code never rewrites a carried log. */
 export const V1_SHARE_LINK = [
   'eyJ2ZXJzaW9uIjoxLCJyZXBsYXlJZCI6InNtb2d0b3Vycy1nZW43b3UtNDUwNjUwIiwiZm9ybWF0IjoiW0dlbiA3XSBPVSIsImZvcm1hdGlkIj',
   'oiZ2VuN291IiwicGxheWVycyI6WyJGdWxsTGlmZUdhbWVzIiwiU1RBUlNQQU5HTEVETEFYRVIiXSwiYnJhbmNoVHVybiI6MTcsImNyZWF0ZWRB',

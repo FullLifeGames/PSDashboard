@@ -12,7 +12,6 @@ type Inputs = Parameters<typeof useGameAnalysis>[0];
 const { replayData, snapshots } = replayFixture('singles');
 const turns = finalPlayedTurn(snapshots);
 
-/** A finished sweep cut to the replay's played turns. */
 function sweptGraph(overrides: Partial<Evaluation['graph']> = {}): Evaluation['graph'] {
   const full = evalGraph('singles');
   const cut = <T,>(list: T[]) => list.slice(0, turns);
@@ -46,7 +45,7 @@ describe('the graph shares (the graph and the card read one map in every engine 
     const shares = overview.current.faintedShares;
     expect(shares).toHaveLength(last);
     expect(shares.every(share => share !== null)).toBe(true);
-    // The short doubles fixture has no faint before its last turn: only the singles game holds a share above the opening one.
+    // The short doubles fixture has no faint before its last turn: only singles holds a share above the opening one.
     if (kind === 'singles') expect(Math.max(...shares.map(share => share ?? 0))).toBeGreaterThan(0);
     for (const turn of [1, Math.ceil(last / 2), last]) {
       const { result } = renderHook(() => useGameAnalysis({ ...base, analysisTurn: turn }));
@@ -68,7 +67,6 @@ describe('useGameAnalysis', () => {
     expect(report).not.toBeNull();
     expect(typeof report!.summary).toBe('string');
     expect(['p1', 'p2', null]).toContain(report!.winner);
-    // The feedback harness reads the same objects through the window handle.
     const debug = (window as Window & { __psDebug?: { gameReport: unknown } }).__psDebug;
     expect(debug?.gameReport).toBe(report);
   });

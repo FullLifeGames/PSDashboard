@@ -117,8 +117,6 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.maxTurn).toBe(result.current.ctx.replay.snapshots.length);
     expect(result.current.ctx.branch.branching).toBe(false);
   });
-  // A saved game opens on its tip. The frame of a game that opens at start (a reload) is not there yet and
-  // reports turn 1 while it loads; the landing holds the pointer against that report like any selection of a turn does.
   test('a saved game opened on its tip keeps the pointer there when the loading frame reports turn 1', async () => {
     const record = await playedRecord(1);
     const { result } = renderHook(() => useBoardHarness());
@@ -127,14 +125,11 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.viewTurn).toBe(2);
     act(() => result.current.board.timeline.handleReplayTurn(1));
     expect(result.current.board.timeline.viewTurn).toBe(2);
-    // the frame that confirms the tip ends the guard, and its later reports move the pointer again
     act(() => result.current.board.timeline.handleReplayTurn(2));
     act(() => result.current.board.timeline.handleReplayTurn(1));
     expect(result.current.board.timeline.viewTurn).toBe(1);
   }, 90_000);
 
-  // The landing holds its turn until the frame confirms it, however long the load takes: a slow load outran the four-second guard and
-  // the frame's report of turn 1 moved the pointer off the tip.
   test('a saved game keeps its tip against a report of turn 1 that comes after the guard time of a selection', async () => {
     const record = await playedRecord(1);
     const { result } = renderHook(() => useBoardHarness());
@@ -164,7 +159,6 @@ describe('useTimelineController', () => {
     expect(result.current.board.timeline.viewTurn).toBe(1);
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 60_000 });
     try {
-      // the frame confirms the click, and its later reports move the pointer again
       act(() => result.current.board.timeline.handleReplayTurn(1));
       act(() => result.current.board.timeline.handleReplayTurn(2));
       expect(result.current.board.timeline.viewTurn).toBe(2);
@@ -173,10 +167,6 @@ describe('useTimelineController', () => {
     }
   }, 90_000);
 
-  // The observed order of a reload on `?game=`: the address opens the record
-  // first; the board mounts afterwards, while the new game's replay data has no id yet. Its reset effect ran then, took the landing and
-  // put the pointer on the tip, and the run for the new id (the document arriving) reset the pointer to turn 1 and found no landing
-  // left. The landing belongs to the game's id: a run for another id (none yet) leaves it, the run for the game's id takes it.
   test('a saved game opened before the board mounts keeps its tip when the replay data arrives after the first run of the reset', async () => {
     const record = await playedRecord(1);
     const seen: { ctx?: ReturnType<typeof useReplayContext>; board?: ReturnType<typeof useTimelineController>; show?: (on: boolean) => void } = {};

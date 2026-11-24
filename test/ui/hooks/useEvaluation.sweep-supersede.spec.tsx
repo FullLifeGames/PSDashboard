@@ -4,8 +4,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings } from '@fulllifegames/eval-engine';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 
-// A single evaluation started while a sweep runs must clear the sweep's running flag, or "analyzing… turn 0/2" and Cancel stay on screen.
-// The sweep is the same code for singles and doubles (the game type only picks the engine), so the specs run on its own surface.
+// The sweep is the same code for singles and doubles (the game type only picks the engine).
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
 }));
@@ -31,7 +30,6 @@ const matrixPrefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as 
 const position = JSON.stringify({ sides: [{ pokemon: [{ hp: 100, fainted: false }] }] });
 
 beforeEach(() => {
-  // The sweep's searches never answer: the sweep stays running until something stops it.
   script.evaluate = () => new Promise<EvalResult>(() => {});
 });
 afterEach(() => localStorage.clear());

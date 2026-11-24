@@ -4,8 +4,6 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { BiggestRoll, EvalResult, EvalSettings } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/** The sweep's last stage replays the biggest roll the other way; a missing copy, a failed evaluation and a cached one are silent. */
-
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
   calls: [] as { serialized: string; settings: EvalSettings }[],
@@ -94,8 +92,6 @@ describe('the sweep\'s biggest-roll stage', () => {
   });
 
   test('the pool gives its workers back before the copy\'s worker spawns: the stage never runs a worker beside a full pool (573756 died of it)', async () => {
-    // 573756 holds twelve pool workers and the replay worker at the end of its sweep, about 6.2 GB in the renderer: a worker of the copy's own
-    // took the page down.
     const { params } = sweepOf(roll, { serialized: COPY_AT, stage: 'request', terminal: null });
     await runSweeps(params);
     const playing = script.events.indexOf('copy plays');
@@ -165,7 +161,6 @@ describe('the sweep\'s biggest-roll stage', () => {
   });
 
   test('a second sweep of a game that ends in the copy reads the end from the cache: no new copy (one code path for singles, doubles and VGC)', async () => {
-    // The terminal score is cached too: a second sweep of 2629703929 (turn 10) plays no copy.
     const { params, playCopy } = sweepOf(roll, { serialized: COPY_AT, stage: 'ended', terminal: -1 });
     const result = await runSweeps(params, 2);
     expect(playCopy).toHaveBeenCalledTimes(1);

@@ -4,8 +4,6 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings, ReplacementPoint, ReplacementRound } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-/** The sweep's replacement stage over a scripted worker pool; a round the capture did not reach stays a silent gap. */
-
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
   calls: [] as { serialized: string; settings: EvalSettings }[],

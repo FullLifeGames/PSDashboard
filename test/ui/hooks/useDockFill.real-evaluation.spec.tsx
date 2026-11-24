@@ -4,12 +4,6 @@ import type { BranchSlotChoice, EvalResult } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * The key of the fill moves while an evaluation is under way (a forced replacement is sent and
- * the next request of the same turn begins; both carry the evalViewKey `variation:2`). The run that was under way belongs to the
- * request before; its result must not fill the new request. The fill starts its own run for it and applies that one.
- */
-
 const script = vi.hoisted(() => ({ evaluate: null as null | (() => Promise<EvalResult>) }));
 
 vi.mock('../../../src/lib/eval/worker-client', async (importOriginal) => {
@@ -66,7 +60,6 @@ describe('useDockFill: the key moves while a run is under way', () => {
     rerender({ history: 2 });
     await waitFor(() => expect(runs).toHaveLength(2));
     expect(result.current.fill.pending).toBe(true);
-    // The first run lands late: it is the replacement's analysis, so it fills nothing.
     await act(async () => runs[0](evalResult(kind)));
     expect(setChoice).not.toHaveBeenCalled();
     expect(result.current.fill.engine).toEqual({ p1: [], p2: [] });
@@ -106,7 +99,6 @@ describe('useDockFill: the key moves while a run is under way', () => {
       historyLength: 1, sessionKey: 's', handleEvaluate, getChoices: () => ({ p1: [], p2: [] }), setChoice, executeTurn: async () => null,
     };
     const { rerender } = renderHook((props: typeof wired) => useDockFill(props), { initialProps: wired });
-    // The key moves while the run is under way and the game analysis starts: the fill may not run.
     rerender({ ...wired, historyLength: 2, evaluation: evaluationOf('searching', null, true) });
     const landed = evalResult('singles');
     rerender({ ...wired, historyLength: 2, evaluation: evaluationOf('done', landed, true), liveEvalStatus: 'done' });
@@ -116,11 +108,7 @@ describe('useDockFill: the key moves while a run is under way', () => {
   });
 });
 
-/**
- * The first frame of a new position. The previous request's run stands done with the same tag, so the render in which
- * the key moves has no run under way and no tag to tell it apart. `pending` must hold there already, until the fill's own run
- * lands or fails.
- */
+// The previous request's run stands done with the same tag: in the render where the key moves nothing tells them apart.
 describe('useDockFill: the first frame of a new key', () => {
   function renderFilled(kind: FormatKind) {
     const pendingByRender: boolean[] = [];
@@ -146,7 +134,6 @@ describe('useDockFill: the first frame of a new key', () => {
     await settleFirstRequest(kind, runs, view);
     const before = view.pendingByRender.length;
     view.rerender({ history: 2 });
-    // The first render of the new key: the old result stands done under the same tag, and the fill has not started its run yet.
     expect(view.pendingByRender[before]).toBe(true);
     await waitFor(() => expect(runs).toHaveLength(2));
     expect(view.pendingByRender.slice(before).every(Boolean)).toBe(true);

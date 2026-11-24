@@ -27,10 +27,6 @@ afterEach(() => {
   root.style.removeProperty('--ps-scale');
 });
 
-/**
- * Below 1050 px the dock is fixed, so the page pads by its height and the tray stands on top of it.
- * The hook writes the height as a CSS custom property on the root element from a ResizeObserver; React state stays out of it.
- */
 describe('useDockHeight', () => {
   test('writes the dock\'s height at once, follows the observer, and removes the property with the dock', () => {
     const observer = stubObserver();
@@ -59,10 +55,7 @@ describe('useDockHeight', () => {
     expect(read()).toBe('');
   });
 
-  /**
-   * Under the root's zoom `getBoundingClientRect` reads visual pixels (150 for a 100 px box at 150 %, Chromium
-   * and WebKit), while the property feeds a CSS length inside the zoomed tree. The hook divides by the factor the root carries.
-   */
+  // Under the root's zoom getBoundingClientRect reads visual pixels (Chromium, WebKit): 150 for a 100 px box at 150 %.
   test.each([[1.5, 150, '100px'], [2, 301, '151px'], [1.25, 125, '100px'], [1, 120, '120px']])(
     'at the root factor %f a box of %f visual px writes %s',
     (factor, visual, expected) => {

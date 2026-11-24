@@ -7,7 +7,6 @@ const bench = (name: string, species = name, fainted = false) => ({ name, specie
 
 type Offered = Pick<BranchSimState, 'p1MovesBySlot' | 'p2MovesBySlot' | 'p1SwitchesBySlot' | 'p2SwitchesBySlot'>;
 
-/** Singles: one slot per side. Doubles: two. */
 const singles: Offered = {
   p1MovesBySlot: [[move('Waterfall'), move('Roost', true)]], p2MovesBySlot: [[move('Roost')]],
   p1SwitchesBySlot: [[bench('Garchomp'), bench('Toxapex', 'Toxapex', true)]], p2SwitchesBySlot: [[]],

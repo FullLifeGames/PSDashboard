@@ -3,8 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useOpenAddress } from '../../../src/hooks/useOpenAddress';
 import { savedRecord } from '../fixtures/saved-game';
 
-/** `?game=<id>` names a game, `?replay=<id>` a replay loaded by link or id, a file has none. Written with `replaceState`, read once at start, left alone in embed mode and behind `#branch=`. */
-
 type Inputs = Parameters<typeof useOpenAddress>[0];
 const inputs = (overrides: Partial<Inputs> = {}): Inputs => ({
   embed: false, requestedGame: null, replayId: null, viewpoint: 'p1', byLink: false, openRecord: vi.fn().mockResolvedValue(undefined), ...overrides,

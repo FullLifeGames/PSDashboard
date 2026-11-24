@@ -16,7 +16,7 @@ function setup(search: string, hash = '') {
   return { ...hook, loadReplay, loadReplayFile };
 }
 
-/** A host message: the app answers `event.source`, which jsdom only accepts as a window. */
+// jsdom accepts `event.source` only as a window, and the app answers it.
 function postFromHost(replay: string) {
   window.dispatchEvent(new MessageEvent('message', { data: { type: 'ps-load-replay', replay }, source: window }));
 }

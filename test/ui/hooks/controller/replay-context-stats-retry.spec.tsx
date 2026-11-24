@@ -4,9 +4,6 @@ import type { ReplayData } from '@fulllifegames/replay-core';
 import { singlesReplay } from '../../fixtures/replay';
 import { realReplayWorkerClient } from '../../fixtures/worker';
 
-// The context runs its real hooks; the replay worker is the real job handler
-// on this thread, and the network serves the fixture replays and, once it is
-// back, the format's usage stats.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
@@ -15,7 +12,6 @@ const { useReplayContext } = await import('../../../../src/hooks/controller/repl
 const statsFile = { pokemon: { Garchomp: { count: 1000, abilities: { 'Rough Skin': 1 }, items: { Leftovers: 1 }, moves: { Earthquake: 1 }, spreads: { 'Jolly:0/252/0/0/4/252': 1 } } } };
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
 
-/** Replays by id; the Smogon hosts fail like a dropped connection until `online` is set. */
 function stubNetwork(replays: ReplayData[], network: { online: boolean }) {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);

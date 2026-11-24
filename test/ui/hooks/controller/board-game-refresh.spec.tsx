@@ -26,12 +26,6 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-/**
- * The seed of a game reaches every path that builds a battle for it. A variation of a game from turn 0 starts
- * the game's own battle; the refresh after a team edit rebuilds it from turn 0 again and must start the same battle, so the dice of
- * the variation do not change under an edit that leaves the moves alone (the other callers: `useDeviation` and `useRestoreVariation`
- * pass the seed through `executeRebuild`; the game's main line rebuilds from its record, which holds the seed).
- */
 const norm = (log: unknown) => JSON.stringify(log).replace(/\|t:\|\d+/g, '');
 
 describe('a variation of a game from turn 0 after a team edit', () => {
@@ -61,8 +55,6 @@ describe('a variation of a game from turn 0 after a team edit', () => {
     const before = result.current.ctx.branch.getBattle()!.prng.getSeed();
     const logBefore = norm(result.current.ctx.branch.getLog());
 
-    // A team edit that changes nothing in the sets (the team knowledge as it stands): the refresh replays the lead entry and the turn, so the
-    // dice are the same exactly when the rebuilt battle starts on the game's own seed. (A restore of the same history passes without the fix.)
     const { effectiveP1Info, effectiveP2Info } = result.current.ctx.knowledge;
     act(() => result.current.ctx.refreshQueue.handleTeamsEdited({ p1: effectiveP1Info!, p2: effectiveP2Info! }));
     await waitFor(() => expect(result.current.ctx.refreshQueue.pendingBranchRefresh).toBeNull(), { timeout: 60_000 });

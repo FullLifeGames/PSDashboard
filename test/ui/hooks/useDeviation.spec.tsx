@@ -88,7 +88,6 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6]).toMatchObject({ p1Choices: prefill.p1Choices });
   }, 60_000);
 
-  // The executor refuses the picked turn after the rebuild replaced the variation.
   describe('a refused execute after the rebuild', () => {
     const prefill = { p1Choices: [{ kind: 'move' as const, moveId: 'toxicspikes', moveName: 'Toxic Spikes' }], p2Choices: [] };
 
@@ -104,7 +103,6 @@ describe('useDeviation', () => {
       act(() => confirm.proceed());
       await waitFor(() => expect(startCalls(wired)).toHaveLength(2), { timeout: 30_000 });
 
-      // The first start replaced the variation at the viewed turn; the second brings the old one back whole.
       expect(startCalls(wired)[0][4]).toBe(3);
       expect(startCalls(wired)[0][6].replayHistory).toEqual([]);
       expect(startCalls(wired)[1][4]).toBe(2);
@@ -180,7 +178,6 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][4]).toBe(3);
   }, 60_000);
 
-  // A caller that arms a run (the play-out) learns when the deviation really starts.
   test('onStart fires when the deviation runs: at once without a variation, after the yes next to one, never on cancel', async () => {
     const wired = inputs();
     const free = renderHook(() => useDeviation(wired));
@@ -195,14 +192,12 @@ describe('useDeviation', () => {
     act(() => asks.result.current.requestDeviation(null, { onStart: armed }));
     expect(armed).not.toHaveBeenCalled();
     const confirm = (standing.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void };
-    // Cancel is the banner dropping the confirm: the proceed callback never runs.
     expect(armed).not.toHaveBeenCalled();
     act(() => confirm.proceed());
     expect(armed).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
   }, 60_000);
 
-  // The notice of a finished run belongs to the line it ran on; a deviation ends it.
   test('onDeviate fires when a deviation or a lead variation really starts, and not while the replace confirm waits', async () => {
     const onDeviate = vi.fn();
     const standing = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }), onDeviate });
@@ -242,7 +237,6 @@ describe('useDeviation', () => {
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
     expect(turn).toBe(2);
-    // One executed turn kept, and the forced interlude that belongs to it.
     expect(options.replayHistory).toEqual([history[0], history[1]]);
     expect(wired.timeline.setViewTurn).not.toHaveBeenCalled();
   }, 60_000);
@@ -295,7 +289,6 @@ describe('useDeviation', () => {
     act(() => result.current.startLeadVariation({ p1: ['Garchomp'], p2: ['Great Tusk'] }, { onStart }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
-    // The new game's tip is followed even when its span matches the one it replaces.
     expect(wired.timeline.followNextTip).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
@@ -339,7 +332,6 @@ type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] 
 describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) => {
   const fixture = replayFixture(kind);
 
-  /** The hook over a viewed position of the fixture, and the picks a user could click there (one move per slot and side). */
   async function viewedPosition() {
     const { result } = renderHook(() => {
       const branch = useBranch();
@@ -357,7 +349,6 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
       return { branch, deviation: useDeviation(inputs), draft, setDraft };
     });
 
-    // The viewed position's moves: one throwaway branch at the turn shows what the picker would offer there.
     await act(async () => { await result.current.deviation.rebuildAt({ turn, line: 'main' }, null); });
     await waitFor(() => expect(result.current.branch.simState).not.toBeNull(), { timeout: 120_000 });
     const before = result.current.branch.simState!;
@@ -383,7 +374,6 @@ describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) =
     expect(result.current.branch.executeError).toBeNull();
     const entry = result.current.branch.history[0];
     expect(entry.p1SlotChoices![0]).toMatchObject({ dice: [die] });
-    // the user's report holds the user's die alone: the log's own results joined the turn but stay out of the user's view
     expect(entry.diceReport?.forced.map(report => report.die)).toEqual([die]);
     expect(['applied', 'no-draw', 'no-chance', 'blocked']).toContain(entry.diceReport!.forced[0].took);
   }, 300_000);

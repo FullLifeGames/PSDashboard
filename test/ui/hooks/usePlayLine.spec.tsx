@@ -6,7 +6,6 @@ import { lineHistory } from '../../../src/lib/line-history';
 import { lineAnchor } from '../../../src/lib/line-view';
 import { doublesLine, singlesLine } from '../fixtures/lines';
 
-/** ▶ Play restores the line through the saved-variation restore, asks first when a variation exists, clears the played-out notice and follows the new tip. */
 function appWith(variationSpan: { startTurn: number; length: number } | null, auto = true) {
   const restoreVariation = vi.fn().mockResolvedValue(undefined);
   const followNextTip = vi.fn();
@@ -52,7 +51,6 @@ describe('usePlayLine', () => {
     expect(result.current.confirm).toBeNull();
     act(() => result.current.onPlay(singlesLine, 20));
     expect(stub.restoreVariation).not.toHaveBeenCalled();
-    // the question stands at the clicked line (the host's `confirm`), not in the dock's banner (`pendingConfirm`)
     expect(stub.setPendingConfirm).not.toHaveBeenCalled();
     const confirm = result.current.confirm!;
     expect(confirm.anchor).toBe(lineAnchor(singlesLine, 20));

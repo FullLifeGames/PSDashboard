@@ -16,7 +16,6 @@ const sources = {
   hpEvidence: [], getInferredSpreads: async () => undefined,
 } as unknown as TeamBuildSources;
 
-/** A branch session whose handles are spies; `isPreparing` mirrors begin/end. */
 function fakeSession(): BranchSession {
   let preparing = false;
   return {
@@ -52,7 +51,6 @@ describe('useBranchRefresh', () => {
     expect(wired.session.begin).not.toHaveBeenCalled();
   });
 
-  // A game's own seed rides on the rebuild, a replay's rebuild names none (its default seed stays).
   test('the dice seed of a new game reaches the rebuild; a replay passes none', async () => {
     const game = args({ request: request(), gameSeed: '7,8,9,10', viewTurn: 0 });
     renderHook(() => useBranchRefresh(game));
@@ -120,7 +118,6 @@ describe('useBranchRefresh', () => {
     const { rerender } = renderHook((props: Args) => useBranchRefresh(props), { initialProps: wired });
     rerender({ ...wired, request: null });
     await new Promise(resolve => setTimeout(resolve, 50));
-    // The cancelled run neither ends the session nor clears a request it no longer owns.
     expect(wired.session.end).not.toHaveBeenCalled();
     expect(wired.clearRequest).not.toHaveBeenCalled();
   });

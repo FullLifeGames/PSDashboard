@@ -6,8 +6,6 @@ import { useOpenSharedGame, type SharedGameApp } from '../../../src/hooks/useOpe
 import { loadGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 
-/** A game's share link opens the main line and the open branch at the sharer's turn. The reader (`recordOfShare`, `game-share.spec.ts`) is stubbed: the rows hold the hook's own steps. */
-
 const opened = vi.hoisted(() => ({ result: null as unknown }));
 vi.mock('../../../src/hooks/branch/share-open', () => ({ recordOfShare: vi.fn(async () => opened.result) }));
 vi.mock('../../../src/lib/lazy/branch-engine', () => ({}));

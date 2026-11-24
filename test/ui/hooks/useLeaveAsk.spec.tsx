@@ -2,7 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useLeaveAsk } from '../../../src/hooks/useLeaveAsk';
 
-/** Start and loading a replay ask first when an unsaved variation is open: with nothing to lose the action runs at once, else it waits behind the question. */
 describe('useLeaveAsk', () => {
   test('with no unsaved variation the action runs at once and nothing is asked', () => {
     const run = vi.fn();

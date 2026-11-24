@@ -6,11 +6,6 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * The engine fill at the live tip of a variation. A stub evaluation stands in for the worker: the
- * spec reads when a run starts, what the result writes, and what Execute does while the run is pending.
- */
-
 type Evaluation = ReturnType<typeof useEvaluation>;
 type Choices = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
@@ -33,7 +28,7 @@ function evaluationOf(shape: Shape = {}) {
   return { evaluation, setPrefs };
 }
 
-/** The branch's pending picks, as the real hook keeps them: written in place, read at the moment. */
+// Pending picks are written in place and read at the moment, as the real hook keeps them.
 function branchOf(kind: FormatKind) {
   const slots = kind === 'doubles' ? 2 : 1;
   const choices: Choices = { p1: Array(slots).fill(null), p2: Array(slots).fill(null) };
@@ -171,7 +166,6 @@ describe('useDockFill: what the result writes', () => {
     branch.choices.p1[0] = user;
     const { result } = renderHook(() => useDockFill(wired));
     act(() => onResultOf(handleEvaluate)(doublesResult()));
-    // The best joint choice opens with Fake Out, so it disagrees with Flare Blitz: the second one decides.
     expect(branch.setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), 0);
     expect(branch.setChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'ragepowder' }), 1);
     expect(branch.choices.p1[0]).toBe(user);
@@ -315,7 +309,6 @@ describe('useDockFill: the rule against jumping', () => {
     const { result } = renderHook(() => useDockFill(wired));
     act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
     act(() => result.current.queueExecute());
-    // The dock closes the tray on the Execute press, before the result lands.
     act(() => result.current.holdTray(null));
     await act(async () => onResultOf(handleEvaluate)(doublesResult()));
     expect(branch.choices.p1[0]).not.toBeNull();
@@ -460,7 +453,6 @@ describe('useDockFill: a forced replacement is filled like any slot', () => {
   const fluttermane = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
   const wait = rankedChoice('wait', '(waiting)', 0);
 
-  /** The replacing side's ranked bench, the waiting side's single "wait" line (the evaluation at an open request). */
   const benchOf = (kind: FormatKind, side: 'p1' | 'p2') => {
     const label = { singles: { p1: 'Heatran', p2: 'Rotom-Wash' }, doubles: { p1: 'Flutter Mane', p2: 'Kingambit' } }[kind][side];
     return rankedChoice(kind === 'doubles' ? 'switch 3' : 'switch 2', `→ ${label}`, 0.2);

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { useLayoutHeight } from '../../../src/hooks/useLayoutHeight';
 
-/** The layout's height goes to the layout element as `--ps-layout-h` from a ResizeObserver, with no React state; a height of 0 writes nothing. */
 function Probe({ height = 700 }: { height?: number }) {
   const attach = useLayoutHeight();
   return <div data-testid="layout" ref={element => { if (element) Object.defineProperty(element, 'clientHeight', { configurable: true, value: height }); attach(element); }} />;

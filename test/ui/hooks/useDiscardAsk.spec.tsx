@@ -2,11 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useDiscardAsk } from '../../../src/hooks/useDiscardAsk';
 
-/**
- * Discard variation asks first once the variation has a played turn, through the same banner as
- * the leave question. A variation with no played turn discards at once. The count is the variation's turns, singles and doubles
- * alike (`turnEntryCount`), so one row per count covers both game types.
- */
 describe('useDiscardAsk', () => {
   test('no played turn: the variation goes at once and nothing is asked', () => {
     const discard = vi.fn();

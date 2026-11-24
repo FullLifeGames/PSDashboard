@@ -6,14 +6,6 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * Hard mode in the turn dock. The move in hand is the side whose slots the user set (a slot with a pick that no fill
- * wrote), provided the other side holds none: that other side is the opponent, and the fill writes the reply that hurts the joint
- * choice of the side in hand most (`worstReply`) where it wrote its best row before. A doubles side in hand counts with its partner
- * slot, which the fill wrote from the best joint choice that agrees. After the fill, a pick of the user in the event handler
- * (`onUserChoice` with the pick) writes the opponent's slots again. Setting off, the fill is unchanged.
- */
-
 describe('useDockFill.hard', () => {
   type Evaluation = ReturnType<typeof useEvaluation>;
   type Choices = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
@@ -51,13 +43,13 @@ describe('useDockFill.hard', () => {
 
   const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...(targetLoc === undefined ? {} : { targetLoc }) });
 
-  /** Singles: Earthquake and Swords Dance (p1) against Leech Seed, Body Press and the switch to Rotom-Wash. Earthquake is hurt most by the switch, Swords Dance by Body Press. */
+  // Earthquake is hurt most by the switch to Rotom-Wash, Swords Dance by Body Press.
   function singles(): EvalResult {
     const base = evalResult('singles');
     return { ...base, matrix: { ...base.matrix!, values: [[0.35, 0.25, 0.15], [0.25, 0.05, 0.15], [0, -0.1, -0.2]] } };
   }
 
-  /** Doubles: three joint choices a side the pickers map. R1 is hurt most by B, R2 by C, R3 by A. */
+  // R1 is hurt most by B, R2 by C, R3 by A.
   function doubles(): EvalResult {
     const rows = (rows: [string, string][]) => rows.map(([choice, label], index) => rankedChoice(choice, label, 0.3 - 0.1 * index));
     const p1 = rows([['move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus'], ['move flareblitz 1, move ragepowder', 'Flare Blitz → Rillaboom + Rage Powder'], ['move fakeout 1, move protect', 'Fake Out → Rillaboom + Protect']]);
@@ -102,7 +94,6 @@ describe('useDockFill.hard', () => {
     test('doubles, on: both slots of a side set by the user read as one joint row; the opponent takes its worst joint answer slot by slot', () => {
       const { setChoice, hook, land } = setup('doubles', true, { p1: [move('flareblitz', 'Flare Blitz', 1), move('ragepowder', 'Rage Powder')] });
       land(doubles());
-      // row R2 is hurt most by C
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'fakeout', targetLoc: 1 }), 0);
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'protect' }), 1);
       expect(setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), expect.anything());
@@ -113,7 +104,6 @@ describe('useDockFill.hard', () => {
       const { setChoice, land } = setup('doubles', true, { p1: [move('fakeout', 'Fake Out', 1), null] });
       land(doubles());
       expect(setChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'spore' }), 1);
-      // R1 (Fake Out + Spore) is hurt most by B
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'woodhammer' }), 0);
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'taunt' }), 1);
     });
@@ -145,7 +135,6 @@ describe('useDockFill.hard', () => {
       const { setChoice, hook, land } = setup('doubles', true);
       land(doubles());
       setChoice.mockClear();
-      // the engine wrote R1 (Fake Out + Spore) on slot 0 and 1; the user swaps slot 1 to Protect: Fake Out + Protect is R3, hurt most by A
       act(() => hook.result.current.onUserChoice('p1', 1, move('protect', 'Protect')));
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'grassyglide', targetLoc: 1 }), 0);
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'tailwind' }), 1);
@@ -171,12 +160,6 @@ describe('useDockFill.hard', () => {
     });
   });
 
-  /**
-   * "Back to the engine's pick". The fill keeps what it chose for each slot (`picks`, frozen
-   * at the fill); `restore(side, slot)` hands that choice back for the dock to write, marks the slot as the engine's again, and answers
-   * for the opponent: Hard mode on, its engine slots get the reply to the restored pick (the pick's own rule, `onUserChoice`); off, they
-   * get the opponent's fill as it was at the start. A slot the fill never wrote has nothing to restore. Singles and doubles.
-   */
   describe('useDockFill: Back to the engine\'s pick', () => {
     const turnOff = (wired: { evaluation: Evaluation }, hook: { rerender: () => void }) => { wired.evaluation = evaluationOf(false); hook.rerender(); };
 
@@ -190,9 +173,7 @@ describe('useDockFill.hard', () => {
       let back: BranchSlotChoice | null = null;
       act(() => { back = hook.result.current.restore('p1', 0); });
       expect(back).toEqual(expect.objectContaining({ moveId: 'earthquake' }));
-      // the opponent answers the restored pick again: Earthquake is hurt most by the switch to Rotom-Wash
       expect(setChoice).toHaveBeenCalledWith('p2', { kind: 'switch', speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' }, 0);
-      // the dock writes the user's own slot, the hook never does
       expect(setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), expect.anything());
       expect(hook.result.current.engine).toEqual({ p1: [true], p2: [true] });
     });
@@ -252,7 +233,6 @@ describe('useDockFill.hard', () => {
       const { setChoice, hook, land } = setup('doubles', true);
       land(doubles());
       expect(hook.result.current.picks.p1).toEqual([expect.objectContaining({ moveId: 'fakeout' }), expect.objectContaining({ moveId: 'spore' })]);
-      // the user swaps slot 1 to Protect (Fake Out + Protect is R3, answered by A), then goes back (Fake Out + Spore is R1, answered by B)
       act(() => hook.result.current.onUserChoice('p1', 1, move('protect', 'Protect')));
       expect(setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: 'grassyglide' }), 0);
       setChoice.mockClear();
@@ -269,7 +249,6 @@ describe('useDockFill.hard', () => {
       const { setChoice, hook, land, wired } = setupWired('doubles', true);
       land(doubles());
       const start = hook.result.current.picks.p2;
-      // Rage Powder on slot 1 stands for row R2, which C answers; the fill at the start had A
       act(() => hook.result.current.onUserChoice('p1', 1, move('ragepowder', 'Rage Powder')));
       expect(setChoice).toHaveBeenLastCalledWith('p2', expect.objectContaining({ moveId: 'protect' }), 1);
       turnOff(wired, hook);
@@ -306,7 +285,6 @@ function evaluationOf(shape: { status?: Evaluation['status']; running?: boolean;
 
 const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...(targetLoc ? { targetLoc } : {}) });
 
-/** A replay turn: the effective choices of the picker are the logged actions under the user's picks. */
 function replayInputs(state: BranchSimState, overrides: Partial<DockFillInputs> = {}) {
   const handleEvaluate = vi.fn<(options?: { onResult?: (result: EvalResult) => void }) => void>();
   const executeTurn = vi.fn();
@@ -332,9 +310,7 @@ const doublesResult = (): EvalResult => {
   return { ...base, perSide: { p1: base.perSide.p1, p2: [rankedChoice('move grassyglide 1, move tailwind', 'Grassy Glide → Incineroar + Tailwind', -0.25)] } };
 };
 
-/** Doubles: P1A logged Flare Blitz, P1B nothing (it flinched), both foes nothing. */
 const doublesTurn = () => simState('doubles', { p1Choices: [move('flareblitz', 'Flare Blitz', 2), null] });
-/** Singles: P2 logged Leech Seed, P1 nothing. */
 const singlesTurn = () => simState('singles', { p2Choices: [move('leechseed', 'Leech Seed')] });
 
 describe('useDockFill at a replay turn: when a run starts', () => {
@@ -400,13 +376,11 @@ describe('useDockFill at a replay turn: what the result writes', () => {
     act(() => result.current.arm());
     act(() => onResultOf(handleEvaluate)(doublesResult()));
     const written = result.current.choices;
-    // The best joint choice opens with Fake Out; the logged Flare Blitz makes the second one decide.
     expect(written?.p1[0]).toBeNull();
     expect(written?.p1[1]).toEqual(expect.objectContaining({ moveId: 'ragepowder' }));
     expect(written?.p2.map(choice => choice?.kind)).toEqual(['move', 'move']);
     expect(result.current.engine).toEqual({ p1: [false, true], p2: [true, true] });
     expect(result.current.pending).toBe(false);
-    // The view owns the choices: nothing is written into the branch or the draft.
     expect(setChoice).not.toHaveBeenCalled();
   });
 

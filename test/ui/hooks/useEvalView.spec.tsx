@@ -21,7 +21,6 @@ interface EvalShape {
   stopped?: Evaluation['stopped'];
 }
 
-/** The evaluation surface as the view hook reads it, every action a spy. */
 function evaluationOf(shape: EvalShape = {}) {
   const spies = { evaluate: vi.fn(), runGraphSweep: vi.fn(), markStale: vi.fn(), reset: vi.fn(), clearGraph: vi.fn(), dropGraphFrom: vi.fn(), setPrefs: vi.fn() };
   const prefs = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...shape.prefs } as Evaluation['prefs'];
@@ -70,7 +69,6 @@ describe('useEvalView', () => {
     expect(spies.evaluate.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
     act(() => view.result.current.handleAnalyzeGame());
     expect(spies.runGraphSweep.mock.calls[0][0]).toMatchObject({ ruleset: 'champions' });
-    // VGC outside Champions is its own rule set too.
     const vgc = { ...replayData, id: 'gen9vgc2026regi-2630181744', formatid: 'gen9vgc2026regi' };
     expect(renderHook(() => useEvalView(inputs(evaluation, { replayData: vgc }))).result.current.effectiveRuleset).toBe('vgc');
   });
@@ -100,7 +98,6 @@ describe('useEvalView', () => {
     expect(sweep.cacheKeyFor(tip - 1)).toBe(`newgame-abcdefghij:${tip - 1}:fp1`);
     act(() => view.result.current.analyzeTurnNow(tip));
     expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`newgame-abcdefghij:${tip}t:fp1`);
-    // a replay's sweep keys stay as they were
     const replay = renderHook(() => useEvalView(inputs(evaluation, { viewTurn: tip, evalViewKey: `main:${tip}` })));
     act(() => replay.result.current.handleAnalyzeGame());
     expect((spies.runGraphSweep.mock.calls.at(-1)![0] as { cacheKeyFor: (turn: number) => string }).cacheKeyFor(tip)).toBe(`${replayData.id}:${tip}:fp1`);
@@ -198,11 +195,9 @@ describe('useEvalView', () => {
     expect(sweep.turns).toBe(6);
     expect(sweep.from).toBeUndefined();
     expect(sweep.cacheKeyFor(3)).toBe(`${replayData.id}:3:fp1`);
-    // The full sweep carries the protocol's replacement rounds and their own cache keys; a single turn's analysis does not.
     const withRounds = sweep as typeof sweep & { replacementRounds: unknown; replacementKeyFor: (turn: number, ordinal: number) => string };
     expect(withRounds.replacementRounds).toEqual(replacementRounds(replayData.log));
     expect(withRounds.replacementKeyFor(3, 1)).toBe(`${replayData.id}:3r1:fp1`);
-    // The rolled-copy stage has its own cache key beside the turn keys.
     const withStage = sweep as typeof sweep & { rolledCopy: { keyFor: (turn: number) => string; namedRoll: unknown; playCopy: unknown } };
     expect(withStage.rolledCopy.keyFor(3)).toBe(`${replayData.id}:3x:fp1`);
     expect(withStage.rolledCopy).toEqual({ keyFor: expect.any(Function), namedRoll: expect.any(Function), playCopy: expect.any(Function) });
@@ -226,7 +221,6 @@ describe('useEvalView', () => {
     const { evaluation } = evaluationOf({ graph, prefs: { depth: 2, samples: 3, mode: 'matrix' } });
     const targetAt = (analysisTurn: number | null, extra: Partial<EvalViewInputs> = {}) =>
       renderHook(() => useEvalView(inputs(evaluation, { analysisTurn, ...extra }))).result.current.analyzeTarget;
-    // A sketch, a configured, a deeper and a tree result alike: nothing to click.
     expect(targetAt(1)).toBeNull();
     expect(targetAt(2)).toBeNull();
     expect(targetAt(3)).toBeNull();
@@ -235,7 +229,6 @@ describe('useEvalView', () => {
     expect(targetAt(null)).toBeNull();
     expect(targetAt(5, { liveEvalView: true })).toBeNull();
 
-    // Auto names the engine the sweep will resolve: per game type where the fraction is known, else the auto sentinel.
     const auto = evaluationOf({ graph, prefs: { mode: 'auto' } }).evaluation;
     const autoAt = (analysisTurn: number, extra: Partial<EvalViewInputs> = {}) =>
       renderHook(() => useEvalView(inputs(auto, { analysisTurn, ...extra }))).result.current.analyzeTarget;
@@ -252,7 +245,6 @@ describe('useEvalView', () => {
     act(() => result.current.handleAnalyzeTurn());
     const sweep = spies.runGraphSweep.mock.calls[0][0] as Record<string, unknown>;
     expect(sweep).toMatchObject({ from: 4, to: 5 });
-    // No override: the sweep reads the panel settings it runs everything else with.
     expect('settings' in sweep).toBe(false);
   });
 
@@ -272,7 +264,6 @@ describe('useEvalView', () => {
     act(() => doubles.result.current.handleAnalyzeGame());
     act(() => doubles.result.current.analyzeTurnNow(2));
     expect(spies.runGraphSweep.mock.calls.map(call => (call[0] as { doubles: boolean }).doubles)).toEqual([false, false, true, true]);
-    // The gap turn at a tenth fainted: singles configure the early matrix there, doubles the tree.
     expect(singles.result.current.analyzeTarget).toEqual({ depth: 1, samples: 1, mode: 'matrix' });
     expect(doubles.result.current.analyzeTarget).toEqual(tree);
     expect(renderHook(() => useEvalView(inputs(evaluation, { analysisTurn: 1 }))).result.current.analyzeTarget).toBeNull();
@@ -298,7 +289,6 @@ describe('useEvalView', () => {
     const counts = () => ({ stale: spies.markStale.mock.calls.length, reset: spies.reset.mock.calls.length, clear: spies.clearGraph.mock.calls.length });
     const before = counts();
 
-    // Moving the pointer alone does not age the result; its position tag decides whether it fits the screen.
     rerender(inputs(evaluation, { viewTurn: 4 }));
     rerender(inputs(evaluation, { viewTurn: 4, viewLine: 'variation' }));
     expect(counts().stale).toBe(before.stale);
@@ -328,8 +318,7 @@ describe('useEvalView', () => {
     expect(pending.spies.runGraphSweep).not.toHaveBeenCalled();
   });
 
-  // Cancel is the user's answer for that position; another position (another tag) is theirs again. The view does not read the game type
-  // here, so one row serves singles and doubles.
+  // The view does not read the game type here, so one row serves singles and doubles.
   test.each([['Auto', { auto: true }], ['Always on', { autoAnalyze: true }]] as const)('%s leaves a position the user stopped alone, and takes the next one', (_name, prefs) => {
     const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'stale' as const, evalViewKey: 'variation:3' };
     const stopped = evaluationOf({ prefs, status: 'stale', result: evalResult(), resultTag: 'variation:3', stopped: { tag: 'variation:3' } });
@@ -339,8 +328,6 @@ describe('useEvalView', () => {
     expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
   });
 
-  // A stop before any result (a tree before its interim result) is the user's answer too: "Always on" does not start the run again, and the
-  // game analysis it starts stands (no single evaluation supersedes it in the same commit: "Analysis stopped").
   test.each([['kept nothing', { tag: 'variation:3', empty: true as const }], ['kept a result', { tag: 'variation:3' }]] as const)(
     'Always on leaves a position whose stop %s alone and starts the game analysis, not a search', (_name, mark) => {
       const live = { branching: true, liveEvalView: true, liveTip: true, liveEvalStatus: 'idle' as const, evalViewKey: 'variation:3' };
@@ -352,8 +339,6 @@ describe('useEvalView', () => {
       expect(stopped.spies.evaluate).toHaveBeenCalledTimes(1);
     });
 
-  // A frame report can park the pointer on an earlier turn of the variation while a play-out runs at the tip. The run's evaluation (the
-  // user's and the Auto one) is the live sim's, tagged with the tip, and its score fills the tip's slot.
   describe.each(['singles', 'doubles'] as const)('a run with the pointer behind the tip, %s', kind => {
     const fixture = replayFixture(kind);
     const behind = (evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {}) => inputs(evaluation, {
@@ -378,7 +363,6 @@ describe('useEvalView', () => {
 
     test('Auto re-evaluates a stale tip during a run, whatever the pointer shows', () => {
       const { evaluation, spies } = evaluationOf({ prefs: { auto: true }, status: 'done', resultTag: 'variation:3' });
-      // The pointer's reading is current (the result is its own); the tip's is not.
       const stale = { liveEvalStatus: 'done' as const, tipEvalStatus: 'stale' as const };
       renderHook(() => useEvalView(behind(evaluation, { ...stale, playOutActive: false })));
       expect(spies.evaluate).not.toHaveBeenCalled();

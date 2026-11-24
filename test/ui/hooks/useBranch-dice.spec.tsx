@@ -18,12 +18,6 @@ import { sideMarkTexts, turnDiceMarks } from '../../../src/lib/branch-dice-marks
 import { freshLog, setOf } from '../fixtures/dice-battle';
 import type { Bench } from '../../../src/lib/bench';
 
-/**
- * A forced die (ADR 0001) rides on the slot choice. The turn plays through the dice
- * module, the history entry keeps the choice with its dice and the report of the user's dice, and a rebuild (a team edit, a
- * support state) replays the forced dice and reaches the same turn. Singles, doubles and VGC.
- */
-
 describe('useBranch-dice', () => {
   function fixture(kind: ReplayKind) {
     const { replayData, snapshots, observations } = replayFixture(kind);
@@ -142,7 +136,6 @@ describe('GPL DzBQ5azlO5l turn 13, Air Slash with a forced flinch', () => {
     const cant = frame.findIndex(line => line.startsWith('|cant|p2a: King Bradley|flinch'));
     expect(mark).toBeGreaterThanOrEqual(0);
     expect(cant).toBeGreaterThan(mark);
-    // Cobalion never reached Heavy Slam: the forced flinch took the move from the game's log
     expect(frame.some(line => line.startsWith('|move|p2a: King Bradley|Heavy Slam'))).toBe(false);
   }, 180_000);
 });

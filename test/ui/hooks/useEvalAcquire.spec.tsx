@@ -44,7 +44,6 @@ describe('useEvalAcquire', () => {
     const onPosition = vi.fn();
     await result.current.makeSweepAcquireAll(6)(report, onPosition);
     expect(source.acquireAll).toHaveBeenCalledWith(6, report, onPosition, undefined);
-    // The replacement callback is the fifth argument, passed only when the sweep has one.
     const onReplacement = vi.fn();
     await result.current.makeSweepAcquireAll(6)(report, onPosition, undefined, onReplacement);
     expect(source.acquireAll).toHaveBeenLastCalledWith(6, report, onPosition, undefined, onReplacement);
@@ -71,7 +70,6 @@ describe('useEvalAcquire', () => {
     const { result, rerender } = renderHook((props: Inputs) => useEvalAcquire(props), { initialProps: inputs({ source, dwellEnabled: true }) });
     expect(source.acquireExact).not.toHaveBeenCalled();
 
-    // Scrubbing restarts the timer; only the settled turn is acquired.
     act(() => vi.advanceTimersByTime(500));
     rerender(inputs({ source, dwellEnabled: true, viewTurn: 4 }));
     act(() => vi.advanceTimersByTime(500));
@@ -133,7 +131,6 @@ describe('useEvalAcquire', () => {
     expect(source.acquireExact).toHaveBeenCalledTimes(2);
     expect(source.acquireExact).toHaveBeenLastCalledWith(13, expect.any(Function));
     await act(async () => { releases[1]('{"turn":13}'); await vi.runAllTimersAsync(); });
-    // a turn that stored its position is not acquired again
     expect(source.acquireExact).toHaveBeenCalledTimes(2);
   });
 });

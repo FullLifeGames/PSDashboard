@@ -21,7 +21,6 @@ interface EvalShape {
   auto: boolean;
 }
 
-/** The slice of the evaluation surface the play-out reads, plus spies on the preference and engine-override writes. */
 function evaluationOf(shape: Partial<EvalShape>, setPrefs = vi.fn(), setEngineOverride = vi.fn()) {
   const prefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as const, auto: shape.auto ?? false, autoAnalyze: false, tera: 'auto' as const };
   return {
@@ -52,7 +51,6 @@ function wiring(overrides: Partial<Wiring> = {}): Wiring {
 
 interface Props { evaluation: Evaluation; wiring: Wiring }
 
-/** The real transients next to the hook, so the loop's own state changes drive its effects. */
 function setup(evaluation: Evaluation, wired: Wiring = wiring()) {
   const hook = renderHook((props: Props) => {
     const transients = useTransients('gen9ou-1');
@@ -118,8 +116,7 @@ describe('usePlayOut', () => {
     expect(wired.applyEvalChoice).toHaveBeenCalledWith('p2', done.perSide.p2[0]);
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 1 });
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
-    // Two calls at the start (the arm, and the kick of this mock whose status stays idle); none after the executed turn
-    // (the harness rows at the end of this file count the real chain).
+    // Two calls at the start (the arm, and the kick of this mock, status idle); none after the executed turn.
     await act(async () => {});
     expect(wired.handleEvaluate).toHaveBeenCalledTimes(2);
 
@@ -159,7 +156,6 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  // A replacement on both sides is played as a pair, but the battle's turn does not move: no turn is counted.
   test.each([
     ['singles', [true], [true]],
     ['doubles', [true, false], [false, true]],
@@ -176,7 +172,6 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
   });
 
-  // The finish leaves the frame where the user watches it; the pointer takes the frame's turn.
   test('an ended battle finishes the run, restores the auto setting, and leaves the frame where it stands after played turns', async () => {
     const { evaluation, setPrefs } = evaluationOf({});
     const { result, rerender, wired } = setup(evaluation);
@@ -225,7 +220,6 @@ describe('usePlayOut', () => {
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice?.text).toBe('Play-out stopped: 0 turns played (they stay in the variation).');
 
-    // The pointer takes the variation position of the turn the frame is about to show, never the tip.
     act(() => result.current.playOut.watchFrom(2));
     expect(wired.navigateTo).toHaveBeenCalledWith({ turn: 2, line: 'variation' }, { seek: false, internal: true, toFrame: 2 });
     expect(wired.setNavSeek).not.toHaveBeenCalled();
@@ -234,7 +228,6 @@ describe('usePlayOut', () => {
     expect(updater(null)).toEqual({ turn: 2, seq: 1, play: true });
   });
 
-  // The lead variation's Watch from turn 0 reads T1 while the frame plays the leads in.
   test('watchFrom turn 0 asks for the frame position of turn 0 and seeks turn 0', () => {
     vi.useFakeTimers();
     const { evaluation } = evaluationOf({ auto: true });
@@ -259,15 +252,13 @@ describe('usePlayOut', () => {
     expect(again.wired.holdTipFollow).toHaveBeenCalledTimes(1);
   });
 
-  // A turn in flight lands after the stop in the append mode of the run ('hold': no seek, no play, no follow-end), so the frame stays where
-  // the user watches it. The run stays active until that turn landed.
   describe('a stop with a turn in flight', () => {
     const inFlight = () => {
       const { evaluation } = evaluationOf({ auto: true });
       const hook = setup(evaluation);
       act(() => hook.result.current.playOut.startPlayOut());
       const done = evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation;
-      hook.rerender({ evaluation: done, wiring: hook.wired }); // the run plays its first turn
+      hook.rerender({ evaluation: done, wiring: hook.wired });
       hook.rerender({ evaluation: done, wiring: { ...hook.wired, executing: true } });
       return { ...hook, done };
     };
@@ -281,7 +272,7 @@ describe('usePlayOut', () => {
       expect(wired.holdTipFollow).toHaveBeenCalledTimes(1);
       expect(wired.navigateTo).not.toHaveBeenCalled();
 
-      rerender({ evaluation: done, wiring: wired }); // executing false: the turn landed
+      rerender({ evaluation: done, wiring: wired });
       expect(result.current.transients.playOut).toBeNull();
       expect(result.current.transients.playOutNotice).toEqual({ text: 'Play-out stopped: 1 turn played (they stay in the variation).', watchTurn: 3 });
       expect(wired.navigateTo).toHaveBeenCalledTimes(1);
@@ -312,7 +303,6 @@ describe('usePlayOut', () => {
       const calls = (wired.applyEvalChoice as ReturnType<typeof vi.fn>).mock.calls.length;
       const next = evaluationOf({ auto: true, status: 'done', result: evalResult('doubles'), resultTag: 'variation:3' }).evaluation;
       rerender({ evaluation: next, wiring: { ...wired, executing: false } });
-      // The turn landed: the run finished instead of playing the next result.
       expect(wired.applyEvalChoice).toHaveBeenCalledTimes(calls);
       expect(wired.executeTurn).toHaveBeenCalledTimes(1);
       expect(result.current.transients.playOut).toBeNull();
@@ -331,7 +321,7 @@ describe('usePlayOut', () => {
       await act(async () => { refuse('Earthquake is disabled for Garchomp right now.'); });
       expect(result.current.transients.playOut).toBeNull();
       expect(result.current.transients.playOutNotice?.text).toContain('the turn could not be played');
-      expect(wired.navigateTo).not.toHaveBeenCalled(); // the user's own navigation stands
+      expect(wired.navigateTo).not.toHaveBeenCalled();
     });
   });
 
@@ -357,7 +347,6 @@ describe('usePlayOut', () => {
     expect(setEngineOverride.mock.calls.every(([override]) => override === null)).toBe(true);
   });
 
-  // The turn-0 run plays from the leads the picker shows, through the same road as "Play from turn 0".
   describe('from turn 0', () => {
     const singlesPicks = { p1: ['Talonflame'], p2: ['Weavile'] };
     const vgcPicks = { p1: ['Incineroar', 'Amoonguss', 'Urshifu', 'Rillaboom'], p2: ['Tornadus', 'Kingambit', 'Chi-Yu', 'Pelipper'], bring: true };
@@ -377,12 +366,9 @@ describe('usePlayOut', () => {
       expect(result.current.transients.playOut).toBeNull();
       const onStart = (wired.startLeadVariation as ReturnType<typeof vi.fn>).mock.calls[0][1].onStart as () => void;
       act(() => onStart());
-      // The run arms with turn 0, so the progress line and the notice name the turn the game starts at.
       expect(result.current.transients.playOut).toMatchObject({ active: true, startTurn: 0 });
     });
 
-    // The notice offers Watch from turn 0, and Watch plays the frame from its team preview while the pointer reads T1 (the variation line has
-    // no turn 0). A run from a later turn keeps its turn (the rows above).
     test.each([
       ['singles', singlesPicks],
       ['doubles with a bring of four', vgcPicks],
@@ -416,8 +402,6 @@ describe('usePlayOut', () => {
 });
 
 describe('usePlayOut, a step that fails', () => {
-  // The forced replacement settles with an execute error (the resolver or the simulator refused the command). The position never changes, so
-  // no new evaluation comes: the run ends with the reason.
   const REFUSED = 'Ogerpon (Ogerpon-Teal-Tera) is no longer available to switch in.';
   test.each(['singles', 'doubles'] as const)('%s: a forced replacement that fails ends the run with its reason instead of waiting', kind => {
     const { evaluation, setPrefs } = evaluationOf({});
@@ -428,7 +412,6 @@ describe('usePlayOut, a step that fails', () => {
     rerender({ evaluation: evaluationOf({ status: 'done', result: forced, resultTag: 'variation:3' }, setPrefs).evaluation, wiring: wired });
     expect(wired.applyEvalChoice).toHaveBeenCalledWith('p1', forced.perSide.p1[0]);
     expect(result.current.transients.playOut).toMatchObject({ executed: 1, turns: 0 });
-    // The settle stored the error; the position (and so the evaluation) stays as it was.
     rerender({ evaluation: evaluationOf({ status: 'done', result: forced, resultTag: 'variation:3' }, setPrefs).evaluation, wiring: { ...wired, executeError: REFUSED } });
     expect(result.current.transients.playOut).toBeNull();
     expect(result.current.transients.playOutNotice).toEqual({
@@ -446,7 +429,6 @@ describe('usePlayOut, a step that fails', () => {
     const forced = evalResult('singles', { perSide: { p1: evalResult().perSide.p1, p2: waitOnly() } });
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: forced, resultTag: 'variation:3' }).evaluation, wiring: { ...wired, executeError: null } });
     expect(result.current.transients.playOut).toMatchObject({ active: true, executed: 1 });
-    // The next position's pair plays on: the forced step's watch is over.
     rerender({ evaluation: evaluationOf({ auto: true, status: 'done', result: evalResult(), resultTag: 'variation:3' }).evaluation, wiring: { ...wired, executeError: null } });
     expect(result.current.transients.playOut).toMatchObject({ active: true, executed: 2, turns: 1 });
   });
@@ -476,11 +458,7 @@ const sources = {
   hpEvidence: [], getInferredSpreads: async () => undefined,
 } as unknown as TeamBuildSources;
 
-/**
- * The real play-out loop next to the real view hook (its Auto effect and Evaluate action), over a scripted evaluation and a
- * scripted branch: an executed turn lands as one history entry plus the end of `executing` in the same tick (execute.ts), a
- * forced replacement lands as an entry that consumes no turn. `evaluate` counts what the worker would be asked.
- */
+// Mirrors execute.ts: an executed turn lands as one history entry plus the end of `executing` in one tick.
 function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: number) {
   const { replayData, snapshots } = replayFixture(kind === 'doubles' ? 'doubles' : 'singles');
   const [status, setStatus] = useState<Status>('idle');
@@ -493,7 +471,6 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   const counts = useRef({ evaluate: 0, tags: [] as (string | null)[], acquires: [] as unknown[], pendingTag: null as string | null });
   const [pointerBehind, setPointerBehind] = useState(false);
   const tipTurn = START_TURN + turns;
-  // `pointerBehind` parks the pointer one turn before the tip, as a frame report does; the run plays on at the tip.
   const viewTurn = pointerBehind ? tipTurn - 1 : tipTurn;
   const liveTip = !pointerBehind;
   const evalViewKey = `variation:${viewTurn}`;
@@ -515,7 +492,6 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
     status, result, resultTag, error: null,
     graph: evalGraph(kind, { scores: Array(10).fill(null), results: Array(10).fill(null), settings: Array(10).fill(null) }),
   } as unknown as Evaluation;
-  // The board layer's reading of a result that belongs to another position.
   const liveEvalStatus: Status = status === 'done' && resultTag !== evalViewKey ? 'stale' : status;
   const tipEvalStatus: Status = status === 'done' && resultTag !== tip.key ? 'stale' : status;
   const [acquireBranchPosition] = useState(() => vi.fn());
@@ -523,7 +499,6 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
   const land = (kindOfEntry: 'turn' | 'forced') => {
     setExecuting(true);
     void Promise.resolve().then(() => {
-      // One tick, as execute.ts does: the history entry and the end of `executing` batch into one render.
       setEntries(count => count + 1);
       if (kindOfEntry === 'turn') setTurns(count => count + 1);
       setExecuting(false);
@@ -548,7 +523,6 @@ function useRunHarness(kind: FormatKind, forcedAt: number[], endAfterTurns: numb
     getBattle: () => ({ ended: turns >= endAfterTurns }) as never,
     executeTurn: async () => { land('turn'); await Promise.resolve(); return null; },
     handleEvaluate,
-    // The forced side of a one-sided position executes at once, like setChoice does for a forced replacement.
     applyEvalChoice: () => { if (forcedAt.includes(entries) && !executing) land('forced'); return true; },
     requestDeviation: vi.fn(), startLeadVariation: vi.fn(), leadPicksRef: { current: null }, setVariationNotice: vi.fn(),
   });
@@ -566,13 +540,10 @@ async function settle() {
   await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 }
 
-/** Plays a run to its end: deliver the finished evaluation of every position the loop asked for. */
 async function runToEnd(kind: FormatKind, forcedAt: number[], endAfterTurns: number, pointerBehind = false) {
   const hook = renderHook(() => useRunHarness(kind, forcedAt, endAfterTurns));
   act(() => hook.result.current.playOut.startPlayOut());
-  // The frame reports a turn before the tip right after the run armed, and the pointer stays there for the whole run.
   if (pointerBehind) act(() => hook.result.current.setPointerBehind(true));
-  // Evaluations that finish are delivered one by one: the harness answers the latest request.
   for (let guard = 0; guard < 40 && hook.result.current.transients.playOut?.active; guard += 1) {
     if (hook.result.current.status === 'reconstructing') act(() => hook.result.current.deliver());
     await settle();
@@ -587,12 +558,10 @@ describe('a play-out evaluates every position once', () => {
     expect(done.turns).toBe(3);
     // The start position, then the positions after turns 1, 2 and 3 (the last one only tells that the battle ended).
     expect(done.counts.current.evaluate).toBe(4);
-    // Each one is tagged with the position it was asked for, never with the turn before.
     expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:5', 'variation:6']);
   });
 
   test.each(['singles', 'doubles'] as const)('%s: a forced replacement is a position of its own and is evaluated once', async kind => {
-    // The position after the first turn needs a replacement (history entry 1), then two more turns follow.
     const done = await runToEnd(kind, [1], 3);
     expect(done.transients.playOut).toBeNull();
     expect(done.turns).toBe(3);
@@ -602,15 +571,12 @@ describe('a play-out evaluates every position once', () => {
     expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:4', 'variation:5', 'variation:6']);
   });
 
-  // The frame's report parks the pointer one turn behind the tip right after the run armed. The run asks for the tip's position (the live
-  // sim, tagged with the tip's key) and plays it, never the evaluation of the turn the pointer shows.
   test.each(['singles', 'doubles'] as const)('%s: a pointer behind the tip does not stop the run or send an evaluation of the clicked turn', async kind => {
     const done = await runToEnd(kind, [], 3, true);
     expect(done.transients.playOut).toBeNull();
     expect(done.turns).toBe(3);
     expect(done.counts.current.evaluate).toBe(4);
     expect(done.counts.current.tags).toEqual(['variation:3', 'variation:4', 'variation:5', 'variation:6']);
-    // Every one acquired the live sim, none the recorded position of the pointer's turn.
     expect(done.counts.current.acquires.every(acquire => acquire === done.acquireBranchPosition)).toBe(true);
   });
 });

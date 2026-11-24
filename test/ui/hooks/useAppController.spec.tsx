@@ -71,8 +71,6 @@ describe('useAppController', () => {
   }, 90_000);
 
   test('the branch log the frame receives names the simulator bodies as the replay does', async () => {
-    // The replay says "Chompy" and "King Bee"; the simulator's sets say Garchomp and Kingambit. A frame log that
-    // mixed the two made the embed open a second roster entry per body (the sidebar kept the first one alive).
     const replay = singlesReplay();
     replay.log = replay.log.replaceAll('p1a: Garchomp', 'p1a: Chompy').replaceAll('p2a: Kingambit', 'p2a: King Bee');
     stubReplayFetch([replay]);

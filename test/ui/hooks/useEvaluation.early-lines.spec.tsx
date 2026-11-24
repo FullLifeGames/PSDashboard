@@ -5,7 +5,6 @@ import type { EvalLine, EvalResult, EvalSettings } from '@fulllifegames/eval-eng
 import { evalResult } from '../fixtures/eval-result';
 import { singlesLine } from '../fixtures/lines';
 
-/** The early-lines stage: `searchLines` runs one tree search on the shared pool without cancelling the others; `attachLines` writes the lines into a turn's stored matrix result and nothing else. */
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings, opts?: { exclusive?: boolean }) => Promise<EvalResult>),
   saved: [] as Record<string, unknown>[],

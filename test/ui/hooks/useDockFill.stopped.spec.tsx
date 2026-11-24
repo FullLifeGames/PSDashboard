@@ -4,13 +4,6 @@ import type { BranchSlotChoice, EvalResult } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * The user stops a search that has streamed a partial result (a forced replacement's quick
- * estimate, a deeper level of a normal turn). The dock keeps that result as the engine's pick: the chip holds the suggestion and
- * Execute stays. The partial belongs to the stop only: a run that something else cancelled (the game analysis) fills nothing, and a
- * stop before any partial leaves the chips empty.
- */
-
 const script = vi.hoisted(() => ({
   handlers: null as null | { onPartial?: (result: EvalResult) => void },
   reject: null as null | ((error: Error) => void),
@@ -90,8 +83,6 @@ describe('a stop keeps the result so far', () => {
     expect(script.runs).toBe(1);
   });
 
-  // A tree search streams its first interim result (tree depth 3 to 5, not the quick estimate)
-  // after 150 iterations of its first tree; a Cancel after it keeps that result in a doubles replacement like any other partial.
   test('doubles: Stop after a tree\'s interim result (depth 3) fills the replacement chips from it and reads as the result so far', async () => {
     const setChoice = vi.fn();
     const { result } = renderHook(() => useFilled('doubles', setChoice));
@@ -121,7 +112,6 @@ describe('a stop keeps the result so far', () => {
     expect(result.current.fill.engine).toEqual({ p1: [], p2: [] });
   });
 
-  // The same stop while the position is still being rebuilt, before the search's first level.
   test.each(['singles', 'doubles'] as const)('%s: a stop while the position is rebuilt marks the stop as empty and starts no search', async (kind) => {
     const setChoice = vi.fn();
     script.acquire = () => new Promise<string>(() => {});
@@ -134,8 +124,7 @@ describe('a stop keeps the result so far', () => {
     expect(setChoice).not.toHaveBeenCalled();
   });
 
-  // The Cancel click can land between the run's first state change and the commit's effects (a long
-  // task after the paint). The stop reads the run's own status, not the last committed one.
+  // Cancel can land before the commit's effects of the run's first state change: the stop reads the run's own status.
   test.each(['singles', 'doubles'] as const)('%s: a stop in the same batch as the run\'s start (before the effects of its render) still marks the stop as empty, and the fill leaves the position alone', async (kind) => {
     const setChoice = vi.fn();
     script.liveTip = false;
@@ -156,8 +145,6 @@ describe('a stop keeps the result so far', () => {
     expect(setChoice).not.toHaveBeenCalled();
   });
 
-  // The game analysis ends: the fill, which starts again after an analysis took its run, leaves a
-  // position the user stopped before its first result alone, as it does for one that kept a result.
   test.each(['singles', 'doubles'] as const)('%s: after a stop before a first result the game analysis starts and ends, and the fill starts no search', async (kind) => {
     const setChoice = vi.fn();
     const { result, rerender } = renderHook(() => useFilled(kind, setChoice));
@@ -193,7 +180,6 @@ describe('a stop keeps the result so far', () => {
     expect(result.current.evaluation.stopped).toEqual({ tag: KEY });
   });
 
-  // The next position of the same turn (a forced replacement answered, the next request has the same tag) is the fill's again.
   test('a stop before a first result does not hold back the fill at the next position of the turn', async () => {
     const setChoice = vi.fn();
     let history = 1;
@@ -217,7 +203,6 @@ describe('a stop keeps the result so far', () => {
     await waitFor(() => expect(script.runs).toBe(2));
   });
 
-  // The game analysis's Cancel button calls the same stop: with no single search under way it marks nothing.
   test.each(['singles', 'doubles'] as const)('%s: a stop while no single search runs leaves no mark', async (kind) => {
     const { result } = renderHook(() => useFilled(kind, vi.fn()));
     await searching(result);

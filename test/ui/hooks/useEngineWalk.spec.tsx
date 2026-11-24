@@ -114,10 +114,7 @@ describe('useEngineWalk', () => {
     expect(wired.executeTurn).toHaveBeenCalledTimes(1);
   });
 
-  // A pick played from the queue arms the walk in the same effect pass in which the walk's own effect
-  // still sees the result that stood before the click. That result is not the replacement position and must not
-  // disarm the walk: the forced replacement that comes next still auto-plays. The arming does not read the game
-  // type, so doubles (a combined choice per side, the same refs) take the same path; the singles case stands for both.
+  // The queued pick arms the walk in the same effect pass in which the walk's effect still sees the pre-click result.
   test('off the tip the queued pick keeps the walk armed until the replacement position arrives', async () => {
     const before = evalResult('singles');
     const doneBefore = evaluationOf({ status: 'done', result: before, resultTag: 'variation:3' }).evaluation;
@@ -157,17 +154,11 @@ describe('useEngineWalk', () => {
     (wired.handleSetChoice as ReturnType<typeof vi.fn>).mockClear();
     rerender({ ...wired, evaluation: evaluationOf({ status: 'done', result: evalResult('singles'), resultTag: 'variation:3' }).evaluation });
     expect(wired.handleSetChoice).not.toHaveBeenCalled();
-    // Disarmed: another forced position now waits for the user.
     rerender({ ...wired, evaluation: evaluationOf({ status: 'done', result: evalResult('singles', { perSide: forced.perSide }), resultTag: 'variation:3' }).evaluation });
     expect(wired.handleSetChoice).not.toHaveBeenCalled();
   });
 });
 
-/**
- * A click on an engine move in a card or the live panel hands the result the card reads; with the setting on
- * the opponent answers with the reply that hurts the clicked move most (`worstReply`), else with the reply the card names (the best
- * row). A matrix cell names its pair and is played as clicked. Singles and doubles.
- */
 describe('useEngineWalk, Hard mode', () => {
   const clicked = (kind: 'singles' | 'doubles', hardMode: boolean | undefined, result: EvalResult = evalResult(kind)) => {
     const wired = inputs({ simState: simState(kind), evaluation: evaluationOf({ status: 'done', result, hardMode }).evaluation });
@@ -193,7 +184,6 @@ describe('useEngineWalk, Hard mode', () => {
   });
 
   test('doubles, on: the joint worst answer fills both slots of the opponent with their targets', () => {
-    // the fixture's own pickers: Rillaboom (slot 0) and Tornadus (slot 1) answer; the clicked row is hurt most by the second reply
     const base = evalResult('doubles');
     const replies = [rankedChoice('move grassyglide 1, move tailwind', 'A', -0.2), rankedChoice('move woodhammer 1, move taunt 1', 'B', -0.3)];
     const result: EvalResult = {
@@ -231,7 +221,6 @@ describe('useEngineWalk, Hard mode', () => {
     const wired = inputs({ liveTip: false, evaluation: evaluationOf({ status: 'done', result, hardMode: true }).evaluation });
     const { result: walk, rerender } = renderHook((props: EngineWalkInputs) => useEngineWalk(props), { initialProps: wired });
     act(() => walk.current.handleExploreChoice('p1', result.perSide.p1[0], result.perSide.p2[0], result));
-    // the position the deviation flow rebuilds carries another result: the pick still plays the reply read at the click
     rerender({ ...wired, liveTip: true, evaluation: evaluationOf({ status: 'done', result: evalResult('singles', { score: 0.9 }), hardMode: true }).evaluation });
     expect(wired.handleSetChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ speciesId: 'rotomwash' }), 0);
   });
