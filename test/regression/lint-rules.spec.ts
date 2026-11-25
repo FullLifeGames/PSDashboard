@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Linter } from 'eslint';
+import { ESLint, Linter } from 'eslint';
 import tseslint from 'typescript-eslint';
 import commentsPlugin from '../../eslint.comments.mjs';
 import prosePlugin from '../../eslint.prose.mjs';
@@ -264,5 +264,27 @@ describe('tests/no-history', () => {
     expect(at('packages/eval-engine/test/gen9-luck.spec.ts')).toEqual([]);
     expect(at('test/regression/sets-roundtrip.spec.ts')).toEqual([]);
     expect(at('test/regression/helper-t22.ts')).toEqual([]);
+  });
+});
+
+describe('comment rules in the project config', () => {
+  const files = [
+    'src/lib/x.ts',
+    'packages/eval-engine/src/x.ts',
+    'packages/replay-core/src/x.ts',
+    'test/ui/x.spec.tsx',
+    'test/regression/x.spec.ts',
+    'test/e2e-feedback/corpus.ts',
+    'packages/eval-engine/test/x.spec.ts',
+    'scripts/x.mjs',
+    'eslint.config.js',
+    'packages/eval-engine/bin/eval-engine.mjs',
+    'packages/replay-core/examples/parse-replay.mjs',
+  ];
+
+  test.each(files)('%s fails on a history line and on shape, JSDoc on a local declaration included', async file => {
+    const config = await new ESLint().calculateConfigForFile(file);
+    expect(config?.rules?.['comments/no-history']?.[0]).toBe(2);
+    expect(config?.rules?.['comments/shape']).toEqual([2, { localDoc: 'forbid' }]);
   });
 });

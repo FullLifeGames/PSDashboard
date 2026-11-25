@@ -43,21 +43,10 @@ export default defineConfig([
     rules: { 'dex/no-global-dex-read': 'error' },
   },
   {
-    files: ['packages/*/src/**/*.ts', 'src/**/*.{ts,tsx}'],
-    plugins: { comments: commentsPlugin },
-    rules: { 'comments/no-history': 'error' },
-  },
-  {
-    files: ['**/*.{ts,tsx,mjs,js,cjs}'],
-    ignores: ['packages/*/src/**', 'src/**', 'test/regression/eval-calibration.spec.ts'],
-    plugins: { comments: commentsPlugin },
-    rules: { 'comments/no-history': 'warn' },
-  },
-  {
     files: ['**/*.{ts,tsx,mjs,js,cjs}'],
     ignores: ['test/regression/eval-calibration.spec.ts'],
     plugins: { comments: commentsPlugin },
-    rules: { 'comments/shape': ['warn', { localDoc: 'forbid' }] },
+    rules: { 'comments/no-history': 'error', 'comments/shape': ['error', { localDoc: 'forbid' }] },
   },
   {
     files: ['test/**/*.{ts,tsx}', 'packages/*/test/**/*.ts'],
