@@ -153,25 +153,23 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
 
 // A held body (`trapped` in a move request) cannot switch out (side.js chooseSwitch): the chips carry the flag.
 function makeSwitches(side: SimSide, activeSlot: number, forced: boolean): BranchSwitchOption[] {
-  const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
   const held = side.active[activeSlot];
   if (!forced && (!held || held.fainted)) return [];
   const trapped = !forced && !!held.trapped;
-  return side.pokemon
-    .map((pokemon, index): BranchSwitchOption => {
-      const percent = shownPercent(pokemon);
-      return {
-        name: pokemon.name,
-        species: pokemon.species.name,
-        activeSlot,
-        slot: index + 1,
-        hp: `${percent}%`,
-        hpPercent: percent,
-        fainted: pokemon.fainted,
-        ...(trapped ? { trapped } : {}),
-      };
-    })
-    .filter(pokemon => !pokemon.fainted && !activeNames.has(pokemon.name));
+  return side.pokemon.flatMap((pokemon, index): BranchSwitchOption[] => {
+    if (pokemon.fainted || side.active.includes(pokemon)) return [];
+    const percent = shownPercent(pokemon);
+    return [{
+      name: pokemon.name,
+      species: pokemon.species.name,
+      activeSlot,
+      slot: index + 1,
+      hp: `${percent}%`,
+      hpPercent: percent,
+      fainted: pokemon.fainted,
+      ...(trapped ? { trapped } : {}),
+    }];
+  });
 }
 
 function normalizeChoices(

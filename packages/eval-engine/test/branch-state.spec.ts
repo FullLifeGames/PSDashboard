@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { createBranchStateFromBattle, createBranchState } from '../src/branch/state';
+import { slotChoicesOf } from '../src/search/lines';
 import { serializeBattleStable, positionBattle, type SimPosition } from '../src/forward-model';
 import type { BranchMoveOption } from '../src/branch/types';
 import { set, singles, clickTera } from './move-oracle';
@@ -10,6 +11,7 @@ import { calcSingleDamageRange } from '../src/damage-calc';
 import { rootOf } from './calc-roll-oracle';
 import { doubles, IDLE_ALONE, SCENES, SCREENS, wall, type Scene } from './forced-spread-scenes';
 import { simDamages } from './sim-rolls';
+import { playClicks } from './dice-fixtures';
 
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
@@ -381,5 +383,40 @@ describe('the picker state carries the spent Stellar types', () => {
     expect(garchomp?.stellarBoostedTypes).toEqual(['Ground', 'Ground']);
     expect(garchomp?.stellarBoostedTypes).toEqual(battle.sides[0].active[0].stellarBoostedTypes);
     expect(corviknight?.stellarBoostedTypes).toEqual([]);
+  });
+});
+
+describe('two bodies of one name: the bench body is a switch choice', () => {
+  const SAME_NICK = { name: 'Tank' };
+  const foes = () => [splash('Garchomp'), splash('Pikachu'), splash('Gengar'), splash('Machamp')];
+  const pairs = {
+    singles: { format: SINGLES, team: [splash('Snorlax'), splash('Snorlax')] },
+    doubles: { format: DOUBLES, team: [splash('Snorlax'), splash('Pikachu'), splash('Snorlax'), splash('Blissey')] },
+  };
+
+  test.each([
+    ['singles, one species twice', SINGLES, [splash('Snorlax'), splash('Snorlax')], [0, 1]],
+    ['singles, one nickname on two species', SINGLES, [splash('Snorlax', SAME_NICK), splash('Blissey', SAME_NICK)], [0, 1]],
+    ['doubles, the active and the bench body of one name', DOUBLES, pairs.doubles.team, [0, 2]],
+  ])('%s: the unforced list holds every body that does not stand', (_title, format, team, [active, bench]) => {
+    const state = createBranchStateFromBattle(battleOf(format, team, foes().slice(0, team.length)), [], {});
+    const listed = state.p1SwitchesBySlot[0].map(option => option.slot);
+    expect(listed).toContain(bench + 1);
+    expect(listed).not.toContain(active + 1);
+  });
+
+  test.each(Object.entries(pairs))('%s: after the first body falls, its same-named replacement is listed, maps onto the slot and carries a line', (_title, { format, team }) => {
+    const doubles = format === DOUBLES;
+    const attackers = [set('Pikachu', ['seismictoss']), splash('Pidgeot'), splash('Gengar'), splash('Machamp')].slice(0, team.length);
+    const battle = battleOf(format, attackers, team);
+    battle.sides[1].pokemon[0].hp = 1;
+    playClicks(battle, { p1: doubles ? 'move 1 1, move 1' : 'move 1', p2: doubles ? 'move 1, move 1' : 'move 1' });
+    const state = createBranchStateFromBattle(battle, [], {});
+    expect(state.p2ForceSwitches[0]).toBe(true);
+    const bench = team.findIndex((member, index) => index > 0 && member.species === 'Snorlax');
+    expect(state.p2SwitchesBySlot[0].map(option => option.slot)).toContain(bench + 1);
+    const choices = slotChoicesOf(battle, 'p2', `switch ${bench + 1}${doubles ? ', pass' : ''}`, '→ Snorlax');
+    expect(choices).not.toBeNull();
+    expect(choices![0]).toMatchObject({ kind: 'switch', speciesId: 'snorlax', pokemonName: 'Snorlax' });
   });
 });

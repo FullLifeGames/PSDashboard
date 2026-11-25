@@ -43,7 +43,7 @@ describe('a stronger play, singles', () => {
     expect(step.status).toBe('found');
     expect(step.chance).toBe(1);
     expect(step.played).toBe(0);
-    // No line is pinned: both foe bodies are named Snorlax and `makeSwitches` (branch/state.ts) filters by name.
+    expect(step.line?.choice).toBe('move seismictoss');
   }, 120_000);
 
   test('the played choice that is already the best leaves nothing stronger', async () => {
@@ -65,9 +65,9 @@ describe('a stronger play, singles', () => {
   }, 120_000);
 
   test('the line follows the proof and plays to the win under two seeds', async () => {
-    for (const board of [FOURTH, COIN]) {
+    for (const board of [FOURTH, FOURTH_WITH_BENCH, COIN]) {
       const { serialized } = await serializedBoard(board);
-      const step = strongerStep(serialized, REQUEST('p1', { rootOrder: board === FOURTH ? RANKING : ['move highjumpkick'] }));
+      const step = strongerStep(serialized, REQUEST('p1', { rootOrder: board === COIN ? ['move highjumpkick'] : RANKING }));
       expect(step.status).toBe('found');
       expect(step.line, 'the proof comes with a line').toBeDefined();
       for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(board, step.line!, seed), 'p1')).toBe(true);
