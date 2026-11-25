@@ -1,23 +1,12 @@
-/**
- * The zero-sum matrix game's equilibrium: regret-matching self-play over
- * the value matrix. Pure, deterministic.
- */
-
 const EQUILIBRIUM_ITERATIONS = 4000;
 
 export interface MatrixSolution {
-  /** Solved value of the zero-sum game (p1 perspective). */
   value: number;
   p1Mix: number[];
   p2Mix: number[];
 }
 
-/**
- * Regret-matching self-play on the zero-sum matrix game (Hart & Mas-Colell).
- * The AVERAGE strategies converge to a Nash equilibrium — the current
- * strategies do not, so only the averages are returned. Deterministic: a
- * fixed iteration count and no randomness.
- */
+/** Regret matching (Hart & Mas-Colell): only the average strategies converge to Nash, so only they return. */
 export function solveMatrixGame(values: number[][]): MatrixSolution {
   const rows = values.length;
   const cols = rows > 0 ? values[0].length : 0;

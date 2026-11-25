@@ -2,11 +2,21 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  NEW_ISSUE_URL, SUPPORT_STATE_VERSION, buildSupportState, isSupportState, issueUrl, positionLabel, screenMessage, supportFileName,
-  supportStateProblem, type SupportStateInputs,
+  NEW_ISSUE_URL,
+  SUPPORT_STATE_VERSION,
+  buildSupportState,
+  isSupportState,
+  issueUrl,
+  positionLabel,
+  screenMessage,
+  supportFileName,
+  supportStateProblem,
+  type SupportStateInputs,
+  type SupportState,
 } from '../../../src/lib/support-state';
 import { savedRecord } from '../fixtures/saved-game';
 import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
+import type { DiceReport, ForcedDie } from '@fulllifegames/eval-engine';
 
 const entry = (turnNumber: number, overrides: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
   turnNumber, p1Choice: 'move 1', p2Choice: 'move 2', serializedPosition: '{"a huge":"position"}',
@@ -31,7 +41,7 @@ function inputs(overrides: Partial<SupportStateInputs> = {}): SupportStateInputs
   };
 }
 
-describe('the support state file (round 77, user gate 28.10.2026)', () => {
+describe('the support state file', () => {
   test('names its kind and version, keeps every choice, and drops the recorded positions', () => {
     const state = buildSupportState(inputs());
     expect(isSupportState(state)).toBe(true);
@@ -46,7 +56,6 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
   test('the position names the line once, and the first message on screen leads', () => {
     const state = buildSupportState(inputs());
     expect(positionLabel(state)).toBe('T28 on the main line (variation from turn 5, 1 turn)');
-    // Round 77 (user report 28.10.2026): the title read "T52, variation (variation from turn 50, 2 turns)".
     const inVariation = buildSupportState(inputs({ view: { turn: 7, line: 'variation', t0: false, viewingVariation: true, liveTip: true } }));
     expect(positionLabel(inVariation)).toBe('T7 in the variation from turn 5 (1 turn)');
     expect(positionLabel(buildSupportState(inputs({ view: { turn: 1, line: 'main', t0: true, viewingVariation: false, liveTip: false } }))))
@@ -58,14 +67,12 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(supportFileName(state)).toBe('ps-dashboard-state-gen9draft-2058494320-2026-10-28T12-34-56Z.json');
   });
 
-  // Round 89 (#105, H7, tester finding 11): at the end of a finished game the position reads "End", as the timeline does, not "T34".
   test('the end of a finished game reads End; a game at its tip and a replay keep their turn', async () => {
     const started = await savedRecord(['Ann', 'Ben'], 33);
     const finished = { ...started, turns: 33, body: ['|start', '|turn|33', '|win|Ann'] };
     const noVariation = { startTurn: null, branching: false, history: [] };
     const atEnd = buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: false } }));
     expect(positionLabel(atEnd)).toBe('the End of the main line');
-    // the game that just finished stands on a live tip too
     expect(positionLabel(buildSupportState(inputs({ game: finished, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } })))).toBe('the End of the main line');
     const tip = buildSupportState(inputs({ game: { ...finished, body: ['|start', '|turn|33'] }, variation: noVariation, view: { turn: 34, line: 'main', t0: false, viewingVariation: false, liveTip: true } }));
     expect(positionLabel(tip)).toBe('T34 on the main line');
@@ -73,7 +80,6 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(positionLabel(midGame)).toBe('T20 on the main line');
   });
 
-  // Round 89 (#105, H8, finding 8): the record's optional `pending` (a tip turn waiting for its replacement) rides in the state file; a file whose record has none still reads.
   test('the state file of a game carries its pending tip turn and still reads a record without one; the version stays', async () => {
     const record = await savedRecord(['Alice', 'Bob'], 2);
     const waiting = { ...record, pending: [entry(3, { p2SlotChoices: [{ kind: 'move', moveId: 'icebeam', moveName: 'Ice Beam' }] })] };
@@ -89,7 +95,7 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(supportStateProblem(old)).toBeNull();
   });
 
-  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist (H4h)', () => {
+  test('the issue link of a new game names the game and the format, not a Showdown replay that does not exist', () => {
     const game = buildSupportState(inputs({ replay: { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' } }));
     const url = new URL(issueUrl(game, 'state.json'));
     expect(url.searchParams.get('replay')).toBe('New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
@@ -97,7 +103,6 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(url.searchParams.get('body')).toContain('**Replay:** New game newgame-m7nj3hx23e, [Gen 9] OU (no Showdown replay)');
   });
 
-  // Round 89 (#105, H5): a game has no replay to load, so its file carries the game's record, and the issue says which game it is.
   describe('a new game in the file', () => {
     const gameReplay = { id: 'newgame-m7nj3hx23e', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Tidepool', 'Marrowkid'] as [string, string], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' as const };
 
@@ -141,10 +146,8 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(url.searchParams.get('position')).toBe('T28 on the main line (variation from turn 5, 1 turn)');
     expect(url.searchParams.get('message')).toBe('PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
     expect(url.searchParams.get('title')).toBe('gen9draft-2058494320: PBA S 2 3 & 5 (Kyurem) no longer knows Brave Bird.');
-    // Round 88 (user report 08.11.2026): the form takes the state file in an upload field, which a link cannot fill
     expect(url.searchParams.get('state-file')).toBeNull();
-    // Round 77 (user report 28.10.2026): GitHub reads issue forms from the default branch only; without the form the link
-    // opened a blank issue with the title alone. The description carries the facts for that case.
+    // GitHub reads issue forms from the default branch only; without the form the link opened a blank issue.
     const body = url.searchParams.get('body') ?? '';
     for (const fact of ['0.7.1 (abc1234)', 'https://replay.pokemonshowdown.com/gen9draft-2058494320', 'T28 on the main line', 'no longer knows Brave Bird', 'state.json']) {
       expect(body).toContain(fact);
@@ -157,12 +160,60 @@ describe('the support state file (round 77, user gate 28.10.2026)', () => {
     expect(issueUrl(long, 'state.json').length).toBeLessThan(8000);
   });
 
-  // Round 88 (user report 08.11.2026): GitHub took no .json file in the form's text box on a new issue (#108 carries the
-  // instruction instead of the file). An issue form's upload field takes .json files.
+  // GitHub takes .json files in an issue form's upload field, not in the text box of a new issue.
   test('the issue form takes the state file in an upload field that accepts .json', () => {
     const form = readFileSync(join('.github', 'ISSUE_TEMPLATE', 'bug_report.yml'), 'utf-8').replace(/\r\n/g, '\n');
     const field = /- type: (\w+)\n\s+id: state-file\n([\s\S]*?)(?=\n {2}- type:|$)/.exec(form);
     expect(field?.[1]).toBe('upload');
     expect(field?.[2]).toMatch(/accept: "\.json"/);
+  });
+});
+
+describe('support-state-dice', () => {
+  const die: ForcedDie = { name: { slot: 'p1a', moveId: 'airslash', targetSlot: 'p2a', kind: 'secondary', effectId: 'flinch' }, result: { happens: true } };
+  const report: DiceReport = { forced: [{ die, took: 'applied', chance: 0.3, logIndex: 41 }], naturalEndSeed: '1,2,3,4' };
+
+  const entry = (overrides: Partial<BranchHistoryEntry> = {}): BranchHistoryEntry => ({
+    turnNumber: 13, p1Choice: 'move 1', p2Choice: 'move 2', serializedPosition: '{"a huge":"position"}',
+    p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [], kind: 'turn',
+    p1SlotChoices: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash', targetLoc: 1, dice: [die] }, null],
+    p2SlotChoices: [{ kind: 'switch', speciesId: 'raichu', pokemonName: 'Raichu' }], ...overrides,
+  });
+
+  const inputs = (history: BranchHistoryEntry[]): SupportStateInputs => ({
+    createdAt: '2026-10-31T12:00:00.000Z',
+    app: { version: '1.0.2', commit: 'abc1234', url: 'https://example.org/', embed: false },
+    browser: { userAgent: 'test', width: 1280, height: 720, pixelRatio: 1 },
+    replay: { id: 'gpl-DzBQ5azlO5l', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['a', 'b'], log: '|turn|1', uploadtime: 1, rating: undefined, viewpoint: 'p1' },
+    knowledge: { teamText: '', editedP1Info: null, editedP2Info: null },
+    builtSets: { p1Team: [], p2Team: [] },
+    variation: { startTurn: 13, branching: true, history },
+    view: { turn: 13, line: 'variation', t0: false, viewingVariation: true, liveTip: false },
+    choices: { draft: { p1: [{ kind: 'move', moveId: 'crunch', moveName: 'Crunch', dice: [die] }], p2: [] }, live: { p1: [], p2: [] } },
+    messages: {},
+    engine: { prefs: { depth: 1, samples: 1, mode: 'auto', auto: false, autoAnalyze: false } as never, fastPlayOut: false, animateBranchTurns: true, playOutActive: false },
+  });
+
+  describe('the support state with forced dice', () => {
+    test('keeps the dice of a history entry and of the draft through the file, and the version stays 1', () => {
+      const state = buildSupportState(inputs([entry({ diceReport: report })]));
+      expect(SUPPORT_STATE_VERSION).toBe(1);
+      expect(state.version).toBe(1);
+      const read = JSON.parse(JSON.stringify(state, null, 2)) as SupportState;
+      expect(isSupportState(read)).toBe(true);
+      expect(read.variation.history[0].p1SlotChoices![0]).toMatchObject({ kind: 'move', dice: [die] });
+      expect(read.variation.history[0].diceReport).toEqual(report);
+      expect(read.choices.draft.p1[0]).toMatchObject({ dice: [die] });
+      expect(JSON.stringify(read)).not.toContain('a huge');
+    });
+
+    test('a file from before the dice loads: the same shape without a dice field or a report', () => {
+      const old = entry({ p1SlotChoices: [{ kind: 'move', moveId: 'airslash', moveName: 'Air Slash' }] });
+      const state = buildSupportState({ ...inputs([old]), choices: { draft: { p1: [], p2: [] }, live: { p1: [], p2: [] } } });
+      const read = JSON.parse(JSON.stringify(state)) as SupportState;
+      expect(isSupportState(read)).toBe(true);
+      expect('dice' in read.variation.history[0].p1SlotChoices![0]!).toBe(false);
+      expect('diceReport' in read.variation.history[0]).toBe(false);
+    });
   });
 });

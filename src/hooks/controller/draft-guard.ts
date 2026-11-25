@@ -5,11 +5,7 @@ export interface DraftChoices { p1: (BranchSlotChoice | null)[]; p2: (BranchSlot
 
 type OfferedState = Pick<BranchSimState, 'p1MovesBySlot' | 'p2MovesBySlot' | 'p1SwitchesBySlot' | 'p2SwitchesBySlot'>;
 
-/**
- * A draft pick belongs to the position it was made on. When a set edit rebuilds that position and the move is gone
- * (or a switch target left the bench), the pick no longer resolves: Execute would fail on it. Returns the same
- * object when nothing was dropped, so a render-phase reconciliation settles after one pass (round 77, D2).
- */
+/** Drops the draft picks the rebuilt position no longer offers; returns the same object when nothing changed. */
 export function dropStaleDraft(draft: DraftChoices, state: OfferedState): DraftChoices {
   let changed = false;
   const prune = (side: 'p1' | 'p2'): (BranchSlotChoice | null)[] => draft[side].map((choice, slot) => {

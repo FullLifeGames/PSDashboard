@@ -5,41 +5,11 @@ import type { PokemonSet } from '@pkmn/sim';
 import { ExhaustiveRunner } from '@pkmn/sim/tools';
 import { buildTeamsFromReplay, generationsFor, inferOpponentTeam, parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 
-/**
- * Round 72 (T237): the simulator's own game generator (@pkmn/sim/tools ExhaustiveRunner) as a ground truth for the inference.
- * The runner builds teams that cover every species, item, ability and move of a generation and plays them with two random AIs, so a
- * generated game has a known true team and a spectator log. Hand-picked replays hold some rules in 1 of 1,167 games (the Z-move
- * of smogtours-gen7ou-450650 was one: the build stored "Devastating Drake" as a move and a branch offered only Struggle); the
- * generator reaches every population of the Dex.
- *
- * One prefix of each format's cycle (all 16 formats of the runner: Gen 1 and 2 singles, Gen 3 to 9 singles and doubles; the
- * simulator has no Gen 1 and 2 doubles) with fixed seeds, so the games are the same on every machine for the pinned @pkmn/sim
- * (test/regression/pkmn-pins.spec.ts). Per game and per side the spec checks:
- *  - no throw: the inference, the parser and the team build run on the spectator log;
- *  - no impossible reveal: a move the inference books as `revealed` is in the Pokemon's true set (Hidden Power and Return fold);
- *  - a CRLF log gives the same inference, parse and build as its LF text;
- *  - one roster entry per body: the inferred team has as many Pokemon as the client's side has and names no species twice.
- *
- * A game whose move lines can show moves outside the set is left out of the reveal check: a move the Dex says calls another
- * move, a move line tagged `[from] move:` or `[from] ability:` (Metronome, Dancer), a transform, a copied move (Mimic, Sketch).
- * The log and the Dex decide, no list of names. A side whose generated team is illegal (a species twice, Illusion, a Z-move or Max
- * move in the set) is left out of the checks of its side.
- *
- * Limits, named: the generator's AI plays no Dynamax (0 of 76 Gen 8 games), and VGC (bring 4) is out because a Custom Game has no
- * bring rule; scripts/corpus-coverage.mjs counts both. The cycle of a format is cut to a prefix to keep the spec near a minute
- * (the full cycles are 1,316 games and about 90 s); the Gen 7 singles prefix reaches game 81, the first generated Z-move game
- * that the inference before 73d7cad read wrongly.
- */
 
-/** Games per format: a prefix of the cycle. Gen 7 singles reaches the Z-move game 81 that the code before 73d7cad failed on. */
 const PREFIX: Record<string, number> = { gen7customgame: 85 };
 const DEFAULT_PREFIX = 40;
 
-/**
- * Floors per format, 80 % of what the fixed seeds gave on 19.10.2026 (@pkmn/sim 0.10.11): sides with a legal team and revealed
- * moves in the games the reveal check reads. A simulator that changes the sequences turns a count below its floor red instead of
- * leaving the checks blind. Gen 7 and 8 teams are mostly illegal for the checks (Z-moves and Max moves in the sets).
- */
+// Floors: 80 % of what the fixed seeds gave under @pkmn/sim 0.10.11; a changed sequence turns a count below red.
 const FLOORS: Record<string, { sides: number; revealed: number }> = {
   gen9customgame: { sides: 62, revealed: 692 }, gen9doublescustomgame: { sides: 58, revealed: 619 },
   gen8customgame: { sides: 28, revealed: 157 }, gen8doublescustomgame: { sides: 28, revealed: 268 },
@@ -50,9 +20,6 @@ const FLOORS: Record<string, { sides: number; revealed: number }> = {
   gen3customgame: { sides: 64, revealed: 392 }, gen3doublescustomgame: { sides: 64, revealed: 451 },
   gen2customgame: { sides: 64, revealed: 416 }, gen1customgame: { sides: 40, revealed: 217 },
 };
-// Round 78 (@pkmn 0.10.12): the generator plays other Gen 2 and 3 games on the new simulator, which show fewer distinct
-// moves (Gen 3 448 to 392, Gen 3 doubles 543 to 451, Gen 2 426 to 416); the parser reads every one of them (its reveals
-// equal the distinct moves of the logs' own move lines) and none is impossible.
 const floorOf = (format: string) => FLOORS[format] ?? { sides: 1, revealed: 1 };
 
 type Teams2 = { p1: PokemonSet[]; p2: PokemonSet[] };
@@ -63,7 +30,6 @@ type RunnerOptions = { prng: { random(n: number): number; getSeed(): [number, nu
 const FORMATS = (ExhaustiveRunner as unknown as { FORMATS: string[] }).FORMATS;
 const SIDES = ['p1', 'p2'] as const;
 
-/** One generated game through the battle streams, as the simulator's own runner plays it, with the spectator log kept. */
 async function play(o: RunnerOptions, format: string): Promise<Game> {
   const streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
   const seedOf = () => [o.prng.random(0x10000), o.prng.random(0x10000), o.prng.random(0x10000), o.prng.random(0x10000)] as [number, number, number, number];
@@ -93,19 +59,18 @@ async function generate(format: string): Promise<Game[]> {
 
 const norm = (move: string) => toID(move).replace(/^hiddenpower[a-z]+$/, 'hiddenpower').replace(/^return\d+$/, 'return');
 
-/** A game whose move lines can show moves outside the sets, read from the log and the Dex. */
 function copiesMoves(log: string): boolean {
   for (const line of log.split('\n')) {
     const p = line.split('|');
     if (p[1] === '-transform') return true;
-    if (p[1] === '-activate' && Dex.moves.get(p[4] ?? '').exists) return true; // Sketch names the copied move
-    if (p[1] === '-start' && Dex.moves.get(p[3] ?? '').exists && Dex.moves.get(p[4] ?? '').exists) return true; // Mimic names it too (Disable as well: a superset)
+    if (p[1] === '-activate' && Dex.moves.get(p[4] ?? '').exists) return true;
+    // Mimic names the move too (Disable as well: a superset).
+    if (p[1] === '-start' && Dex.moves.get(p[3] ?? '').exists && Dex.moves.get(p[4] ?? '').exists) return true;
     if (p[1] === 'move' && (Dex.moves.get(p[3] ?? '').callsMove || p.some(field => /^\[from\]\s*(move|ability):/.test(field)))) return true;
   }
   return false;
 }
 
-/** The sides whose generated team the checks can read: the generator is a crash tester, not a legal team builder. */
 function legalSides(format: string, game: Game): Array<(typeof SIDES)[number]> {
   const dex = Dex.forFormat(format);
   return SIDES.filter(side => {
@@ -117,14 +82,12 @@ function legalSides(format: string, game: Game): Array<(typeof SIDES)[number]> {
   });
 }
 
-/** The client's roster of a side: one entry per body the log showed. */
 function clientRoster(format: string, log: string, side: (typeof SIDES)[number]): string[] {
   const battle = new Battle(generationsFor(format));
   for (const line of log.split('\n')) if (line.startsWith('|')) battle.add(line);
   return battle[side].team.map(mon => mon.speciesForme);
 }
 
-/** The four readings of one log, each computed once for all the checks. */
 type Readings = { p1: ReturnType<typeof inferOpponentTeam>; p2: ReturnType<typeof inferOpponentTeam>; parsed: ReturnType<typeof parseReplayLogWithObservations>; built: ReturnType<typeof buildTeamsFromReplay> };
 const readings = new WeakMap<Game, Readings>();
 function readingsOf(game: Game): Readings {
@@ -136,7 +99,6 @@ function readingsOf(game: Game): Readings {
   return found;
 }
 
-/** The CRLF check reads every CRLF_EVERY-th game: the readers fold line endings at their door, so the text does not matter to them. */
 const CRLF_EVERY = 4;
 
 const baseOf = (format: string, species: string) => toID(Dex.forFormat(format).species.get(species).baseSpecies || species);

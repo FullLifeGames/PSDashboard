@@ -9,16 +9,7 @@ import { SWEEPS_FULL } from './dice-fixtures';
 import { SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf, HOLDERS, holderOf, verdictOf, type Holder, type Lineup } from './board-key-support';
 
-/**
- * Round 89 (#149, step A8-6): a field that every reader in the Dex tests only as "zero or not" is keyed as that predicate. The turns
- * a body has stood on the field (`activeTurns`) is read by Stakeout, Mountaineer, Rebound, Speed Boost, Slow Start, Truant, Electrify,
- * Taunt, Octolock and a partial trap, each of them as `activeTurns` against 0 (a foe that came in this turn, a body past its first
- * turn). The key then splits a board at 0 and keeps 1, 2 and 17 together. This spec holds the predicate to the simulator in every rule
- * set the corpus plays, singles and doubles: every Dex entry the scan names as a reader of the field, placed on each holder of the
- * board, plays the same hit (and the same end of the turn) at 1, 4 and 17, and the key of the board is the same; at 0 against 3 the
- * plays differ (the teeth), so the predicate is no blanket. A simulator whose entry compares the field with a number turns the row
- * red, and the field is keyed whole again.
- */
+// `activeTurns` is tested only against 0 by every Dex reader: the key splits at 0 and keeps 1, 2 and 17 together.
 
 await loadSimMods('gen9championscustomgame');
 
@@ -30,14 +21,12 @@ const setTurns = (battle: Battle, turns: number): void => {
   for (const side of battle.sides) for (const body of side.active) if (body) body.activeTurns = turns;
 };
 
-/** The end of the turn of a board, played without a memo. */
 function freshEnd(battle: Battle): string {
   const copy = copyOf(battle);
   return JSON.stringify(playResiduals(copy, slotsOf(copy)));
 }
 
 describe.each(CASES)('$name: the turns a body has stood are keyed as zero or not', ({ rules, mode, name }) => {
-  // A move that costs its user HP by itself: the cost of the hit then follows the damage a Stakeout or a Slow Start changes.
   const recoil = sweepMoves(rules, move => !!move.recoil || !!move.struggleRecoil, true).moves.find(move => move.category === 'Physical')?.id ?? 'tackle';
   const base = boardFor(rules, mode, recoil);
   const { dex } = base;
@@ -71,10 +60,10 @@ describe.each(CASES)('$name: the turns a body has stood are keyed as zero or not
       for (const id of ids) for (const holder of holders) if (holderOf(base, holder)) check(`${kind} ${id} on ${holder}`, recoil, lineupOf(kind, id, holder));
     }
     for (const move of moves) check(`move ${move}`, move, {});
-    // Generations 1 and 2 have no entry that reads the field.
+    // Gens 1 and 2 have no abilities and no other entry that reads the field.
     if (rules.generation >= 3) expect(rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    // The teeth: Stakeout on the attacker (Gen 7 on) and Mountaineer-like entries read the zero.
+    // The teeth: Stakeout, from Gen 7, doubles the attack against a body that has stood no turn.
     if (rules.generation >= 7 || rules.name === 'Champions') expect(teeth).toBeGreaterThan(0);
   });
 

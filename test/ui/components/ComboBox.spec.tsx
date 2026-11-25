@@ -6,7 +6,6 @@ import { ComboBox } from '../../../src/components/ComboBox';
 
 const OPTIONS = ['Earthquake', 'Earth Power', 'Fire Fang', 'Scale Shot', 'Stone Edge'];
 
-/** A controlled host, as the editor fields use it. */
 function Host({ onSelect, onEnterFreeText, onBlur, disabled }: {
   onSelect: (option: string) => void;
   onEnterFreeText?: (text: string) => void;
@@ -85,7 +84,6 @@ describe('ComboBox', () => {
     const boxes = screen.getAllByRole('combobox');
     expect(boxes[1]).toBeDisabled();
   });
-  // Round 89 (T9c): Escape with the list open closes the list only; a dialog around the box keeps its edits.
   test('Escape closes an open list and stops there; with the list closed the key reaches the host', async () => {
     const onHostKey = vi.fn();
     render(

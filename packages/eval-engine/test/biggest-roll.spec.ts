@@ -5,20 +5,6 @@ import { buildGameReport } from '../src/report';
 import type { KoOddsInfo, RankedChoice } from '../src/types';
 import { winPercent } from '../src/winprob';
 
-/**
- * Round 79 (T284): the report names the game's biggest roll against the eventual winner. 573756 turn 73: the 95 % Fire Fang
- * missed, worth +13 % to SOULWIND, the largest roll of the game, but the report spoke of turn 71 and the chip printed the
- * net +5 %. The roll is the largest |chanceDelta| on a turn whose roll went in the chance's direction, toward the loser,
- * at least CHANCE_THRESHOLD (0.2). The move is named only when the winner's played move provably carried the roll: a sure
- * kill behind an accuracy under 1.
- * User gate 30.10.2026 ("2a"): the sentence speaks only where the log names the event; a biggest roll whose move is not
- * proven says nothing, since "the game's biggest roll" with no event behind it told the reader nothing.
- * Round 86 (T304, spec gate 2a): the sentence names both chances of the side that rolled, "A hit would have left Beta 84% to win;
- * after the miss Beta stood at 76%." The hit is the engine's score of the next root of the copy that plays the turn with the die turned
- * over (rolled-copy.ts); the miss is the actual next root. A doubles click names its move and target through the odds' label, and
- * the sentence waits for the copy there, since the copy is what finds the die in the log.
- */
-
 const names: [string, string] = ['Alpha', 'Beta'];
 const none = { p1: false, p2: false };
 const forP1 = { p1: true, p2: false };
@@ -34,7 +20,6 @@ const mk = (turn: number, scoreBefore: number, scoreAfter: number | null, over: 
   p1: sideOf(), p2: sideOf(), ...over,
 });
 
-/** Beta wins; every turn is rolled (rolledFor present); the scores favor Beta from turn 4 on. */
 const game = (rollTurn: Partial<TurnAnalysis>, extra: TurnAnalysis[] = []): TurnAnalysis[] => [
   mk(1, -0.1, -0.1, { chanceDelta: 0, rolledFor: none }),
   mk(2, -0.1, -0.3, { chanceDelta: -0.05, rolledFor: none }),
@@ -43,10 +28,9 @@ const game = (rollTurn: Partial<TurnAnalysis>, extra: TurnAnalysis[] = []): Turn
   ...extra,
 ];
 const fireFang = sideOf({ played: choice('Fire Fang', { accuracy: 0.95, killFraction: 1, attacker: { slot: 0, species: 'Garchomp' } }) });
-/** The copy's next root: Beta's score if the Fire Fang had hit (p1 view). */
 const hitOf = (score: number): RollFlip => ({ turn: 3, score });
 
-describe('the game\'s biggest roll against the winner (T284, T304)', () => {
+describe('the game\'s biggest roll against the winner', () => {
   test('573756 shape: the sentence names what a hit would have left the side that rolled and where it stood after the miss', () => {
     const report = buildGameReport(game({ chanceDelta: 0.27, rolledFor: forP1, p2: fireFang }), names, 'p2', true, new Set([3]), hitOf(-0.9));
     expect(report.summary).toContain(

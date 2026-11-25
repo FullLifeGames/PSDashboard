@@ -1,17 +1,6 @@
-/**
- * Round 59 (T91), lever clone: the generated parts of the copy (round 58
- * prototype v2, docs/perf/probes/2026-09-24-r58/patch/clone.ts). One shell
- * constructor and one filler per own-key list keep every copy of one shape
- * in one hidden class with its fields in-object; the fast ActiveMove copier
- * does the same per move id. Pokemon's two per-instance arrow closures
- * (getHealth, getFullDetails) are rebuilt from the sim's own source and
- * bound to the copy.
- */
-
 export type Obj = Record<string, unknown>;
 export type CopyValue = (value: unknown, x: Ctx) => unknown;
 
-/** What one copy works with: the new objects, the classes it recognizes, the ActiveMove mode. */
 export interface Ctx {
   battle: Obj;
   field: Obj;
@@ -30,7 +19,6 @@ export type PlanTag = 'battle' | 'field' | 'side' | 'pokemon';
 const quote = (key: string): string => JSON.stringify(key);
 const plans: Record<PlanTag, Plan[]> = { battle: [], field: [], side: [], pokemon: [] };
 
-/** Same own keys in the same order, compared without allocating. */
 export function sameKeys(obj: Obj, keys: readonly string[]): boolean {
   let i = 0;
   for (const key in obj) {
@@ -40,7 +28,6 @@ export function sameKeys(obj: Obj, keys: readonly string[]): boolean {
   return i === keys.length;
 }
 
-/** Plan for the object's own key list; `special` maps a key to generated code. */
 export function planFor(tag: PlanTag, obj: Obj, proto: object, special: Readonly<Record<string, string>>): Plan {
   const list = plans[tag];
   for (const plan of list) {
@@ -61,7 +48,6 @@ export function planFor(tag: PlanTag, obj: Obj, proto: object, special: Readonly
 interface MovePlan { keys: string[]; Made: new (s: Obj, x: Ctx, sh: CopyValue) => Obj }
 const movePlans = new Map<string, MovePlan[]>();
 
-/** ActiveMove at the top level: every own key through `sh` (nested plain data stays shared). */
 export function copyActiveMoveFast(move: Obj, proto: object, x: Ctx, sh: CopyValue): Obj {
   const id = String(move.id);
   let list = movePlans.get(id);
@@ -96,11 +82,10 @@ export const BATTLE_SPECIAL: Readonly<Record<string, string>> = {
 };
 
 type ClosureFactory = (this: Obj) => unknown[];
-/** Any whitespace after `()`: the minified bundle prints `()=>{`. */
+// The minified bundle prints `()=>{`: any whitespace after `()` is allowed.
 const CLOSURE_SHAPE = /^\(\)\s*=>/;
 let closureFactory: ClosureFactory | null = null;
 
-/** Rebuilds [getFullDetails, getHealth] from the source Pokemon's own closures. */
 export function compileClosures(source: Obj): ClosureFactory {
   const details = String(source.getFullDetails);
   const health = String(source.getHealth);
@@ -110,7 +95,6 @@ export function compileClosures(source: Obj): ClosureFactory {
   return new Function(`return function () { return [${details}, ${health}]; };`)() as ClosureFactory;
 }
 
-/** [getFullDetails, getHealth] bound to `target`, compiled once per process. */
 export function closuresFor(target: Obj, source: Obj): unknown[] {
   closureFactory ??= compileClosures(source);
   return closureFactory.call(target);

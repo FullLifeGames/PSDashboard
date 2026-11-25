@@ -9,16 +9,7 @@ import {
 
 registerChampionsDex(championsMod as never, (championsMod as unknown as { Formats: never }).Formats);
 
-/**
- * Round 89 (#124): a body that enters and leaves within one turn is a brought body. The turn snapshots show the bodies on the
- * field at the turn's end, so a Pokémon that enters on a switch, a U-turn or Volt Switch, a drag or an Illusion break and
- * faints before the turn ends never stood active in a snapshot. The bring list read it as an unfielded candidate: 131 games of
- * the holdouts and the bank (VGC 2630452654 among them, P2's Farigiraf) counted as short while the log shows every brought body.
- *
- * The rows play every line kind that puts a body on the field, in singles (Battle Stadium Singles, bring 3) and doubles (VGC,
- * bring 4), through `parseReplayLog`; the protocol is the oracle, no species name stands in the code. The corpus row reads every
- * bring-limited replay of the fit corpus and holds the list to the log's own `switch` and `drag` lines.
- */
+// Snapshots show the turn's end: a Pokémon that enters and faints before never stood active, yet counts as brought.
 
 type Kind = 'switch' | 'switch after a U-turn' | 'switch after Volt Switch' | 'drag' | 'Illusion break';
 const KINDS: Kind[] = ['switch', 'switch after a U-turn', 'switch after Volt Switch', 'drag', 'Illusion break'];
@@ -26,7 +17,6 @@ const KINDS: Kind[] = ['switch', 'switch after a U-turn', 'switch after Volt Swi
 const detail = (name: string) => `${name}, L50`;
 const hp = (value: string) => `|${value}`;
 
-/** One short-lived body of p1: it enters through `kind`, takes a hit and faints; the forced replacement stays on the field. */
 function scene(kind: Kind, game: 'singles' | 'doubles') {
   const doubles = game === 'doubles';
   const shortLived = kind === 'Illusion break' ? 'Zoroark' : 'Jolteon';
@@ -56,14 +46,11 @@ function scene(kind: Kind, game: 'singles' | 'doubles') {
     ...lead('p1', doubles ? ['Pikachu', 'Eevee'] : ['Pikachu']),
     ...lead('p2', doubles ? ['Bulbasaur', 'Charmander'] : ['Bulbasaur']),
     '|turn|1',
-    // The side's second body stays on the field from turn 1.
     `|switch|p1a: Raichu|${detail('Raichu')}${hp('100/100')}`, `|switch|${doubles ? 'p2b' : 'p2a'}: Squirtle|${detail('Squirtle')}${hp('100/100')}`, '|turn|2',
-    // Turn 2: the short-lived body enters, faints, and the replacement stays.
     ...entry, ...hitAndFaint, `|switch|${mover}: ${doubles ? 'Eevee' : 'Pikachu'}|${detail(doubles ? 'Eevee' : 'Pikachu')}${hp('100/100')}`,
     `|switch|${doubles ? 'p2b' : 'p2a'}: Ivysaur|${detail('Ivysaur')}${hp('100/100')}`, '|turn|3',
     '|turn|4',
   ];
-  // Bring 3 (singles): Pikachu, Raichu, the short-lived one. Bring 4 (doubles): Pikachu, Eevee, Raichu, the short-lived one.
   const p1Brought = doubles ? ['Pikachu', 'Eevee', 'Raichu', shortLived] : ['Pikachu', 'Raichu', shortLived];
   const p2Brought = doubles ? ['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur'] : ['Bulbasaur', 'Squirtle', 'Ivysaur'];
   const formatid = doubles ? 'gen9vgc2026regi' : 'gen9battlestadiumsinglesregh';
@@ -84,7 +71,6 @@ describe('a body that enters and faints within one turn is fielded', () => {
         expect(bases(broughtSpeciesFor(snapshots, 'p1', rules))).toEqual(bases(p1Brought));
         expect(bases(broughtSpeciesFor(snapshots, 'p2', rules))).toEqual(bases(p2Brought));
         if (kind === 'Illusion break') expect(broughtSpeciesFor(snapshots, 'p1', rules)).not.toContain(disguise);
-        // Both sides fielded their whole selection: a pinned list and a list with nothing open.
         const pinned = replayBringOnly(replay, snapshots);
         expect(pinned).not.toBeNull();
         expect(pinned!.p1).toContain(shortLived);

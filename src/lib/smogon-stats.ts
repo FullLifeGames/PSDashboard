@@ -16,21 +16,11 @@ export function getSmogonStatsFormat(formatId: string | undefined): string {
   const id = toId(formatId || 'gen9ou').replace(/^smogtours/, '');
   const nationalDex = nationalDexDoublesFormat(id);
   if (nationalDex) return nationalDex;
-  // VGC: the year-level stats file aggregates all regulations and holds
-  // species the Smogon doubles ladder never sees (e.g. Annihilape).
-  // Pokémon Champions VGC keeps a year file of its own (round 66, T141):
-  // megas, its own item pool and EV scale, another metagame.
+  // VGC: the year-level file aggregates all regulations and holds species the doubles ladder never sees (Annihilape).
   return vgcYearFormat(id) ?? ouFallbackFormat(id);
 }
 
-/**
- * Only the data.pkmn.cc mirror sends CORS headers — the historical
- * www.smogon.com fallback months could never succeed in a browser and only
- * produced 16+ console errors per load (B14), so they are gone.
- *
- * Formats without a stats file (custom rulesets, niche metas) fall back to
- * the generation's OU so the app still has usage-based assumptions.
- */
+/** Only the data.pkmn.cc mirror sends CORS headers, so no www.smogon.com months are tried (they fail in a browser). */
 export function buildSmogonStatsUrls(
   formatId: string | undefined,
 ): { month: string; format: string; url: string }[] {
@@ -38,10 +28,7 @@ export function buildSmogonStatsUrls(
   const candidates = [format];
   const gen = format.match(/^gen\d+/)?.[0];
   if (gen) {
-    // Per-species merge fallbacks (fetchSmogonUsageStats): a format's file
-    // existing does not mean it lists every Pokémon — VGC fills from the
-    // doubles ladder, everything from the gen's OU, and OU-banned species
-    // (draft leagues, VGC) from Ubers.
+    // A file does not list every species: VGC fills from the doubles ladder, all from the gen's OU, banned from Ubers.
     if (format.includes('vgc')) candidates.push(`${gen}doublesou`);
     candidates.push(`${gen}ou`, `${gen}ubers`);
   }
@@ -52,14 +39,7 @@ export function buildSmogonStatsUrls(
   }));
 }
 
-/**
- * Fetches every candidate and merges per species: the format's own file
- * wins, the generation's OU fills species it lacks. A niche format's stats
- * file existing must not blank out guessing for a Pokémon that simply is not
- * played there (e.g. Annihilape missing from doublesou). `answered` is false
- * when a source failed for any reason but a 404 (network, server error): the
- * stats are then what the reachable sources said, not the whole answer.
- */
+// `answered` is false when a source failed for any reason but a 404: the stats are what the reachable sources said.
 async function fetchCandidates(
   formatId: string | undefined,
   fetcher: SmogonFetch,
@@ -71,7 +51,6 @@ async function fetchCandidates(
     try {
       const response = await fetcher(candidate.url, { signal });
       if (!response.ok) {
-        // A 404 is an answer (the file is absent); anything else may pass.
         if (response.status !== 404) answered = false;
         continue;
       }
@@ -103,8 +82,7 @@ export async function fetchSmogonUsageStats(
   const cacheKey = `${format}:${options?.now?.toISOString() ?? 'latest'}:${fetcherKey(options?.fetcher)}`;
   const cached = usageCache.get(cacheKey);
   if (cached) {
-    // Joining a load that another caller aborts is not this caller's answer:
-    // the memo has dropped that load by then, so ask again.
+    // A joined load that another caller aborts is not this caller's answer; the memo dropped it, so ask again.
     return cached.catch(error => {
       if (isAbort(error) && !options?.signal?.aborted) return fetchSmogonUsageStats(formatId, options);
       throw error;
@@ -115,9 +93,7 @@ export async function fetchSmogonUsageStats(
   const outcome = fetchCandidates(formatId, fetcher, options?.signal);
   const request = outcome.then(result => result.stats);
   usageCache.set(cacheKey, request);
-  // Only an answer is remembered (T68): an abort, a network failure or a
-  // server error leaves the memo empty, so the next load asks again; a 404
-  // from every source stays (the format has no file).
+  // Only an answer is memoized: an abort or a failure leaves it empty, a 404 from every source stays.
   const forget = () => {
     if (usageCache.get(cacheKey) === request) usageCache.delete(cacheKey);
   };

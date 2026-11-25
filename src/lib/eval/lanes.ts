@@ -1,11 +1,5 @@
-/**
- * Small indexed-job pipeline: `size` jobs run through at most `laneCount`
- * concurrent lanes, picked up in index order. A job resolving false stops
- * every lane from picking up further work (in-flight jobs still settle),
- * and the call resolves false — the sweep's "cancelled" signal. Pure
- * scheduling: results must not depend on which lane runs a job or in what
- * order jobs finish.
- */
+/** Runs `size` jobs in index order through `laneCount` lanes; a job returning false stops pickups and the call. */
+// Results must not depend on which lane runs a job or in what order jobs finish.
 export async function runInLanes(
   laneCount: number,
   size: number,

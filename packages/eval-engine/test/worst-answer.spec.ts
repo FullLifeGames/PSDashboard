@@ -2,18 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { worstAnswer } from '../src/turn-analysis/worst-answer';
 import type { EvalMatrix, EvalResult, MatrixCell, RankedChoice } from '../src/types';
 
-/**
- * Round 89 (#153): the reply that hurts a row most. The lowest cell of the row among the cells the result trusts (verified, or the
- * visits the hindsight read asks for, or every cell when the result carries no cell statistics), else the row's own floor
- * (`punishedBy`), else none. Singles and doubles boards read the same matrix.
- */
 
 const ranked = (choice: string, label: string, punishedBy: string | null = null): RankedChoice => ({ choice, label, worstCase: 0, expected: 0, ev: 0, punishedBy });
 const solid: MatrixCell = { visits: 20, verified: false };
 const thin: MatrixCell = { visits: 2, verified: false };
 const verified: MatrixCell = { visits: 1, verified: true };
 
-/** Rows: Surf, Ice Beam (p1). Columns: Draining Kiss, Moonblast, Mew (p2). Values are p1's view. */
+// Values are p1's view.
 function board(values: number[][], cells?: MatrixCell[][], p1 = ['Surf', 'Ice Beam'], p2 = ['Draining Kiss', 'Moonblast', '→ Mew']): EvalResult {
   const matrix: EvalMatrix = {
     p1Labels: p1, p2Labels: p2, p1Choices: p1.map(label => `c:${label}`), p2Choices: p2.map(label => `c:${label}`),

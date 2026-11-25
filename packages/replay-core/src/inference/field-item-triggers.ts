@@ -8,23 +8,7 @@ import { possibleAbilities, ruleOutUnknown } from './item-evidence.ts';
 import { arg, keyOf, type LogLine } from './log-line.ts';
 import type { TriggerWatch } from './trigger-evidence.ts';
 
-/**
- * Round 88 (T349, GitHub issue #5): the items that fire when the field changes, ruled out by a trigger the log shows without
- * the item's line, in the shape of trigger-evidence.ts (a trigger opens a check, the next move or turn closes it). In the Dex
- * these are the items with an `onTerrainChange` or an `onAnyPseudoWeatherChange` handler: the four terrain seeds (Generation 7
- * on) and Room Service (Generation 8 on, Past in the Champions mod). Each is used at three triggers:
- *  - its holder enters (`onStart`) while its terrain, or Trick Room, stands;
- *  - a terrain starts (`onTerrainChange`) with the holder on the field;
- *  - a pseudo-weather starts (`onAnyPseudoWeatherChange`) while Trick Room stands, Trick Room's own start and any later
- *    Gravity, Wonder Room, Mud Sport, Ion Deluge or Fairy Lock included; a second Trick Room that ends the first runs no event.
- * Which terrain or room arms an item comes from running its own handler on a stand-in holder over the field the log shows (the
- * model of `spendsWith` in trigger-evidence.ts), never from a typed table. The gates are read at the trigger, not at the
- * boundary: Magic Room and Embargo stop every item at that moment and a block that ends later does not release the item (the
- * next trigger decides), and a Pokémon that may have Klutz is not judged (Neutralizing Gas turns Klutz off, so the rule stays
- * out of that case on purpose). +6, Contrary and Commander do not stop a use. Only items still unknown and never swapped are
- * ruled out, and a team that may hold an Illusion user is not judged (ruleOutUnknown, item-evidence.ts). The facts run through
- * @pkmn/sim in field-item-triggers-sweep.spec.ts.
- */
+// Design: EVALUATION.md "Rule-outs".
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 type Trigger = 'start' | 'terrain' | 'pseudo';
@@ -34,7 +18,6 @@ const HANDLER = { start: 'onStart', terrain: 'onTerrainChange', pseudo: 'onAnyPs
 
 const candidates = new WeakMap<RulesDex, FieldItem[]>();
 
-/** The Dex items that read the field when it changes (the sweep holds this list to the Dex of every generation and mod). */
 function fieldItems(dex: RulesDex): FieldItem[] {
   let items = candidates.get(dex);
   if (!items) {
@@ -47,9 +30,9 @@ function fieldItems(dex: RulesDex): FieldItem[] {
 export const fieldItemIds = (dex: RulesDex): string[] => fieldItems(dex).map(item => item.id);
 
 export interface FieldItemWatch {
-  /** The pseudo-weathers standing (Trick Room, Gravity, Magic Room, ...): field conditions that are neither weather nor terrain. */
+  /** Field conditions that are neither weather nor terrain (Trick Room, Gravity, Magic Room). */
   pseudo: Set<string>;
-  /** The items each opponent Pokémon would have used at a trigger of the window that is open, by side and nickname. */
+  /** Items each opponent would have used at the open window's trigger, keyed by side and nickname. */
   pending: Map<string, Set<string>>;
 }
 
@@ -57,7 +40,6 @@ export function newFieldItemWatch(): FieldItemWatch {
   return { pseudo: new Set(), pending: new Map() };
 }
 
-/** Whether the item's own handler uses the item for a holder on this field. */
 function uses(handler: ItemHandler | undefined, terrain: string, pseudo: ReadonlySet<string>): boolean {
   if (!handler) return false;
   let used = false;
@@ -78,7 +60,6 @@ function uses(handler: ItemHandler | undefined, terrain: string, pseudo: Readonl
   return used;
 }
 
-/** A trigger passed with these holders on the field: each holder the gates let through and an item's handler would use opens a check. */
 function open(state: InferrerState, watch: TriggerWatch, trigger: Trigger, keys: Iterable<string>) {
   const items = fieldItems(dexOf(state));
   for (const key of keys) {
@@ -93,22 +74,21 @@ function open(state: InferrerState, watch: TriggerWatch, trigger: Trigger, keys:
   }
 }
 
-/** The window closes at the next move or turn: a holder still without its item's line has not that item. */
 function close(state: InferrerState, watch: TriggerWatch) {
   for (const [key, ids] of watch.field.pending) {
     const abilities = possibleAbilities(state, key);
+    // A Pokémon that may have Klutz is not judged; Neutralizing Gas turns Klutz off and the rule stays out on purpose.
     if (abilities && !ITEM_BLOCKERS.ability.some(blocker => abilities.has(blocker))) for (const id of ids) ruleOutUnknown(state, key, id);
   }
   watch.field.pending.clear();
 }
 
-/** A field condition starts or ends. A terrain start is read from `watch.terrain`, which trigger-evidence.ts has updated for this line. */
 function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   const dex = dexOf(state);
   const effect = Protocol.parseEffect(arg(line, 1));
   const id = toId(effect.name);
   if (line.cmd === '-fieldactivate') {
-    // Ion Deluge and Fairy Lock announce themselves as an activation; Perish Song and Pay Day do not change a pseudo-weather.
+    // Ion Deluge and Fairy Lock announce themselves as an activation; Perish Song and Pay Day change no pseudo-weather.
     if (dex.moves.get(effect.name).pseudoWeather) open(state, watch, 'pseudo', new Set(watch.slots.values()));
     return;
   }
@@ -124,10 +104,7 @@ function onField(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   open(state, watch, 'pseudo', new Set(watch.slots.values()));
 }
 
-/**
- * The line handler of the five items; trigger-evidence.ts calls it after it has read the line for the gates (`magicRoom`,
- * `embargoed`, `terrain`, `slots`).
- */
+/** Call after trigger-evidence.ts has read the line for the gates (`magicRoom`, `embargoed`, `terrain`, `slots`). */
 export function watchFieldItems(state: InferrerState, watch: TriggerWatch, line: LogLine) {
   const tag = line.cmd;
   if (tag === 'move' || tag === 'turn') close(state, watch);

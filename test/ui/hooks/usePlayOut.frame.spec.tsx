@@ -10,15 +10,9 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult } from '../fixtures/eval-result';
 import { replayFixture } from '../fixtures/replay';
 
-// Round 89 (#112): a play-out without Fast play-out waited forever when the replay frame reported a turn other than the
-// tip after the timeline's play-in guard had ended. The real timeline (pointer, tip-follow, guard), the real loop and the
-// real transients run in one hook; the evaluation, the simulator and the frame are stubs. The spec reads what the user
-// sees (the next turn arrives, the pointer, the run), so it holds for each way to fix it: the loop stops reading the
-// pointer, the pointer walks back to the tip, or the guard covers the whole run.
-
 type Evaluation = ReturnType<typeof useEvaluation>;
 const GUARD_MS = 20_000; // PLAY_IN_GUARD_MS, src/hooks/useTimeline.ts
-const FIRST_TURN = 3; // the tip the run starts on (variation from turn 2, one entry)
+const FIRST_TURN = 3;
 
 const entry = (turnNumber: number): BranchHistoryEntry => ({
   turnNumber, p1Choice: 'move a', p2Choice: 'move b', serializedPosition: `pos-${turnNumber}`,
@@ -58,18 +52,14 @@ function harness(kind: 'singles' | 'doubles') {
     return { transients, timeline, setEv, setHistory };
   });
   const cur = () => hook.result.current;
-  /** The engine's result for a position; the tag is the key of the tip position, as the app tags it. */
   const result = (tag: string) => act(async () => { cur().setEv({ status: 'done', result: evalResult(kind), tag }); });
-  /** The frame reports a turn, as the iframe's tracker does. */
   const frame = (turn: number) => act(() => cur().timeline.handleReplayTurn(turn));
   const advance = (ms: number) => act(async () => { vi.advanceTimersByTime(ms); });
-  /** A turn lands without the loop (one that was in flight). */
   const land = () => act(async () => { cur().setHistory(h => [...h, entry(2 + h.length)]); });
   const view = () => ({
     tip: cur().timeline.tipTurn, pointer: cur().timeline.viewTurn, liveTip: cur().timeline.liveTip,
     executed: executeSpy.mock.calls.length, active: !!cur().transients.playOut?.active,
   });
-  /** Arms a run on the tip, lets the engine's first result play turn 3 -> 4 (tip 4, the play-in guard on turn 4). */
   async function armAndLand() {
     await act(async () => { cur().transients.setPlayOut({ active: true, executed: 0, turns: 0, startTurn: FIRST_TURN, prevAuto: false }); });
     await result(`variation:${FIRST_TURN}`);
@@ -82,7 +72,7 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1_000_000); });
 afterEach(() => { vi.useRealTimers(); });
 
 for (const kind of ['singles', 'doubles'] as const) {
-  describe(`#112 play-out and the frame's reports, ${kind}`, () => {
+  describe(`play-out and the frame's reports, ${kind}`, () => {
     test('A (guard): a pause on the turn being played in, inside the guard, keeps the run going', async () => {
       const h = harness(kind);
       await h.armAndLand();
@@ -97,10 +87,10 @@ for (const kind of ['singles', 'doubles'] as const) {
     test('B: a pause after the frame landed on the tip does not stop the next turn', async () => {
       const h = harness(kind);
       await h.armAndLand();
-      h.frame(4); // the frame lands on the tip: the guard ends
+      h.frame(4);
       await h.advance(2_000);
-      h.frame(3); // the user steps the frame back and pauses there
-      await h.result('variation:4'); // the engine's next result, keyed to the tip
+      h.frame(3);
+      await h.result('variation:4');
       await h.advance(1_000);
       expect(h.view()).toMatchObject({ executed: 2, active: true });
     });

@@ -8,15 +8,6 @@ import type { RulesDex } from '../src/rules-dex';
 import { effectLands, mayRefuseHit, twinPlays } from '../src/sim-ask/effect-refusal';
 import { play, type PlayBody } from './blocked-effects-play';
 
-/**
- * Round 89 (#150, claim 2): a move hit that the log shows dealing damage rules out every candidate ability of the target under which the
- * simulator would have refused that hit. The scene of the issue is gen9natdexdraft-2713067801 turn 11 (Aqua Step hits Dracovish for 21 %,
- * and the app still built it with Water Absorb); the rows after it play the same rule on @pkmn/sim for singles, doubles and the Champions
- * mod, and the cases where the log proves nothing (a Mold Breaker attacker, a move or a condition that changes the type, Gravity, Ingrain,
- * Smack Down, an Illusion user, the whole set of the species). The sweep over every ability of every generation and mod is
- * `landed-hit-sweep.spec.ts`.
- */
-
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.json', import.meta.url), 'utf8')) as { log: string };
 
 const SINGLES = 'gen9customgame';
@@ -130,8 +121,7 @@ describe('where the log proves nothing, nothing is ruled out', () => {
   });
 
   test('a Ditto that takes a hit with no transform on the log keeps Imposter: the twin with Imposter plays another battle (a transform), so there is no verdict (singles and doubles)', () => {
-    // Round 89 (#150), the first full run of the sweep: "Ditto type Fighting (Close Combat): imposter" was a false rule-out in Generation 5. With Imposter the
-    // Ditto copies the attacker on entry and moves as a copy of it, so the scene is not the one the log shows; the played battle counts such a scene as landed.
+    // Imposter copies the attacker on entry: the scene differs from the log, and the played battle counts it as landed.
     for (const [format, aim, ally] of [['gen5customgame', '', false], ['gen5doublescustomgame', ' 1', true]] as const) {
       const source = mon('Smeargle', 'Technician', ['Close Combat']);
       const log = ally ? doubles(source, mon('Ditto', 'Limber'), FILLER, aim, format) : singles(source, mon('Ditto', 'Limber'), format);
@@ -142,9 +132,7 @@ describe('where the log proves nothing, nothing is ruled out', () => {
   });
 
   test('the twin\'s target acts after the hit, never before: a Protean body under Water type takes Hex on the twin (singles and doubles)', () => {
-    // The first full run of the prefilter sweep (Champions mod): "Greninja target Protean type Ghost (Hex)" was refused on the twin because the target's own
-    // move came first in the twin's turn and Protean made it Normal. The log shows the hit after the target's own move and its type change (Water here), so
-    // the twin's turn must not let the target act before the hit. (The reader asks no Protean in practice: it has no handler in a hit's steps.)
+    // The twin must not let the target act before the hit: Greninja's Protean would turn Normal first and refuse Hex.
     const dex = Dex.forGen(9) as RulesDex;
     for (const partner of [undefined, { species: 'Chansey', ability: '' }]) {
       const scene = {
@@ -156,9 +144,6 @@ describe('where the log proves nothing, nothing is ruled out', () => {
   });
 
   describe('an Illusion user the log has not revealed', () => {
-    // Zoroark leads and shows the name and the species of the last member of its party (the simulator's Illusion). The log names the disguise on the hit
-    // (`|-damage|p2a: Bronzong|`), and the damage breaks the disguise right after it (`|replace|`, `|-end|...|Illusion`). Bronzong is the disguise whose
-    // second ability the hit would seem to rule out: a Ground move lands on the body, and the real body is Zoroark (Dark, no Levitate).
     const withoutPreview = (log: string) => log.split('\n').filter(line => !line.startsWith('|poke|')).join('\n');
     const disguised = (preview: boolean, doubleBattle: boolean) => {
       const zoroark = mon('Zoroark', 'Illusion');

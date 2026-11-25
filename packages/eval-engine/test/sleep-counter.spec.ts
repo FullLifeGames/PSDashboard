@@ -4,15 +4,6 @@ import { parseReplayLogWithObservations, type TurnSnapshot } from '@fulllifegame
 import { correctBattleFromSnapshot } from '../src/branch/corrections';
 import type { SimBattle } from '../src/branch/types';
 
-/**
- * Round 69, T187 (spec decision 29): the snapshot carries the sleep turns
- * @pkmn/client counts, and the correction gives a sleeper a remaining count the
- * protocol allows. The range comes from the simulator's own sleep condition
- * (run on a stand-in that records the draw), Rest's exact count from the Rest
- * move, and the Outrage length from the lock condition. Battle B is the game
- * (its log is the protocol); battle A is the simulator's run that drew another
- * length.
- */
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
 const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -22,7 +13,6 @@ const set = (species: string, moves: string[], level = 100): PokemonSet => ({
 
 interface Scene {
   format: string;
-  /** The second choice fragment: the partner's move in doubles, nothing in singles. */
   partner: string;
   target: string;
   p1: PokemonSet[];
@@ -44,7 +34,6 @@ const outrageScene = (shape: typeof SINGLES): Scene => ({
   p2: [set('Blissey', ['Splash']), ...partners(shape === SINGLES, [['Corviknight', 'Splash']])],
 });
 
-/** A battle played for the given turns (each [p1 choice, p2 choice] without the partner fragment); returns the battle and the public log. */
 function play(scene: Scene, seed: number, turns: [string, string][]): { battle: SimBattle; log: string } {
   const battle = new Battle({
     formatid: toID(scene.format), seed: [seed, 2, 3, 4],
@@ -66,11 +55,9 @@ const snapshotAt = (log: string, turn: number): TurnSnapshot =>
 const bodyOf = (battle: SimBattle, side: 0 | 1, name: string) => battle.sides[side].pokemon.find(pokemon => pokemon.name === name)!;
 const cantsIn = (log: string) => log.split('\n').filter(line => /^\|cant\|p2a: Snorlax\|slp/.test(line)).length;
 
-/** Spore on turn 1, then splashes: the choices of `count` turns. */
 const sporeTurns = (scene: Scene, count: number): [string, string][] =>
   [[`move 1${scene.target}`, 'move 1'], ...Array.from({ length: count - 1 }, (): [string, string] => ['move 2', 'move 1'])];
 
-/** The sleep draw as the Dex's own condition makes it: the arguments of the one random call in onStart. */
 function sleepDrawOf(dex: Battle['dex']): { lo: number; hi: number } {
   const draws: number[][] = [];
   const standIn = { effectState: {}, add: () => undefined, random: (...args: number[]) => (draws.push(args), args[0]) };
@@ -78,7 +65,6 @@ function sleepDrawOf(dex: Battle['dex']): { lo: number; hi: number } {
   return { lo: draws[0][0], hi: draws[0][1] };
 }
 
-/** A seed whose Spore sleep lasts exactly `cants` cant lines in the scene. */
 function seedWithCants(scene: Scene, cants: number): number {
   for (let seed = 1; seed < 400; seed++) {
     if (cantsIn(play(scene, seed, sporeTurns(scene, 6)).log) === cants) return seed;
@@ -86,7 +72,7 @@ function seedWithCants(scene: Scene, cants: number): number {
   throw new Error(`no seed with ${cants} cants`);
 }
 
-describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 sleep counter (%s)', (_label, shape) => {
+describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('sleep counter (%s)', (_label, shape) => {
   const scene = sleepScene(shape);
 
   test('the simulator draws a sleep of 1 to 3 cants, the range the Dex condition states', () => {
@@ -134,10 +120,8 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 sleep
     let rests = 0;
     for (let seed = 1; seed <= 12; seed++) {
       const game = play(scene, seed, restTurns);
-      // Super Fang can miss, and Rest fails at full HP.
       if (!game.log.includes('[from] move: Rest')) continue;
       rests++;
-      // One block holds the Rest and the first cant: the boundary before it is not corrected.
       const merged = game.log.replace('\n|turn|3\n', '\n');
       const snapshot = snapshotAt(merged, 4);
       const sleeper = snapshot.p2.pokemon.find(pokemon => pokemon.name === 'Snorlax')!;
@@ -153,7 +137,7 @@ describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 sleep
   });
 });
 
-describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('T187 Outrage length (%s)', (_label, shape) => {
+describe.each([['singles', SINGLES], ['doubles', DOUBLES]] as const)('Outrage length (%s)', (_label, shape) => {
   const scene = outrageScene(shape);
   const outrage = (turns: number): [string, string][] => Array.from({ length: turns }, (): [string, string] => ['move 1', 'move 1']);
   const fatigue = (log: string) => log.includes('|-start|p1a: Dragonite|confusion|[fatigue]');

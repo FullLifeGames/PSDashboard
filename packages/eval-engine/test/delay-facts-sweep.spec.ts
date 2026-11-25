@@ -8,17 +8,6 @@ import { dexOfRules, SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { liveState, turnOf } from './flip-turn-support';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 89 (P1): the delay facts against the simulator, in every rule set the corpus plays (Gens 2 to 9 and the Champions mod; Gen 1
- * has no stalling move), singles and doubles. Nothing calls the module yet; each row holds one claim of `endgame/delay-facts.ts`:
- *  1. The stall volatile is what a rolling stalling move leaves on its user, so `heldStall` and the dropped counter read the right key.
- *  2. A repeat that held and changed nothing else gives equal facts; each turn that changes something a later turn reads (a heal, a
- *     status, a weather, a stage, a contact shield, the partner's attack, an Endure that held above 1 HP) gives different facts.
- *  3. Facts that are equal mean the same next turn, for every move the side may click next (a sample, all of them with `DICE_SWEEPS=full`),
- *     and the entries that read PP keep it.
- *  4. The PP margin, with and without Pressure, with a partner in doubles.
- *  5. The questions leave the live battle as they found it.
- */
 await loadSimMods('gen9championsou');
 
 const WITH_STALL = SWEEP_CASES.filter(({ rules }) => rules.generation >= 2);
@@ -26,9 +15,7 @@ const WITH_STALL = SWEEP_CASES.filter(({ rules }) => rules.generation >= 2);
 interface Setup { moves: string[]; item?: string; hp?: (maxhp: number) => number }
 interface Case {
   name: string;
-  /** The attacking side's first body, the protector's first body, and the protector's partner (doubles only). */
   p1: Setup; p2: Setup; p2b?: Setup;
-  /** The clicks of the first body of each side, turn one and turn two (a move number; a star adds the aim a doubles click needs for a move that targets a foe). */
   t1: [string, string]; t2: [string, string]; partner?: string;
   setup?: (battle: Battle) => void;
   ids: string[];
@@ -52,7 +39,6 @@ const DOUBLES_CASES: Case[] = [
 
 const rollable = (rules: Rules): boolean => dexOfRules(rules).moves.get('protect').exists && rules.generation >= 2;
 
-/** A body of the sweep's set: Snorlax attacks, Vaporeon protects (Blissey and a second Vaporeon stand beside them in doubles). */
 function bodyOf(rules: Rules, species: string, setup: Setup) {
   return { ...mon(rules, { species, moves: setup.moves }), ...(setup.item ? { item: setup.item } : {}) };
 }
@@ -71,18 +57,15 @@ function boardOf(rules: Rules, mode: Mode, scene: Case, seed: string): Battle {
   return battle;
 }
 
-/** The clicks of one turn: the first bodies' moves, and in doubles the partners' (the second protector's partner clicks its own move). */
 const clicksOf = (mode: Mode, scene: Case, first: [string, string]): { p1: string; p2: string } => {
   const aimed = (click: string): string => click.replace('*', mode === 'doubles' ? ' 1' : '');
   return mode === 'singles' ? { p1: `move ${aimed(first[0])}`, p2: `move ${aimed(first[1])}` }
     : { p1: `move ${aimed(first[0])}, move 1`, p2: `move ${aimed(first[1])}, move ${scene.partner ?? '1'}` };
 };
 
-/** A board where the second Protect of the protector held: the position after the first turn, and after the second. */
 function heldTurn(rules: Rules, mode: Mode, scene: Case): { parent: Battle; child: Battle } | null {
   for (let index = 0; index < 60; index++) {
     const parent = boardOf(rules, mode, scene, seedOf(index));
-    // a move the simulator refuses to click (disabled until a condition is met) has no turn: no scene
     const refused = (): boolean => { try { playClicks(parent, clicksOf(mode, scene, scene.t1)); return false; } catch { return true; } };
     if (refused()) return null;
     const turn = turnOf(parent, clicksOf(mode, scene, scene.t2));
@@ -156,15 +139,6 @@ describe.each(WITH_STALL)('a repeated stall that held, $name', ({ rules, mode })
   });
 });
 
-/**
- * Equal facts mean the same next turn. The sample is the moves of the Dex a side may click next (the attacker's slot holds the move for
- * all three turns); the facts of two positions that differ only in dropped fields give the same log (the turn number line apart) and the same facts again.
- */
-/**
- * Equal facts mean the same next turn. The attacker's slot holds the move for all three turns; for each move the facts of the two positions
- * (after turn 1 and after the held turn 2) are compared, and where they are equal, turn 3 played on both with one seed gives the same log
- * (the turn number line apart) and the same facts again. A move whose turn 2 gives different facts or no held repeat is no case.
- */
 function nextTurnReads(rules: Rules, mode: Mode, moves: { id: string; target: string }[]): { bad: string[]; equalCases: number } {
   let equalCases = 0;
   const bad: string[] = [];
@@ -174,7 +148,7 @@ function nextTurnReads(rules: Rules, mode: Mode, moves: { id: string; target: st
     const first: [string, string] = [`1${aim}`, '1'];
     const held = heldTurn(rules, mode, { ...scene, t1: first, t2: first });
     if (!held) continue;
-    // a move that rewrites its own slot (the one that copies a foe's move) may leave the board before the reader is asked
+    // a move that rewrites its own slot (Mimic) may leave the board before the reader is asked
     const reads = readsOfBoard(held.parent);
     const same = delayFacts(held.parent, 'p2') === delayFacts(held.child, 'p2');
     if ((reads.pp || reads.calls) && same && held.parent.sides[0].active[0].moveSlots[0].pp !== held.child.sides[0].active[0].moveSlots[0].pp) bad.push(`${move.id}: PP dropped`);
@@ -183,7 +157,7 @@ function nextTurnReads(rules: Rules, mode: Mode, moves: { id: string; target: st
     const third = clicksOf(mode, scene, [`1${aim}`, '2']);
     const logs = [held.parent, held.child].map(board => {
       const copy = turnOf(board, third).fork();
-      // the effects a turn creates take their `effectOrder` from a counter that differs between the two histories; only the order of creation is read
+      // `effectOrder` comes from a counter that differs between the two histories; only the order of creation is read
       copy.prng = new PRNG('5,6,7,8');
       const start = copy.log.length;
       playClicks(copy, third);
@@ -194,14 +168,12 @@ function nextTurnReads(rules: Rules, mode: Mode, moves: { id: string; target: st
   return { bad, equalCases };
 }
 
-/** A future attack (the `futuremove` flag of the Dex move) waits in a slot condition of the target's side and lands when the battle's turn count reaches a turn it noted. */
 const isFutureAttack = (move: { flags: Record<string, unknown> }): boolean => !!move.flags.futuremove;
 
 describe.each(WITH_STALL)('equal facts, the same next turn, $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const moves = sweepMoves(rules, () => true, false).moves;
   const readers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && Object.entries(readsOfEntry(dex, 'move', move.id)).some(([name, read]) => read && name !== 'last'));
-  // the future attacks are the next describe's rows: their condition keeps the turn it lands on, which the facts do not read yet
   const sample = [...new Map([...sweepSelection(moves, 'moves'), ...readers, dex.moves.get('tackle')].filter(move => !isFutureAttack(move)).map(move => [move.id, move])).values()];
 
   test('the sample holds moves that read PP, the last move and the entry counters', () => expect(readers.length).toBeGreaterThan(0));
@@ -213,18 +185,11 @@ describe.each(WITH_STALL)('equal facts, the same next turn, $name', ({ rules, mo
   });
 });
 
-/**
- * Round 89 (CI-1), a fault of the delay facts that the full sweep found: since Generation 5 a future attack (Future Sight, Doom Desire) notes the
- * absolute turn it lands on (`endingTurn` of the `futuremove` condition, read as `getOverflowedTurnCount() >= endingTurn`), and the facts drop the
- * battle's turn count. The position after a held repeat has the same facts as the one before it and lands the attack one turn sooner, so the delay
- * rule would call it the same board. Generations 2 to 4 count a duration down in the condition (the facts differ), and the rows read right there.
- * The rows of the later generations are `test.fails` until the facts carry the turn relative to the count; then they become plain tests and the
- * future attacks join the sample above.
- */
+// From Generation 5 a future attack notes the absolute turn it lands on (`endingTurn`), which the facts drop: the later
+// generations' rows are `test.fails` until the facts carry the turn relative to the count.
 describe.each(WITH_STALL)('a pending future attack, equal facts, the same next turn, $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const attacks = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && isFutureAttack(move));
-  // Generations 2 to 4 give the condition a duration that counts down (its facts differ with every turn); from Generation 5 it holds the ending turn alone
   const keepsTurn = rules.generation >= 5;
   test('the Dex holds a future attack', () => expect(attacks.length).toBeGreaterThan(0));
   (keepsTurn ? test.fails : test)('the turn after a held repeat is the same where the facts are equal', () => {

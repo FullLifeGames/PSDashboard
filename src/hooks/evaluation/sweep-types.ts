@@ -11,22 +11,11 @@ import type { EngineMode, TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
 import type { RolledCopyParams } from '../../lib/rolled-copy-stage';
 
-/** Played-pair matching with the KO'd-before-acting stand-in: a side that
- * never got to act still prices its pair through the charitable
- * outcome-equivalent phantom (analysis.ts) — T14/T36 stop reading
- * "unclear". Round 89 (#108): both read the order bound the result carries
- * (`playedBounds`), so a hidden slot that fell before it acted is matched
- * to a row it could have played; a result cached before has none and
- * matches as it did. */
+/** Played-pair matching with the KO'd-before-acting stand-in (analysis.ts); both sides read `playedBounds`. */
 export const matchOrPhantom = (result: EvalResult, side: 'p1' | 'p2', played: PlayedTurn | null, rules: GameRules): RankedChoice | null =>
   matchPlayedSide(result, side, played, result.playedBounds) ?? phantomStayIn(result, side, played, rules, result.playedBounds?.[side]?.[0]);
 
-/**
- * Eval-layer lifecycle guard: a failure is only a gap while the turn is
- * scoreless — the monotone sweep never lets a failing later pass talk over
- * an earlier score (the settings badges already say how converged a scored
- * turn is).
- */
+/** A failure is a gap only while the turn is scoreless; a failing later pass never talks over an earlier score. */
 export function recordEvalError(
   evalErrors: (string | null)[], scores: (number | null)[], turn: number, error: unknown,
 ): void {
@@ -34,78 +23,44 @@ export function recordEvalError(
   evalErrors[turn - 1] = error instanceof Error ? error.message : String(error);
 }
 
-/** Sweep-level settings: like EvalSettings, but the mode may still be the unresolved 'auto'. */
 export type SweepSettings = Omit<EvalSettings, 'mode'> & { mode?: EvalPreferences['mode'] };
 
 export interface GraphSweepParams {
-  /** Number of turns in the game (sizes the graph; sweep may cover less). */
   turns: number;
-  /** Optional sub-range to sweep (on-demand analysis); defaults to 1..turns. */
   from?: number;
   to?: number;
-  /** Resolved Tera allowance. */
   tera: TeraAllowance;
-  /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
-  /** Round 75 (T160): the replay's generation and mod, for the Dex reads of the sweep (the stay-in phantom's move priorities). */
+  /** For the Dex reads of the sweep (the stay-in phantom's move priorities). */
   rules: GameRules;
-  /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
-  /** Round 89 (NG-2): the sweep runs over a new game, whose positions come from its record, not from a replay's guessed sets: the coverage notice words itself for that. */
+  /** The sweep runs over a new game: positions come from its record, not a replay's guessed sets. */
   game?: boolean;
-  /** The replay's game type: auto resolves each turn per game type (round 63, T110). */
   doubles: boolean;
   cacheKeyFor(turn: number): string;
   acquireFor(turn: number): (report: (turn: number, target: number) => void) => Promise<string>;
-  /**
-   * Optional single-pass acquisition of ALL positions (index = turn − 1).
-   * Preferred over acquireFor when present — one reconstruction instead of
-   * one per turn. Only invoked once, on the first cache miss. `onPosition`
-   * streams each position as it is captured so searches start immediately
-   * instead of waiting for the full replay pass.
-   */
+  /** Single-pass capture of ALL positions (index = turn - 1), preferred over acquireFor; called on the first miss. */
   acquireAll?(
     report: (turn: number, target: number) => void,
     onPosition?: (turn: number, serialized: string) => void,
     onDiagnostic?: (message: string) => void,
-    /** Round 79 (T290): an open replacement request of a knockout, serialized as the player faced it. */
     onReplacement?: (point: ReplacementPoint, serialized: string) => void,
   ): Promise<(string | null)[]>;
-  /** What was actually played on this turn (parsed from the replay log). */
   playedFor(turn: number): PlayedTurn | null;
-  /**
-   * Turn 0: the serialized team-preview position, or null for formats
-   * without preview. Present only on full-game sweeps.
-   */
+  /** Turn 0: the serialized team-preview position, or null without preview. Full-game sweeps only. */
   acquirePreview?(): Promise<string | null>;
-  /** The leads each side actually sent (species, slot order). */
   playedLeads?: { p1: string[] | null; p2: string[] | null };
-  /**
-   * Guessed-item mons per side with their usage-plausible alternative items
-   * (rule-outs applied) — the sensitivity probes' search space. Absent =
-   * probing disabled.
-   */
+  /** Guessed-item mons per side with plausible alternative items (rule-outs applied); absent = no probing. */
   sensitivityTargetsFor?(side: 'p1' | 'p2'): SensitivityTarget[];
-  /**
-   * This replay's store-key prefix (evalStorePrefix): the run reads every
-   * persisted eval under it once, before the first pass, instead of one
-   * store read per turn. Absent = single reads.
-   */
+  /** This replay's store-key prefix (evalStorePrefix): the run reads every persisted eval under it once. */
   storePrefix?: string;
-  /**
-   * Round 79 (T290): the protocol's replacement request rounds (full-game sweeps only). The last stage prices each one at the
-   * position the capture hands out, under the key of replacementKeyFor.
-   */
+  /** Replacement request rounds (full-game sweeps only), priced at the captured position by `replacementKeyFor`. */
   replacementRounds?: ReplacementRound[];
   replacementKeyFor?(turn: number, ordinal: number): string;
-  /**
-   * Round 86 (T304): the last stage plays the game's biggest roll the other way (full-game sweeps only). Absent = no stage, and the
-   * graph keeps the flip of the sweep before it.
-   */
+  /** The biggest roll played the other way (full-game sweeps only); absent = no stage, the graph keeps its flip. */
   rolledCopy?: RolledCopyParams;
 }
 
-/** The sweep's working arrays plus the lead/notice slots — mutated in place, painted via snapshots. */
 export interface SweepData {
   scores: (number | null)[];
   results: (EvalResult | null)[];
@@ -117,42 +72,37 @@ export interface SweepData {
   sensitivity: (TurnSensitivity | null)[];
   evalErrors: (string | null)[];
   lead: LeadEvalData | null;
-  /** Round 79 (T290): the replacement points of the knockout turn t at index t (the card of turn t + 1 reads index (t + 1) - 1). */
+  /** The replacement points of the knockout turn t at index t (the card of turn t + 1 reads index (t + 1) - 1). */
   replacements: (ReplacementEvalData[] | null)[];
-  /** Round 86 (T304): the engine's score of the next root with the biggest roll's die turned over; null = no named roll or no copy. */
+  /** The engine's score of the next root with the biggest roll's die turned over; null = no named roll or no copy. */
   rollFlip: RollFlip | null;
   notice: string | null;
 }
 
-/** Everything one sweep run threads through its stages. */
 export interface SweepEnv {
   params: GraphSweepParams;
   runId: number;
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
-  /** Cross-mode merge arbiter: the mode the USER configured, even when this
-   *  sweep runs an escalation override. */
+  /** The mode the USER configured (the cross-mode merge arbiter), even when this sweep runs an escalation override. */
   configuredMode: EvalPreferences['mode'];
   data: SweepData;
   paint(progress: { done: number; total: number } | null, force?: boolean): void;
   positionFor(turn: number): Promise<string>;
-  /** Round 79 (T290): the serialized open request of a replacement round, or null where the capture never reached it. */
+  /** The serialized open request of a replacement round, or null where the capture never reached it. */
   replacementPositionFor?(turn: number, ordinal: number): Promise<string | null>;
   /** The store's evals for this replay, read once at run start (null = read unavailable, single reads instead). */
   prefetched: Map<string, StoredEval> | null;
 }
 
-/** A concrete per-turn engine after 'auto' resolution. */
 export interface TurnEngine {
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
   mode: EngineMode;
-  /** Round 35: false marks a sketch that skips the forced-win prover (see EvalSettings.prove). */
   prove?: boolean;
 }
 
-/** What every per-turn stage needs about the turn it works on. */
 export interface TurnStageArgs {
   hit: CachedEval;
   key: string;
@@ -166,13 +116,7 @@ export interface TurnStageArgs {
 export const aborted = (env: SweepEnv) => env.runRef.current !== env.runId;
 export const isCancelled = (err: unknown) => err instanceof Error && err.message === 'cancelled';
 
-/**
- * One awaited sweep stage under the run's cancellation contract: a run
- * that changed hands or a cancelled worker call ends the turn with
- * 'abort'; any other failure keeps the stage's null result, so the turn
- * stays silent in that channel. The run is checked again after the
- * await, because it can change hands while the stage is in flight.
- */
+/** One awaited stage under the run's cancellation contract: a changed run or a cancelled call ends it with 'abort'. */
 export async function guardedStage<T>(env: SweepEnv, run: () => Promise<T>): Promise<T | null | 'abort'> {
   let value: T | null = null;
   try {

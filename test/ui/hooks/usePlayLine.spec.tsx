@@ -6,10 +6,6 @@ import { lineHistory } from '../../../src/lib/line-history';
 import { lineAnchor } from '../../../src/lib/line-view';
 import { doublesLine, singlesLine } from '../fixtures/lines';
 
-/**
- * Round 89 (#104), step G3: ▶ Play restores the line as a variation through the restore every saved variation takes, asks first
- * when a variation exists (the replace confirm of every other way in), clears the played-out notice and follows the new tip.
- */
 function appWith(variationSpan: { startTurn: number; length: number } | null, auto = true) {
   const restoreVariation = vi.fn().mockResolvedValue(undefined);
   const followNextTip = vi.fn();
@@ -55,7 +51,6 @@ describe('usePlayLine', () => {
     expect(result.current.confirm).toBeNull();
     act(() => result.current.onPlay(singlesLine, 20));
     expect(stub.restoreVariation).not.toHaveBeenCalled();
-    // the question stands at the clicked line (the host's `confirm`), not in the dock's banner (`pendingConfirm`)
     expect(stub.setPendingConfirm).not.toHaveBeenCalled();
     const confirm = result.current.confirm!;
     expect(confirm.anchor).toBe(lineAnchor(singlesLine, 20));
@@ -102,7 +97,7 @@ describe('useLinesHost', () => {
       ...stub.app,
       ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots } },
       board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2, analyzableTurns: 3 } },
-      // round 89 (#130, G8b): the host mounts the win-path hook, which reads the analyses, the position source and the effective rules
+      // the host mounts the win-path hook, which reads the analyses, the position source and the effective rules
       analysis: { gameAnalyses: null },
       engine: { smogonPending: false, acquire: { makeReplayAcquire: vi.fn() }, evalView: { effectiveTera: false, effectiveSleepClause: true, effectiveRuleset: undefined } },
     } as unknown as AppController;

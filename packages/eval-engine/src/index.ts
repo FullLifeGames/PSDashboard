@@ -1,11 +1,5 @@
-/**
- * Public surface of @fulllifegames/eval-engine. Curated: the names the app, the worker, the
- * sibling package, the worked example, and the root suite reach, plus every
- * type their signatures mention. Widen it by adding a line here and refreshing
- * test/regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1). The
- * package's own tests import the sources directly; the root suite imports by
- * name, so it consumes this list like any other user.
- */
+// The curated public surface: widen it by adding a line here and refreshing
+// test/regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1).
 export {
   analyzeTurn, PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
   diffChoices, matchPlayedSide, phantomStayIn, playedSetupMove,
@@ -29,8 +23,7 @@ export type {
   BranchSlotModifiers, BranchSwitchOption, BranchTargetOption, PokemonStatTable, SimPokemonInfo,
   ResolvedSideCommand, ReconstructParams, ReplacementPoint, AdoptParams,
 } from './branch-engine.ts';
-// Round 82 (forced dice): what the app needs of the dice module. The words, the log reader and the label are free of simulator
-// imports; the offers read the simulator and load with the branch engine (src/lib/lazy/branch-engine.ts).
+// Free of simulator imports: the main chunk reads these; the offers load with the branch engine (lib/lazy/).
 export { DIE_KINDS, dieKey, tieName } from './dice/types.ts';
 export type { DiceReport, DieKind, DieName, DieReport, DieResult, DieTook, ForcedDie } from './dice/types.ts';
 export { dieLabel } from './dice/die-label.ts';
@@ -85,7 +78,6 @@ export { parseTendencies, computeRead } from './opponent-model.ts';
 export type { PlayerTendencies } from './opponent-model.ts';
 export { searchOrchestrated } from './orchestrator.ts';
 export type { SearchExecutor, OrchestratorCallbacks } from './orchestrator.ts';
-// Round 77 (user gate 28.10.2026): the protocol other engines answer (docs: ENGINES.md).
 export {
   DASHBOARD_ORIGINS, ENGINE_PROTOCOL, buildEngineRequest, checkEngine, engineOptions, engineRequestFor, engineResponseToResult,
   validateEngineResponse,
@@ -109,17 +101,13 @@ export type { PlayedAction, PlayedTurn, SackInfo } from './played.ts';
 export { cellKey } from './rank.ts';
 export { KEY_MOMENT_SWING, buildGameReport } from './report.ts';
 export type { GameReport } from './report.ts';
-// Round 86 (B6, T304): the biggest roll the app plays the other way (the sweep's last stage) and the copy that plays it.
 export { rollToCopy } from './biggest-roll.ts';
 export type { BiggestRoll, RollFlip } from './biggest-roll.ts';
 export { rolledCopy } from './branch/rolled-copy.ts';
 export type { RolledCopy, RollSelector } from './branch/rolled-copy.ts';
-// Round 89 (#124): the worlds of a bring-limited game, for the hosts that measure (the bank) and the app's world registry.
 export { BRING_WORLD_CAP, bringWorlds, blendValues, blendWorlds } from './branch/bring-worlds.ts';
 export type { BringWorld } from './branch/bring-worlds.ts';
-// Round 89 (#105): a new game from two teams starts the chosen format in the simulator and reports the simulator's team problems; the interface rules whether Start is allowed.
 export { startGameLog, checkGameTeams, readGameSeed } from './branch/new-game.ts';
-/** The seed a game starts on when the caller names none: the one every reconstruction of the replay path uses (`startBattle`). */
 export { DEFAULT_GAME_SEED } from './branch/game-seed.ts';
 export type { NewGameBody, NewGameStart, StartGameParams, GameTeamProblems, GameSeedRead } from './branch/new-game.ts';
 export type { WinConversion, WinPath } from './win-reason.ts';

@@ -8,7 +8,7 @@ const report = {
   downloaded: false,
 };
 
-describe('ReportIssueDialog (round 77, user request 28.10.2026)', () => {
+describe('ReportIssueDialog', () => {
   test('offers the state file as a download and the issue form as a link, and starts neither by itself', () => {
     const onDownload = vi.fn();
     const onClose = vi.fn();
@@ -28,7 +28,6 @@ describe('ReportIssueDialog (round 77, user request 28.10.2026)', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (#105, H7, tester finding 11): a new game has no Showdown replay; the file holds the game.
   test('for a new game the words name the game, not a replay', () => {
     render(<ReportIssueDialog report={report} game onDownload={() => {}} onClose={() => {}} />);
     expect(screen.getByText(/It holds the game \(both teams, the seed and every turn\)/)).toBeVisible();

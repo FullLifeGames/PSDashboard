@@ -8,7 +8,6 @@ import type { LinesHost } from '../../../src/lib/line-view';
 import type { WinPathsHost, WinPathsRun } from '../../../src/lib/win-paths-host';
 import { doublesLine, DOUBLES_NAMES, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/** Round 89 (#130), step G8b: the win-path panel and the turn card's entry, singles and doubles. */
 const spent = { cells: 3, turns: 5 };
 const step = (kind: WinStep['kind'], status: WinStep['status'], extra: Partial<WinStep> = {}): WinStep => ({ kind, status, spent, ...extra });
 const line = (base: EvalLine = singlesLine): EvalLine => ({ ...base, for: [] });
@@ -119,7 +118,6 @@ describe('WinPathsPanel, doubles', () => {
     const first = document.querySelector('[data-step="stronger"]') as HTMLElement;
     expect(within(first).getAllByText('pixelfrost', { selector: '.side' }).length).toBeGreaterThanOrEqual(2);
     expect(within(first).getAllByText('Mstr_Hawk', { selector: '.side' }).length).toBeGreaterThanOrEqual(2);
-    // the chips of the dice that could have gone the other way
     expect(within(first).getByText('Speed tie: p2a first (50%)')).toBeInTheDocument();
     expect(within(first).getByText('Behemoth Bash: KO (12 of 16 rolls)')).toBeInTheDocument();
   });
@@ -144,11 +142,9 @@ describe('WinPathsEntry (the turn card)', () => {
     expect(container).toBeEmptyDOMElement();
     rerender(<WinPathsEntry turn={24} host={{ rules: { gen: 9, mod: undefined } }} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(container).toBeEmptyDOMElement();
-    // the open search is for turn 23: the card of 24 offers the question but shows no panel
     rerender(<WinPathsEntry turn={24} host={hostOf(run(ALL, 'done', 23, 'card'))} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(screen.getByRole('button', { name: 'How could Pepitopalotin have won from here?' })).toBeInTheDocument();
     expect(screen.queryByRole('region')).toBeNull();
-    // the open search is the Game review's, for this very turn: the card keeps its question closed
     rerender(<WinPathsEntry turn={24} host={hostOf(run(ALL, 'done', 24, 'review'))} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(screen.getByRole('button', { name: 'How could Pepitopalotin have won from here?' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();

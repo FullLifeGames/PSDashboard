@@ -5,10 +5,6 @@ import { switchOptionKey } from '@fulllifegames/eval-engine';
 import { SwitchRow } from '../../../../src/components/dock/SwitchRow';
 import { simState, switchOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the cases of the old SwitchBtn and switch-labels specs that the bench tile keeps: the sprite,
- * the label of a nicknamed body, the HP bar by health, the played flag, and the reasons a body is out. The compact chip is gone.
- */
 type Props = Parameters<typeof SwitchRow>[0];
 
 function row(overrides: Partial<Props> = {}) {
@@ -91,8 +87,7 @@ describe('the switch tile label', () => {
   });
 });
 
-describe('the badges of a tile (A7b)', () => {
-  // The badge must not change the tile's box: it stands in the flag row on the tile's top edge, never in the name line.
+describe('the badges of a tile', () => {
   test('played and engine stand in the flag row, outside the name line', () => {
     const { container } = render(row({
       played: { kind: 'switch', name: 'Heatran', species: 'Heatran' },

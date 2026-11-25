@@ -11,19 +11,7 @@ import { cellSeeds } from '../src/search/root-quantile';
 import { totalHp } from '../src/search/outcome-children';
 import { SWEEPS_FULL, sweepSelection } from './dice-fixtures';
 
-/**
- * Round 89 (A6-1, ruling 24): the lossless recorder row. The plain path of the endgame children will take the median draw's seed
- * again under the dice module's recorder; the recorder must change nothing. On the cells of the fixture positions the recorded
- * redraw is `drawChild`'s child for the same seed: the same state of the battle (the stream's seed included) and the same log.
- * A plain run plays a fixed sample of the cells of each position; `DICE_SWEEPS=full` plays every cell.
- *
- * Round 89 (A6-3b): the full mode plays every cell of a doubles position, and seven fixtures ran past the default 60 s on devbox.
- * Two measurements, one process at a time: A6-3a's run took 83 to 312 s for them (2634199230 t5 254 s, 2660802611 t2 312 s,
- * 2629703929 t4 160 s, 938276 t10 108 s, 2629731825 t2 87 s, 2629783504 t3 86 s, 2630461565 t2 83 s), A6-3b's run with the bound below
- * 66 to 261 s (2660802611 t2 261 s, 2634199230 t5 209 s, 2629703929 t4 113 s, 938276 t10 78 s, 2629731825 t2 70 s, 2629783504 t3 69 s,
- * 2630461565 t2 66 s; all 35 rows green in 1,261 s). The full mode gets 900 s per row, about three times the slowest; the plain run
- * keeps the default.
- */
+// A plain run plays a fixed sample of the cells of each position; `DICE_SWEEPS=full` plays every cell.
 const FULL_ROW_TIMEOUT = 900_000;
 await loadSimMods('gen9championsou');
 
@@ -32,14 +20,13 @@ interface Fixture { id: string; turn: number; serialized: string; tera: boolean 
 const DIR = new URL('./fixtures/positions/', import.meta.url);
 const FILES = readdirSync(DIR).filter(file => file.endsWith('.json')).sort();
 
-/** The same turn as `advancePositionWithLog` plays it (the choices, then the forced switches). */
 function playCell(battle: Battle, p1Choice: string, p2Choice: string, seed: PRNGSeed): void {
   applyChoice(battle, 'p1', p1Choice);
   applyChoice(battle, 'p2', p2Choice);
   resolveForcedSwitches(battle, seed, { p1: p1Choice.split(' > ')[1], p2: p2Choice.split(' > ')[1] });
 }
 
-/** The battle's state without its wall-clock lines (`|t:|` differs between two runs a second apart). */
+// Without wall-clock lines: `|t:|` differs between two runs a second apart.
 function stateOf(battle: Battle): unknown {
   const state = JSON.parse(JSON.stringify(State.serializeBattle(battle))) as { log: string[] };
   state.log = state.log.filter(line => !line.startsWith('|t:|'));
@@ -47,7 +34,6 @@ function stateOf(battle: Battle): unknown {
 }
 const timeless = (lines: string[]): string[] => lines.filter(line => !line.startsWith('|t:|'));
 
-/** The first path where two states differ, or null (the message of a red row). */
 function firstDiff(a: unknown, b: unknown, path = ''): string | null {
   if (JSON.stringify(a) === JSON.stringify(b)) return null;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return `${path}: ${JSON.stringify(a)?.slice(0, 60)} | ${JSON.stringify(b)?.slice(0, 60)}`;

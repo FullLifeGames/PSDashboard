@@ -1,14 +1,5 @@
 import type { TurnEvalSettings } from '../../hooks/useEvaluation';
 
-/**
- * A gap turn's first analysis: a turn the line has not reached yet searches
- * itself and its follow-up turn at the panel's current settings. The label
- * names the engine so the click is never a surprise. The acquire runs
- * through the HEALED single-turn reconstruction (per-turn snapshot
- * corrections, with the reached guard as the loud-failure backstop). An
- * analyzed turn offers nothing: the deeper stage left with "Think deeper"
- * (round 67, T109, gate answer 5b).
- */
 export function AnalyzePositionButton({ onAnalyze, target, disabled, smogonPending }: {
   onAnalyze?: () => void;
   target?: TurnEvalSettings | { mode: 'auto' } | null;

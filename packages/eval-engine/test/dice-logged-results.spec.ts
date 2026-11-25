@@ -6,16 +6,9 @@ import { parseTurnBlocks } from '../src/branch/protocol-choices';
 import { loggedActions, loggedDice, mergeLoggedDice } from '../src/dice/logged-results';
 import { dieKey, type ForcedDie } from '../src/dice/types';
 
-/**
- * Round 82 (forced dice), step A5, gate answer 19a: what the log rolled, read per action as forced dice. The reader is free of
- * simulator imports (it sits in the main bundle beside `hax-alignment.ts`), so this file holds it to the lines the simulator
- * and the replays write, and to the reader of the protocol's dice witnesses on every turn of the fixtures.
- */
-
 const show = (dice: readonly ForcedDie[]): string[] => dice.map(die => `${dieKey(die.name)} ${JSON.stringify(die.result)}`);
 const lines = (text: string): string[] => text.trim().split('\n');
 
-// GPL DzBQ5azlO5l turn 13: Air Slash, then Heavy Slam; the log shows no flinch and no crit.
 const GPL13 = lines(`
 |move|p1a: Steve|Air Slash|p2a: King Bradley
 |-damage|p2a: King Bradley|36/100
@@ -23,7 +16,6 @@ const GPL13 = lines(`
 |-damage|p1a: Steve|55/161
 `);
 
-// smogtours-gen8ou-573756 turn 73: the 95 percent Fire Fang misses.
 const FIRE_FANG = lines(`
 |move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]
 |-miss|p2a: Penal Battalion|p1a: Corviknight
@@ -33,14 +25,12 @@ const FIRE_FANG = lines(`
 |faint|p2a: Penal Battalion
 `);
 
-// Doubles OU 912045 turn 5: Heat Wave misses the first foe and hits the second.
 const HEAT_WAVE = lines(`
 |move|p2a: Chi-Yu|Heat Wave|p1a: Incineroar|[spread] p1b
 |-miss|p2a: Chi-Yu|p1a: Incineroar
 |-damage|p1b: Volcarona|41/100
 `);
 
-// Doubles OU 2663093831 turn 8: Scale Shot hits four times, Matcha Gotcha burns the second foe.
 const SCALE_SHOT = lines(`
 |move|p1b: Dragonite|Scale Shot|p2a: kanye
 |-damage|p2a: kanye|281/394
@@ -137,7 +127,7 @@ describe('the dice a log shows, action by action', () => {
     expect(loggedDice(selfOnly)).toEqual([]);
   });
 
-  // Round 88 (T338, #74): `self.chance` is drawn once per move from Gen 7, so one gain line against two struck foes is a yes
+  // `self.chance` is drawn once per move from Gen 7.
   test('a self chance is one die for the move: one gain line against two struck foes is a yes, none is a no', () => {
     const selfOf = (move: string) => (move === 'diamondstorm' ? 'self:def' : undefined);
     const spread = (gain: string) => lines(`
@@ -150,7 +140,6 @@ ${gain}`);
     expect(asked(spread(''))).toEqual(['p1a:diamondstorm::self-effect {"happens":false}']);
   });
 
-  // Round 88 (T337, #73): a move whose every hit rolls its accuracy writes `|-hitcount|` and no miss for a later hit
   describe('the accuracy of each hit of a multi-accuracy move', () => {
     const hitsOf = (move: string) => (move === 'tripleaxel' ? 3 : undefined);
     const axe = (count: string, first = '|-damage|p2a: B|70/100') => lines(`
@@ -208,7 +197,6 @@ ${count}`);
 |cant|p2a: B|flinch
 `);
     expect(show(loggedDice(turn))).toContain('p1a:airslash:p2a:secondary:flinch {"happens":true}');
-    // a move that missed flinches nobody
     const missed = lines(`
 |move|p1a: A|Air Slash|p2a: B|[miss]
 |-miss|p1a: A|p2a: B
@@ -233,7 +221,6 @@ ${count}`);
 |-damage|p2a: B|90/100
 `);
     expect(show(loggedDice(turn, { checks: new Map([['p1a', ['par']]]) }))).toContain('p1a:tackle::status-check:par {"happens":true}');
-    // a body that never acted passed nothing
     expect(show(loggedDice(turn, { checks: new Map([['p2a', ['par']]]) })).filter(entry => entry.includes('status-check'))).toEqual([]);
   });
 
@@ -309,7 +296,6 @@ describe('the logged dice join the forced dice of a turn (19a)', () => {
   });
 });
 
-// The two readers of the protocol's dice witnesses hold each other: the same counts on every turn of the fixtures.
 const normalize = (raw: string): string => {
   const match = raw.match(/^(p[12])[a-d]?:\s*(.*)$/);
   return match ? `${match[1]}:${toId(match[2])}` : toId(raw);
@@ -360,17 +346,14 @@ describe.each([
   });
 });
 
-// Round 89 (#137): the log names the foe a move was aimed at and the body a drag brought in; the simulator draws both with a `sample`
-// (`getRandomTarget`, `getRandomSwitchable`), the reader hands the answers over as the dice of those draws.
+// The simulator draws both with a `sample` (`getRandomTarget`, `getRandomSwitchable`); the reader supplies the answers.
 describe('the random target and the drag a log shows', () => {
-  // Champions VGC 2658911747 turn 6: Sableye's Encore bends Gallade's click to Taunt, and the game drew Corviknight
   const ENCORE = lines(`
 |move|p2b: Sableye|Encore|p1a: Gallade
 |-start|p1a: Gallade|Encore
 |move|p1a: Gallade|Taunt|p2a: Corviknight
 |-start|p2a: Corviknight|move: Taunt
 `);
-  // Doubles OU 2553498001 turn 5: Roar drags Sableye in over Ogerpon
   const ROAR = lines(`
 |move|p1a: Incineroar|Roar|p2a: Ogerpon-Wellspring
 |drag|p2a: Sableye|Sableye, L50, M|100/100

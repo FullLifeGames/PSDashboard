@@ -6,36 +6,24 @@ import { interludesAfter, isInterlude } from './variation-turns';
 
 export interface BranchHistoryEntry {
   turnNumber: number;
-  /** 'forced' entries record single-side forced-switch interludes (B15). */
+  /** 'forced': a single-side forced-switch interlude, recorded as its own entry. */
   kind?: 'turn' | 'forced';
   forcedSide?: SideId;
-  /** Turn-0 lead entry: the chosen leads (slot order; with `bring`, the
-   *  whole brought selection), so a rebuild can re-seed them. */
+  /** Turn-0 lead entry: the chosen leads (slot order; with `bring`, the whole brought selection). */
   leadChoices?: { p1: string[]; p2: string[]; bring?: boolean };
-  /** Identity-based choices used to replay this entry after a team edit (B1). */
+  /** Identity-based choices that replay this entry after a team edit. */
   p1SlotChoices?: (BranchSlotChoice | null)[];
   p2SlotChoices?: (BranchSlotChoice | null)[];
-  /**
-   * Round 82 (forced dice): what the simulator did with the dice the user forced in this turn (the dice ride on the slot
-   * choices above). A turn that paused for a switch holds its dice in two entries: the forced replacement that finishes the
-   * turn carries the report that joins both parts. Absent for a turn without a forced die.
-   */
+  /** What the simulator did with this turn's forced dice; the replacement that finishes a paused turn joins both. */
   diceReport?: DiceReport;
-  /**
-   * Round 82 (forced dice), step A7b: the display lines of that report (decision 6a), placed in the shown log by index. The frame
-   * log puts them in; the battle's own log never holds them. A rebuild writes them again with the report.
-   */
+  /** The display lines of that report, placed in the shown log by index; the battle's own log never holds them. */
   dieLines?: DieLine[];
-  /**
-   * Round 82 (forced dice), step A7c: the labels of the report's dice by side, for the history row and the share link, named with the
-   * battle's words when the turn played (the entry has no battle later). A rebuild writes them again with the report.
-   */
+  /** The labels of the report's dice by side, named when the turn played (the entry has no battle later). */
   diceMarks?: DiceMarks;
-  /** The resolved commands actually sent to the sim (display/share only). */
+  /** The resolved commands sent to the sim (display and share only). */
   p1Choice: string;
   p2Choice: string;
-  /** Serialized position AFTER this entry executed (unified timeline);
-   *  null when capture failed — navigation still works via the sim log. */
+  /** Serialized position after this entry executed; null when the capture failed (navigation uses the sim log). */
   serializedPosition?: string | null;
   p1Active: SimPokemonInfo | null;
   p1ActiveSlots: (SimPokemonInfo | null)[];
@@ -45,10 +33,7 @@ export interface BranchHistoryEntry {
   p2Pokemon: SimPokemonInfo[];
 }
 
-/** "Shinyhead (Toxtricity)" — nickname and species together so the original
- *  and branch columns stay comparable (G11). The history rows, the switch
- *  buttons and the choice picker all read this one rule; a body without a
- *  nickname shows its species alone. */
+/** "Shinyhead (Toxtricity)": nickname and species together; a body without a nickname shows its species alone. */
 export function displayName(name: string, species: string): string {
   if (!name || name === species) return species || name;
   return `${name} (${species})`;
@@ -84,21 +69,11 @@ export interface HistoryRowAlignment {
   entry: BranchHistoryEntry;
   originalTurn: number | null;
   variationTurn: number | null;
-  /** The entry that holds the board at `variationTurn`: the row's own entry,
-   *  or the last forced replacement that follows it (a pivot or a knock-out
-   *  settles after the turn). */
+  /** The entry that holds the board at `variationTurn`: the row's own entry or the last forced replacement after it. */
   settled: BranchHistoryEntry;
 }
 
-/**
- * Forced-switch interludes are recorded as their own entries (B15) but must
- * not shift the turn-by-turn alignment with the original replay. Round 88 (T348): an interlude on both sides is one of them
- * (`isInterlude`, the one rule of which entries make a turn).
- * `variationTurn` is the position AFTER the row's move — where clicking the
- * branch column navigates (the notation reads "this move led here"). That
- * position includes the forced replacements that follow the turn, so the
- * row's cell reads the board from `settled`.
- */
+/** Interludes are own entries, no turn; `variationTurn` is the position after the row's move and its replacements. */
 export function alignHistoryRows(history: BranchHistoryEntry[], branchStartTurn: number): HistoryRowAlignment[] {
   let turnIndex = 0;
   return history.map((entry, index) => {

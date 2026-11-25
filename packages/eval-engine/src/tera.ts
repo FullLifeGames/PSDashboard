@@ -2,15 +2,11 @@ import type { TeraAllowance } from './types.ts';
 import { toId } from '@fulllifegames/replay-core';
 import { normalizeLineEndings } from './line-endings.ts';
 
-/**
- * Tera-rights resolution. Draft leagues grant Terastallization to specific
- * drafted Pokémon — a global on/off would let the engine recommend illegal
- * Teras and price floors against impossible opponent Teras. Pure, sim-free.
- */
+// Draft leagues grant Terastallization to specific Pokémon: a global on/off would recommend illegal Teras.
 
+/** The panel's Tera setting. */
 export type TeraPreference = 'auto' | 'on' | 'off' | 'revealed';
 
-/** Formats where Tera rights belong to individual Pokémon, not everyone. */
 const PER_POKEMON_TERA_FORMATS = /draft|customgame/;
 
 const sideOf = (ref: string): 'p1' | 'p2' | null =>
@@ -21,7 +17,6 @@ const nicknameOf = (ref: string): string => ref.replace(/^p[12][a-c]: /, '');
 type SpeciesByNick = Record<'p1' | 'p2', Map<string, string>>;
 type Revealed = { p1: string[]; p2: string[] };
 
-/** A switch-family line maps the slot's nickname to its species. */
 function noteSwitchLine(parts: string[], species: SpeciesByNick): void {
   const side = sideOf(parts[2] ?? '');
   if (!side) return;
@@ -29,7 +24,6 @@ function noteSwitchLine(parts: string[], species: SpeciesByNick): void {
   if (name) species[side].set(nicknameOf(parts[2] ?? ''), name);
 }
 
-/** A terastallize line reveals the nickname's species (the nickname itself when no switch named it). */
 function noteTeraLine(parts: string[], species: SpeciesByNick, revealed: Revealed): void {
   const side = sideOf(parts[2] ?? '');
   if (!side) return;
@@ -38,10 +32,7 @@ function noteTeraLine(parts: string[], species: SpeciesByNick, revealed: Reveale
   if (!revealed[side].includes(name)) revealed[side].push(name);
 }
 
-/**
- * The species that actually terastallized in the replay, per side —
- * `|-terastallize|` names nicknames, resolved through the switch lines.
- */
+/** Species that terastallized per side: `|-terastallize|` names nicknames, resolved through the switch lines. */
 export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: string[] } {
   const species: SpeciesByNick = { p1: new Map(), p2: new Map() };
   const revealed = { p1: [] as string[], p2: [] as string[] };
@@ -57,11 +48,7 @@ export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: st
   return revealed;
 }
 
-/**
- * Resolves the panel preference against the replay. 'auto' restricts
- * per-Pokémon-rights formats (draft, custom game) to the revealed species;
- * ladder formats keep the global switch — there everyone genuinely may Tera.
- */
+/** Resolves the panel setting; 'auto' limits draft and custom game formats to the revealed species. */
 export function resolveTeraPreference(
   pref: TeraPreference,
   formatid: string,
@@ -76,7 +63,7 @@ export function resolveTeraPreference(
   return true;
 }
 
-/** Stable, store-key-safe encoding of an allowance. */
+/** A stable, store-key-safe encoding of an allowance. */
 export function teraKey(tera: TeraAllowance | undefined): string {
   if (tera === undefined || tera === true) return '1';
   if (tera === false) return '0';

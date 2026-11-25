@@ -6,15 +6,6 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { isSitrusBerry, sitrusEatsAt, sitrusKeptAt } from '../src/inference/item-triggers';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Round 69, T168 (decision 34): four items whose trigger the protocol shows without the item's line are ruled out, as
- * R5 does for Air Balloon, Booster Energy and Eject Pack (trigger-evidence.spec.ts). A Lum Berry holder eats on a status or
- * a confusion, a Sitrus Berry holder at half HP, an Eject Button holder survives a damaging hit from another Pokémon and
- * leaves, a Red Card holder sends the attacker away. Every log comes from @pkmn/sim: each case first checks what a real
- * holder shows (so a wrong trigger fails here, not in a game), then what the inference reads for the side p2 from the
- * same battle with a neutral item. A guard is a case where the real holder shows nothing and the inference rules nothing out.
- */
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -28,16 +19,12 @@ const FORMATS: Format[] = ['singles', 'doubles'];
 
 interface Scene {
   attacker?: Partial<PokemonSet> & { moves?: string[] };
-  /** The second attacker of the doubles side (default: a Ground-immune Skarmory that splashes). */
   partner?: PokemonSet;
   holder?: Partial<PokemonSet>;
   mate?: PokemonSet;
-  /** Pokémon on each side beyond the leads. */
   p1Bench?: number;
   p2Bench?: number;
-  /** The turns as the p1 move ids with targets: 'earthquake' (the holder is target 1 in doubles), 'splash'. */
   turns: string[][];
-  /** The holder's move per turn (default: Splash). */
   p2Turns?: string[];
   gen?: number;
 }
@@ -58,7 +45,6 @@ function side2(scene: Scene, format: Format, item: string): PokemonSet[] {
   return format === 'doubles' ? [holder, mate, ...bench] : [holder, ...bench];
 }
 
-/** The battle's log as a viewer reads it (the split lines keep their public form). */
 function playTeams(p1: PokemonSet[], p2: PokemonSet[], options: { doubles: boolean; gen?: number }, turns: [string, string][]): string {
   const { doubles, gen = 9 } = options;
   const battle = new Battle({
@@ -73,7 +59,6 @@ function playTeams(p1: PokemonSet[], p2: PokemonSet[], options: { doubles: boole
     battle.choose('p1', first);
     battle.choose('p2', second);
   }
-  // A pivot, an Eject Button or a Red Card asks for a switch: the first Pokémon on the bench comes in.
   if (battle.requestState === 'switch') {
     for (const side of [battle.p1, battle.p2]) {
       const forced = (side.activeRequest as { forceSwitch?: boolean[] } | null)?.forceSwitch;
@@ -94,23 +79,20 @@ function play(scene: Scene, format: Format, item: string): string {
 }
 
 const mv = (id: string, target?: number) => `move ${id}${target ? ` ${target}` : ''}`;
-/** One turn of p1: the lead uses `id` on the holder (target 1 where the move picks a target), the partner splashes in doubles. */
 const hit = (id: string): string[] => [mv(id, ['normal', 'any', 'adjacentFoe'].includes(Dex.moves.get(id).target) ? 1 : undefined), mv('splash')];
 const quiet: string[] = [mv('splash'), mv('splash')];
-/** An item that shows nothing in a log, so the holder stays unknown. */
 const NEUTRAL = 'Mystic Water';
 
 const ruledOut = (log: string, species: string) =>
   inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === species)?.ruledOut?.items ?? [];
 
-/** What the real holder shows, and what the inference rules out when the holder's item is a neutral one. */
 function read(scene: Scene, format: Format, item: string, species = 'Blissey') {
   const withItem = play(scene, format, item);
   const shown = new RegExp(`\\|-enditem\\|p2a: ${species}\\|${item}`).test(withItem);
   return { shown, out: ruledOut(play(scene, format, NEUTRAL), species).includes(toID(item)) };
 }
 
-describe('Lum Berry is eaten on a status or a confusion (T168)', () => {
+describe('Lum Berry is eaten on a status or a confusion', () => {
   const toxic: Scene = { turns: [hit('toxic')] };
   const confusion: Scene = { turns: [hit('confuseray')] };
 
@@ -146,7 +128,7 @@ describe('Lum Berry is eaten on a status or a confusion (T168)', () => {
   });
 });
 
-describe('Sitrus Berry is eaten at half HP (T168)', () => {
+describe('Sitrus Berry is eaten at half HP', () => {
   const low = { level: 70 };
   const strike: Scene = { holder: low, turns: [hit('earthquake')] };
 
@@ -168,7 +150,7 @@ describe('Sitrus Berry is eaten at half HP (T168)', () => {
     expect(ruledOut(mixed, 'Chansey')).not.toContain('sitrusberry');
   });
 
-  // Leech Seed's drain is the residual phase: the simulator eats the berry in its last update, after the upkeep line (level 90 holds above half after the Earthquake and below it after the drain).
+  // Leech Seed's drain is residual: the simulator eats the berry in its last update, after the upkeep line.
   test.each(FORMATS)('%s: a berry eaten after the upkeep line is no miss, and a drain below half without it rules the item out', format => {
     const scene: Scene = { holder: { level: 90 }, turns: [hit('earthquake'), hit('leechseed')] };
     const real = play(scene, format, 'Sitrus Berry');
@@ -190,11 +172,10 @@ describe('Sitrus Berry is eaten at half HP (T168)', () => {
   });
 });
 
-describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where rounding cannot hide it (T168)', () => {
+describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where rounding cannot hide it', () => {
   const mod = championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>;
   Dex.mod('champions', mod);
 
-  /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: the upper bound of the true ratio never undercuts the real one. */
   test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged to eat at the shown HP eats at every real HP that shows it', formatid => {
     const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
     if (battle.requestState === 'teampreview') { battle.choose('p1', 'team 1'); battle.choose('p2', 'team 1'); }
@@ -215,8 +196,7 @@ describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where 
   });
 });
 
-describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating (T214)', () => {
-  /** Every HP of a 400 HP Pokémon, shown the way the simulator shows it: a berry judged kept stays uneaten at every real HP that shows it. */
+describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged only where rounding cannot hide an eating', () => {
   test.each(['gen9ou', 'gen6ou', 'gen5ou', 'gen9championsou'])('%s: a berry judged kept is uneaten at every real HP that shows the text', formatid => {
     const battle = new Battle({ formatid: toID(formatid), seed: '1,2,3,4', p1: { name: 'A', team: Teams.pack([set('Blissey', 'Sitrus Berry', 'Natural Cure', ['Splash'])]) }, p2: { name: 'B', team: Teams.pack([set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])]) } });
     if (battle.requestState === 'teampreview') { battle.choose('p1', 'team 1'); battle.choose('p2', 'team 1'); }
@@ -246,7 +226,7 @@ describe('the shown HP bounds the real HP, so the kept Sitrus Berry is judged on
   });
 });
 
-describe('Eject Button switches its holder out after a damaging hit (T168)', () => {
+describe('Eject Button switches its holder out after a damaging hit', () => {
   const attack = (id: string): Scene => ({ turns: [hit(id)] });
   test.each(FORMATS)('%s: a hit that leaves no Eject Button line rules the item out (Hatterene 2663112821 t4 shape)', format => {
     expect(read(attack('earthquake'), format, 'Eject Button')).toEqual({ shown: true, out: true });
@@ -258,7 +238,6 @@ describe('Eject Button switches its holder out after a damaging hit (T168)', () 
     const real = play(scene, 'doubles', 'Eject Button');
     expect(real).toMatch(/\|-enditem\|p2a: Blissey\|Eject Button/);
     expect(real).not.toMatch(/\|-enditem\|p2b: Chansey\|Eject Button/);
-    // The holder that held on has its item: the other holder's line is in its window.
     expect(ruledOut(real, 'Chansey')).not.toContain('ejectbutton');
     expect(ruledOut(play(scene, 'doubles', NEUTRAL), 'Blissey')).not.toContain('ejectbutton');
   });
@@ -284,7 +263,7 @@ describe('Eject Button switches its holder out after a damaging hit (T168)', () 
   });
 });
 
-describe('Commander and a fainting attacker (T168)', () => {
+describe('Commander and a fainting attacker', () => {
   const p1 = (lead: PokemonSet) => [lead, set('Skarmory', 'Leftovers', 'Sturdy', ['Splash']), set('Chansey', 'Leftovers', 'Natural Cure', ['Splash'])];
   const bench = set('Heatran', 'Leftovers', 'Flash Fire', ['Splash']);
 
@@ -309,7 +288,7 @@ describe('Commander and a fainting attacker (T168)', () => {
   });
 });
 
-describe('Red Card sends the attacker away after a damaging hit (T168)', () => {
+describe('Red Card sends the attacker away after a damaging hit', () => {
   const attack = (id: string): Scene => ({ turns: [hit(id)] });
   test.each(FORMATS)('%s: a hit that leaves no Red Card line rules the item out (Glimmora 751443 t10 shape)', format => {
     expect(read(attack('earthquake'), format, 'Red Card')).toEqual({ shown: true, out: true });

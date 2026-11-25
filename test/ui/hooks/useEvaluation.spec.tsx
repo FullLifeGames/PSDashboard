@@ -4,8 +4,6 @@ import { logRules } from '@fulllifegames/replay-core';
 import { AUTO_MCTS_FAINTED_FRACTION, configureSearchBudget, parsePlayedActions, parseSearchBudget, type EvalResult, type EvalSettings, type SearchProgress } from '@fulllifegames/eval-engine';
 import { evalResult } from '../fixtures/eval-result';
 
-// The evaluation surface over a scripted worker pool client: the hook's
-// contract is what it asks the client for and how it installs the answers.
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings, handlers?: { onProgress?(p: SearchProgress): void; onPartial?(r: EvalResult): void }) => Promise<EvalResult>),
   calls: [] as { serialized: string; settings: EvalSettings }[],
@@ -78,7 +76,7 @@ describe('useEvaluation preferences', () => {
   });
 });
 
-describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
+describe('useEvaluation preferences: Hard mode', () => {
   test('off by default and in an old store; only a stored true restores it; the switch is stored', () => {
     expect(renderHook(() => useEvaluation()).result.current.prefs).not.toHaveProperty('hardMode');
     localStorage.setItem(PREFS_KEY, JSON.stringify({ depth: 1, mode: 'matrix', hardMode: 'yes' }));
@@ -100,13 +98,7 @@ describe('useEvaluation preferences: Hard mode (round 89, #153)', () => {
   });
 });
 
-/**
- * Round 89 (ruling 49): with the flag VITE_FEATURE_OPPONENT_READS off (the default of every build), a `hardMode: true` that an earlier
- * nightly stored is ignored: the hook hands every reader (the dock fill, the engine walk, the lines, the cards) the preference as
- * unset, no search request carries it, and the stored value stays as it was. The preference does not depend on the game type, so one
- * row covers singles and doubles; the position of the search row is a doubles one on purpose.
- */
-describe('useEvaluation preferences: Opponent reads my move behind its flag (round 89, ruling 49)', () => {
+describe('useEvaluation preferences: Opponent reads my move behind its flag', () => {
   beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
   afterEach(() => vi.unstubAllEnvs());
 
@@ -166,14 +158,12 @@ describe('useEvaluation single position', () => {
     expect(result.current.progress).toBeNull();
     expect(script.calls[0].settings).toEqual({ depth: 1, samples: 1, mode: 'matrix', tera: false, sleepClause: true });
 
-    // The same position with the same engine is a cache hit: no acquisition, no search.
     act(() => result.current.evaluate({ cacheKey: 'replay:3:fp', tera: false, acquire, tag: 'main:3' }));
     expect(result.current.status).toBe('done');
     expect(acquire).toHaveBeenCalledTimes(1);
     expect(script.calls).toHaveLength(1);
   });
 
-  // Round 63 (final review): the single evaluation of a replay turn searches with the played action, like the sweep it shares the cache key with.
   test('a single evaluation hands its played action to the search as keepPlayed', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
@@ -183,7 +173,6 @@ describe('useEvaluation single position', () => {
     expect(script.calls[0].settings.keepPlayed).toEqual(played);
   });
 
-  // Round 65: the rule set (Pokémon Champions or standard) rides with the search settings to the pool.
   test('a single evaluation hands the rule set to the search', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
@@ -193,7 +182,7 @@ describe('useEvaluation single position', () => {
   });
 
   test('auto mode reads the fainted fraction off the acquired position and routes to the tree once bodies fell', async () => {
-    // The threshold before round 61; the default now runs the tree from the first turn (next test).
+    // tree-from is set explicitly: the default runs the tree from the first turn (next test).
     configureSearchBudget(parseSearchBudget(`tree-from=${AUTO_MCTS_FAINTED_FRACTION},early-samples=1`));
     onTestFinished(() => configureSearchBudget(null));
     const { result } = renderHook(() => useEvaluation());
@@ -236,7 +225,6 @@ describe('useEvaluation single position', () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));
     act(() => result.current.setEngineOverride({ depth: 1, samples: 1, mode: 'matrix' }));
-    // Four of six bodies fainted: auto would route to the tree here.
     act(() => result.current.evaluate({ cacheKey: null, tera: false, acquire: async () => position(4), tag: 'a' }));
     await waitFor(() => expect(result.current.status).toBe('done'));
     expect(script.calls[0].settings).toMatchObject({ depth: 1, samples: 1, mode: 'matrix' });
@@ -307,7 +295,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(graph.scores).toEqual([0, 0.1, 0.2]);
     expect(graph.results.map(entry => entry?.score)).toEqual([0, 0.1, 0.2]);
     expect(graph.settings).toEqual([{ depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }]);
-    // A fixed engine never needs the fainted fraction; only auto routing reads it.
     expect(graph.faintedFractions).toEqual([null, null, null]);
     expect(graph.evalErrors).toEqual([null, null, null]);
     expect(graph.notice).toBeNull();
@@ -315,7 +302,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(script.calls).toHaveLength(3);
   });
 
-  // Round 63 (T78, lane C's merge patch): the verify step joins the played row and column, so a singles turn hands its played action on too.
   test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
@@ -360,7 +346,7 @@ describe('useEvaluation whole-game sweep', () => {
     expect(result.current.graph.notice).toBeNull();
   });
 
-  test('dropGraphFrom keeps the turns before the old tip of a game and drops the tip and everything the report built on it (H4h)', async () => {
+  test('dropGraphFrom keeps the turns before the old tip of a game and drops the tip and everything the report built on it', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
     act(() => result.current.runGraphSweep(sweepParams(turn => async () => position(turn - 1))));
@@ -371,7 +357,6 @@ describe('useEvaluation whole-game sweep', () => {
     expect(result.current.graph.results).toHaveLength(2);
     expect(result.current.graph.played).toHaveLength(2);
     expect(result.current.graph.rollFlip ?? null).toBeNull();
-    // a later sweep of the grown game starts from the kept turns' length, not from the stale tip
     act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), turns: 4 }));
     await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
     expect(result.current.graph.scores).toHaveLength(4);
@@ -409,7 +394,6 @@ describe('useEvaluation whole-game sweep', () => {
     const singles = await sweepOf(false);
     expect(singles.settings).toEqual([matrix, matrix, tree]);
     expect(singles.faintedFractions).toEqual([0, 1 / 6, 2 / 6]);
-    // Doubles keep the tree from the first turn under the same form.
     expect((await sweepOf(true)).settings).toEqual([tree, tree, tree]);
   });
 
@@ -417,7 +401,6 @@ describe('useEvaluation whole-game sweep', () => {
     const tree = { depth: 1, samples: 1, mode: 'mcts' };
     const early = { depth: 1, samples: 3, mode: 'matrix' };
     const sweepOf = async (doubles: boolean) => {
-      // The team-preview position, told apart from turn 1's by a marker field.
       const preview = JSON.stringify({ preview: true, ...JSON.parse(doubles ? doublesPosition(0) : position(0)) });
       const { result } = renderHook(() => useEvaluation());
       act(() => result.current.setPrefs({ ...matrixPrefs, mode: 'auto' }));

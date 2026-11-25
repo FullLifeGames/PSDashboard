@@ -34,7 +34,6 @@ describe('runInLanes', () => {
       return index !== 3;
     });
     expect(ok).toBe(false);
-    // In-flight lanes settle, but nothing far beyond the failure starts.
     expect(started.length).toBeLessThan(10);
   });
 

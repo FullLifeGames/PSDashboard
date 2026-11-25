@@ -7,6 +7,7 @@ export type SimBattle = NonNullable<BattleStreams.BattleStream['battle']>;
 export type SimSide = SimBattle['sides'][number];
 export type SimPokemon = SimSide['pokemon'][number];
 
+/** The six stats, HP included (EVs, IVs). */
 export interface PokemonStatTable {
   hp: number;
   atk: number;
@@ -16,6 +17,7 @@ export interface PokemonStatTable {
   spe: number;
 }
 
+/** One move button of the picker: the slot, PP, type, target type and the aims it offers. */
 export interface BranchMoveOption {
   name: string;
   activeSlot: number;
@@ -31,6 +33,7 @@ export interface BranchMoveOption {
   targetOptions: BranchTargetOption[];
 }
 
+/** One aim of a doubles move: the body at the loc, with its HP percent. */
 export interface BranchTargetOption {
   label: string;
   targetLoc: number;
@@ -41,6 +44,7 @@ export interface BranchTargetOption {
   hpPercent: number;
 }
 
+/** One switch chip of the picker: a bench body with its HP and the party slot to switch to. */
 export interface BranchSwitchOption {
   name: string;
   species: string;
@@ -49,10 +53,11 @@ export interface BranchSwitchOption {
   hp: string;
   hpPercent: number;
   fainted: boolean;
-  /** The slot's Pokémon is held: the simulator refuses any switch from it this turn (round 77, A-3). Absent on a forced replacement. */
+  /** Held: the simulator refuses any switch from it this turn; absent on a forced replacement. */
   trapped?: boolean;
 }
 
+/** The calc's reading of a simulator body: stats, set, status, boosts and the volatile facts damage formulas use. */
 export interface SimPokemonInfo {
   name: string;
   species: string;
@@ -72,28 +77,22 @@ export interface SimPokemonInfo {
   ivs?: PokemonStatTable;
   gender?: string;
   teraType?: string;
-  /** Types a Stellar Pokémon has already spent its one-time boost on (the sim's stellarBoostedTypes). */
   stellarBoostedTypes?: string[];
-  /** The stat Protosynthesis or Quark Drive raises, as the simulator's volatile names it (round 67, T76). */
   boostedStat?: string;
-  /** Supreme Overlord's count of fallen allies, as its ability state keeps it (T76). */
   alliesFainted?: number;
-  /** The side's fallen so far (side.totalFainted), the count Last Respects powers up by (T76). */
   totalFainted?: number;
-  /** The hits the body took (timesAttacked), the count Rage Fist powers up by (round 76, T265). */
   timesAttacked?: number;
-  /** Hidden Power's type and power as the simulator gives them (hpType, hpPower; round 67, T83). */
   hpType?: string;
   hpPower?: number;
-  /** 'champions' on a body of a Champions battle: its evs hold Stat Points, which the calc reads as EVs (round 67, decision 30). */
+  /** 'champions' on a body of a Champions battle: its evs hold Stat Points, which the calc reads as EVs. */
   mod?: string;
-  /** Round 85 (T320): a Tatsugiri inside its Dondozo (the simulator's `commanding` volatile); the simulator passes its slot. */
   commanding?: boolean;
   boosts: Record<string, number>;
   level: number;
   types: string[];
 }
 
+/** The weather, terrain and side conditions of a position. */
 export interface BranchFieldState {
   weather: string;
   terrain: string;
@@ -101,7 +100,7 @@ export interface BranchFieldState {
   p2SideConditions: string[];
 }
 
-/** Per-active-slot availability of battle gimmicks (Tera/Mega/Z/Ultra, G7). */
+/** Per-active-slot availability of battle gimmicks (Tera, Mega, Z, Ultra Burst). */
 export interface BranchSlotModifiers {
   teraType: string | null;
   canMegaEvo: boolean;
@@ -110,6 +109,7 @@ export interface BranchSlotModifiers {
   zMoves: (string | null)[];
 }
 
+/** What the pickers read off a position: moves, switches, bodies, field, force-switch flags, pending choices. */
 export interface BranchSimState {
   p1Moves: BranchMoveOption[];
   p1MovesBySlot: BranchMoveOption[][];
@@ -143,34 +143,29 @@ export interface BranchSimState {
   p2Choices: (BranchSlotChoice | null)[];
 }
 
+/** A rebuilt battle with its streams, log, choice errors and the per-block hax alignment. */
 export interface BranchRuntime {
   battleStream: BattleStreams.BattleStream;
   streams: ReturnType<typeof BattleStreams.getPlayerStreams>;
   log: string[];
   choiceErrors: BranchChoiceErrorLog;
-  /** True when the overall reconstruction deadline was hit before the target turn (B17). */
+  /** The reconstruction deadline was hit before the target turn. */
   timedOut: boolean;
-  /** Per-block hax alignment: chosen seed + the truly emitted block's score. */
   haxAlignment: TurnAlignmentRecord[];
 }
 
-/**
- * Choice rejections arrive as `|error|` sideupdates on the per-player streams,
- * never on the omniscient stream — this collects them so executes can fail loudly.
- */
+/** The count and last text of choice rejections (`|error|` sideupdates of the player streams, not the omniscient). */
 export interface BranchChoiceErrorLog {
   count: number;
   last: string | null;
 }
 
-/**
- * `dice` (round 82, forced dice): what the simulator did with the dice the user forced in this turn, only for a turn that carried
- * one. A turn that pauses for a switch (U-turn) reports the dice it has drawn so far; the last call of the turn holds all of them.
- */
+/** The result of an execute; `dice` reports what the simulator did with the dice the user forced. */
 export type BranchExecuteResult =
   | { ok: true; dice?: DiceReport }
   | { ok: false; error: string };
 
+/** The pending choice per side, by slot (`p1Choice` is the first slot of `p1Choices`). */
 export interface BranchChoices {
   p1Choice?: BranchSlotChoice | null;
   p2Choice?: BranchSlotChoice | null;

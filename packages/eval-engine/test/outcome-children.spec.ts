@@ -4,13 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, positionBattle } from '../src/forward-model';
 import { boundaryEvent } from '../src/ko-odds';
 import { classChildren, speedTie } from '../src/search/outcome-children';
-import { SEARCH_SEEDS } from '../src/search/leaf';
-
-/**
- * Round 43: outcome children on demand. The boundary event's kill-roll
- * counts, the class path with forced draws, the empirical grouping, and
- * the speed-tie split.
- */
+import { SEARCH_SEEDS } from './seed-streams';
 
 function makeSet(name: string, species: string, moves: string[], level = 100): PokemonSet {
   return {
@@ -35,7 +29,6 @@ function makeBattle(formatid: string, p1Sets: PokemonSet[], p2Sets: PokemonSet[]
   return battle;
 }
 
-/** Sets the first active's HP per side (null keeps full HP) and serializes. */
 function serializeAt(battle: Battle, hp: [number | null, number | null]): string {
   hp.forEach((value, index) => { if (value !== null) battle.sides[index].active[0]!.sethp(value); });
   return JSON.stringify(State.serializeBattle(battle));
@@ -44,7 +37,7 @@ function serializeAt(battle: Battle, hp: [number | null, number | null]): string
 const jolt = () => makeSet('Jolt', 'Jolteon', ['Thunder', 'Thunderbolt']);
 const champ = () => makeSet('Champ', 'Machamp', ['Close Combat']);
 
-describe('boundary event kill rolls (round 43)', () => {
+describe('boundary event kill rolls', () => {
   test('a sure kill counts 16 rolls, a status roll none, a range its share', () => {
     const sure = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [null, 1]));
     const battle = positionBattle(sure);
@@ -60,7 +53,6 @@ describe('boundary event kill rolls (round 43)', () => {
     expect(bolt.critKillRolls).toBeGreaterThanOrEqual(0);
     expect(bolt.killFraction).toBeCloseTo((bolt.normalKillRolls * 23 / 24 + bolt.critKillRolls / 24) / 16, 9);
 
-    // Machamp in range of a non-crit Thunderbolt: some rolls kill, some do not.
     const range = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [null, 160]));
     const rangeBattle = positionBattle(range);
     const inRange = boundaryEvent(rangeBattle, rangeBattle.sides[0].active[0]!, rangeBattle.sides[1].active[0]!, 'thunderbolt')!;
@@ -70,12 +62,11 @@ describe('boundary event kill rolls (round 43)', () => {
   });
 });
 
-// Both at 1 HP (the solver test's shape): Thunder kills on a hit, Close Combat kills for sure after a miss, so Thunder is the only priced event.
 const thunderAtOne = () => createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [1, 1]));
 const TREE_OPTS = { baseSeeds: [SEARCH_SEEDS[0]], forcedCap: 6 };
 const weights = (children: { key: string; weight: number }[]) => Object.fromEntries(children.map(child => [child.key, Number(child.weight.toFixed(6))]));
 
-describe('classChildren (round 43)', () => {
+describe('classChildren', () => {
   test('thunder 70: one natural draw plus one forced draw give miss and hit-kill without probe seeds', () => {
     const drawn = classChildren(thunderAtOne(), 'move thunder', 'move closecombat', TREE_OPTS)!;
     expect(drawn).not.toBeNull();
@@ -86,7 +77,6 @@ describe('classChildren (round 43)', () => {
     expect(positionBattle(kill.position).sides[1].pokemon[0].fainted).toBe(true);
     const miss = drawn.children.find(child => child.key === 'p1:miss')!;
     expect(positionBattle(miss.position).sides[1].pokemon[0].fainted).toBe(false);
-    // Deterministic.
     const again = classChildren(thunderAtOne(), 'move thunder', 'move closecombat', TREE_OPTS)!;
     expect(again.children.map(child => child.position.serialized)).toEqual(drawn.children.map(child => child.position.serialized));
   });
@@ -97,15 +87,11 @@ describe('classChildren (round 43)', () => {
     const drawn = classChildren(root, 'move thunder', 'move closecombat', { ...TREE_OPTS, stopAtForcedSwitch: true })!;
     const kill = drawn.children.find(child => child.key === 'p1:hit-kill')!;
     expect(kill.pendingSwitch).toBe(true);
-    // The miss lets Close Combat take Jolteon: p1's switch request opens instead.
     expect(drawn.children.find(child => child.key === 'p1:miss')!.pendingSwitch).toBe(true);
     expect(positionBattle(drawn.children.find(child => child.key === 'p1:miss')!.position).sides[0].pokemon[0].fainted).toBe(true);
   });
 
   test('a knock-out only a crit reaches gets a crit representative', () => {
-    // Thunderbolt against a Machamp whose HP sits above every non-crit roll but under the crit rolls:
-    // the first HP from the top of the non-crit range where no normal roll kills and a crit roll still does.
-    // Jolteon at 1 HP keeps Close Combat a sure kill (no second event).
     const eventAt = (hp: number) => {
       const root = createRootPosition(serializeAt(makeBattle('gen9customgame', [jolt()], [champ()]), [1, hp]));
       const battle = positionBattle(root);
@@ -143,7 +129,6 @@ describe('classChildren (round 43)', () => {
     const root = createRootPosition(serializeAt(makeBattle('gen9customgame',
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])], [makeSet('Egg', 'Chansey', ['Soft-Boiled'])]), [null, null]));
     expect(classChildren(root, 'move seismictoss', 'move softboiled', TREE_OPTS)).toBeNull();
-    // Doubles pairs have no class plan either.
     const doubles = createRootPosition(serializeAt(makeBattle('gen9doublescustomgame',
       [jolt(), champ()], [champ(), makeSet('Chu', 'Pikachu', ['Tackle'], 30)]), [null, null]));
     expect(classChildren(doubles, 'move thunder 1, move closecombat 1', 'move closecombat 1, move tackle 1', TREE_OPTS)).toBeNull();

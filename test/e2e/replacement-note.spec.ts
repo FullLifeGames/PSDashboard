@@ -5,14 +5,6 @@ import { test, expect, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
 
-/**
- * Round 79 (T290): the replacement after a knockout, as a note on the card of the next turn. Two real fixtures serve the loader:
- * a Gen 9 OU game in which Toxapex comes in on turn 6 (the card of turn 7 carries the note, the card of turn 6 none) and a
- * Doubles OU game in which Flamigo and Sylveon come in together on turn 2 (one sentence names both slots). A reload serves the
- * note from the stored sweep. The default e2e replay has a knockout the simulator does not reproduce, so it shows no note.
- */
-
-// The e2e specs load as ES modules, which have no __dirname (helpers.ts derives it the same way).
 const here = dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) =>
   JSON.parse(readFileSync(join(here, '../../packages/eval-engine/test/fixtures', `${name}.json`), 'utf-8')) as ReplayData;
@@ -58,12 +50,10 @@ test.describe('the replacement note', () => {
     const note = panel.locator('.ps-eval-replacement', { hasText: 'Before turn 7' });
     await expect(note).toBeVisible({ timeout: 15_000 });
     await expect(note).toContainText(/(sent in Toxapex \(\d+%\)\.|had only Toxapex left\.)/);
-    // The note sits above the turn card under its own class, and the card keeps its header. Nothing is graded.
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 7');
     await expect(note).not.toContainText(/blunder|mistake|inaccuracy/i);
 
-    // A reload serves the note from the stored sweep. Round 89 (lane H, H4c): the address names the open replay, so the reload
-    // brings the game back by itself; typing the id into the start page's loader would race the page that is replacing it.
+    // The address names the replay: typing its id into the loader again would race the page that is replacing it.
     await expect(page).toHaveURL(/[?&]replay=gen9ou-2658662321/);
     await page.reload();
     await expect(page.getByText(fixture('gen9ou-2658662321').players[0], { exact: true }).first()).toBeVisible({ timeout: 15_000 });

@@ -2,15 +2,6 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-/**
- * A guessed item whose trigger the protocol shows without the item's line is
- * ruled out (round 67, T130, decision 18). The round-64 census counted the
- * guesses the simulator consumed where the game showed nothing: Air Balloon,
- * Booster Energy and Eject Pack made 554 of the 562 singles rows. Every log
- * here comes from @pkmn/sim: each case first checks what a holder shows, then
- * what the inference reads for the side p2 from a log without the item.
- */
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -42,7 +33,7 @@ const ruledOut = (log: string, species: string) =>
   inferOpponentTeam(log, 'p2').pokemon.find(mon => mon.species === species)?.ruledOut?.items ?? [];
 const wall = () => set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled', 'Seismic Toss']);
 
-describe('Air Balloon announces itself on entry (T130)', () => {
+describe('Air Balloon announces itself on entry', () => {
   const lead = (item: string) => set('Heatran', item, 'Flash Fire', ['Magma Storm', 'Protect']);
   const turn: [string, string] = ['move softboiled', 'move protect'];
 
@@ -94,7 +85,7 @@ describe('Air Balloon announces itself on entry (T130)', () => {
   });
 });
 
-describe('Booster Energy is spent on entry outside its weather or terrain (T130)', () => {
+describe('Booster Energy is spent on entry outside its weather or terrain', () => {
   const tusk = (item: string) => set('Great Tusk', item, 'Protosynthesis', ['Headlong Rush', 'Protect']);
   const hands = (item: string) => set('Iron Hands', item, 'Quark Drive', ['Drain Punch', 'Protect']);
 
@@ -119,7 +110,6 @@ describe('Booster Energy is spent on entry outside its weather or terrain (T130)
     expect(ruledOut(play([sun], [wall(), tusk('Leftovers')], turns), 'Great Tusk')).not.toContain('boosterenergy');
   });
 
-  // 752839 t13: Iron Valiant comes in after an Eject Button as the turn's last action; the sun's upkeep line follows before the turn ends.
   const ninetales = () => set('Ninetales', 'Heat Rock', 'Drought', ['Nasty Plot', 'Protect']);
   const pivot = () => set('Blissey', 'Leftovers', 'Natural Cure', ['U-turn', 'Protect']);
   const lastEntry = {
@@ -137,7 +127,6 @@ describe('Booster Energy is spent on entry outside its weather or terrain (T130)
     const withBooster = play(p1(), p2('Booster Energy'), turns as unknown as [string, string][], options);
     expect(withBooster).toMatch(/\|-enditem\|p2a: Iron Hands\|Booster Energy/);
     const log = play(p1(), p2('Leftovers'), turns as unknown as [string, string][], options);
-    // The shape: no move between the entry and the turn's end, only the sun's upkeep line.
     expect(log).toMatch(/\|switch\|p2a: Iron Hands\|(?:(?!\|move\|)[\s\S])*\|-weather\|SunnyDay\|\[upkeep\](?:(?!\|move\|)[\s\S])*\|turn\|2/);
     expect(ruledOut(log, 'Iron Hands')).toContain('boosterenergy');
   });
@@ -153,7 +142,7 @@ describe('Booster Energy is spent on entry outside its weather or terrain (T130)
   });
 });
 
-describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
+describe('Eject Pack switches its holder out after a stat drop', () => {
   const intimidate = () => set('Incineroar', 'Leftovers', 'Intimidate', ['Fake Out', 'Parting Shot', 'Protect']);
   const target = (item: string) => set('Garchomp', item, 'Rough Skin', ['Protect', 'Close Combat']);
 
@@ -188,7 +177,6 @@ describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
 
   test('a drop from Parting Shot never ejects: nothing is ruled out', () => {
     const p1 = [set('Incineroar', 'Leftovers', 'Blaze', ['Parting Shot']), wall()];
-    // Garchomp moves first, Parting Shot drops it, p1 brings Blissey in, and a second turn closes the window.
     const turns: [string, string][] = [['move partingshot', 'move earthquake'], ['switch 2', ''], ['move softboiled', 'move earthquake']];
     const holder = (item: string) => set('Garchomp', item, 'Rough Skin', ['Protect', 'Earthquake']);
     const withPack = play(p1, [holder('Eject Pack'), wall()], turns);
@@ -199,7 +187,7 @@ describe('Eject Pack switches its holder out after a stat drop (T130)', () => {
   });
 });
 
-describe('the terrain seeds and Room Service are used when the field changes (T349)', () => {
+describe('the terrain seeds and Room Service are used when the field changes', () => {
   const surge = (item: string) => set('Tapu Koko', item, 'Electric Surge', ['Thunderbolt', 'Protect']);
   const turn: [string, string] = ['move softboiled', 'move protect'];
   const doublesTurn: [string, string] = ['move softboiled, move softboiled', 'move protect, move protect'];

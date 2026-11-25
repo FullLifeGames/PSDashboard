@@ -1,16 +1,4 @@
-// Round 72 (T236): the one reader of Dex name literals in the sources. The name ratchet (eslint.names.mjs), the twin detector
-// (scripts/twin-lists.mjs), scripts/update-name-baseline.mjs and their specs import it; the CLI prints the census.
-//
-//   node scripts/name-census.mjs [--json]
-//
-// AGENTS.md, Rules for the code: our code translates and reads library data and never writes species or move names; where it
-// must know a rule, a test checks it against the simulator. This file counts the places that do write names.
-//
-// What counts as a name literal: a string literal, or a template literal without ${}, 4 to 40 characters long, whose text is
-// exactly the display name of a Dex species, move, item or ability ("Rocky Helmet", "Mind's Eye") or exactly its id
-// ("copycat"), unless that id is also a Dex type, nature or stat id ("Psychic" is a type and a move). Not counted: comments (the
-// syntax tree has none), the module specifier of an import or export, regular expressions, templates with an expression.
-// Type unions of names count like any other literal. A pair is (file, id), once per file.
+// The one reader of Dex name literals in the sources; the name ratchet, the twin detector and their specs import it.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,7 +11,7 @@ const MAX_LENGTH = 40;
 
 const toID = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '');
 
-/** Display names and ids of the four kinds of the default generation; the vocabulary of types, natures and stats stays out. */
+/** Display names and ids of the four Dex kinds of the default generation; types, natures and stats stay out. */
 export function loadUniverse() {
   const kinds = [['species', Dex.species], ['move', Dex.moves], ['item', Dex.items], ['ability', Dex.abilities]];
   const vocabulary = new Set();
@@ -69,7 +57,6 @@ export function plainText(node) {
   return null;
 }
 
-/** `{ id, kind, text }` when the node is a Dex name literal. */
 export function literalName(node, universe) {
   const text = plainText(node);
   if (text === null) return null;
@@ -77,7 +64,6 @@ export function literalName(node, universe) {
   return found ? { ...found, text } : null;
 }
 
-/** Every node of a parsed file, with `parent` set. */
 function* nodesOf(root) {
   const stack = [root];
   while (stack.length) {
@@ -99,7 +85,6 @@ export function parseSource(text, file) {
   return tseslint.parser.parseForESLint(text, { ecmaFeatures: { jsx: file.endsWith('.tsx') }, filePath: file }).ast;
 }
 
-/** `[{ id, kind, text, line }]` of a parsed file, in source order. */
 export function namePairs(ast, universe) {
   const found = [];
   for (const node of nodesOf(ast)) {
@@ -111,11 +96,7 @@ export function namePairs(ast, universe) {
 
 const REVIEWED = /eslint-disable-(next-)?line\b.*\bnames\/no-new-dex-name\b/;
 
-/**
- * The lines a reviewed exception covers: the line after an `eslint-disable-next-line names/no-new-dex-name` comment and
- * the line of an `eslint-disable-line` one. The census counts what the rule would report, so the baseline never holds a
- * pair whose line already carries its reason (round 72 merge: nine reviewed pairs of lane A).
- */
+/** The lines a reviewed exception covers, which the census leaves out as the rule does. */
 export function reviewedLines(ast) {
   const lines = new Set();
   for (const comment of ast.comments ?? []) {
@@ -125,14 +106,13 @@ export function reviewedLines(ast) {
   return lines;
 }
 
-/** The pairs of one file's text, without the lines a reviewed exception covers. */
 export function filePairs(text, file, universe) {
   const ast = parseSource(text, file);
   const reviewed = reviewedLines(ast);
   return namePairs(ast, universe).filter(pair => !reviewed.has(pair.line));
 }
 
-/** Paths relative to `root`, posix style, of every .ts and .tsx file under the given folders (a folder may hold a `*`). */
+/** Posix paths relative to `root` of every .ts and .tsx file under the folders (a folder may hold a `*`). */
 export function sourceFiles(root, folders) {
   const out = [];
   const walk = (dir, rel) => {
@@ -160,7 +140,6 @@ export function sourceFiles(root, folders) {
   return out.sort();
 }
 
-/** The folders the name ratchet reads. */
 export const NAME_FOLDERS = ['packages/*/src'];
 
 /** `{ "<file>": ["<id>", ...] }`: the sorted distinct ids per file, files without a name left out. */

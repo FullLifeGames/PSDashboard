@@ -3,31 +3,24 @@ import { umbrellaWeathers } from '@fulllifegames/replay-core';
 import { hitDraws } from '../calc/hit-draws.ts';
 import { CONTEXT_MOVES, moveAtUse, RULE_ABILITIES, RULE_MOVES, type ItemLike, type MoveAtUse, type MoveField, type MoveUser } from '../move-use.ts';
 
-/**
- * The static's side of the move table (round 57): facts from the sim
- * objects, read RAW (ability and item ids, stored stats, fields), the way
- * ABILITY_IMMUNITIES reads them. Suppression (Neutralizing Gas, Gastro Acid,
- * Magic Room, the bench) is ignored on purpose: the static prices benched
- * bodies, and the simulator's own helpers read them as ability- and itemless.
- */
+// Facts are read raw from the sim objects: suppression (Neutralizing Gas, Gastro Acid, Magic Room, bench) is ignored,
+// because the static prices benched bodies, which the simulator's helpers read as ability- and itemless.
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
 const BOOST_TABLE = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 
-/** getStat(stat, false, true): the stored stat with its stage, no modifiers. */
 function staged(pokemon: Pokemon, stat: 'atk' | 'spa' | 'spe'): number {
   const boost = Math.max(-6, Math.min(6, pokemon.boosts[stat]));
   const base = pokemon.storedStats[stat];
   return boost >= 0 ? Math.floor(base * BOOST_TABLE[boost]) : Math.floor(base / BOOST_TABLE[-boost]);
 }
 
-/** The types a body is hit and grounded by: the Tera type once clicked (a Stellar Tera keeps the old ones). */
+// The types a body is hit and grounded by: the Tera type once clicked (a Stellar Tera keeps the old ones).
 function typesNow(pokemon: Pokemon): readonly string[] {
   const tera = pokemon.terastallized;
   return tera && tera !== 'Stellar' ? [tera] : pokemon.types;
 }
 
-/** pokemon.isGrounded() on raw facts (the sim's reads ability and item through the bench suppression). */
 function grounded(pokemon: Pokemon, battle: Battle): boolean {
   if ('gravity' in battle.field.pseudoWeather) return true;
   if (('ingrain' in pokemon.volatiles && battle.gen >= 4) || 'smackdown' in pokemon.volatiles) return true;
@@ -38,10 +31,6 @@ function grounded(pokemon: Pokemon, battle: Battle): boolean {
   return pokemon.item !== 'airballoon';
 }
 
-/**
- * The user's facts, computed when a rule reads them (round 57, timing): most
- * rules read one or two facts, and a cold static prices every living pair.
- */
 class UserFacts implements MoveUser {
   readonly gen: number;
   readonly species: string;
@@ -78,7 +67,6 @@ export function userFacts(pokemon: Pokemon, battle: Battle): MoveUser {
   return new UserFacts(pokemon, battle);
 }
 
-/** The weather the user's moves feel (pokemon.effectiveWeather on raw facts), read when a rule asks, and the terrain. */
 export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
   return {
     get weather() {
@@ -89,26 +77,7 @@ export function fieldFacts(pokemon: Pokemon, battle: Battle): MoveField {
   };
 }
 
-/**
- * Power at use, asked from the simulator (round 63, T81). These moves set
- * their power when they land: by weight, HP, speed, status, the held item,
- * happiness or the field. The static asks the move's own handler in the
- * simulator (basePowerCallback, the move's onBasePower, Endeavor's
- * damageCallback) instead of a rule of its own (round 57 parked hand rules
- * on branch r57-power; since round 60 the rules come from the simulator).
- * Only handlers that are pure functions of the board are asked:
- * test/power-handlers-census.spec.ts names every other power handler of the
- * Dex with the reason it stays out (it writes the battle, draws from the
- * PRNG, writes the log, or reads the turn in progress), and checks each
- * class against the simulator:
- *  - memo: the answer reads only what pairKey keys (item, forme, happiness);
- *  - live: it reads HP, status, the field, speed, weight or the history (fallen, hits taken), so landedKey keys
- *    the answer itself;
- *  - stages: it reads the boost stages, which stay outside the memo key, so
- *    the memo prices it at the power of no boosts and boostedFraction asks
- *    the power on the stages of the moment (stagedPower; decision 3 of the
- *    round-63 wave spec).
- */
+/** Power-at-use moves by key class: memo (pairKey), live (landedKey), stages (unboosted, then live). */
 // oracle: packages/eval-engine/test/power-handlers-census.spec.ts
 export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new Map([
   ...['knockoff', 'acrobatics', 'return', 'frustration', 'pikapapow', 'veeveevolley', 'watershuriken']
@@ -117,23 +86,13 @@ export const POWER_MOVES: ReadonlyMap<string, 'memo' | 'live' | 'stages'> = new 
     'crushgrip', 'wringout', 'hardpress', 'brine', 'gyroball', 'electroball', 'facade', 'hex', 'venoshock',
     'barbbarrage', 'infernalparade', 'wakeupslap', 'smellingsalts', 'solarbeam', 'solarblade', 'expandingforce',
     'psyblade', 'mistyexplosion', 'gravapple', 'collisioncourse', 'electrodrift', 'endeavor',
-    // Round 76 (T265): the history powers, by the side's fallen and the hits taken.
     // eslint-disable-next-line names/no-new-dex-name -- held by history-power-sweep.spec.ts: every Dex move that historyPower reads is priced by the callback
     'lastrespects', 'ragefist']
     .map(id => [id, 'live'] as const),
   ...['storedpower', 'powertrip', 'punishment'].map(id => [id, 'stages'] as const),
 ]);
 
-/**
- * Per Dex, read once (round 63, T81 timing): which moves the static resolves
- * at use at all (`touched`: a type rule, a power asked from the simulator,
- * more than one hit or a sure crit), whose answer the memo key carries
- * (`keyed`: the context moves, the live power moves, the sure crits, the
- * moves that split over two foes), which read other stats than their
- * category's (`offAxis`) or set their power from the boosts (`staged`), and
- * the abilities with their own ModifySTAB handler. A set lookup per slot
- * instead of Dex reads per slot.
- */
+/** Per Dex, read once: moves resolved at use (`touched`), moves the memo key carries (`keyed`), off-axis, staged. */
 export interface DexTraits {
   touched: ReadonlySet<string>;
   keyed: ReadonlySet<string>;
@@ -172,18 +131,12 @@ export function traitsOf(battle: Battle): DexTraits {
   return traits;
 }
 
-/** A move's power as the simulator sets it at use; `simDamage` for a fixed-damage move. */
 interface PowerAtUse { basePower: number; powerMult: number; simDamage?: number }
 
 type Handler = (this: Battle, ...args: unknown[]) => unknown;
 
-/**
- * One call into the simulator for the static: no debug lines (a custom-game
- * format runs in debug mode, and the sim throws once 1000 unsent lines pile
- * up), and benched bodies read as if on the field (the sim switches off the
- * ability and item of an inactive body from gen 5 on; speed.ts
- * effectiveSpeed does the same for one body).
- */
+// No debug lines: a custom-game format runs in debug mode and the sim throws once 1000 unsent lines pile up.
+// Benched bodies read as on the field: the sim switches off an inactive body's ability and item from gen 5 on.
 function onField<T>(battle: Battle, attacker: Pokemon, defender: Pokemon, ask: () => T): T {
   const log = battle as unknown as { debugMode: boolean };
   const debug = log.debugMode;
@@ -201,7 +154,6 @@ function onField<T>(battle: Battle, attacker: Pokemon, defender: Pokemon, ask: (
   }
 }
 
-/** askPower on the field (onField) without a closure: the static's hot path asks it for every asked slot. */
 function askPowerOnField(attacker: Pokemon, defender: Pokemon, move: ActiveMove, battle: Battle): PowerAtUse {
   const log = battle as unknown as { debugMode: boolean };
   const debug = log.debugMode;
@@ -219,14 +171,8 @@ function askPowerOnField(attacker: Pokemon, defender: Pokemon, move: ActiveMove,
   }
 }
 
-/**
- * The move's own onBasePower in an event frame of the sim's shape (what
- * runEvent hands its handlers: the user, the target, the move and a
- * modifier of 1): its chainModify writes the frame's modifier, which the
- * static keeps as powerMult. The frame is set for the call and restored
- * (singleEvent would do the same with more bookkeeping, measured too slow
- * for the static, round 63).
- */
+// An event frame of the sim's shape: chainModify writes the frame's modifier, which becomes powerMult.
+// The frame is restored after the call (singleEvent does the same, too slow here).
 function ownBasePower(battle: Battle, attacker: Pokemon, defender: Pokemon, move: ActiveMove, basePower: number): PowerAtUse {
   const own = move.onBasePower as unknown as Handler;
   const frame = battle as unknown as { event: unknown };
@@ -242,7 +188,7 @@ function ownBasePower(battle: Battle, attacker: Pokemon, defender: Pokemon, move
   return { basePower: typeof relay === 'number' ? relay : basePower, powerMult: event.modifier };
 }
 
-/** getDamage's order: fixed damage first, then the power callback, then the move's own BasePower handler. */
+// getDamage's order: fixed damage first, then the power callback, then the move's own BasePower handler.
 function askPower(attacker: Pokemon, defender: Pokemon, move: ActiveMove, battle: Battle): PowerAtUse {
   if (move.damageCallback) {
     const damage: unknown = move.damageCallback.call(battle, attacker, defender);
@@ -258,24 +204,15 @@ function askPower(attacker: Pokemon, defender: Pokemon, move: ActiveMove, battle
 const skillLink = (attacker: Pokemon) => String(attacker.ability) === 'skilllink';
 const loadedDice = (attacker: Pokemon) => attacker.item === 'loadeddice';
 
-/**
- * The expected hit count of the simulator's hit loop: the mean of the array
- * it samples (calc/hit-draws.ts; test/multi-hit.spec.ts holds it against the
- * simulator's counts per turn), 3.1 for 2 to 5 hits from gen 5 on, 3 before,
- * 4.5 and 7 under Loaded Dice. Skill Link takes the top count.
- */
+// The mean of the sim's sampled hit array (calc/hit-draws.ts): 3.1 for 2 to 5 hits from gen 5 on, 3 before,
+// 4.5 and 7 under Loaded Dice; Skill Link takes the top count.
 function expectedHits(attacker: Pokemon, multihit: number | number[], gen: number): number {
   const drawn = hitDraws(gen, Array.isArray(multihit) && skillLink(attacker) ? multihit[1] : multihit, loadedDice(attacker));
   return drawn.reduce((sum, hits) => sum + hits, 0) / drawn.length;
 }
 
-/**
- * Every hit of a multi-hit move as one factor on the damage. A move whose
- * callback reads the hit number (Triple Axel) is asked per hit; a per-hit
- * accuracy roll (multiaccuracy, cleared by Skill Link and Loaded Dice) ends
- * the chain at the first miss, so hit k counts at accuracy^(k-1); Dragon
- * Darts in doubles splits its two hits over two living foes (smartTarget).
- */
+// A callback that reads the hit number (Triple Axel) is asked per hit; a per-hit accuracy roll (multiaccuracy) ends
+// it at the first miss, so hit k counts at accuracy^(k-1); Dragon Darts in doubles splits its two hits over two foes.
 function hitsFactor(attacker: Pokemon, defender: Pokemon, move: DexMove, basePower: number, battle: Battle): number {
   const multihit = move.multihit;
   if (!multihit) return 1;
@@ -291,35 +228,27 @@ function hitsFactor(attacker: Pokemon, defender: Pokemon, move: DexMove, basePow
   return basePower ? chainedPower(hits, accuracy, powerOf) / basePower : 0;
 }
 
-/** The power of a hit chain: hit k at its own power, reached at accuracy^(k-1). */
 function chainedPower(hits: number, accuracy: number, powerOf: (hit: number) => number): number {
   let total = 0;
   for (let hit = 1; hit <= hits; hit++) total += powerOf(hit) * accuracy ** (hit - 1);
   return total;
 }
 
-/**
- * A sure crit (willCrit) lands its crit unless the target blocks it (the
- * sim's CriticalHit event: Battle Armor, Shell Armor, Lucky Chant); the
- * multiplier is modifyDamage's: the move's critModifier, else 1.5 from gen 6
- * on and 2 before.
- */
+// A sure crit lands unless the target blocks it (CriticalHit event: Battle Armor, Shell Armor, Lucky Chant);
+// the multiplier is the move's critModifier, else 1.5 from gen 6 on and 2 before.
 function critFactor(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): number {
   if (!move.willCrit) return 1;
   const lands: unknown = onField(battle, attacker, defender, () => battle.runEvent('CriticalHit', defender, null, move as unknown as ActiveMove));
   return lands ? move.critModifier || (battle.gen >= 6 ? 1.5 : 2) : 1;
 }
 
-/** A move as the static reads it: the answer at use, or the catalog entry itself when no rule can touch it. */
 export type Landed = Pick<MoveAtUse, 'type' | 'category' | 'basePower'> & {
   powerMult?: number;
-  /** Fixed damage the simulator deals (Endeavor). */
   simDamage?: number;
   /** Every hit and a sure crit, on the whole damage (each hit carries its own +2, a crit multiplies it). */
   landing?: number;
 };
 
-/** The catalog path allocates nothing: the dex move stands in for its own answer. */
 export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): Landed {
   const retypedByAbility = RULE_ABILITIES.has(String(attacker.ability));
   if (!retypedByAbility && !traitsOf(battle).touched.has(move.id)) return move;
@@ -329,7 +258,6 @@ export function landedOrCatalog(attacker: Pokemon, defender: Pokemon, move: DexM
   return landedPower(attacker, defender, move, battle, typed);
 }
 
-/** The power at use on top of the typed answer: asked from the simulator, every hit, a sure crit. */
 function landedPower(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle, typed: Landed): Landed {
   // The Dex move stands in for the active move: the asked handlers only read it (the census spec checks).
   const power = POWER_MOVES.has(move.id) ? askPowerOnField(attacker, defender, move as unknown as ActiveMove, battle) : null;
@@ -346,10 +274,6 @@ function landedPower(attacker: Pokemon, defender: Pokemon, move: DexMove, battle
   return answer;
 }
 
-/**
- * The attacker's own ModifySTAB handler (Adaptability), found by its Dex
- * field and asked in the sim's event frame on the STAB the rules give.
- */
 export function abilityStab(attacker: Pokemon, defender: Pokemon, move: DexMove, stab: number, battle: Battle): number {
   if (!traitsOf(battle).stabAbilities.has(attacker.ability)) return stab;
   const ability = battle.dex.abilities.getByID(attacker.ability);
@@ -360,16 +284,13 @@ export function abilityStab(attacker: Pokemon, defender: Pokemon, move: DexMove,
 
 const NO_BOOSTS: BoostsTable = { atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 };
 
-/** A view of one body on other stages; every other read goes to the body itself. */
 const onStages = (pokemon: Pokemon, boosts: BoostsTable): Pokemon =>
   Object.create(pokemon, { boosts: { value: boosts } }) as Pokemon;
 
-/** A stages-class move as the memo prices it: both bodies on no boosts. */
 export function stagedLanded(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): Landed {
   return landedOrCatalog(onStages(attacker, NO_BOOSTS), onStages(defender, NO_BOOSTS), move, battle);
 }
 
-/** The power the simulator gives a stages-class move on the live stages, the attacker's overridden where asked. */
 export function stagedPower(attacker: Pokemon, defender: Pokemon, moveId: string, boosts?: Partial<BoostsTable>): number {
   const battle = attacker.battle;
   const user = boosts ? onStages(attacker, { ...attacker.boosts, ...boosts }) : attacker;
@@ -377,10 +298,8 @@ export function stagedPower(attacker: Pokemon, defender: Pokemon, moveId: string
   return askPowerOnField(user, defender, move, battle).basePower;
 }
 
-/** A move as it lands for one pair, every field set; `simDamage` and `landing` as in Landed. */
 export type LandedAnswer = MoveAtUse & { simDamage?: number; landing?: number };
 
-/** The move as it lands for this pair; the catalog when no rule can touch it. */
 export function landedMove(attacker: Pokemon, defender: Pokemon, move: DexMove, battle: Battle): LandedAnswer {
   const use = landedOrCatalog(attacker, defender, move, battle);
   return {
@@ -390,13 +309,7 @@ export function landedMove(attacker: Pokemon, defender: Pokemon, move: DexMove, 
   };
 }
 
-/**
- * The answers the memo key carries (round 57): every usable slot whose
- * answer reads a fact outside pairKey (CONTEXT_MOVES, the live power moves,
- * a sure crit against Lucky Chant, Dragon Darts against the foe's partner),
- * by slot id; null when no slot needs one, as for most pairs. On a miss the
- * memo prices the pair with these same answers (round 63: asked once).
- */
+/** The answers the memo key carries, by slot id; null when no slot needs one, as for most pairs. */
 export function keyedAnswers(attacker: Pokemon, defender: Pokemon, slots: readonly { id: string }[], battle: Battle): Map<string, Landed> | null {
   const { keyed } = traitsOf(battle);
   let answers: Map<string, Landed> | null = null;
@@ -407,7 +320,6 @@ export function keyedAnswers(attacker: Pokemon, defender: Pokemon, slots: readon
   return answers;
 }
 
-/** The memo-key term of the keyed answers, so the memo stays a function of its key (round 49) without one key term per fact. */
 export function landedKey(answers: ReadonlyMap<string, Landed> | null): string {
   if (!answers) return '';
   let key = '';

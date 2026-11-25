@@ -8,11 +8,6 @@ import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
 import type { AppController } from '../../../src/hooks/useAppController';
 
-// Round 89 (#112): a play-out without Fast play-out stopped for good when the replay frame reported a turn before the tip
-// (the user stepped the frame back and paused). The run below plays over the real controller (timeline, evaluation view,
-// walk, loop) and a scripted search: the frame's report parks the pointer behind the tip right after the run armed, and the
-// run must still play its turns on the live sim. Singles only here: the unit rows (usePlayOut.frame, usePlayOut.evaluations,
-// useEvalView) cover doubles, and the loop and the controllers do not branch on the game type.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
@@ -59,7 +54,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A loaded replay with a variation from turn 2 that knows U-turn and has played two turns by hand. */
 async function variationWithPivot() {
   const replay = singlesReplay();
   const { result } = renderHook(() => useAppController());
@@ -78,7 +72,8 @@ async function variationWithPivot() {
     const sim = result.current.ctx.branch.simState!;
     const quiet = sim.p1MovesBySlot[0].find(move => move.name === 'Swords Dance')!;
     act(() => result.current.ctx.branch.setChoice('p1', { kind: 'move', moveId: toId(quiet.name), moveName: quiet.name }, 0));
-    const reply = sim.p2MovesBySlot[0].find(move => move.name === 'Sucker Punch')!; // fails against a status move: the quiet turns hurt nobody
+    // Sucker Punch fails against a status move: the quiet turns hurt nobody.
+    const reply = sim.p2MovesBySlot[0].find(move => move.name === 'Sucker Punch')!;
     act(() => result.current.ctx.branch.setChoice('p2', { kind: 'move', moveId: toId(reply.name), moveName: reply.name }, 0));
     const before = result.current.ctx.branch.history.length;
     await act(async () => { await result.current.handleExecuteTurn(); });
@@ -90,14 +85,13 @@ async function variationWithPivot() {
   return { app: () => result.current };
 }
 
-describe('a play-out with the frame parked behind the tip (#112)', () => {
+describe('a play-out with the frame parked behind the tip', () => {
   test('the run keeps playing turns on the live sim', async () => {
     const { app } = await variationWithPivot();
     const before = app().ctx.branch.history.length;
     const tip = app().board.timeline.viewTurn;
     act(() => app().engine.playOutControls.startPlayOut());
-    // The frame reports an earlier turn (a Pause after stepping back), after the timeline's 20 second play-in guard of the
-    // last landed turn: the pointer follows the report.
+    // The frame reports an earlier turn after the timeline's 20 s play-in guard: the pointer follows the report.
     const now = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 25_000);
     act(() => app().board.timeline.handleReplayTurn(tip - 1));
@@ -105,7 +99,6 @@ describe('a play-out with the frame parked behind the tip (#112)', () => {
     expect(app().board.timeline.viewTurn).toBe(tip - 1);
     expect(app().board.timeline.liveTip).toBe(false);
     await waitFor(() => expect(app().ctx.branch.history.length).toBeGreaterThanOrEqual(before + 2), { timeout: 120_000 });
-    // The run took its two turns from the live sim; whichever way it ends, it ended by itself and not by the pointer.
     act(() => app().engine.playOutControls.stopPlayOut());
   }, 240_000);
 });

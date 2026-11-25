@@ -9,11 +9,6 @@ import {
   critsOf, damageAtRaw, dieOf, forcedOn, missesOf, monOf, SWEEP_CASES, sweepBoard, sweepClicks, sweepTargets, VGC_RULES,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A2b: the damage roll sweep. Per rule set and game type, a physical, a special and a spread move
-// (and the confusion self-hit from Gen 3 on) with every step of the roll forced, on every target on its own: the damage a
-// step deals equals the damage the simulator deals when it draws the step's raw value itself, no step deals less than the
-// one before, and the top step deals more than step 0. Gens 1 and 2 have 39 steps (higher raw hurts more), Gens 3 on 16
-// (lower raw hurts more); the module's step always runs from the lowest damage up.
 await loadSimMods('gen9championsou');
 
 const SEEDS = Array.from({ length: 24 }, (_, index) => seedOf(index));
@@ -23,11 +18,9 @@ const SCENES = [
   { id: 'a spread move', move: 'rockslide', target: 'allAdjacentFoes' },
 ];
 
-/** Every step of the roll on one slot against the simulator's own draw of the step's raw value. */
 function checkRoll(rules: Rules, mode: Mode, scene: { move: string; target: string }, slot: string, vgc: boolean): void {
   const { move, target } = scene;
   const shape = genShape(rules.generation).roll;
-  // a seed whose turn hits every target without a crit: the roll is then the only die that moves the damage
   const clicks = sweepClicks(mode, target);
   const seed = SEEDS.find(candidate => {
     const plain = sweepBoard(rules, move, mode, candidate, vgc);
@@ -66,7 +59,7 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the con
   const shape = genShape(rules.generation).roll;
   const outfit = { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) };
 
-  /** A confused Snorlax tackles; the foe splashes. Gens 1 and 2 have no roll for the self-hit (their damage is computed inline). */
+  // Gens 1 and 2 have no roll for the self-hit: their damage is computed inline.
   function confusedBoard(seed: string): Battle {
     const attacker = set('Snorlax', ['tackle'], { ...outfit, gender: 'M' });
     const foe = set('Vaporeon', ['splash'], { ...outfit, gender: 'F' });
@@ -79,7 +72,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the con
   const clicks = sweepClicks(mode, 'normal');
 
   test('every step of the self-hit deals what the simulator deals for its raw value, from the lowest damage up', () => {
-    // a seed whose confusion hits the body itself
     const seed = SEEDS.find(candidate => {
       const plain = confusedBoard(candidate);
       plain.choose('p1', clicks.p1);

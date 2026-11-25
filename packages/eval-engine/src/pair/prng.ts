@@ -8,41 +8,8 @@ import type { DieQuantiles } from '../search/root-quantile.ts';
 import type { PricedHit } from './kill-table.ts';
 import { captureHit, type HitSnapshot } from './snapshot.ts';
 
-/**
- * Round 56: the doubles pair plan's dice. A recording PRNG writes down, per
- * hit instance (one move object and one target), the accuracy roll with the
- * threshold the sim used, the crit roll with its denominator, and the damage
- * roll with the crit flag and a snapshot of both bodies — hitStepAccuracy and
- * getSpreadDamage set battle.activeTarget per target, so a spread move is
- * one instance per target. A speed tie among move actions is written down
- * too. Scripts answer one instance's rolls on demand, keyed
- * `${attackerSlot}:${moveId}>${targetSlot}`; an answered roll still draws
- * its number, so everything before it replays exactly as without the
- * script. Without scripts the draws are the plain PRNG's, number for number.
- * The singles solver keeps ScriptedPRNG; nothing here reaches it.
- *
- * Round 69 (T154): a move that doubles its strength on a chance (Fickle Beam's
- * randomChance(3, 10) in the BasePower event, read from the Dex handler by
- * calc/fickle.ts) draws that chance before the damage roll; the draw is kept
- * on the hit's instance and the roll's snapshot carries the factor it drew, so
- * the table at the roll is the table of the strength the log shows. A script
- * answers it with `doubled`.
- *
- * Round 86 (T299): the recorder no longer tells a draw by its numbers. A `DrawNamer`
- * (dice/namer.ts, the module's naming by the simulator's hook, docs/adr/0002) names
- * each call, and only the move's own accuracy, crit and damage roll are booked: an
- * attacker's status check (the confusion check has an accuracy shape, the others a
- * crit shape) and the confusion self-hit's random(16) leave no record. The draws
- * stay the plain PRNG's number for number, as before.
- *
- * Round 86 (T305): a secondary die (an entry of the move's `secondaries`, one `random(100)` per entry the target's rules leave)
- * is booked per hit instance with its effect id, its chance and the result it had. A script answers it by effect id
- * (`secondary`); as with the other rolls the natural value is drawn first, so the stream stays where it would have been.
- *
- * Round 89 (#59, T322 block 1): a tree's root draw may carry `DieQuantiles` (`search/root-quantile.ts`). The natural value is drawn
- * first, then replaced for every NAMED die the quantiles answer (they read the raw name, also a status check the records skip), and
- * the records carry the replaced value, so `readPattern` names the class the battle shows. A script outranks a quantile.
- */
+/** The doubles pair plan's dice: a recording PRNG books each hit instance's rolls; scripts answer them on demand. */
+// An answered roll still draws its number, so what came before replays as without the script.
 
 export interface PairScript {
   hit?: boolean;
@@ -51,7 +18,7 @@ export interface PairScript {
   roll?: number;
   /** The strength draw of a move that doubles on a chance (Fickle Beam): true is the stronger strength. */
   doubled?: boolean;
-  /** The secondary dice by effect id (`secondaryEffectId`): true lets the entry happen, false stops it; an id left out keeps the natural draw. */
+  /** By effect id (`secondaryEffectId`): true lets the entry happen, false stops it; an id left out draws naturally. */
   secondary?: Record<string, boolean>;
 }
 
@@ -103,7 +70,6 @@ interface Instance {
 }
 interface QueueAction { choice?: string; pokemon?: unknown }
 
-/** Every item of the range is a move action with an acting Pokémon: speedSort shuffling a tie in the queue. */
 function isMoveRange(items: unknown[], start: number, end: number): boolean {
   if (end - start < 2) return false;
   for (let index = start; index < end; index++) {
@@ -136,23 +102,19 @@ export class PairPRNG extends PRNG {
     this.namer = new DrawNamer(battle);
   }
 
-  /** Puts the battle back as the simulator made it; `drawPair` calls this when the turn is over. */
   release(): void {
     this.namer?.release();
     this.namer = null;
   }
 
-  /** The die of a draw the move in flight rolls: its own accuracy, crit or damage roll, not a condition's draw. */
   private static ownDie(name: DieName | null): DieName | null {
     return name && name.effectId === undefined ? name : null;
   }
 
-  /** The quantiles' answer for a named die, undefined when there are none or they leave the draw to the stream. */
   private quantile(name: DieName | null, draw: Draw): number | boolean | undefined {
     return name && this.quantiles ? this.quantiles.answer(name, draw) : undefined;
   }
 
-  /** The seed's chance (drawn first, so the stream stays where it was), replaced by the quantiles' answer when they have one. */
   private chanceValue(name: DieName | null, draw: Draw): boolean {
     const drawn = this.delegate(() => super.randomChance(draw.numerator!, draw.from!));
     const answered = this.quantile(name, draw);
@@ -181,7 +143,6 @@ export class PairPRNG extends PRNG {
     return this.strengthDraw(hit, numerator, denominator, natural);
   }
 
-  /** The chance a move that doubles on one draws before its damage roll (Fickle Beam): kept on the instance, answered by the script's `doubled`. */
   private strengthDraw(hit: Instance, numerator: number, denominator: number, natural: boolean): boolean {
     const mix = hit.strength === undefined && !hit.roll ? strengthMix(this.battle!.dex, this.battle!.activeMove!.id) : null;
     if (!mix || numerator !== mix.numerator || denominator !== mix.denominator) return natural;
@@ -214,7 +175,6 @@ export class PairPRNG extends PRNG {
     return roll;
   }
 
-  /** The entry's `random(100)`: the natural value is drawn, the script (once per effect of the instance) may replace it, the record keeps the result. */
   private secondaryRandom(name: DieName, draw: Draw): number {
     const drawn = super.random(draw.from, draw.to);
     const answered = this.quantile(name, draw);
@@ -250,7 +210,7 @@ export class PairPRNG extends PRNG {
     this.delegate(() => super.shuffle(items, start, end));
   }
 
-  /** The instance the sim rolls for: one per move object and target slot; a script answers only the first instance of its key. */
+  /** One per move object and target slot; a script answers only the first instance of its key. */
   private instance(targetSlot?: string): Instance | null {
     const move = this.battle?.activeMove;
     const pokemon = this.battle?.activePokemon;

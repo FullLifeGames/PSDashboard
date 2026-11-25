@@ -2,9 +2,6 @@ import { test, expect, describe } from 'vitest';
 import type { TurnAnalysis } from '@fulllifegames/eval-engine';
 import { attributionBadge } from '../../src/components/eval-badges';
 
-// The attribution badge is the one label the turn card and the game report
-// share for "who moved the needle": only the attribution and the two
-// sides' verdict flags decide it.
 const side = (extra: Partial<TurnAnalysis['p1']> = {}) => ({ tier: 'inaccuracy', riskUnpunished: false, riskPaidOff: false, ...extra }) as TurnAnalysis['p1'];
 const analysis = (attribution: TurnAnalysis['attribution'], p1: Partial<TurnAnalysis['p1']> = {}, p2: Partial<TurnAnalysis['p2']> = {}, extra: Partial<TurnAnalysis> = {}) =>
   ({ turn: 3, attribution, p1: side(p1), p2: side(p2), ...extra }) as unknown as TurnAnalysis;
@@ -34,7 +31,7 @@ describe('attributionBadge', () => {
     expect(attributionBadge(analysis('none' as TurnAnalysis['attribution']), names).text).toBe('quiet turn');
   });
 
-  test('round 89 (B8a): the quiet badge stands only on a card that highlights nothing else; beside a hint or a switch it reads "no mistake"', () => {
+  test('the quiet badge stands only on a card that highlights nothing else; beside a hint or a switch it reads "no mistake"', () => {
     const quiet = (p1: Partial<TurnAnalysis['p1']> = {}, p2: Partial<TurnAnalysis['p2']> = {}) =>
       attributionBadge(analysis('none' as TurnAnalysis['attribution'], p1, p2), names);
     const hint = { hindsightRead: { response: 'Hurricane', against: 'Lopunny-Mega', gain: 0.2, shown: true, line: 'Against switching to Lopunny-Mega, Hurricane was worth +20% more.' } };
@@ -42,37 +39,33 @@ describe('attributionBadge', () => {
     expect(quiet(hint)).toEqual({ text: 'no mistake', color: '#778' });
     expect(quiet({}, { forcedMix: { label: 'Bisharp', weight: 0.95 } }).text).toBe('no mistake');
     expect(quiet({}, { unanswered: { species: 'Lopunny-Mega' } }).text).toBe('no mistake');
-    // A side with a mistake tier makes "no mistake" false: the badge keeps the plain movement word.
     expect(quiet({ tier: 'mistake', ...hint }).text).toBe('quiet turn');
-    // Without played actions the card cannot claim that no one made a mistake.
     expect(attributionBadge(analysis('none' as TurnAnalysis['attribution'], hint, {}, { playedTracking: false }), names).text).toBe('quiet turn');
   });
 
-  test('round 89 (FT-1): a quiet card that names an inaccuracy or a risk never wears "no mistake"', () => {
+  test('a quiet card that names an inaccuracy or a risk never wears "no mistake"', () => {
     const choice = (label: string, ev: number) => ({ choice: label, label, ev, expected: ev, worstCase: ev, punishedBy: null });
     const played = choice('U-turn', 0.1);
     const best = choice('Draco Meteor', 0.2);
     const quiet = (p1: Partial<TurnAnalysis['p1']> = {}, p2: Partial<TurnAnalysis['p2']> = {}) =>
       attributionBadge(analysis('none' as TurnAnalysis['attribution'], p1, p2), names);
     const hint = { hindsightRead: { response: 'Hurricane', against: 'Lopunny-Mega', gain: 0.2, shown: true, line: 'Against switching to Lopunny-Mega, Hurricane was worth +20% more.' } };
-    // An inaccuracy the card writes out (a played and a best line) reads as that, with the hint beside it or not.
     expect(quiet({ played, best }, {}).text).toBe('small inaccuracy');
     expect(quiet({ played, best, ...hint }, {}).text).toBe('small inaccuracy');
     expect(quiet({}, { played, best }).text).toBe('small inaccuracy');
-    // A risk that kept ground (a safe line that did as well or better against the click) reads as a risk, and wins over the inaccuracy.
     const gamble = { played, best, safe: choice('Recover', 0.3), safeAgainstClick: { playedValue: 0.2, safeValue: 0.25, against: 'Protect' } };
     expect(quiet(gamble, {}).text).toBe('risk (unpunished)');
     expect(quiet(gamble, { played, best }).text).toBe('risk (unpunished)');
   });
 
-  test('round 67 (T59): a read whose side lost ground loses its praise badge and shows the turn\'s movement', () => {
+  test('a read whose side lost ground loses its praise badge and shows the turn\'s movement', () => {
     const lost = { swing: -0.3, chanceDelta: -0.25 };
     expect(attributionBadge(analysis('p1-read', { riskPaidOff: true }, {}, lost), names).text).toBe('chance swing (rolls, crits, reveals)');
     expect(attributionBadge(analysis('both-read', { riskPaidOff: true }, { riskPaidOff: true }, lost), names).text).toBe("Bob's read paid off");
     expect(attributionBadge(analysis('p1-read', { riskPaidOff: true }, {}, { swing: -0.05, chanceDelta: 0 }), names).text).toBe("Alice's read paid off");
   });
 
-  test('round 67 (T22): a chance swing without a roll in its direction reads as an estimate that moved with no roll behind it', () => {
+  test('a chance swing without a roll in its direction reads as an estimate that moved with no roll behind it', () => {
     const swing = (chanceDelta: number, rolledFor?: { p1: boolean; p2: boolean }) =>
       analysis('chance', {}, {}, { chanceDelta, ...(rolledFor ? { rolledFor } : {}) });
     expect(attributionBadge(swing(0.3, { p1: false, p2: true }), names)).toEqual({ text: 'estimate moved (no roll behind it)', color: '#b6a46a' });

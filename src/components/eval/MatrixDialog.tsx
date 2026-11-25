@@ -11,19 +11,12 @@ interface MatrixDialogProps {
   result: EvalResult;
   analysis: TurnAnalysis;
   playerNames: [string, string];
-  /** The panel's handler of a cell click (the overview's): the dialog plays the pair out and closes. */
   onPickPair?: PickPair;
   onClose: () => void;
 }
 
-/**
- * Round 89 (B7a): the turn's payoff matrix at reading size. It reads what the overview's matrix reads (`result.matrix`) and what the card
- * grades (`analysis`): the played row and column, the engine's best row and column, each player's worst cell (the Hard mode rule,
- * `worstReply`) and the equilibrium weights. Singles choices are moves, doubles choices pairs: labels wrap and the table scrolls in its box.
- */
 function MatrixDialog({ result, analysis, playerNames, onPickPair, onClose }: MatrixDialogProps) {
   const matrix = result.matrix!;
-  // Machine choice ids arrived with cache v13; older cached results render the values read-only.
   const clickable = !!onPickPair && !!matrix.p1Choices && !!matrix.p2Choices;
   const marks = matrixMarks(result, matrix, analysis);
   return (
@@ -45,10 +38,6 @@ function MatrixDialog({ result, analysis, playerNames, onPickPair, onClose }: Ma
   );
 }
 
-/**
- * The turn card's "Open matrix" button with its dialog; absent where the turn's result holds no matrix (a search that kept none, an older
- * cache). The overview keeps its own "Matrix" toggle.
- */
 export function MatrixDialogButton({ result, analysis, playerNames, onPickPair }: Omit<MatrixDialogProps, 'result' | 'onClose'> & { result: EvalResult | null | undefined }) {
   const [open, setOpen] = useState(false);
   if (!result?.matrix) return null;

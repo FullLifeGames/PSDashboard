@@ -10,24 +10,8 @@ interface CacheEntry {
   payload?: unknown;
 }
 
-/**
- * Disk-caching fetch for the calibration harness's Smogon lever
- * (EVAL_CALIBRATION_SMOGON): the first run pins every data.pkmn.cc payload
- * under .smogon-cache/ (gitignored), so paired engine runs and later
- * reruns see IDENTICAL usage/set data with zero network. Misses are cached
- * too — a format file that 404s must 404 for BOTH engines, or the paired
- * comparison silently diverges.
- *
- * Only the surface the Smogon consumers touch is implemented (ok, status,
- * json) — fetchSmogonUsageStats, fetchSmogonSetAssumptions, and
- * @pkmn/smogon's Smogon class never read headers or bodies as streams.
- * Parallel calibration slices (scripts/run-calibration.mjs) share this
- * directory, so an entry is published atomically and a half-written file
- * reads as absent; two slices pinning the same URL at once write the same
- * payload.
- */
+// Disk-caching fetch of the calibration's Smogon lever: the first run pins every payload, misses too.
 
-/** A complete cached entry, or null when the file is absent or still being written by a sibling process. */
 function readEntry(path: string): CacheEntry | null {
   if (!existsSync(path)) return null;
   try {
@@ -37,7 +21,7 @@ function readEntry(path: string): CacheEntry | null {
   }
 }
 
-/** Write to a temp file and rename it into place, so no reader ever sees a partial entry. */
+// Write to a temp file and rename it into place, so no reader ever sees a partial entry.
 function writeEntry(path: string, entry: CacheEntry): void {
   const temp = `${path}.${process.pid}.tmp`;
   writeFileSync(temp, JSON.stringify(entry));
@@ -66,7 +50,7 @@ export function diskCachedSmogonFetcher(): typeof fetch {
           ? { status: response.status, payload: await response.json() }
           : { status: response.status };
       } catch {
-        // Network failure pins as a miss — deterministic beats lucky.
+        // Network failure pins as a miss: deterministic beats lucky.
         entry = { status: 599 };
       }
       writeEntry(path, entry);

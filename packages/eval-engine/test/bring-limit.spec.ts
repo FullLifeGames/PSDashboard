@@ -49,12 +49,9 @@ const vgcLog = [
 
 describe('bring-limited team preview (VGC 4 of 6)', () => {
   test('getReplayBringCount answers from the rule table and the format-id heuristic', () => {
-    // Regulations newer than the bundled sim resolve via the heuristic.
     expect(getReplayBringCount({ formatid: 'gen9vgc2026regi' })).toBe(4);
-    // A regulation the Dex knows answers from its own rule table.
     expect(getReplayBringCount({ formatid: 'gen9vgc2025regi' })).toBe(4);
     expect(getReplayBringCount({ formatid: 'gen9battlestadiumsinglesregi' })).toBe(3);
-    // Bring-all formats have no limit.
     expect(getReplayBringCount({ formatid: 'gen9ou' })).toBe(null);
     expect(getReplayBringCount({ formatid: 'gen9doublesou' })).toBe(null);
   });
@@ -86,7 +83,6 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
     });
     expect(state.p1ActiveSlots.map(active => active?.species)).toEqual(['Raichu', 'Jolteon']);
     expect(state.p2ActiveSlots.map(active => active?.species)).toEqual(['Squirtle', 'Ivysaur']);
-    // The bench holds ONLY the rest of the brought four.
     expect(state.p1SwitchesBySlot[0].map(option => option.species).sort()).toEqual(['Eevee', 'Pikachu']);
   });
 
@@ -103,18 +99,13 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
       },
     });
 
-    // Round 89 (#124): both sides trim or neither. P1's list does not resolve, so P2's four does not trim alone either
-    // (was 6 v 4: a pinned four against an open six, the asymmetry that flipped game 452654 in the A.3c gate).
     const battle = runtime.battleStream.battle!;
     expect(battle.sides[0].pokemon).toHaveLength(6);
     expect(battle.sides[1].pokemon).toHaveLength(6);
   });
 
   test('replayBringOnly pins both sides or neither and dedupes battle formes', () => {
-    // A forme change mid-game (Terapagos-Terastal → -Stellar) is ONE brought
-    // body (the VGC-tranche sighting caught it counted twice). A side whose
-    // fourth never entered leaves the WHOLE replay unpinned: the A/B gate
-    // showed a pinned four against an unpinned six flips games (452654).
+    // A forme change mid-game (Terapagos-Terastal → -Stellar) is ONE brought body.
     const log = [
       '|player|p1|Alice|',
       '|player|p2|Bob|',
@@ -148,26 +139,19 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
       '|turn|3',
     ].join('\n');
     const { snapshots } = parseReplayLogWithObservations(log);
-    // p2's fourth never entered — the whole replay stays unpinned.
     expect(replayBringOnly({ formatid: 'gen9vgc2026regi', log }, snapshots)).toBeNull();
 
-    // With p2's fourth revealed, both sides pin — and Terapagos counts once
-    // (first-seen forme name) despite entering as two formes.
     const fullLog = `${log}\n|switch|p2b: Ivysaur|Ivysaur, L50|100/100\n|turn|4`;
     const fullSnapshots = parseReplayLogWithObservations(fullLog).snapshots;
     const brought = replayBringOnly({ formatid: 'gen9vgc2026regi', log: fullLog }, fullSnapshots);
     expect(brought).not.toBeNull();
     expect([...brought!.p1].sort()).toEqual(['Eevee', 'Pikachu', 'Raichu', 'Terapagos-Terastal']);
     expect([...brought!.p2].sort()).toEqual(['Bulbasaur', 'Charmander', 'Ivysaur', 'Squirtle']);
-    // Bring-all formats never produce a bring list.
     expect(replayBringOnly({ formatid: 'gen9doublesou', log: fullLog }, fullSnapshots)).toBeNull();
   });
 
   test('brought forme names resolve onto their base-species sets, exact match first', async () => {
-    // The protocol reveals the ACTIVE forme (Zamazenta-Crowned) while the
-    // built set may carry the base name — the unique base match resolves
-    // it. A team holding BOTH forme siblings as separate sets keeps the
-    // exact match only (the sighting found 7-8-set VGC teams).
+    // The protocol shows the ACTIVE forme (Zamazenta-Crowned); a set with the base name resolves by its unique match.
     const withBase = [mon('Zamazenta', 'Iron Head'), ...p1Team.slice(1)];
     const runtime = await reconstructBranchRuntime({
       format: 'gen9doublesou',
@@ -210,11 +194,9 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
     });
     expect(serialized).not.toBeNull();
     const root = createRootPosition(serialized!);
-    // Four brought per side: the lead enumeration prices real pairs only.
     const options = legalChoices(root, 'p1');
     expect(options).toHaveLength(6);
     expect(options.every(option => !option.label.includes('Flareon'))).toBe(true);
-    // An unpinned side ([]) keeps its whole pool.
     const open = serializePreviewPosition('gen9doublesou', p1Team, p2Team, {
       p1: ['Pikachu', 'Eevee', 'Raichu', 'Jolteon'],
       p2: [],
@@ -224,14 +206,9 @@ describe('bring-limited team preview (VGC 4 of 6)', () => {
   });
 });
 
-/**
- * Round 89 (#116): a Ditto that copied a foe stands in the snapshot as the foe's species, and the bring list named the copy.
- * The list names the body's own species (the client's `baseSpeciesForme` of a transformed body), so the trim keeps the Ditto
- * and drops the unbrought body of the copied species. VGC (doubles, bring four) and Battle Stadium Singles (bring three).
- */
 const baseNames = (sets: PokemonSet[]) => sets.map(set => set.species).sort();
 
-describe('a transformed body keeps its own species on the bring list (#116)', () => {
+describe('a transformed body keeps its own species on the bring list', () => {
   test('VGC 2565721987: P1 brought Iron Bundle, Grimmsnarl, Ditto and Miraidon, and the rebuild fields four against four', async () => {
     const replay = JSON.parse(readFileSync(new URL('./fixtures/gen9vgc2026regi-2565721987.json', import.meta.url), 'utf-8')) as ReplayData;
     const brought = replayBringOnly(replay, parseReplayLog(replay.log));
@@ -256,7 +233,6 @@ describe('a transformed body keeps its own species on the bring list (#116)', ()
     expect(battle.sides[0].pokemon.map(body => body.species.name)).toContain('Ditto');
   }, 240_000);
 
-  /** Game 2382086291's shape: the side holds its own foe-species body in the preview, leaves it at home and brings a Ditto that copies the foe's. */
   const COPIED = 'Tornadus';
   const homeSet = (names: string[]) => names.map(name => mon(name, 'Tackle'));
   const SHAPES = {
@@ -305,11 +281,6 @@ describe('a transformed body keeps its own species on the bring list (#116)', ()
   }
 });
 
-/**
- * Round 89 (#124, stage 1): a side that never fielded its whole selection plays its fielded bodies plus one guess for each
- * missing body, taken from its team preview. The rebuild of every world fields the count on both sides, the guess takes the last
- * party slot, and every known body keeps one party index in all worlds, so a choice string names the same body in each world.
- */
 const SCENES = [
   {
     label: 'Champions VGC 2625939941 (doubles; P1 short, candidates Ceruledge, Ninetales-Alola, Kingambit)',
@@ -318,20 +289,15 @@ const SCENES = [
     lastBoundaryDiverges: false,
   },
   {
-    // Round 89 (#124, B5b): 2630452654 was the VGC row until its P2 read as short by mistake (Farigiraf entered on Volt Switch and
-    // fainted in the same turn, so P2 fielded all four); 2630181744 is short by the log: P1 never fielded its fourth body.
     label: 'VGC 2630181744 (doubles; P1 short, candidates Incineroar, Grimmsnarl, Amoonguss)',
     file: 'gen9vgc2026regi-2630181744.json', short: 'p1' as const,
     fielded: ['Calyrex-Shadow', 'Solgaleo', 'Rillaboom'], candidates: ['Incineroar', 'Grimmsnarl', 'Amoonguss'], noBody: ['Incineroar', 'Rillaboom'],
-    // The sim loses a P1 body at turn 6 that the log keeps, and its forced switch brings the guess in: the last boundary reads
-    // a replay divergence of the sim, not the list, so the party checks stop one boundary short.
     lastBoundaryDiverges: true,
   },
 ];
 
 interface Boundaries { sizes: [number, number]; parties: Record<number, [string[], string[]]> }
 
-/** One world's rebuild through the whole log: the party of both sides (base species, by party index) at every raw boundary. */
 async function rebuildWorld(replay: ReplayData, world: BringWorld, teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }): Promise<Boundaries> {
   const format = getBranchSimulatorFormat(replay);
   await loadSimMods(format);
@@ -357,7 +323,7 @@ const statsOf = (counts: [string, number][]): SmogonUsageStats => ({
 const guessedOf = (short: 'p1' | 'p2') => (short === 'p1' ? { p1: 1, p2: 0 } : { p1: 0, p2: 1 });
 const fixture = (file: string) => JSON.parse(readFileSync(new URL(`./fixtures/${file}`, import.meta.url), 'utf-8')) as ReplayData;
 
-describe('#124: the worlds of a short side', () => {
+describe('the worlds of a short side', () => {
   for (const scene of SCENES) {
     test(`${scene.label}: replayBringList names the fielded bodies and the candidates, and every world rebuilds the count against the count`, async () => {
       const replay = fixture(scene.file);
@@ -486,13 +452,12 @@ describe('#124: the worlds of a short side', () => {
   }, 240_000);
 });
 
-describe('#124: trimTeamsToBring trims both teams or neither', () => {
+describe('trimTeamsToBring trims both teams or neither', () => {
   const rules = { gen: 9, mod: undefined };
   const names = (team: PokemonSet[]) => team.map(set => set.name);
   const p2Four = ['Squirtle', 'Ivysaur', 'Bulbasaur', 'Charmander'];
 
   test('the guessed set moves behind the known bodies, which keep team order', () => {
-    // Team order: Pikachu, Eevee, Raichu, Jolteon. The guess is Eevee, which sits before two known non-leads.
     const { p1, p2 } = trimTeamsToBring(p1Team, p2Team, { p1: ['Pikachu', 'Raichu', 'Jolteon', 'Eevee'], p2: p2Four, guessed: { p1: 1, p2: 0 } }, rules);
     expect(names(p1)).toEqual(['Pikachu', 'Raichu', 'Jolteon', 'Eevee']);
     expect(names(p2)).toEqual(['Bulbasaur', 'Charmander', 'Squirtle', 'Ivysaur']);

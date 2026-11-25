@@ -8,23 +8,13 @@ import { CHAMPIONS, mon, RULES, RULES_WITH_DOUBLES, standing, sweepSelection, ty
 import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 89 (#136): the protocol hides the target of a move that fails before it animates (`attrLastMove('[still]')`, "if no animation
- * plays, the target should never be known"): the log shows `|move|p2b: Sableye|Disable||[still]`. The rebuild aimed such a move at the
- * default foe, the one in slot a, and a Disable or Encore that failed on a fresh switch-in in slot b landed on the body in slot a: the
- * rebuilt body carried a volatile the game never gave it, and the turn analysis offered it only the moves that volatile leaves.
- *
- * The rebuild now asks the simulator on a copy of the battle which aim makes the move fail as the log shows (`sim-ask/hidden-aim.ts`).
- * Rows: the scene (a Disable or Encore at a body that switched in that turn, no last move) in doubles, the guard rows (the target the log
- * shows stays; two failing aims keep the default; singles has one foe), and the live battle after the question. The sweep over every
- * single-target move of the Dex is below.
- */
+// The log hides the target of a move that fails before it animates: `|move|p2b: Sableye|Disable||[still]`.
+// The rebuild asks the simulator on a copy which aim makes the move fail as the log shows (`sim-ask/hidden-aim.ts`).
 await loadSimMods('gen9championsou');
 
 beforeAll(() => setAskCheck(true));
 afterAll(() => setAskCheck(null));
 
-/** The simulator's public lines: each private line is written twice (`|split|pN`, the owner's line, the spectator's line). */
 const publicLines = (battle: Battle): string[] => {
   const out: string[] = [];
   for (let index = 0; index < battle.log.length; index++) {
@@ -35,7 +25,6 @@ const publicLines = (battle: Battle): string[] => {
 
 const body = (rules: Rules, species: string, moves: string[]): PokemonSet => mon(rules, { species, moves, gender: 'M' });
 
-/** p1 leads with two splashers and has two bodies on the bench; p2 leads with a splasher and the probe user (slot b). */
 function teams(rules: Rules, probe: string[]): { p1: PokemonSet[]; p2: PokemonSet[] } {
   return {
     p1: [body(rules, 'Pikachu', ['splash']), body(rules, 'Blissey', ['splash']), body(rules, 'Chansey', ['splash']), body(rules, 'Raichu', ['splash'])],
@@ -43,7 +32,6 @@ function teams(rules: Rules, probe: string[]): { p1: PokemonSet[]; p2: PokemonSe
   };
 }
 
-/** The board at the start of turn 2: both sides clicked Splash on turn 1, so both foes have a last move. */
 function boardAtTurn2(rules: Rules, probe: string[], singles = false): Battle {
   const { p1, p2 } = teams(rules, probe);
   const battle = singles
@@ -54,13 +42,10 @@ function boardAtTurn2(rules: Rules, probe: string[], singles = false): Battle {
   return battle;
 }
 
-/** The aim of the probe user (p2b) at the body of p1's slot `slot` (0 or 1): the loc the simulator reads. */
 const locOf = (battle: Battle, slot: number): number => battle.sides[1].active[1].getLocOf(battle.sides[0].active[slot]);
 
-/** What the switch of p1's slot b (`both`: both slots) leaves: the probe is aimed at `aim`. */
 interface Played { events: string[]; log: string[]; line: string }
 
-/** Plays turn 2 with p1's switches and p2's probe at `aim`; returns the turn's public lines and the probe's move line. */
 function playTurn2(battle: Battle, p1Click: string, aim: number | null, singles = false): Played {
   const p2Click = singles ? 'move 1' : `move 1, move 1${aim === null ? '' : ` ${aim > 0 ? `+${aim}` : aim}`}`;
   if (!battle.choose('p1', p1Click) || !battle.choose('p2', p2Click)) throw new Error(`refused ${p1Click} / ${p2Click}`);
@@ -89,7 +74,6 @@ describe('the aim of a failed move whose target the protocol hides', () => {
         expect(standing(board), 'the question leaves the live battle as it was').toBe(before);
         expect(choice).toBe(`move 1, move 1 +${aimAtFresh}`);
 
-        // played on a fresh board, the choice makes the same move line, and no foe carries the volatile
         const again = boardAtTurn2(rules, [probe.id]);
         const replay = playTurn2(again, 'move 1, switch 3', Number(choice.split(' ').pop()));
         expect(replay.line).toBe(played.line);
@@ -127,21 +111,12 @@ describe('the aim of a failed move whose target the protocol hides', () => {
   }
 });
 
-/**
- * The sweep: every single-target move of the Dex that a click aims (`targetTypeChoices`), in every rule set the corpus plays in doubles
- * (Gens 3 to 9 and Champions; the corpus' own are Gen 9 and Champions). Each move is played from p2b in four situations that make it fail
- * at one foe and not at the other, each read from the Dex of the move: the foe in slot b switched in this turn (no last move), has the
- * volatile the move sets, has the status the move sets, or sits at the boost limit the move pushes against. The simulator is the oracle:
- * the move is played aimed at each legal aim, and every aim whose line hides its target is a log to ask about. The question answers an aim
- * that, played on a fresh board, makes the same hidden line, and leaves the live battle as it was. A run without `DICE_SWEEPS=full` plays
- * a fixed sample of the moves plus every move whose handlers read the target's last move.
- */
+// A run without `DICE_SWEEPS=full` plays a fixed sample of the moves plus every move that reads the target's last move.
 type Dex = ReturnType<typeof dexOfRules>;
 type Move = ReturnType<Dex['moves']['get']>;
 
 interface Situation { id: string; p1: string; inject?: (target: Battle['sides'][number]['active'][number]) => void }
 
-/** The situations a move has: each reads the move's own Dex entry. */
 function situationsOf(move: Move): Situation[] {
   const keep = 'move 1, move 1';
   const out: Situation[] = [{ id: 'switch-in', p1: 'move 1, switch 3' }];
@@ -205,7 +180,6 @@ describe('the sweep: every single-target move, played where it fails at one foe 
             const aim = Number(choice.split(', ')[1].split(' ').pop());
             const replay = playTurn2(make()!, situation.p1, aim);
             expect(replay.line, `${label}: the choice "${choice}" hides the target as the log does`).toBe(row.played!.line);
-            // an aim that shows its target is never the answer
             expect(showing.some(other => other.aim === aim), `${label}: "${choice}" aims where the move shows its target`).toBe(false);
             seen.hiddenRows++;
             seen.moves.add(move.id);

@@ -7,7 +7,7 @@ const labelled = (options: EngineOption[], ids: string[]) => {
   return ids.map(id => ({ choice: id, label: byId.get(id) ?? id }));
 };
 
-/** Without a matrix a value is its own floor and expectation; nobody is named as its punisher. */
+// Without a matrix a value is its own floor and expectation; nobody is named as its punisher.
 function rankedFromValues(options: EngineOption[], values: Record<string, number>): RankedChoice[] {
   return options
     .map(option => ({
@@ -17,12 +17,7 @@ function rankedFromValues(options: EngineOption[], values: Record<string, number
     .sort((a, b) => b.ev - a.ev);
 }
 
-/**
- * The dashboard's reading of a checked answer (validateEngineResponse first). With a matrix the game
- * is solved by the ranking the dashboard's own engine uses (rankFromMatrix, toResult): floors,
- * punishers, the equilibrium mixes and the score as the solved value. Without one the engine's score
- * and values stand as given.
- */
+/** With a matrix the game is solved as for the own engine (`rankFromMatrix`); without one the engine's values stand. */
 export function engineResponseToResult(request: EngineRequest, response: EngineResponse): EvalResult {
   if (response.matrix) {
     const { p1, p2, values } = response.matrix;

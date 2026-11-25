@@ -4,12 +4,7 @@ import { installReplayEmbedCache, routeOfflineFixtures, type ReplayWindow } from
 
 test.beforeAll(installReplayEmbedCache);
 
-/**
- * Round 77 (branching swarm, 28.10.2026): a cold first load left the frame empty with "$ is not defined".
- * replay-embed.js appends its sixteen scripts as dynamic scripts, and those run in the order they arrive:
- * graphics.js extends $.easing at load time, stops halfway when jQuery comes later, BattleBackdrops stays
- * undefined, and the battle never builds. Here jQuery arrives after graphics.js on purpose.
- */
+// graphics.js extends $.easing at load time and stops halfway when jQuery arrives later: the battle never builds.
 test('the replay frame builds when jQuery arrives after graphics.js', async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
@@ -31,12 +26,7 @@ test('the replay frame builds when jQuery arrives after graphics.js', async ({ p
   expect(errors.filter(message => /is not defined|Cannot read properties of undefined/.test(message))).toEqual([]);
 });
 
-/**
- * Round 77 (user report 28.10.2026): the Stealth Rock around both Pokémon of 562428 turn 12 showed as empty
- * boxes. graphics.js prefixes the effect sprites with Dex.fxPrefix only when Dex already exists, the embed
- * runs its scripts in any order, and a sprite left as "rock1.png" has no base in the blob document. The
- * document's base names Showdown's fx folder (src/lib/replay-html.ts). The sprites come from the network.
- */
+// graphics.js adds Dex.fxPrefix to effect sprites only when Dex exists; a bare "rock1.png" has no base in the blob.
 test('the effect sprites of a replay frame load: Stealth Rock at 562428 turn 12', async ({ page }) => {
   test.setTimeout(120_000);
   await routeOfflineFixtures(page);
@@ -50,7 +40,6 @@ test('the effect sprites of a replay frame load: Stealth Rock at 562428 turn 12'
   const frame = await (await page.locator('iframe[title="PS Replay"]').elementHandle({ timeout: 10_000 }))?.contentFrame();
   expect(frame).toBeTruthy();
   await expect.poll(async () => frame!.evaluate(() => (window as unknown as { Replays?: { battle?: { turn?: number } } }).Replays?.battle?.turn ?? -1), { timeout: 30_000 }).toBe(12);
-  // Both sides carry Stealth Rock here: two rock sprites a side, every one of them loaded from the fx folder.
   await expect.poll(async () => frame!.evaluate(() => [...document.querySelectorAll('img')]
     .filter(image => /rock\d\.png$/.test(image.src))
     .map(image => ({ src: image.src, loaded: image.complete && image.naturalWidth > 0 }))), { timeout: 30_000 })

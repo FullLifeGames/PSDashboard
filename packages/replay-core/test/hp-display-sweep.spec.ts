@@ -4,14 +4,8 @@ import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex } from '../src/rules-dex';
 import { formOf, hpBoundsOf, shownOf, type HpForm } from '../src/hp-display';
 
-/**
- * Round 89 (#75, ruling 27.4): the sweep that holds `hp-display.ts` to the simulator. The simulator prints a body's HP in the form its battle
- * names (`getHealth`: Scarlet/Violet round a percentage up, the Champions mod rounds it down, a format without the HP Percentage Mod before
- * Generation 7 prints 48ths). Each battle below is a real @pkmn/sim battle: the sweep sets the one body's HP and maximum HP to every pair of a
- * range of maximum HP and reads what `getHealth().shared` prints. Three things must hold for every maximum HP: `shownOf` is the printed number,
- * `formOf` names the form the battle prints (by the text's maximum, as the log shows it), and `hpBoundsOf` returns exactly the lowest and the
- * highest HP that print the same number (the HP the solver may read behind a shown text), and null for a number no HP prints.
- */
+// getHealth: Scarlet/Violet round a percentage up, the Champions mod down;
+// a format without the HP Percentage Mod before Generation 7 prints 48ths.
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -32,7 +26,6 @@ function bodyOf(world: World) {
   return battle.p1.pokemon[0];
 }
 
-/** What the simulator prints for the body at this HP: the text of the shared log line (`75/100`, `24/48g`). */
 function printed(body: ReturnType<typeof bodyOf>, hp: number, maxhp: number): { hp: number; maxhp: number } {
   body.hp = hp;
   body.maxhp = maxhp;
@@ -42,7 +35,6 @@ function printed(body: ReturnType<typeof bodyOf>, hp: number, maxhp: number): { 
   return { hp: Number(match[1]), maxhp: Number(match[2]) };
 }
 
-/** The maximum HP the sweep plays: every one up to 130 (past the percentage scale), then the real stats of a level 50 and a level 100 body. */
 const MAXES = [...Array.from({ length: 130 }, (_, i) => i + 1), 143, 155, 160, 186, 191, 200, 207, 222, 255, 271, 294, 310, 341, 404, 482, 524, 599, 714];
 
 describe('hp-display against the simulator', () => {
@@ -64,7 +56,6 @@ describe('hp-display against the simulator', () => {
           const bounds = hpBoundsOf({ hp: shown, maxhp: scale }, max, world.champions);
           expect(bounds, `${world.name}: shown ${shown}/${scale} of a body with ${max} HP`).toEqual({ lowest: Math.min(...hps), highest: Math.max(...hps) });
         }
-        // A number no HP of this body prints reads as no bound.
         for (let shown = 1; shown <= (world.form === 'pixels' ? 48 : 100); shown += 1) {
           if (byShown.has(shown)) continue;
           expect(hpBoundsOf({ hp: shown, maxhp: world.form === 'pixels' ? 48 : 100 }, max, world.champions), `${world.name}: shown ${shown} of ${max} HP`).toBeNull();

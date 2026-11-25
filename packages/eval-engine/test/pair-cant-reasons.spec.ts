@@ -9,17 +9,7 @@ import { randomDeviation } from '../src/pair/log';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 70 (N1): the pair plan reads a draw's own lines, and `randomDeviation` sends a draw to the plain mean when a `|cant|`
- * line shows a dice outcome the plan does not price. The set it read held 'attract', but the simulator writes the
- * infatuation by the name of its condition, `|cant|p1a: Blissey|Attract`, so a real infatuation passed as a plain turn
- * (the reported scene below, seed 2). The reasons now come from the simulator: this census scans every `add('cant', ...)`
- * of @pkmn/sim (the data of every generation and its scripts) and of the Champions mod, names each reason it can write as
- * dice (the simulator draws a number this turn to decide it) or fixed (the position decides it), plays every reason in a
- * small doubles scene over 40 seeds (a dice reason shows on some seeds and not on others, a fixed one on every seed), and
- * holds `randomDeviation` to the same split. A reason the simulator adds or renames fails the census until someone
- * classifies it.
- */
+// The simulator writes the infatuation by its condition's name, `|cant|p1a: Blissey|Attract`, not 'attract'.
 
 await loadSimMods('gen9championsou');
 const require = createRequire(import.meta.url);
@@ -31,9 +21,7 @@ function jsFiles(dir: string): string[] {
   });
 }
 
-/** The simulator's CommonJS build (its data of every generation and its scripts) and the Champions mod's bundle. */
 const SOURCES = [...jsFiles(join(dirname(require.resolve('@pkmn/sim')), '..')), require.resolve('@pkmn/mods/champions')];
-/** Every write of a `|cant|` line, and the writes whose reason (the third argument) is a plain string. */
 const ANY_WRITE = /\.add\(\s*(['"])cant\1/g;
 const PLAIN_REASON = /\.add\(\s*(['"])cant\1\s*,\s*[^,()]+,\s*(['"])((?:(?!\2)[^\\]|\\.)*)\2/g;
 
@@ -52,7 +40,6 @@ function scan(): { writes: number; plain: number; reasons: string[] } {
   return { writes, plain, reasons: [...reasons].sort() };
 }
 
-/** `dice`: the simulator draws a number this turn to decide the reason. Fixed: the position decides it. */
 const REASONS: Record<string, { dice: boolean; why: string }> = {
   par: { dice: true, why: 'the simulator draws full paralysis each time the body moves, 1 in 4 (1 in 8 in the Champions mod)' },
   frz: { dice: true, why: 'the simulator draws the thaw each time the body moves (Gen 1 freezes for good, and Gen 1 has no doubles format)' },
@@ -77,12 +64,10 @@ const REASONS: Record<string, { dice: boolean; why: string }> = {
   'ability: Damp': { dice: false, why: 'a self-destructing move while a Damp holder is on the field' },
 };
 
-describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
+describe('the |cant| reasons of the simulator, scanned', () => {
   const found = scan();
 
   test('every write has a plain reason, and the census names exactly the reasons the simulator writes', () => {
-    // Round 78 (@pkmn 0.10.12): the Champions mod no longer carries a copy of the simulator, so the scan finds 50 writes
-    // where it found 93, with the same 21 reasons.
     expect(found.writes).toBeGreaterThan(40);
     expect(found.plain).toBe(found.writes);
     expect(found.reasons).toEqual(Object.keys(REASONS).sort());
@@ -94,8 +79,7 @@ describe('the |cant| reasons of the simulator, scanned (round 70, N1)', () => {
     }
   });
 
-  // Round 76 (T233): the report's dice markers read the same census: a dice reason is a dice event (sleep stays the documented
-  // over-inclusion: the sleep length is drawn at the start, but a sleeping turn has always read as a roll in the luck claims).
+  // Sleep stays an over-inclusion: its length is drawn at the start, but a sleeping turn has always read as a roll.
   test('diceEventTurns and the sack scan (CHANCE_CANT) read every dice reason, and the pair plan reads the same set without sleep', () => {
     for (const [reason, kind] of Object.entries(REASONS)) {
       const marked = diceEventTurns([[], [`|cant|p1a: Snorlax|${reason}`]]).has(1);
@@ -126,7 +110,6 @@ const CHAMPIONS: Rules = {
   name: 'Pokémon Champions doubles', format: 'gen9championsdoublescustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 },
 };
 
-/** Snorlax (slow) and Blissey of p1 against Pikachu (fast) and Chansey of p2: the victim in front of p1, the actor in front of p2. */
 function board(rules: Rules, seed: string, victim: string[], actor: string[], extra: { victim?: Partial<PokemonSet>; actor?: Partial<PokemonSet> } = {}): Battle {
   const mon = (species: string, moves: string[], more: Partial<PokemonSet> = {}): PokemonSet =>
     set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}), ...more });
@@ -143,7 +126,6 @@ function turn(battle: Battle, p1: string, p2: string): Battle {
 const AT_FOE = 'move 1 1, move 1';
 const PLAIN = 'move 1, move 1';
 
-/** One scene per reason: the cause is set up so that the reason is what the first (or second) turn writes. */
 const SCENES: Record<string, (rules: Rules, seed: string) => Battle> = {
   par: (rules, seed) => {
     const battle = board(rules, seed, ['tackle'], ['splash']);
@@ -195,14 +177,13 @@ const SCENES: Record<string, (rules: Rules, seed: string) => Battle> = {
 
 const reasonsOf = (battle: Battle): string[] => battle.log.filter(line => line.startsWith('|cant|')).map(line => line.split('|')[3]);
 
-/** The scenes of the reasons the rule sets can host: the dice reasons in every doubles generation the simulator has, the fixed ones in the two rule sets of the corpus. */
 const RULE_SETS: { rules: Rules; reasons: string[] }[] = [
   ...[3, 4, 5, 6, 7, 8].map(generation => ({ rules: gen(generation), reasons: ['par', 'frz', 'flinch', 'Attract', 'slp'] })),
   { rules: gen(9), reasons: Object.keys(SCENES) },
   { rules: CHAMPIONS, reasons: Object.keys(SCENES) },
 ];
 
-describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds (round 70, N1)', ({ rules, reasons }) => {
+describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds', ({ rules, reasons }) => {
   test.each(reasons)('%s', reason => {
     const kind = REASONS[reason];
     const battles = SEEDS.map(seed => SCENES[reason](rules, seed));
@@ -216,7 +197,7 @@ describe.each(RULE_SETS)('$rules.name: every reason played over 40 seeds (round 
   });
 });
 
-describe('Gen 1, the one reason the doubles generations never write (round 70, N1)', () => {
+describe('Gen 1, the one reason the doubles generations never write', () => {
   test('partiallytrapped shows on every seed where the Wrap landed, and randomDeviation reads it as fixed', () => {
     const landed = SEEDS.map(seed => {
       const battle = battleOf('gen1customgame', [set('Snorlax', ['tackle'])], [set('Pikachu', ['wrap'])], seed);

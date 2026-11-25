@@ -8,25 +8,16 @@ import { MIN_FORCED_MASS, PROVER_SCORE_FLOOR, type ForcedWinInput, type ForcedWi
 
 type Side = 'p1' | 'p2';
 
-/**
- * Where the prover runs (round 35): small endgames (at most three living
- * bodies), the last pair, and any board the decided sweep or the near
- * stage names once the search itself reads it at PROVER_SCORE_FLOOR or
- * beyond. The favored side first (the profile's side, else the score's
- * sign); the other side only in the endgame scope, where a failed attempt
- * is cheap.
- */
-/** The side the decided sweep or the near stage names; on a large board only once the search reads it at the floor or beyond. */
 function namedSide(input: ForcedWinInput, smallBoard: boolean): Side | undefined {
   const named = input.unanswered?.decided?.side ?? input.unanswered?.nearDecided?.side;
   if (!named) return undefined;
   return smallBoard || Math.abs(input.score) >= PROVER_SCORE_FLOOR ? named : undefined;
 }
 
+/** The sides the prover tries, favored first; the other side only in the endgame scope, where a failure is cheap. */
 export function forcedWinSides(battle: Battle, input: ForcedWinInput): Side[] {
   if (battle.ended) return [];
   const endgame = endgameScope(battle);
-  // Round 67 (T139): the race reads threats only, its cache still names the search's rule set.
   const pair = !endgame && lastPairRace(battle, createMatchupCache(input.ruleset)) !== null;
   const named = namedSide(input, endgame || pair);
   if (!endgame && !pair && !named) return [];

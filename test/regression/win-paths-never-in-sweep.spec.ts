@@ -2,11 +2,6 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
-/**
- * Round 89 (#130, G8b): the win paths run only when the user opens the Endgame row or a turn card's question, never in the analysis
- * (plan 3.4: the analysis' cost stays +0). The sweep's code holds no call of the job, and the one hook that starts it is the panel's.
- * The message level (the pool's workers never receive a `job`) is held by `worker-client-winpaths.spec.ts`.
- */
 const ROOT = join(import.meta.dirname, '..', '..');
 
 function sources(dir: string): string[] {

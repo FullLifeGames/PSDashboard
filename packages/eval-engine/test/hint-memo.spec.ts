@@ -6,13 +6,7 @@ import { combinedOptionHints, singlesOptionHints } from '../src/search/hints';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 63 (T112): the search hints keep a memo per position. A doubles node
- * hints up to some hundred combos built from a few dozen parts, and hints its
- * kept combos a second time for the expansion order; every distinct part of
- * a position is now priced once. The memo is keyed by the position object,
- * whose battle never changes, so a hint is the same with or without it.
- */
+// The memo is keyed by the position object, whose battle never changes, so a hint is the same with or without it.
 
 const calls = vi.hoisted(() => ({ n: 0 }));
 vi.mock('../src/eval-function', async importOriginal => {
@@ -37,7 +31,7 @@ const counted = <T>(run: () => T): [T, number] => {
   return [value, calls.n - before];
 };
 
-describe('the hint memo (round 63, T112)', () => {
+describe('the hint memo', () => {
   test('combined hints price each distinct part once per position', () => {
     const root = doublesRoot();
     const options = legalChoices(root, 'p1', { tera: true });
@@ -49,11 +43,6 @@ describe('the hint memo (round 63, T112)', () => {
     expect(firstCalls).toBeLessThanOrEqual(parts.size * 4);
   });
 
-  // Round 64 (T126): both sides of the old comparison ran through the memo, so
-  // a key that mixed parts (without the side, without the slot) passed. The
-  // reference hints each option alone on its own fresh position, where the
-  // memo holds only that option's parts. Both p1 actives know Knock Off, both
-  // slot-0 mons know it, and both sides can send in their slot 3.
   test('one memo hints every option of both sides as the option alone on a fresh position, singles and doubles', () => {
     const doubles = rootOf(battleOf('gen9doublescustomgame',
       [set('Garchomp', ['earthquake', 'knockoff', 'protect']), set('Rillaboom', ['knockoff', 'woodhammer', 'fakeout']), splash('Pikachu')],

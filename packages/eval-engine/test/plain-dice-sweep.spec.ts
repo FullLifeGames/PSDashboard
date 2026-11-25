@@ -9,19 +9,6 @@ import { CHECK_MOVES, CHECKS } from './dice-status-support';
 import { clicksAccepted, dexOfRules, isCharge, SWEEP_CASES, sweepMoves, type DexMove } from './dice-sweep-support';
 import { chancesCalled, liveState } from './flip-turn-support';
 
-/**
- * Round 89 (A6-2, ruling 24, #145): the prover rows of the plain-path sweep. The plain path of the endgame children (every doubles
- * cell, a singles cell the class plan refuses) records the median draw's turn and plays each chance die the other way
- * (`dice/flip.ts`); a die that moves the board facts is a child whose share is the simulator's own chance. In every rule set the
- * corpus plays (Gens 1 to 9, the Champions mod), singles and doubles, the cell of
- * - every stalling move used again (its stall counter on the user) splits by the chance the simulator passes to `randomChance`, and
- *   the first use has no split (no die);
- * - every status check of the attacker (paralysis, freeze, infatuation, confusion) splits by the check's chance;
- * - every accuracy below 100 against a foe at 1 HP splits by the accuracy (the hit takes the foe down; a miss that leaves its HP
- *   alone moves no fact, so the sweep takes the foe down on the hit);
- * holds: the shares are the simulator's chances (the spy over `randomChance`, exact), they add up to 1, the group is priced, and
- * the root battle stands (`liveState`). A plain run plays a fixed sample; `DICE_SWEEPS=full` plays every entry.
- */
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -33,7 +20,6 @@ afterAll(() => {
 const SEEDS = ['1,2,3,4', '5,6,7,8', '9,10,11,12', '13,14,15,16'];
 const FAST = 'Pikachu';
 
-/** The board: the attacker leads p1 with the move, a Vaporeon leads p2 with `foeMoves`; in doubles the partners splash. */
 function boardOf(rules: Rules, mode: Mode, moves: string[], foeMoves: string[], seed: string, species = FAST): Battle {
   const attacker = mon(rules, { species, moves, gender: 'M' });
   const foe = mon(rules, { species: 'Vaporeon', moves: foeMoves });
@@ -48,11 +34,9 @@ function boardOf(rules: Rules, mode: Mode, moves: string[], foeMoves: string[], 
   return battle;
 }
 
-/** The clicks of a board that `boardOf` made: the attacker uses its first move at the first foe, the foe its first move (a splash splashes). */
 const clicksFor = (mode: Mode, aimed: boolean, foeAims = false): { p1: string; p2: string } =>
   mode === 'singles' ? { p1: 'move 1', p2: 'move 1' } : { p1: `move 1${aimed ? ' 1' : ''}, move 1`, p2: `move 1${foeAims ? ' 1' : ''}, move 1` };
 
-/** The cell's choice strings, as the prover names them (`move <id>`, the aim kept where the click has one). */
 function choicesOf(board: Battle, clicks: { p1: string; p2: string }): [string, string] {
   const choice = (side: 0 | 1, click: string): string => click.split(',').map((part, position) => {
     const [, index, aim] = part.trim().split(' ');
@@ -73,10 +57,8 @@ function tally(name: string, split: boolean): void {
   tallies.set(name, row);
 }
 
-/** The shares of a cell, smallest first. */
 const sharesOf = (cell: ReturnType<typeof endgameChildren>): number[] => cell.children.map(child => child.share).sort((a, b) => a - b);
 
-/** The cell of a board's clicks, with the checks every row shares: the priced group, the shares add up to 1, the live board stands. */
 function cellOf(board: Battle, rules: Rules, clicks: { p1: string; p2: string }) {
   const before = liveState(board);
   const [p1Choice, p2Choice] = choicesOf(board, clicks);
@@ -102,9 +84,7 @@ describe.each(SWEEP_CASES)('the stalling moves: $name', ({ rules, mode, name }) 
         const board = boardOf(rules, mode, [move.id, 'splash'], foeMoves, seed);
         const clicks = clicksFor(mode, false, foeMoves[0] === 'tackle');
         if (!clicksAccepted(board, clicks)) return;
-        // a foe that attacks adds dice of its own (its accuracy moves the facts where a hit is written down), so the exact rows are the splashing foe's
         const exact = foeMoves[0] === 'splash';
-        // the first use draws no stall die: no split
         const first = cellOf(board, rules, clicks);
         if (exact) {
           expect(first.shares, `${name} ${move.id} first use`).toEqual([1]);
@@ -137,7 +117,6 @@ describe.each(SWEEP_CASES)('the status checks: $name', ({ rules, mode, name }) =
     test.each(sweepSelection(CHECK_MOVES, 'moves'))('%s', moveId => {
       const dex = dexOfRules(rules);
       const move = dex.moves.get(moveId);
-      // a move with a secondary of its own draws a second die (and a cell with two dice leaves their joint share out of the mass): the rows read the plain moves
       const secondaries = (move as unknown as { secondaries?: unknown[] }).secondaries ?? [];
       // (Gens 1 to 4 give Tackle 95 accuracy: its own die)
       if (!move.exists || move.gen > dex.gen || secondaries.length > 0 || typeof move.accuracy === 'number') return;
@@ -148,16 +127,14 @@ describe.each(SWEEP_CASES)('the status checks: $name', ({ rules, mode, name }) =
         if (!clicksAccepted(board, clicks)) continue;
         const oracle = chancesCalled(board, clicks).filter(entry => entry.event === 'BeforeMove' && entry.effect === check.id && entry.chance > 0 && entry.chance < 1).map(entry => entry.chance);
         const { cell, shares } = cellOf(board, rules, clicks);
-        // a singles cell that the class plan prices has its own rows (the class path); this sweep reads the plain path
         if (!cell.plain) continue;
         expect(cell.unpriced, `${name} ${check.id} ${moveId} priced`).toBe(false);
-        // Gens 3 and 4: a move that thaws its user overrules a thaw that fails, so the other branch shows the same board
+        // Gens 3 and 4: a move that thaws its user overrules a thaw that fails, so the other branch is the same board
         const defrosts = check.id === 'frz' && !!move.flags.defrost;
         if (oracle.length === 0 || defrosts) {
           tally(`check ${name}`, false);
           continue;
         }
-        // a status move behind a draw that leaves the board alone (nothing to fail) prices as one child; every other check splits
         if (shares.length === 1) {
           tally(`check ${name}`, false);
           continue;
@@ -169,11 +146,6 @@ describe.each(SWEEP_CASES)('the status checks: $name', ({ rules, mode, name }) =
   });
 });
 
-/**
- * A damaging move at one foe with an accuracy of its own and no secondary: a status move's hit lands an effect whose own dice (a
- * confusion's self-hit, a paralysis) join the cell's, a spread move draws one accuracy per foe, and a secondary is a second die (a
- * cell of two dice leaves their joint share out of the mass; the exact share of each die is this row's claim).
- */
 const inaccurate = (move: DexMove): boolean => typeof move.accuracy === 'number' && move.accuracy < 100 && move.category !== 'Status'
   && ['normal', 'any', 'adjacentFoe'].includes(move.target) && ((move as unknown as { secondaries?: unknown[] }).secondaries ?? []).length === 0;
 
@@ -189,7 +161,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.mode === 'doubles'))('the accura
         clicks = clicksFor(mode, false);
       }
       if (!clicksAccepted(board, clicks) || board.ended) return;
-      // every foe at 1 HP: a hit takes the first foe down, a miss leaves it standing
       for (const foe of board.sides[1].pokemon) foe.hp = 1;
       const oracle = chancesCalled(board, clicks).filter(entry => entry.chance > 0 && entry.chance < 1).map(entry => entry.chance);
       const { cell, shares } = cellOf(board, rules, clicks);
@@ -198,7 +169,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.mode === 'doubles'))('the accura
         tally(`accuracy ${name}`, false);
         continue;
       }
-      // every share is a chance of the turn or its complement: the simulator's own numbers
       for (const share of shares) {
         expect(oracle.some(chance => Math.abs(chance - share) < 1e-12 || Math.abs(1 - chance - share) < 1e-12), `${name} ${move.id} ${seed}: ${shares} among ${oracle}`).toBe(true);
       }

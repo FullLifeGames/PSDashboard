@@ -1,9 +1,6 @@
 import { test, expect, describe } from 'vitest';
 import { looksLikeReplayFileContent, parseExportedReplay } from '../../src/lib/replay-file';
 
-// Mirrors the structure of a real "Download replay" export from
-// replay.pokemonshowdown.com: hidden replayid input plus a text/plain script
-// holding the protocol log with `/` escaped as `\/`.
 const exportedHtml = `<!DOCTYPE html>
 <meta charset="utf-8" />
 <!-- version 1 -->
@@ -62,7 +59,6 @@ describe('exported replay file parsing', () => {
     expect(replay.format).toBe('[Gen 9] Draft');
     expect(replay.formatid).toBe('gen9draft');
     expect(replay.uploadtime).toBe(1767717812);
-    // The export escapes `/` as `\/`; the parsed log must be unescaped.
     expect(replay.log).toContain('|switch|p1a: Deoxys|Deoxys-Speed|100/100');
     expect(replay.log).toContain('</strong></summary></details></div>');
     expect(replay.log).not.toContain('\\/');
@@ -74,7 +70,6 @@ describe('exported replay file parsing', () => {
     const replay = parseExportedReplay(withoutId, 'Gen9Draft-2026-01-06-alpha-beta.html');
 
     expect(replay.id).toBe('gen9draft-2026-01-06-alpha-beta');
-    // A file-name id must never pollute format inference.
     expect(replay.formatid).toBe('gen9draft');
   });
 
@@ -89,10 +84,7 @@ describe('exported replay file parsing', () => {
   });
 
   test('normalizes Windows line endings out of the log', () => {
-    // Files written by external tools (video reconstructions, Windows
-    // editors) arrive with CRLF. A trailing \r on line-final fields (tera
-    // types, win lines, cant reasons) survives into built teams and crashes
-    // the sim's JSON team parsing — the log must be LF the moment it enters.
+    // A trailing \r on line-final fields (tera types, win lines) crashes the team parser: the log must be LF.
     const crlfHtml = exportedHtml.replace(/\n/g, '\r\n');
     const replay = parseExportedReplay(crlfHtml, 'crlf.html');
     expect(replay.log).not.toContain('\r');

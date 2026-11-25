@@ -1,16 +1,11 @@
 import { toId } from '../ids.ts';
 import type { RulesDex } from '../rules-dex.ts';
 
-/** The simulator's damage hooks of an item: the attacker's Attack or Special Attack, the move's power, the final damage. */
 const DAMAGE_HOOKS = ['onModifyAtk', 'onModifySpA', 'onBasePower', 'onModifyDamage'] as const;
 
 const cache = new WeakMap<RulesDex, Set<string>>();
 
-/**
- * The ids of the items that raise the holder's damage in the generation (round 69, T26): every item the simulator
- * gives a damage hook (Choice Band, Choice Specs, Life Orb, Muscle Band, the type boosters and the species items).
- * Read from the simulator's Dex, so a new item or a generation's changes need no edit here.
- */
+/** The ids of the items that raise the holder's damage: every item the simulator gives a damage hook; no list here. */
 export function boostItemIds(dex: RulesDex): ReadonlySet<string> {
   let ids = cache.get(dex);
   if (!ids) {
@@ -22,22 +17,21 @@ export function boostItemIds(dex: RulesDex): ReadonlySet<string> {
   return ids;
 }
 
-/** Whether the named item raises its holder's damage in the generation. */
 export const isBoostItem = (dex: RulesDex, item: string): boolean => boostItemIds(dex).has(toId(item));
 
-/** Whether the species cannot be what it is without the item (the Ogerpon masks, the orbs, Soul Dew: the Dex's required items). */
+/** Whether the Dex requires the item for the species (Ogerpon masks, the orbs, Soul Dew). */
 export function requiresItem(dex: RulesDex, species: string, item: string): boolean {
   const entry = dex.species.get(species);
   return [entry.requiredItem, ...(entry.requiredItems ?? [])].some(name => !!name && toId(name) === toId(item));
 }
 
-/** Whether the item changes its holder's Speed (the simulator's `onModifySpe` hook: the Choice Scarf, the Iron Ball and the like). */
+/** Whether the item has an `onModifySpe` hook (Choice Scarf, Iron Ball). */
 export function changesSpeed(dex: RulesDex, item: string): boolean {
   const entry = dex.items.get(item);
   return entry.exists && typeof (entry as unknown as Record<string, unknown>).onModifySpe === 'function';
 }
 
-/** Whether the item belongs to other species only (Light Ball, Thick Club, Soul Dew: the Dex's `itemUser`). */
+/** Whether the Dex's `itemUser` limits the item to other species (Light Ball, Thick Club). */
 export function belongsToOthers(dex: RulesDex, species: string, item: string): boolean {
   const users = dex.items.get(item).itemUser;
   return !!users && !users.some(user => toId(user) === toId(species));

@@ -2,12 +2,7 @@ import { useEffect, useState } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import type { GameTeamProblems } from '@fulllifegames/eval-engine';
 
-/**
- * Round 89 (lane H, #105), stage H4: the simulator's check of the two pasted teams for the chosen format (`checkGameTeams`), run a
- * moment after a paste, a format change or a click on Validate. The result belongs to the input it was made for: a newer input
- * hides an older result at once, and a result that arrives late is dropped. The check informs; it never stops Start (user ruling
- * 13.11.2026, H2b).
- */
+// A result that arrives late is dropped; the check informs and never stops Start.
 
 const DEBOUNCE_MS = 300;
 
@@ -21,7 +16,6 @@ interface Result { key: string; check: TeamCheck }
 
 export function useTeamCheck(format: string, p1: PokemonSet[], p2: PokemonSet[], nonce: number): TeamCheck {
   const empty = p1.length === 0 && p2.length === 0;
-  // the signature of the input: what the sets say, not their object identity
   const key = `${format}|${nonce}|${JSON.stringify([p1, p2])}`;
   const [result, setResult] = useState<Result | null>(null);
   useEffect(() => {

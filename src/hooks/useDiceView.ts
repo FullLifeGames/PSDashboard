@@ -6,12 +6,7 @@ import { TURN_KINDS, applyDie, toggleDie, withDice } from '../lib/branch-dice';
 import type { TurnDiceProps } from '../components/branch/DiceChips';
 import type { DiceTableProps } from '../components/dock/DiceTable';
 
-/**
- * Round 82 (forced dice), step A7a: what the panel hands to the chips. Each die rides on the choice of its own slot (ADR 0001):
- * the dice of a move on the move's slot, the dice of the turn (a speed tie, a first mover, the end of the turn) on the choice of
- * the slot the die names. A click edits that choice and sends it through the panel's `onSetChoice`, so a new move or target for
- * the slot, which sends a fresh choice, gives its dice back to the seed.
- */
+/** Each die rides on the choice of its own slot (ADR 0001); a new move or target gives its dice back to the seed. */
 
 export type SlotDiceView = Omit<DiceTableProps, 'label'>;
 type Side = 'p1' | 'p2';
@@ -26,7 +21,6 @@ export interface DiceViews {
 }
 
 export function useDiceViews(args: {
-  /** The tray's "Dice · What if" section is open: the dock asks the simulator for the dice only then. */
   diceOpen: boolean;
   stale: boolean | undefined;
   simState: BranchSimState | null;
@@ -38,7 +32,6 @@ export function useDiceViews(args: {
   const view = useDiceOffers({ enabled: diceOpen && !stale, simState, getBattle, replayLog });
   const choiceAt = useCallback((side: Side, index: number): BranchSlotChoice | null =>
     (side === 'p1' ? simState?.p1Choices : simState?.p2Choices)?.[index] ?? null, [simState]);
-  /** A move's die settles the dice around it (the hit it needs); a die of the turn is a plain toggle. */
   const toggleOn = useCallback((slot: string, die: ForcedDie, offers: readonly DieOffer[] | null) => {
     const side = sideOf(slot);
     const index = indexOf(slot);

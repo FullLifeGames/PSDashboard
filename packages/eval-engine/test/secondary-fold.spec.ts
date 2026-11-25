@@ -11,17 +11,7 @@ import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 import { FAST, rootOf } from './secondary-classes-support';
 
-/**
- * Round 86 (T305), step A5a: the arithmetic of the secondary classes in `cell-blend.ts` and `search/secondary-classes.ts`.
- *
- * - Which effects cut the target's move is read from the Dex condition (`truncates`: lasts one turn, has a `BeforeMove`
- *   handler). The sweep holds that to the simulator: for every volatile status that any move of a rule set can put on a target
- *   as a secondary, a target that carries it either loses its move on every seed or keeps it on some.
- * - The classes of a hit split by the subsets of the entries, two entries of one effect land in one class, and the weights sum
- *   to the hit's.
- * - `classifyChild` with the fork's dice record names the effects that came true, also those that leave no mark that the
- *   protocol shows beside the move (a burn the target already carries would show nothing, a blocked effect still counts by its die).
- */
+// `truncates` is read from the Dex condition (one turn, a `BeforeMove` handler); the sweep holds it to the simulator.
 await loadSimMods('gen9championsou');
 
 describe.each(SWEEP_CASES.filter(entry => entry.mode === 'singles'))('which secondary effects cut the target\'s move: $name', ({ rules, name }) => {
@@ -32,7 +22,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.mode === 'singles'))('which seco
     .filter(entry => entry.volatileStatus && !entry.self)
     .map(entry => entry.volatileStatus!))];
 
-  /** The simulator's answer: does a target that carries the volatile lose its move on every one of the seeds? */
   function losesMove(id: string): boolean {
     for (let index = 0; index < 8; index++) {
       const board = sweepBoard(rules, 'tackle', 'singles', seedOf(index + 1), false, FAST);
@@ -77,7 +66,6 @@ describe('the classes of a hit', () => {
 });
 
 describe('classifyChild with the fork\'s dice record', () => {
-  // Flamethrower into a Vaporeon that splashes: a sure hit that cannot kill, with a 10 percent burn
   const cell = battleOf('gen9customgame', [set('Pikachu', ['flamethrower'])], [set('Vaporeon', ['splash'])]);
   const root = rootOf(cell);
   const plan = planCellEvents(cell, 'move flamethrower', 'move splash');

@@ -16,17 +16,9 @@ import type { EvalLine, LineDie, LineRequest, LinesInput, LineStep, TreeLineStep
 import { battleFaintedFraction, leafValue } from './leaf.ts';
 import { searchOptions } from './options.ts';
 
-/**
- * Round 89 (#104): the lines job. A tree's line names both sides' choices by label; this replay plays it on the root, one step at a
- * time, with every die at its likeliest result (dice/likeliest.ts), and writes what the branch layer needs to play it as a variation:
- * each step's slot choices with the dice on the bodies that hold them. Each step is resolved by label against the options the replay's
- * own position offers (the trees run on the canonical bench order, their choice strings below the root do not translate), so a line
- * stops before a step that is no longer legal after the likeliest dice (`cut`): the tree's world had a miss where the line hits.
- *
- * Singles and doubles share this path. The replay reads the simulator on copies and never writes the root.
- */
+// A step is resolved by label against the replay's own options (tree choice strings below the root do not translate);
+// a line stops (`cut`) before a step that is no longer legal after the likeliest dice.
 
-/** The seed of a replay's battle: every die the line names is forced, so nothing reads it (the sweep plays two seeds and compares the logs). */
 const REPLAY_SEED = '1,2,3,4';
 
 /** One side's slot choices for the engine's choice string, aligned with the slots the simulator asks. */
@@ -41,7 +33,7 @@ export function slotChoicesOf(battle: Battle, side: 'p1' | 'p2', choice: string,
   );
 }
 
-/** The dice put on the slot choice of the body that holds them (a pair's die on its first slot); a die whose holder has no choice goes on the first choice of its side, else of the other. */
+/** Puts each die on its holder's slot choice; a holderless die goes on its side's first choice, else the other's. */
 export function withDice(p1: (BranchSlotChoice | null)[], p2: (BranchSlotChoice | null)[], dice: readonly ForcedDie[]): void {
   for (const die of dice) {
     const own = die.name.slot[1] === '1' ? p1 : p2;
@@ -57,7 +49,6 @@ interface Replay { steps: LineStep[]; unforced: Set<string>; cut?: string; battl
 
 const labelOf = (line: TreeLineStep, side: 'p1' | 'p2'): string => (side === 'p1' ? line.p1 : line.p2);
 
-/** The two sides' options for one wanted step, resolved by label, and the slot choices that go with them; null with the reason when the step cannot be played. */
 interface Resolved { o1: ChoiceOption; o2: ChoiceOption; s1: (BranchSlotChoice | null)[]; s2: (BranchSlotChoice | null)[] }
 
 function resolveStep(root: SimPosition, battle: Battle, index: number, wanted: TreeLineStep, input: LinesInput): Resolved | string {
@@ -97,7 +88,6 @@ function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: L
       out.cut = `step ${index + 1}: ${String((error as Error)?.message ?? error).slice(0, 120)}`;
       break;
     }
-    // a die that is sure (a 100 percent accuracy) cannot go the other way: the click need not force it
     const kept = turn.dice.filter(entry => entry.chance !== 1);
     const forced = kept.map(entry => entry.die);
     const dice = kept.map((entry, at) => lineDie(battle, play, forced, entry, at));
@@ -117,7 +107,7 @@ function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: L
   return out;
 }
 
-/** One die as the line shows it: its chance, whether it earns a chip, and, for a roll, whether the roll decides a knock-out. */
+/** One die as the line shows it: chance, whether it earns a chip, and for a roll whether it decides a knock-out. */
 export function lineDie(battle: Battle, play: (b: Battle) => void, forced: readonly ForcedDie[], entry: LikeliestDie, at: number): LineDie {
   const decides = entry.die.name.kind === 'damage-roll' ? rollDecides(battle, play, forced, at) : null;
   const chance = decides ? decides.chance : entry.chance;
@@ -129,7 +119,6 @@ export function lineDie(battle: Battle, play: (b: Battle) => void, forced: reado
   };
 }
 
-/** Who the position after the last step asks to send a body in (a pivot's switch, a faint's): the tree made no choice for it. */
 function awaitsOf(battle: Battle): 'p1' | 'p2' | 'both' | undefined {
   if (battle.ended) return undefined;
   const asked = battle.sides.map(side => side.requestState === 'switch');
@@ -156,10 +145,7 @@ function lineOf(request: LineRequest, replay: Replay, perspective: 1 | -1, match
   };
 }
 
-/**
- * The lines of a search: for each request the first donor whose replay keeps every step of its tree's line, else the replay that kept
- * the most (the earlier donor on a tie). A request no donor can start is left out. The root battle is read and never written.
- */
+/** The lines of a search: per request the first donor that replays whole, else the one that kept most. */
 export function playLines(serializedBattle: string, ruleset: StaticRuleset, input: LinesInput): EvalLine[] {
   const root = createRootPosition(serializedBattle, ruleset);
   if (positionBattle(root).ended) return [];

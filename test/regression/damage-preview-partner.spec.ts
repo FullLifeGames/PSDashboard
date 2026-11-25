@@ -3,12 +3,7 @@ import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { calcSingleDamageRange, createBranchStateFromBattle, loadSimMods, type DamageResult } from '@fulllifegames/eval-engine';
 import { computePreviewDamage, hitsPartner } from '../../src/lib/branch-damage';
 
-/**
- * Round 83 (the user, 01.11.2026: "Multihits like Earthquake are also weird, the damage on P1B is missing"): a move that hits
- * every body next to its user hits the user's partner too, and the move tile listed only the foes. The preview now adds the
- * partner's row, priced behind the partner's own side's screens. The scenes hold the row to the HP the simulator takes; the
- * sweep holds the reading to the simulator's targets for every damaging move of the Dex.
- */
+// A move that hits every adjacent body hits the user's partner too: its row is priced behind the partner's screens.
 
 await loadSimMods('gen9championsou');
 
@@ -22,7 +17,6 @@ function set(species: string, moves: string[], extra: Partial<PokemonSet> = {}):
   };
 }
 
-/** A bulky body that takes every hit standing; Battle Armor keeps the crit out of the check. */
 const wall = (species: string) => set(species, ['Splash'], { evs: { ...STATS, hp: 252, def: 252 }, ability: 'Battle Armor' });
 
 function battle(format: string, p1: PokemonSet[], p2: PokemonSet[], seed = 1): Battle {
@@ -46,7 +40,6 @@ function preview(current: Battle) {
   }, calcSingleDamageRange);
 }
 
-/** Plays one turn and returns the HP every active body lost, by row label. */
 function play(current: Battle, p1: string, p2: string): Record<string, number> {
   const bodies = current.sides.flatMap((side, sideIndex) => side.active.map((mon, slot) => ({ label: `P${sideIndex + 1}${'AB'[slot]}`, mon })));
   const before = bodies.map(({ mon }) => mon.hp);
@@ -63,7 +56,7 @@ function expectInside(range: DamageResult | undefined, lost: number, maxhp: numb
   expect(percent).toBeLessThanOrEqual(range!.maxPercent);
 }
 
-describe('the partner of a move that hits every body next to its user (round 83)', () => {
+describe('the partner of a move that hits every body next to its user', () => {
   const scene = () => battle('gen9doublescustomgame',
     [set('Garchomp', ['Earthquake', 'Rock Slide']), wall('Blissey')],
     [wall('Snorlax'), wall('Clefable')]);
@@ -98,16 +91,14 @@ describe('the partner of a move that hits every body next to its user (round 83)
     const quake = side.spread[0][1];
     const partner = quake.find(row => row.label === 'P1B')!.result;
     const foes = quake.filter(row => row.label !== 'P1B').map(row => row.result.maxPercent);
-    // Heatran takes four times the damage of a Ground move: the partner's row is the largest, the default stays a foe's
     expect(partner.maxPercent).toBeGreaterThan(Math.max(...foes));
     expect(side.default[0][0].maxPercent).toBe(Math.max(...foes));
   });
 });
 
-/** Every realm with doubles the corpus plays: Scarlet/Violet and the older generations back to 3, and the Champions mod. */
 const REALMS = [3, 4, 5, 6, 7, 8, 9].map(gen => `gen${gen}doublescustomgame`).concat('gen9championsdoublescustomgame');
 
-describe.each(REALMS)('%s: the partner\'s row follows the simulator\'s targets (round 83 sweep)', format => {
+describe.each(REALMS)('%s: the partner\'s row follows the simulator\'s targets', format => {
   test('every damaging move hits the partner in the simulator exactly when the preview lists its row', () => {
     const current = battle(format, [set('Mew', ['Splash']), wall('Blissey')], [wall('Snorlax'), wall('Clefable')]);
     const [user, partner] = current.sides[0].active;

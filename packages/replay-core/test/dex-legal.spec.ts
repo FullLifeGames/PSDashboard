@@ -3,13 +3,7 @@ import { toID } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '../src/team-builder';
 import { abilitiesAreFree, legalAbility } from '../src/team/dex-legal';
 
-/**
- * Round 60 (T93): the log names an ability by its display name. "As One" is
- * no ability id of the gen 9 dex ("As One (Glastrier)", "As One (Spectrier)"),
- * and the sim plays an unknown id as no ability at all (no Unnerve, no boost
- * after a KO). Ogerpon and Terapagos carried the ability of a battle-only
- * forme (Embody Aspect, Teraform Zero) on their base forme.
- */
+// The log names display names: 'As One' is no id of the Gen 9 Dex, and the sim plays an unknown id as no ability.
 
 const vgcLog = (tier: string) => [
   '|gametype|doubles', '|gen|9', `|tier|${tier}`,
@@ -35,7 +29,7 @@ const vgcLog = (tier: string) => [
 const abilityOf = (team: { species: string; ability: string }[], species: string) =>
   toID(team.find(set => set.species === species)?.ability ?? '');
 
-describe('dex-legal abilities (round 60, T93)', () => {
+describe('dex-legal abilities', () => {
   test('every built set carries an ability the dex knows for its species', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] VGC 2026 Reg I'));
     expect({
@@ -46,9 +40,6 @@ describe('dex-legal abilities (round 60, T93)', () => {
     }).toEqual({ calyrexIce: 'asoneglastrier', calyrexShadow: 'asonespectrier', terapagos: 'terashift', ogerpon: 'waterabsorb' });
   });
 
-  // Since round 67 (T108 step 2) the inference also reads an ability a line names as its effect, as the client does:
-  // Terapagos shows Tera Shift on entry (`|-activate|p1b: Terapagos|ability: Tera Shift`) before its Stellar forme shows
-  // Teraform Zero, so the set keeps the ability it entered with; Ogerpon's Embody Aspect still shows only on its Tera.
   test('a format with free abilities keeps a battle-only ability, but an unknown name still becomes the dex ability', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Balanced Hackmons'));
     expect(abilityOf(p2Team, 'Calyrex-Shadow')).toBe('asonespectrier');
@@ -56,7 +47,6 @@ describe('dex-legal abilities (round 60, T93)', () => {
     expect(abilityOf(p1Team, 'Terapagos')).toBe('terashift');
   });
 
-  // Round 67 gate (11.10.): draft leagues play as custom games under the usual abilities.
   test('a custom game reads abilities like a standard format', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(vgcLog('[Gen 9] Custom Game'));
     expect(abilityOf(p1Team, 'Ogerpon-Wellspring')).toBe('waterabsorb');
@@ -73,7 +63,7 @@ describe('dex-legal abilities (round 60, T93)', () => {
   });
 });
 
-describe('fixed Tera type and item (round 60, T79)', () => {
+describe('fixed Tera type and item', () => {
   const doublesLog = (tier: string, extra: string[] = []) => [
     '|gametype|doubles', '|gen|9', `|tier|${tier}`,
     '|poke|p2|Ogerpon-Cornerstone, L50, F|', '|poke|p2|Ogerpon-Wellspring, L50, F|', '|poke|p2|Terapagos, L50, M|',
@@ -99,7 +89,7 @@ describe('fixed Tera type and item (round 60, T79)', () => {
     expect(p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!.teraType).toBeUndefined();
   });
 
-  test('a custom game carries the fixed Tera type and item like a standard format (round 67 gate)', () => {
+  test('a custom game carries the fixed Tera type and item like a standard format', () => {
     const { p2Team } = buildTeamsFromReplay(doublesLog('[Gen 9] Doubles Custom Game'));
     const cornerstone = p2Team.find(set => set.species === 'Ogerpon-Cornerstone')!;
     expect(cornerstone.teraType).toBe('Rock');
@@ -120,7 +110,7 @@ describe('fixed Tera type and item (round 60, T79)', () => {
   });
 });
 
-describe('legality follows the replay\'s format and generation (round 60 review)', () => {
+describe('legality follows the replay\'s format and generation', () => {
   test('a battle-only forme\'s ability falls back to the species\' ability of that generation', () => {
     const set = { name: 'Gengar', species: 'Gengar', item: '', ability: 'Shadow Tag', moves: [], nature: '', gender: '', evs: {}, ivs: {}, level: 100 };
     expect(legalAbility(set as never, { gen: 6, freeAbilities: false })).toBe('Levitate');

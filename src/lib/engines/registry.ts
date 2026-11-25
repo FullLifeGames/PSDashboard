@@ -1,8 +1,3 @@
-/**
- * Round 77 (user gate 28.10.2026, 4a): the engines the Evaluation panel offers. The dashboard's own
- * search is the first; engines contributed to this repository follow (ENGINES.md, "Contribute an
- * engine"); a user's own, added by address in the panel, are kept in this browser.
- */
 export interface EngineEntry {
   /** Stable id: results and cache keys carry it. */
   id: string;
@@ -16,10 +11,6 @@ export interface EngineEntry {
 
 export const BUILTIN_ENGINE: EngineEntry = { id: 'ps-dashboard', name: 'PS Dashboard', url: null, source: 'builtin' };
 
-/**
- * Engines contributed to this repository: an entry names a hosted endpoint that passes
- * `npx @fulllifegames/eval-engine check-engine <url>`, with its author and a homepage.
- */
 export const CONTRIBUTED_ENGINES: EngineEntry[] = [];
 
 export const ADDED_ENGINES_KEY = 'ps-replay-interceptor:engines';
@@ -27,7 +18,6 @@ export const SELECTED_ENGINE_KEY = 'ps-replay-interceptor:engine';
 
 export const engineIdForUrl = (url: string) => `url:${url}`;
 
-/** The user's own engines; a broken or missing list is no list. */
 export function loadAddedEngines(): EngineEntry[] {
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ADDED_ENGINES_KEY) : null;
@@ -50,7 +40,6 @@ export function saveAddedEngines(engines: EngineEntry[]): void {
   }
 }
 
-/** An address the panel accepts: http or https, a host, no credentials in it. */
 export function engineUrlProblem(url: string): string | null {
   let parsed: URL;
   try {

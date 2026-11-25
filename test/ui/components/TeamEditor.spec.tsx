@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TeamEditor } from '../../../src/components/TeamEditor';
-import { teamInfo } from '../fixtures/team-info';
+import { teamInfo, revealedPokemon } from '../fixtures/team-info';
 
 describe('TeamEditor', () => {
   test('lists every Pokémon with its fields, loads the legal pools, and saves the edited team', async () => {
@@ -13,11 +13,9 @@ describe('TeamEditor', () => {
     expect(screen.getByText('Garchomp', { exact: false })).toBeInTheDocument();
     expect(screen.getAllByText(/Moves \(2\/4\)/)).toHaveLength(6);
 
-    // The pools arrive after the lazy load: the ability field becomes a select with the species' abilities.
     const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
     await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
     expect(within(ability).getByRole('option', { name: 'Rough Skin' })).toBeInTheDocument();
-    // Round 83 (T308): the other abilities of the generation follow, so Garchomp can hold Intimidate.
     expect(within(ability).getByRole('option', { name: 'Intimidate' })).toBeInTheDocument();
     await userEvent.selectOptions(ability, 'Rough Skin');
 
@@ -51,7 +49,6 @@ describe('TeamEditor', () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  // Round 89 (T9c, tester BROKEN 2 and 3; singles and doubles share the editor).
   describe.each([
     { label: 'singles', kind: 'singles' as const, format: 'gen9ou', first: 'Ferrothorn' },
     { label: 'doubles', kind: 'doubles' as const, format: 'gen9doublesou', first: 'Rillaboom' },
@@ -98,4 +95,60 @@ describe('TeamEditor', () => {
       expect(add).toHaveValue('Earthquake');
     }, 60_000);
   });
+});
+
+const team = { pokemon: [revealedPokemon('Dracovish', { moves: [{ name: 'Protect', source: 'revealed' }] }), revealedPokemon('Zygarde', { moves: [] })] };
+
+async function openEditor(format: string) {
+  render(<TeamEditor title="Edit Opp" teamInfo={team} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
+  const ability = await screen.findByRole('combobox', { name: 'Dracovish ability' }, { timeout: 30_000 });
+  await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
+  return ability;
+}
+
+describe.each([
+  ['a singles draft league', 'gen9natdexdraft'],
+  ['a doubles draft league', 'gen9doublesdraftleague'],
+])('%s (an id the simulator does not list)', (_kind, format) => {
+  test('the ability list of Dracovish is its Dex entry\'s, and Fishious Rend joins from the dropdown without a note', async () => {
+    const ability = await openEditor(format);
+    for (const name of ['Strong Jaw', 'Sand Rush', 'Water Absorb']) expect(within(ability).getByRole('option', { name })).toBeInTheDocument();
+
+    const adder = screen.getAllByPlaceholderText('Add move...')[0];
+    await userEvent.type(adder, 'fishious');
+    await userEvent.click(screen.getByRole('option', { name: 'Fishious Rend' }));
+    expect(screen.getByText('Fishious Rend', { selector: 'span, div' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('not learnable')).not.toBeInTheDocument();
+  }, 90_000);
+
+  test('typing Thousand Arrows adds it to Zygarde; a move outside the pool of Dracovish joins with the note', async () => {
+    await openEditor(format);
+    const adders = screen.getAllByPlaceholderText('Add move...');
+    await userEvent.type(adders[1], 'thousand arrows{Enter}');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Remove Thousand Arrows from Zygarde')).toBeInTheDocument();
+    expect(screen.queryByText('not learnable')).not.toBeInTheDocument();
+
+    await userEvent.type(adders[0], 'Flying Press{Enter}');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Remove Flying Press from Dracovish')).toBeInTheDocument();
+    expect(screen.getAllByText('not learnable')).toHaveLength(1);
+  }, 90_000);
+});
+
+describe('a standard format keeps refusing both moves (singles and doubles)', () => {
+  test.each([['singles', 'gen9ou'], ['doubles', 'gen9doublesou']])('%s: %s', async (_kind, format) => {
+    // Garchomp's ability select shows when the pools have loaded; Dracovish has no abilities in a standard format.
+    const withGarchomp = { pokemon: [...team.pokemon, revealedPokemon('Garchomp')] };
+    render(<TeamEditor title="Edit Opp" teamInfo={withGarchomp} gen={9} format={format} onSave={vi.fn()} onClose={vi.fn()} />);
+    const ability = await screen.findByRole('combobox', { name: 'Garchomp ability' }, { timeout: 30_000 });
+    await waitFor(() => expect(ability.tagName).toBe('SELECT'), { timeout: 30_000 });
+    expect(screen.queryByRole('combobox', { name: 'Dracovish ability' })?.tagName).not.toBe('SELECT');
+    const adders = screen.getAllByPlaceholderText('Add move...');
+    await userEvent.type(adders[0], 'Fishious Rend{Enter}');
+    expect(screen.getByRole('alert')).toHaveTextContent('"Fishious Rend" is not a known move.');
+    await userEvent.type(adders[1], 'Thousand Arrows{Enter}');
+    expect(screen.getAllByRole('alert').map(alert => alert.textContent)).toEqual(['"Fishious Rend" is not a known move.', '"Thousand Arrows" is not a known move.']);
+  }, 90_000);
 });

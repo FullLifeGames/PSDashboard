@@ -5,15 +5,8 @@ import { historyOfShare, sameGameAsShare, shareEntry, type GameSharePayload } fr
 import type { ViewLine } from '../lib/timeline';
 import type { SavedVariation } from './useRestoreVariation';
 
-/**
- * Round 89 (lane H, #105), stage H5 (user ruling 13.11.2026, H6a): a game's share link (`#branch=` version 2) opens the main line and
- * the open branch at the sharer's turn. The reader starts the shared game as a copy with a new id and saves it in the browser; the
- * address then names it (`?game=<id>`, `useOpenAddress`) and a reload brings it back. A link of the game that is open, whose main
- * line the open game holds from its start, opens its branch in that game and makes no copy (a saved branch's Open, a link pasted into
- * the tab that made it). The hash leaves the address before the game opens, so the address can name the game.
- */
+/** Opens a shared game as a saved copy with a new id, or its branch in the held game when the link names it. */
 
-/** What the hook reads of the app: the shared link, the open game, the data on screen, the branch restore and the pointer. */
 export interface SharedGameApp {
   ctx: {
     shared: { sharedGame: GameSharePayload | null; clearSharedBranch: () => void };
@@ -29,7 +22,6 @@ export interface SharedGameApp {
 const POLL_MS = 25;
 const WAIT_MS = 60_000;
 
-/** Whether the open game holds the link's main line from its start: same id, and every shared entry equals the open game's entry at its place. */
 export function holdsMainLine(payload: GameSharePayload, record: NewGameRecord | null): record is NewGameRecord {
   if (!record || record.id !== payload.gameId || payload.entries.length > record.entries.length) return false;
   return payload.entries.every((entry, index) => JSON.stringify(entry) === JSON.stringify(shareEntry(record.entries[index])));
@@ -64,11 +56,9 @@ async function restoreView(latest: React.RefObject<SharedGameApp>, payload: Game
   else timeline.navigateTo({ turn: view.turn, line: view.line });
 }
 
-/** One link, start to end: the game (a copy or the open one), then the branch and the pointer. Returns the problem, or null. */
 async function openShared(latest: React.RefObject<SharedGameApp>, payload: GameSharePayload): Promise<string | null> {
   const { ctx } = latest.current;
   let game = holdsMainLine(payload, ctx.newGame.record) ? ctx.newGame.record : null;
-  // a link that equals a game this browser holds (the copy an earlier open made, the sharer's own game) opens that game: no new copy
   const held = game ? null : findGame(record => sameGameAsShare(record, payload), payload.seed);
   if (held) {
     ctx.shared.clearSharedBranch();

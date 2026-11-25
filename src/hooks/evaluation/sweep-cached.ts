@@ -5,11 +5,7 @@ import { aborted, guardedStage, isCancelled, matchOrPhantom, type SweepEnv, type
 import { probeSensitivity, verifyFlagged } from './sweep-verify';
 import { playedCellValue } from './played-cell';
 
-/**
- * Entries written by single evaluations never computed the
- * played-pair expectation (undefined ≠ null = tried, unmatched) —
- * fill it in so the analysis gets its decision/chance split.
- */
+// undefined means never computed, null means tried and unmatched.
 async function backfillPlayedOutcome(
   env: SweepEnv, args: TurnStageArgs,
 ): Promise<'abort' | { value: number | null }> {
@@ -20,7 +16,6 @@ async function backfillPlayedOutcome(
     outcome = null;
     const p1Choice = matchOrPhantom(hit.result, 'p1', turnPlayed, env.params.rules);
     const p2Choice = matchOrPhantom(hit.result, 'p2', turnPlayed, env.params.rules);
-    // Round 79 (T287): a tree turn prices the pair with the root's own cell (no position needed); the sub-search stays where the pair is no cell.
     const cell = p1Choice && p2Choice && mode === 'mcts' ? playedCellValue(hit.result, p1Choice.choice, p2Choice.choice) : null;
     if (cell !== null) {
       outcome = cell;
@@ -47,8 +42,6 @@ async function backfillPlayedOutcome(
   return { value: outcome };
 }
 
-/** Verification backfill: cached entries from before the pass (or
- *  written by single evaluations) never verified their flags. */
 async function backfillVerification(
   env: SweepEnv, args: TurnStageArgs, outcome: number | null, verify: boolean,
 ): Promise<'abort' | { value: TurnVerification | null | undefined }> {
@@ -69,7 +62,6 @@ async function backfillVerification(
   return { value: turnVerified };
 }
 
-/** Sensitivity backfill, same shape as the verification backfill. */
 async function backfillSensitivity(
   env: SweepEnv, args: TurnStageArgs, outcome: number | null,
   turnVerified: TurnVerification | null | undefined, verify: boolean,
@@ -92,7 +84,6 @@ async function backfillSensitivity(
   return { value: turnSensitivity };
 }
 
-/** Install a cache/store hit into the graph arrays, backfilling what the entry never computed. */
 export async function installCachedTurn(env: SweepEnv, args: TurnStageArgs, verify: boolean): Promise<boolean> {
   const { hit, turn, engine } = args;
   const { data } = env;

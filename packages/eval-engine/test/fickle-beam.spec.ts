@@ -17,15 +17,7 @@ import { pairCellSample } from '../src/pair/sampler';
 import { rollSet as set, rootOf } from './calc-roll-oracle';
 import { killing, simDamages, strengthSeeds, type SimDamages } from './sim-rolls';
 
-/**
- * Round 69, lane D (T154): Fickle Beam doubles in power on 30 % of its uses
- * (the Dex move's onBasePower asks randomChance(3, 10) and chains a factor of
- * 2), which the calculator does not know. The chance and the factor are read
- * from the Dex handler; the engine prices the move as the mix of its two
- * strengths, each with its 16 rolls and its crits. The oracle is the
- * simulator's own damage, drawn on a seed where the stronger strength came
- * out and one where it did not (sim-rolls.ts).
- */
+// Fickle Beam doubles in power on 30 % of its uses (onBasePower asks randomChance(3, 10)); the calculator lacks it.
 
 const MARKER = 'move: Fickle Beam';
 const dragonite = (): PokemonSet => set('Dragonite', ['Fickle Beam', 'Dragon Pulse', 'Splash']);
@@ -36,7 +28,6 @@ describe('the strength mix is read from the Dex handler', () => {
 
   test('Fickle Beam: 3 of 10 and a factor of 2; moves without a draw: none', () => {
     expect(strengthMix(dex, 'Fickle Beam')).toEqual({ numerator: 3, denominator: 10, chance: 0.3, factor: 2 });
-    // Dragon Pulse has no onBasePower; Venoshock has one without a chance draw; Expanding Force's needs the battle.
     for (const name of ['Dragon Pulse', 'Venoshock', 'Expanding Force', 'Earthquake', 'Splash']) expect(strengthMix(dex, name)).toBeNull();
   });
 
@@ -53,7 +44,6 @@ describe('the strength mix is read from the Dex handler', () => {
       if (hit?.kind === 'roll') damages.add(hit.snapshot.defender.hp - positionBattle(drawn.child).sides[1].active[0]!.hp);
     }
     expect(Math.abs(strong - 200 * mix.chance)).toBeLessThan(3 * Math.sqrt(200 * mix.chance * (1 - mix.chance)));
-    // Two damages only: the weak one and the doubled one.
     expect(damages.size).toBe(2);
   });
 });
@@ -148,7 +138,6 @@ describe('doubles: the pair plan reads the strength the dice drew', () => {
   const seeds = strengthSeeds(base(), choice, idle, MARKER);
   const weak = simDamages(base(), choice, idle, key, seeds.weak);
   const strong = simDamages(base(), choice, idle, key, seeds.strong);
-  // Only the doubled strength kills: the median of its rolls.
   const hp = [...strong.normal].sort((a, b) => a - b)[8];
   const root = rootOf('gen9doublescustomgame', [dragonite(), wall('Snorlax')], [wall(), wall('Chansey')], battle => { battle.sides[1].active[0]!.sethp(hp); });
   const share = (damages: SimDamages) => (1 - crit) * killing(damages.normal, hp) / 16 + crit * killing(damages.crit, hp) / 16;

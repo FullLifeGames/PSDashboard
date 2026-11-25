@@ -7,27 +7,13 @@ import { toId } from '../src/ids.ts';
 import { fixtureTexts, GENERATIONS, generatedTeams, withCorners } from './team-text-sources.ts';
 import './champions-mod';
 
-/**
- * Round 72, T241 step 1b: an Open Team Sheet (`|showteam|`) goes through the library. `parseShowteamSheet` and the sets
- * `extractTeamSheets` builds read one packed team entry by entry through `Teams.import` of @pkmn/sim, which unpacks a
- * single line with the Dex tables. The hand reader it replaced lives on below as `legacyParseShowteamSheet`, and this
- * spec holds the library to it on every `|showteam|` side of the fixtures and on simulator-generated teams of
- * generations 1 to 9 (plain and with corners, on both sides, so singles and doubles teams alike). Census at the change
- * (1,734 sides of fixtures and fit corpus): 974 read as before, 760 differ in the spelling of 12 names, all with equal
- * ids (`out/team-text-census.txt` of lane D).
- *   F2  The Dex spells a name where it knows the id: the hand splitter wrote "Will OWisp", "XScissor", "Lightof Ruin",
- *       "Uturn", "Freeze Dry", "Kings Shield", and the library's own fallback "Will O Wisp"; the Dex says "Will-O-Wisp",
- *       "X-Scissor", "Light of Ruin", "U-turn", "Freeze-Dry", "King's Shield". A name the Dex does not know keeps the
- *       text as written.
- *   F5  A species the sheet writes in its own field reads the Dex name ("Porygon2", "Zygarde-10%"); the real sheets (the
- *       server writes the species into the name field) read the same as before.
- */
+// Held to the hand reader except on purpose: F2 the Dex spells a name it knows ("Will-O-Wisp" for "Will OWisp"),
+// F5 a species written in its own field reads the Dex name ("Zygarde-10%").
 
 interface LegacySheetPokemon { species: string; item: string; ability: string; moves: string[]; teraType: string; level: number; gender: string }
 
 const legacySplitPackedName = (value: string): string => value.replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim();
 
-/** The hand reader as it stood before round 72 (packages/replay-core/src/opponent-inferrer.ts). */
 function legacyParseShowteamSheet(log: string, side: 'p1' | 'p2'): LegacySheetPokemon[] | null {
   const prefix = `|showteam|${side}|`;
   const line = log.split('\n').find(candidate => candidate.startsWith(prefix));
@@ -51,16 +37,11 @@ function legacyParseShowteamSheet(log: string, side: 'p1' | 'p2'): LegacySheetPo
   return pokemon.length > 0 ? pokemon : null;
 }
 
-/** The Dex's name where the Dex knows the id, the text as written where it does not (round 72, F2). */
 const dexSpelled = (table: { get(name: string): { exists: boolean; name: string } }, text: string): string => {
   const entry = table.get(text);
   return entry.exists ? entry.name : text;
 };
 
-/**
- * Equal on every field. The names of species, item, ability and moves compare as ids, because the two readers spell a
- * packed name differently (F2, F5); `exact` also holds the species, item, ability and moves to the old text spelled by the Dex tables.
- */
 function expectSameSheet(log: string, side: 'p1' | 'p2', exact: boolean) {
   const old = legacyParseShowteamSheet(log, side);
   const now = parseShowteamSheet(log, side);
@@ -109,13 +90,12 @@ describe('parseShowteamSheet reads like the hand reader did, through the Dex tab
   });
 
   test('an entry with fewer fields than a full one reads, and does not swallow the entries after it', () => {
-    // The line of unknown-forme-marker.spec.ts: Miraidon's entry has ten pipes where a full entry has eleven.
+    // Miraidon's entry has ten pipes where a full entry has eleven.
     const log = '|showteam|p2|Miraidon||ChoiceSpecs|HadronEngine|ElectroDrift,DracoMeteor,VoltSwitch,Protect|Timid||||50|]' +
       'Urshifu-Rapid-Strike||FocusSash|UnseenFist|SurgingStrikes,CloseCombat,AquaJet,Protect|Jolly||M|||50|]' +
       'Incineroar||SafetyGoggles|Intimidate|FakeOut,KnockOff,FlareBlitz,PartingShot|Careful||F|||50|';
     expect(parseShowteamSheet(log, 'p2')!.map(mon => mon.species)).toEqual(['Miraidon', 'Urshifu-Rapid-Strike', 'Incineroar']);
     expectSameSheet(log, 'p2', true);
-    // Cut off after the moves: the rest reads as empty, as the hand reader did.
     const cut = '|showteam|p1|Gengar||BlackSludge|CursedBody|ShadowBall,SludgeBomb]Pikachu||LightBall|Static|Thunderbolt|Timid||F|||50|';
     expect(parseShowteamSheet(cut, 'p1')!.map(mon => [mon.species, mon.level, mon.gender])).toEqual([['Gengar', 100, ''], ['Pikachu', 50, 'F']]);
     expectSameSheet(cut, 'p1', true);
@@ -147,7 +127,6 @@ describe('parseShowteamSheet reads like the hand reader did, through the Dex tab
     const sets = extractTeamSheets(`|player|p2|Bo|1|
 ${line}`).p2!;
     const sheet = parseShowteamSheet(line, 'p2')!;
-    // A short first entry no longer drops the entries after it (F6), and the spelling is the sheet reader's.
     expect(sets.map(set => set.species)).toEqual(sheet.map(mon => mon.species));
     expect(sets.map(set => set.moves)).toEqual(sheet.map(mon => mon.moves));
     expect(sets[1].moves).toEqual(['Will-O-Wisp', 'X-Scissor', 'Protect', 'Tailwind']);

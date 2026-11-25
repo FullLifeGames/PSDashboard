@@ -11,7 +11,6 @@ import { createRootPosition } from '../src/forward/position.ts';
 const position = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf8')) as { serialized: string; turn: number };
 
-/** The root options the engine's own matrix uses. */
 function rootOptions(serialized: string) {
   const root = createRootPosition(serialized);
   return {
@@ -37,7 +36,7 @@ const answer = (overrides: Partial<EngineResponse> = {}): EngineResponse => ({
   ...overrides,
 });
 
-describe('the engine protocol (round 77, user gate 28.10.2026: "1a 2a 3a 4a 5a 6a")', () => {
+describe('the engine protocol ("1a 2a 3a 4a 5a 6a")', () => {
   test('an option names the dashboard id, the label, and the command a Showdown client sends', () => {
     expect(engineOptions([
       { choice: 'move closecombat', label: 'Close Combat' },
@@ -64,10 +63,8 @@ describe('the engine protocol (round 77, user gate 28.10.2026: "1a 2a 3a 4a 5a 6
       expect(built.state).toBe(fixture.serialized);
       expect(built.budgetMs).toBe(4000);
       expect(built.options.p1.map(option => option.id)).toEqual(options.p1.map(option => option.choice));
-      // The spectator log: the public lines up to the turn, no |split| secrets.
       expect(built.log).toContain(`|turn|${fixture.turn}`);
       expect(built.log.some(line => line.startsWith('|split|'))).toBe(false);
-      // Each side's request as the simulator would send it.
       expect((built.requests.p1 as { side?: { id?: string } } | null)?.side?.id).toBe('p1');
       expect((built.requests.p2 as { side?: { id?: string } } | null)?.side?.id).toBe('p2');
     }

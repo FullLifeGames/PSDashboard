@@ -5,15 +5,7 @@ import { forceSwitches as engineForceSwitches } from '../../packages/eval-engine
 import type { SimBattle } from '../../packages/eval-engine/src/branch/types';
 import { requiredChoices } from '../../src/hooks/branch/shared';
 
-/**
- * Round 89 (final gate, D8a): `requiredChoices` of the branch hook (src/hooks/branch/shared.ts) is a deliberate copy of the engine's
- * `forceSwitches` (packages/eval-engine/src/branch/forced-slots.ts) in its request reading: the app reaches the package through its
- * barrel only, and the barrel does not export the engine's reader (`forward/request-reviving.ts`), so the hook reads a Revival
- * Blessing prompt itself (`reviving` on an active party entry of the request) and caps the forced slots by the living bench
- * as `canSwitchIn` of the simulator does. AGENTS.md asks a deliberate copy for a spec that compares the two: here both read the same
- * simulator battles, in singles and doubles, and name the same slots. The scenes: a Revival Blessing prompt, a forced replacement with
- * a living bench, and (doubles) two fainted slots with one living body behind them, where the bench caps the replacements.
- */
+// `requiredChoices` copies the engine's `forceSwitches` on purpose: the app reaches the package by its barrel only.
 const set = (species: string, moves: string[], level = 100): PokemonSet => ({
   name: species, species, item: '', ability: '', moves, nature: 'Hardy', level, gender: '',
   evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
@@ -68,10 +60,8 @@ describe('the branch hook reads a request as the engine does', () => {
     test(`${scene.doubles ? 'doubles' : 'singles'}: ${scene.label}`, () => {
       const battle = scene.battle();
       expect(battle.sides[0].requestState).toBe('switch');
-      // The scene has teeth: the request asks for the slots below, and the copy and the engine both name exactly those.
       expect(engineForceSwitches(battle as unknown as SimBattle, 0)).toEqual(scene.slots);
       expect(requiredChoices(battle, 'p1')).toEqual(scene.slots);
-      // The side that was not asked has nothing forced in either reading.
       expect(engineForceSwitches(battle as unknown as SimBattle, 1)).toEqual(scene.slots.map(() => false));
     });
   }

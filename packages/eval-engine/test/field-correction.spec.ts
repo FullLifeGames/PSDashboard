@@ -7,13 +7,6 @@ import { advancePositionWithLog, createRootPosition } from '../src/forward-model
 import { serializeBattleStable } from '../src/forward/serialize';
 import { SEEDS, stableLog, withSimFast } from './sim-fast-helpers';
 
-/**
- * Round 60 (T92): the snapshot correction wrote side conditions without
- * their layers (Spikes priced NaN, the sim skipped the damage; Toxic Spikes
- * never poisoned badly), let corrected weather last forever and left
- * corrected terrain without its state.
- */
-
 const mon = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: '', ability: 'No Ability', moves, nature: 'Hardy', gender: '',
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
@@ -38,7 +31,7 @@ function snapshotOf(battle: Battle, field: Partial<TurnSnapshot['field']>, p1Con
   } as TurnSnapshot;
 }
 
-describe('field correction (round 60, T92)', () => {
+describe('field correction', () => {
   test('inserted Spikes (3) and Toxic Spikes (2) hit the next switch-in', () => {
     const battle = battleOf([mon('Blissey', ['Splash']), mon('Garchomp', ['Splash'])], [mon('Blissey', ['Splash'])]);
     correctBattleFromSnapshot(battle, snapshotOf(battle, {}, {
@@ -51,7 +44,6 @@ describe('field correction (round 60, T92)', () => {
     const chomp = battle.sides[0].active[0]!;
     expect(chomp.species.name).toBe('Garchomp');
     expect(chomp.status).toBe('tox');
-    // A quarter from three layers of Spikes plus the first Toxic tick.
     expect((chomp.maxhp - chomp.hp) / chomp.maxhp).toBeGreaterThan(0.29);
   });
 
@@ -78,7 +70,7 @@ describe('field correction (round 60, T92)', () => {
     expect(battle.field.terrainState.duration).toBeUndefined();
   });
 
-  test('a snapshot from before round 60 (no weatherState) corrects weather as before', () => {
+  test('a snapshot without weatherState still corrects the weather', () => {
     const battle = battleOf([mon('Blissey', ['Splash'])], [mon('Blissey', ['Splash'])]);
     expect(() => correctBattleFromSnapshot(battle, snapshotOf(battle, { weather: 'Sun' }))).not.toThrow();
     expect(battle.field.weather).toBe('sunnyday');

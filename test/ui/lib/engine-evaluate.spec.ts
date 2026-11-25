@@ -13,7 +13,6 @@ const choices = {
 };
 const executor = { choices: vi.fn(async () => choices) };
 
-/** A fetch stand-in that records the request and answers with what the test names. */
 function serve(answer: (request: EngineRequest) => { status?: number; body: unknown }) {
   const seen: EngineRequest[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
@@ -32,7 +31,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('another engine answers over HTTP (round 77, user gate 28.10.2026)', () => {
+describe('another engine answers over HTTP', () => {
   test('the request carries the pool\'s options; the checked answer comes back ranked and names its engine', async () => {
     const seen = serve(request => ({
       body: {
@@ -53,7 +52,7 @@ describe('another engine answers over HTTP (round 77, user gate 28.10.2026)', ()
     expect(result.engine).toEqual({ id: engine.id, name: 'Test engine', version: '0.1' });
   });
 
-  test('the order bound of the played turn rides on the result, whichever engine ranked the rows (round 89, #108)', async () => {
+  test('the order bound of the played turn rides on the result, whichever engine ranked the rows', async () => {
     serve(request => ({
       body: {
         protocol: ENGINE_PROTOCOL, score: 0.2,

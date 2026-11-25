@@ -13,19 +13,10 @@ import {
 import { winPercent } from './winprob.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
 
-/**
- * Multi-turn root-cause analysis over a completed graph sweep: where the
- * game tipped for good, which decisions seeded the loss, and how much of
- * the result was play vs luck. Pure — no sim imports, main-bundle safe.
- */
-
 export { KEY_MOMENT_SWING };
-/** How many misplays the report lists per player. */
 const REPORT_MISPLAYS_PER_SIDE = 2;
-/** How many paid-off reads the report lists per player. */
 const REPORT_READS_PER_SIDE = 2;
 
-/** One risk whose read won value, ready for display. */
 interface GameRead {
   turn: number;
   side: 'p1' | 'p2';
@@ -33,68 +24,48 @@ interface GameRead {
   /** Own-perspective value won over the safe line's guarantee. */
   payoff: number;
 }
-/** Below this summed regret a player's game counts as clean. */
 const CLEAN_PLAY_TOTAL = 0.2;
 
-/** One regretted decision, ready for display. */
 interface GameMisplay {
   turn: number;
   side: 'p1' | 'p2';
   regret: number;
   played: string;
   better: string;
-  /** Verdict band (mistake or blunder — inaccuracies stay out of the list). */
+  /** Verdict band: mistake or blunder; inaccuracies stay out of the list. */
   tier?: VerdictTier;
-  /** The punishing reply never came — a read that came true, not a punished misplay. */
   riskUnpunished?: boolean;
-  /** A nearly-dead Pokémon was deliberately fed — rendered neutrally as a sack. */
   sacrifice?: boolean;
-  /** Round 89 (FT-1d, #162): the body fell before it moved; `played` is the engine's stand-in label, so the display says so and gives the stand-in's chance. */
+  /** The body fell before it moved; `played` is the engine's stand-in label, so the display gives its chance. */
   neverActed?: { ev: number; faintedFraction?: number };
-  /** Round 64 (T123): a regret over 1 spans these two values (shown best, played), rendered as two win chances. */
+  /** A regret over 1 spans these two values (shown best, played). */
   span?: { from: number; to: number; faintedFraction?: number };
 }
 
+/** The game report: turning point, key moments, misplays, reads, totals and the summary text. */
 export interface GameReport {
   winner: 'p1' | 'p2' | null;
-  /** The turn whose play made the winner's advantage permanent (null = wire-to-wire or unknown). */
+  /** The turn whose play made the winner's advantage permanent; null = wire-to-wire or unknown. */
   turningPoint: number | null;
-  /** The biggest non-quiet swings, in turn order. */
   keyMoments: TurnAnalysis[];
-  /** Each side's biggest regrets, in turn order. */
   misplays: GameMisplay[];
-  /** Each side's biggest paid-off reads, in turn order. */
   reads: GameRead[];
-  /** False when played actions were unavailable — an empty misplay list then means "unknown", not "clean". */
+  /** False when played actions were unavailable: an empty misplay list then means "unknown", not "clean". */
   tracked: boolean;
-  /**
-   * Lichess-style game accuracy per player (0–100): win-probability loss per
-   * graded turn through the accuracy curve, aggregated as the mean of the
-   * harmonic and volatility-weighted means. Null under 5 graded turns.
-   */
+  /** Lichess-style game accuracy per player (0–100); null below ACCURACY_MIN_TURNS graded turns. */
   accuracy?: { p1: number | null; p2: number | null };
-  /** Summed regret per player across the analyzed game. */
   decisionTotals: { p1: number; p2: number };
   /** Net chance contribution across the game (p1 perspective). */
   chanceTotal: number;
-  /**
-   * Chance booked past the favor boundary toward the winner — the decided
-   * game RESOLVING (the static bar's horizon gap on a locked endgame), not
-   * luck. Kept out of `chanceTotal` and the key moments (573756 t138).
-   */
+  /** Chance booked past the favor boundary toward the winner: the decided game resolving; kept out of `chanceTotal`. */
   resolutionTotal: number;
-  /** Chance summed over the protocol's dice-event turns (p1 perspective, resolution excluded) — the luck claims' anchor. Absent without dice info. */
+  /** Chance over the dice-event turns (p1 perspective, resolution excluded); absent without dice info. */
   diceAnchorTotal?: number;
-  /**
-   * Round 67 (T22): chanceTotal in two parts (p1 perspective): the turns with a roll in their residual's
-   * direction and the rest (an estimate that moved with no roll behind it). Absent without the turns' rolls.
-   */
+  /** `chanceTotal` in two parts: turns with a roll in their residual's direction and the rest; absent without rolls. */
   chanceSplit?: LuckSplit;
-  /** How the winner sealed it: the first proven forced win or decided sweep. Absent without a signal. */
   conversion?: WinConversion;
-  /** A one-roll sweep that visibly failed while the game ran on — the denied early end (denied-end.ts). */
   deniedEnd?: DeniedEnd;
-  /** The dominant edge the summary credits the win to ('close' = the fallback sentence). Absent when the seeds tell the story or no winner is known. */
+  /** The dominant edge the summary credits the win to ('close' = the fallback sentence); absent without a winner. */
   winPath?: WinPath;
   summary: string;
 }
@@ -102,10 +73,7 @@ export interface GameReport {
 type Winner = 'p1' | 'p2' | null;
 type Side = 'p1' | 'p2';
 
-/**
- * Score series by turn: s[t] = score at the start of turn t, plus one final
- * entry after the last analyzed turn. Unknown turns stay undefined.
- */
+// s[t] is the score at the start of turn t, plus a final entry after the last analyzed turn; unknown turns: undefined.
 function scoreSeries(analyses: (TurnAnalysis | null)[]): (number | undefined)[] {
   const series: (number | undefined)[] = new Array(analyses.length + 2).fill(undefined);
   for (const analysis of analyses) {
@@ -116,15 +84,8 @@ function scoreSeries(analyses: (TurnAnalysis | null)[]): (number | undefined)[] 
   return series;
 }
 
-/** Minimum graded turns before an accuracy number is honest. */
 const ACCURACY_MIN_TURNS = 5;
 
-/**
- * Per-player game accuracy: each graded turn's win-probability loss runs
- * through Lichess's accuracy curve; the game aggregates as the mean of the
- * harmonic mean (single blunders drag hard — right for short games) and the
- * volatility-weighted mean (sharp phases count more).
- */
 function accuracyFor(
   known: TurnAnalysis[],
   side: 'p1' | 'p2',
@@ -138,9 +99,6 @@ function accuracyFor(
 
   const entries = graded.map(analysis => {
     const sideAnalysis = analysis[side];
-    // Scores and EVs are wp-units: winPercent owns the calibrated
-    // score→probability conversion, so accuracy loss is priced in the same
-    // honest probability space the user sees.
     const toWin = (value: number) => winPercent(value) / 100;
     const deltaWin = Math.max(0, toWin(sideAnalysis.best!.ev) - toWin(sideAnalysis.played!.ev));
     const accuracy = Math.max(0, Math.min(100,
@@ -162,10 +120,6 @@ function accuracyFor(
   return (harmonic + weighted) / 2;
 }
 
-/**
- * Earliest turn from which every known score favors the winner — the game's
- * decided region. Feeds both the turning point and resolution detection.
- */
 function favorBoundary(series: (number | undefined)[], winner: 'p1' | 'p2'): number | null {
   const favors = (score: number) => (winner === 'p1' ? score > 0 : score < 0);
   let earliest: number | null = null;
@@ -178,14 +132,7 @@ function favorBoundary(series: (number | undefined)[], winner: 'p1' | 'p2'): num
   return earliest;
 }
 
-/**
- * Chance booked inside the decided region TOWARD the winner is the game
- * resolving: past the favor boundary the static bar underprices a locked
- * endgame, so its terminal convergence "surprises" the model by the
- * horizon gap (573756 t138: chanceDelta −1.02 on the final KO of a game
- * decided at t71). Those turns leave the key moments and the luck ledger;
- * chance AGAINST the winner stays genuine luck wherever it lands.
- */
+// Past the favor boundary a locked endgame is underpriced, so its convergence is no luck; chance against the winner is.
 function resolutionTurns(known: TurnAnalysis[], boundary: number | null, winner: Winner): Set<number> {
   const towardWinner = (delta: number) => (winner === 'p1' ? delta > 0 : delta < 0);
   return new Set(boundary === null ? [] : known
@@ -194,10 +141,7 @@ function resolutionTurns(known: TurnAnalysis[], boundary: number | null, winner:
     .map(analysis => analysis.turn));
 }
 
-/**
- * Selected PER SIDE — a global top list lets one player's numbers (often
- * a winner's unpunished risks) crowd the other's out entirely.
- */
+// Selected per side: a global top list would let one player's numbers crowd the other's out.
 function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
   return known
     .filter(analysis => badTier(analysis[side]) &&
@@ -207,8 +151,7 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
       side,
       regret: analysis[side].regret ?? 0,
       played: analysis[side].played!.label,
-      // A mechanically null best displays as its co-optimal alternative —
-      // same swap the turn summary makes (grading untouched).
+      // A mechanically null best displays as its co-optimal alternative, as in the turn summary.
       better: analysis[side].bestNull?.alternative?.label ?? analysis[side].best!.label,
       ...(analysis[side].tier ? { tier: analysis[side].tier } : {}),
       ...(analysis[side].riskUnpunished ? { riskUnpunished: true } : {}),
@@ -219,10 +162,7 @@ function misplaysFor(known: TurnAnalysis[], side: Side): GameMisplay[] {
     .slice(0, REPORT_MISPLAYS_PER_SIDE);
 }
 
-/**
- * Round 67 (T59): a read whose side lost ground on the turn stays off the list (its regret stays out of the totals).
- * Round 79 (T285): so does a read inside a standoff, where the payoff is the HP and PP cycle of one position.
- */
+// Reads stay off the list when the side lost ground (their regret leaves the totals) or the turn is inside a standoff.
 function readsFor(known: TurnAnalysis[], side: Side, standoffs: readonly Standoff[]): GameRead[] {
   return known
     .filter(analysis => analysis[side].riskPaidOff && analysis[side].played && !lostGround(analysis, side) &&
@@ -237,10 +177,8 @@ function readsFor(known: TurnAnalysis[], side: Side, standoffs: readonly Standof
     .slice(0, REPORT_READS_PER_SIDE);
 }
 
-/** Paid-off reads are not decision errors — they stay out of the totals. */
 const regretOf = (side: SideAnalysis) => (side.riskPaidOff ? 0 : side.regret ?? 0);
 
-/** Summed regret per player, the net chance outside the resolution turns, and the resolution itself. */
 function gameTotals(
   known: TurnAnalysis[],
   resolution: Set<number>,
@@ -256,12 +194,11 @@ function gameTotals(
   return { decisionTotals, chanceTotal, resolutionTotal };
 }
 
-/** The winner-side pieces of the story (win-reason.ts), resolved once for the summary and the report fields. */
 interface WinStory {
   seeds: TurnAnalysis[];
   conversion: ReturnType<typeof conversionFor>;
   denied: DeniedEnd | null;
-  /** Round 79 (T284): the largest roll against the winner, absent where the denied end already speaks that turn. */
+  /** The largest roll against the winner, absent where the denied end already speaks that turn. */
   roll: BiggestRoll | null;
   /** The tip turn's mechanism clause ('' when it has none the report may name). */
   tip: string;
@@ -293,14 +230,12 @@ function winStoryFor(args: {
     known, series: args.series, boundary: args.boundary, winner, playerNames: args.playerNames, chanceTotal: args.chanceTotal,
     diceAnchor: args.diceAnchor, chanceSplit: args.chanceSplit, playedTracking, seedsSpoken: seeds.length > 0,
   });
-  // Nothing else explained a tipped game: say so instead of saying nothing.
   if (!path && !conversion && seeds.length === 0 && turningPoint !== null) {
     return { seeds, conversion, denied, roll, tip, path: closeGameFallback(args.playerNames[sideIndex(winner)]) };
   }
   return { seeds, conversion, denied, roll, tip, path };
 }
 
-/** The winner's story: who won, when and how it tipped, the conversion, the seeds (or clean play), and the winning edge. */
 function winnerSentences(
   playerNames: [string, string],
   winner: Side,
@@ -326,8 +261,6 @@ function winnerSentences(
     const parts = story.seeds.map(analysis => seedPhrase(analysis, loser));
     sentences.push(`The seeds of the loss: ${parts.join(' and ')}.`);
   } else if (playedTracking && decisionTotals[loser] < CLEAN_PLAY_TOTAL) {
-    // With a win-path sentence following, the explaining is its job — the
-    // clean line keeps the praise and drops its matchup-and-variance tail.
     sentences.push(story.path
       ? `${loserName}'s play was clean.`
       : `${loserName}'s play was clean: the loss came from matchup and variance, not blunders.`);
@@ -336,7 +269,6 @@ function winnerSentences(
   return sentences;
 }
 
-/** The report's prose: the winner's story (or the unfinished note), then the luck line. */
 function reportSummary(
   known: TurnAnalysis[],
   playerNames: [string, string],
@@ -356,7 +288,6 @@ function reportSummary(
   } else if (known.length > 0) {
     sentences.push('No winner recorded; the game may be unfinished.');
   }
-  // Round 79 (T285): the stretch the key moments and the reads skip is named once, in game terms.
   if (standoffs.length > 0) sentences.push(standoffSentence(standoffs));
 
   if (!story?.path?.foldLuck && Math.abs(chanceTotal) >= LUCK_TOTAL_THRESHOLD) {
@@ -365,7 +296,6 @@ function reportSummary(
   return sentences.join(' ');
 }
 
-/** The report's optional story-and-anchor fields, absent when unset. */
 function optionalFields(story: WinStory | null, diceAnchor: number | null, split: LuckSplit | null): Partial<GameReport> {
   return {
     ...(diceAnchor !== null ? { diceAnchorTotal: diceAnchor } : {}),
@@ -376,15 +306,16 @@ function optionalFields(story: WinStory | null, diceAnchor: number | null, split
   };
 }
 
+/** Builds the game report from the turn analyses of a finished game. */
 export function buildGameReport(
   analyses: (TurnAnalysis | null)[],
   playerNames: [string, string],
   winner: 'p1' | 'p2' | null,
-  /** False = played actions unavailable (doubles): no seeds, no clean-play claim. */
+  /** False = played actions unavailable: no seeds, no clean-play claim. */
   playedTracking = true,
   /** Turns with a protocol-visible dice event (dice-events.ts); null = no dice info, luck claims stay ungated. */
   diceTurns: ReadonlySet<number> | null = null,
-  /** Round 86 (T304): the engine's score of the next root with the biggest roll's die turned over (rolled-copy.ts); null = not played. */
+  /** Score of the next root with the biggest roll's die turned over (rolled-copy.ts); null = not played. */
   rollFlip: RollFlip | null = null,
 ): GameReport {
   const known = analyses.filter((entry): entry is TurnAnalysis => entry !== null);
@@ -405,7 +336,6 @@ export function buildGameReport(
     : { p1: null, p2: null };
 
   const diceAnchor = diceAnchorFor(known, diceTurns, resolution);
-  // Round 67 (T22): the ledger in the rolled part and the rest, when every turn carries its rolls.
   const chanceSplit = luckSplit(known, resolution);
 
   // The play that produced the boundary score happened on the turn before.

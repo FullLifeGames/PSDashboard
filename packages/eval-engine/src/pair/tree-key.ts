@@ -6,18 +6,8 @@ import { readPattern, type EntriesFor, type TableFor } from './pattern.ts';
 import { entriesOf, tablesFor } from './sampler.ts';
 import type { DieQuantiles } from '../search/root-quantile.ts';
 
-/**
- * Round 86 (A9b): the class key of a doubles tree's root draw, the one the pair plan gives the sampler's classes. A tree draws a
- * root cell once, at its first visit. The draw runs under the pair recorder (`drawKeyed`: the natural stream, number for number),
- * `readPattern` names its class from the recorded dice and the kill tables of the hits, and the key goes into the tree's root book,
- * where the merge joins the tree to the pool of the class it drew. A tree draw and a sampler class share a key because it is one
- * function over the same records. A cell the sampler never plans (a guard before the draw), a read that falls back and a draw
- * without an uncertain event book no key: they carry no blend at the merge either.
- */
-
 interface PairKeyState { battle: Battle; tableFor: TableFor; entriesFor: EntriesFor; pairable: Map<number, boolean> }
 
-/** The pair state of one tree's root, per owner (the tree's root book): the battle, the kill tables of its hits, the entries of its moves. */
 const states = new WeakMap<object, PairKeyState>();
 
 function stateOf(owner: object, root: SimPosition): PairKeyState {
@@ -30,7 +20,6 @@ function stateOf(owner: object, root: SimPosition): PairKeyState {
   return state;
 }
 
-/** The sampler's gate for a cell: both choices parse to slot actions and no guard sends the cell to the plain draws before any die. */
 function pairable(state: PairKeyState, key: number, p1Choice: string, p2Choice: string): boolean {
   let ok = state.pairable.get(key);
   if (ok === undefined) {
@@ -42,20 +31,16 @@ function pairable(state: PairKeyState, key: number, p1Choice: string, p2Choice: 
   return ok;
 }
 
-/** `classWeight`: the plan's chance of the drawn class (round 89, #59), null together with a null key. */
+/** `classWeight`: the plan's chance of the drawn class, null together with a null key. */
 export interface KeyedAdvance { child: SimPosition; log: string[]; pendingSwitch: boolean; classKey: string | null; classWeight: number | null }
 
-/**
- * One root draw of a doubles tree with its class key (null when the draw shows no uncertain event or the read falls back). Null as a
- * whole when the pair plan never reads the cell: the caller draws plainly.
- */
+/** One root draw of a doubles tree with its class key; null when the pair plan never reads the cell. */
 export function keyedAdvance(
-  owner: object, root: SimPosition, key: number, p1Choice: string, p2Choice: string, seed: PRNGSeed, stopAtForcedSwitch: boolean,
-  quantiles?: DieQuantiles,
+  owner: object, root: SimPosition, key: number, p1Choice: string, p2Choice: string, seed: PRNGSeed, quantiles?: DieQuantiles,
 ): KeyedAdvance | null {
   const state = stateOf(owner, root);
   if (!pairable(state, key, p1Choice, p2Choice)) return null;
-  const drawn = drawKeyed(root, p1Choice, p2Choice, seed, stopAtForcedSwitch, quantiles);
+  const drawn = drawKeyed(root, p1Choice, p2Choice, seed, true, quantiles);
   const pattern = readPattern(drawn.records, drawn.log, state.battle.dex, state.tableFor, state.entriesFor);
   const keyed = pattern.kind === 'pattern' && pattern.events.length > 0;
   return {

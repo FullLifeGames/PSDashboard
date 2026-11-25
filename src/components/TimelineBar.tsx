@@ -11,10 +11,9 @@ interface TimelineBarProps {
   endSnapshotTurn: number | null;
   atEndPosition: boolean;
   viewingVariation: boolean;
-  /** The variation's live sim has a winner: its tip reads End and the total counts played turns (round 77, A-6). */
   variationEnded?: boolean;
   branching: boolean;
-  /** A new game's tip turn that is no variation (waiting for its replacement): the slider counts it, the variation's chrome stays away. */
+  /** A new game's tip waiting for its replacement: the slider counts it, the variation's chrome stays away. */
   idle?: boolean;
   onNavigate: (position: TimelinePosition) => void;
   onGraphSelectLine: (turn: number) => void;
@@ -22,11 +21,8 @@ interface TimelineBarProps {
 }
 
 function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationSpan; maxTurn: number }) {
-  // Gold stripe under the slider marking where the variation
-  // lives — without it nothing on the timeline said so.
   const max = sliderMax(maxTurn, variationSpan);
   const pos = (turn: number) => (max <= 1 ? 0 : ((turn - 1) / (max - 1)) * 100);
-  // A turn-0 variation starts left of the slider's domain.
   const from = Math.max(0, pos(variationSpan.startTurn));
   const to = pos(variationTip(variationSpan));
   return (
@@ -41,7 +37,6 @@ function VariationStripe({ variationSpan, maxTurn }: { variationSpan: VariationS
 function TimelinePositionLabel({ viewT0, viewTurn, variationSpan, maxTurn, endSnapshotTurn, atEndPosition, viewingVariation, variationEnded }: Pick<TimelineBarProps,
   'viewT0' | 'viewTurn' | 'variationSpan' | 'maxTurn' | 'endSnapshotTurn' | 'atEndPosition' | 'viewingVariation' | 'variationEnded'>) {
   const playedMain = endSnapshotTurn !== null ? endSnapshotTurn - 1 : maxTurn;
-  // An ended variation's tip is its end sentinel, not one more played turn.
   const atVariationEnd = !!variationEnded && viewingVariation && variationSpan !== null && viewTurn >= variationTip(variationSpan);
   const total = variationEnded && variationSpan ? Math.max(playedMain, variationTip(variationSpan) - 1) : sliderMax(playedMain, variationSpan);
   return (
@@ -52,8 +47,7 @@ function TimelinePositionLabel({ viewT0, viewTurn, variationSpan, maxTurn, endSn
         <strong style={{ color: '#fff' }}>End</strong>
       ) : (
         <>
-          {/* The total counts PLAYED turns — the end snapshot is the
-              "End" sentinel, not a 68th turn of a 67-turn game. */}
+          {/* The total counts played turns: the end snapshot is the "End" sentinel. */}
           T<strong style={{ color: '#fff' }}>{viewTurn}</strong>/{total}
         </>
       )}
@@ -127,7 +121,6 @@ function TimelineBackControls({ viewT0, viewTurn, viewLine, onNavigate, onGraphS
   );
 }
 
-/** Timeline bar: always visible — one slider over main line and variation. */
 export function TimelineBar(props: TimelineBarProps) {
   const { viewT0, viewTurn, viewLine, variationSpan, maxTurn, branching, idle = false, onNavigate, onGraphSelectLine, onDiscard } = props;
   return (
@@ -152,9 +145,7 @@ export function TimelineBar(props: TimelineBarProps) {
         viewingVariation={props.viewingVariation}
         variationEnded={props.variationEnded}
       />
-      {/* Round 88 (T345, #81): the chip and Discard variation share one wrapper, so they move to a second row together when the slider
-          would fall below 200 px. The chip stays put while a variation exists: flickering away outside the covered turns made the
-          whole bar jump around. */}
+      {/* The chip stays put while a variation exists: hiding it outside the covered turns made the bar jump. */}
       {(variationSpan !== null || branching) && !idle && (
         <div className="ps-branch-bar-vari">
           {variationSpan !== null && (

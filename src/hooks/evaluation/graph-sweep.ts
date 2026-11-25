@@ -16,12 +16,7 @@ import { coverageNotice, makePositionSource } from './sweep-positions';
 export type { GraphSweepParams } from './sweep-types';
 export { coverageNotice };
 
-/**
- * The ⚠ line's second half: acquisition gaps keep coverageNotice's wording,
- * eval-layer gaps (live position, throwing evaluation) append their count
- * and the first reason — without this they were invisible (653785 lost
- * 16 of 26 turns with the notice staying null).
- */
+/** The ⚠ line's second half: coverageNotice's wording for acquisition gaps; count and first reason for eval gaps. */
 export function withEvalGapNotice(
   acquisition: string | null, evalErrors: (string | null)[],
 ): string | null {
@@ -34,11 +29,8 @@ export function withEvalGapNotice(
 export interface EvalGraphState {
   /** scores[t-1] = score at turn t; null = not evaluated (gap). */
   scores: (number | null)[];
-  /** Full per-turn results for the analysis view. */
   results: (EvalResult | null)[];
-  /** What produced each result (fast scan vs configured settings). */
   settings: (TurnEvalSettings | null)[];
-  /** Fainted fraction at each swept turn's position — the auto mode's routing signal. */
   faintedFractions: (number | null)[];
   played: (PlayedTurn | null)[];
   playedOutcome: (number | null)[];
@@ -46,40 +38,22 @@ export interface EvalGraphState {
   verified: (TurnVerification | null)[];
   /** Item-sensitivity probes per turn (null = nothing to probe / not run). */
   sensitivity: (TurnSensitivity | null)[];
-  /**
-   * Per-turn eval-layer failure: the position existed but its evaluation
-   * threw (evalErrors[t-1] = message). Acquisition gaps stay in `notice` —
-   * a turn never carries both. Cleared the moment any pass scores the turn.
-   */
+  /** evalErrors[t-1] = message of a throwing evaluation; acquisition gaps stay in `notice`. */
   evalErrors: (string | null)[];
-  /** Turn 0 (team preview) evaluation — null when unavailable or not swept. */
+  /** Turn 0 (team preview) evaluation; null when unavailable or not swept. */
   lead: LeadEvalData | null;
-  /**
-   * Round 79 (T290): the replacement points after a knockout, under the card of the turn that follows it (replacements[t - 1]
-   * holds what happened between turn t - 1 and turn t, in request order). Null = none or not priced; absent = no sweep ran.
-   */
+  /** replacements[t-1] = the replacements between turn t-1 and t; null = none or not priced, absent = no sweep ran. */
   replacements?: (ReplacementEvalData[] | null)[];
-  /**
-   * Round 86 (T304): the engine's score (p1's view) of the next root with the game's biggest roll's die turned over, played by the
-   * sweep's last stage. Null = no named roll or no copy; absent = no full sweep ran.
-   */
+  /** p1-view score with the biggest roll's die turned over; null = no named roll or no copy, absent = no full sweep. */
   rollFlip?: RollFlip | null;
-  /**
-   * Why the line is short, when it is: the single-pass acquisition only
-   * reached part of the game (a diverging reconstruction). Silence here
-   * used to leave the panel showing an unexplained empty graph.
-   */
+  /** Why the line is short, when it is: the single pass reached only part of the game (a diverging reconstruction). */
   notice: string | null;
   running: boolean;
   progress: { done: number; total: number } | null;
-  /**
-   * Round 77 (C1): set when a single evaluation took over while the sweep was running; the sweep's status names
-   * where it stopped. Any new sweep or a clear resets it. Absent or null = nothing was stopped.
-   */
+  /** Set when a single evaluation took over mid-sweep; the status names where it stopped. Absent or null = nothing. */
   stopped?: { done: number; total: number } | null;
 }
 
-/** The persisted-between-sweeps slice of the graph state (range sweeps merge into it). */
 export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements' | 'rollFlip'>;
 
 const emptyGraphState = (): EvalGraphState => ({
@@ -87,12 +61,10 @@ const emptyGraphState = (): EvalGraphState => ({
   notice: null, running: false, progress: null,
 });
 
-/** Copy of the previous run's array when it is being kept, else a null-filled fresh one. */
 function carriedArray<T>(kept: T[] | undefined, turns: number): (T | null)[] {
   return kept ? [...kept] : new Array(turns).fill(null);
 }
 
-/** Working arrays for one sweep: fresh, or copies of the previous graph when the game length matches. */
 function buildSweepData(params: GraphSweepParams, previous: GraphData | null): SweepData {
   const keepPrevious = previous !== null && previous.scores.length === params.turns;
   const kept = <T>(array: T[] | undefined): T[] | undefined => (keepPrevious ? array : undefined);
@@ -115,7 +87,6 @@ function buildSweepData(params: GraphSweepParams, previous: GraphData | null): S
   };
 }
 
-/** The lead evaluation's cache layers (memory, then the persisted store). */
 async function loadLeadResult(
   env: SweepEnv, lead0: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -129,7 +100,6 @@ async function loadLeadResult(
   return hit?.result ?? null;
 }
 
-/** Search the team-preview position and persist the result. */
 async function searchLeadResult(
   env: SweepEnv, leadSettings: AppEvalSettings, lead0: TurnEvalSettings, key: string, storeKey: string,
 ): Promise<'abort' | EvalResult | null> {
@@ -150,25 +120,16 @@ async function searchLeadResult(
   } catch (err) {
     if (env.runRef.current !== env.runId) return 'abort';
     if (err instanceof Error && err.message === 'cancelled') return 'abort';
-    // No turn 0 for this replay — the graph stands on its own.
     return null;
   }
 }
 
-/**
- * Turn 0: the lead decision, one extra evaluation at full settings —
- * after the graph so the game line appears first. false = aborted (the
- * caller must skip the finalize, exactly like the pre-split early return).
- */
 async function evaluateLead(
   env: SweepEnv,
   sweep: { depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'] },
   paintFinal: (running: boolean) => void,
 ): Promise<boolean> {
   if (!(env.params.acquirePreview && env.data.lead === null && env.runRef.current === env.runId)) return true;
-  // Round 61: under auto the lead keeps the matrix whatever the turns run;
-  // round 63: the budget's own lead matrix, apart from the early splits
-  // (resolveAutoLeadSettings).
   const { depth, samples, mode } = sweep;
   const lead0 = mode === 'auto' ? resolveAutoLeadSettings() : { depth, samples, mode };
   const leadSettings: AppEvalSettings = { ...lead0, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
@@ -189,7 +150,6 @@ async function evaluateLead(
   return true;
 }
 
-/** The stages after the turn passes: the lead, the replacement points, then the biggest roll played the other way. false = aborted. */
 async function evaluateEnd(
   env: SweepEnv,
   sweep: { depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'] },
@@ -198,27 +158,12 @@ async function evaluateEnd(
   return (await evaluateLead(env, sweep, paintFinal)) && (await evaluateReplacements(env, paintFinal)) && (await evaluateRolledCopy(env));
 }
 
-/**
- * One store read for the whole run: every persisted eval of this replay
- * (all turns, engines, fingerprints) instead of one read per turn. false
- * = the run changed hands while the read was in flight.
- */
 async function prefetchStore(env: SweepEnv): Promise<boolean> {
   const { storePrefix } = env.params;
   env.prefetched = storePrefix ? await perfSpan('cache-load', () => loadStoredEvalsByPrefix(storePrefix)) : null;
   return env.runRef.current === env.runId;
 }
 
-/**
- * Three-pass sweep: a fast depth-1 pass shapes the whole graph in
- * seconds, the configured settings then deepen the report-worthy
- * swings (both sides of each — analysis compares across them), and
- * finally EVERY remaining turn converges to the configured settings
- * too — the settings ARE the line, the fast pass is only the sketch
- * ("I cannot configure anything for the graph line", GPL). Badges
- * track the convergence; the monotone merge makes each pass safe.
- * Short ranges (on-demand turn analysis) go straight to full settings.
- */
 async function runSweep(env: SweepEnv, opts: {
   from: number; to: number;
   depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'];
@@ -229,7 +174,6 @@ async function runSweep(env: SweepEnv, opts: {
   const rangeTurns: number[] = [];
   for (let turn = from; turn <= to; turn++) rangeTurns.push(turn);
   const fullSettings: SweepSettings = { depth, samples, mode, tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset };
-  // The sketch skips the forced-win prover (round 35): every sketch is replaced by the full pass.
   const fastSettings: SweepSettings = { depth: 1, samples: 1, mode: 'matrix', tera: env.params.tera, sleepClause: env.params.sleepClause, ruleset: env.params.ruleset, prove: false };
   const isFast = depth === 1 && samples === 1 && mode === 'matrix';
 
@@ -247,22 +191,15 @@ async function runSweep(env: SweepEnv, opts: {
   if (!(await evaluateEnd(env, { depth, samples, mode }, paintFinal))) return;
 
   if (env.runRef.current === env.runId) {
-    // The summary ⚠ line settles once, when the line is final.
     env.data.notice = withEvalGapNotice(env.data.notice, env.data.evalErrors);
     paintFinal(false);
     perfReport(`graph sweep ${from}-${to} of ${env.params.turns} turns`);
   }
 }
 
-/** The graph's state cell: shared by the sweep runner and the cancel path. */
 export function useGraphState() {
   const [graph, setGraph] = useState<EvalGraphState>(emptyGraphState());
-  /** Latest graph arrays, so partial (range) sweeps merge instead of wiping. */
   const graphDataRef = useRef<GraphData | null>(null);
-  /**
-   * cancel clears the sweep's running flag; the bumped run counter stops its work. A single evaluation that takes
-   * over passes `superseded`, and the graph keeps where the sweep stopped (round 77, C1).
-   */
   const stopGraphPaint = useCallback((superseded = false) => {
     setGraph(prev => {
       if (!prev.running) return prev;
@@ -274,10 +211,7 @@ export function useGraphState() {
     graphDataRef.current = null;
     setGraph(emptyGraphState());
   }, []);
-  /**
-   * Round 89 (#105, H4h): a new game's main line grew, so the entry of its old tip (swept while nobody had played that turn) is no
-   * longer the turn's own: the graph keeps the turns before it. A running sweep paints from its own arrays and is left alone.
-   */
+  /** A running sweep paints from its own arrays and is left alone. */
   const dropGraphFrom = useCallback((turn: number) => {
     const kept = <T,>(list: T[]): T[] => list.slice(0, Math.max(0, turn - 1));
     const trimmed = <D extends GraphData>(data: D): D => ({
@@ -291,11 +225,6 @@ export function useGraphState() {
   return { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom };
 }
 
-/**
- * Sequential background sweep evaluating turns for the game graph — the
- * whole game by default, or a sub-range (on-demand turn analysis). Range
- * results merge into the existing graph state.
- */
 export function useGraphSweepRunner(env: {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
@@ -328,16 +257,8 @@ export function useGraphSweepRunner(env: {
     };
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total }, stopped: null });
-    // Painting (snapshot + setGraph) is presentation only — the sweep's
-    // own logic reads the local arrays, and every result also lands in the
-    // caches. Per-turn painting made a long sweep pay a fresh copy of ten
-    // whole-game arrays plus a React re-render for every single turn, so
-    // routine paints are throttled; forced paints keep pass boundaries and
-    // the final state exact.
     let lastPaintAt = 0;
     const paint = (progress: { done: number; total: number } | null, force = false) => {
-      // A lane can finish a turn after this run was superseded — a stale
-      // run must never repaint over the new one's state.
       if (runRef.current !== runId) return;
       const at = Date.now();
       if (!force && at - lastPaintAt < 200) return;

@@ -912,6 +912,154 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
+ * ROUND 90 2026-11-22 to 2026-11-25 (improvement round 90, the clean-up
+ * before 1.2.1: milestone "Clean-up before 1.2.1", no release and no version
+ * bump; branch r90 from master c87b617d (release 1.2.0) with the lane
+ * branches r90-e, r90-ci, r90-fb and r90-c, 278 commits at the head 3ec89b67
+ * of r90-c; one pull request; probes docs/perf/probes/2026-11-22-r90/).
+ * Lossless (D4): no score, no pin and no behaviour for the user moved. Gates:
+ * four review pages (22.11., 23.11. twice, 24.11.), rulings 1 to 4 of the
+ * brief. The user's complaint that drove it: the suite grew from 828 to 1,064
+ * spec files in round 89 and the browser flows led every pull request.
+ *
+ * DELIVERED: #173 unused code (f947e10a to 82e5caae): knip's four unused
+ * exports, BASE_DRAWS and FALLBACK_DRAWS in place of four seed lists, the
+ * constant stopAtForcedSwitch parameter, the merge's reader of cells[].classes
+ * (the verify plan's MatrixCell.classes stays), BuildOptions.randomSets with
+ * one random-format rule generatesTeam in replay-core (one API snapshot line,
+ * on purpose), knip and lint as steps of the required job Production build
+ * smoke. #222 browser specs (d916f6c7 to cf90e57e, 4d7da6df): game-review
+ * (except its Auto row), win-paths and lines-play read saved engine results
+ * from test/e2e/fixtures/eval-store/ (EVAL_STORE=live runs them live; devbox
+ * 696 to 77 s, 582 to 182 s, 560 to 147 s), hard-mode stays live (2 of 18
+ * seeded runs executed no turn), one play-out serves two rows of
+ * play-out-finish, 17 browser rows that read text and state became ui rows,
+ * the dev server skips six folders (inotify watches 25,398 to 2,187), and the
+ * browser flows run in three parts with an aggregate job of the same name.
+ * #171 and #191 fewer tests: spec files 1,070 to 796 (eval-engine 483 to 325,
+ * replay-core 128 to 79, ui 255 to 207, app 156 to 138, e2e 46 to 45) plus
+ * the new count of test/e2e-capture (1); 259 spec files folded into 131
+ * (engine 155 into 73, replay-core, app and ui 104 into 58) and 18 guard
+ * files into 4, every row kept by project and full name; 63 rows cut in nine
+ * units, each with its surviving row; the coverage provider, cov-compare,
+ * rows-collect and rows-compare as proof tools; spec-count-ratchet.json; the
+ * eight rules "What earns a test" in AGENTS.md. #157 comments: comment lines
+ * of the three source trees and the app's stylesheets 21,164 to 12,408, of
+ * the test projects 14,882 to 10,794 (the capture suite's 13 lines included
+ * after), history lines of source 2,661 to 0; the designs of the cut comments
+ * moved into EVALUATION-DETAILS.md and ARCHITECTURE-DETAILS.md, the fit and
+ * cache-version histories into docs/completed/source-comment-history.md; the rule
+ * comments/no-history, comment-ratchet.json and scripts/comment-only-diff.mjs
+ * hold it. Test names: 884 titles in 343 spec files and 12 file names lost
+ * their round, T-number, issue number or plan code; tests/no-history holds
+ * new ones as an error. CI: Node suites without the engine project (32 to 43
+ * min before, 10.5 after), nine required checks (the three full-sweep parts
+ * are new), Browser flows 33.9 to 10.6 min.
+ *
+ * MEASUREMENT: lossless. Bank r90-m (CI run 45362162567, head ff22d7cf)
+ * against r89-fin: merged.jsonl byte-identical, 838 of 838 rows, every pooled
+ * row +0. Feedback r90-ff (CI run 45355764741, ff22d7cf, three runs of 26.5 to
+ * 26.9 min): byte-identical with each other and with feedback-r89-final3 (12
+ * dumps). EVAL_ENGINE_CACHE_VERSION stays 80 (checked against master). No pin
+ * moved: corpus.ts, the golden pins and branch.spec.ts differ in comments
+ * only (comment-only-diff exit 0). Global coverage, the thinned tests of
+ * 90efe4cd against f5723329: lost items 0, one statement map differs
+ * (calc/body.ts, a dead wrapper that knip found); the run read three timeouts
+ * under coverage (bank-search, bring-worlds-corpus,
+ * tree-orchestrator.verify-scenes). Final suite in the main checkout on
+ * ff22d7cf, plain, four workers: 748 files passed, 1 skipped; 25,519 tests
+ * passed, 49 expected fail, 29 skipped, 0 failed, 4,615 s; two of the
+ * skipped rows are deleted since (27). Test names, row lists of 06290d8d
+ * against 3ec89b67 with the generated name map: plain 25,569 to 25,572 and
+ * full 68,912 to 68,915 (lost 0, gained the three rows of the new rule),
+ * speed layer off 17,277 and 60,591 on both sides, the seven renamed browser
+ * rows pair one to one; a token comparison of 797 spec files shows only title
+ * arguments moved. CI Tests run 45399383689 on 3ec89b67: every job green.
+ *
+ * GATE: 22.11. all four rests of #191, saved engine results for the views,
+ * three browser parts, knip and lint in the build job; the comment and test
+ * questions answered with "be radical". 23.11. the radical cut with a
+ * thinning list, the engine project in its two jobs only, the final suite in
+ * plain mode with three required full-sweep parts, the Dex sweeps' plain
+ * sample stays until a count probe (with #172), eight test rules in
+ * AGENTS.md, the comment rule of audit B1, issues #224 and #225 for 1.2.1.
+ * 24.11. the 17 clear repeats, six of ten weight pins, the 13 marker rows,
+ * seven faked doubles rows, five single points, TODOs 1 and 2 approved as
+ * issues (#226, #227), TODO 3 parked until the next clean-up round. Final
+ * page: test names cleaned in this round with a lint rule, stage 2 of the
+ * slow-row work not merged (#226), the heap rows stay as rebuilt, the eighth
+ * faked doubles row moved to the real board, issues for the weak survivors
+ * (#228) and the two lint exceptions of useTeamSources (#229), two stale
+ * skipped rows deleted, one sentence on <module>.<topic>.spec.ts in rule 5,
+ * two stale worktrees removed.
+ *
+ * SECOND COMMENT PASS (round 90, lane C2, 24.11. to 25.11.2026; ruling 5 of
+ * the user, 24.11. evening: the comments were still too many after the first
+ * pass, 24,429 lines by the ratchet, and the comments of test.yml had grown).
+ * Measure: no JSDoc on a declaration that is not exported, no line that cites
+ * a replay id in a spec, no near-obvious game-rule line;
+ * a design that lived only in a comment moves into a document, and a spec
+ * keeps one line with the calculation of an expected number. The figures of
+ * #157 above (21,164 to 12,408 in source, 14,882 to 10,794 in tests) are the
+ * state after the first pass; this pass replaces them.
+ *
+ * DELIVERED: the rule comments/shape (120 columns, two lines, one JSDoc line
+ * on an export and none on a declaration that is not exported; c1f95a11 as a
+ * warning) and comments/no-history, both as errors in every code file except
+ * this ledger (167d02f3); comment-counts.mjs --shape in npm run lint for the
+ * workflows and stylesheets (2c53041e); 33 slices over
+ * 1,543 files, each commit proven comment-only with comment-only-diff; comment
+ * lines per project 24,429 to 5,816 (comment-ratchet.json holds these): eval-
+ * engine src 7,266 to 2,366, replay-core src 2,120 to 865, app src 2,925 to
+ * 891, app css 97 to 33, workflows 39 to 26, scripts 1,037 to 225, configs
+ * 151 to 26, test:eval-engine 5,308 to 654, test:app 1,771 to 213, test:
+ * replay-core 1,250 to 190, test:ui 1,247 to 147, test:e2e 1,036 to 140,
+ * test:e2e-feedback 139 to 34, test:e2e-build 30 to 2, test:e2e-capture 13 to
+ * 4 (the workflows had fallen from 109 to 39 before the ruling, 64764339).
+ * 91 design blocks of the cut comments went into EVALUATION-DETAILS.md,
+ * ARCHITECTURE-DETAILS.md (two documents of their own, which EVALUATION.md
+ * and ARCHITECTURE.md point to section by section), six ADRs and GLOSSARY.md,
+ * each read against the code first; that check corrected two sentences on
+ * the replay frame's phone layout in the main documents, which shrinks the
+ * scene under 642 px and keeps no scroll container. The new scripts/README.md says how to call each of the 42
+ * scripts and corrected twelve statements of the old script headers. The
+ * "Comments:" bullet of AGENTS.md has the stricter rule.
+ *
+ * REVIEW: three reviewers judged the 413 deletions that the builders doubted
+ * or that a sample found: 65 facts came back (game rules, traps, invariants
+ * the code does not check, the DICE_SWEEPS switch in the shared sweep helpers,
+ * the calculation of an expected number). The builders had also cut the hover
+ * line of 124 of the engine's 327 barrel exports; a barrel probe found it and
+ * the lines are back (486 of 486 exports of both packages carry one line).
+ * The legal notice of sim-fast/index.ts stands alone, its dead pointer is
+ * gone.
+ *
+ * MEASUREMENT: lossless, no bank and no feedback run. comment-only-diff
+ * c1f95a11 against 46e7fb8e: 1,543 files, five expected exceptions
+ * (eslint.config.js, eslint.ratchet.mjs, sim-fast/index.ts,
+ * update-lint-ratchet.mjs and lint-rules.spec.ts, the rule and its pins);
+ * the parsed YAML of the five workflows is equal (release.yml differs in the
+ * shell comment lines of one run step). tsc -b, npm run lint and knip exit 0;
+ * the 14 specs that read text (322 tests) and setup-moves-oracle (27 tests)
+ * pass. Every code token and string is proven the same, so the bank, the
+ * feedback corpus and the pins stand; the bank fingerprint hashes the tree,
+ * so run-calibration.mjs --reuse finds no base from before the pass.
+ *
+ * LESSONS: a builder told to keep what holds a fact kept half; a default of
+ * no comment with one test question cut specs to a tenth and source to a
+ * third. Workflows, scripts and configs stood under no rule. Builders deleted
+ * export hover lines that the rule keeps. A share target per slice kind made
+ * the slices comparable. A comment moved into a document needs a check
+ * against the code (the phone layout, twelve script usages).
+ *
+ * RESTS (TODO proposals for the gate, no issues yet): the generation >= 4
+ * threshold of the board-key-effects sweep has no stated reason (a probe
+ * lists the rows with a hit split in Generations 3 and 4); the witnessed > 0
+ * condition from Generation 3 in prover-helping-secondary-sweep has no stated
+ * reason; three scripts write history into their output (fresh-holdout.mjs
+ * "Round 86", build-fit-holdout.mjs "Round 65", upgrade-pkmn.mjs "T103 (issue
+ * #6)"); the EVAL_FIT_* levers of eval-fit.spec.ts are in no document.
+ *
  * ROUND 89 2026-11-09 to 2026-11-20 (improvement round 89, the wave of 1.2.0:
  * the 38 open issues of milestone 1.2.0, built in lanes A to H, N, P, Q, S, L
  * and a feedback lane; base r89 on master 439ae2d (release 1.1.1 plus PR #128

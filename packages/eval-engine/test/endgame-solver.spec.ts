@@ -42,13 +42,9 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
 
 const serialize = (battle: Battle): string => JSON.stringify(State.serializeBattle(battle));
 
-describe('endgame key (round 34)', () => {
+describe('endgame key', () => {
   test('two move orders reaching the same board share one key, different PP do not', () => {
-    // Setup moves without chance: Iron Defense, Swords Dance, Swords Dance
-    // equals Swords Dance, Iron Defense, Swords Dance (same PP, same
-    // boosts, same last move, which stays in the key because Choice lock,
-    // Encore, and Torment read it); seeds differ on purpose so the key
-    // provably ignores the PRNG, the turn counter, and the log.
+    // The seeds differ on purpose: the key must ignore the PRNG, the turn counter and the log.
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Scizor', 'Scizor', ['Swords Dance', 'Iron Defense'])],
       [makeSet('Magikarp', 'Magikarp', ['Splash'])],
@@ -66,10 +62,9 @@ describe('endgame key (round 34)', () => {
   });
 });
 
-describe('endgame children (round 34)', () => {
+describe('endgame children', () => {
   test('a deterministic pair yields one child with weight 1 and no unpriced flag', () => {
-    // Chansey, not Blissey: Blissey ties Machamp on base speed, which is a
-    // priced order split of its own (the next tests cover it).
+    // Chansey, not Blissey: Blissey ties Machamp on base speed, a priced order split of its own.
     const root = createRootPosition(serialize(makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'])],
       [makeSet('Egg', 'Chansey', ['Soft-Boiled'])],
@@ -107,7 +102,7 @@ describe('endgame children (round 34)', () => {
     expect(new Set(winners)).toEqual(new Set(['Alpha', 'Beta']));
   });
   test('doubles cells take the plain path and flag unpriced only when the draws disagree on a KO', () => {
-    // Round 67: a level above Blissey's, so no speed tie splits the cell (the tie has its own test below).
+    // A level above Blissey's, so no speed tie splits the cell (the tie has its own test below).
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -116,19 +111,17 @@ describe('endgame children (round 34)', () => {
     for (const side of battle.sides) side.active[1]!.faint();
     battle.resolveFaints();
     const root = createRootPosition(serialize(battle));
-    // The first legal option of each side: the solver uses searchOptions, the test only needs one valid pair.
     const p1Choice = searchOptions(root, 'p1', { tera: false })[0].choice;
     const p2Choice = searchOptions(root, 'p2', { tera: false })[0].choice;
     const { children, unpriced } = endgameChildren(root, p1Choice, p2Choice);
     expect(children).toHaveLength(1);
     expect(unpriced).toBe(false);
   });
-  test('class children carry their analytic share and key; the plain path says so (round 35)', () => {
+  test('class children carry their analytic share and key; the plain path says so', () => {
     const battle = makeBattle(
       [makeSet('Jolt', 'Jolteon', ['Thunder'])],
       [makeSet('Champ', 'Machamp', ['Close Combat'])],
     );
-    // Both at 1 HP like the weights test above: every hit kills, the miss lets Machamp answer.
     for (const side of battle.sides) side.active[0]!.sethp(1);
     const { children, plain } = endgameChildren(createRootPosition(serialize(battle)), 'move thunder', 'move closecombat');
     expect(plain).toBe(false);
@@ -136,7 +129,7 @@ describe('endgame children (round 34)', () => {
     expect(children.reduce((sum, child) => sum + child.share, 0)).toBeCloseTo(1, 6);
     for (const child of children) expect(child.share).toBeCloseTo(child.weight, 6);
   });
-  test('the doubles plain path reports plain with share 1 and no key (round 35)', () => {
+  test('the doubles plain path reports plain with share 1 and no key', () => {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss'], 110), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
       [makeSet('Blob', 'Blissey', ['Soft-Boiled']), makeSet('Chu', 'Pikachu', ['Tackle'], 5)],
@@ -153,7 +146,6 @@ describe('endgame children (round 34)', () => {
     expect(children[0].share).toBe(1);
     expect(children[0].key).toBeUndefined();
   });
-  // Round 67 (T114): Machamp and Blissey share their speed; the order of Seismic Toss and Soft-Boiled is a coin.
   test('a doubles speed tie prices each order as a plain child of one half', () => {
     const battle = makeBattle(
       [makeSet('Champ', 'Machamp', ['Seismic Toss']), makeSet('Pika', 'Pikachu', ['Tackle'], 5)],
@@ -176,7 +168,7 @@ describe('endgame children (round 34)', () => {
 
 const SMALL = { states: 2000, wallMs: 30_000 };
 
-describe('endgame solver (round 34)', () => {
+describe('endgame solver', () => {
   test('a fixed-damage race resolves to the side that needs fewer hits, speed tie or not', () => {
     const battle = makeBattle(
       [makeSet('Toss', 'Machamp', ['Seismic Toss'])],

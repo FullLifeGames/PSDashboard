@@ -3,11 +3,6 @@ import { saveBranchPayload, type BranchSharePayload } from '../../../src/lib/bra
 import type { GameSharePayload } from '../../../src/lib/new-game/share';
 import { variationSaved } from '../../../src/lib/variation-saved';
 
-/**
- * Round 89 (lane H, #105), H16a: a variation counts as saved when a saved branch of the same replay or game holds the same turn and
- * the same choices; a variation nobody saved, or one changed since the save, is not. The payloads are the ones Save Branch writes
- * (version 1 for a replay's branch, version 2 for a game's); the stand-ins hold the fields the comparison reads.
- */
 const choice = (turnNumber: number, move: string) => ({ turnNumber, p1Choice: `move ${move}`, p2Choice: 'move protect', p1Label: move, p2Label: 'Protect' });
 const replayBranch = (moves: string[], replayId = 'gen9ou-1'): BranchSharePayload => ({
   version: 1, replayId, format: 'gen9ou', formatid: 'gen9ou', players: ['A', 'B'], branchTurn: 3, createdAt: '2026-11-13T10:00:00Z',

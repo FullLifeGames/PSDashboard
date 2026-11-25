@@ -9,7 +9,6 @@ import { leadAnalysis, turnAnalysis } from '../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
-/** The chip of one turn (T3 but not T30). */
 const chip = (turn: number) => screen.getByRole('button', { name: new RegExp(`^T${turn}(?!\\d)`) });
 
 describe('EvalGameReport', () => {
@@ -22,7 +21,7 @@ describe('EvalGameReport', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  test('a misplay of a body that fell before it moved prints the card\'s sentence, not the engine\'s label (issue 162); an acted one keeps its move', () => {
+  test('a misplay of a body that fell before it moved prints the card\'s sentence, not the engine\'s label; an acted one keeps its move', () => {
     const report = gameReport({
       misplays: [
         { turn: 4, side: 'p2', regret: 0.3, played: 'stayed in (KO’d before acting)', better: '→ Landorus-Therian', tier: 'mistake', neverActed: { ev: -0.8, faintedFraction: 0.25 } },
@@ -88,7 +87,6 @@ describe('EvalGameReport', () => {
   });
 
   test('doubles: a lead pair graded a mistake gets no chip, because the lead reading there is close to a coin flip', () => {
-    // Round 63 (T116): 912045, "led Ogerpon-Cornerstone + Rillaboom, better: Chi-Yu + Okidogi" at a 0.25 regret.
     const played = rankedChoice('team 34', 'Lead Ogerpon-Cornerstone + Rillaboom', -0.35);
     const best = rankedChoice('team 12', 'Lead Chi-Yu + Okidogi', -0.1);
     const leads = leadAnalysis({ p2: { played, best, regret: 0.25, tier: 'mistake' } });
@@ -97,7 +95,7 @@ describe('EvalGameReport', () => {
     expect(screen.queryByText(/better: Chi-Yu \+ Okidogi/)).toBeNull();
   });
 
-  test('a misplay whose regret is over 1 shows the two win chances it spans (T123 point 8, 2630685175 t8)', () => {
+  test('a misplay whose regret is over 1 shows the two win chances it spans (2630685175 t8)', () => {
     const misplays = [
       { turn: 8, side: 'p2' as const, regret: 1.687, played: 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', better: 'Astral Barrage + Body Press→Calyrex-Ice', tier: 'mistake' as const, span: { from: 0.92, to: -0.767 } },
       { turn: 3, side: 'p1' as const, regret: 0.3, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' as const },
@@ -108,7 +106,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(3)).getByText(winDeltaText(-0.3))).toBeInTheDocument();
   });
 
-  test('a misplay span prints at the turn\'s fainted share, the same map as the graph (T51)', () => {
+  test('a misplay span prints at the turn\'s fainted share, the same map as the graph', () => {
     const span = { from: 0.5, to: -0.5, faintedFraction: 0.5 };
     const misplays = [{ turn: 12, side: 'p1' as const, regret: 1.4, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' as const, span }];
     render(<EvalGameReport report={gameReport({ misplays })} playerNames={names} />);
@@ -116,7 +114,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(12)).getByText(`${late(0.5)}% to ${late(-0.5)}%`)).toBeInTheDocument();
   });
 
-  test('a key moment whose read lost ground shows the turn\'s movement, not the praise badge (T59)', () => {
+  test('a key moment whose read lost ground shows the turn\'s movement, not the praise badge', () => {
     const read = { playedRaw: null, played: rankedChoice('move hypervoice', 'Hyper Voice', 0.3), best: null, safe: null, regret: 0, riskPaidOff: true };
     const moment = turnAnalysis(9, { attribution: 'p1-read', p1: read, swing: -0.544, chanceDelta: -0.687 });
     render(<EvalGameReport report={gameReport({ keyMoments: [moment] })} playerNames={names} />);
@@ -124,7 +122,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(9)).getByText('chance swing (rolls, crits, reveals)')).toBeInTheDocument();
   });
 
-  test('a chance chip prints the chance part and the net, 573756 t73: +13% from the roll (net +5%) (T284)', () => {
+  test('a chance chip prints the chance part and the net, 573756 t73: +13% from the roll (net +5%)', () => {
     const rolled = turnAnalysis(73, { attribution: 'chance', swing: 0.103, chanceDelta: 0.269, rolledFor: { p1: true, p2: false } });
     const reread = turnAnalysis(74, { attribution: 'chance', swing: -0.2, chanceDelta: -0.35, rolledFor: { p1: false, p2: false } });
     const plain = turnAnalysis(75, { attribution: 'shift', swing: 0.4, chanceDelta: 0.1 });
@@ -134,7 +132,7 @@ describe('EvalGameReport', () => {
     expect(within(chip(75)).getByText(winDeltaText(0.4))).toBeInTheDocument();
   });
 
-  test('a denied end at odds 1 reads as a sure KO that never came, never as a 100% roll or a failed one (T123 point 3, T135 point 4)', () => {
+  test('a denied end at odds 1 reads as a sure KO that never came, never as a 100% roll or a failed one', () => {
     const deniedEnd = { turn: 9, side: 'p2' as const, species: 'Kingambit', odds: 1, removes: 'Garchomp', turnsRemaining: 12 };
     render(<EvalGameReport report={gameReport({ deniedEnd })} playerNames={names} />);
     expect(within(chip(9)).getByText('one sure KO from ending it, never came')).toBeInTheDocument();

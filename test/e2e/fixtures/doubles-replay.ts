@@ -1,6 +1,5 @@
 import type { ReplayData } from '@fulllifegames/replay-core';
 
-/** A gen 9 Doubles OU replay with chat-posted team sheets: two active slots per side from turn 1. */
 export const doublesReplay: ReplayData = {
   id: 'gen9doubles-test',
   format: '[Gen 9] Doubles OU',
@@ -36,18 +35,13 @@ export const doublesReplay: ReplayData = {
   ].join('\n'),
 };
 
-/** Round 83: the same game with Pikachu's Quick Attack swapped for Discharge, which hits both foes and Pikachu's partner. */
 export const doublesSpreadReplay: ReplayData = {
   ...doublesReplay,
   id: 'gen9doubles-spread-test',
   log: doublesReplay.log.replace('- Thunderbolt<br />- Quick Attack<br />', '- Thunderbolt<br />- Discharge<br />'),
 };
 
-/**
- * Round 84 (A7d): the same game with Pikachu's and Eevee's first moves swapped for Memento and four bodies on P1's bench
- * (Raichu, Jolteon, Vaporeon, Flareon). Two Mementos faint both bodies of P1 whatever the dice roll (accuracy 100, the user faints
- * when it hits) while P2 loses nothing, so the executed turn ends at a replacement of both P1 slots: the scene of ruling 16a.
- */
+// Memento (accuracy 100) faints its user when it hits, so both P1 bodies faint whatever the dice roll.
 export const doublesForcedReplay: ReplayData = {
   ...doublesReplay,
   id: 'gen9doubles-forced-test',

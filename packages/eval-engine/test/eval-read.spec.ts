@@ -2,24 +2,14 @@ import { test, expect, describe } from 'vitest';
 import { rankFromMatrix, toResult, type ValueMatrix } from '../src/rank';
 import { computeRead, modelOpponent, parseTendencies, READ_CONFIDENCE, READ_LAMBDA } from '../src/opponent-model';
 
-/**
- * The exploitative Read lens: a boundedly-rational opponent model (softmax
- * over their own EVs, RNR-mixed with the equilibrium) and a best response
- * over the ALREADY-SOLVED matrix. Values are wp-units (p1 perspective).
- */
-
 const option = (choice: string, label: string) => ({ choice, label });
 
-// The Flying-switch shape: p2 very likely clicks Earthquake (their high-EV
-// column vs most of p1's rows); p1's exploit row (switch Noivern) crushes
-// Earthquake but loses to the rarely-clicked Ice Beam. Equilibrium prefers
-// the safe row.
 const matrix: ValueMatrix = {
   p1Options: [option('move stay', 'Stay'), option('switch 3', '→ Noivern')],
   p2Options: [option('move earthquake', 'Earthquake'), option('move icebeam', 'Ice Beam')],
   values: [
-    [-0.20, -0.02], // Stay: EQ chips it hard, Ice Beam barely — EQ is p2's obvious click
-    [0.60, -0.50],  // Noivern: wins big vs EQ, loses big vs Ice Beam
+    [-0.20, -0.02],
+    [0.60, -0.50],
   ],
   ended: [[false, false], [false, false]],
 };
@@ -29,14 +19,11 @@ describe('opponent model and read solve', () => {
     const ranked = rankFromMatrix(matrix, 0);
     const solved = toResult(ranked, 1).matrix!;
     const model = modelOpponent(solved, 'p1');
-    // From p2's view Earthquake dominates vs the equilibrium-heavy Stay row.
     const eqIndex = 0;
     expect(model.probs[eqIndex]).toBeGreaterThan(0.5);
     expect(model.probs.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
-    // The attached mixes are probability distributions.
     expect(solved.mixes.p1.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
     expect(solved.mixes.p2.reduce((sum, p) => sum + p, 0)).toBeCloseTo(1, 8);
-    // Machine-readable choice ids ride along, aligned with the label arrays.
     expect(solved.p1Choices).toEqual(['move stay', 'switch 3']);
     expect(solved.p2Choices).toEqual(['move earthquake', 'move icebeam']);
   });
@@ -45,7 +32,6 @@ describe('opponent model and read solve', () => {
     const ranked = rankFromMatrix(matrix, 0);
     const result = toResult(ranked, 1);
     const read = computeRead(result.matrix!, 'p1');
-    // Equilibrium prefers Stay; the read backs the Noivern switch.
     expect(result.perSide.p1[0].label).toBe('Stay');
     expect(read).not.toBeNull();
     expect(read!.choice.label).toBe('→ Noivern');
@@ -57,7 +43,6 @@ describe('opponent model and read solve', () => {
   });
 
   test('an unconfident model yields no read', () => {
-    // The opponent's options are interchangeable: nothing to concentrate on.
     const flat: ValueMatrix = {
       p1Options: matrix.p1Options,
       p2Options: matrix.p2Options,
@@ -80,13 +65,11 @@ describe('opponent model and read solve', () => {
     const tendencies = parseTendencies(log, 'p2');
     expect(tendencies.attackRate).toBeCloseTo(0.75, 8);
     expect(tendencies.switchRate).toBeCloseTo(0.25, 8);
-    // Earthquake repeated once in three move turns' two repeat chances.
     expect(tendencies.repeatBias).toBeGreaterThan(0);
   });
 
   test('parseTendencies ignores forced replacement switches after a faint', () => {
-    // p2 never chooses to switch: B faints before acting and C is the forced
-    // replacement. Counting it would fabricate a switch tendency.
+    // p2 never chooses to switch: C is the forced replacement of the fainted B, which would fabricate a tendency.
     const log = [
       '|start',
       '|switch|p1a: A|Snorlax, M|100/100', '|switch|p2a: B|Garchomp, F|100/100',
@@ -110,7 +93,6 @@ describe('opponent model and read solve', () => {
     expect(READ_LAMBDA).toBeLessThan(1);
     const ranked = rankFromMatrix(matrix, 0);
     const model = modelOpponent(toResult(ranked, 1).matrix!, 'p1');
-    // No probability collapses fully to zero while λ > 0.
     for (const p of model.probs) expect(p).toBeGreaterThan(0);
   });
 });

@@ -9,15 +9,8 @@ import { dexOfRules, SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 import { rulesetOf } from './forced-win-delay-support';
 
-/**
- * Round 89 (P3, 1.2.0): the sure strike against the simulator, in every rule set the corpus plays (Gens 1 to 9 and the Champions mod),
- * singles and doubles. The board: the foe's last body stands at 1 HP behind a Tackle and a Splash and outruns the attacker; the attacker
- * clicks one move of the Dex with positive priority. The oracle plays that turn on 20 seeds (6 without `DICE_SWEEPS=full`): the strike
- * exists exactly where every game ends before the foe moves. Rules that stop a priority move (Psychic Terrain, Dazzling, a move that
- * fails after the first turn, a Focus Sash, an immune target, a Quick Claw that lets the foe go first) are rows of their own, and the
- * strike is never offered where the simulator stops it. Generations 1 and 2 have no kill odds in the model (`boundaryEvent` returns
- * null there), so no strike is offered and the oracle's rows only count what the model leaves out.
- */
+// The oracle plays the turn on 20 seeds (6 without `DICE_SWEEPS=full`).
+// Generations 1 and 2 have no kill odds in the model (`boundaryEvent` returns null there), so no strike is offered.
 await loadSimMods('gen9championsou');
 
 const SEEDS = process.env.DICE_SWEEPS === 'full' ? 20 : 6;
@@ -28,7 +21,6 @@ const ownClick = (mode: Mode, target: string): string => (mode === 'singles' ? '
 interface Foe { species: string; moves?: string[]; item?: string; ability?: string; maxHp?: boolean }
 interface Own { species: string; moves: string[] }
 
-/** The attacker leads side p1, the foe's last body leads side p2 (in doubles the foe's partner has fallen and the attacker's partner splashes). */
 function board(rules: Rules, mode: Mode, own: Own, foe: Foe, seed: string, prepare: (battle: Battle) => void = () => undefined): Battle {
   const attacker = mon(rules, { species: own.species, moves: own.moves, gender: 'M' });
   const target = { ...mon(rules, { species: foe.species, moves: foe.moves ?? ['tackle', 'splash'] }), ...(foe.item ? { item: foe.item } : {}), ...(foe.ability ? { ability: foe.ability } : {}) };
@@ -54,7 +46,6 @@ function board(rules: Rules, mode: Mode, own: Own, foe: Foe, seed: string, prepa
   return battle;
 }
 
-/** The simulator: the share of the seeds on which the attacker's turn ends the game before the foe moves. */
 function endsBeforeFoe(build: (seed: string) => Battle, own: string, foe: string): { ended: number; refused: boolean } {
   let ended = 0;
   for (let index = 0; index < SEEDS; index++) {
@@ -70,7 +61,6 @@ function endsBeforeFoe(build: (seed: string) => Battle, own: string, foe: string
   return { ended, refused: false };
 }
 
-/** The strike the prover offers on a board: the first of the legal choices that the strike rule takes (null when none). */
 function offered(battle: Battle, rules: Rules): string | null {
   const position = createRootPosition(JSON.stringify(State.serializeBattle(battle)), rulesetOf(rules));
   const live = standing(positionBattle(position));
@@ -79,7 +69,6 @@ function offered(battle: Battle, rules: Rules): string | null {
   return strike?.choice ?? null;
 }
 
-/** Whether the model prices the attacker's move at the foe as a sure kill (the generations before 3 and the unpriceable moves: no). */
 function sureKill(battle: Battle, moveId: string): boolean {
   const event = boundaryEvent(battle, battle.sides[0].active[0]!, battle.sides[1].active[0]!, moveId);
   return event !== null && event.pKill === 1;

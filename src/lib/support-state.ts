@@ -6,18 +6,6 @@ import type { ViewLine } from './timeline';
 import { turnEntryCount } from './variation-turns';
 import { isGameId, type NewGameRecord } from './new-game/record';
 
-/**
- * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the app's state as one readable file for a bug
- * report. It holds what a reproduction needs (the replay, the sets the app played with, the variation
- * with every slot choice, the viewed position, the messages on screen) and nothing beyond what the user
- * gave the app. The recorded positions of the variation stay out: they are large, and the rebuild
- * recomputes them from the choices.
- *
- * Round 89 (#105, H5): a new game has no replay to load, so its file carries the game's record in the optional `game` (the format,
- * both teams, the seed and every turn; its log is `replay.log`), and the restore opens the game from it. The version stays 1: a
- * new optional field is no break, a replay's file is the file of before to the byte, and an app that reads version 1 only meets a
- * game file at "Load the replay newgame-... first", a refusal and no misreading.
- */
 export const SUPPORT_STATE_KIND = 'ps-dashboard-state';
 export const SUPPORT_STATE_VERSION = 1;
 export const NEW_ISSUE_URL = 'https://github.com/FullLifeGames/PSDashboard/issues/new';
@@ -39,14 +27,12 @@ export interface SupportState {
   variation: { startTurn: number | null; branching: boolean; history: SupportHistoryEntry[] };
   view: { turn: number; line: ViewLine; t0: boolean; viewingVariation: boolean; liveTip: boolean };
   choices: { draft: Choices; live: Choices };
-  /** Round 89 (#105, H5): the record of the open new game; absent for a replay (no key at all). */
+  /** The open new game's record; absent for a replay (no key at all), which keeps the version at 1. */
   game?: NewGameRecord;
-  /** The messages on screen when the file was written, by where they show. */
   messages: Record<string, string | null>;
   engine: { prefs: EvalPreferences; fastPlayOut: boolean; animateBranchTurns: boolean; playOutActive: boolean };
 }
 
-/** An open "Report issue" dialog: the file it offers, the filled issue link, and whether the file went out. */
 export interface IssueReport {
   fileName: string;
   issueUrl: string;
@@ -95,7 +81,6 @@ export function supportStateProblem(value: unknown): string | null {
   return NOT_A_STATE;
 }
 
-/** "T7 in the variation from turn 5 (2 turns)", "T28 on the main line (variation from turn 5, 2 turns)": the line once. */
 export function positionLabel(state: Pick<SupportState, 'view' | 'variation' | 'game'>): string {
   const { view, variation } = state;
   const turns = turnEntryCount(variation.history);
@@ -108,7 +93,6 @@ export function positionLabel(state: Pick<SupportState, 'view' | 'variation' | '
   return hasVariation ? `${where} (variation from turn ${variation.startTurn}, ${length})` : where;
 }
 
-/** The first message on screen, in the order a reader looks for it. */
 export function screenMessage(state: Pick<SupportState, 'messages'>): string | null {
   return Object.values(state.messages).find((text): text is string => typeof text === 'string' && text.trim() !== '') ?? null;
 }
@@ -119,20 +103,14 @@ export function supportFileName(state: Pick<SupportState, 'replay' | 'createdAt'
   return `ps-dashboard-state-${id}-${stamp}.json`;
 }
 
-/** The longest field text the issue link carries: GitHub refuses a URL past its limit (414). */
+// GitHub refuses a URL past its limit (414).
 const FIELD_MAX = 600;
 const clip = (text: string) => (text.length > FIELD_MAX ? `${text.slice(0, FIELD_MAX - 1)}…` : text);
 
-/**
- * The new-issue link with the issue form's fields filled (`.github/ISSUE_TEMPLATE/bug_report.yml`):
- * GitHub fills a form's text fields from query parameters named by their ids. The state file goes into the form's upload
- * field, which no link fills (round 88, user report 08.11.2026: the text box took no .json file). GitHub reads forms from the
- * default branch only, and without the form it opens a blank issue: the description then carries the same
- * facts (round 77, user report 28.10.2026: the issue held the title alone).
- */
+// GitHub fills a form's text fields from query parameters named by their ids; no link fills the upload field. It reads
+// forms from the default branch only, and without the form opens a blank issue: the description carries the same facts.
 export function issueUrl(state: SupportState, fileName: string): string {
   const message = screenMessage(state);
-  // a new game has no Showdown page: its id, format, seed and turns stand in the field (the state file carries the record)
   const played = state.game ? `, seed ${state.game.seed}, ${state.game.turns} ${state.game.turns === 1 ? 'turn' : 'turns'} played` : '';
   const replay = !state.replay ? 'none loaded'
     : isGameId(state.replay.id) ? `New game ${state.replay.id}, ${state.replay.format}${played} (no Showdown replay)`

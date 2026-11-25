@@ -2,7 +2,6 @@ import type { Battle, PokemonSet } from '@pkmn/sim';
 import type { SimPosition } from '../src/forward-model';
 import { rollSet as set, rootOf } from './calc-roll-oracle';
 
-/** The scenes of the forced spread behind a screen (round 73, T202): which hits the calc forces onto every foe, and the doubles battle that plays them. */
 
 const terapagos = (): PokemonSet => set('Terapagos', ['Tera Starstorm', 'Splash'], { ability: 'Tera Shift', teraType: 'Stellar' });
 const hatterene = (): PokemonSet => set('Hatterene', ['Expanding Force', 'Splash']);
@@ -34,7 +33,6 @@ export const SCENES: Scene[] = [
   },
 ];
 
-/** A doubles battle with the first foe alone (`alone`) or beside a second one, and `screen` up on the foes' side. */
 export function doubles(scene: Scene, screen: string | null, alone: boolean): SimPosition {
   return rootOf('gen9doublescustomgame', [scene.attacker(), wall('Snorlax')], [wall(), wall('Chansey')], battle => {
     if (alone) {

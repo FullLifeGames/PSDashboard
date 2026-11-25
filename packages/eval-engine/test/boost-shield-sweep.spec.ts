@@ -6,16 +6,6 @@ import { boostedFraction, pairThreat } from '../src/score/threat';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 79 (T288), the sweep behind the shield rule: every move of the Dex that raises Defense or Special Defense, played
- * once at a Rhydon-shaped hard hitter in every generation and mod the corpus plays (Generations 6, 8 and 9, the Champions
- * mod; singles, and doubles for the stage). The rule reads two things the simulator owns: the stage a standing boost is
- * (the stages each attack sees, `pairStages`) and the damage of the foe's hit at that stage (`boostedFraction`). Both must
- * equal what the simulator played: the stage the move applied, and the hit that came after it in the same turn (the holder
- * moves first), inside the cell of the damage rolls. The moves come from the Dex fields (`boosts`, `self.boosts`) and from
- * the simulator's own play (Stockpile, Curse, Psyshield Bash stand in conditions and secondaries), never by name.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 interface Mode { name: string; format: string; gen: number; doubles: boolean; mon: (species: string, moves: string[]) => PokemonSet }
@@ -34,14 +24,12 @@ const MODES: Mode[] = [
 
 const dexOf = (mode: Mode) => battleOf(mode.format, [set('Pikachu', ['splash']), set('Pikachu', ['splash'])], [set('Pikachu', ['splash']), set('Pikachu', ['splash'])]).dex;
 
-/** The moves the Dex fields say raise Defense or Special Defense of the user for sure (no chance, no handler that can fail it). */
 function raisesBulk(move: Move): boolean {
   const boosts = move.target === 'self' ? move.boosts : move.self?.boosts;
   const handlers = ['onTry', 'onTryMove', 'onTryHit', 'onPrepareHit'].some(key => key in move);
   return !!boosts && ((boosts.def ?? 0) > 0 || (boosts.spd ?? 0) > 0) && !handlers && !move.secondary && !move.secondaries?.length;
 }
 
-/** p1's lead (Clefable) and the foe's lead (Rhydon with one hit) on a battle of the mode; doubles stand a Splashing Pikachu next to each. */
 function board(mode: Mode, holderMove: string, foeMove: string, seed = '1,2,3,4'): { battle: Battle; mine: Pokemon; foe: Pokemon } {
   const mine = [mode.mon('Clefable', [holderMove, 'tackle'])];
   const foe = [mode.mon('Rhydon', [foeMove])];
@@ -50,7 +38,6 @@ function board(mode: Mode, holderMove: string, foeMove: string, seed = '1,2,3,4'
   return { battle, mine: battle.sides[0].active[0]!, foe: battle.sides[1].active[0]! };
 }
 
-/** One turn: the holder clicks its move (a doubles move aims at the foe's slot 0 when it needs a target), the foe clicks its hit. */
 function turn(mode: Mode, battle: Battle): void {
   if (mode.doubles) {
     if (!battle.choose('p1', 'move 1, move 1')) battle.choose('p1', 'move 1 1, move 1');
@@ -61,10 +48,6 @@ function turn(mode: Mode, battle: Battle): void {
   }
 }
 
-/**
- * The share of its maximum HP the holder loses to the foe's hit in the turn: its HP when the foe is about to move against the
- * HP after the turn (the holder's own move and its cost, Clangorous Soul's third of the HP, come before).
- */
 function playTurn(mode: Mode, battle: Battle, mine: Pokemon, foe: Pokemon): number {
   let before = mine.hp;
   battle.onEvent('BeforeMove', battle.format, -100, (pokemon: Pokemon) => { if (pokemon === foe) before = mine.hp; });
@@ -77,7 +60,6 @@ const FOE_HIT = { def: 'earthquake', spd: 'surf' } as const;
 describe.each(MODES)('every move that raises Defense or Special Defense, played at a hard hitter ($name)', mode => {
   const moves = dexOf(mode).moves.all().filter(move => move.exists && move.isNonstandard !== 'Future' && move.gen <= mode.gen && !move.isZ && !move.isMax && move.id !== 'struggle');
 
-  /** The moves the simulator plays into a higher Defense or Special Defense of the user (the first turn, a hit of the foe behind it). */
   const applied = moves.filter(move => {
     const { battle, mine } = board(mode, move.id, 'earthquake');
     const before = { ...mine.boosts };
@@ -101,7 +83,7 @@ describe.each(MODES)('every move that raises Defense or Special Defense, played 
     }
   });
 
-  // Doubles hit with spread moves at 0.75 and aim at slots: the damage cell is read in singles, the stage above in both.
+  // Doubles use spread moves at 0.75 and aim at slots: the damage cell is read in singles, the stage in both.
   test.skipIf(mode.doubles)('the hit the race prices matches the hit the simulator played at that stage, inside the cell of the damage rolls', () => {
     const problems: string[] = [];
     let checked = 0;

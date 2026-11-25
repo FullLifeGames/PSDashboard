@@ -7,17 +7,6 @@ import {
 import { parseSmogonChaosStats } from '../../src/lib/smogon-stats';
 import * as championsMod from '@pkmn/mods/champions';
 
-/**
- * Round 88 (F, #101), sweeps S2 and S3 of the plan.
- * S3: no measured row moves. The step returns the infos unchanged for every log of the bank's replays, the fit corpus (the holdouts'
- *     games among them) and the feedback fixtures, because none has a short side; a tracked row keeps the guard in CI (the feedback
- *     fixtures), the local rows read the data that only the main checkout holds.
- * S2: a stand-in is a body of the game's own Dex that the format's rule table lets in, and never repeats a base species of its side:
- *     for the 34 short sides of the fit corpus and a simulator-made log of every no-preview format with a stats file, the whole team
- *     (shown bodies plus stand-ins) validates in the format, ignoring the problems of sets (moves, abilities, items, spreads: the
- *     stand-ins carry none) and holds six distinct base species.
- */
-// The feedback fixtures include Champions games: the mod registers before a log is read, as every host does (round 75).
 registerChampionsDex(championsMod as unknown as Parameters<typeof registerChampionsDex>[0], championsMod.Formats as unknown as Parameters<typeof registerChampionsDex>[1]);
 const FEEDBACK = 'test/e2e-feedback/fixtures';
 const readLog = (path: string): string | null => {
@@ -32,7 +21,7 @@ const GEN4 = parseSmogonChaosStats(JSON.parse(readFileSync('test/regression/fixt
 const rawOf = (log: string) => ({ p1: inferOpponentTeam(log, 'p1'), p2: inferOpponentTeam(log, 'p2') });
 const unchanged = (log: string) => { const raw = rawOf(log); return withStandIns(raw, log, GEN4) === raw; };
 
-describe('S3: the logs of the measurements have no short side', () => {
+describe('the logs of the measurements have no short side', () => {
   test('the feedback fixtures and the tracked replays come back as they went in', () => {
     const logs = readdirSync(FEEDBACK).filter(name => name.endsWith('.json')).map(name => readLog(`${FEEDBACK}/${name}`)).filter((log): log is string => !!log);
     logs.push(...['smogtours-gen7ou-450650'].map(name => readLog(`test/regression/fixtures/${name}.json`)!));
@@ -53,7 +42,6 @@ describe('S3: the logs of the measurements have no short side', () => {
         if (!/^\|teamsize\|/m.test(log)) continue;
         const preview = /^\|poke\|/m.test(log);
         if (!preview) previewless++;
-        // A preview side is never short, whatever it built; a game without preview is short where the inference built fewer bodies.
         const raw = preview ? null : rawOf(log);
         for (const side of ['p1', 'p2'] as const) {
           if (missingBodies(log, raw ? raw[side].pokemon.length : 99, side) > 0) short.push(`${root}/${name}:${side}`);
@@ -62,14 +50,11 @@ describe('S3: the logs of the measurements have no short side', () => {
     }
     expect(games).toBeGreaterThan(5000);
     expect(previewless).toBeGreaterThan(100);
-    // The 34 short sides of the fit corpus (gens 2 to 4, singles) are the games the step is for; no other set has one: the bank and
-    // the holdouts' own games are not among them.
     const bank = new Set(readdirSync('.calibration/replays').map(name => `.fit-corpus/${name}`));
     expect(short.filter(entry => bank.has(entry.replace(/:p\d$/, '')) || /gen(9|8|7|6|5)/.test(entry))).toEqual([]);
   }, 600_000);
 });
 
-/** The stats of a cached format, parsed as the app does; null when the cache holds none (or a 404). */
 function cachedStats(format: string): SmogonUsageStats | null {
   if (!existsSync('.smogon-cache')) return null;
   const file = readdirSync('.smogon-cache').find(name => name.includes(`stats-${format}-json`));
@@ -79,7 +64,6 @@ function cachedStats(format: string): SmogonUsageStats | null {
 
 const problemsOfSets = /move|learn|ability|item|hold|EV|IV|Hidden Power|nature|gender|level|happiness|event/i;
 
-/** The problems of the team that concern its species and its clauses, for the bodies in `only` (the shown ones are the log's own) or the clauses. */
 function speciesProblems(formatId: string, species: string[], only: string[]): string[] {
   const dex = Dex.forFormat(simFormats().get(formatId));
   const team = species.map(name => {
@@ -94,7 +78,7 @@ function speciesProblems(formatId: string, species: string[], only: string[]): s
     .filter(problem => !problemsOfSets.test(problem) && (only.some(name => problem.includes(name)) || /Clause|limited/i.test(problem)));
 }
 
-describe('S2: the stand-ins are legal in the format and distinct by base species', () => {
+describe('the stand-ins are legal in the format and distinct by base species', () => {
   const formats = ['gen1ou', 'gen2ou', 'gen2ubers', 'gen3ou', 'gen3ubers', 'gen3uu', 'gen3ru', 'gen4ou', 'gen4ubers', 'gen4uu', 'gen4doublesou']
     .filter(format => cachedStats(format));
 

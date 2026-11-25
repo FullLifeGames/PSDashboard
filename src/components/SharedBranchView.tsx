@@ -23,7 +23,6 @@ function SharedBranchTopbar({
         <span style={{ fontSize: 11, fontWeight: 'bold', color: '#8cf' }}>
           Shared Branch
         </span>
-        {/* a game of the app has no Showdown replay to load (round 89, #105, H5) */}
         {!isGameId(branch.replayId) && (
           <button
             type="button"
@@ -49,7 +48,6 @@ function SharedBranchTopbar({
 
 type SharedChoice = BranchSharePayload['choices'][number];
 
-/** One line of the choice list: names where the link carries them, the simulator commands for an older link. */
 function choiceLine(choice: SharedChoice): string {
   const p1 = choice.p1Label ?? choice.p1Choice;
   const p2 = choice.p2Label ?? choice.p2Choice;
@@ -59,7 +57,6 @@ function choiceLine(choice: SharedChoice): string {
   return `Turn ${choice.turnNumber}: P1 ${p1} / P2 ${p2}`;
 }
 
-/** The dice the user forced in a turn, by side: the texts the history row shows. Nothing for a link from before the dice. */
 function ChoiceDice({ choice }: { choice: SharedChoice }) {
   const dice = [
     ...(choice.p1DiceLabels ?? []).map(text => `P1 ${text}`),

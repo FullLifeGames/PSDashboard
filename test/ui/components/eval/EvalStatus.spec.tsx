@@ -33,7 +33,7 @@ describe('EvalStatus', () => {
     expect(screen.getByText('Position changed; re-evaluate.')).toBeInTheDocument();
   });
 
-  test('a play-out in a game names no gold line: a game\'s line is its main line (H4h)', () => {
+  test('a play-out in a game names no gold line: a game\'s line is its main line', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 1, atTurn: null, game: true }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 5. 1 turn played. The line below grows as it plays.');
     expect(screen.getByRole('status')).not.toHaveTextContent(/gold/);
@@ -48,13 +48,11 @@ describe('EvalStatus', () => {
     expect(screen.queryByText(/Position changed/)).toBeNull();
   });
 
-  // Round 88 (T343, #79): a run from the turn 0 view names turn 0, the turn the leads come in.
   test('a run from turn 0 names turn 0 in the status line', () => {
     render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 0, turns: 0, atTurn: 1 }} />);
     expect(screen.getByRole('status')).toHaveTextContent('Engine is playing both sides from turn 0. 0 turns played, now at turn 1.');
   });
 
-  // Round 89 (#119): after Stop the status line says the engine finishes the turn in flight, as the bar does.
   test('a stopping run says the engine finishes the turn in flight', () => {
     const { rerender } = render(<EvalStatus {...base} status="searching" playOutProgress={{ startTurn: 5, turns: 3, atTurn: 8, stopping: true }} />);
     const line = screen.getByRole('status');

@@ -1,9 +1,4 @@
-// Paired records on a subset of the joined positions:
-//   node scripts/subset-calibration.mjs <a.jsonl> <b.jsonl> <field> [<field> ...]
-// Joins on id#turn, keeps positions where ANY named field is truthy in A
-// or in B (a field recorded on one side only still selects the subset),
-// prints both sides' records plus the "favored side wins" rate (sign of
-// the score against p1Won) per side. Round 33: lastPair and decided.
+// Paired records on a subset of the joined positions.
 import { filterQuality, load, record, right, takeQualityArg } from './calibration-lib.mjs';
 
 const { argv, quality } = takeQualityArg(process.argv.slice(2));

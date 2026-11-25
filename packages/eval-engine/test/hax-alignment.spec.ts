@@ -1,12 +1,27 @@
 import { test, expect, describe } from 'vitest';
-import { Battle, Teams } from '@pkmn/sim';
-import type { PokemonSet } from '@pkmn/sim';
+import { Battle, Teams, Battle as LiveBattle, type PokemonSet } from '@pkmn/sim';
 import {
-  extractProtocolEvents, scoreAlignment, compareAlignment, isPerfectAlignment,
-  summarizeAlignment, ALIGNMENT_SEEDS, chooseAlignedSeed,
-  type AlignmentScore, type TurnAlignmentRecord,
+  extractProtocolEvents,
+  scoreAlignment,
+  compareAlignment,
+  isPerfectAlignment,
+  summarizeAlignment,
+  ALIGNMENT_SEEDS,
+  chooseAlignedSeed,
+  type AlignmentScore,
+  type TurnAlignmentRecord,
 } from '../src/hax-alignment';
 import { serializeBattleStable, trialAdvanceLog } from '../src/forward-model';
+import { readFileSync } from 'node:fs';
+import {
+  buildTeamsFromReplay,
+  getBranchSimulatorFormat,
+  parseReplayLog,
+  parseReplayLogWithObservations,
+  replayBringOnly,
+} from '@fulllifegames/replay-core';
+import { buildChoiceLockContext } from '../src/choice-lock';
+import { reconstructBranchRuntime } from '../src/branch-engine';
 
 describe('extractProtocolEvents', () => {
   test('reads faints, win, and normalizes idents without slot letters', () => {
@@ -92,7 +107,6 @@ describe('scoreAlignment + compareAlignment', () => {
     const expected = block(['|move|p1a: A|Tackle|p2a: B', '|move|p2a: B|Tackle|p1a: A']);
     const flipped = block(['|move|p2a: B|Tackle|p1a: A', '|move|p1a: A|Tackle|p2a: B']);
     expect(scoreAlignment(expected, flipped).softMismatches).toBe(1);
-    // A mover only present on one side is a count mismatch story, not an order one:
     const oneSided = block(['|move|p1a: A|Tackle|p2a: B']);
     expect(scoreAlignment(expected, oneSided).softMismatches).toBeGreaterThan(0);
   });
@@ -117,7 +131,6 @@ describe('seed list + summary', () => {
     expect(summary).toEqual({ turns: 3, perfectTurns: 1, softResidual: 2, faintResidualTurns: 1, endedMismatches: 1 });
   });
 
-  // Round 86 (ruling C2): a forced turn under another seed than index 0 is "seeded", a turn of the seed search is "fallback", never both
   test('summarizeAlignment counts the forced turns that play under another seed, apart from the fallback turns', () => {
     const perfect: AlignmentScore = { endedMismatch: false, faintMismatches: 0, softMismatches: 0 };
     const record = (turn: number, seed: string, via: 'forced' | 'fallback'): TurnAlignmentRecord => ({
@@ -142,7 +155,6 @@ function makeSet(species: string, moves: string[], extras: Partial<PokemonSet> =
   } as PokemonSet;
 }
 
-/** Keldeo Hydro Pump (80% accurate) into a wall — the seed decides the miss. */
 function hydroPosition(): { serialized: string } {
   const battle = new Battle({
     formatid: 'gen9customgame' as never,
@@ -150,8 +162,6 @@ function hydroPosition(): { serialized: string } {
     p1: { name: 'p1', team: Teams.pack([makeSet('Keldeo', ['hydropump'], { ability: 'Justified' })]) },
     p2: { name: 'p2', team: Teams.pack([makeSet('Blissey', ['softboiled'], { ability: 'Natural Cure' })]) },
   });
-  // gen9customgame opens with team preview; answer it so the serialized
-  // checkpoint sits at a normal move-request turn boundary.
   battle.choose('p1', 'team 1');
   battle.choose('p2', 'team 1');
   return { serialized: serializeBattleStable(battle) };
@@ -162,7 +172,6 @@ describe('trialAdvanceLog', () => {
     const result = trialAdvanceLog(hydroPosition(), 'move 1', 'move 1', ALIGNMENT_SEEDS[0]);
     expect(result.log.length).toBeGreaterThan(0);
     expect(result.log.some(line => line.startsWith('|move|p1a: Keldeo|Hydro Pump'))).toBe(true);
-    // No pre-advance history (team preview / lead switches from the fork's past):
     expect(result.log.some(line => line.startsWith('|start'))).toBe(false);
   });
 
@@ -172,9 +181,7 @@ describe('trialAdvanceLog', () => {
       const trial = trialAdvanceLog(position, 'move 1', 'move 1', seed);
       return extractProtocolEvents(trial.log).misses.size > 0 ? 'miss' : 'hit';
     });
-    // Sanity for the search: both outcomes must be reachable within the list.
-    // If this ever fails, the pinned list cannot align accuracy rolls — that
-    // is a design-level finding, not a flaky test (the run is deterministic).
+    // Both outcomes must be reachable within the list, or the pinned list cannot align accuracy rolls.
     expect(new Set(outcomes).size).toBe(2);
   });
 
@@ -218,7 +225,6 @@ describe('chooseAlignedSeed', () => {
   });
 
   test('no perfect candidate: strict-improvement argmin, ties keep the earlier seed', () => {
-    // Every trial hits (1 soft mismatch vs the expected miss) — all tie.
     const choice = chooseAlignedSeed({
       expected: extractProtocolEvents(missBlock),
       trial: () => ({ log: hitBlock }),
@@ -249,5 +255,101 @@ describe('chooseAlignedSeed', () => {
     expect(calls).toBe(3);
     expect(choice.seed).toBe('1,2,3,4');
     expect(choice.candidatesTried).toBe(3);
+  });
+});
+
+type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
+
+const mon = (species: string, moves: string[]): PokemonSet => ({
+  name: species, species, item: '', ability: 'No Ability', moves, nature: 'Serious', gender: '', level: 100,
+  evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+});
+
+function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
+  const battle = new LiveBattle({ formatid: format as never, seed: [1, 2, 3, 4], p1: { name: 'A', team: Teams.pack(p1) }, p2: { name: 'B', team: Teams.pack(p2) } });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2.map((_, index) => index + 1).join('')}`);
+  }
+  return battle;
+}
+
+describe('the simulator\'s body names are the protocol\'s names', () => {
+  const log = [
+    '|showteam|p1|Landorus-Therian||Leftovers|Intimidate|Taunt|||M|||100|]Dragonite||HeavyDutyBoots|Multiscale|IceSpinner|||F|||100|',
+    '|switch|p1a: Last Regrets|Landorus-Therian, M|100/100',
+    '|switch|p2b: kanye|Incineroar, M|100/100',
+  ].join('\n');
+
+  test('the built sets carry the nicknames the lines show, so the events keyed by name meet', () => {
+    const { p1Team, p2Team } = buildTeamsFromReplay(log);
+    const battle = make('gen9customgame', p1Team, p2Team);
+    expect(battle.sides[0].pokemon.map(body => body.name)).toEqual(['Last Regrets', 'Dragonite']);
+    expect(battle.sides[1].pokemon.map(body => body.name)).toEqual(['kanye']);
+  });
+
+  test.each([
+    ['gen9customgame', 'p1a'],
+    ['gen9doublescustomgame', 'p1b'],
+  ])('%s: a nicknamed faint meets the sim\'s faint of the same body', (format, slot) => {
+    const { p1Team } = buildTeamsFromReplay(log.replace('p1a: Last Regrets', `${slot}: Last Regrets`));
+    const battle = make(format, [mon('Gholdengo', ['Nasty Plot']), ...p1Team.filter(set => set.species === 'Landorus-Therian')], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
+    expect(battle.sides[0].pokemon[1].name).toBe('Last Regrets');
+    const protocol = [
+      `|move|p2a: Dragapult|Draco Meteor|${slot}: Last Regrets`, `|-damage|${slot}: Last Regrets|0 fnt`,'|-unboost|p2a: Dragapult|spa|2', `|faint|${slot}: Last Regrets`,
+    ];
+    const sim = protocol.map(line => line.replaceAll('Last Regrets', battle.sides[0].pokemon[1].name));
+    expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(sim))).toEqual({ endedMismatch: false, faintMismatches: 0, softMismatches: 0 });
+    const plain = make(format, [mon('Gholdengo', ['Nasty Plot']), mon('Landorus-Therian', ['Taunt'])], [mon('Dragapult', ['Draco Meteor']), mon('Clefable', ['Moonblast'])]);
+    expect(plain.sides[0].pokemon[1].name).toBe('Landorus');
+    expect(scoreAlignment(extractProtocolEvents(protocol), extractProtocolEvents(protocol.map(line => line.replaceAll('Last Regrets', 'Landorus')))).faintMismatches).toBe(2);
+  });
+});
+
+describe('scene: 751543, the alignment keeps the KO the game had', () => {
+  test('block 19 aligns, and Dragapult carries no Taunt at boundary 20', { timeout: 240000 }, async () => {
+    const replay = fixture('smogtours-gen9ou-751543.json');
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
+    let dragapultTaunted: boolean | null = null;
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log,
+      bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
+      targetTurn: 21, snapshot: snapshotFor(21),
+      choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
+      capturePositions: {
+        snapshotFor,
+        onPosition: (turn, battle) => {
+          if (turn === 20 && dragapultTaunted === null) dragapultTaunted = 'taunt' in battle.sides[1].active[0]!.volatiles;
+        },
+      },
+    });
+    // The record scores the block the turn emitted under the log's dice, not the chosen seed's (perfect) trial.
+    const record = runtime.haxAlignment.find(entry => entry.turn === 19);
+    expect(record).toMatchObject({ via: 'forced', actual: { endedMismatch: false, faintMismatches: 0, softMismatches: 0 } });
+    expect(dragapultTaunted).toBe(false);
+  });
+});
+
+describe('scene: doubles 912884, Bleakwind Storm KOs the nicknamed Ting-Lu', () => {
+  test('block 7 aligns, and the sim plays JOHN PEEL\'s faint', { timeout: 240000 }, async () => {
+    const replay = fixture('smogtours-gen9doublesou-912884.json');
+    const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
+    const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
+    const snapshotFor = (turn: number) => snapshots[Math.min(turn - 1, snapshots.length - 1)] ?? null;
+    const runtime = await reconstructBranchRuntime({
+      format: getBranchSimulatorFormat(replay), p1Team, p2Team, replayLog: replay.log,
+      bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
+      targetTurn: 8, snapshot: snapshotFor(8),
+      choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, observations),
+      capturePositions: { snapshotFor, onPosition: () => {} },
+    });
+    const log = runtime.battleStream.battle!.log;
+    const block = log.slice(log.lastIndexOf('|turn|7') + 1, log.lastIndexOf('|turn|8'));
+    const record = runtime.haxAlignment.find(entry => entry.turn === 7);
+    expect(record).toMatchObject({ via: 'forced', actual: { endedMismatch: false, faintMismatches: 0, softMismatches: 0 } });
+    expect(block.some(line => line.startsWith('|faint|p2') && line.includes(': JOHN PEEL'))).toBe(true);
   });
 });

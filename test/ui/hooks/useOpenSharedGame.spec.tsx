@@ -6,13 +6,6 @@ import { useOpenSharedGame, type SharedGameApp } from '../../../src/hooks/useOpe
 import { loadGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 
-/**
- * Round 89 (lane H, #105), stage H5 (ruling 31, H6a): a game's share link opens the main line and the open branch at the sharer's
- * turn. The reader (`recordOfShare`, spec `game-share.spec.ts`) is stubbed here: the rows hold the hook's own steps. It saves the
- * game as a copy, clears the hash, opens the record, waits for the game's data on screen, restores the branch and moves the pointer;
- * a link of the game that is open (same id, same main line) opens its branch in that game and makes no copy.
- */
-
 const opened = vi.hoisted(() => ({ result: null as unknown }));
 vi.mock('../../../src/hooks/branch/share-open', () => ({ recordOfShare: vi.fn(async () => opened.result) }));
 vi.mock('../../../src/lib/lazy/branch-engine', () => ({}));

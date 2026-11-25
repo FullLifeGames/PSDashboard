@@ -34,8 +34,8 @@ const healLog = [
   '|turn|2',
 ].join('\n');
 
-describe('stats panel data quality (WP11)', () => {
-  test('mega formes merge into the base species instead of a seventh card (B16)', () => {
+describe('stats panel data quality', () => {
+  test('mega formes merge into the base species instead of a seventh card', () => {
     const info = inferOpponentTeam(megaLog, 'p2');
     const speciesList = info.pokemon.map(pokemon => pokemon.species);
 
@@ -44,13 +44,13 @@ describe('stats panel data quality (WP11)', () => {
     expect(info.pokemon).toHaveLength(2);
   });
 
-  test('mega evolution reveals the stone as the held item (G19)', () => {
+  test('mega evolution reveals the stone as the held item', () => {
     const info = inferOpponentTeam(megaLog, 'p2');
     const lopunny = info.pokemon.find(pokemon => pokemon.species === 'Lopunny');
     expect(lopunny?.item).toEqual(expect.objectContaining({ value: 'Lopunnite', source: 'revealed' }));
   });
 
-  test('heal-from-item messages reveal the held item (G19)', () => {
+  test('heal-from-item messages reveal the held item', () => {
     const info = inferOpponentTeam(healLog, 'p2');
     const skarmory = info.pokemon.find(pokemon => pokemon.species === 'Skarmory');
     expect(skarmory?.item).toEqual(expect.objectContaining({ value: 'Leftovers', source: 'revealed' }));
@@ -79,7 +79,7 @@ describe('stats panel data quality (WP11)', () => {
     expect(corv?.ruledOut?.items).toContain('heavydutyboots');
   });
 
-  test('taking a Ground move rules out Levitate only for a species that can hold it (#150: Rotom-Heat holds only Levitate, a landed hit is a contradiction the rule leaves unread)', () => {
+  test('taking a Ground move rules out Levitate only for a species that can hold it (Rotom-Heat holds only Levitate, a landed hit is a contradiction the rule leaves unread)', () => {
     const log = [
       '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
       '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
@@ -93,8 +93,6 @@ describe('stats panel data quality (WP11)', () => {
   });
 
   test('an immune Ground move plus later unattributed damage does NOT rule out Levitate', () => {
-    // The stale-attribution bug class: |-immune| ends the action, so the
-    // confusion self-hit next turn must not be read as landed Earthquake.
     const log = [
       '|player|p2|Bob|', '|gen|9', '|poke|p2|Bronzong|',
       '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
@@ -123,7 +121,6 @@ describe('stats panel data quality (WP11)', () => {
     const zong = inferOpponentTeam(moldBreaker, 'p2').pokemon.find(p => p.species === 'Bronzong');
     expect(zong?.ruledOut?.abilities ?? []).not.toContain('levitate');
 
-    // Gravity grounds everyone; a landed Ground move proves nothing.
     const gravity = [
       '|player|p2|Bob|', '|gen|9', '|poke|p2|Rotom-Heat|',
       '|start', '|switch|p1a: Chomp|Garchomp, M|100/100',
@@ -186,7 +183,6 @@ describe('stats panel data quality (WP11)', () => {
     ].join('\n');
     const lax = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Snorlax');
     expect(lax?.ruledOut?.items).toContain('assaultvest');
-    // Sleep Talk's called move must not count as a second distinct choice-locked move.
     expect(lax?.ruledOut?.items ?? []).not.toContain('choicescarf');
   });
 
@@ -227,16 +223,12 @@ describe('stats panel data quality (WP11)', () => {
     expect(uxie.evs.value.hp).toBe(252);
     expect(uxie.evs.sourceDetail).toBe(INFERRED_SPREAD_DETAIL);
     expect(uxie.nature?.value).toBe('Timid');
-    // Manual EVs are never overridden by inference.
     const clef = overlaid.pokemon[1];
     expect(clef.evs.value.hp).toBe(252);
     expect(clef.evs.sourceDetail).toBeUndefined();
   });
 
-  test('a tricked item is never the set item; the giver gets the credit (GPL T11)', () => {
-    // Rotom tricks its scarf onto Vileplume: the scarf is NOT Vileplume's
-    // set item (crediting it manufactured a choice lock that hid the real
-    // moves), and it IS Rotom's.
+  test('a tricked item is never the set item; the giver gets the credit (GPL t11)', () => {
     const log = [
       '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9',
       '|poke|p1|Vileplume, F|', '|poke|p2|Rotom-Wash|',
@@ -250,7 +242,6 @@ describe('stats panel data quality (WP11)', () => {
       '|turn|2',
     ].join('\n');
     const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
-    // Not the scarf — and the counterpart line reveals Plume's original.
     expect(plume?.item?.value).toBe('Black Sludge');
     const wash = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Wash');
     expect(wash?.item?.value).toBe('Choice Scarf');
@@ -270,7 +261,6 @@ describe('stats panel data quality (WP11)', () => {
     ].join('\n');
     const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
     expect(plume?.item?.value).toBeFalsy();
-    // The giver still gets its original credited from the receiver's line.
     const wash = inferOpponentTeam(log, 'p2').pokemon.find(p => p.species === 'Rotom-Wash');
     expect(wash?.item?.value).toBe('Choice Scarf');
   });
@@ -292,7 +282,6 @@ describe('stats panel data quality (WP11)', () => {
       '|turn|4',
     ].join('\n');
     const plume = inferOpponentTeam(log, 'p1').pokemon.find(p => p.species === 'Vileplume');
-    // The pre-swap heal reveal is the set item; the knocked-off scarf is not.
     expect(plume?.item?.value).toBe('Black Sludge');
   });
 
@@ -334,7 +323,7 @@ describe('stats panel data quality (WP11)', () => {
   });
 
   test('Rocky Helmet damage without [of] falls back to the attacker\'s move target (video logs)', () => {
-    // gpl-pipeline reconstructions drop the [of] attribution — the holder is
+    // gpl-pipeline reconstructions drop the [of] attribution: the holder is
     // whoever the damaged Pokémon just hit with a contact move.
     const log = [
       '|player|p1|Alice|',
@@ -354,7 +343,6 @@ describe('stats panel data quality (WP11)', () => {
     const uxie = inferOpponentTeam(log, 'p1').pokemon.find(pokemon => pokemon.species === 'Uxie');
     expect(uxie?.item).toEqual(expect.objectContaining({ value: 'Rocky Helmet', source: 'revealed' }));
 
-    // The damaged attacker itself must NOT be credited with the helmet.
     const lando = inferOpponentTeam(log, 'p2').pokemon.find(pokemon => pokemon.species === 'Landorus-Therian');
     expect(lando?.item?.value ?? '').not.toBe('Rocky Helmet');
   });
@@ -411,15 +399,13 @@ describe('stats panel data quality (WP11)', () => {
         },
       },
     };
-    // Current guess excluded, ruled-out items skipped, capped at 2.
     expect(alternativeItems(usageStats, 'Heatran', 'Leftovers', { items: ['choicespecs'] }))
       .toEqual(['Air Balloon', 'Assault Vest']);
     expect(alternativeItems(usageStats, 'Heatran', 'Choice Specs')).toEqual(['Leftovers', 'Air Balloon']);
-    // Unknown species: nothing to probe.
     expect(alternativeItems(usageStats, 'Blissey', 'Leftovers')).toEqual([]);
   });
 
-  test('guessed typed Hidden Power does not join a revealed generic one (G12)', () => {
+  test('guessed typed Hidden Power does not join a revealed generic one', () => {
     const revealed: RevealedPokemonInfo = {
       species: 'Zapdos',
       moves: [{ name: 'Hidden Power', source: 'revealed' }],

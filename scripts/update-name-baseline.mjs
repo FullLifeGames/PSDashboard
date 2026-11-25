@@ -1,11 +1,4 @@
-// Round 72 (T236): rewrites the baselines of the name ratchet (scripts/name-baseline.json) and of the twin detector
-// (scripts/twin-baseline.json). A baseline only shrinks: the script drops the pairs that left the code (a twin group that lost
-// a file keeps the others, a group down to one file goes) and refuses, with exit 1 and the list, when the code holds a pair the
-// baseline lacks. Model: scripts/update-lint-ratchet.mjs.
-//
-// Usage: node scripts/update-name-baseline.mjs [--allow-raise] [--dry-run]
-//   --allow-raise  take pairs the baseline lacks (the integrator reads them with --dry-run first, after a merge)
-//   --dry-run      print the difference and write nothing
+// Rewrites the baselines of the name ratchet and of the twin detector; they only shrink.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';

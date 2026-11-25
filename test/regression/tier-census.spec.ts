@@ -8,13 +8,7 @@ import {
   censusLines, censusOfDump, gameTypeFromDump, gameTypeOfLog, movedLines, movedTurns, resolveGameType,
 } from '../../scripts/tier-census.mjs';
 
-/**
- * scripts/tier-census.mjs is the instrument of standing rule D21: it counts
- * the verdict tiers of feedback dump folders and names the turns behind a
- * changed count. The script is unlinted and untyped, so this spec is its only
- * gate. The dumps here are hand-built: the builder below IS the list of dump
- * fields the tool reads.
- */
+// The dumps are hand-built: the builder below is the list of dump fields scripts/tier-census.mjs reads.
 
 interface SideInit {
   tier?: 'inaccuracy' | 'mistake' | 'blunder';
@@ -34,7 +28,6 @@ const side = (init: SideInit = {}) => ({
   regret: init.unmatched ? null : init.regret ?? 0,
   choiceCount: 4,
   viableCount: 2,
-  // A nested tier that is no verdict: a key scan would count it.
   sensitivity: { alternatives: [{ tier: 'blunder' }] },
   ...(init.tier ? { tier: init.tier } : {}),
   ...(init.slots ? { playedSlots: [null, null] } : {}),
@@ -97,10 +90,8 @@ describe('tier census', () => {
     const { fixtures } = folders({}, { 'game-d': DOUBLES_LOG, 'game-s': SINGLES_LOG });
     expect(resolveGameType('game-d', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toBe('doubles');
     expect(() => resolveGameType('game-s', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toThrow(/fixture log says singles/);
-    // A doubles dump without analyses has no marks to contradict its fixture: the log stands, and the census counts zero.
     expect(resolveGameType('game-d', { graph: {}, analyses: null }, fixtures)).toBe('doubles');
     expect(censusOfDump({ graph: {}, analyses: null }).sides).toBe(0);
-    // No fixture: the dump's marks stand alone.
     expect(resolveGameType('unknown', dumpOf([turn(1, 'quiet', pairSide)]), fixtures)).toBe('doubles');
   });
 
@@ -132,7 +123,6 @@ describe('tier census', () => {
       turn(3, 'shift', {}, {}),
       turn(4, 'quiet', {}, {}),
     ]);
-    // The next dump lost turn 1 (a null slot shifts every index) and moved three verdicts.
     const next = dumpOf([
       null,
       turn(2, 'p1-read', { tier: 'blunder', regret: 0.43, riskPaidOff: true }),

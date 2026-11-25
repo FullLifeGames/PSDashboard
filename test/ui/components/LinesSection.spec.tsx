@@ -9,14 +9,12 @@ import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { turnAnalysis } from '../fixtures/analysis';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/** Round 89 (#104), step G3: the Lines section under a turn's rows, singles and doubles. */
 const withLines = (lines?: EvalLine[], extra: Partial<EvalResult> = {}): EvalResult => ({ ...evalResult('singles'), ...(lines ? { lines } : {}), ...extra });
 const host = (onPlay = vi.fn()): LinesHost => ({ rules: { gen: 9, mod: undefined }, onPlay });
 
 describe('LinesSection', () => {
   test('singles: a block per line with its head, its end value, its play button and one row per step', () => {
     render(<LinesSection turn={20} result={withLines([bothRolesLine, singlesLine, playedLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
-    // the "Lines" title moved to the turn card's toggle (EvalTurnAnalysis.spec.tsx)
     expect(screen.queryByText('Lines')).toBeNull();
     expect(screen.getByText('Tzon · played the engine\'s move: Draining Kiss')).toBeInTheDocument();
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
@@ -25,7 +23,6 @@ describe('LinesSection', () => {
     expect(screen.getAllByText(/^ends at \d+% for /)).toHaveLength(3);
     const turns = screen.getAllByText(/^T2\d$/).map(node => node.textContent);
     expect(turns).toEqual(['T20', 'T20', 'T21', 'T22', 'T20']);
-    // chips: only the dice that could have gone the other way
     expect(screen.getByText('Hydro Pump: hits (80%)')).toBeInTheDocument();
     expect(screen.getByText('Brave Bird: KO (10 of 16 rolls)')).toBeInTheDocument();
     expect(screen.queryByText(/no crit/)).toBeNull();
@@ -63,7 +60,6 @@ describe('LinesSection', () => {
     const { unmount } = render(<LinesSection turn={3} result={withLines()} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
     unmount();
-    // a tree search that kept none says so of the search
     const tree = withLines();
     render(<LinesSection turn={3} result={{ ...tree, matrix: { ...tree.matrix!, cells: [[{ visits: 9, verified: false }]] } }} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText('No line on this turn: the search kept none for these choices.')).toBeInTheDocument();
@@ -72,7 +68,6 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line: Other engine sends none.')).toBeInTheDocument();
   });
 
-  // Round 89 (G13b): a turn that is about to get lines does not tell the user to analyze it again.
   test.each([['singles', false], ['doubles', true]])('%s: a turn whose lines are coming says when, and a turn that waits for nothing keeps the matrix sentence', (_kind, doubles) => {
     const names = doubles ? DOUBLES_NAMES : SINGLES_NAMES;
     const { unmount } = render(<LinesSection turn={3} result={withLines()} playerNames={names} doubles={doubles} host={{ ...host(), lineComing: () => 'stage' }} />);
@@ -86,7 +81,6 @@ describe('LinesSection', () => {
     expect(screen.getByText('No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.')).toBeInTheDocument();
   });
 
-  // Round 89 (ruling 49): the review is not there with its flag off, so the sentence does not send the reader to it.
   test.each([['singles', false], ['doubles', true]])('%s: with the Game review flag off the coming-lines sentence names no review', (_kind, doubles) => {
     vi.stubEnv('VITE_FEATURE_GAME_REVIEW', '');
     try {
@@ -111,7 +105,6 @@ describe('LinesSection', () => {
   });
 
   test('two chips with the same words do not collide as React keys', () => {
-    // one die listed twice on a slot: two chips with the same words
     const [first, ...rest] = doublesLine.steps;
     const slots = first.p1.slots.map((slot, index) => (index === 0 && slot?.kind === 'move' && slot.dice ? { ...slot, dice: [...slot.dice, ...slot.dice] } : slot));
     const twice = { ...doublesLine, steps: [{ ...first, p1: { ...first.p1, slots } }, ...rest] };
@@ -122,7 +115,7 @@ describe('LinesSection', () => {
     spy.mockRestore();
   });
 
-  test('the dice chips carry their own class, not the timeline bar\'s line chip (its padding and margin broke the pill, FT-1)', () => {
+  test('the dice chips carry their own class, not the timeline bar\'s line chip (its padding, margin broke the pill)', () => {
     const { container } = render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={host()} />);
     const chips = screen.getAllByText(/^Speed tie: .* first \(50%\)$/);
     expect(chips.length).toBeGreaterThan(0);
@@ -147,7 +140,6 @@ describe('the Lines section in the turn card', () => {
   test('the card mounts it under its closed Lines toggle when its host hands one over, and not otherwise', async () => {
     const analysis = turnAnalysis(20, { p2: { ...turnAnalysis(20).p2, best: rankedChoice('move 1', 'Hydro Pump', 0.1) } });
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={SINGLES_NAMES} result={withLines([singlesLine])} linesHost={host()} />);
-    // closed first (the user's note on X1): the section's lines are not built until the toggle opens it
     expect(screen.queryByText('Pepitopalotin · engine: Hydro Pump')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
     expect(screen.getByText('Pepitopalotin · engine: Hydro Pump')).toBeInTheDocument();
@@ -156,7 +148,6 @@ describe('the Lines section in the turn card', () => {
   });
 });
 
-/** Round 89 (#104), step G10 (ruling G5a): both numbers on a line, and one sentence on why they differ when a line does. */
 describe('both numbers on a line', () => {
   const SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
   const p2Rows = (engineEv: number, playedEv: number, faintedFraction?: number) => {
@@ -201,7 +192,6 @@ describe('both numbers on a line', () => {
   });
 });
 
-/** Round 89 (#104), step G11 (ruling G8a): the head names the answer the line meets and its rank in this search. */
 describe('the answer a line meets', () => {
   const ranked = (kind: 'singles' | 'doubles', rows: { p1: string[]; p2: string[] }): EvalResult => {
     const base = withLines([], {});
@@ -229,13 +219,8 @@ describe('the answer a line meets', () => {
   });
 });
 
-/**
- * Round 89 (#153, Hard mode): with the setting on, a row's line is the one that meets the reply the search rates lowest for the row, named by what
- * stands behind it; a row whose search holds no such line shows today's line and says so; with the setting off the worst lines are
- * not shown at all. Singles and doubles.
- */
 describe('Hard mode in the Lines section', () => {
-  /** Pepitopalotin (p2) plays Hydro Pump or Hyper Voice against Tzon's Draining Kiss or Surf; Surf is the lowest cell of Hydro Pump's row (p1's highest cell of its column, 0.4). */
+  // Surf is the lowest cell of Hydro Pump's row: p1's highest cell of its column, 0.4.
   const hurtBy = (lines: EvalLine[]): EvalResult => {
     const base = withLines(lines);
     const p1 = [rankedChoice('move 0', 'Draining Kiss', 0.1), rankedChoice('move 1', 'Surf', 0.05)];

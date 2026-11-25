@@ -10,15 +10,8 @@ import { rulesOfActives } from './rules.ts';
 import { turnRolledFor } from './luck.ts';
 import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
 
-/**
- * The grading half of one side's turn, stage by stage in analyzeTurn's
- * original order: the played match, the verified regret, the verdict band
- * with its leniencies (decided position, sack, item sensitivity). Every
- * stage is pure and reads analyzeTurn's params; the narrative signals live
- * in signals.ts and never touch the grading.
- */
+// Grading only: the narrative signals (`signals.ts`) never touch it.
 
-/** The played action matched into the ranked list, with the doubles and phantom flags. */
 interface PlayedMatch {
   played: RankedChoice | null;
   /** A slot's choice stayed hidden: `played` is the charitable consistent combo. */
@@ -27,7 +20,6 @@ interface PlayedMatch {
   neverActed: boolean;
 }
 
-/** Doubles per slot (charitable on hidden slots), singles by choice id, then the stay-in phantom. */
 function matchPlayedForSide(
   params: AnalyzeTurnParams,
   key: Side,
@@ -54,12 +46,7 @@ function matchPlayedForSide(
   return { played, playedPartial, neverActed };
 }
 
-/**
- * best.ev − played.ev (own perspective), floored at 0. Verification can
- * only ACQUIT: a deep pass that confirms the gap keeps the shallow
- * equilibrium regret (the deep pair values are an exploitative lens, not a
- * fairer grade when they agree).
- */
+// Verification can only ACQUIT: a deep pass that confirms the gap keeps the shallow equilibrium regret.
 function verifiedRegret(
   params: AnalyzeTurnParams,
   key: Side,
@@ -88,7 +75,6 @@ const tierOf = (regretValue: number): VerdictTier | undefined =>
     : regretValue >= TIER_THRESHOLDS.mistake ? 'mistake'
       : regretValue >= TIER_THRESHOLDS.inaccuracy ? 'inaccuracy' : undefined;
 
-/** The regret's band, softened one tier in a decided position (own perspective). */
 function baseTier(regret: number | null, key: Side, scoreBefore: number): VerdictTier | undefined {
   let tier: VerdictTier | undefined;
   if (regret !== null) {
@@ -99,24 +85,14 @@ function baseTier(regret: number | null, key: Side, scoreBefore: number): Verdic
   return tier;
 }
 
-/** The sack verdict on the tier: demoted one band, cleared for a verified feed, never excusing a blunder. */
 interface SackVerdict {
   sacrificed: boolean;
   feedVerified: boolean;
   tier: VerdictTier | undefined;
 }
 
-/**
- * A sack of a nearly-dead body is a deliberate low-cost play: demote one
- * band (same shape as the decided-position leniency) and mark it so the
- * risk machinery and the report treat it neutrally. BOUNDED: a
- * blunder-sized regret is a throw whatever the body was worth — the sack
- * leniency never forgives the blunder band. A stayed feed VERIFIES when
- * its windowed payoff repaid the FULL regret with the read margin on top:
- * the line reached what the engine's best promised, measured from the
- * accepted floor upward (573756 t68 post-race: payoff 0.359 ≥ regret
- * 0.129 + 0.1), and no verdict band sticks.
- */
+// BOUNDED: a blunder-sized regret is a throw whatever the body was worth. A stayed feed verifies when its payoff repaid
+// the full regret with the read margin on top.
 function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate: SackGate): SackVerdict {
   const sacrificed = !!(tier && gate.sackApplies && (regret ?? 0) < TIER_THRESHOLDS.blunder);
   const feedVerified = sacrificed && gate.feedPayoff !== null && regret !== null &&
@@ -124,7 +100,6 @@ function sackVerdict(tier: VerdictTier | undefined, regret: number | null, gate:
   return { sacrificed, feedVerified, tier: sacrificed ? (feedVerified ? undefined : demoteTier(tier)) : tier };
 }
 
-/** The verdict before sensitivity: a tiered side through the sack leniency, an untiered one through the praise forms. */
 function sideVerdict(
   params: AnalyzeTurnParams,
   key: Side,
@@ -136,12 +111,7 @@ function sideVerdict(
   return { sacrificed: praised, feedVerified: praised, tier: undefined };
 }
 
-/**
- * Item-sensitivity: if the verdict changes band under a usage-plausible
- * alternative item for an opposing mon whose item is only a guess, the
- * verdict HINGES on hidden information — soften to the most charitable
- * probed band (acquit-only) and record the hinge.
- */
+// A verdict that changes band under a plausible alternative item of a guessed-item mon hinges: take the kindest band.
 function sensitivityAcquittal(
   tier: VerdictTier | undefined,
   probes: SensitivityProbe[] | undefined,
@@ -168,7 +138,6 @@ function sensitivityAcquittal(
   return { tier: softened, sensitivity };
 }
 
-/** Everything the grading stages produced for one side, in the order they ran. */
 export interface SideGrading {
   playedRaw: PlayedAction | null;
   playedSlots: (PlayedAction | null)[] | undefined;
@@ -176,13 +145,13 @@ export interface SideGrading {
   playedPartial: boolean;
   neverActed: boolean;
   options: RankedChoice[];
-  /** The top choice by equilibrium EV — the grading reference. */
+  /** The top choice by equilibrium EV, the grading reference. */
   best: RankedChoice | null;
-  /** The max-floor choice — the engine's safe line, the safety reference. */
+  /** The max-floor choice, the engine's safe line. */
   safe: RankedChoice | null;
   regret: number | null;
   verifiedAtDepth: boolean;
-  /** The verdict band after every leniency (absent = clean play). */
+  /** The verdict band after every leniency; absent for clean play. */
   tier: VerdictTier | undefined;
   sack: SackInfo | undefined;
   sacrificed: boolean;
@@ -190,10 +159,7 @@ export interface SideGrading {
   sensitivity: SideAnalysis['sensitivity'];
 }
 
-/**
- * Round 79: the turn's dice for the sack gates, read before the side records exist: both sides' matched played lines go to
- * the one rule that builds `rolledFor` (luck.ts). Only a side with a sack asks.
- */
+// Both sides' matched played lines go to the one rule that builds `rolledFor` (luck.ts); only a side with a sack asks.
 function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoice | null): { p1: boolean; p2: boolean } | undefined {
   if (!params.sacks?.[key]) return undefined;
   const foe: Side = key === 'p1' ? 'p2' : 'p1';
@@ -203,7 +169,6 @@ function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoic
   return turnRolledFor(params, key === 'p1' ? own : other, key === 'p1' ? other : own);
 }
 
-/** Runs the grading stages for one side: match, references, regret, band, sack, sensitivity. */
 export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   const playedRaw = params.played?.[key] ?? null;
   const playedSlots = key === 'p1' ? params.played?.p1Slots : params.played?.p2Slots;
@@ -224,7 +189,6 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   };
 }
 
-/** The setup move the side clicked, by the replay's own Dex (round 75, T160); none without the board context. */
 function setupField(params: AnalyzeTurnParams, g: SideGrading): { setupMove?: string } {
   const rules = rulesOfActives(params.actives);
   const setup = rules ? setupMoveClicked({ playedRaw: g.playedRaw, playedSlots: g.playedSlots }, dexOf(rules)) : null;

@@ -1,9 +1,7 @@
 name: Deploy GitHub Pages
 
 on:
-  # The root of the site is the nightly of master (user gate 07.11.2026, "3a"): a push of master deploys only after the
-  # Tests workflow passed on that very commit, so a push that breaks the app never reaches the nightly. The build job's
-  # condition drops a Tests run that failed, was cancelled or ran for a pull request.
+  # The nightly of master deploys only after the Tests workflow passed on that very commit.
   workflow_run:
     workflows:
       - Tests
@@ -12,10 +10,7 @@ on:
     branches:
       - master
       - main
-  # A published release has to redeploy the site, otherwise its frozen copy
-  # would not appear until the next unrelated push. This trigger serves a
-  # release made by hand; a release that release.yml makes with its token
-  # starts no workflow, so release.yml dispatches this one (round 78).
+  # A release made by hand redeploys the site; release.yml dispatches this workflow for the release it makes.
   release:
     types:
       - published
@@ -33,16 +28,14 @@ concurrency:
 jobs:
   build:
     name: Build
-    # Round 71: a data release of the bank (bank-data-<hash>, scripts/bank-data-pack.mjs --upload) carries no build and
-    # its tag may not deploy to github-pages; the site has nothing to rebuild for it.
+    # A data release of the bank carries no build and may not deploy to github-pages.
     if: ${{ (github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'bank-data-')) && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')) }}
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
         with:
-          # A workflow_run event carries the newest commit of the default branch in github.sha; the build takes the commit
-          # the tests passed on. A release or a dispatch has no workflow_run and builds github.sha.
+          # A workflow_run event carries the newest commit of master; the build takes the one the tests passed on.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
@@ -60,15 +53,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Two channels share the site: the nightly sits at the root and tracks
-      # master, while every official release keeps a frozen copy under its own
-      # tag — rebuilt from the zip that release published, so old builds never
-      # have to be recompiled from old source.
       - name: Assemble nightly and release channels
         env:
           GH_TOKEN: ${{ github.token }}
-          # The hand-updated production deployment. Only linked from /versions/;
-          # nothing in this pipeline writes to it.
           PS_PRODUCTION_URL: https://fulllifegames.com/Tools/PSDashboard/
         run: |
           mkdir -p site

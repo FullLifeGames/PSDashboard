@@ -41,12 +41,10 @@ describe('sensitivity probe plumbing', () => {
     const battle = positionBattle(createRootPosition(patched!));
     const tran = battle.sides[1].pokemon.find(pokemon => pokemon.species.id === 'heatran');
     expect(tran?.item).toBe('leftovers');
-    // The other mon and the original position stay untouched.
     const clef = battle.sides[1].pokemon.find(pokemon => pokemon.species.id === 'clefable');
     expect(clef?.item).toBe('leftovers');
     const original = positionBattle(createRootPosition(serialized));
     expect(original.sides[1].pokemon.find(pokemon => pokemon.species.id === 'heatran')?.item).toBe('choicespecs');
-    // Unknown species: nothing to patch.
     expect(patchSerializedItem(serialized, 'p2', 'Blissey', 'Leftovers')).toBeNull();
   });
 
@@ -55,7 +53,6 @@ describe('sensitivity probe plumbing', () => {
       [makeSet('A', 'Garchomp', ['Earthquake'])],
       [makeSet('Tran', 'Heatran', ['Magma Storm'], 'choicespecs'), makeSet('Clef', 'Clefable', ['Moonblast'], 'leftovers')],
     ));
-    // Active Heatran is involved; benched Clefable only via a switch label.
     const targets = [
       { species: 'Heatran', items: ['Leftovers', 'Air Balloon'] },
       { species: 'Clefable', items: ['Sticky Barb'] },

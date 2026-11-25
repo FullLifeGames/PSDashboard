@@ -26,13 +26,11 @@ export interface EngineWalkInputs {
   setBranchDivergence: (updater: (previous: string | null) => string | null) => void;
 }
 
-/** The walk's two shared refs: armed for the interlude, and the last result it has read. */
 interface WalkRefs {
   walkInterludeRef: MutableRefObject<boolean>;
   walkProcessedRef: MutableRefObject<EvalResult | null>;
 }
 
-/** Maps an engine choice string onto the live pickers, slot-aligned (round 84: `slotChoicesOf` is the dock fill's too). */
 function useApplyEvalChoice(simState: BranchSimState | null, handleSetChoice: EngineWalkInputs['handleSetChoice']) {
   return useCallback((side: 'p1' | 'p2', ranked: RankedChoice): boolean => {
     if (!simState) return false;
@@ -48,9 +46,6 @@ function useApplyEvalChoice(simState: BranchSimState | null, handleSetChoice: En
   }, [simState, handleSetChoice]);
 }
 
-/** Chess-style walk: clicking an engine line PLAYS THE TURN OUT — the
- *  clicked side commits its line, the other side answers with the engine's
- *  top reply, the turn executes, and the result re-evaluates. */
 function usePlayTurnOut(args: EngineWalkInputs & WalkRefs & {
   applyEvalChoice: ReturnType<typeof useApplyEvalChoice>;
 }) {
@@ -58,8 +53,6 @@ function usePlayTurnOut(args: EngineWalkInputs & WalkRefs & {
     evaluation, applyEvalChoice, walkInterludeRef, walkProcessedRef, getBattle, setBranchDivergence, executeTurn, handleEvaluate,
   } = args;
   return useCallback((side: 'p1' | 'p2', ranked: RankedChoice, reply: RankedChoice | null) => {
-    // A diverged/finished branch sim cannot accept choices — refuse with the
-    // divergence notice instead of letting the sim reject confusingly.
     if (getBattle()?.ended) {
       setBranchDivergence(previous => previous ??
         'The simulated replay already ended; recommendations cannot be played out in this diverged line.');
@@ -67,28 +60,21 @@ function usePlayTurnOut(args: EngineWalkInputs & WalkRefs & {
     }
     if (!applyEvalChoice(side, ranked)) return;
     const other = side === 'p1' ? 'p2' : 'p1';
-    // The top reply can fail to map onto the live pickers (label/slot
-    // mismatches) — walking down the ranked list keeps the click playing a
-    // full turn instead of silently stalling on a prefilled half-choice.
+    // Walk down the ranked list: the top reply may not map onto the live pickers (label or slot mismatch).
     const replies = [
       ...(reply ? [reply] : []),
       ...(evaluation.result?.perSide[other] ?? []),
     ].filter(candidate => candidate.choice !== 'wait');
     for (const candidate of replies) {
       if (applyEvalChoice(other, candidate)) {
-        // Mid-turn KOs pause the sim on a forced replacement — the walk
-        // finishes those interludes with the engine's answer (effect below).
+        // A mid-turn KO pauses the sim on a forced replacement: the interlude effect below finishes it.
         walkInterludeRef.current = true;
-        // Round 77 (C3): the result that stands now is the position this click left; it is not the replacement
-        // position. A pick played from the queue arms the walk inside an effect pass, and the interlude effect of
-        // the same pass would read that result as the answer and disarm the walk.
+        // The standing result is the click's position; the interlude effect would read it as the answer and disarm.
         walkProcessedRef.current = evaluation.result;
         void executeTurn().then(() => handleEvaluate());
         return;
       }
     }
-    // No engine reply to commit (forced-switch positions execute through
-    // setChoice on their own) — show the engine's view of what stands.
     handleEvaluate();
   }, [applyEvalChoice, walkInterludeRef, walkProcessedRef, evaluation.result, getBattle, executeTurn, handleEvaluate, setBranchDivergence]);
 }
@@ -99,34 +85,22 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   const { evaluation, liveTip, simState, requestDeviation, branching, branchPreparing, confirmOpen } = args;
   const playOutEvalChoice = usePlayTurnOut(args);
 
-  // The queued pick lives in a ref (the effect below only ACTS, it never
-  // sets state — the react-hooks gate); the version state re-arms the
-  // effect when a pick is queued.
   const pendingPickRef = useRef<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
   const [pickVersion, setPickVersion] = useState(0);
 
-  /**
-   * `reply` is the answer the card names (the best row). Round 89 (#153, Hard mode): a click on an engine move also hands `from`, the
-   * result the card reads; with the setting on the opponent answers with the reply that hurts the clicked move most (`worstReply`),
-   * read here, at the click, so a pick that waits for the deviation flow keeps it. A matrix pair passes no `from`: it is played as clicked.
-   */
+  /** `from`: the result of an engine-move click, read for Hard mode's worst reply; a matrix pair has none. */
   const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, named?: RankedChoice | null, from?: EvalResult | null) => {
-    // The walk re-evaluates after every executed turn — surface that as the visible Auto setting rather than a hidden mode.
     if (!evaluation.prefs.auto) evaluation.setPrefs({ ...evaluation.prefs, auto: true });
     const reply = evaluation.prefs.hardMode && from ? worstReply(from, side, ranked)?.reply ?? named ?? null : named ?? null;
     if (liveTip && simState) {
       playOutEvalChoice(side, ranked, reply);
       return;
     }
-    // Any other position: the deviation flow rebuilds the sim there (chess
-    // rules incl. the replace confirm) and the pending pick plays out once
-    // the pointer sits on the live tip again.
     pendingPickRef.current = { side, ranked, reply };
     setPickVersion(version => version + 1);
     requestDeviation(null);
   }, [liveTip, simState, playOutEvalChoice, requestDeviation, evaluation]);
 
-  // A matrix cell names BOTH sides' choices — play exactly that pair out.
   const handlePickPair = useCallback((p1: { choice: string; label: string }, p2: { choice: string; label: string }) => {
     const rankedLike = (entry: { choice: string; label: string }): RankedChoice =>
       ({ choice: entry.choice, label: entry.label, worstCase: 0, expected: 0, ev: 0, punishedBy: null });
@@ -136,13 +110,11 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   useEffect(() => {
     const pendingEvalPick = pendingPickRef.current;
     if (!pendingEvalPick) return;
-    // Wait until the rebuild landed the pointer ON the live sim — applying
-    // earlier would play the pick into whatever position the OLD sim held.
+    // Wait until the rebuild landed the pointer on the live sim: earlier, the pick would play into the old sim.
     if (liveTip && simState && !branchPreparing && !confirmOpen) {
       pendingPickRef.current = null;
       playOutEvalChoice(pendingEvalPick.side, pendingEvalPick.ranked, pendingEvalPick.reply);
     } else if (!branching && !branchPreparing && !confirmOpen) {
-      // Branch entry failed or was cancelled — drop the stale pick.
       pendingPickRef.current = null;
     }
   }, [pickVersion, liveTip, simState, branching, branchPreparing, confirmOpen, playOutEvalChoice]);
@@ -153,15 +125,7 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   return { playOutEvalChoice, handleExploreChoice, handlePickPair, clearPendingPick };
 }
 
-/**
- * Chess-walk interlude completion: after a clicked engine line executes,
- * a mid-turn KO leaves the sim waiting on a forced replacement. While
- * armed, one-sided positions (only forced replacements rank — the other
- * side 'wait's) auto-play the engine's top answer; the first two-sided
- * position is the next real decision point and disarms the walk.
- */
-/** The one-sided answer an armed walk should auto-play, or the reason to
- *  disarm ('two-sided' reaches the next real decision point). */
+// One-sided positions (only forced replacements rank) auto-play the top answer; the first two-sided one disarms.
 function interludeStep(result: EvalResult): { side: 'p1' | 'p2'; choice: RankedChoice } | 'disarm' {
   const p1 = result.perSide.p1.find(choice => choice.choice !== 'wait') ?? null;
   const p2 = result.perSide.p2.find(choice => choice.choice !== 'wait') ?? null;
@@ -195,17 +159,12 @@ function useWalkInterlude(args: EngineWalkInputs & WalkRefs & {
       walkInterludeRef.current = false;
       return;
     }
-    // setChoice auto-executes forced replacements; the auto pref re-evaluates
-    // once the entry lands, which re-enters this effect until two-sided.
   }, [playOutActive, liveTip, executing, branchPreparing, evaluation.status, evaluation.result, evaluation.resultTag, evalViewKey, getBattle, applyEvalChoice, walkInterludeRef, walkProcessedRef]);
 }
 
 export function useEngineWalk(inputs: EngineWalkInputs) {
   const applyEvalChoice = useApplyEvalChoice(inputs.simState, inputs.handleSetChoice);
-  // Armed by a clicked engine line whose turn executed — see the interlude
-  // completion effect.
   const walkInterludeRef = useRef(false);
-  // The result the walk has already read (or that stood when it armed); the interlude acts on newer results only.
   const walkProcessedRef = useRef<EvalResult | null>(null);
   const walk = useChessWalk({ ...inputs, applyEvalChoice, walkInterludeRef, walkProcessedRef });
   useWalkInterlude({ ...inputs, applyEvalChoice, walkInterludeRef, walkProcessedRef });

@@ -1,33 +1,10 @@
-/**
- * Publishes the workspace packages (packages/*) as part of the release flow.
- *
- * One global version: every package manifest carries the root package.json
- * version (release 1.0.1, test/regression/package-api.spec.ts), and this
- * script writes it again while it runs. Changed-only: a package is selected
- * when its files changed since the previous release tag (the newest v* tag
- * below the current version), when no earlier tag exists, or when the
- * registry has no version of it yet; the release bump moves every manifest,
- * so a release selects every package. The workspace reference "*" on the
- * sibling package becomes a caret range on the version being published, or
- * on the latest published version when the sibling is skipped this round.
- * The manifests are restored afterwards, whatever happens in between.
- *
- *   node scripts/publish-packages.mjs --dry-run           # the plan plus npm pack --dry-run, nothing uploaded
- *   node scripts/publish-packages.mjs --pack <dir> --all  # tarballs for every package (the pack smoke)
- *   node scripts/publish-packages.mjs                     # publish the selected packages (release.yml)
- *
- * --registry-latest <name>=<version> answers "what is on npm" without the
- * network (tests, air-gapped dry runs). Runs from the repository root; the
- * publish itself expects npm to be authenticated - in CI through trusted
- * publishing (release.yml holds the OIDC permission), locally through
- * `npm login`.
- */
+// Publishes the workspace packages (packages/*) as part of the release flow.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { lower, missingReleaseTags, parseVersion, remoteTagNames } from './release-tags.mjs';
 
-/** Dependency order: a package comes after the packages it depends on. */
+// Dependency order: a package comes after the packages it depends on.
 const PACKAGES = ['replay-core', 'eval-engine'];
 const SCOPE = '@fulllifegames';
 
@@ -51,7 +28,7 @@ if (!existsSync(resolve(root, 'packages')) || !existsSync(resolve(root, 'package
 }
 
 const readJson = file => JSON.parse(readFileSync(file, 'utf8'));
-/** npm is a .cmd shim on Windows, which Node only runs through a shell; everything else spawns directly. */
+// npm is a .cmd shim on Windows, which Node runs only through a shell.
 const quote = arg => (/[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg);
 const run = (command, commandArgs, options = {}) =>
   command === 'npm' && process.platform === 'win32'
@@ -63,10 +40,6 @@ const git = (...gitArgs) => {
   return result.stdout.trim();
 };
 
-/**
- * The newest v* tag whose version is below the one being released, or null. A plan that selects by change needs every
- * release tag of origin: it stops when the local tags lack one (round 77, "6a"); --all selects without a tag.
- */
 function previousReleaseTag(version) {
   const current = parseVersion(version);
   if (!current) throw new Error(`root version ${version} is not major.minor.patch`);
@@ -92,7 +65,6 @@ function changedSince(tag, dir) {
   throw new Error(`git diff --quiet ${tag} HEAD -- ${dir} failed: ${result.stderr}`);
 }
 
-/** The version on the registry, or null when the package was never published. */
 function publishedVersion(name) {
   if (registryOverrides.has(name)) return registryOverrides.get(name) || null;
   const result = run('npm', ['view', name, 'version', '--json'], { cwd: resolve(root, '..') });
@@ -121,7 +93,6 @@ function buildPlan() {
     const publish = all || published === null || !previousTag || changed;
     return { short, name, dir, version, published, publish, reason };
   });
-  // The sibling range a published manifest carries instead of the workspace "*".
   const byName = new Map(entries.map(entry => [entry.name, entry]));
   for (const entry of entries) {
     const manifest = readJson(resolve(root, entry.dir, 'package.json'));
@@ -138,7 +109,6 @@ function buildPlan() {
   return { version, previousTag, entries };
 }
 
-/** Writes the release version and the sibling ranges into the manifests; returns the restore function. */
 function prepareManifests(entries) {
   const originals = new Map();
   for (const entry of entries) {

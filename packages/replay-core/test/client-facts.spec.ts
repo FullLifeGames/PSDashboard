@@ -2,19 +2,6 @@ import { test, expect, describe } from 'vitest';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 
-/**
- * T108 step 2 (round 67, spec decision 19): the inference takes from its own
- * @pkmn/client walk the facts its handlers missed, class by class as the
- * census of client against inference found them (544 deviations in 133
- * bank and feedback games): an ability the line names as its effect
- * (`|-activate|p2a: X|ability: Quark Drive`, a Queenly Majesty block), an item
- * a line names from the holder's own side (`[from] item: Toxic Orb` on a
- * status line, Poltergeist), and the client's rule for a move that is no
- * choice of the user's own (a Magic Bounce reflection, a move while
- * transformed, Struggle). Every log comes from @pkmn/sim; each case checks
- * the simulator's line first, then what the inference reads for p2.
- */
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -45,7 +32,7 @@ const moves = (log: string, species: string) => mon(log, species)?.moves.map(mov
 const wall = () => set('Blissey', 'Leftovers', 'Natural Cure', ['Soft-Boiled', 'Protect']);
 const partner = () => set('Chansey', 'Eviolite', 'Natural Cure', ['Soft-Boiled', 'Protect']);
 
-describe('an ability the line names as its effect comes from the client (T108 step 2)', () => {
+describe('an ability the line names as its effect comes from the client', () => {
   const hands = () => set('Iron Hands', 'Booster Energy', 'Quark Drive', ['Drain Punch', 'Protect']);
   const glimmora = () => set('Glimmora', 'Focus Sash', 'Toxic Debris', ['Protect', 'Mortal Spin']);
 
@@ -86,7 +73,7 @@ describe('an ability the line names as its effect comes from the client (T108 st
   });
 });
 
-describe('an item a line names from the holder\'s side comes from the client (T108 step 2)', () => {
+describe('an item a line names from the holder\'s side comes from the client', () => {
   test('singles: Toxic Orb poisons its holder at the end of the turn', () => {
     const gliscor = set('Gliscor', 'Toxic Orb', 'Poison Heal', ['Protect', 'Earthquake']);
     const log = play([wall()], [gliscor, wall()], [['move softboiled', 'move protect']]);
@@ -110,7 +97,7 @@ describe('an item a line names from the holder\'s side comes from the client (T1
   });
 });
 
-describe('a move that is no choice of the user\'s own is not its move (T108 step 2)', () => {
+describe('a move that is no choice of the user\'s own is not its move', () => {
   test('singles: a Magic Bounce reflection is not the bouncer\'s move, and Magic Bounce is its ability', () => {
     const setter = set('Garchomp', 'Leftovers', 'Rough Skin', ['Stealth Rock', 'Earthquake']);
     const hatterene = set('Hatterene', 'Leftovers', 'Magic Bounce', ['Draining Kiss', 'Psychic']);

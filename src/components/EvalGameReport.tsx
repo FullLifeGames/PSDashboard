@@ -10,14 +10,10 @@ interface EvalGameReportProps {
   report: GameReport;
   playerNames: [string, string];
   onSelectTurn?: (turn: number) => void;
-  /** Turn-0 verdicts — a T0 chip appears for mistake-level lead choices (singles; a doubles lead carries none, eval-badges leadTier). */
+  /** Turn-0 verdicts; a doubles lead carries no mistake tier (`leadTier`). */
   leads?: LeadAnalysis | null;
-  /** What produced each turn's numbers — chips carry a d1/d2/MCTS badge so
-   * mixed-depth curves read honestly. */
   settingsFor?: (turn: number) => TurnEvalSettings | null;
 }
-
-// Deltas render as win-probability points ("−12%") — see winDeltaText.
 
 type SettingsFor = EvalGameReportProps['settingsFor'];
 type SelectTurn = EvalGameReportProps['onSelectTurn'];
@@ -164,7 +160,6 @@ function ReadChips({ report, playerNames, onSelectTurn, settingsFor }: EvalGameR
 function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalGameReportProps) {
   const denied = report.deniedEnd;
   if (!denied) return null;
-  // Round 67 (T135): a sure KO has no roll that could fail; it never came.
   const sure = denied.odds >= 1;
   return (
     <div className="ps-eval-report-moments">
@@ -186,11 +181,6 @@ function DeniedEndChip({ report, playerNames, onSelectTurn, settingsFor }: EvalG
   );
 }
 
-/**
- * Round 79 (T284): a chance chip prints the chance part and the net ("+13% from the roll (net +5%)", 573756 t73: the
- * biggest roll of the game netted +5% because the decision part pulled the other way); the badge beside it is about
- * the chance part. Every other attribution keeps the net swing.
- */
 function momentDelta(moment: TurnAnalysis, swing: number): string {
   if (shownAttribution(moment) !== 'chance' || moment.chanceDelta === null) return winDeltaText(swing);
   return `${winDeltaText(moment.chanceDelta)}${chanceRolled(moment) ? ' from the roll' : ''} (net ${winDeltaText(swing)})`;
@@ -221,7 +211,6 @@ function KeyMomentChips({ report, playerNames, onSelectTurn, settingsFor }: Eval
   );
 }
 
-/** Game-level story from a completed sweep: the tip, the seeds, the key moments. */
 export function EvalGameReport(props: EvalGameReportProps) {
   const { report, playerNames, onSelectTurn, leads } = props;
   return (

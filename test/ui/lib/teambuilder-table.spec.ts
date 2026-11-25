@@ -5,12 +5,6 @@ import {
   TABLE_PART_MODS, cutTablePart, tablePartScript, tableSwapScript,
 } from '../../../src/lib/teambuilder-table';
 
-/**
- * Round 85 (T318): every replay frame ran Showdown's `data/teambuilder-tables.js` (15.8 MB, 185 ms at load and again at every
- * variation start), of which the replay client reads the generation tables `gen1` to `gen8` and the mods it names
- * (`battledata.js` ModdedDex; `battle.js` Dex.mod). A worker cuts that part once per session; the frame's script hook swaps
- * the table's source for the part's script. The e2e sweep (`test/e2e/teambuilder-table.spec.ts`) holds the part to the client.
- */
 const table = {
   tiers: ['header'], learnsets: { pikachu: {} }, overrideTier: {}, metagameBans: {}, natdexchampions: { x: 1 }, gen9dlc1: { y: 2 },
   gen9: { z: 3 }, gen8: { overrideMoveData: { a: 1 } }, gen7: {}, gen6: {}, gen5: {}, gen4: {}, gen3: {}, gen2: {}, gen1: { b: 2 },
@@ -66,7 +60,6 @@ describe('the frame takes the part instead of Showdown\'s table', () => {
 });
 
 describe('a new frame waits for the part only while the worker runs, at most until TABLE_PART_WAIT_MS', () => {
-  /** A worker that answers when the test says so. */
   class FakeWorker {
     static last: FakeWorker | null = null;
     onmessage: ((event: { data: unknown }) => void) | null = null;

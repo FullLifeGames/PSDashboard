@@ -40,7 +40,6 @@ function matrixOf(p1: RankedChoice[], p2: RankedChoice[]): EvalMatrix {
   };
 }
 
-/** A finished depth-1 search: both sides ranked, the joint matrix, the top p1 move carrying kill odds. */
 export function evalResult(kind: FormatKind = 'singles', overrides: Partial<EvalResult> = {}): EvalResult {
   const sides = structuredClone(kind === 'singles' ? SINGLES : DOUBLES);
   return {
@@ -53,7 +52,6 @@ export function evalResult(kind: FormatKind = 'singles', overrides: Partial<Eval
   };
 }
 
-/** A whole-game sweep over ten turns: scores per turn, results on every turn, no verification yet. */
 export function evalGraph(kind: FormatKind = 'singles', overrides: Partial<EvalGraphState> = {}): EvalGraphState {
   const turns = 10;
   const scores = Array.from({ length: turns }, (_, i) => Math.round(Math.sin(i / 2) * 50) / 100);
@@ -75,7 +73,6 @@ export function evalGraph(kind: FormatKind = 'singles', overrides: Partial<EvalG
   };
 }
 
-/** A tracked report with a winner, a turning point, and totals; the lists start empty. */
 export function gameReport(overrides: Partial<GameReport> = {}): GameReport {
   return {
     winner: 'p1',

@@ -8,22 +8,14 @@ import {
   VGC_RULES, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A2b: the accuracy sweep. Every move of every rule set with a numeric accuracy, singles and
-// doubles (a spread move: every target on its own), forced to hit and forced to miss, and the report held against the
-// protocol's own lines. A hit has no `|-miss|` for the target and an effect line; a miss has one. A draw that cannot give
-// the answer (a 100 percent move forced to miss) says `no-chance` and the hit shows; a die the simulator never drew says so
-// with the protocol line that explains it. A move the simulator drew an accuracy for but the module did not name fails the
-// sweep: its report would read `no-draw` with the generic sentence, or `no-chance` with no chance behind it. The rows with
-// no chance (a move that cannot miss) and a VGC row (a team of six, Scarlet/Violet and Champions) close it.
 await loadSimMods('gen9championsou');
 
-/** The problem with a report, or null when the report and the protocol agree. */
 function problemOf(report: DieReport, happens: boolean, misses: number, move: DexMove, rules: Rules): string | null {
   switch (report.took) {
     case 'applied': return (happens ? misses === 0 : misses >= 1) ? null : `applied but the protocol shows ${misses} misses`;
     case 'blocked': return happens && misses === 0 && report.reason ? null : `blocked: ${why(report)} (${misses} misses)`;
     case 'no-chance': {
-      // a sure draw (chance of one), a move that cannot miss (no draw), or Gen 2's 100 percent moves, which draw nothing
+      // a sure draw (chance of one), a move that cannot miss (no draw), or Gen 2's 100 percent moves: they draw nothing
       const sure = (report.chance ?? 0) >= 1 || move.accuracy === true || (rules.generation === 2 && move.accuracy === 100);
       return misses === 0 && sure && !!report.reason ? null : `no-chance: chance ${report.chance}, ${misses} misses, ${why(report)}`;
     }
@@ -31,7 +23,6 @@ function problemOf(report: DieReport, happens: boolean, misses: number, move: De
   }
 }
 
-/** The reason of a report, or the word that it has none (a report that must have one fails with this). */
 const why = (report: DieReport): string => report.reason ?? 'no reason';
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -40,7 +31,6 @@ afterAll(() => {
   if (logPath) writeFileSync(logPath, summaries.join('\n') + '\n', 'utf8');
 });
 
-/** Forces the accuracy of one move to hit and to miss on every slot it can draw for; the problems found, with the tally filled. */
 function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = false): string[] {
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', vgc);
   let clicks = sweepClicks(mode, move.target);
@@ -66,7 +56,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = f
         : problemOf(shown, happens, misses, move, rules);
       verdicts.push({ slot, report: shown, problem });
     }
-    // a move that picks one target draws for that one only: the others are no draw
     const settled = picksOne(move.target) && verdicts.some(verdict => verdict.report.took !== 'no-draw' && !verdict.problem);
     for (const verdict of verdicts) {
       if (settled && verdict.report.took === 'no-draw') continue;
@@ -81,7 +70,6 @@ function conclude(name: string, moves: DexMove[], skipped: number, tally: Tally)
   summaries.push(`${name}: ${moves.length} moves (${skipped} skipped: no foe as target) ${JSON.stringify({ ...tally, bad: undefined, unexercised: tally.unexercised.join(',') })}`);
   expect(tally.unexercised.length, `clicks refused: ${tally.unexercised}`).toBeLessThan(moves.length * 0.02);
   expect(tally.cases).toBeGreaterThan(moves.length);
-  // most moves in a plain scene draw their accuracy (or cannot miss: a no-draw with that reason, each held by its case) and show the answer
   expect(tally.applied + tally.blocked + tally.noChance + tally.noDraw).toBeGreaterThan(tally.cases * 0.8);
   expect(tally.applied).toBeGreaterThan(tally.cases * 0.3);
 }
@@ -117,7 +105,6 @@ describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, 
           return report.forced[0];
         });
         const sure = (report: DieReport): boolean => report.took === 'no-draw' && explained(report.reason);
-        // a move that picks one target draws for that one only
         const fine = picksOne(move.target) ? shown.some(sure) : shown.every(sure);
         expect(fine, `${move.id} ${happens}: ${shown.map(report => `${report.took} ${report.reason}`).join(' | ')}`).toBe(true);
         noChance += shown.filter(sure).length;
@@ -128,7 +115,6 @@ describe.each(SWEEP_CASES)('the accuracy rows with no chance: $name', ({ rules, 
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the accuracy sweep, a team of six: $name', ({ rules, name }) => {
-  // every tenth move keeps the row short; the dice behave as in doubles, the row exists because VGC counts on its own
   const { moves, skipped } = sweepMoves(rules, move => typeof move.accuracy === 'number');
   const some = moves.filter((_, index) => index % 10 === 0);
   const tally: Tally = newTally();

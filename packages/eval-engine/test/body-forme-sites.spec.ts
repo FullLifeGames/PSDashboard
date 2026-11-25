@@ -10,16 +10,6 @@ import { findPokemonOnSide, findSlotBySpecies } from '../src/branch/protocol-cho
 import { toId } from '@fulllifegames/replay-core';
 import { RULESETS, become, forcedBoard, mon, type GameType, type Ruleset } from './forme-boards';
 
-/**
- * Round 88 (#103): the other sites that tell whether two names are one body in another forme. Each used to cut the suffix list ('tera',
- * 'stellar', 'terastal') off the ids it compared; each now asks the battle's Dex (`sameBodyForme`, `branch/body-forme.ts`). Held here the way
- * `switch-forme-sweep.spec.ts` holds the resolver: in every generation and mod the corpus plays, singles and doubles (the predicates read a
- * species and a name and do not depend on the game type, the boards are built for both anyway), for every species with a `battleOnly`
- * origin: the body on the bench holds the forme and the other side names the origin, the other way round, and the forme itself. The body's
- * name is a nickname and the other side's name another, so only the species can tie them. Negative rows: two bodies of one base that the
- * Dex keeps apart (Ogerpon-Teal-Tera and Ogerpon-Wellspring-Tera, Rotom-Wash and Rotom) never match.
- */
-
 const NICKNAME = 'Nick';
 const OGERPON_APART: [string, string][] = [
   ['Ogerpon-Teal-Tera', 'Ogerpon-Wellspring-Tera'], ['Ogerpon-Wellspring-Tera', 'Ogerpon-Teal-Tera'], ['Ogerpon-Teal-Tera', 'Ogerpon-Wellspring'],
@@ -27,7 +17,6 @@ const OGERPON_APART: [string, string][] = [
 ];
 const NEGATIVES: [string, string][] = [...OGERPON_APART, ['Rotom-Wash', 'Rotom'], ['Rotom', 'Rotom-Wash']];
 
-/** The failures of `holds` over every forme of the Dex and every origin (as a list of readable rows), and over the negative rows. */
 function sweep(
   rules: Ruleset, type: GameType, holds: (body: Pokemon, species: string) => boolean, { decoyFirst = false, negatives = NEGATIVES } = {},
 ): { failures: string[]; formes: number } {
@@ -61,7 +50,7 @@ function sweep(
 
 const BOARDS = RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(type => ({ rules, type })));
 
-describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (#103)', ({ rules, type }) => {
+describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family', ({ rules, type }) => {
   test('corrections: the active body of the snapshot (sameMon)', () => {
     const { failures, formes } = sweep(rules, type, (body, species) => sameMon(body, { speciesForme: species, name: 'Other' } as PokemonSnapshot));
     expect(formes).toBeGreaterThan(100);
@@ -81,7 +70,6 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
   });
 
   test('protocol choices: the bench slot of a species the protocol names (findSlotBySpecies), a decoy ahead of the body', () => {
-    // The decoy (a Meowth) sits before the target on the bench, so the fallback (the first living slot) is never the right one.
     const { failures, formes } = sweep(rules, type, (body, species) =>
       findSlotBySpecies(body.battle, body.side.n, species) === body.side.pokemon.indexOf(body) + 1, { decoyFirst: true, negatives: OGERPON_APART });
     expect(formes).toBeGreaterThan(100);
@@ -99,9 +87,9 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
     expect(toId(findPokemonOnSide(battle.sides[0], 'Rotom')!.species.name)).toBe('rotom');
   });
 
-  test('protocol choices: the bench slot follows the name the log shows for the origin (#118, the prefix pass is gone)', () => {
-    // The simulator's own log (`getUpdatedDetails`) shows Greninja-Bond as "Greninja". Every forme whose origin the log shows under another
-    // name ties to the body that name stands for; a forme whose origin the log shows by its own name never ties to the base species.
+  test('protocol choices: the bench slot follows the name the log shows for the origin (the prefix pass is gone)', () => {
+    // The log (`getUpdatedDetails`) shows Greninja-Bond as "Greninja": such a forme ties to the body that name names,
+    // a forme the log shows by its own name never ties to the base species.
     const battle = forcedBoard(rules, type, [mon(rules, 'Meowth', ['splash']), mon(rules, 'Eevee', ['splash'])]);
     const target = battle.sides[0].pokemon.find(body => body.set.species === 'Eevee')!;
     const slotOf = (held: string, named: string): number => {
@@ -132,12 +120,11 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
       }
     }
     expect(apart).toBeGreaterThan(5);
-    // The real scene: smogtours-gen7ubers-317232 turn 28, the log asks Greninja-Ash and the slot holds Greninja. It is the one pair.
     expect(tied).toEqual(['Greninja / Greninja-Ash']);
     expect(failures).toEqual([]);
   });
 
-  test('protocol choices: names that merely share a prefix stay apart (#118)', () => {
+  test('protocol choices: names that merely share a prefix stay apart', () => {
     const PAIRS: [string, string][] = [
       ['Mewtwo', 'Mew'], ['Mew', 'Mewtwo'], ['Porygon2', 'Porygon'], ['Porygon', 'Porygon2'], ['Porygon-Z', 'Porygon'], ['Porygon', 'Porygon-Z'], ['Porygon2', 'Porygon-Z'],
       ['Pawmot', 'Pawmo'], ['Pawmo', 'Pawmot'], ['Urshifu-Rapid-Strike', 'Urshifu'], ['Urshifu', 'Urshifu-Rapid-Strike'],
@@ -166,8 +153,7 @@ describe.each(BOARDS)('$rules.label $type: sites read a body by its Dex family (
   });
 });
 
-describe('no site reads a species suffix list (#103)', () => {
-  // The suffix list of team-order.ts ('terastal', 'stellar', 'tera') is gone: the six sites ask `branch/body-forme.ts`, which reads the Dex.
+describe('no site reads a species suffix list', () => {
   test('no source file of the packages or the app names the list, its helper or a Tera suffix test', () => {
     const roots = ['packages/eval-engine/src', 'packages/replay-core/src', 'src'];
     const files = roots.flatMap(root => readdirSync(root, { recursive: true, withFileTypes: true })

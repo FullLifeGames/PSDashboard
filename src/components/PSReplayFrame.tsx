@@ -14,47 +14,26 @@ interface Props {
   seekTurn?: number;
   autoPlay?: boolean;
   liveUpdates?: boolean;
-  /** 'hold' appends without seeking — the frame stays where it is while a
-   *  play-out streams turns in; the finish notice's watch seek moves it. */
+  /** 'hold' appends without seeking: the frame stays put while a play-out streams turns in. */
   liveAppendMode?: 'play' | 'follow-end' | 'hold';
   liveAppendTurn?: number | null;
-  /**
-   * A live document that opens now opens at the start of this turn and plays the turn in: the pointer
-   * followed a turn that just ran, and the frame mounted after it (the first turn of a new variation).
-   */
   openAtTurn?: number | null;
   reloadKey?: string;
-  /** Viewer perspective — 'p2' renders from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
   onTurnChange?: (turn: number) => void;
-  /** Round 88 (T316): the frame reports the side it shows near (Switch sides, the ?p2 flag); the dock puts that side on top. */
   onSideChange?: (side: FrameSide) => void;
-  /** Round 88 (T316): false hides Color scheme and Music, which do nothing in the app's frames. Default true. */
+  /** False hides Color scheme and Music, which do nothing in the app's frames. Default true. */
   choosers?: boolean;
-  /**
-   * Explicit one-shot seek command for live-update frames, which ignore
-   * seekTurn prop changes after mount (re-seeking on every render fought
-   * the append stream). Bump `seq` to send; `play` starts playback there —
-   * the "watch the line from its branch point" affordance.
-   */
+  /** One-shot seek for live-update frames, which ignore seekTurn after mount; bump `seq` to send, `play` starts it. */
   seekRequest?: SeekRequest | null;
 }
 
-/**
- * Renders a real Pokémon Showdown replay viewer in an iframe.
- * The iframe loads replay-embed.js from play.pokemonshowdown.com
- * which provides the full battle scene, animations, and playback controls.
- *
- * When seekTurn is set, the replay is asked to seek in-place via postMessage
- * so changing turns does not rebuild the iframe.
- * onTurnChange fires when the user scrubs/plays to a different turn.
- */
 interface DocumentProps extends Props {
   documentLog: string;
-  /** The turn a new document opens on: the opening turn's start, or the pointer's turn. */
   documentSeekTurn?: number;
 }
 
+/** A Showdown replay viewer in an iframe (replay-embed.js); `seekTurn` seeks in place by postMessage. */
 export function PSReplayFrame(props: Props) {
   const generation = useLiveDocumentGeneration(props.log, !!props.liveUpdates);
   const key = props.liveUpdates
@@ -71,11 +50,7 @@ export function PSReplayFrame(props: Props) {
   );
 }
 
-/**
- * The log up to the line that starts `turn`, when lines follow it: a document on that prefix shows the
- * position before the turn, and the append that brings the rest plays the turn (round 77, user report
- * 28.10.2026: the first turn of a new variation opened on its end).
- */
+// The prefix shows the position before the turn and the append plays it: else a first turn opens on its end.
 function openingAt(log: string, turn: number | null | undefined): { log: string; turn: number } | null {
   if (turn == null || turn < 1) return null;
   const lines = log.split('\n');
@@ -84,12 +59,7 @@ function openingAt(log: string, turn: number | null | undefined): { log: string;
   return { log: lines.slice(0, start + 1).join('\n'), turn };
 }
 
-/**
- * A live frame keeps its document and streams appended lines into it. A log that no longer extends the last one (the
- * branch rebuilt for a new choice behind its tip, or for a team edit) starts a new document: appended to the old one, the
- * new turn played after the old tail, and the frame showed the old attack and then the new one (round 77, user report
- * 28.10.2026). Reconciled during render, as state that follows a prop is.
- */
+// A log that no longer extends the last one starts a new document: appended, the old attack would play before the new.
 function useLiveDocumentGeneration(log: string, liveUpdates: boolean): number {
   const [seen, setSeen] = useState({ log, generation: 0 });
   if (liveUpdates && log !== seen.log) {
@@ -115,7 +85,6 @@ function EmptyFrame({ height }: { height: number }) {
   );
 }
 
-/** Each load of the frame starts a new height follower and sends the frame's first seek. */
 function onFrameLoad(frame: HTMLIFrameElement | null, followRef: { current: (() => void) | null }, seekTurn: number | undefined, autoPlay: boolean) {
   followRef.current?.();
   followRef.current = frame ? followFrame(frame) : null;
@@ -145,14 +114,12 @@ function PSReplayFrameDocument({
   seekRequest = null,
 }: DocumentProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  // Round 84 (A7c, ruling 10a): a phone frame's height follows its document; each load of the frame starts a new follower.
   const followRef = useRef<(() => void) | null>(null);
   useEffect(() => () => followRef.current?.(), []);
   const reportTurn = !!onTurnChange;
   const [documentLog] = useState(initialDocumentLog);
   const [initialSeek] = useState(() => ({ seekTurn: documentSeekTurn, autoPlay }));
-  // A live document seeks once, to where it opened; navigation reaches it through seekRequest and new
-  // lines through appends, so a later seekTurn never moves it (a late load event would end a turn playing in).
+  // A live document seeks once, where it opened: a later seekTurn would end a turn playing in.
   const frameSeekTurn = liveUpdates ? initialSeek.seekTurn : seekTurn;
 
   const blobUrl = useReplayBlobUrl({
@@ -169,16 +136,13 @@ function PSReplayFrameDocument({
   }
 
   return (
-    // No sandbox: a same-origin blob document with allow-scripts can strip
-    // its own sandboxing (Firefox warns about exactly that combination), so
-    // the attribute bought console noise, not isolation.
+    // No sandbox: allow-scripts on a same-origin blob document strips itself (Firefox warns) and isolates nothing.
     <iframe
       ref={iframeRef}
       src={blobUrl}
       onLoad={() => onFrameLoad(iframeRef.current, followRef, frameSeekTurn, !!autoPlay)}
       style={{
         width: '100%',
-        // The document sets --ps-frame-h in phone mode (replay-frame-height.ts); the desktop layout keeps `height`.
         height: `var(--ps-frame-h, ${height}px)`,
         border: 'none',
         borderRadius: 5,

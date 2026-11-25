@@ -4,14 +4,6 @@ import { Dex as BaseDex } from '@pkmn/dex';
 import * as championsMod from '@pkmn/mods/champions';
 import { generationsFor } from '../src/format-generations';
 
-/**
- * Round 69 (T188, decision 33): the Generations a format's client battle is built on. A Champions battle's log names
- * species the mod calls non-standard (Absol-Mega-Z was `Past` in the mod and `Future` in the base Dex until Regulation M-C
- * of @pkmn 0.10.12 made it legal; Heatran-Mega stands in, `Future` in both), so the parser reads
- * the 'logged' scope (every species the Dex knows, with the base Dex's data) and the team editor's pools read the 'legal'
- * scope (exactly what the registered mod allows). Every other format keeps the one shared standard Generations.
- * The checker is the mod: Dex.mod('champions', @pkmn/mods/champions), as the engine registers it.
- */
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const mod = Dex.dexes.champions;
 const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmbbo3', logTier: '[Gen 9 Champions] OU' } as const;

@@ -7,19 +7,10 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
 
-/**
- * Round 89 (#149, step A8-7): what the board key costs. The hit memo and the end-of-turn memo key every evaluation of a leaf, and the
- * key of a board that stands as another board did is the same text. A key must not pay for a board's composition more than once per
- * process (the reads of the handlers on it are found once and shared by every board of that composition), must not scan a Dex entry
- * for a reader that never asks for a key, and must not touch a field the key leaves out. The partition of the states stays the one
- * of the sweeps (board-key-effects, -census, -readers, -noise, -predicate, contact-memo-state); this file holds the cost rules.
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const CONSUMERS: Consumer[] = ['hit', 'residual'];
 
-/** What the reads of a board were before they were shared: the scan of every entry on the board, the move and the bodies off the field, by the Dex. */
 function readsByEntries(battle: Battle, consumer: Consumer, moveId: string | undefined, outside: readonly Pokemon[]): ReadonlySet<string> {
   const { dex, field } = battle;
   const bodyEntries = (pokemon: Pokemon): object[] => [dex.abilities.getByID(pokemon.ability), dex.items.getByID(pokemon.item), dex.conditions.get(pokemon.status), ...Object.keys(pokemon.volatiles).map(id => dex.conditions.get(id))];

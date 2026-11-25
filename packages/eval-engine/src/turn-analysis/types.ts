@@ -5,131 +5,59 @@ import type { TurnRolls } from '../dice-events.ts';
 import type { RulesMod, SideId } from '@fulllifegames/replay-core';
 import type { PlayerTendencies } from '../opponent-model.ts';
 
-/**
- * The turn analysis' vocabulary: the verdict bands and their tuning
- * constants, the per-side and per-turn records analyzeTurn produces, the
- * spoken-once keys the game report walks with, and analyzeTurn's own
- * parameter shape. Types and constants only.
- */
-
 export type Side = SideId;
 
-/**
- * Chess-style verdict bands on the EV-regret, in WP-UNITS (0.1 = 5% win
- * probability): 5% / 10% / 20% win-prob loss. Half of Lichess's 10/20/30
- * bands — deliberately: the score-space thresholds flagged ~3–5% losses as
- * mistakes (the T22/T26/T29 over-flagging), while full Lichess bands would
- * barely flag anything at this engine's confidence levels.
- */
+/** A verdict band on the EV-regret. */
 export type VerdictTier = 'inaccuracy' | 'mistake' | 'blunder';
+/** Regret thresholds of the verdict bands in wp-units (0.1 = 5% win probability). */
 export const TIER_THRESHOLDS: Record<VerdictTier, number> = {
   inaccuracy: 0.1,
   mistake: 0.2,
   blunder: 0.4,
 };
-/**
- * Lichess-style leniency: once the game is this decided (own perspective;
- * 0.7 wp-units = 85% win probability), verdicts soften one tier — piling
- * blame onto a lost position teaches nothing, and a winning position
- * forgives small imprecision. KEPT after the wp-unit conversion: sigmoid
- * compression already shrinks decided-position regrets, but garbage-time
- * turns still produce band-crossing regrets when the leaf spread is wide.
- */
+/** Own-perspective score (0.7 wp-units = 85% win probability) from which verdicts soften one tier. */
 export const DECIDED_SCORE = 0.7;
 
-/**
- * Own-perspective score at or above which a HEALTHY-body feed can read as a
- * deliberate simplification sack (both before and after the sack). Anchored
- * to the calibration buckets: |score| 0.4–0.7 wins for the favored side 77%
- * of the time — "decisively ahead", where surplus material buys certainty.
- */
+/** Own-perspective score from which a healthy-body feed can read as a simplification sack, before and after it. */
 export const HEALTHY_SACK_FLOOR = 0.4;
 
-/** Regret (best − played, own perspective) that marks a decision problem. */
+/** Regret (best − played, own perspective) that marks a decision problem: a mistake-sized one. */
 export const REGRET_THRESHOLD = TIER_THRESHOLDS.mistake;
-/**
- * Residual swing (actual − expected outcome) that marks a chance swing.
- * Derived from the tier bands (re-derived with them for wp-units): the roll
- * "mattered" when it moved the game a mistake-sized amount.
- */
+/** Residual swing (actual − expected outcome) that marks a chance swing: a mistake-sized one. */
 export const CHANCE_THRESHOLD = TIER_THRESHOLDS.mistake;
 
+/** Who or what moved a turn's score. */
 export type TurnAttribution =
   | 'p1-decision' | 'p2-decision' | 'both-decision'
-  /** A flagged risk whose read won real value — graded as a good play, not a mistake. */
+  /** A flagged risk whose read won real value: graded as a good play. */
   | 'p1-read' | 'p2-read' | 'both-read'
   | 'chance'
-  /** A meaningful swing with no single culprit: decision and chance parts each stay under their thresholds. */
+  /** A meaningful swing with no single culprit: decision and chance each stay under their thresholds. */
   | 'shift'
   | 'quiet' | 'unclear';
 
-/**
- * A risk pays off when the actual pair's expected value beats the safe
- * line's GUARANTEE by at least this much (own perspective). Comparing
- * against the floor is deliberate: the guarantee is exactly what the safe
- * player locks in — beating it is what the read earned. Derived from the
- * tier bands (wp-units): an inaccuracy-sized edge is a real edge.
- */
+/** A risk pays off when the actual pair's value beats the safe line's floor by at least this much, own perspective. */
 export const RISK_PAYOFF_MARGIN = TIER_THRESHOLDS.inaccuracy;
 
-/**
- * Measurement-noise tolerance UNDER the payoff margin for the paid-off
- * credit only: static-eval repricing legitimately moves guarantees at the
- * third decimal, and a knife-edge credit must not flip with it (648453
- * t20: a pinned paid-off read at 0.1006 fell to 0.0972 when stranded
- * pricing moved the safe floor by 0.0033). Same epsilon scale as the
- * rank-tie and feed-certainty gates. The feed payoff gate and the
- * clearly-failed exit stay strict — this widens praise, never excuses.
- */
+/** Noise tolerance under the payoff margin, for the paid-off credit only: it widens praise, never excuses. */
 export const RISK_PAYOFF_EPSILON = 0.02;
 
-/**
- * How many FUTURE turns a read gets to cash in: setup and positional plays
- * bank their payoff over the following expected outcomes, not one turn. The
- * chain uses depth-matched expectations only — rolls stay in the luck ledger.
- */
+/** How many future turns a read gets to cash in. */
 export const PAYOFF_WINDOW = 3;
 
-/**
- * A stay-and-die feed's floor gate: the realized outcome may exceed the
- * played line's priced floor by at most this much to count as "the player
- * accepted the known worst case and got it" (573756 t68: realized = floor
- * exactly). Round 12 replaced the old certainty gate (ev ≈ floor) with
- * this — a race-priced feed turn carries real spread, but as long as the
- * WORST branch is what materialized, the turn's own rolls contributed
- * nothing positive and the windowed payoff credits the plan, not the luck.
- * Same epsilon scale as the rank-tie threshold.
- */
+/** A stay-and-die feed's floor gate: the outcome may exceed the played line's priced floor by at most this much. */
 export const FEED_FLOOR_EPSILON = 0.02;
 
-/**
- * Both sides must have at least this many VIABLE options (within an
- * inaccuracy of best) before a culprit-free swing reads as a genuinely open
- * turn instead of a drift (562428 t10: the expert counted four-plus live
- * options per side and called the turn a read, not a shift).
- */
+/** Viable options (within an inaccuracy of best) both sides need before a culprit-free swing reads as an open turn. */
 export const BREADTH_MIN_OPTIONS = 4;
 
-/**
- * A recommendation conflicts with the engine's own play when the side's
- * equilibrium mix puts at least this much weight on a DIFFERENT choice than
- * the argmax-EV pick — the "better was X" line then owes the reader the
- * condition under which X actually is the pick (653785 t19).
- */
+/** A recommendation conflicts with the engine's play when the mix puts this much weight on another choice. */
 export const CONDITIONAL_MIX_MIN = 0.5;
 
-/**
- * An equilibrium mix this concentrated on one SWITCH reads as "effectively
- * forced" — the forced-sac situations whose expectation the narrative names
- * in prose instead of leaving the percentage in matrix header badges.
- */
+/** An equilibrium mix this concentrated on one switch reads as "effectively forced". */
 export const FORCED_MIX_THRESHOLD = 0.85;
 
-/**
- * One re-evaluation of the flagged side's turn under an ALTERNATIVE item on
- * an opposing mon whose item is only a usage guess. EVs are own-perspective
- * pair values, same space as RankedChoice.ev.
- */
+/** One re-evaluation of the flagged side's turn under another item on an opposing mon; EVs are own-perspective. */
 export interface SensitivityProbe {
   species: string;
   item: string;
@@ -137,278 +65,155 @@ export interface SensitivityProbe {
   bestEv: number;
 }
 
-/** Per-side probes for one turn — the shape sweeps cache and analyzeTurn consumes. */
+/** Per-side item-sensitivity probes for one turn. */
 export interface TurnSensitivity {
   p1?: SensitivityProbe[];
   p2?: SensitivityProbe[];
 }
 
+/** One side's grading and narrative signals for one turn. */
 export interface SideAnalysis {
-  /**
-   * Round 69 (T51): the fainted share of the turn this record was read at (an echo of the param, absent without
-   * one). The percent texts of the side print at this share; no grade reads it.
-   */
+  /** The fainted share this record was read at (an echo of the param); percent texts print at it, no grade reads it. */
   faintedFraction?: number;
   playedRaw: PlayedAction | null;
-  /** Round 75 (T160): the setup move the side clicked (playedSetupMove), read by the replay's own Dex when the record was made; absent for none. */
   setupMove?: string;
-  /**
-   * The protocol's reason a chosen action never surfaced ('slp', 'flinch',
-   * 'move: Taunt', 'faint', …) — the side DID pick something.
-   */
+  /** The protocol's reason a chosen action never surfaced ('slp', 'flinch', 'faint'): the side did pick. */
   prevented?: string;
-  /** The side was KO'd before it ever acted — `played` is a charitable
-   * outcome-equivalent stand-in ("stayed in") for the hidden move choice,
-   * gradable against the engine's best; risk framing stays off. */
+  /** KO'd before it acted: `played` is a charitable stand-in ("stayed in"); risk framing stays off. */
   neverActed?: boolean;
   /** Doubles: the per-slot actions this side actually took. */
   playedSlots?: (PlayedAction | null)[];
-  /** The played action matched into the engine's ranked list. */
   played: RankedChoice | null;
-  /** The top choice by equilibrium EV — the grading reference. */
+  /** The top choice by equilibrium EV, the grading reference. */
   best: RankedChoice | null;
-  /** The max-floor choice — "the engine's safe line", the safety reference. */
+  /** The max-floor choice, "the engine's safe line". */
   safe: RankedChoice | null;
   /** best.ev − played.ev (own perspective), floored at 0. */
   regret: number | null;
-  /**
-   * The regret's floor priced in a punishing reply the opponent did NOT
-   * click — a prediction play whose read came true, not a punished misplay.
-   */
+  /** The regret's floor priced in a punisher the opponent did not click: a read that came true. */
   riskUnpunished?: boolean;
   /** Own-perspective value of the actual pair over the safe line's floor. */
   riskPayoff?: number;
   /** Turns AFTER this one until the payoff peaked (absent = immediate). */
   riskPayoffTurn?: number;
-  /**
-   * The read won at least RISK_PAYOFF_MARGIN over the safe guarantee. Also
-   * set on UNTIERED turns when the play was a genuine gamble (deviated from
-   * the engine's pick, gave up a mistake-sized floor) that landed.
-   */
+  /** The read won at least RISK_PAYOFF_MARGIN over the safe guarantee; also set for a gamble that landed. */
   riskPaidOff?: boolean;
   /**
-   * Round 89 (B6a): the played line and the safe line, each against the opponent's clicked reply, in the side's own perspective.
-   * Written when the payoff cleared the margin and both cells are known (the clicked label and the two cells). The credit needs
-   * the played cell to beat the safe cell by CLICK_EDGE_MIN; a side that carries the field without `riskPaidOff` took a risk
-   * the safe line did as well or better against. Absent where there is no cell to compare (no matrix, a hidden doubles slot).
+   * The played and the safe line against the opponent's clicked reply, own perspective; absent where there is
+   * no cell to compare (no matrix, a hidden doubles slot).
    */
   safeAgainstClick?: { against: string; playedValue: number; safeValue: number };
-  /**
-   * The flagged risk MATCHES the opponent model's best response — phrased
-   * as "a read against the opponent's tendencies" (grading unchanged).
-   */
+  /** The flagged risk matches the opponent model's best response: phrased as a read; no grade reads it. */
   riskWasRead?: boolean;
   /**
-   * Round 63 (T17): a read on an UNTIERED turn — the played choice carried
-   * no equilibrium weight, gave up some floor against the safe line, paid
-   * at once and grew a mistake-sized edge within the window (648453 t13,
-   * the Lopunny-Mega switch). Card sentence only: it is no riskPaidOff, so
-   * the attribution, the report's read list and the totals stay unmoved.
+   * A read on an untiered turn that paid at once and grew a mistake-sized edge in the window; card sentence only.
    * `payoff` is the window's best own outcome over the safe guarantee.
    */
   readCredit?: { payoff: number; payoffTurn?: number };
-  /**
-   * A slot's choice was never observed (flinch/sleep — the protocol shows
-   * `|cant|`): `played` is the BEST combo consistent with the visible slots,
-   * so the regret is a charitable lower bound, never blame for hidden picks.
-   */
+  /** A slot's choice was never observed (`|cant|`): `played` is the best combo fitting the visible slots. */
   playedPartial?: boolean;
   /** A depth+1 verification pass cleared the shallow misplay flag. */
   verifiedAtDepth?: boolean;
   /** Verdict band for the regret, after leniency (absent = clean play). */
   tier?: VerdictTier;
   /**
-   * The flagged turn fed a body deliberately — a nearly-dead Pokémon
-   * (≤ SACK_HP_THRESHOLD at turn start, unconditional) or a HEALTHY one
-   * while the engine's scores stayed ≥ HEALTHY_SACK_FLOOR on both sides of
-   * the sack (simplification). Graded as a sack: tier demoted one band —
-   * cleared entirely for a stayed feed whose windowed payoff repaid the
-   * full regret plus the margin (`verified`) — never labeled a risk.
+   * The flagged turn fed a body deliberately: tier demoted one band, cleared for a stayed feed that repaid the
+   * full regret plus the margin (`verified`); never a risk.
    */
   sacrifice?: SackInfo;
-  /**
-   * How many options the engine ranked for this side — 1 marks a forced
-   * turn (or the waiting sentinel), which accuracy grading must exclude.
-   */
+  /** Options the engine ranked for this side; 1 marks a forced turn (or the waiting sentinel), not graded. */
   choiceCount?: number;
-  /**
-   * The verdict HINGES on a guessed item: under some usage-plausible
-   * alternative set the regret lands in a softer band. The tier above is
-   * already softened to the most charitable probed band (acquit-only —
-   * probes never add blame).
-   */
+  /** The verdict hinges on a guessed item: with another the regret lands softer; `tier` is that band. */
   sensitivity?: { species: string; alternatives: { item: string; tier: VerdictTier | 'none' }[] };
-  /**
-   * How many ranked options sit within an inaccuracy of best — the side's
-   * real decision breadth. Both sides clearing BREADTH_MIN_OPTIONS turns a
-   * culprit-free shift into an "open turn" in the narrative.
-   */
+  /** Ranked options within an inaccuracy of best (both sides at BREADTH_MIN_OPTIONS make an open turn). */
   viableCount?: number;
   /**
-   * The engine's own equilibrium leans a DIFFERENT choice than the argmax-EV
-   * recommendation (weight ≥ CONDITIONAL_MIX_MIN): the narrative renders the
-   * recommendation conditionally. bestWhen/mixWhen name the opponent replies
-   * against which each choice earns its keep (largest own-perspective value
-   * difference in the solved matrix); null when no reply favors that side of
-   * the split. Only computed on tiered turns — where a recommendation renders.
+   * The equilibrium leans another choice than the argmax-EV one (weight at least CONDITIONAL_MIX_MIN); tiered only.
+   * bestWhen/mixWhen name the opponent replies where each choice earns its keep; null when no reply favors that side.
    */
   conditional?: { mixLabel: string; mixWeight: number; bestWhen: string | null; mixWhen: string | null };
   /**
-   * The recommended best is MECHANICALLY NULL against the opposing active
-   * (Will-O-Wisp into a Fire-type). `alternative` is a co-optimal option
-   * within the rank-tie epsilon that is not itself null — the narrative
-   * displays it in place of the null pick (grading untouched); with no such
-   * option the narrative keeps the true best and names the caveat.
+   * The recommended best is mechanically null against the opposing active (Will-O-Wisp into a Fire-type);
+   * `alternative` is a co-optimal non-null option shown in its place, grading untouched; else the narrative names it.
    */
   bestNull?: { reason: string; alternative: { label: string; ev: number; koOdds?: KoOddsInfo } | null };
-  /**
-   * The side's equilibrium mix all but commits to one SWITCH
-   * (≥ FORCED_MIX_THRESHOLD with more than one option) — a forced-sac /
-   * forced-pivot expectation the narrative names in prose.
-   */
+  /** The equilibrium mix all but commits to one switch (at least FORCED_MIX_THRESHOLD, more than one option). */
   forcedMix?: { label: string; weight: number };
-  /**
-   * Multi-turn expectation cumulation (round 6): a milestone streak of
-   * secondary fishing or crit accumulation ending on this turn. Render-time
-   * narrative only — grading never sees it.
-   */
+  /** A milestone streak of secondary or crit luck ending on this turn; render-time narrative only. */
   streakOdds?: StreakOdds;
   /**
-   * The punishing counterfactual the solved matrix already knows (round 13):
-   * the own row that best answers the opponent's ACTUAL click, when it beats
-   * the played line in that column by a mistake-sized gain. The shift
-   * narrative renders it as the concrete read that was on the table
-   * (562428 t10: → Heatran into the Horn Leech). Display-only, never grades;
-   * fails closed without machine choice ids or a known opponent action.
+   * The own row that best answers the opponent's actual click and beats the played line there by a mistake-sized gain.
+   * Display-only; fails closed without machine choice ids or a known opponent action.
    */
   hindsightRead?: {
     response: string; against: string; gain: number;
-    /**
-     * Round 76 (T233): the played row's own-perspective value against the click (the gain is the best row's value minus
-     * this one). `walkedInto` reads it to tell a click that ties the played row's punisher from one that does not.
-     */
+    /** The played row's own-perspective value against the click (gain = best row's minus this). */
     playedValue?: number;
-    /**
-     * Round 47: the opponent model's share of the actual click, set when
-     * that click was the model's favourite (≥ LIKELIEST_CLICK_MIN) — the
-     * read was findable, not just there in hindsight (562428 t10).
-     */
+    /** The opponent model's share of the actual click, set when it was the favourite (at least LIKELIEST_CLICK_MIN). */
     likeliest?: number;
     /**
-     * Round 69 (T64): the read clears the side row's gate: its gain lies a
-     * band (one inaccuracy) past the equilibrium regret, and the cells of the
-     * best row and of the played row against the click are no guess
-     * (EvalMatrix.cells: at least HINDSIGHT_MIN_VISITS visits, verified, or,
-     * since round 70, a plain cell a tree expanded; a result without cells passes).
+     * The read clears the side row's gate: gain a band past the equilibrium regret, no guessed cell (see `cellSolid`).
      * `line` is the side row's sentence; neither enters tier or sums.
      */
     shown?: true;
     line?: string;
-    /**
-     * Gate of 12.10. 19:17: the cell of the best row against the click is a
-     * guess (fewer than HINDSIGHT_MIN_VISITS visits, not verified); round 70
-     * (T217): so is the played row's. The card sentences leave such a read
-     * out; the read itself stays on the analysis.
-     */
+    /** A cell against the click is a guess (see `cellSolid`): card sentences leave the read out. */
     thin?: true;
   };
   /**
-   * Round 70 (gate of 13.10. 20:26, 4a): the KO odds the "True odds" note quotes for the played line (`played`) or for the shown
-   * recommendation (`best`) price a hit that never landed against the opponent's actual click: in the cell of that line against
-   * the click the search finds no uncertain hit of the claim's move (the opponent's pair stops it: a Protect, a Wide Guard).
-   * Display only: the note leaves such a claim out (turn-analysis/odds-stopped.ts), no grade reads it.
+   * The "True odds" note's KO odds for the played or shown line price a hit the opponent's click stopped
+   * (a Protect, a Wide Guard); display only: the note leaves such a claim out (odds-stopped.ts).
    */
   hitStopped?: { played?: true; best?: true };
   /**
-   * Round 47: the read BEFORE the click. The opponent model's favourite
-   * `expect` holds at least PREDICTIVE_READ_CONFIDENCE, and against it the
-   * own row `response` beats the displayed recommendation `over` by a
-   * mistake-sized `gain`. Needs the players' tendencies; display-only,
-   * never grades.
+   * The read before the click: the model's favourite `expect` (at least PREDICTIVE_READ_CONFIDENCE) is beaten by
+   * own row `response` over the displayed `over` by a mistake-sized `gain`. Needs the tendencies; display-only.
    */
   predictiveRead?: { expect: string; confidence: number; response: string; gain: number; over: string };
   /**
-   * The turn brings in a mon the opponent has no live race answer to
-   * (round 13, root profile from the search): entering it cleanly is profit
-   * on its own — the opponent can only sacrifice into it (648453 t13,
-   * Lopunny-Mega). Set when the played or recommended line's entry target
-   * ("→ X", a pivot's "U-turn → X" included) is on the own unanswered
-   * list; display-only, never grades. With `heldBy` (round 14) the mon sits
-   * in the SWITCH-IN stage instead: every bench answer dies on arrival and
-   * only the named standing active still holds the pair.
+   * The turn brings in a mon the opponent has no live race answer to (the search's root profile); display-only.
+   * With `heldBy` every bench answer dies on arrival and only the named standing active still holds the pair.
    */
   unanswered?: { species: string; heldBy?: string };
   /**
-   * Round 15: the board is practically decided FOR this side — one own mon
-   * clears the whole living enemy team in sequence and survives the
-   * expected return fire (the search root's decided sweep). A board STATE,
-   * not click context: present on every decided turn so display layers can
-   * book the resolution prose; `announce` is true only until the game
-   * report has spoken the sentence once (the per-turn card, which passes
-   * no seen-set, announces on every decided turn).
+   * The board is practically decided for this side (the search root's decided sweep); present on every decided turn.
+   * `announce` is true only until the game report has spoken the sentence once; the per-turn card announces every time.
    */
   decided?: { species: string; announce: boolean };
-  /**
-   * Round 15: one high-odds click from decided — `odds` (accuracy × kill
-   * share, round 6) on the click that removes `removes`, after which
-   * `species` clears the rest (573756 t73: a 95% Fire Fang from the sweep).
-   * Round 80 (T292): `species` is the clicker, and `click` the move as the
-   * played choice writes it.
-   */
+  /** One high-odds click from decided: `odds` (accuracy × kill share) on the click that removes `removes`. */
   nearDecided?: { species: string; odds: number; removes: string; click?: { move: string; target?: number }; announce: boolean };
   /**
-   * Round 35: a forced win proven from this root FOR this side (the sim
-   * played every reply out): `turns` the deepest proven line, `mass` the
-   * proven share of the outcome classes, `caveat` what the class model
-   * leaves out. `announce` is true until the game report has spoken it
-   * once (forcedWinSeenKey); the per-turn card announces every turn.
+   * A forced win proven from this root (the sim played every reply out): `turns` the deepest proven line, `mass` the
+   * proven share of the outcome classes, `caveat` what the class model leaves out. `announce`: see `decided`.
    */
   forcedWin?: Pick<ForcedWin, 'delay' | 'delayName' | 'choiceNames'> & { turns: number; mass: number; caveat: ForcedWinCaveat; open?: ForcedWinOpen; announce: boolean };
 }
 
-/**
- * Spoken-once key for the game report's entry sentences (round 14): the
- * report walk collects the keys it has already spoken and passes them back
- * in via `unansweredSeen`, so a mon's entry sentence appears on its FIRST
- * entry only (573756: ten identical Zapdos-Galar sentences). Each stage is
- * its own statement — a spoken held-pair sentence never mutes the later,
- * stronger no-answer one.
- */
+/** The spoken-once key of a game-report entry sentence; each stage (held, open) is its own statement. */
 export const unansweredSeenKey = (side: 'p1' | 'p2', signal: { species: string; heldBy?: string }): string =>
   `${side}:${signal.species}:${signal.heldBy ? 'held' : 'open'}`;
 
-/**
- * Spoken-once key for the decided/near-decided announcements (round 15),
- * same regime as unansweredSeenKey: a `removes` target marks the near
- * stage. Each near stage (each new removal target) is its own statement —
- * a spoken near sentence never mutes the later full decided one. Round 63
- * (T18): the decided stage keys on the side alone — "practically decided"
- * is said once per side, not again for each new sweeper (2663093831 t12
- * Volcanion, t13 Ting-Lu).
- */
+/** The spoken-once key of a decided or near-decided announcement; each near stage (removal target) is its own. */
 export const decidedSeenKey = (side: 'p1' | 'p2', signal: { species: string; removes?: string }): string =>
   signal.removes ? `${side}:${signal.species}:near:${signal.removes}` : `${side}:decided`;
 
-/** Spoken-once key for the forced-win sentence (round 35), same walk regime as decidedSeenKey. */
+/** The spoken-once key of the forced-win sentence: once per side. */
 export const forcedWinSeenKey = (side: 'p1' | 'p2'): string => `${side}:forced`;
 
-/** Deep re-search of the played and best pairs (p1-perspective outcomes). */
 interface VerifiedOutcomes {
   playedDeep: number;
   bestDeep: number;
 }
+/** Per-side deep re-search results for one flagged turn (p1-perspective outcomes). */
 export interface TurnVerification {
   p1?: VerifiedOutcomes;
   p2?: VerifiedOutcomes;
 }
 
+/** The analysis of one turn: the score movement, its attribution and both sides' records. */
 export interface TurnAnalysis {
   turn: number;
-  /**
-   * Round 69 (T51): the fainted share at this turn's start and, for the after score, at the next turn's start (echoes
-   * of the params, absent without them): the estimate sentence prints each score at its own turn's share, as the
-   * graph does.
-   */
+  /** The fainted share at this turn's start and, for the after score, at the next turn's (echoes of the params). */
   faintedFraction?: number;
   faintedFractionAfter?: number;
   scoreBefore: number;
@@ -423,21 +228,9 @@ export interface TurnAnalysis {
   attribution: TurnAttribution;
   p1: SideAnalysis;
   p2: SideAnalysis;
-  /**
-   * False when played actions were never parsed (doubles) — score movement
-   * and engine lines still apply, but nothing may claim blame or "could not
-   * act". Absent means true.
-   */
+  /** False when played actions were never parsed (doubles): no blame, no "could not act"; absent means true. */
   playedTracking?: boolean;
-  /**
-   * Round 67 (T22): the sides the turn's rolls favored (turn-analysis/luck.ts):
-   * a protocol dice marker, or a played line's KO odds as they came out on
-   * the body they priced. The luck sentences say "rolled" only for a roll in
-   * the residual's direction and name the rest as the engine re-reading the
-   * position. Absent without the turn's protocol and without the planner's
-   * answer for the played cell (round 69, T178; doubles since round 70,
-   * T217): the sentences keep their ungated form.
-   */
+  /** The sides the turn's rolls favored (turn-analysis/luck.ts); absent without the turn's protocol or played cell. */
   rolledFor?: { p1: boolean; p2: boolean };
 }
 
@@ -447,78 +240,42 @@ export interface AnalyzeTurnParams {
   result: EvalResult;
   played: PlayedTurn | null;
   playedOutcome: number | null;
-  /**
-   * Expected pair values of the FOLLOWING turns (p1 perspective) — lets a
-   * read's payoff cash in over PAYOFF_WINDOW turns of expected play.
-   */
+  /** Expected pair values of the following turns (p1 perspective); a read cashes in over PAYOFF_WINDOW turns. */
   futureOutcomes?: (number | null)[];
-  /**
-   * Deep re-search of flagged turns (chess.com's sacrifice-verification
-   * pattern): when the depth+1 pair values say the played line holds up,
-   * the misplay verdict is cleared. Confirming passes change nothing.
-   */
+  /** Deep re-search of flagged turns: when the depth+1 values say the played line holds, the misplay is cleared. */
   verified?: TurnVerification | null;
   scoreBefore: number;
   scoreAfter: number | null;
-  /** False = played actions unavailable (doubles); blame is off the table. */
+  /** False = played actions unavailable (doubles). */
   playedTracking?: boolean;
-  /** Per-side low-HP sacrifices detected in the turn's protocol (played.ts). */
   sacks?: { p1?: SackInfo; p2?: SackInfo };
-  /** Round 67 (T22): the turn's dice markers and move hits (dice-events.ts detectRolls); absent keeps rolledFor off. */
+  /** The turn's dice markers and move hits (detectRolls); absent keeps rolledFor off. */
   rolls?: TurnRolls | null;
-  /** Per-side opponent-model best responses (opponent-model.ts computeRead). */
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null };
-  /**
-   * Each player's OWN action tendencies from this replay (parseTendencies) —
-   * the opponent model behind the predictive read and the hindsight's
-   * likeliest-click note. Absent keeps both out (fail closed).
-   */
+  /** Each player's action tendencies from this replay (parseTendencies); absent keeps the predictive read out. */
   tendencies?: { p1: PlayerTendencies; p2: PlayerTendencies } | null;
-  /**
-   * Per-side item-sensitivity probes for flagged turns (useEvaluation).
-   * Acquit-only: a probe can soften the side's verdict, never harshen it.
-   */
+  /** Item-sensitivity probes for flagged turns; acquit-only: a probe can soften the verdict, never harshen it. */
   sensitivity?: TurnSensitivity | null;
   /**
-   * Active species at turn start (singles: exactly one per side, else null)
-   * plus the replay generation — the null-move guard's board context.
-   * Absent/null species keep the guard off (fail closed). The Tera types
-   * name what a terastallized active defends with (absent = not terastallized).
+   * Active species at turn start (singles: exactly one per side, else null) plus the replay generation: the
+   * null-move guard's board context; absent or null species keep the guard off.
    */
   actives?: {
     p1: string | null; p2: string | null; gen: number;
-    /** Round 75 (T160): the replay's mod (Champions), next to its generation: the Dex the analysis reads is the game's own. */
+    /** The replay's mod (Champions): the Dex the analysis reads is the game's own. */
     mod?: RulesMod;
     p1Tera?: string | null; p2Tera?: string | null;
   } | null;
-  /**
-   * Per-side played-move history for the whole game (index t−1 = turn t,
-   * the current turn included) — the streak detector's input. Render-time
-   * only, fail closed when absent.
-   */
+  /** Per-side played-move history for the whole game (index t−1 = turn t, current turn included); render-time only. */
   playedHistory?: { p1: (StreakHistoryEntry | null)[]; p2: (StreakHistoryEntry | null)[] } | null;
-  /**
-   * Entry sentences the game report has already spoken (round 14), keyed by
-   * unansweredSeenKey — the report walk passes its collected keys so each
-   * mon's stage speaks once; the per-turn card omits this and keeps the
-   * sentence on every entry turn.
-   */
+  /** Entry sentences the game report has already spoken, keyed by unansweredSeenKey; the per-turn card omits it. */
   unansweredSeen?: ReadonlySet<string> | null;
-  /**
-   * Decided/near-decided announcements the game report has already spoken
-   * (round 15), keyed by decidedSeenKey — same walk regime as
-   * unansweredSeen. The signal STATE stays present regardless; only
-   * `announce` flips off.
-   */
+  /** Announcements the game report has already spoken, keyed by decidedSeenKey; only `announce` flips off. */
   decidedSeen?: ReadonlySet<string> | null;
   /**
-   * Round 63 (T18): the fainted share of all bodies at turn start, the
-   * auto mode's phase measure. The near-decided sentence waits for
-   * AUTO_MCTS_FAINTED_FRACTION — on full teams a one-roll sweep is a
-   * threat, not a near-won game (649664 t3). Absent or null keeps the
-   * gate off.
+   * The fainted share of all bodies at turn start, the auto mode's phase measure; the near-decided sentence waits for
+   * AUTO_MCTS_FAINTED_FRACTION. Absent or null keeps the gate off.
    */
   faintedFraction?: number | null;
-  /** Round 69 (T51): the share at the next turn's start, for the after score's percent text. */
   faintedFractionAfter?: number | null;
 }

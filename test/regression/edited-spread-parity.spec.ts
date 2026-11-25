@@ -11,15 +11,8 @@ import { replayBuildOptions, replaySolveOptions } from '../../src/lib/team-build
 import { fetchSmogonSetAssumptions } from '../../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../../src/lib/smogon-stats';
 
-/**
- * Issue 150, claim 1 (round 89): what the panel shows is what the battle plays, on the edit path too. Every body of the
- * harness games gets its EVs set by hand at the values the panel showed (the user's edit of one number marks the field
- * manual); the app then solves again and builds. The built nature and EVs must equal the nature and EVs of the panel
- * (`applyInferredSpreads` over the edited info). Before the fix the solver's nature, fitted to the solver's own EVs,
- * replaced the shown one. The games are the feedback harness's tracked fixtures with their pinned Smogon answers, so the
- * sweep runs in a clone; it needs no local data. Game types are counted apart: singles (Gen 6, Gen 8, Champions OU),
- * doubles (Doubles OU) and VGC (Scarlet/Violet Regulation I, Champions Regulation M-C).
- */
+// An edited number marks its field manual; the built nature and EVs must equal the panel's (`applyInferredSpreads`),
+// not the solver's nature fitted to its own EVs.
 const FIXTURES = join('test', 'e2e-feedback', 'fixtures');
 const GAMES: { kind: 'singles' | 'doubles' | 'vgc'; id: string }[] = [
   { kind: 'singles', id: 'smogtours-gen6ou-648453' },
@@ -46,13 +39,11 @@ const pinnedFetcher = (async (input: string | URL | Request) => {
 
 const evsKey = (evs: Partial<Record<string, number>>) => ['hp', 'atk', 'def', 'spa', 'spd', 'spe'].map(stat => evs[stat] ?? 0).join('/');
 
-/** The set of an info's body: same position first, the species id second (a forme or a stand-in may shift the order). */
 const setFor = <T extends { species: string }>(team: T[], info: RevealedPokemonInfo, index: number): T | undefined =>
   toId(team[index]?.species ?? '') === toId(info.species) ? team[index] : team.find(set => toId(set.species) === toId(info.species));
 
 async function sweep(id: string) {
   const replay = JSON.parse(readFileSync(join(FIXTURES, `${id}.json`), 'utf-8')) as { log: string; formatid: string };
-  // Every realm that rebuilds a game loads the Champions mod itself before the resolver is asked (AGENTS.md).
   await loadSimMods(getBranchSimulatorFormat(replay));
   const seed = appTeamSeed(replay.log, parseReplayLogWithObservations(replay.log));
   const usageStats = await fetchSmogonUsageStats(replay.formatid, { fetcher: pinnedFetcher });
@@ -60,7 +51,6 @@ async function sweep(id: string) {
   const app = buildAppTeams(replay.log, seed, { usageStats, setAssumptions });
   const sides = ['p1', 'p2'] as const;
 
-  // The user edits the EVs of every body at the panel's values; the nature field stays what the panel showed.
   const edited = Object.fromEntries(sides.map(side => {
     const panel = applyInferredSpreads(app[`${side}Info`], side, app.inferredSpreads);
     return [side, { ...panel, pokemon: panel.pokemon.map(mon => ({ ...mon, evs: { value: { ...mon.evs.value }, source: 'manual' as const } })) }];

@@ -8,12 +8,10 @@ export interface ReplayLoaderProps {
   onTeamLoad: (teamText: string) => void;
   loading: boolean;
   error: string | null;
-  /** Canonical link of the replay that is currently loaded — mirrored into the input. */
   loadedUrl?: string | null;
   teamStatus?: string | null;
   teamError?: string | null;
   showGuide?: boolean;
-  /** Round 84: 'menu' is the body in the top bar's Load panel: no frame, no title, and the page takes the dropped file. */
   variant?: 'panel' | 'menu';
 }
 
@@ -142,11 +140,6 @@ function TeamPasteDetails({ teamStatus, teamError, onTeamLoad }: Pick<Props, 'te
 export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, loadedUrl = null, teamStatus = null, teamError = null, showGuide = false, variant = 'panel' }: Props) {
   const [url, setUrl] = useState('https://replay.pokemonshowdown.com/gen9draft-2058494320');
 
-  // Once a replay is loaded the input shows ITS link, not the default or a
-  // stale draft — a replay can arrive through share links, files, or embed
-  // messages, not just typing here. Mirrored during render (the React-docs
-  // adjust-state-when-a-prop-changes form) rather than in an effect, which
-  // react-hooks/set-state-in-effect forbids.
   const [mirroredUrl, setMirroredUrl] = useState<string | null>(null);
   if (loadedUrl !== mirroredUrl) {
     setMirroredUrl(loadedUrl);
@@ -162,7 +155,6 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
 
   const body = (
     <>
-      {/* the Game menu's first part is headed as its two other parts are (H10b); the start page keeps its panel title */}
       {inMenu ? <div className="ps-entry-head">Load replay</div> : <div style={{ fontSize: 13, fontWeight: 'bold', marginBottom: 8 }}>Load Replay</div>}
 
       <UrlForm url={url} setUrl={setUrl} loading={loading} onLoad={onLoad} />
@@ -184,7 +176,6 @@ export function ReplayLoader({ onLoad, onLoadFile, onTeamLoad, loading, error, l
       <TeamPasteDetails teamStatus={teamStatus} teamError={teamError} onTeamLoad={onTeamLoad} />
     </>
   );
-  // In the top bar's panel the page takes the drop (LoaderMenu), so the body has no frame of its own.
   if (inMenu) return <div className="ps-loader-body">{body}</div>;
   return (
     <div

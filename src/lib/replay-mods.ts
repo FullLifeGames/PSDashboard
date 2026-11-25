@@ -2,16 +2,10 @@ import { getBranchSimulatorFormat, isChampionsFormat, logRules, replayRuleset } 
 
 type ReplaySource = Parameters<typeof replayRuleset>[0];
 
-/** The Champions format a log names when the replay's own id and format do not (the log's tier line decides the inference's Dex). */
+// For a log whose replay id and format do not name Champions: its tier line decides the inference's Dex.
 const CHAMPIONS_LOAD_FORMAT = 'gen9championsou';
 
-/**
- * Round 75 (T160): the one load order of every host. The inference, the team build and the item judge read the Dex of the game
- * (replay-core's rulesDex), and a Pokémon Champions game reads the registered Champions mod, which loads on demand (about 0.5 MB
- * since @pkmn/mods 0.10.12, 10 MB before).
- * A host awaits this before it parses, infers or builds a replay: the app's replay load, the bank's team build and the
- * calibration and fit harnesses. A replay of any other format returns at once and loads nothing.
- */
+/** Every host awaits this before it parses, infers or builds: a Champions game needs its mod loaded first. */
 export async function loadReplayMods(source: ReplaySource): Promise<void> {
   if (replayRuleset(source) !== 'champions' && logRules(source.log ?? '').mod !== 'champions') return;
   const format = getBranchSimulatorFormat(source);

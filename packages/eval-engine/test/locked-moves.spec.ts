@@ -6,26 +6,18 @@ import { submittableChoice } from '../src/forward/request-moves';
 import { doublesRoot, pairSet } from './pair-battles';
 import { SEEDS } from './sim-fast-helpers';
 
-/**
- * Round 60 (T94): a locked doubles slot (rampage, charge release, recharge,
- * Bide, Uproar) gets a request entry with NO target type (pokemon.js
- * getMoves(lockedMove)). By name the sim then assumes 'normal' and demands a
- * target (side.js:397,469: "Outrage needs a target"); by index it takes the
- * missing type and uses the locked target itself (side.js:384,480-492).
- * smogtours-gen9doublesou-913996 turn 6: p1's Dragonite rages since turn 5,
- * every option of the position was rejected and the bank dropped the row.
- */
+// A locked doubles slot gets a request entry with no target type (pokemon.js getMoves(lockedMove)).
+// By name the sim assumes 'normal' and demands a target (side.js:397,469); by index it uses the locked one (:384).
 
 const WALLS = [pairSet('Wall', 'Blissey', ['Splash'], { level: 100 }), pairSet('Wall2', 'Chansey', ['Splash'], { level: 100 })];
 const QUIET = 'move splash, move splash';
 
-/** The request entries of p1's slot `slot` after the setup turn. */
 function slotEntries(position: ReturnType<typeof createRootPosition>, slot: number): Record<string, unknown>[] {
   const request = positionBattle(position).sides[0].activeRequest as { active?: { moves: Record<string, unknown>[] }[] } | null;
   return request?.active?.[slot]?.moves ?? [];
 }
 
-describe('locked doubles slots (round 60, T94)', () => {
+describe('locked doubles slots', () => {
   test('913996 turn 6: the raging slot offers one bare option and every option plays', () => {
     const fixture = JSON.parse(readFileSync(
       new URL('./fixtures/positions/smogtours-gen9doublesou-913996-t6.json', import.meta.url), 'utf-8')) as { serialized: string };
@@ -58,7 +50,6 @@ describe('locked doubles slots (round 60, T94)', () => {
         WALLS,
         battle => battle.makeChoices(kind.turn1, QUIET),
       );
-      // Not vacuous (the round-60 lesson of eval-search.spec.ts): the slot IS locked.
       const entries = slotEntries(root, 0);
       expect(entries).toHaveLength(1);
       expect('target' in entries[0]).toBe(false);

@@ -2,11 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useLeaveAsk } from '../../../src/hooks/useLeaveAsk';
 
-/**
- * Round 89 (lane H, #105), H16a (user ruling 13.11.2026): Start and loading a replay ask first when an unsaved variation is open. The
- * hook runs the action at once when there is nothing to lose; else it holds the action behind the question, which names what the
- * action is and what goes. Discard variation runs it, Cancel drops it.
- */
 describe('useLeaveAsk', () => {
   test('with no unsaved variation the action runs at once and nothing is asked', () => {
     const run = vi.fn();

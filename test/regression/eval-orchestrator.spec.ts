@@ -53,9 +53,8 @@ describe('search orchestrator', () => {
   });
 
   test('parity includes pivot pairs — the orchestrated matrix names the follow-ups', async () => {
-    // The app's worker-pool path builds its root options through the choices
-    // RPC; a bare "U-turn" row there while the sync path enumerated pairs was
-    // exactly the user-visible defect (the matrix never showed "U-turn → X").
+    // The worker-pool path builds root options through the choices RPC: a bare "U-turn" row would hide the
+    // "U-turn → X" pairs the sync path enumerates.
     const root = serialize(makeBattle(
       [
         makeSet('Mien', 'Mienshao', ['U-turn', 'Close Combat'], 100),
@@ -131,7 +130,6 @@ describe('search orchestrator', () => {
   });
 
   test('a fake executor drives the orchestration without any sim', async () => {
-    // 2x2 matrix: p1's "a" is safe (0.2 worst case), "b" is punished (-0.5).
     const values: Record<string, number> = { '0,0': 0.2, '0,1': 0.3, '1,0': 0.6, '1,1': -0.5 };
     const subSearches: EvalSubSearchJob[] = [];
     const executor: SearchExecutor = {
@@ -148,7 +146,6 @@ describe('search orchestrator', () => {
       },
       async subSearch(job: EvalSubSearchJob): Promise<EvalResult> {
         subSearches.push(job);
-        // Deepening confirms the static value exactly, so iteration converges.
         return {
           score: values[`${job.i},${job.j}`],
           interval: 0,
@@ -169,26 +166,13 @@ describe('search orchestrator', () => {
     expect(result.perSide.p1[0].choice).toBe('move a'); // maximin: worst(a)=0.2 > worst(b)=-0.5
     expect(result.perSide.p1[0].line).toEqual([{ p1: 'Next', p2: 'Reply' }]);
     expect(subSearches.length).toBeGreaterThan(0);
-    // Game value lies in [v1, v2] = [0.2, 0.3] — the prediction interval.
     expect(result.interval).toBeCloseTo(0.1, 10);
   });
 });
 
-/**
- * Round 70: the horizon-trend probe runs from every base draw of a decisive cell of several draws (the seeds its value was
- * priced with) and compares each child with its own leaf. The orchestrator keeps the cell's draws from the executor's cell
- * values, asks for one probe per draw, and books the mean of the answers' trends. A cell of one draw gets the probe of
- * before the round, one job on its first child, booked as the child's score against the cell's value; so does an executor
- * that answers no trend.
- */
-describe('the trend probe over the base draws (round 70)', () => {
+describe('the trend probe over the base draws', () => {
   const SETTINGS = { depth: 1, samples: 3, tera: false, prove: false } as const;
 
-  /**
-   * A 2x2 matrix whose four cells all hold 0.2: every row and column ties, so the layers price every decisive cell. Each
-   * cell reports `draws` base draws (none for one); a probe of a draw answers with `trend(draw index)` when the protocol
-   * has it, and every probe with the score 1.1 (0.9 above the cell). The depth is 1, so every sub-search is a trend probe.
-   */
   function tiedExecutor(draws: number, trend?: (index: number) => number) {
     const probes: EvalSubSearchJob[] = [];
     const executor: SearchExecutor = {
@@ -214,18 +198,15 @@ describe('the trend probe over the base draws (round 70)', () => {
     };
     return { executor, probes };
   }
-  /** The probed cells with the draw indices asked for each (undefined: the probe of the first child, no draw named). */
   const drawsByCell = (probes: EvalSubSearchJob[]) => {
     const cells = new Map<string, (number | undefined)[]>();
     for (const job of probes) cells.set(`${job.i},${job.j}`, [...(cells.get(`${job.i},${job.j}`) ?? []), job.draw?.index]);
     return [...cells.values()].map(indices => indices.sort());
   };
-  /** How far the layers moved every row from the solved game (p1 at 0.2, p2 at -0.2), each in its own perspective. */
   const moved = (result: EvalResult) => ({
     p1: result.perSide.p1.map(row => row.ev - 0.2),
     p2: result.perSide.p2.map(row => -0.2 - row.ev),
   });
-  /** Every tied row moves by the strength of the trend layer (0.5) times the booked trend. */
   const SHIFT = 0.5;
 
   test('one probe per base draw of each decisive cell; the booked trend is the mean of the answers', async () => {
@@ -234,7 +215,7 @@ describe('the trend probe over the base draws (round 70)', () => {
     const cells = drawsByCell(probes);
     expect(cells.length).toBeGreaterThan(0);
     for (const indices of cells) expect(indices).toEqual([0, 1, 2]);
-    // The mean of 0.9, 0.3 and 0.0 is 0.4 in every probed cell, so every tied row moves by 0.5 x 0.4 whatever its weights.
+    // The mean of 0.9, 0.3 and 0.0 is 0.4 in every probed cell: every tied row moves by 0.5 x 0.4.
     for (const amount of [...moved(result).p1, ...moved(result).p2]) expect(amount).toBeCloseTo(SHIFT * 0.4, 10);
   });
 
@@ -252,11 +233,9 @@ describe('the trend probe over the base draws (round 70)', () => {
     const result = await searchOrchestrated(executor, SETTINGS);
     expect(probes.length).toBeGreaterThan(0);
     for (const indices of drawsByCell(probes)) expect(indices).toEqual([0, 1, 2]);
-    // The score 1.1 against the cell's 0.2 is a trend of 0.9 in every draw.
     for (const amount of [...moved(result).p1, ...moved(result).p2]) expect(amount).toBeCloseTo(SHIFT * 0.9, 10);
   });
 
-  /** Gengar against a Magikarp with two identical Skarmory behind it: p2's switch rows tie, Focus Blast (70 %) rolls. */
   const twinScene = () => {
     const evs = { hp: 252, atk: 252, def: 0, spa: 252, spd: 4, spe: 0 };
     const set = (species: string, moves: string[]): PokemonSet => ({ ...makeSet(species, species, moves, 100), evs });
@@ -275,7 +254,6 @@ describe('the trend probe over the base draws (round 70)', () => {
     const logged: SearchExecutor = { ...local, subSearch: job => { if (job.draw) probes.push(job); return local.subSearch(job); } };
     const orchestrated = await searchOrchestrated(logged, settings);
     expect(orchestrated).toEqual(sync);
-    // The two switch rows of the identical Skarmory tie; Focus Blast against each switch is a cell of three draws.
     expect(drawsByCell(probes)).toEqual([[0, 1, 2], [0, 1, 2]]);
   });
 
@@ -294,17 +272,13 @@ describe('the trend probe over the base draws (round 70)', () => {
 describe('depth-matched played outcome', () => {
   test('routes the played pair to the same estimator as the sweep cells', async () => {
     const { playedOutcomeSettings } = await import('../../src/lib/eval/worker-client');
-    // Depth-1 matrix cells ARE static evals — the plain cell path matches.
     expect(playedOutcomeSettings({ depth: 1, samples: 3, tera: false })).toBeNull();
-    // Deeper searches deepen cells with a depth-(d−1) sub-search — so does the pair.
     expect(playedOutcomeSettings({ depth: 2, samples: 3, tera: true }))
       .toEqual({ depth: 1, samples: 1, tera: true, mode: 'matrix' });
     expect(playedOutcomeSettings({ depth: 3, samples: 1, tera: false }))
       .toEqual({ depth: 2, samples: 1, tera: false, mode: 'matrix' });
-    // MCTS approximates with a depth-1 sub-search (better than a bare static).
     expect(playedOutcomeSettings({ depth: 1, samples: 1, tera: false, mode: 'mcts' }))
       .toEqual({ depth: 1, samples: 1, tera: false, mode: 'matrix' });
-    // Root-only hints never leak into the pair's sub-search.
     expect(playedOutcomeSettings({ depth: 2, samples: 1, tera: false, keepPlayed: { p1Slots: [] } })?.keepPlayed)
       .toBeUndefined();
   });

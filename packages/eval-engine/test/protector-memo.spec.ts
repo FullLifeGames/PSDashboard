@@ -6,17 +6,9 @@ import { copyOf, FixedDice, protectorStops, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 72 (T256, step 7d): the answers of `protectorStops` are shared per Dex, so a first question on a body is rare. The
- * memo is exact only if what a protector's handler reads about a hit is the attack and the HitProtect handlers on the field.
- * This sweep plays every protector of the Dex (the Protect family of dex-facts/protect.ts) against a class of attacks on boards
- * that differ in everything else a handler could read (status, lockedmove, items, abilities, HP, stages, terrain, weather, the
- * pseudo-weathers, Dynamax, the partners), in two orders, so each key is filled by a different board in each pass. The reference is the
- * protector's own handler on a copy of that board. With the development check off, the memo answers alone.
- */
-
 await loadSimMods('gen9championsou');
 
+// The memo is exact only if a protector's handler reads only the attack and the HitProtect handlers on the field.
 beforeAll(() => setAskCheck(false));
 afterAll(() => setAskCheck(null));
 
@@ -39,7 +31,6 @@ interface Board { label: string; apply: Mutation }
 
 const monOf = (rules: Rules, species: string, moves: string[]) => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
 
-/** A fresh board: side two's first body hits side one's first body. */
 function freshBoard(rules: Rules): Battle {
   const mine = [monOf(rules, 'Blissey', ['splash'])];
   const theirs = [monOf(rules, 'Shuckle', ['splash'])];
@@ -63,7 +54,6 @@ const give = (battle: Battle, mon: Pokemon, volatile: string, state: object) => 
   (mon.volatiles as Record<string, unknown>)[volatile] = (battle as unknown as { initEffectState(state: object): unknown }).initEffectState({ id: volatile, target: mon, ...state });
 };
 
-/** The boards that vary what a handler could read besides the attack. */
 function handBoards(dex: Battle['dex'], doubles: boolean): Board[] {
   const boards: Board[] = [{ label: 'plain', apply: () => undefined }];
   for (const status of ['psn', 'tox', 'brn', 'par', 'slp', 'frz']) {
@@ -98,7 +88,6 @@ function handBoards(dex: Battle['dex'], doubles: boolean): Board[] {
   return boards;
 }
 
-/** One board per ability of the Dex on the attacker, then on the defender; one per item with a handler on the attacker. */
 function dexBoards(dex: Battle['dex'], everyItem: boolean): Board[] {
   const boards: Board[] = [];
   const abilities = dex.abilities.all().filter(ability => ability.exists && ability.gen <= dex.gen && ability.id !== 'noability');
@@ -113,7 +102,6 @@ function dexBoards(dex: Battle['dex'], everyItem: boolean): Board[] {
   return boards;
 }
 
-/** One move per class of what the protectors' handlers read: protect flag, contact, target, category, priority, Z and Max. */
 function attackClasses(dex: Battle['dex']): string[] {
   const seen = new Map<string, string>();
   for (const move of dex.moves.all()) {
@@ -124,7 +112,6 @@ function attackClasses(dex: Battle['dex']): string[] {
   return [...seen.values()];
 }
 
-/** The four attacks that tell an ability or an item from another: contact, plain, spread, priority (all with the protect flag), and one without it. */
 function probeAttacks(dex: Battle['dex']): string[] {
   const pick = (test: (move: ReturnType<Battle['dex']['moves']['get']>) => boolean) => dex.moves.all().find(move => move.exists && !move.isZ && !move.isMax && move.category !== 'Status' && test(move))?.id;
   return [
@@ -136,7 +123,6 @@ function probeAttacks(dex: Battle['dex']): string[] {
   ].filter((id): id is string => !!id);
 }
 
-/** The simulator's answer: the protector's own handler on a copy of the board, with the copy's bodies and the attack. */
 function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
   const copy = copyOf(battle);
   copy.prng = new FixedDice({});
@@ -148,7 +134,6 @@ function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, sourc
   }
 }
 
-/** Attacks the way a caller could hand them: fresh, with the target at use, and edited in a property a handler reads. */
 function variantsOf(dex: Battle['dex'], id: string): { label: string; make: () => ActiveMove }[] {
   const fresh = () => dex.getActiveMove(id);
   const edit = (label: string, change: (move: ActiveMove) => void) => ({ label, make: () => { const move = fresh(); change(move); return move; } });
@@ -165,7 +150,7 @@ function variantsOf(dex: Battle['dex'], id: string): { label: string; make: () =
   ];
 }
 
-describe.each(RULES)('$name: the shared answers of protectorStops equal a copy of the board (round 72, T256)', rules => {
+describe.each(RULES)('$name: the shared answers of protectorStops equal a copy of the board', rules => {
   const base = freshBoard(rules);
   const dex = base.dex;
   const protectors = dex.moves.all()
@@ -176,7 +161,6 @@ describe.each(RULES)('$name: the shared answers of protectorStops equal a copy o
   const probes = probeAttacks(dex);
   const boards: Board[] = [...hand, ...dexBoards(dex, !!rules.everyItem)];
 
-  /** One pass over the boards in one order; a derived Dex object gives the pass a memo of its own. */
   function pass(order: Board[]): string[] {
     const wrong: string[] = [];
     const memoDex = Object.create(dex) as Battle['dex'];

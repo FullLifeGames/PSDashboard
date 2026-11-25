@@ -3,24 +3,14 @@ import type { SimBattle, SimPokemon, SimSide } from './types.ts';
 
 type BodyOf = (side: SimSide, snapshotPokemon: TurnSnapshot['p1']['pokemon'][number]) => SimPokemon | undefined;
 
-/** The key the session's subscription writes: the volatiles a body held when the simulator took it off the field. */
 type ExitRecorded = SimPokemon & { volatilesAtExit?: SimPokemon['volatiles']; slotAtExit?: number };
 
-/**
- * Round 69, T172: the simulator's faint and its switch-out clear a body's
- * volatiles, and an exit the game never saw (a K.O. the game's damage did not
- * deal, an Eject Button the build guessed) leaves the body the game kept
- * without Protosynthesis, Quark Drive, Leech Seed, Heal Block or Substitute.
- * The session keeps the volatiles as they stand when the Faint or SwitchOut
- * event runs (before the clear); the property serializes with the body, so a
- * clone of the raw boundary carries it, and the next snapshot correction
- * settles it.
- */
+/** Keeps a body's volatiles as they stand when the Faint or SwitchOut event runs, before the simulator clears them. */
+// The property serializes with the body, so a clone of the raw boundary carries it until the next snapshot correction.
 export function recordVolatilesAtExit(pokemon: SimPokemon) {
   const recorded = pokemon as ExitRecorded;
   if (Object.keys(pokemon.volatiles).length > 0) {
     recorded.volatilesAtExit = { ...pokemon.volatiles };
-    // Round 89 (#138): the slot the body stood on, because the block shows its switch-out as another body's entry on THAT slot.
     recorded.slotAtExit = pokemon.position;
   } else {
     delete recorded.volatilesAtExit;
@@ -28,21 +18,7 @@ export function recordVolatilesAtExit(pokemon: SimPokemon) {
   }
 }
 
-/**
- * The protocol itself took the body off the field earlier in the block: a
- * switch or drag line puts another body on its slot before the body's own
- * entry line (562428 turn 12: Blacephalon out for Weavile, Weavile knocked
- * out, Blacephalon back). The simulator's exit is then the game's exit, and
- * the second stint starts fresh, without the Choice lock or Leech Seed the
- * first one held.
- *
- * Round 89 (#138): the block shows the body leave through another body's
- * entry on the slot it LEFT, and the drag that brings it back may land on the
- * other slot (2553498001 turn 5: Sableye out of p2b for Rillaboom, Roar drags
- * it into p2a). `exitSlot` is the slot of the simulator's own exit; the slot
- * the body enters stays a second witness (a record without a slot, a pair the
- * game swapped).
- */
+// A Roar drag may bring it back on the other slot, so `exitSlot` (the sim's own exit slot) is a second witness.
 function leftBeforeEntry(log: readonly string[], name: string, exitSlot?: number): boolean {
   const entries = log.map(line => line.split('|')).filter(([, tag]) => tag === 'switch' || tag === 'drag');
   const last = entries.map(([, , ident]) => ident.replace(/^p[12][a-d]: /, '')).lastIndexOf(name);
@@ -53,7 +29,6 @@ function leftBeforeEntry(log: readonly string[], name: string, exitSlot?: number
   return entries.slice(0, last).some(([, , ident]) => slots.some(slot => ident.startsWith(`${slot}: `)));
 }
 
-/** Puts the record of an exit back on the body, minus the conditions the protocol ended for it in the block (|-end|, as the simulator's condition ids). */
 function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string, log: readonly string[]) {
   const recorded = body as ExitRecorded;
   if (!recorded.volatilesAtExit) return;
@@ -75,31 +50,17 @@ function putBackExitVolatiles(battle: SimBattle, body: SimPokemon, name: string,
   delete recorded.slotAtExit;
 }
 
-/**
- * The protocol's switch-in put a body on the field that the simulator had
- * taken off it after its own entry in the same block (752755 turn 9: the
- * guessed Eject Button sent Hatterene out after the Psychic Noise that began
- * its Heal Block). With one entry line in the block the two stints are the
- * same one, and the record holds what the body carried at the exit.
- */
+/** The protocol's entry put back a body the sim took off after its own entry in the block: the two stints are one. */
 export function restoreAfterProtocolEntry(battle: SimBattle, body: SimPokemon, ident: string, events: readonly string[]) {
   const entries = events.filter(line => /^\|(?:switch|drag)\|/.test(line) && line.split('|')[2] === ident).length;
   const name = ident.replace(/^p[12][a-d]: /, '');
   if (entries === 1 && !leftBeforeEntry(events, name, (body as ExitRecorded).slotAtExit)) putBackExitVolatiles(battle, body, name, events);
 }
 
-/** Every body the simulator holds off the field right now: fainted, or not among the actives. */
 export function bodiesOffTheField(battle: SimBattle): Set<SimPokemon> {
   return new Set(battle.sides.flatMap(side => side.pokemon.filter(pokemon => pokemon.fainted || !side.active.includes(pokemon))));
 }
 
-/**
- * The corrections put back on the field a body the simulator had taken off
- * it (fainted or switched out) and the game kept: what the simulator carried
- * at that exit comes back, minus the conditions the protocol ended in the
- * block. A body that stayed on the field keeps its own volatiles. Then every
- * record goes, whether it was used or not.
- */
 export function restoreExitVolatiles(battle: SimBattle, snapshot: TurnSnapshot, offTheField: ReadonlySet<SimPokemon>, bodyOf: BodyOf) {
   for (const [sideIdx, snapshotSide] of [snapshot.p1, snapshot.p2].entries()) {
     const side = battle.sides[sideIdx];

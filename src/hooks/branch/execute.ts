@@ -6,12 +6,10 @@ import {
   type BranchEngineModule, type BranchRefs, type BranchSetters, type LiveBattle, type SideId,
 } from './shared';
 
-/** Round 89 (#105): the entry has landed; a new game promotes its tip turn here (a replay has no hook set). */
 const runAfterTurn = async (refs: BranchRefs): Promise<void> => {
   await refs.afterTurnRef?.current?.();
 };
 
-/** Resolve both sides' pending choices against the live request; an error string on the first miss. */
 function resolveBothSides(
   branchEngine: BranchEngineModule, battle: LiveBattle, refs: BranchRefs,
 ): { ok: true; p1: string; p2: string } | { ok: false; error: string } {
@@ -22,7 +20,6 @@ function resolveBothSides(
   return { ok: true, p1: p1.command, p2: p2.command };
 }
 
-/** Executes both sides' pending choices as one turn; a normal history entry follows. */
 function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: () => void) {
   const { streamsRef, battleStreamRef, branchEngineRef, choiceErrorsRef, executingRef, logRef, p1ChoicesRef, p2ChoicesRef } = refs;
   const { setExecuting, setExecuteError, setHistory, setSimState } = setters;
@@ -88,7 +85,6 @@ function useExecuteTurn(refs: BranchRefs, setters: BranchSetters, clearChoices: 
     p1ChoicesRef, p2ChoicesRef, setExecuting, setExecuteError, setHistory, setSimState]);
 }
 
-/** Executes one side's forced replacement as a 'forced' interlude entry (B15). */
 function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
   const { streamsRef, battleStreamRef, branchEngineRef, choiceErrorsRef, executingRef, logRef, p1ChoicesRef, p2ChoicesRef } = refs;
   const { setExecuting, setExecuteError, setHistory, setSimState } = setters;
@@ -110,7 +106,7 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
       const turnNumber = battleStream.battle?.turn ?? 0;
       const battle = battleStream.battle;
       const start = battle ? turnStart(battle, logRef.current) : null;
-      // the turn's dice wait on the battle when the turn paused for this switch: the replacement plays the rest of the turn with them
+      // A turn that paused for this switch keeps its dice on the battle: the replacement plays the rest with them.
       const result = await branchEngine.executeBranchChoices({
         streams,
         log: logRef.current,
@@ -149,11 +145,6 @@ function useExecuteForcedSide(refs: BranchRefs, setters: BranchSetters) {
     setExecuting, setExecuteError, setHistory, setSimState]);
 }
 
-/**
- * The single-side forced-switch rule: when exactly one side must replace and
- * that side just completed its choices, its command resolves now. Returns
- * the command, an error, or null when the rule does not apply.
- */
 function forcedSideCommand(
   branchEngine: BranchEngineModule, battle: LiveBattle, refs: BranchRefs, side: SideId,
   forced: { p1: boolean; p2: boolean },
@@ -170,16 +161,14 @@ function forcedSideCommand(
   return null;
 }
 
-/** Writes one slot's choice into the side's pending list (a fresh array, so React sees the change). */
 function recordSlotChoice(refs: BranchRefs, side: SideId, activeSlot: number, choice: BranchSlotChoice): void {
   const ref = side === 'p1' ? refs.p1ChoicesRef : refs.p2ChoicesRef;
   ref.current = [...ref.current];
   ref.current[activeSlot] = choice;
 }
 
-/** Mirrors the pending picks into the state the pickers read. */
 function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
-  // Round 84 (A7j): the picks are copied now, not when the updater runs: a send that clears the refs first cannot publish an empty list.
+  // The picks are copied now, not when the updater runs: a send that clears the refs first would publish an empty list.
   const p1Choices = [...refs.p1ChoicesRef.current];
   const p2Choices = [...refs.p2ChoicesRef.current];
   setters.setSimState(prev => prev ? {
@@ -191,10 +180,6 @@ function publishChoices(refs: BranchRefs, setters: BranchSetters): void {
   } : null);
 }
 
-/**
- * What a complete forced replacement sets in motion, after `side` just completed its picks: the lone replacing side's command
- * resolves now, and when both sides replace the turn runs once both are complete. False when nothing is due yet.
- */
 function useSettle(
   refs: BranchRefs, setters: BranchSetters,
   executeTurn: () => Promise<void>,
@@ -227,7 +212,6 @@ function useSettle(
   }, [executeForcedSide, executeTurn, refs, battleStreamRef, branchEngineRef, p1ChoicesRef, p2ChoicesRef, setExecuteError]);
 }
 
-/** Records one slot's choice and fires the forced-switch or both-sides-ready follow-ups. */
 function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: SideId) => boolean) {
   const { executingRef } = refs;
   const { setExecuteError } = setters;
@@ -236,16 +220,12 @@ function useSetChoice(refs: BranchRefs, setters: BranchSetters, settle: (side: S
     recordSlotChoice(refs, side, activeSlot, choice);
     setExecuteError(null);
     if (!refs.battleStreamRef.current?.battle || !refs.branchEngineRef.current) return;
-    // Round 84 (A7j): the pick is published before the send goes out, so the chip shows the clicked body and Execute "Executing..." while the replacement plays. The updater is queued ahead of the send's own `setSimState(nextState)`, which wins.
+    // Published before the send: the updater is queued ahead of the send's `setSimState`, which wins.
     publishChoices(refs, setters);
     settle(side);
   }, [settle, refs, setters, executingRef, setExecuteError]);
 }
 
-/**
- * Round 84 (A7a): records a pick and sends nothing, the way the engine's fill writes a forced replacement the user has not
- * confirmed. A click on the bench uses `setChoice`, which sends the replacement at once.
- */
 function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
   const { executingRef } = refs;
   const { setExecuteError } = setters;
@@ -257,10 +237,6 @@ function useRecordChoice(refs: BranchRefs, setters: BranchSetters) {
   }, [refs, setters, executingRef, setExecuteError]);
 }
 
-/**
- * Round 84 (A7a): Execute for whatever the position is waiting for. At a forced replacement it sends the picks the dock holds
- * (a lone replacing side's command, or the turn when both replace); otherwise it runs the turn.
- */
 function useExecutePending(refs: BranchRefs, executeTurn: () => Promise<void>, settle: (side: SideId) => boolean) {
   const { battleStreamRef, executingRef } = refs;
   return useCallback(async () => {
@@ -268,12 +244,10 @@ function useExecutePending(refs: BranchRefs, executeTurn: () => Promise<void>, s
     if (!battle || executingRef.current) return;
     const forced = (['p1', 'p2'] as const).filter(side => forceSwitches(battle, side).some(Boolean));
     if (forced.length === 0) { await executeTurn(); return; }
-    // The side that replaces first: for a lone side its command, for two sides the turn once both are complete.
     settle(forced[0]);
   }, [battleStreamRef, executingRef, executeTurn, settle]);
 }
 
-/** The execute side of the branch: turn execution, forced-switch interludes, and choice recording. */
 export function useBranchExecute(refs: BranchRefs, setters: BranchSetters, clearChoices: () => void) {
   const executeTurn = useExecuteTurn(refs, setters, clearChoices);
   const executeForcedSide = useExecuteForcedSide(refs, setters);

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useSmogonSetAssumptions } from '../../../src/hooks/useSmogonSetAssumptions';
 
-/** A data.pkmn.cc sets file: named sets per species. */
 const setsFile = {
   Garchomp: {
     'Swords Dance': { ability: 'Rough Skin', item: 'Loaded Dice', moves: ['Swords Dance', 'Scale Shot', 'Earthquake', 'Fire Fang'], nature: 'Jolly', evs: { atk: 252, spe: 252, spd: 4 } },
@@ -27,8 +26,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-// The sets fetcher caches per format and species list for the life of the
-// module, so every test below reads a different format.
+// The fetcher caches per format and species list for the life of the module, so every test reads a different format.
 describe('useSmogonSetAssumptions', () => {
   test('without a format or without species nothing loads', () => {
     const fetchMock = stubSets({});
@@ -52,7 +50,6 @@ describe('useSmogonSetAssumptions', () => {
     expect(garchomp.moves.map(move => move.value)).toEqual(['Swords Dance', 'Scale Shot', 'Earthquake', 'Fire Fang']);
     expect(garchomp.spread).toMatchObject({ nature: 'Jolly', value: 'Jolly:0/252/0/0/4/252' });
     expect(garchomp.alternatives?.[0].item?.value).toBe('Choice Scarf');
-    // No published set is absence, not failure.
     expect(result.current.assumptions!.pokemon.heatran).toBeUndefined();
   });
 

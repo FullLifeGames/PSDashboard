@@ -10,12 +10,6 @@ import { dieKey, type ForcedDie } from '../src/dice/types';
 import { loggedClicks, reconstruct } from './arrival-turn';
 import { secondariesIn } from '../src/dice/secondaries';
 
-/**
- * Round 82 (forced dice), step A5, gate answer 19a, on the app's own reconstruction of real games: once the user forces any die
- * on the first turn of a branch, the module forces the other logged results too, so the turn differs from the log only in the
- * user's die, even where the 16-seed search found no perfect seed. Each scene plays the turn twice from the same arrival: with
- * the user's die alone (today's reading of a forced turn) and with the logged dice joined to it.
- */
 await loadSimMods('gen9championsou');
 
 const feedback = (name: string): ReplayData =>
@@ -36,10 +30,6 @@ const FIRE_BLAST = {
 const DOUBLES = { label: 'doubles (Doubles OU 2663093831)', fixture: 'gen9doublesou-2663093831', source: feedback('gen9doublesou-2663093831'), turn: 8 };
 const VGC = { label: 'VGC (Regulation I 2630685175)', fixture: 'gen9vgc2026regi-2630685175', source: feedback('gen9vgc2026regi-2630685175'), turn: 9 };
 
-/**
- * The first turn played with the dice module. `user` is the user's dice; `joined` adds the dice the log shows (19a).
- * Returns the turn's lines, the report and the discrete events of the log for comparison.
- */
 async function firstTurn(scene: Scene, user: ForcedDie[], joined: boolean) {
   const { replay, runtime } = await reconstruct(scene.fixture, scene.turn, scene.source);
   const battle = runtime.battleStream.battle!;
@@ -60,7 +50,6 @@ const tookOf = (report: { forced: { die: ForcedDie; took: string }[] }, wanted: 
 const has = (lines: string[], prefix: string): boolean => lines.some(line => line.startsWith(prefix));
 
 describe('a die the log does not show: the flinch Air Slash never had', () => {
-  // GPL turn 13: Air Slash against Heavy Slam, no flinch in the game (Cobalion moves after it). The user forces the flinch.
   const flinch = die('p1a', 'airslash', 'p2a', 'secondary', { happens: true }, 'flinch');
 
   test(`${GPL.label}: Air Slash flinches Cobalion and keeps its logged hit; nothing else of the log moves`, { timeout: 300000 }, async () => {
@@ -68,7 +57,6 @@ describe('a die the log does not show: the flinch Air Slash never had', () => {
     expect(tookOf(report, flinch)).toBe('applied');
     expect(has(lines, '|cant|p2a: King Bradley|flinch')).toBe(true);
     expect(has(lines, '|move|p2a: King Bradley|Heavy Slam')).toBe(false);
-    // the logged hit of Air Slash: no miss, no crit, the damage the logged turn plays
     const asLogged = await firstTurn(GPL, [], false);
     const hit = (turn: string[]) => turn.filter(line => line.startsWith('|-damage|p2a')).slice(0, 2);
     expect(hit(lines)).toEqual(hit(asLogged.lines));
@@ -78,14 +66,10 @@ describe('a die the log does not show: the flinch Air Slash never had', () => {
   });
 });
 
-// Round 86 (T306): these four turns were the ones the sixteen-seed search could not make match the log, so the arrival's turn alone showed another
-// result than the log and only the joined list repaired it. The arrival now carries the draws of the turn the log's dice force, so the turn alone
-// already shows the log's results and the user\'s die joins them: the `alone` rows moved from "differs from the log" to "shows the log", the joined rows stay.
 describe('a turn the search once missed: the logged results stand beside the user\'s die', () => {
   test(`${FIRE_FANG.label}: forcing the crit of Body Press keeps the Fire Fang miss of the log`, { timeout: 300000 }, async () => {
     const crit = die('p1a', 'bodypress', 'p2a', 'crit', { happens: true });
     const alone = await firstTurn(FIRE_FANG, [crit], false);
-    // before round 86 the arrival's seed hit with Fire Fang (the turn the search could not make match the log); its logged draws now miss as the log does
     expect(has(alone.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(true);
     const joined = await firstTurn(FIRE_FANG, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');
@@ -100,7 +84,6 @@ describe('a turn the search once missed: the logged results stand beside the use
     expect(tookOf(joined.report, hit)).toBe('applied');
     expect(has(joined.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(false);
     expect(has(joined.lines, '|-miss|')).toBe(false);
-    // Corviknight faints to the hit: the logged Body Press has no body left to be played
     expect(has(joined.lines, '|move|p1a: Corviknight|Body Press')).toBe(false);
   });
 
@@ -129,8 +112,6 @@ describe('a turn the search once missed: the logged results stand beside the use
   test(`${VGC.label}: forcing the crit of Body Press keeps the crit High Horsepower rolled in the log`, { timeout: 300000 }, async () => {
     const crit = die('p2b', 'bodypress', 'p1b', 'crit', { happens: true });
     const alone = await firstTurn(VGC, [crit], false);
-    // ruling Q2: the log's crit kills Zamazenta and ends the game in the simulator while the log goes on, so the block falls back to the seed search,
-    // whose turn shows no crit; the joined list below still forces both crits
     expect(has(alone.lines, '|-crit|p2b: Zamazenta')).toBe(false);
     const joined = await firstTurn(VGC, [crit], true);
     expect(tookOf(joined.report, crit)).toBe('applied');

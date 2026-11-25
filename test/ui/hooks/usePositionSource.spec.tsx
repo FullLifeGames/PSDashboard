@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { buildTeamsFromReplay, getBranchSimulatorFormat } from '@fulllifegames/replay-core';
+import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog } from '@fulllifegames/replay-core';
 import { reconstructBranchRuntime, serializeLiveBattle, type BringWorld } from '@fulllifegames/eval-engine';
 import { usePositionSource } from '../../../src/hooks/usePositionSource';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
@@ -8,6 +8,12 @@ import type { ReconstructOutcome, ReplayJobRequest, ReplayJobResponse } from '..
 import { clearWorldPositions, worldPositionsOf } from '../../../src/lib/eval/world-positions';
 import { replayFixture } from '../fixtures/replay';
 import { fakeReplayWorkerClient } from '../fixtures/worker';
+import { gameReplayData, appendTurn, type NewGameRecord } from '../../../src/lib/new-game/record';
+import { rebuildGame } from '../../../src/hooks/branch/game-rebuild';
+import * as branchEngine from '../../../src/lib/lazy/branch-engine';
+import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
+import { coverageNotice } from '../../../src/hooks/evaluation/sweep-positions';
+import { startedRecord } from '../fixtures/new-game';
 
 type Inputs = Parameters<typeof usePositionSource>[0];
 
@@ -23,7 +29,6 @@ const outcome = (overrides: Partial<ReconstructOutcome> = {}): ReconstructOutcom
   choiceErrors: { count: 0, last: null }, ...overrides,
 });
 
-/** A worker that streams one position per boundary and lands on the target turn; `final` overrides the outcome. */
 function streamingWorker(final: (job: ReplayJobRequest) => Partial<ReconstructOutcome> = () => ({})) {
   return fakeReplayWorkerClient((request): ReplayJobResponse[] => {
     if (request.type !== 'reconstruct') return [];
@@ -59,7 +64,6 @@ describe('usePositionSource', () => {
     expect(job).toMatchObject({ format: getBranchSimulatorFormat(replayData), targetTurn: 3, mode: 'replay', replayLog: replayData.log, bringOnly: null });
     expect(job.p1Team.length).toBeGreaterThan(0);
 
-    // The streamed boundaries and the target are stored; a second acquire never reaches the worker.
     await waitFor(() => expect(result.current.getExact(2)).toBe('pos-2'));
     expect(result.current.getExact(3)).toBe('pos-3');
     await expect(result.current.acquireExact(3, report)).resolves.toBe('pos-3');
@@ -113,7 +117,6 @@ describe('usePositionSource', () => {
     expect(onDiagnostic).toHaveBeenCalledWith(expect.stringMatching(/ended at turn 2 although the real game continued/));
   }, 30_000);
 
-  // Round 79 (T290): only a sweep that asks gets the replacement requests, and they reach its callback with the point intact.
   test('acquireAll asks the worker for the replacement requests only when it has a consumer, and hands them on', async () => {
     const point = { turn: 1, ordinal: 0, forced: { p1: [0], p2: [] }, played: { p1: ['Toxapex'], p2: [] } };
     const { client, requests } = fakeReplayWorkerClient((request): ReplayJobResponse[] => (request.type === 'reconstruct'
@@ -156,18 +159,12 @@ describe('usePositionSource', () => {
   }, 60_000);
 });
 
-/**
- * Round 89 (#124): a short-side game plays every world of its unknown bodies. The position source reconstructs each world's main line,
- * hands out the heaviest world's positions, and registers the siblings of each one (the worker client reads them) before it hands
- * the position out. A sibling's position never enters the exact store. A game with one world or none reconstructs once and registers nothing.
- */
 describe('usePositionSource with the worlds of a short side', () => {
   const world = (guess: string, weight: number): BringWorld =>
     ({ p1: ['Alpha', 'Beta', guess], p2: ['Gamma', 'Delta', 'Eps'], guessed: { p1: 1, p2: 0 }, weight });
   const WORLDS = [world('K', 0.6), world('N', 0.3), world('R', 0.1)];
   const guessOf = (request: ReplayJobRequest) => (request as Extract<ReplayJobRequest, { type: 'reconstruct' }>).job.bringOnly?.p1.at(-1) ?? 'none';
 
-  /** A worker whose positions name their world: `pos-<turn>-<guess>`; a world named in `failing` answers with an error. */
   function worldWorker(failing: string[] = [], points: ReplayJobResponse[] = []) {
     return fakeReplayWorkerClient((request): ReplayJobResponse[] => {
       if (request.type !== 'reconstruct') return [];
@@ -223,13 +220,11 @@ describe('usePositionSource with the worlds of a short side', () => {
     clearWorldPositions();
     const { client, requests } = worldWorker();
     const { result } = renderHook(() => usePositionSource(withWorlds(client)));
-    // The branch start stores the heaviest world's position of its turn without siblings (`acquireRuntime`).
     result.current.storeExactPosition(2, 'pos-2-K');
     expect(worldPositionsOf('pos-2-K')).toBeNull();
     await expect(result.current.acquireExact(2, vi.fn())).resolves.toBe('pos-2-K');
     expect(requests.map(guessOf)).toEqual(['N', 'R']);
     expect(registered('pos-2-K')).toEqual([['pos-2-K', 0.6], ['pos-2-N', 0.3], ['pos-2-R', 0.1]]);
-    // A second acquire finds them registered and asks for nothing.
     requests.length = 0;
     await result.current.acquireExact(2, vi.fn());
     expect(requests).toHaveLength(0);
@@ -267,4 +262,119 @@ describe('usePositionSource with the worlds of a short side', () => {
       expect(worldPositionsOf('pos-1-' + (worlds ? 'K' : 'none'))).toBeNull();
     }
   }, 30_000);
+});
+
+const entry = (turnNumber: number, extra: Partial<BranchHistoryEntry>): BranchHistoryEntry => ({
+  turnNumber, p1Choice: '', p2Choice: '', p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [], ...extra,
+});
+const move = (name: string) => ({ kind: 'move' as const, moveId: name.toLowerCase(), moveName: name });
+
+async function twoTurnGame(format = 'gen9ou'): Promise<NewGameRecord> {
+  const start = await startedRecord(format);
+  const doubles = format !== 'gen9ou';
+  const slots = (name: string) => (doubles ? [move(name), move(name)] : [move(name)]);
+  const lead = doubles
+    ? { p1: ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar'], p2: ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar'], bring: true }
+    : { p1: ['Snorlax'], p2: ['Snorlax'] };
+  const entries = [
+    entry(0, { leadChoices: lead }),
+    entry(1, { kind: 'turn', p1SlotChoices: slots('Protect'), p2SlotChoices: slots('Protect') }),
+    entry(2, { kind: 'turn', p1SlotChoices: slots('Substitute'), p2SlotChoices: slots('Protect') }),
+  ];
+  const rebuilt = await rebuildGame(branchEngine, { ...start, entries });
+  if (!rebuilt || rebuilt.failure) throw new Error('the fixture game does not play');
+  const { bodyLines } = await import('../../../src/lib/new-game/game-log');
+  return appendTurn({ ...start, entries: [] }, { entries: rebuilt.entries, lines: bodyLines(rebuilt.runtime.log) });
+}
+
+describe('usePositionSource for a new game', () => {
+  test('a position the store lacks is rebuilt from the record, every turn lands in the store, and no replay job goes out', async () => {
+    const record = await twoTurnGame();
+    const data = gameReplayData(record);
+    const snapshots = parseReplayLog(data.log);
+    const { client, requests } = fakeReplayWorkerClient(() => []);
+    const { result } = renderHook(() => usePositionSource({
+      replayData: data, snapshots, observations: [], sources, setsFingerprint: 'fp1', bringOnlyLists: null, smogonPending: true,
+      replayWorker: client, gameRecord: record,
+    }));
+    expect(result.current.getExact(2)).toBeNull();
+    const position = await result.current.acquireExact(2, () => {});
+    expect(position).toContain('"turn":2');
+    for (const turn of [1, 2, 3]) expect(result.current.getExact(turn)).not.toBeNull();
+    expect(requests).toEqual([]);
+  });
+
+  test('the sweep reads the stored positions and the branch start adopts the tip position as stored, with the game PRNG', async () => {
+    const record = await twoTurnGame();
+    const data = gameReplayData(record);
+    const snapshots = parseReplayLog(data.log);
+    const { client, requests } = fakeReplayWorkerClient(() => []);
+    const { result } = renderHook(() => usePositionSource({
+      replayData: data, snapshots, observations: [], sources, setsFingerprint: 'fp1', bringOnlyLists: null, smogonPending: false,
+      replayWorker: client, gameRecord: record,
+    }));
+    const all = await result.current.acquireAll(2, () => {});
+    expect(all.every(position => position !== null)).toBe(true);
+    const tip = result.current.getExact(3)!;
+    const runtime = await result.current.acquireRuntime({
+      format: 'gen9ou', p1Team: record.teams.p1, p2Team: record.teams.p2, replayLog: data.log, targetTurn: 3, snapshot: snapshots[2],
+    }, { isT0: false });
+    const stored = JSON.parse(tip) as { prngSeed?: string };
+    const adopted = JSON.parse(branchEngine.captureSerializedPosition(runtime.battleStream.battle)!) as { prngSeed?: string };
+    expect(adopted.prngSeed).toBe(stored.prngSeed);
+    expect(requests).toEqual([]);
+  });
+
+  function sourceOf(record: NewGameRecord) {
+    const data = gameReplayData(record);
+    const snapshots = parseReplayLog(data.log);
+    const { client, requests } = fakeReplayWorkerClient(() => []);
+    const view = renderHook(({ fp }) => usePositionSource({
+      replayData: data, snapshots, observations: [], sources, setsFingerprint: fp, bringOnlyLists: null, smogonPending: false,
+      replayWorker: client, gameRecord: record,
+    }), { initialProps: { fp: 'fp1' } });
+    return { ...view, requests };
+  }
+
+  for (const format of ['gen9ou', 'gen9vgc2025regi']) {
+    test(`${format}: the store swaps to an empty one (a new sets fingerprint) and Analyze game still gets every turn, with no notice`, async () => {
+      const record = await twoTurnGame(format);
+      const { result, rerender, requests } = sourceOf(record);
+      await result.current.acquireExact(3, () => {});
+      expect((await result.current.acquireAll(2, () => {})).every(Boolean)).toBe(true);
+      rerender({ fp: 'fp2' });
+      expect(result.current.getExact(1)).toBeNull();
+      const after = await result.current.acquireAll(2, () => {});
+      expect(after.map(Boolean)).toEqual([true, true]);
+      expect(coverageNotice(after, { game: true })).toBeNull();
+      for (const turn of [1, 2, 3]) expect(result.current.getExact(turn)).not.toBeNull();
+      expect(requests).toEqual([]);
+    }, 120_000);
+  }
+
+  test('a rebuild that failed is tried again, not remembered: the second Analyze game gets its positions', async () => {
+    const record = await twoTurnGame();
+    const { result } = sourceOf(record);
+    const loader = vi.spyOn(branchEngine, 'loadSimMods').mockRejectedValueOnce(new Error('the simulator did not load'));
+    try {
+      expect(await result.current.acquireAll(2, () => {})).toEqual([null, null]);
+      expect(loader).toHaveBeenCalledTimes(1);
+      const second = await result.current.acquireAll(2, () => {});
+      expect(second.map(Boolean)).toEqual([true, true]);
+    } finally {
+      loader.mockRestore();
+    }
+  }, 120_000);
+
+  test('one Analyze game rebuilds at most once, even when every turn misses', async () => {
+    const record = await twoTurnGame();
+    const { result } = sourceOf(record);
+    const loader = vi.spyOn(branchEngine, 'loadSimMods').mockRejectedValue(new Error('the simulator did not load'));
+    try {
+      expect(await result.current.acquireAll(2, () => {})).toEqual([null, null]);
+      expect(loader).toHaveBeenCalledTimes(1);
+    } finally {
+      loader.mockRestore();
+    }
+  }, 120_000);
 });

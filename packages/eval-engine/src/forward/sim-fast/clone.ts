@@ -1,17 +1,5 @@
-/**
- * Round 59 (T91), lever clone: a Battle -> Battle copy for the pinned
- * @pkmn/sim release (named at PINNED_SIM_HASHES in guard.ts), no JSON and no
- * constructor. Phase one allocates a shell for the battle,
- * the field, every side and every Pokemon; phase two fills each shell field
- * by field and remaps back-references through the shells.
- *
- * Value rules: primitives and functions shared; Battle, Field, Side and
- * Pokemon remapped (Pokemon by side.n and position, as the sim's own
- * toRef/fromRef); ActiveMoves copied at the top level with references
- * remapped (queued actions and battle.activeMove deep); plain objects and
- * arrays copied per site; Sets copied; dex data of the classes on the
- * positive list shared; any other class throws, and the caller falls back.
- */
+// A Battle -> Battle copy for the pinned @pkmn/sim release (PINNED_SIM_HASHES in guard.ts), no JSON, no constructor;
+// a class outside the positive list throws and the caller falls back.
 import { PRNG, type Battle } from '@pkmn/sim';
 import {
   BATTLE_SPECIAL, FIELD_SPECIAL, POKEMON_SPECIAL, SIDE_SPECIAL, closuresFor, copyActiveMoveFast, forgetClosures, planFor,
@@ -83,7 +71,6 @@ function copyArray(value: unknown[], x: Ctx): unknown[] {
   return out;
 }
 
-/** Top-level ActiveMove copy: nested plain data shared, arrays, references and sets through the rules. */
 const shallowValue = (value: unknown, x: Ctx): unknown =>
   typeof value === 'object' && value !== null && Object.getPrototypeOf(value) !== ObjProto ? copyValue(value, x) : value;
 
@@ -135,7 +122,7 @@ function allocate(src: Source, x: Ctx): Plans {
   return { battle, field, sides, mons };
 }
 
-/** Move slots keep their identity: a base slot that is a move slot stays the same object. */
+// Move slots keep their identity: a base slot that is a move slot stays the same object.
 function moveSlotsInto(parts: unknown[], pokemon: Obj, x: Ctx): void {
   const slots = pokemon.moveSlots as unknown[];
   const base = pokemon.baseMoveSlots as unknown[];
@@ -168,13 +155,9 @@ function shellOf(proto: object): Obj {
   return Object.create(proto) as Obj;
 }
 
-/**
- * A copy writes to no stream, as a deserialized battle does (`new Battle` without `send` gets a no-op). Round 82, the user's
- * test of 01.11.2026: a copy of a branch's live battle kept its `send`, and a click the copy refused reached the branch's stream.
- */
+// A copy writes to no stream, as a deserialized battle does: a kept `send` once pushed a refused click to a stream.
 const silentSend = (): void => {};
 
-/** Queue, actions and the move in flight (deep), PRNG, history and the silent send for the battle's filler. */
 function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   x.deep = true;
   const queue = shellOf(Object.getPrototypeOf(src.queue) as object);
@@ -194,7 +177,6 @@ function battleParts(src: Source, x: Ctx, history: boolean): Obj {
   };
 }
 
-/** First copy per process: the rebuilt closures answer as the originals do (spec, decision 3). */
 function checkClosures(src: Source, x: Ctx): void {
   if (closuresChecked) return;
   for (let i = 0; i < src.sides.length; i++) {
@@ -233,7 +215,6 @@ export function cloneBattle(source: Battle, options: CloneOptions = {}): Battle 
   return x.battle as unknown as Battle;
 }
 
-/** Test hook: forget the compiled closures and their check (a spec compiles its own). */
 export function resetClosuresForTests(): void {
   forgetClosures();
   closuresChecked = false;

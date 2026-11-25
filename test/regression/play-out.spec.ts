@@ -24,8 +24,6 @@ test('a one-sided position becomes a single (forced) step', () => {
 });
 
 test('a waiting side is not a playable choice — the forced side steps alone', () => {
-  // Forced-switch interlude: the waiting side ranks only the 'wait' sentinel.
-  // Feeding that sentinel into a pair killed the loop silently (t: 2058494320).
   expect(nextPlayOutStep(result(['wait'], ['switch 2', 'switch 3']), false, 2))
     .toEqual({ kind: 'single', side: 'p2', choice: ranked('switch 2') });
   expect(nextPlayOutStep(result(['switch 4'], ['wait']), false, 2))

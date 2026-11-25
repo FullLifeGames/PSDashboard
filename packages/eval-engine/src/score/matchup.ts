@@ -6,16 +6,6 @@ import { boostedFraction, livingMons, threatGetter, type MatchupCache, type Pair
 import { idleHolders, withoutRaises } from './boost-race.ts';
 import { healProfile, ppBudget, raceClocks, raceSide, statusResidual, type RaceClocks, type RaceSide } from './races.ts';
 
-/**
- * The aggregated 1v1 terms: every living pair raced on its clocks, the
- * uncovered-threat coverage, and the boost-flip sweep cells.
- */
-
-/**
- * KO-first 1v1 verdict for one pair, same semantics as the matchup term:
- * fewer race-clock turns to KO wins (raceClocks: heal-PP absorption, action
- * economy, PP budgets), priority then speed break ties.
- */
 function beatsPair(
   a: Pokemon,
   b: Pokemon,
@@ -36,16 +26,9 @@ interface SweepCells { fastKo: number; fastChip: number; slowKo: number; slowChi
 
 const NO_STAGES: Readonly<BoostsTable> = Object.freeze({ atk: 0, def: 0, spa: 0, spd: 0, spe: 0, accuracy: 0, evasion: 0 });
 
-/**
- * The mon without its boosts (round 64, T125): a view of the body on no
- * stages at all, every other read and write going to the view (the idiom of
- * onStages in move-facts.ts). Resetting only Attack and Special Attack kept a
- * Calm Mind's Special Defense in the foe's race, a Dragon Dance's Speed in
- * the move order and an Iron Defense under Body Press.
- */
+// No stages at all: resetting only Attack and Special Attack would keep a Calm Mind's Special Defense in the race.
 const unboosted = (pokemon: Pokemon): Pokemon => Object.create(pokemon, { boosts: { value: NO_STAGES } }) as Pokemon;
 
-/** One side's sweep cells (see EvalFeatures.sweepFastKo). */
 export function sweepCells(
   sideIndex: 0 | 1,
   battle: Battle,
@@ -78,7 +61,6 @@ export function sweepCells(
   return cells;
 }
 
-/** Per-mon race inputs memoized for one matchupTerms call — loop-invariant across pairs. */
 interface RaceInputs {
   /** Hazard-adjusted arrival HP of a benched mon, live HP of an active one. */
   effHp: (pokemon: Pokemon) => number;
@@ -86,12 +68,7 @@ interface RaceInputs {
 }
 
 function raceInputs(battle: Battle): RaceInputs {
-  // Wincon-vs-hazards interaction: a BENCHED mon fights through its entry
-  // damage — its pressure is weighed by the HP it would actually arrive
-  // with (Boots/Magic Guard/airborne mons pay nothing via
-  // hazardEntryFraction). Actives are already on the field. A mon whose
-  // entry would kill it contributes nothing — hazards can fully disable a
-  // benched sweeper, which the additive hazards term alone never saw.
+  // A benched mon is weighed by the HP it arrives with; one whose entry would kill it contributes nothing.
   const effHpMemo = new Map<Pokemon, number>();
   const effHp = (pokemon: Pokemon): number => {
     let value = effHpMemo.get(pokemon);
@@ -105,7 +82,6 @@ function raceInputs(battle: Battle): RaceInputs {
     return value;
   };
 
-  // Race-side PP inputs memoized per mon — loop-invariant across pairs.
   const profiles = new Map<Pokemon, { rate: number; absorb: number }>();
   const profileOf = (pokemon: Pokemon): { rate: number; absorb: number } => {
     let value = profiles.get(pokemon);
@@ -131,7 +107,6 @@ function raceInputs(battle: Battle): RaceInputs {
   return { effHp, raceSideOf };
 }
 
-/** Who wins the pair: the faster race clock, then (finite ties) the speed order in either direction. */
 function pairSign(
   a: Pokemon,
   b: Pokemon,
@@ -150,31 +125,18 @@ function pairSign(
   return 0;
 }
 
-/**
- * T248 (round 73): a side the foe moves ahead of and takes down with its best hit never gets to heal, so its heal PP
- * are no wall. One HP point above that hit the race priced the heals as a wall, one point below as a lost race, and a
- * hit taken raised the grade (573756 turn 73, Toxapex 282 to 281 of 303). `foeFrac` is the foe's best hit as a share
- * of the maximum; the side keeps its attack, so the clocks read the pair as the plain race it is.
- */
+// A side the foe moves ahead of and takes down with its best hit never gets to heal: its heal PP are no wall.
 function unhealedIfBeaten(side: RaceSide, foeFrac: number, foeFirst: () => boolean): RaceSide {
   if (side.healRate <= 0 && side.healAbsorb <= 0) return side;
   if (foeFrac < side.hp || !foeFirst()) return side;
   return { ...side, healRate: 0, healAbsorb: 0 };
 }
 
-/**
- * The value of one pair for p1 (round 73, T248): the HP share of the side that wins it, signed for the winner. The pair
- * used to weigh both bodies' shares, so a lost pair counted less the lower the loser's HP and a hit p1 took raised the
- * matchup (and a hit p1 landed on the loser of a won pair lowered it); in a small board the bodies term could not
- * cancel that (gen9vgc-2629703929 turn 13: a 1v1 lost at 88 of 176 HP). The winner's share keeps every step the
- * right way: more HP for the winner, or less for the loser, never moves the pair against the side it helps. A body
- * whose entry hazards would kill it has no HP share and loses its pairs at the foe's share.
- */
+// The winner's HP share alone, signed: weighing both shares let a lost pair count less the lower the loser's HP.
 function pairValue(sign: number, hpA: number, hpB: number): number {
   return sign > 0 ? hpA : sign < 0 ? -hpB : 0;
 }
 
-/** Coverage: each enemy no remaining teammate trades favorably against, its answer deficit × HP (p1-positive). */
 function coverageFrom(
   bestAnswerToP2: Map<Pokemon, number>,
   bestAnswerToP1: Map<Pokemon, number>,
@@ -190,15 +152,7 @@ function coverageFrom(
   return coverage;
 }
 
-/**
- * Aggregated 1v1 threat terms from p1's perspective. `matchup` in [-1, +1]:
- * for every living pair, whoever's race clock lands first wins the pair
- * (raceClocks: heal-PP absorption, action economy, PP budgets — no infinite
- * walls), speed breaking ties; pairs are weighted by both sides' HP
- * fractions. `coverage` is MAX-based per enemy: each living Pokémon that the
- * other side has NO favorable trade against contributes its answer deficit ×
- * its HP fraction (p1-positive). Exported for direct testing.
- */
+/** `matchup` is in [-1, +1], pairs weighted by both HP fractions; `coverage` is max-based per enemy (deficit × HP). */
 export function matchupTerms(
   battle: Battle,
   cache?: MatchupCache,
@@ -210,15 +164,13 @@ export function matchupTerms(
 
   const threat = threatGetter(battle, cache);
   const idleBodies = idle ?? idleHolders(battle, threat);
-  // A body that never acts is read on its drops only, as the attacker and as the defender: a hit that reads the target's own
-  // stat (Foul Play) would otherwise price the stage of a body that is KO'd before it matters (round 76, 12a, after T258).
+  // A body that never acts is read on its drops only: Foul Play would price the target's stage.
   const offence = (mon: Pokemon): Pokemon => (idleBodies.has(mon) ? withoutRaises(mon) : mon);
   const inputs = raceInputs(battle);
   let sum = 0;
   let totalWeight = 0;
-  // Per-enemy best answer margins (my best fraction minus theirs).
-  const bestAnswerToP2 = new Map<Pokemon, number>(); // p2 mon -> best p1 margin
-  const bestAnswerToP1 = new Map<Pokemon, number>(); // p1 mon -> best p2 margin
+  const bestAnswerToP2 = new Map<Pokemon, number>();
+  const bestAnswerToP1 = new Map<Pokemon, number>();
   for (const a of p1Living) {
     for (const b of p2Living) {
       const threatA = threat(a, b);
@@ -229,9 +181,7 @@ export function matchupTerms(
         unhealedIfBeaten(inputs.raceSideOf(a, fracA), fracB, () => movesFirst(b, a, threatB, threatA, battle)),
         unhealedIfBeaten(inputs.raceSideOf(b, fracB), fracA, () => movesFirst(a, b, threatA, threatB, battle)),
       );
-      // Answer margins read the race's effective offense: an attacker held
-      // by a (now finite) wall keeps its partial answer, a pinned healer
-      // stops counting as one.
+      // Answer margins read the race's effective offense: a pinned healer stops counting as one.
       bestAnswerToP2.set(b, Math.max(bestAnswerToP2.get(b) ?? -Infinity, clocks.effFracA - clocks.effFracB));
       bestAnswerToP1.set(a, Math.max(bestAnswerToP1.get(a) ?? -Infinity, clocks.effFracB - clocks.effFracA));
       const sign = pairSign(a, b, threatA, threatB, clocks, battle);

@@ -41,13 +41,11 @@ function twoBattles(formatid: string): [esm.Battle, esm.Battle] {
   return [make(), make()];
 }
 
-/** Undefined writes whose receiver is no Battle, Field, Side or Pokemon ("<file> <receiver>"). */
 const NOT_BATTLE_STATE = new Set([
-  'sim/side.mjs req', // an entry of side.activeRequest, which today's fork rebuilds (state.mjs:112-126)
-  'sim/team-validator.mjs this', // the TeamValidator
+  'sim/side.mjs req', // an entry of side.activeRequest, which the standard fork rebuilds (state.mjs:112-126)
+  'sim/team-validator.mjs this',
 ]);
 
-/** Own function-valued keys whose function differs between two battles: per-instance closures. */
 function closures(a: object, b: object): string[] {
   const left = a as Record<string, unknown>;
   const right = b as Record<string, unknown>;
@@ -65,12 +63,6 @@ const CENSUS_FORMATS = ['gen1customgame', 'gen2customgame', 'gen3customgame', 'g
   'gen7customgame', 'gen8customgame', 'gen9customgame', 'gen9doublescustomgame'];
 
 type Member = [species: string, item: string, moves: string[]];
-/**
- * Items to steal and swap (Thief, Trick), a berry and Leftovers, Rollout and
- * the moves that call it through another move (Mirror Move, Metronome),
- * Explosion for mid-turn replacements. Each gen keeps the moves and items it
- * has (gen 1 has no items).
- */
 const CENSUS_SIDES: [Member[], Member[]] = [
   [['Mew', '', ['Thief', 'Trick', 'Mirror Move', 'Metronome']], ['Clefable', 'Sitrus Berry', ['Metronome', 'Trick', 'Body Slam', 'Thief']],
     ['Chansey', 'Leftovers', ['Soft-Boiled', 'Seismic Toss', 'Mirror Move', 'Thief']]],
@@ -99,7 +91,6 @@ function censusRoot(formatid: string): string {
 
 interface CensusTally { forks: number; templates: number; snapshots: number; mismatches: string[] }
 
-/** Where two lists first differ, with a little context. */
 function firstDifference(today: readonly string[], copied: readonly string[]): string {
   let index = 0;
   while (index < Math.max(today.length, copied.length) && today[index] === copied[index]) index++;
@@ -109,12 +100,10 @@ function firstDifference(today: readonly string[], copied: readonly string[]): s
   return `#${index}: today ...${a.slice(Math.max(0, at - 60), at + 60)} | copy ...${b.slice(Math.max(0, at - 60), at + 60)}`;
 }
 
-/** Every copy source (position template, mid-turn snapshot): a copy of it against today's round trip of it. */
 function censusTemplate(template: esm.Battle, tally: CensusTally): void {
   tally.templates++;
   if (template.sides.some(side => side.requestState === 'switch')) tally.snapshots++;
   const copy = copyBattle(template)!;
-  // A template has no PRNG (a fork seeds its copy); the round trip serializes a seeded copy, same state otherwise.
   copy.prng = new esm.PRNG('1,2,3,4');
   const today = ownKeyLists(deserializeFromParsed(parseSearchState(serializeBattleStable(copy))));
   restoreSideInvariants(copy);
@@ -122,7 +111,6 @@ function censusTemplate(template: esm.Battle, tally: CensusTally): void {
   if (copied.join('\n') !== today.join('\n')) tally.mismatches.push(`${template.format.id} template: ${firstDifference(today, copied)}`);
 }
 
-/** A few plies, the same picks with the lever clone and without: every fork's own keys and every child as today. */
 function censusPlayout(label: string, root: string, seed: (typeof SEEDS)[number], pick: number, tally: CensusTally): void {
   let copied = createRootPosition(root);
   let today = createRootPosition(root);
@@ -204,13 +192,12 @@ describe('the pins the layer relies on', () => {
   });
 
   test('every constructor key the sim empties by name holds undefined on a fresh object, in every gen', () => {
-    // Today's round trip drops a key holding undefined and leaves the constructor's value; a copy keeps
-    // undefined. adoptTemplate (sim-fast/index.ts) relies on the two agreeing for constructor keys.
-    // A source scan sees only literal writes (gen 2's lastMoveTargetLoc = targetLoc it cannot see):
-    // the census below plays the rest.
+    // The JSON round trip drops a key holding undefined and leaves the constructor's value; a copy keeps undefined.
+    // adoptTemplate (sim-fast/index.ts) relies on the two agreeing for constructor keys.
     const esmDir = join(SIM_BUILD, 'esm');
     const sources = [...readdirSync(join(esmDir, 'sim')).filter(name => name.endsWith('.mjs')).map(name => join(esmDir, 'sim', name)),
       ...walk(join(esmDir, 'data'))];
+    // The scan sees literal writes only (`lastMoveTargetLoc = targetLoc` can be undefined); the census plays the rest.
     const emptied = new Set<string>();
     for (const file of sources) {
       const where = relative(esmDir, file).replaceAll('\\', '/');
@@ -230,7 +217,7 @@ describe('the pins the layer relies on', () => {
       }
     }
     expect(kept).toEqual([]);
-    expect([...emptied].sort()).toContain('moveThisTurnResult'); // the scan still reads the sources
+    expect([...emptied].sort()).toContain('moveThisTurnResult');
   });
 
   test('census: in every gen a copy source forks with today\'s own keys and plays as today (singles and doubles)', () => {
@@ -294,7 +281,7 @@ describe('the hash gate', () => {
       esm: { ...PINNED_SIM_HASHES.esm, 'Battle.runEvent': '00000000' },
       cjs: { ...PINNED_SIM_HASHES.cjs, 'Battle.runEvent': '00000000' },
     };
-    // One lever at a time: with all three, the rules gate breaks first and turns the others off before they reach their gate.
+    // One lever at a time: with all three, the rules gate breaks first and turns the others off.
     const counter = { rules: 'ruleTables', clone: 'clones', dispatch: 'dispatchCalls' } as const;
     for (const lever of ['rules', 'clone', 'dispatch'] as const) {
       resetSimFastForTests();
@@ -309,7 +296,7 @@ describe('the hash gate', () => {
       setPinnedHashes(falsified);
       configureSimFast([lever], { forced: true });
       expect(play, lever).toThrow(/sim-fast hash-mismatch/);
-      expect(play, lever).toThrow(/sim-fast hash-mismatch/); // every use, never a silent standard path after the first throw
+      expect(play, lever).toThrow(/sim-fast hash-mismatch/);
     }
   });
 });

@@ -1,11 +1,7 @@
 import type { NewGameRecord } from './record';
 import { GAME_RECORD_VERSION } from './record';
 
-/**
- * Round 89 (lane H, #105): where new games live in localStorage. One key per game holds its record; an index lists the games
- * for the panel (newest first, at most 20, as saved variations keep 20). A game's saved variations stay under today's
- * `ps-replay-interceptor:branches:<id>` and its set edits under `ps-replay-interceptor:sets:<id>`: a delete removes both.
- */
+// One key per game and an index for the panel; a game's saved variations and set edits go with it on delete.
 
 export const GAMES_INDEX_KEY = 'ps-replay-interceptor:games';
 export const MAX_SAVED_GAMES = 20;
@@ -20,7 +16,6 @@ export interface SavedGameRow {
   players: [string, string];
   turns: number;
   updatedAt: string;
-  /** The dice seed (shown in the saved list); a row written before the seed was listed has none. */
   seed?: string;
 }
 
@@ -28,7 +23,6 @@ function rowOf(record: NewGameRecord): SavedGameRow {
   return { id: record.id, formatName: record.formatName, players: record.players, turns: record.turns, updatedAt: record.updatedAt, seed: record.seed };
 }
 
-/** The saved games, newest first; an unreadable index reads as empty. */
 export function listGames(): SavedGameRow[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(GAMES_INDEX_KEY) ?? '[]') as unknown;
@@ -38,7 +32,6 @@ export function listGames(): SavedGameRow[] {
   }
 }
 
-/** The game a key holds; null for none, an unreadable record or a record of a newer shape. */
 export function loadGame(id: string): NewGameRecord | null {
   try {
     const raw = localStorage.getItem(gameKey(id));
@@ -50,7 +43,6 @@ export function loadGame(id: string): NewGameRecord | null {
   }
 }
 
-/** The newest saved game that satisfies the test, else null (the index's seed spares loading a record whose seed cannot match). */
 export function findGame(matches: (record: NewGameRecord) => boolean, seed?: string): NewGameRecord | null {
   for (const row of listGames()) {
     if (seed !== undefined && row.seed !== undefined && row.seed !== seed) continue;
@@ -60,7 +52,6 @@ export function findGame(matches: (record: NewGameRecord) => boolean, seed?: str
   return null;
 }
 
-/** Removes a game and what it owns; the other games stay. */
 export function deleteGame(id: string): SavedGameRow[] {
   for (const key of [gameKey(id), branchesKey(id), setsKey(id)]) localStorage.removeItem(key);
   const next = listGames().filter(row => row.id !== id);
@@ -70,16 +61,12 @@ export function deleteGame(id: string): SavedGameRow[] {
 
 const evictionListeners = new Set<(rows: SavedGameRow[]) => void>();
 
-/** Calls the listener with the rows a save pushed out of the store (the notice names them); returns the function that stops it. */
 export function onGameEvicted(listener: (rows: SavedGameRow[]) => void): () => void {
   evictionListeners.add(listener);
   return () => { evictionListeners.delete(listener); };
 }
 
-/**
- * The rows that stay: the newest first, at most 20. A game over the limit that has no played turn goes first (the oldest of them), then the oldest game;
- * the game just saved (the first row) never goes (round 89, H15a).
- */
+// At most 20 rows: a game with no played turn goes first (oldest of them), then the oldest; the new game never goes.
 function keepNewest(rows: SavedGameRow[]): { kept: SavedGameRow[]; evicted: SavedGameRow[] } {
   const kept = [...rows];
   const evicted: SavedGameRow[] = [];
@@ -92,11 +79,7 @@ function keepNewest(rows: SavedGameRow[]): { kept: SavedGameRow[]; evicted: Save
   return { kept, evicted };
 }
 
-/**
- * Saves the record and moves its row to the front of the index; a 21st game pushes one game out with everything it owns (the oldest
- * without a played turn, else the oldest) and tells the listeners which. Returns false when the browser refuses the write (a full
- * store): the game stays in memory and the caller may say so.
- */
+/** Saves the record and moves its row to the front; a 21st game pushes one out. False when the write is refused. */
 export function saveGame(record: NewGameRecord): boolean {
   try {
     localStorage.setItem(gameKey(record.id), JSON.stringify(record));

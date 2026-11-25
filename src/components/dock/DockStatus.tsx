@@ -3,12 +3,7 @@ import { opponentReadsEnabled } from '../../lib/feature-flags';
 import { DICE_WAIT_NOTE } from '../branch/DiceChips';
 import type { DockModel, DockSlotModel } from './dock-model';
 
-/**
- * Round 77 (user request 28.10.2026): the winner left the top bar for the place of the pickers. Round 89 (#105, H4h): the end of a
- * game's main line is the game's end, not a variation's: `game` names it that way.
- */
 export function EndedNotice({ winner, game = false, battle = false }: { winner: string | null; game?: boolean; battle?: boolean }) {
-  // a replay's end speaks as Showdown's battle log does (H19a): "<winner> won the battle!"
   const text = battle
     ? (winner ? `${winner} won the battle!` : 'The battle ended in a tie.')
     : game
@@ -23,30 +18,21 @@ export function EndedNotice({ winner, game = false, battle = false }: { winner: 
 
 const OPPONENT_READS_NOTE_TITLE = 'The opponent\'s engine picks answer yours with the reply the search rates lowest for your pick. Setup ▾ holds this setting.';
 
-/** What a forced replacement asks of its slot. */
 function forcePrompt(slot: DockSlotModel): string {
   return slot.fainted ? `${slot.name} fainted! Choose who to send in:` : `${slot.name} is switching out. Choose who to send in:`;
 }
 
-/**
- * Round 84 (turn dock): the strip above the chips: where the choices come from, what a forced replacement asks, which side
- * waits for the other's replacement, the note that dice need the exact position, and the error of the last Execute.
- */
 export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false, opponentReads = false, onOpponentReadsChange }: {
   source?: PickerSource;
   acquiringExact?: boolean;
   executeError: string | null;
   model: DockModel;
-  /** The tray's "Dice · What if" section is open. */
   diceOpen: boolean;
-  /** Round 89 (#105): the position belongs to a new game, so the words name the game, not a replay. */
   game?: boolean;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the strip opens with a note and a button that turns it off. */
   opponentReads?: boolean;
   onOpponentReadsChange?: (value: boolean) => void;
 }) {
   const slots = [...model.p1, ...model.p2];
-  // The side that does not replace waits; the note names the side that does.
   const waitingFor = [...(model.flags.p1Waits ? ['P2'] : []), ...(model.flags.p2Waits ? ['P1'] : [])];
   return (
     <div className="ps-dock-status">

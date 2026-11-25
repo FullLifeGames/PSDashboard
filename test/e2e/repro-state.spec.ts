@@ -6,12 +6,7 @@ test.beforeAll(installReplayEmbedCache);
 
 type StateHandle = { restore: (state: unknown) => Promise<void> };
 
-/**
- * Round 77 (user gate 28.10.2026, 3a): replays a state file from a bug report up to its saved position.
- *   REPRO_STATE=path/to/ps-dashboard-state-….json npm run test:e2e -- test/e2e/repro-state.spec.ts
- * It serves the file's replay to the loader, loads it, restores sets, variation, pointer and drafts, prints
- * what the reporter saw, and stops with a screenshot. A fix copies this test and adds its own assertion.
- */
+// REPRO_STATE=path/to/ps-dashboard-state-….json npm run test:e2e -- test/e2e/repro-state.spec.ts
 test('reproduce a reported state', async ({ page }, testInfo) => {
   const file = process.env.REPRO_STATE;
   test.skip(!file, 'set REPRO_STATE=<state file> to reproduce a report');
@@ -20,7 +15,6 @@ test('reproduce a reported state', async ({ page }, testInfo) => {
   expect(state.kind, 'a PS Dashboard state file').toBe('ps-dashboard-state');
 
   await routeOfflineFixtures(page);
-  // Round 89 (#105, H5): a game's file carries its record; the restore opens the game, no replay is loaded first.
   const game = typeof state.game?.id === 'string';
   const replay = { views: 0, ...state.replay };
   await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({

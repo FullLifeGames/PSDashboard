@@ -6,19 +6,8 @@ import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Items the protocol rules out by a line it does NOT show (round 63, T80):
- * a Life Orb holder's damaging hit always shows its recoil, Leftovers and
- * Black Sludge always show their end-of-turn line below full HP, and a
- * Rocky Helmet always hurts a contact attacker. The item-evidence tests run
- * each fact through @pkmn/sim. Only holders whose item is still unknown are
- * judged, and any doubt drops the judgment: a faint, an item line around
- * the hit, Magic Room, Embargo, Heal Block, or an ability the species may
- * have that hides the line (Magic Guard, Klutz, Sheer Force on a move with
- * a secondary effect, Long Reach).
- */
+// Design: EVALUATION.md "Rule-outs".
 
-/** One resolving move: the plain hits it landed, the item lines it showed, who fainted. */
 interface ActionWatch {
   ident: string;
   attacker: string;
@@ -31,21 +20,13 @@ interface ActionWatch {
 
 export interface ItemWatch {
   action: ActionWatch | null;
-  /** The latest HP line of each opponent Pokémon, by side and nickname. */
   hp: Map<string, string>;
-  /** The opponent Pokémon on each field position. */
   slots: Map<string, string>;
-  /** Each Pokémon's held item as the log shows it ('' after it lost it), by side and nickname. */
+  /** Held item as the log shows it ('' after it lost it), by side and nickname. */
   items: Map<string, string>;
-  /** The HP of the opponent's actives when the turn's residual phase began. */
   residual: Map<string, string> | null;
-  /** Pokémon that showed a residual item line since then. */
   residualShown: Set<string>;
-  /**
-   * Pokémon whose items the residual phase may have silenced: blocked when it
-   * began or at any line of it (Heal Block ends inside the phase, after the
-   * Leftovers turn; Magic Room the same).
-   */
+  /** Blocked when the residual phase began or at any line of it (Heal Block ends inside it, after Leftovers). */
   residualSilenced: Set<string>;
   healBlocked: Set<string>;
   embargoed: Set<string>;
@@ -57,16 +38,12 @@ const ACTION_BOUNDARIES = new Set(['done', 'move', 'switch', 'drag', 'cant', 'tu
 const ITEM_LINES = new Set(['-item', '-enditem']);
 const RESIDUAL_ITEMS = ['leftovers', 'blacksludge'];
 
-/** HP as the protocol reads an HP argument ("50/100 par"); null when it names none. */
 const healthOf = (text: string | undefined) => Protocol.parseHealth((text ?? '') as Protocol.PokemonHPStatus);
-/** Alive and below full HP. */
 function belowFull(text: string | undefined): boolean {
   const health = healthOf(text);
   return !!health && health.hp > 0 && health.hp < health.maxhp;
 }
-/** The item a line's [from] effect names ('' for none). */
 const fromItem = (line: LogLine) => (fromEffect(line).type === 'item' ? fromEffect(line).name : '');
-/** The item an -activate (or its upgraded -block) names as its effect: Quick Claw, Safety Goggles, Protective Pads. */
 function activatedItem(line: LogLine): string {
   if (line.cmd !== '-activate' && line.cmd !== '-block') return '';
   const effect = Protocol.parseEffect(arg(line, 2));
@@ -80,16 +57,11 @@ function newWatch(): ItemWatch {
   };
 }
 
-/** The ability the log or the user proved ('' when only guessed or unknown). */
 function provenAbility(info: RevealedPokemonInfo | undefined): string {
   return info && (info.ability.source === 'revealed' || info.ability.source === 'manual') ? toId(info.ability.value) : '';
 }
 
-/**
- * Abilities the Pokémon may have: the known one, else its species' minus the
- * rule-outs; null when unknown, and in a format whose rules let any species
- * hold any ability (the simulator's rule table, round 64, T125).
- */
+/** The abilities the Pokémon may have (known one, else its species' minus rule-outs); null when unknown or free. */
 export function possibleAbilities(state: InferrerState, ident: string): Set<string> | null {
   const key = keyOf(ident);
   const opponent = key.startsWith(state.opponentSide);
@@ -104,13 +76,7 @@ export function possibleAbilities(state: InferrerState, ident: string): Set<stri
   return new Set(Object.values(entry.abilities ?? {}).map(name => toId(String(name))).filter(id => id && !ruled.includes(id)));
 }
 
-/**
- * Illusion shows another party member's name (round 63 review): any
- * absence line on the side could belong to the disguised Pokémon, so a
- * team that may hold an Illusion user is not judged. The abilities come
- * from the Dex of the replay's generation; a revealed ability decides; in a
- * format with free abilities any unknown one may be Illusion.
- */
+/** Illusion shows another member's name, so a team that may hold an Illusion user is not judged. */
 export function illusionPossible(state: InferrerState): boolean {
   const dex = dexOf(state);
   return [...state.pokemonMap.values()].some(mon => {
@@ -124,12 +90,7 @@ export function illusionPossible(state: InferrerState): boolean {
 
 const hiddenParty = new WeakMap<InferrerState, boolean>();
 
-/**
- * Whether the opponent's party may hold an Illusion user the log has not shown. Team preview lists the whole party (`illusionPossible` reads it); a format
- * without it (Random Battle) shows only the bodies that entered, and a disguised Zoroark enters as another species: the log then names the disguise on the
- * hit and the damage breaks it a line later (`|replace|`), so the rule-out would land on the disguise's species. From Generation 5, where the Dex has
- * Illusion, such a party gives no verdict.
- */
+/** Without team preview a disguised Zoroark enters as another species and the hit names it; no verdict from Gen 5. */
 export function partyMayHideIllusion(state: InferrerState): boolean {
   const known = hiddenParty.get(state);
   if (known !== undefined) return known;
@@ -138,7 +99,6 @@ export function partyMayHideIllusion(state: InferrerState): boolean {
   hiddenParty.set(state, hidden);
   return hidden;
 }
-/** Rules an item out for an opponent Pokémon whose item the log has not shown and no swap replaced. */
 export function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
   if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return;
   const nickname = key.slice(4);
@@ -150,15 +110,8 @@ export function ruleOutUnknown(state: InferrerState, key: string, itemId: string
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 
-/**
- * Whether the generation's Life Orb deals its recoil after this move, read
- * from the simulator's item. Gen 4's arms the recoil in the base-power step
- * (onBasePower), which a fixed-damage move (Seismic Toss, Super Fang:
- * `damage`, `damageCallback`) and a one-hit KO move (`ohko`) never run
- * (round 64, T125 and its review). From gen 5 the item's own
- * onAfterMoveSecondarySelf decides, called on stubs: gens 5 and 6 skip a
- * one-hit KO move there. A handler that fails on the stubs proves nothing.
- */
+// Gen 4 arms Life Orb in `onBasePower`, which fixed-damage and one-hit KO moves never run; from Gen 5
+// `onAfterMoveSecondarySelf` decides, on stubs (Gens 5 and 6 skip one-hit KO moves). A failing handler proves nothing.
 function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']>): boolean {
   const lifeOrb = dex.items.get('lifeorb') as { onBasePower?: unknown; onAfterMoveSecondarySelf?: ItemHandler };
   if (lifeOrb.onBasePower) return !move.damage && !move.damageCallback && !move.ohko;
@@ -172,7 +125,6 @@ function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']
   return recoil;
 }
 
-/** Whether a Life Orb on the attacker would have shown its recoil after this hit. */
 function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = dexOf(state);
   const move = dex.moves.get(action.move);
@@ -183,13 +135,7 @@ function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: Action
   return !watch.magicRoom && !watch.embargoed.has(action.attacker);
 }
 
-/**
- * Whether a Shell Bell on the attacker would have shown its heal after this
- * hit: the simulator heals an eighth of the damage dealt after the move
- * (onAfterMoveSecondarySelf, gens 3 to 9), so a holder still below full HP
- * when the move ends shows the line. Sheer Force on a move with a secondary
- * effect skips that step; Klutz, Embargo, Magic Room and Heal Block silence it.
- */
+// The simulator heals an eighth of the damage after the move (`onAfterMoveSecondarySelf`, Gens 3 to 9).
 function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = dexOf(state);
   const bell = dex.items.get('shellbell');
@@ -201,12 +147,7 @@ function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: Acti
   return !watch.magicRoom && !watch.embargoed.has(action.attacker) && !watch.healBlocked.has(action.attacker);
 }
 
-/**
- * Whether a move from an attacker holding `heldItem` ('' for none) makes
- * contact, read from the simulator: the item's own move change (Punching
- * Glove takes contact from a punch), then `Battle#checkMoveMakesContact`
- * (Protective Pads). Any doubt reads as no contact (round 64, T120).
- */
+/** Whether a move makes contact with `heldItem`: Punching Glove, then `checkMoveMakesContact`; doubt reads as no. */
 export function contactLands(dex: RulesDex, moveName: string, heldItem: string): boolean {
   const holder = { hasItem: (item: string | string[]) => [item].flat().map(toId).includes(heldItem), addVolatile: () => false };
   try {
@@ -219,13 +160,7 @@ export function contactLands(dex: RulesDex, moveName: string, heldItem: string):
   }
 }
 
-/**
- * Whether a Rocky Helmet on the target would have hurt this attacker. From
- * the generation of Protective Pads on, only an attacker whose item the log
- * showed is judged (round 64, decision 19; the fit corpus of round 63
- * showed helmets that stayed silent against Kleavor and Zapdos-Galar and
- * spoke later), and the simulator says whether that item lets it make contact.
- */
+// From the generation of Protective Pads on, only an attacker whose item the log showed is judged.
 function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = dexOf(state);
   const pads = dex.items.get('protectivepads');
@@ -239,7 +174,6 @@ function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionW
   return !!abilities && !abilities.has('magicguard') && !abilities.has('longreach') && !watch.magicRoom;
 }
 
-/** The opponent attacker's own items: Life Orb shows its recoil, Shell Bell its heal. */
 function judgeAttacker(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
   if (!action.shown.has(`${action.attacker}|lifeorb`) && lifeOrbWouldShow(state, watch, action)) {
     ruleOutUnknown(state, action.attacker, 'lifeorb');
@@ -259,7 +193,6 @@ function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch
   }
   if (!helmetWouldShow(state, watch, action)) return;
   for (const holder of hitOthers) {
-    // A holder that may have Klutz ignores its item (the sim's ignoringItem).
     const judged = holder.startsWith(state.opponentSide) && !action.fainted.has(holder) &&
       !action.shown.has(`${holder}|rockyhelmet`) && !watch.embargoed.has(holder) &&
       possibleAbilities(state, holder)?.has('klutz') === false;
@@ -267,12 +200,7 @@ function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch
   }
 }
 
-/**
- * At |upkeep|: an opponent active below full HP when the residual phase
- * began, and no residual item line. Not before gen 3: gen 2 logs show
- * Leftovers holders below full HP without the heal (fit corpus 684843
- * turn 34, 72 such turns over 30 gen 2 games).
- */
+// Not before Gen 3: Gen 2 logs show Leftovers holders below full HP without the heal.
 function judgeResidual(state: InferrerState, watch: ItemWatch) {
   if (state.gen < 3) return;
   for (const [key, hp] of watch.residual ?? []) {
@@ -289,7 +217,6 @@ function closeAction(state: InferrerState, watch: ItemWatch) {
   if (action) judgeAction(state, watch, action);
 }
 
-/** Everyone the residual phase may have silenced, from its opening state and each line of it. */
 function noteSilenced(watch: ItemWatch) {
   if (!watch.residual) return;
   for (const key of watch.residual.keys()) {
@@ -305,14 +232,13 @@ interface LineContext {
   opponent: boolean;
 }
 
-/** A Pokémon entered: the opponent's positions and HP. */
 function onEntry({ watch, line, key, opponent }: LineContext) {
   if (!opponent) return;
   watch.slots.set(arg(line, 1).slice(0, 3), key);
   watch.hp.set(key, arg(line, 3));
 }
 
-/** An HP line. Full HP inside the residual phase (Grassy Terrain before the Leftovers turn) leaves nothing to heal. */
+// Full HP inside the residual phase (Grassy Terrain before the Leftovers turn) leaves nothing to heal.
 function onHp({ watch, line, key, opponent }: LineContext) {
   if (!opponent) return;
   watch.hp.set(key, arg(line, 2));
@@ -320,11 +246,6 @@ function onHp({ watch, line, key, opponent }: LineContext) {
   if (watch.residual?.has(key) && health && health.hp >= health.maxhp) watch.residualSilenced.add(key);
 }
 
-/**
- * Ally Switch (`|swap|p2a: Kadabra|1|`): the Pokémon leaves its position for
- * the numbered one and the Pokémon there takes its place (round 64, T125: a
- * stale map judged a benched Leftovers holder after the next switch).
- */
 function onSwap({ watch, line, opponent }: LineContext) {
   if (!opponent) return;
   const from = arg(line, 1).slice(0, 3);
@@ -342,7 +263,6 @@ function onFaint({ watch, key }: LineContext) {
   watch.residual?.delete(key);
 }
 
-/** Heal Block and Embargo silence a holder's item line. */
 function onCondition({ watch, line, key }: LineContext) {
   const add = line.cmd === '-start';
   const effect = Protocol.parseEffect(arg(line, 2)).name;
@@ -350,17 +270,11 @@ function onCondition({ watch, line, key }: LineContext) {
   if (effect === 'Embargo') watch.embargoed[add ? 'add' : 'delete'](key);
 }
 
-/** Magic Room silences every item. */
 function onField({ watch, line }: LineContext) {
   if (Protocol.parseEffect(arg(line, 1)).name === 'Magic Room') watch.magicRoom = line.cmd === '-fieldstart';
 }
 
-/**
- * The item a line shows: `-item` gives the subject its item, `-enditem`
- * leaves it with none, a `[from] item:` effect names the item of its
- * `[of]` Pokémon or else of the subject (Life Orb, Rocky Helmet), an
- * `-activate` of an item names the subject's.
- */
+// `-item` gives, `-enditem` takes; a `[from] item:` effect names the item of its `[of]` Pokémon, else of the subject.
 function noteHeldItem(watch: ItemWatch, { line, key }: LineContext) {
   const of = ofIdent(line);
   const shown = fromItem(line);
@@ -377,12 +291,8 @@ const BOARD: Record<string, (context: LineContext) => void> = {
   faint: onFaint, '-start': onCondition, '-end': onCondition, '-fieldstart': onField, '-fieldend': onField,
 };
 
-/**
- * An item line inside the resolving move: what it shows, and whether it
- * casts doubt. The attacker's own item moved (Magician, an Eject Pack), or
- * another Pokémon's item acted on it without a move of its own (Red Card,
- * Pickpocket): the hit proves nothing about the attacker's item.
- */
+// Doubt: the attacker's own item moved (Magician, Eject Pack), or another Pokémon's item acted on it without a move of
+// its own (Red Card, Pickpocket); the hit then proves nothing about the attacker's item.
 function noteItemLine(action: ActionWatch, { line, key }: LineContext) {
   const of = ofIdent(line);
   const shown = fromItem(line);
@@ -393,7 +303,6 @@ function noteItemLine(action: ActionWatch, { line, key }: LineContext) {
   }
 }
 
-/** What the resolving move shows: plain hits, item lines, faints, doubt. */
 function trackAction(watch: ItemWatch, context: LineContext) {
   const action = watch.action;
   if (!action) return;
@@ -403,7 +312,6 @@ function trackAction(watch: ItemWatch, context: LineContext) {
   noteItemLine(action, context);
 }
 
-/** The phases: a "|" line opens the residual window, |upkeep| judges it, a plain |move| opens an action. */
 function notePhase(state: InferrerState, watch: ItemWatch, line: LogLine) {
   if (line.cmd === 'done') {
     watch.residual = new Map([...watch.slots.values()].map(key => [key, watch.hp.get(key) ?? '']));
@@ -420,11 +328,6 @@ function notePhase(state: InferrerState, watch: ItemWatch, line: LogLine) {
   }
 }
 
-/**
- * The line handler: closes the resolving move at each action boundary and
- * judges it, opens the next plain move, and judges the residual phase at
- * |upkeep| against the HP its opening "|" line found.
- */
 export function watchItemEvidence(state: InferrerState, line: LogLine) {
   const watch = (state.itemWatch ??= newWatch());
   if (ACTION_BOUNDARIES.has(line.cmd)) closeAction(state, watch);

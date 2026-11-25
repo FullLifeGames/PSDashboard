@@ -1,8 +1,4 @@
-/**
- * Cache identity per custom fetcher: two fakes serving different files must
- * not share an entry. One counter for the usage stats and the set
- * assumptions, so a fetcher has the same identity in both caches.
- */
+// Two fakes serving different files must not share a cache entry.
 const fetcherIds = new WeakMap<object, number>();
 let nextFetcherId = 1;
 

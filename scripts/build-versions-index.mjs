@@ -1,20 +1,4 @@
-/**
- * Renders the /versions/ index for the deployed Pages site.
- *
- * The Pages workflow unpacks each release's `ps-dashboard-<version>.zip` into
- * `site/<tag>/` and writes a manifest of what it kept; this turns that manifest
- * into a browsable page. Kept as a script rather than a heredoc in the workflow
- * so the markup can be rendered and eyeballed locally:
- *
- *   node scripts/build-versions-index.mjs site .versions-tmp/manifest.tsv owner/repo abc1234 2026-08-17
- *
- * Manifest format is one release per line, newest first — the first line is the
- * one mirrored at /latest/:
- *   <tag>\t<publishedAt ISO>
- *
- * Set PS_PRODUCTION_URL to also surface the hosted production deployment. It is
- * optional so the page still renders for a fork with nowhere to point.
- */
+// Renders the /versions/ index of the deployed Pages site from the release manifest.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -28,7 +12,6 @@ if (!siteDir || !manifestPath || !repoSlug) {
   process.exit(1);
 }
 
-/** Tags and dates come from the GitHub API, but they land in markup — escape. */
 const esc = (value) =>
   String(value)
     .replace(/&/g, '&amp;')
@@ -40,8 +23,7 @@ let manifest = '';
 try {
   manifest = readFileSync(manifestPath, 'utf8');
 } catch {
-  // No manifest means no release carried a build asset. Render the empty state
-  // rather than failing the deploy — the nightly itself is still fine.
+  // No manifest means no release carried a build asset. Render the empty state rather than failing the deploy.
 }
 
 const releases = manifest
@@ -52,11 +34,8 @@ const releases = manifest
     const [tag, publishedAt] = line.split('\t');
     return {
       tag,
-      // ISO prefix, not toLocaleDateString: the output has to be identical on
-      // every runner so redeploys don't churn the page.
+      // ISO prefix, not toLocaleDateString: the output must be identical on every runner.
       date: (publishedAt ?? '').slice(0, 10),
-      // The workflow mirrors the newest release that carried a build to
-      // /latest/, and that is the first manifest line by construction.
       isLatest: index === 0,
     };
   });

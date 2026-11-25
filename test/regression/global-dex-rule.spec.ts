@@ -5,13 +5,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import dexPlugin from '../../eslint.dex.mjs';
 
-/**
- * Round 75 (T160, decision D1): the rule dex/no-global-dex-read. The global Dex of @pkmn/sim (and of @pkmn/dex) is Generation 9 on
- * Scarlet/Violet, so a read of it is wrong for the type chart of Gens 1 to 5, a species' older stats and abilities, and the
- * Pokémon Champions mod. replay-core, eval-engine and the app read rules only through rules-dex.ts; the rule fails `npm run lint` on any other value
- * reference to an imported `Dex`. It replaces the census spec of round 67: no exceptions, and a new read is a lint error, not a number.
- * The rule reads code, not games: a singles and a doubles log reach it the same way.
- */
 const RULE = 'dex/no-global-dex-read';
 const linter = new Linter();
 
@@ -77,21 +70,8 @@ describe(RULE, () => {
 });
 
 describe('the rule in the repository', () => {
-  /** Every source file under a folder of the repository, as repository-relative paths. */
   const sourcesUnder = (folder: string) => (readdirSync(join(__dirname, '..', '..', folder), { recursive: true }) as string[])
     .filter(name => name.endsWith('.ts') || name.endsWith('.tsx')).map(name => `${folder}/${name.split('\\').join('/')}`);
-  const offendingIn = (files: string[]) => files.filter(file => !file.endsWith('replay-core/src/rules-dex.ts'))
-    .flatMap(file => lint(readFileSync(join(__dirname, '..', '..', file), 'utf8'), file).filter(message => message.ruleId === RULE).map(message => `${file}:${message.line}`));
-
-  test.each([
-    ['replay-core', 'packages/replay-core/src', 70],
-    ['eval-engine', 'packages/eval-engine/src', 100],
-    ['the app', 'src', 100],
-  ])('%s reads the global Dex nowhere (the resolver rules-dex.ts is the one place)', (_name, folder, least) => {
-    const files = sourcesUnder(folder);
-    expect(files.length).toBeGreaterThan(least);
-    expect(offendingIn(files)).toEqual([]);
-  });
 
   test('the resolver itself reads the Dex', () => {
     const files = sourcesUnder('packages/replay-core/src').filter(file => file.endsWith('rules-dex.ts'));

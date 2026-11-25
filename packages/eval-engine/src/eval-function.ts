@@ -4,12 +4,6 @@ import { evalFeatures, faintedFractionOf } from './score/features.ts';
 import { phaseFormOf, STANDARD_SINGLES_TERMS, staticFormOn } from './score/phase-form.ts';
 import type { MatchupCache } from './score/threat.ts';
 
-/**
- * The static positional evaluation, p1's perspective in [-1, +1]. The
- * stages live in score/: the tuning and feature weights, the hazard
- * pricing, the threat proxy, the race clocks, the matchup and sweep
- * terms, the feature vector, and the unanswered-mon profile.
- */
 
 export {
   CHAMPIONS_DOUBLES_FEATURE_WEIGHTS, CHAMPIONS_FEATURE_WEIGHTS, DOUBLES_FEATURE_WEIGHTS, EVAL_WEIGHTS, FEATURE_WEIGHTS, featureWeights,
@@ -33,7 +27,7 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
     return -1;
   }
 
-  // Round 65: the cache names the rule set of its search (a plain Map reads as standard).
+  // The cache names the rule set of its search (a plain Map reads as standard).
   const weights = featureWeights(battle.gameType === 'doubles', cache?.ruleset);
   const features = evalFeatures(battle, cache, weights);
   const teamSize = Math.max(battle.sides[0].pokemon.length, battle.sides[1].pokemon.length, 1);
@@ -42,7 +36,6 @@ export function evaluatePosition(battle: Battle, cache?: MatchupCache): number {
   for (const key of Object.keys(weights) as (keyof EvalFeatures)[]) {
     diff += weights[key] * features[key];
   }
-  // Round 69 (S9, T102): the phase form of standard singles, switchable (score/phase-form.ts).
   if (staticFormOn() && phaseFormOf(battle.gameType === 'doubles', cache?.ruleset)) {
     const share = faintedFractionOf(battle);
     for (const term of STANDARD_SINGLES_TERMS) diff += (term.shift + term.addend * share) * features[term.key];

@@ -4,13 +4,7 @@ import { notationSideLabel } from '@fulllifegames/eval-engine';
 import { sideMarkTexts, turnDiceMarks } from './branch-dice-marks';
 import { isGameSharePayload, type GameSharePayload } from './new-game/share';
 
-/**
- * One executed entry of the branch. `p1Choice` and `p2Choice` are the simulator commands; the labels (round 77, D6) are the
- * move and Pokemon names the history panel shows, so the shared view reads names. A link built before the labels carries
- * the commands alone and the view lists those (format version 1 stays: the fields are optional). Round 82 (forced dice, step A7c):
- * `p1DiceLabels` and `p2DiceLabels` name the dice the user forced in the turn, one text per die as the history row writes it, a
- * die that took no effect marked; a turn without a forced die on a side has no key for it, and the viewer shows a link without them.
- */
+// The fields after the commands are optional, so format version 1 stays (a link without labels lists the commands).
 interface BranchShareChoice {
   turnNumber: number;
   p1Choice: string;
@@ -35,15 +29,14 @@ export interface BranchSharePayload {
   finalLog: string;
 }
 
-/** A saved row: a replay's branch (version 1) or a game's (version 2, `GameSharePayload`). The rows of one replay or game share one store key. */
+/** A saved row: a replay's branch (version 1) or a game's (version 2); a replay or game has one store key. */
 export type SavedBranch = BranchSharePayload | GameSharePayload;
 
-/** The id the rows are stored under: the replay's, or the game's. */
 export function savedBranchOwner(row: SavedBranch): string {
   return row.version === 2 ? row.gameId : row.replayId;
 }
 
-/** How many choices a saved row holds: a replay's branch, or the open variation of a game (none: the game's own line). */
+/** How many choices a saved row holds: a replay's branch, or a game's open variation (none: its own line). */
 export function savedBranchChoices(row: SavedBranch): number {
   return row.version === 2 ? (row.variation?.entries.length ?? 0) : row.choices.length;
 }
@@ -116,11 +109,7 @@ export function decodeBranchShare(encoded: string): BranchSharePayload {
   return decodeShareJson(encoded) as BranchSharePayload;
 }
 
-/**
- * Round 89 (#105, H5): what a `#branch=` link holds. Version 1 is a replay's branch (its id and the log it ends on: the read-only
- * view), version 2 a game (`GameSharePayload`: the reader plays it). A version above 2 comes from a newer app and reads as such,
- * so the page can say so; anything else, a version 1 link without its log included, is damaged and throws.
- */
+/** What a `#branch=` link holds: version 1 a replay's branch, 2 a game; above 2 a newer app's; else damaged, throws. */
 export type ReadShare =
   | { kind: 'branch'; payload: BranchSharePayload }
   | { kind: 'game'; payload: GameSharePayload }
@@ -151,17 +140,13 @@ export function loadSavedBranches(replayId: string): SavedBranch[] {
   }
 }
 
-/** The time a save happened, moved forward by a millisecond while a saved row of the replay already carries it. */
 function uniqueSaveTime(existing: SavedBranch[]): string {
   let time = Date.now();
   while (existing.some(entry => entry.createdAt === new Date(time).toISOString())) time += 1;
   return new Date(time).toISOString();
 }
 
-/**
- * Stores the branch as a new row. A row's key is its `createdAt` and `branchTurn`; the save stamps the time of the save, so
- * saving one branch twice makes two rows with two keys (round 77, D7) and a delete removes the row it names.
- */
+/** Stores the branch as a new row: the key is `createdAt` and `branchTurn`, so saving twice makes two rows. */
 export function saveBranchPayload(payload: SavedBranch): SavedBranch[] {
   const existing = loadSavedBranches(savedBranchOwner(payload));
   const next = [{ ...payload, createdAt: uniqueSaveTime(existing) }, ...existing].slice(0, 20);
@@ -169,7 +154,7 @@ export function saveBranchPayload(payload: SavedBranch): SavedBranch[] {
   return next;
 }
 
-/** Removes one row: the first whose key matches (rows saved before the keys were unique may share one). */
+/** Removes one row: the first whose key matches (an old saved row may share a key). */
 export function deleteSavedBranch(payload: SavedBranch): SavedBranch[] {
   const rows = loadSavedBranches(savedBranchOwner(payload));
   const index = rows.findIndex(entry => entry.createdAt === payload.createdAt && entry.branchTurn === payload.branchTurn);

@@ -2,13 +2,6 @@ import { test, expect, type Page } from '@playwright/test';
 import { dockChip, dockTray, installReplayEmbedCache, routeOfflineFixtures, waitForExactPickers } from './helpers';
 import { Clicks, failOnResizeLoops, lightEngine, loadDockReplay, variationPanel } from './dock-helpers';
 
-/**
- * Round 84 (T315, A7d, spec addendum A): the app grows with large windows. At 2560 x 1290 Auto takes 150 %: the app fills the window
- * (the vh rules divide by the scale), the left column does not scroll, the replay frame's content scales with the app (Chromium
- * carries the root's zoom into the frame, WebKit needs the frame follower), the timeline slider's pointer lands where it shows, and
- * the task of criterion 1 (a move instead of the played one: chip, tile, Execute) takes the same three clicks. The setting
- * overrides Auto, persists across a reload, and a step that leaves the app less than 1050 px is disabled and says why.
- */
 const DOUBLES = 'gen9doublesou-2693620934';
 const TURN = 5;
 const BATTLE_WIDTH = 642;
@@ -26,11 +19,8 @@ test.beforeEach(async ({ page }) => {
 const rootScale = (page: Page) => page.evaluate(() => document.documentElement.style.getPropertyValue('--ps-scale'));
 const frameOf = (page: Page) => page.frameLocator('.ps-iframe-wrap iframe').first();
 
-/**
- * The battle's box on the screen, from the page: its share of the frame's document (the rect inside over the document's clientWidth)
- * times the frame's rect on the screen. Chromium reads the rect inside in the frame's CSS px (641 of 976, the frame 1,464 px wide on
- * the screen); WebKit's zoomed document reads it in screen px (962 of 1,464). The share is the same number in both.
- */
+// Chromium reads the rect inside in the frame's CSS px (641 of 976), WebKit in screen px (962 of 1,464):
+// the share of the document times the frame's rect on the screen is the same in both.
 async function battleOnScreen(page: Page) {
   return page.evaluate(() => {
     const frame = document.querySelector('.ps-iframe-wrap iframe') as HTMLIFrameElement;
@@ -67,17 +57,12 @@ test('Auto at 2560 x 1290 takes 150 %: the app fills the window, the column does
     };
   });
   expect(Number(facts.zoom), 'the root\'s zoom').toBeCloseTo(1.5, 5);
-  // The app fills the window and no more: a vh rule left undivided would reach 1.5 times the window.
   expect(Math.abs(facts.appHeight - facts.innerHeight), `height of the app ${JSON.stringify(facts)}`).toBeLessThanOrEqual(2);
   expect(facts.pageOverflow, 'the page does not scroll').toBeLessThanOrEqual(1);
   expect(facts.leftOverflow, 'the left column does not scroll').toBeLessThanOrEqual(1);
   expect(facts.leftScrollTop).toBe(0);
   expect(facts.frameVisual / facts.frameCss, 'the frame element\'s scale').toBeCloseTo(1.5, 1);
-  // The replay's content scales with the frame, drawn at the zoomed size: its 642 px battle stands about 963 px wide on the screen. In
-  // WebKit a frame that kept its 100 % layout shows it at 642. Playwright's boundingBox() of an element inside a zoomed frame reads page
-  // coordinates divided by the zoom (641 for 963; the A7d run), and the engines read the rect inside in different units (Chromium in
-  // the frame's CSS px, WebKit in screen px; the A7e run), so the width on the screen is the battle's share of the document times the
-  // frame's rect on the screen.
+  // The 642 px battle stands about 963 px wide on the screen (1.5 x); a frame that kept its 100 % layout shows 642.
   await expect(frameOf(page).locator('.battle')).toBeVisible({ timeout: 60_000 });
   const shown = await battleOnScreen(page);
   const message = `the battle on the screen ${JSON.stringify(shown)}`;
@@ -95,7 +80,7 @@ test('the timeline slider lands where the pointer shows at 150 %', async ({ page
   const slider = page.locator('.ps-branch-bar input[type="range"]');
   const range = await slider.evaluate(input => ({ min: Number((input as HTMLInputElement).min), max: Number((input as HTMLInputElement).max) }));
   const box = (await slider.boundingBox())!;
-  // The box is in screen pixels (150 % of its CSS size); a click at its middle reads half the range if the pointer hits what is shown.
+  // The box is in screen pixels (150 %): a click at its middle reads half the range if the pointer hits what is shown.
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   const value = Number(await slider.inputValue());
   const middle = (range.min + range.max) / 2;
@@ -119,7 +104,6 @@ test('task 1 at 150 %, a move instead of the played one: the same 3 clicks (chip
   await expect(variationPanel(page)).toContainText(name);
 });
 
-/** Round 84 (A7f, ruling 18a): the history panel stands closed under its toggle, so a doubles variation with a turn in it still fits. */
 test('a doubles variation with its history at 150 %: the left column does not scroll while the panel is closed', async ({ page }) => {
   test.setTimeout(180_000);
   await loadDockReplay(page, DOUBLES, TURN);
@@ -138,7 +122,6 @@ test('a doubles variation with its history at 150 %: the left column does not sc
   const closed = await overflow();
   expect(closed.overflow, `closed ${JSON.stringify(closed)}`).toBeLessThanOrEqual(1);
   expect(closed.scrollTop).toBe(0);
-  // Open, the history may need the column's scroll (the panel's own height); the toggle opens it and the cells show.
   await toggle.click();
   await expect(page.getByText('Variation result').first()).toBeVisible();
 });
@@ -151,7 +134,6 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   await expect(size.locator('option').first()).toHaveText('Auto (150 %)');
   expect(await rootScale(page)).toBe('1.5');
 
-  // A step overrides Auto, at once: 100 % is the app's own size (no factor written), 200 % doubles it.
   await size.selectOption({ value: '1' });
   expect(await rootScale(page)).toBe('');
   expect(Math.abs((await page.locator('.ps-app-root').boundingBox())!.height - 1290)).toBeLessThanOrEqual(2);
@@ -159,20 +141,15 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   expect(await rootScale(page)).toBe('2');
   expect(Math.abs((await page.locator('.ps-app-root').boundingBox())!.height - 1290)).toBeLessThanOrEqual(2);
 
-  // The choice persists across a reload: the root carries it before anything renders, and the select shows it.
   await page.reload();
   expect(await rootScale(page)).toBe('2');
-  // The address names the replay (round 89, H12a): the reload opens it again, so the loader field is gone and the page needs no second load.
   await waitForExactPickers(page, TURN);
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
   size = await openSetup(page);
   await expect(size).toHaveValue('2');
 
-  // A narrower window disables the steps that would leave under 1050 px (1600 / 1.75 = 914) and holds the chosen 200 % back to 150 %.
-  // The options are read through their `disabled` property: toBeDisabled() and toBeEnabled() retarget an element inside a <label> to the
-  // label's control (Playwright's `retarget` with `follow-label`), so on an option of this select they read the select, which is never
-  // disabled (the A7d run: "Received: enabled" for an option whose attribute and label were right; the ui spec of the menu follows the
-  // same resize). The label text is read as it is.
+  // 1600 / 1.75 = 914 px < 1050: those steps are disabled, the chosen 200 % is held back to 150 %.
+  // Options are read through `disabled`: toBeDisabled() retargets an option to its label's control, the select.
   await page.setViewportSize({ width: 1600, height: 1000 });
   await expect(size.locator('option', { hasText: /^175 %/ })).toHaveJSProperty('disabled', true);
   await expect(size.locator('option', { hasText: /^200 %/ })).toHaveJSProperty('disabled', true);
@@ -180,7 +157,6 @@ test('the Size setting overrides Auto, persists across a reload, and disables a 
   await expect(size.locator('option', { hasText: /^150 %/ })).toHaveJSProperty('disabled', false);
   await expect.poll(() => rootScale(page)).toBe('1.5');
 
-  // Auto takes the choice back: this window gives 100 %.
   await size.selectOption({ value: 'auto' });
   expect(await rootScale(page)).toBe('');
   await expect(size.locator('option').first()).toHaveText('Auto (100 %)');

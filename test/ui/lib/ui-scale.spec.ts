@@ -4,10 +4,6 @@ import {
 } from '../../../src/lib/ui-scale';
 import { UI_SCALE_STORAGE_KEY, parseUiScale, readUiScale, writeUiScale } from '../../../src/lib/ui-scale-setting';
 
-/**
- * Round 84 (T315, A7c): the rule for Auto (spec addendum A, 7a) and the setting. The table is the spec's: the largest step of 25 % at
- * which the window still gives the app 1400 x 820 px, measured in CSS pixels so a browser zoom already set counts.
- */
 describe('Auto', () => {
   test.each([
     [1366, 657, 1], [1366, 768, 1], [1920, 970, 1], [1920, 1080, 1.25], [1400, 820, 1],

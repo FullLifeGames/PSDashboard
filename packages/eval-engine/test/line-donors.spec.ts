@@ -2,18 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { lineRequests } from '../src/search/line-donors';
 import type { EvalResult, EvalSettings, MctsTreeStats, RankedChoice, TreeLineStep } from '../src/types';
 
-/**
- * Round 89 (#104), step G2: which lines the lines job replays. Each side's best row and its played row; one request with both roles
- * when they are the row; the donors of a row are the trees that hold its line, the ones whose first step answers with the other side's
- * best row first, then by the visits of the first step.
- */
-
 const row = (choice: string, label: string): RankedChoice => ({ choice, label, worstCase: 0, expected: 0, ev: 0, punishedBy: null });
 const step = (p1: string, p2: string, visits: number): TreeLineStep => ({ p1, p2, visits });
 
 const options = (labels: [string, string][]) => labels.map(([choice, label]) => ({ choice, label }));
 
-/** The lines a tree holds for a row: one list per row, the tree's own line first (a bare line is a list of one). */
 type Held = Record<string, TreeLineStep[] | TreeLineStep[][]>;
 const listed = (held: Held): Record<string, TreeLineStep[][]> => Object.fromEntries(Object.entries(held).map(([label, value]) => [label, Array.isArray(value[0]) ? (value as TreeLineStep[][]) : [value as TreeLineStep[]]]));
 
@@ -70,11 +63,6 @@ describe('the requests of the lines job', () => {
   });
 });
 
-/**
- * Round 89 (#104), step G12 (ruling G8a): a tree ships up to three lines for a row, against its own top answers. The donors of a row are
- * every tree's lines, ordered by the rank of the first answer in the merged ranking of the other side (the best answer overall comes
- * first, an answer the ranking does not hold comes last), then by the first step's visits, then by the lower tree.
- */
 describe('the donors follow the merged ranking of the answers', () => {
   const ranking = (answers: [string, string][]): EvalResult => ({
     ...result(),
@@ -94,7 +82,6 @@ describe('the donors follow the merged ranking of the answers', () => {
     const trees = [tree({ Surf: [[step('Surf', '→ Mew', 40)], [step('Surf', 'Draining Kiss', 12)], [step('Surf', 'Surf Pair', 9)]] })];
     const merged = ranking([['switch 2', '→ Mew'], ['move drainingkiss', 'Draining Kiss'], ['move x', 'Surf Pair']]);
     const [request] = lineRequests(trees, merged, settings(null));
-    // the merged ranking puts → Mew first, so the tree's own first line stays first and the rest follow by rank
     expect(request.donors.map(donor => donor[0].p2)).toEqual(['→ Mew', 'Draining Kiss', 'Surf Pair']);
     const swapped = ranking([['move drainingkiss', 'Draining Kiss'], ['move x', 'Surf Pair'], ['switch 2', '→ Mew']]);
     expect(lineRequests(trees, swapped, settings(null))[0].donors.map(donor => donor[0].p2)).toEqual(['Draining Kiss', 'Surf Pair', '→ Mew']);
@@ -115,16 +102,11 @@ describe('the donors follow the merged ranking of the answers', () => {
   test('the opponent\'s rows are ordered by the merged ranking of the first side', () => {
     const trees = [tree({}, { 'Draining Kiss': [[step('Ice Beam', 'Draining Kiss', 50)], [step('Surf', 'Draining Kiss', 10)]] })];
     const [request] = lineRequests(trees, result(), settings(null));
-    // the merged top of player 1 is Surf: its line comes first although Ice Beam's holds more visits
     expect(request.side).toBe('p2');
     expect(request.donors.map(donor => donor[0].p1)).toEqual(['Surf', 'Ice Beam']);
   });
 });
 
-/**
- * Round 89 (#104), step G13 (ruling G2b): a host that graded the turn with the matrix names the answers its card ranks first
- * (settings.lineReplies, by the side whose lines they are). The donors then meet those answers before the tree's merged ranking.
- */
 describe('a host names the answers its card ranks first (lineReplies)', () => {
   const two = [tree({ Surf: [step('Surf', 'Draining Kiss', 8)], 'Ice Beam': [step('Ice Beam', '→ Mew', 40)] }, { 'Draining Kiss': [[step('Surf', 'Draining Kiss', 30)], [step('Ice Beam', 'Draining Kiss', 12)]] })];
 
@@ -147,13 +129,7 @@ describe('a host names the answers its card ranks first (lineReplies)', () => {
   });
 });
 
-/**
- * Round 89 (#153, Hard mode): beside a row's usual request the job asks for the row's line against the reply that hurts it most
- * (`worstAnswer` of the merged result), from the lines the trees hold against that answer: their lists and their floor lines. Only
- * when a tree holds one, and only when the usual line does not already meet that answer. The usual request stays what it was.
- */
 describe('the line against the reply that hurts a row most (versus worst)', () => {
-  /** Surf is hurt most by → Mew (its floor); Ice Beam by Draining Kiss; the best answer overall is Draining Kiss. */
   const hurt = (): EvalResult => ({
     ...result(),
     perSide: {
@@ -183,7 +159,6 @@ describe('the line against the reply that hurts a row most (versus worst)', () =
   test('no request when no tree holds a line against the floor answer, or when the usual line already meets it', () => {
     const none = lineRequests([tree({ Surf: [step('Surf', 'Draining Kiss', 30)] })], hurt(), settings(null));
     expect(none.map(request => request.versus)).toEqual([undefined]);
-    // Ice Beam's floor is Draining Kiss, the answer its usual line meets
     const same = lineRequests([tree({ 'Ice Beam': [step('Ice Beam', 'Draining Kiss', 12)] })], { ...hurt(), perSide: { ...hurt().perSide, p1: [hurt().perSide.p1[1], hurt().perSide.p1[0]] } }, settings(null));
     expect(same.map(request => [request.label, request.versus])).toEqual([['Ice Beam', undefined]]);
   });

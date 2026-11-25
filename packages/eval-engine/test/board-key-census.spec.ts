@@ -13,19 +13,16 @@ import { sweepMoves } from './dice-sweep-support';
 import { SWEEPS_FULL } from './dice-fixtures';
 import { attackerOf, boardFor, defenderOf, type Lineup } from './board-key-support';
 
-/** The events a played copy fires: the copies of the played hit are hooked through the module that makes them. */
 const hooks: { onCopy?: (copy: Battle) => void } = {};
 vi.mock('../src/sim-ask/copy', async importOriginal => {
   const real = await importOriginal<typeof import('../src/sim-ask/copy')>();
   return { ...real, copyOf: (battle: Battle) => { const copy = real.copyOf(battle); hooks.onCopy?.(copy); return copy; } };
 });
 
-/** Under `DICE_SWEEPS=full` an ability or item is played against this many moves, not against every move (the full product took over an hour in one CI part). */
 const FULL_MOVES_PER_ENTRY = 6;
 
 const EVENT_CALLS = ['runEvent', 'singleEvent', 'priorityEvent', 'eachEvent', 'fieldEvent'] as const;
 
-/** Records the name of every event the battle fires from now on (the first argument of each call). */
 function listen(battle: Battle, fired: Set<string>): void {
   const target = battle as unknown as Record<string, (...args: unknown[]) => unknown>;
   for (const call of EVENT_CALLS) {
@@ -37,27 +34,8 @@ function listen(battle: Battle, fired: Set<string>): void {
   }
 }
 
-/**
- * Round 89 (#149, step A8): the census of the board key. The key of the hit memo and of the end-of-turn memo
- * (score/board-key.ts) names every own field of the simulator's `Pokemon`, `Side`, `Field` and `Battle` with a class (keyed,
- * read, normalized, relative, a reference, inert). A simulator that adds a field turns this spec red, so the table grows
- * with the simulator and a new pocket of state never goes unkeyed without a failing row. A field the table does not know
- * is keyed anyway (the fail-safe, checked here too): the key fails toward a lower hit rate, never toward a wrong answer.
- *
- * Every rule set the corpus plays (Gens 1 to 9, the Champions mod), singles and, from Gen 3 on, doubles: a board of
- * three bodies a side after a Substitute, a poison, a hit and a switch.
- *
- * The last row plays hits. The plain run plays 6 cases, a sample of the moves and a sample of the entries. `DICE_SWEEPS=full` plays every case, every move
- * of the Dex on five fixed boards (a Flame Body, a Static, a Poison Point with a Sticky Barb, a Life Orb against a Rocky Helmet with a Rough Skin, and the
- * bare board) and every ability and item of the Dex, on the attacker and on the defender, against 6 moves spread over the list. It no longer plays every
- * move against every entry (a few million hits, over an hour in CI): an event that only a particular move and a particular entry fire together, and
- * neither fires with the five boards or the six moves, is not reached. The first two rows of the file (every field of the simulator is in the table) and
- * the fail-safe row read no hit.
- */
-
 await loadSimMods('gen9championscustomgame');
 
-/** A board two bodies deep a side (doubles: four) that has played a Substitute, a toxic, a tackle and a switch. */
 function playedBoard(rules: Rules, mode: Mode): Battle {
   const doubles = mode === 'doubles';
   const body = (species: string, moves: string[]) => mon(rules, { species, moves, gender: 'M' });
@@ -70,7 +48,6 @@ function playedBoard(rules: Rules, mode: Mode): Battle {
   return battle;
 }
 
-/** The data fields of an object (a game mod puts methods on the instance: they are the format's, and the format is in the key). */
 const dataNames = (object: object): string[] => Object.getOwnPropertyNames(object).filter(name => typeof (object as Record<string, unknown>)[name] !== 'function');
 
 const NAMES = {
@@ -80,9 +57,8 @@ const NAMES = {
   battle: (battle: Battle) => dataNames(battle),
 } as const;
 
-/** Fields the simulator creates only when an event happens that the sample board lacks, with the event. */
 const AFTER_AN_EVENT: Record<string, string[]> = {
-  pokemon: ['terastallized' /* a Terastallization */, 'lastMoveTargetLoc' /* a move with a chosen target slot */, 'pendingStaleness' /* an item given or taken */, 'staleness' /* a berry eaten after one was given */],
+  pokemon: ['terastallized', 'lastMoveTargetLoc', 'pendingStaleness', 'staleness'],
 };
 
 describe('the board key names every own field of the simulator', () => {
@@ -104,7 +80,6 @@ describe('the board key names every own field of the simulator', () => {
       for (const owner of ['pokemon', 'side', 'field', 'battle'] as const) for (const name of NAMES[owner](battle)) seen[owner].add(name);
     }
     const stale = Object.fromEntries((['pokemon', 'side', 'field', 'battle'] as const).map(owner => [owner, Object.keys(BOARD_FIELDS[owner]).filter(name => !seen[owner].has(name) && !(AFTER_AN_EVENT[owner] ?? []).includes(name)).sort().join(' ')]));
-    // A field some generation or mod never builds is listed here with its reason; the rest of the table is held to the simulator.
     expect(stale).toEqual({ pokemon: '', side: '', field: '', battle: '' });
   });
 
@@ -138,7 +113,6 @@ describe('the board key names every own field of the simulator', () => {
       for (const item of items.filter((_, index) => SWEEPS_FULL || index % 12 === 0)) entryLineups.push({ attacker: { item } }, { defender: { item } });
       const plays: [(typeof moves)[number], Lineup][] = [];
       if (SWEEPS_FULL) {
-        // every move on the five fixed lineups, and every ability and item on each side against FULL_MOVES_PER_ENTRY moves spread over the list (each entry starts at another move)
         for (const move of moves) for (const lineup of base) plays.push([move, lineup]);
         const step = Math.max(1, Math.floor(moves.length / FULL_MOVES_PER_ENTRY));
         entryLineups.forEach((lineup, index) => { for (let slot = 0; slot < FULL_MOVES_PER_ENTRY; slot++) plays.push([moves[(index * 7 + slot * step) % moves.length], lineup]); });
@@ -150,7 +124,6 @@ describe('the board key names every own field of the simulator', () => {
         const battle = boardFor(rules, mode, move.id, lineup);
         playHit(battle, attackerOf(battle), defenderOf(battle), move.id);
       }
-      // The end of the turn: a board with a status, a Substitute and a weather has played.
       const battle = boardFor(rules, mode, 'tackle');
       const copy = (battle.sides[0].active[0] as unknown as { battle: Battle }).battle;
       listen(copy, residualFired);

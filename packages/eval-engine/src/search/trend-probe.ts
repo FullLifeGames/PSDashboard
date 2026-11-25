@@ -4,19 +4,7 @@ import type { CellDraw, EvalResult } from '../types.ts';
 import { leafValue, tieOrderScripts } from './leaf.ts';
 import { cellSeeds } from './root-quantile.ts';
 
-/**
- * Round 70: the horizon-trend probe of one base draw of a decisive cell. The trend layers ask how a tied row's
- * decisive cell moves when the search looks one ply further; the answer for one draw is the sub-search of the child
- * that draw leads to minus that child's own leaf (never the cell's mean over draws, which would read the outcome
- * variance of one draw as a trend). The sync search and the executor's sub-search job both run this, the orchestrator
- * averages the answers of a cell's draws (ranking/trend.ts meanTrend).
- */
-
-/**
- * The child one base draw of a cell leads to: the very child the matrix priced, the draw's seed and, for a
- * speed-tied cell, the move order scripted into it (cell-sampler.ts mixOrders). Round 89 (#60, T324): the draw's seed is slot
- * `index` of the cell's own list, which the root and the two choices name, so the record needs no key of its own.
- */
+/** The child one base draw leads to: the one the matrix priced (draw seed, and a speed tie's scripted move order). */
 export function drawChild(root: SimPosition, p1Choice: string, p2Choice: string, draw: CellDraw): SimPosition {
   const seed = cellSeeds(root, p1Choice, p2Choice)[draw.index];
   if (!draw.first) return advancePosition(root, p1Choice, p2Choice, seed);
@@ -24,7 +12,7 @@ export function drawChild(root: SimPosition, p1Choice: string, p2Choice: string,
   return advancePositionWithLog(root, p1Choice, p2Choice, seed, { scripts }).child;
 }
 
-/** The draw's child searched by `search`, the answer carrying its `trend`: the score minus the child's own leaf. */
+/** The draw's child searched by `search`; `trend` is the score minus the child's own leaf. */
 export function probeDraw(
   root: SimPosition,
   p1Choice: string,

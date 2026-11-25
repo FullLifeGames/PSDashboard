@@ -7,25 +7,9 @@ import { pinnedFetcher } from './forced-reconstruction-support';
 import { CORPUS } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * Round 89 (#75 step 1, ruling 27.4): a knockout reads the shown HP by the game's own display (Scarlet/Violet rounds the percentage up, the
- * Champions mod down). The three scenes of the issue's diagnosis (round 88, lane C) read through the bank's and the app's build with the
- * disk-cached Smogon data (local: the rows skip without `.fit-corpus`):
- *  - VGC 2159578969 turn 2: Terapagos-Stellar's Earth Power takes Weezing-Galar from a shown 100, which Scarlet/Violet prints only at full HP, and the
- *    built best roll reached 0.988. The game refutes the built pair. Terapagos' clean lines (Double-Edge, Endeavor) keep its Special Attack, so the
- *    defender's top-up gives up the Special Defense the knockout refutes (136 to 120 EVs) and the pair reaches.
- *  - Champions VGC 2611728375 turn 4: Glimmora's Power Gem takes Basculegion from a shown 49, which the Champions mod prints for 49 percent or more
- *    (it rounds down), and the built best roll reached 0.482. The game refutes it too.
- *  - VGC 2243810213 turn 6, a guard: Palafin-Hero's Jet Punch takes Annihilape from a shown 75; the built best roll deals 138 of its 186 HP, and
- *    Scarlet/Violet prints 75 for 138 and 139. The game allows that knockout (at the top roll only), so the built Palafin stays as it was. The issue
- *    read the 0.742 against a 0.75 and called the set wrong; the round's ruling 27 (4) reads it by the display.
- *  - Gen 6 OU smogtours-648453 turn 4, a singles row: Lopunny-Mega's High Jump Kick takes Rotom-Wash from its exact 219 of 303 HP (a Gen 6 replay
- *    of the player's own side prints exact HP). The old pair's best roll is 216 and the old reading's 2 % slack hid that; no rung reaches 219 with
- *    the Fake Out line of turn 2 beside it, but the refutation now pulls the defender one rung down (Defense 252 to 244). Round 89's gate rows
- *    (`lanes/D/d7-gate-rows.md`) carry the rebuild fingerprint this moves.
- * Doubles and VGC are the rows above; singles also have the unit rows of `packages/replay-core/test/lethal-reading.spec.ts`; the corpus rows are the doubles and VGC scenes.
- */
-interface Row { /** A feedback fixture (tracked, built with its pinned Smogon data) instead of a replay of the local corpus. */ fixture?: true; id: string; family: string; move: string; defender: string; shown: { hp: number; maxhp: number }; attacker: string; check: (attacker: Record<string, number>, defender: Record<string, number>) => void }
+// Local: the rows skip without `.fit-corpus`.
+// The shown HP reads by the game's own display: Scarlet/Violet rounds the percentage up, the Champions mod down.
+interface Row { fixture?: true; id: string; family: string; move: string; defender: string; shown: { hp: number; maxhp: number }; attacker: string; check: (attacker: Record<string, number>, defender: Record<string, number>) => void }
 
 const ROWS: Row[] = [
   {
@@ -54,7 +38,7 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-describe('a knockout the game refutes opens the attacker\'s offense; one it allows stays (#75)', () => {
+describe('a knockout the game refutes opens the attacker\'s offense; one it allows stays', () => {
   for (const row of ROWS) {
     const path = row.fixture ? join('test', 'e2e-feedback', 'fixtures', `${row.id}.json`) : CORPUS(row.id);
     test.skipIf(!existsSync(path))(`${row.family} ${row.id}: ${row.attacker}'s ${row.move} on ${row.defender} shown at ${row.shown.hp}/${row.shown.maxhp}`, async () => {
@@ -63,7 +47,6 @@ describe('a knockout the game refutes opens the attacker\'s offense; one it allo
       const parsed = parseReplayLogWithObservations(replay.log);
       const raw = parsed.observations.filter(obs => obs.lethal && obs.moveId === row.move && obs.defenderSpecies.startsWith(row.defender));
       expect(raw.length, 'the knockout is in the parse').toBeGreaterThan(0);
-      // The parse keeps the text the log showed before the hit.
       expect(raw.some(obs => obs.defenderShown?.before.hp === row.shown.hp && obs.defenderShown.before.maxhp === row.shown.maxhp)).toBe(true);
       const built = await bankTeamsFor({ log: replay.log, formatId, parsed, fetcher: row.fixture ? pinnedFetcher : diskCachedSmogonFetcher() });
       expect(built.teams).not.toBeNull();
@@ -80,15 +63,9 @@ describe('a knockout the game refutes opens the attacker\'s offense; one it allo
   }
 });
 
-/**
- * Round 89 (D9): gen9ou-2658671254, a bank game (a copy of its replay is tracked beside the spec; the row skips without `.smogon-cache`). p2 Iron Valiant takes
- * Ogerpon from a shown 100/100 in turn 15 (a Moonblast that must do the whole 301 HP of a body without HP EVs) and hits Moltres from 100 to 74 in turn 8, a hit
- * whose window of 100 to 103 HP sits low. On the project's calc, with the bodies of the build, a Special Attack of 28 EVs and more reaches the knockout, and the hit
- * on Moltres stays inside its slack up to 60 EVs (64 overshoots it by 1.6e-6, 100 by 8e-5, 180 by 9e-4). The top-up measured its tolerance from the winning rung's
- * refuted knockout and ran the stat to 180 (round 89, D7); the rule it now holds (`lethal-reading.spec.ts`, "never ends on an offense the lines fit worse than the
- * cheapest spread that reaches every knockout") puts it on the reach: the built spread reaches the knockout and sits where the clean line still fits.
- */
-describe('the offense of a mon with a knockout and a clean line sits where both fit (D9)', () => {
+// Local: the gen9ou row skips without `.smogon-cache`.
+// On the project's calc 28 Special Attack EVs reach the Ogerpon knockout; the Moltres hit fits up to 60 EVs.
+describe('the offense of a mon with a knockout and a clean line sits where both fit', () => {
   const FILE = join('test', 'regression', 'fixtures', 'bank-games', 'gen9ou-2658671254.json');
   test.skipIf(!existsSync(FILE) || !existsSync('.smogon-cache'))('gen9ou-2658671254: Iron Valiant\'s Moonblast on Ogerpon (100/100) and on Moltres (100 to 74)', async () => {
     const replay = JSON.parse(readFileSync(FILE, 'utf-8')) as Replay;

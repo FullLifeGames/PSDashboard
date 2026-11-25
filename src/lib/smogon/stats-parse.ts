@@ -53,7 +53,6 @@ function probabilityRows(
   return usageRows(rows, detail, kind, count => normalizeUsageValue(count, denominator, bucketTotal));
 }
 
-/** Display-named, positive, sorted usage rows; `probabilityOf` prices one raw entry. */
 function usageRows(
   rows: [string, number][],
   detail: string,
@@ -84,10 +83,7 @@ function fractionalProbabilityRows(
   return usageRows(numericEntries(entries), detail, kind, normalizeFractionalProbability);
 }
 
-/**
- * Round 88 (F, #101): a teammate list as probability rows, sorted by share and then name. `probabilityOf` prices one raw entry;
- * four digits stay, because the stand-in step sums a few of them and the three-digit rounding of the other rows would tie them.
- */
+// Four digits stay: the stand-in step sums a few, and three-digit rounding would tie them.
 function teammateRows(
   entries: Record<string, number | string> | undefined,
   detail: string,
@@ -129,7 +125,6 @@ function spreadRows(
   return spreadRowsOf(rows, detail, count => normalizeUsageValue(count, denominator, bucketTotal));
 }
 
-/** Parsed, positive, sorted spread rows; `probabilityOf` prices one raw entry. */
 function spreadRowsOf(
   rows: [string, number][],
   detail: string,
@@ -157,7 +152,6 @@ function fractionalSpreadRows(
   return spreadRowsOf(numericEntries(entries), detail, normalizeFractionalProbability);
 }
 
-/** The optional field only where the file has the list: a species without one keeps the shape it had before. */
 const withTeammates = (teammates: UsageProbability[] | undefined): { teammates?: UsageProbability[] } => (teammates ? { teammates } : {});
 
 function parseDataPkmnStats(

@@ -11,12 +11,7 @@ import { killCount } from '../src/pair/kill-table';
 import { checkedRolls, drawTurn, rollSet as set, rootOf } from './calc-roll-oracle';
 import { doublesRoot, pairSet } from './pair-battles';
 
-/**
- * Round 67, lane A (T72): a species the calc does not know goes to it as
- * the form it does know with the same Dex base stats and types (Gastrodon-East
- * as Gastrodon, the simulator's "Aegislash" as Aegislash-Shield, color forms);
- * an attacking Aegislash in the forme its Stance Change gives it at use.
- */
+// (Gastrodon-East as Gastrodon, "Aegislash" as Aegislash-Shield); an attacking Aegislash is in its Stance Change forme.
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
 
 function mon(species: string, overrides: Partial<SimPokemonInfo> = {}): SimPokemonInfo {
@@ -38,7 +33,7 @@ function move(name: string, targetType = 'normal'): BranchMoveOption {
 const singlesRoot = (p1: Parameters<typeof rootOf>[1], p2: Parameters<typeof rootOf>[2], setup?: Parameters<typeof rootOf>[3]) => rootOf('gen9customgame', p1, p2, setup);
 const rolls = (root: SimPosition, p1: string, p2: string) => checkedRolls(drawTurn(root, p1, p2));
 
-describe('forms the calc does not know (T72)', () => {
+describe('forms the calc does not know', () => {
   test('the preview prices Gastrodon-East as Gastrodon, attacking and defending, singles and doubles', () => {
     for (const gameType of ['Singles', 'Doubles'] as const) {
       const into = calcSingleDamageRange(mon('Gastrodon-East'), mon('Snorlax'), move('Earth Power'), { gameType, gen: 9 });
@@ -105,9 +100,8 @@ describe('forms the calc does not know (T72)', () => {
   });
 });
 
-describe('the form map reads the Dex and the calc data, no list (T72)', () => {
+describe('the form map reads the Dex and the calc data, no list', () => {
   test('every species of gens 6 to 9 the calc refuses maps to a form of the same base species with equal base stats and types, or stays', () => {
-    /** The map's promise for one name: the same base species, base stats and types, or the name itself. */
     const holds = (gen: number, name: string) => {
       const known = calcSpecies(gen, name);
       if (known === name) return known;
@@ -124,7 +118,6 @@ describe('the form map reads the Dex and the calc data, no list (T72)', () => {
         if (species.exists && !calcGen.species.get(toID(species.name))) holds(gen, species.name);
       }
     }
-    // The forms the bank and the fit corpus carry (round 62 census); color forms resolve through the Dex, not its list.
     expect(holds(9, 'Gastrodon-East')).toBe('Gastrodon');
     expect(holds(9, 'Aegislash')).toBe('Aegislash-Shield');
     expect(holds(6, 'Aegislash')).toBe('Aegislash-Shield');

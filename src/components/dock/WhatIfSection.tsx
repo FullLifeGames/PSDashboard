@@ -5,11 +5,6 @@ import { ComboBox } from '../ComboBox';
 import { displayName } from '../../lib/branch-history';
 import { useIsGuessed, type GuessedSide } from '../../lib/stand-in-mark';
 
-/**
- * Round 84 (turn dock): "All choices" and "What if it had…", not restyled since the old panel. The dock's tray shows them
- * under "Dice · What if".
- */
-
 export interface WhatIfState {
   whatIfMove: string;
   setWhatIfMove: (value: string) => void;
@@ -18,7 +13,6 @@ export interface WhatIfState {
 }
 
 export function ChoicePicker({ side, label, moves, switches, blockedSwitchKeys, onPick }: {
-  /** The side of the slot: its stand-ins carry the marker of the stats panel (round 88, #101). */
   side: GuessedSide;
   label: string; moves: BranchMoveOption[]; switches: BranchSwitchOption[]; blockedSwitchKeys: Set<string>; onPick: (value: string) => void;
 }) {

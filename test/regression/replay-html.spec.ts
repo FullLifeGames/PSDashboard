@@ -19,9 +19,7 @@ describe('Replay iframe HTML', () => {
   test('seeks like the native player: rest state before the seek, never pause() after', () => {
     const html = generateReplayHtml({ log, seekTurn: 2 });
 
-    // scene.pause() bumps interruptionCount, which cancels the async seek
-    // chain battle.js schedules past 300ms of fast-forwarding — the old
-    // post-seek pause() was one half of the "seeking..." hang.
+    // scene.pause() after the seek bumps interruptionCount, which cancels battle.js's seek chain: the frame hangs.
     expect(html).toContain('if (!seek.autoPlay && !battle.paused) battle.pause();');
     expect(html).toContain('battle.seekTurn(seek.turn)');
     expect(html).not.toContain('Replays.battle.pause()');
@@ -30,9 +28,7 @@ describe('Replay iframe HTML', () => {
   test('the turn tracker stays silent while a seek is scrubbing', () => {
     const html = generateReplayHtml({ log, reportTurn: true });
 
-    // Mid-seek turns echoed to the parent come back as stale seeks
-    // (turn <= current resets the scrub) — the self-sustaining reset loop
-    // that froze long jumps on "seeking..." forever.
+    // Mid-seek turns echoed to the parent come back as stale seeks and reset the scrub in a loop.
     expect(html).toContain('if (Replays.battle.seeking !== null) return;');
   });
 
@@ -43,8 +39,6 @@ describe('Replay iframe HTML', () => {
     expect(html).toContain('battle.play()');
   });
 
-  // Round 88 (T347, #83): the bridge's guard against its own retries dropped Watch from turn N while the frame already
-  // played at or past N. A play seek with an id (the app's request, sent with retries) runs once per id instead.
   describe('play seeks with an id', () => {
     const bridge = () => {
       const html = generateReplayHtml({ log });
@@ -71,17 +65,17 @@ describe('Replay iframe HTML', () => {
       const { battle, calls, send } = bridge();
       send({ turn: 3, autoPlay: true, id: 4 });
       expect(calls).toEqual(['seek 3', 'play']);
-      battle.turn = 5; // the frame plays on
+      battle.turn = 5;
       send({ turn: 3, autoPlay: true, id: 4 });
       send({ turn: 3, autoPlay: true, id: 4 });
       expect(calls).toEqual(['seek 3', 'play']);
-      send({ turn: 3, autoPlay: true, id: 5 }); // the user presses Watch again
+      send({ turn: 3, autoPlay: true, id: 5 });
       expect(calls).toEqual(['seek 3', 'play', 'seek 3', 'play']);
     });
 
     test('seeks without an id keep the guards against the app\'s own retries', () => {
       const { calls, send } = bridge();
-      send({ turn: 3, autoPlay: true }); // the frame plays at turn 5, past the request: nothing to do
+      send({ turn: 3, autoPlay: true });
       expect(calls).toEqual([]);
       send({ turn: 8, autoPlay: true });
       expect(calls).toEqual(['seek 8', 'play']);
@@ -97,10 +91,7 @@ describe('Replay iframe HTML', () => {
   });
 
   test('predefines Showdown\'s Config.routes so battledata.js survives loading before config.js', () => {
-    // replay-embed.js appends its dependencies as dynamic scripts, which the
-    // browser may execute in any order. battledata.js (client 0.11.2) reads
-    // `window.Config ? Config.routes.client : default` at load time: a
-    // predefined Config WITHOUT routes crashes it, and Dex never exists.
+    // Scripts load in any order and battledata.js reads `Config.routes` at load: a Config without routes crashes it.
     const html = generateReplayHtml({ log, seekTurn: 2, viewpoint: 'p2', reportTurn: true });
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1])
       .filter(body => !body.includes('replay-embed.js'));
@@ -113,36 +104,27 @@ describe('Replay iframe HTML', () => {
       for (const body of scripts) runInNewContext(body, sandbox);
       return sandbox.Config as { routes: Record<string, string>; sound: boolean; mute: boolean };
     };
-    // A page that predefines nothing: our stub carries Showdown's own route table.
     const fresh = run({});
     expect(fresh.routes.client).toBe('play.pokemonshowdown.com');
     expect(fresh.routes.replays).toBe('replay.pokemonshowdown.com');
     expect(fresh.mute).toBe(true);
-    // config.js already ran: its routes win over our defaults, the mute stays.
     const configured = run({ Config: { routes: { client: 'mirror.example', root: 'example' }, sound: true } });
     expect(configured.routes.client).toBe('mirror.example');
     expect(configured.sound).toBe(false);
   });
 
-  test('relative effect sprites resolve against Showdown\'s fx folder (round 77)', () => {
-    // User report 28.10.2026: the Stealth Rock around both Pokémon of 562428 turn 12 showed as empty boxes.
-    // graphics.js prefixes BattleEffects with Dex.fxPrefix only when Dex already exists; the embed loads
-    // its scripts in any order, and when graphics.js runs first the sprites stay "rock1.png". A blob
-    // document has no base to resolve that against, so the base names the folder the prefix would have.
+  test('relative effect sprites resolve against Showdown\'s fx folder', () => {
+    // graphics.js prefixes BattleEffects with Dex.fxPrefix only when Dex exists; a blob document needs the base.
     const html = generateReplayHtml({ log });
     const head = html.slice(0, html.indexOf('<div class="wrapper replay-wrapper">'));
     expect(head).toContain('<base href="https://play.pokemonshowdown.com/fx/">');
     const resolved = new URL('rock1.png', 'https://play.pokemonshowdown.com/fx/').href;
     expect(resolved).toBe('https://play.pokemonshowdown.com/fx/rock1.png');
-    // Every other resource the document names is absolute, so the base moves nothing else.
     const relative = [...html.matchAll(/\b(?:src|href)="(?!https:\/\/)([^"]+)"/g)].map(match => match[1]);
     expect(relative).toEqual([]);
   });
 
-  test('the embed\'s scripts run in the order the embed appends them (round 77)', () => {
-    // Branching swarm 28.10.2026: a cold first load left the frame empty with "$ is not defined". replay-embed.js
-    // appends its dependencies as dynamic scripts, those run in the order they arrive, and graphics.js stops halfway
-    // when jQuery comes after it. test/e2e/replay-sprites.spec.ts plays that order in a browser.
+  test('the embed\'s scripts run in the order the embed appends them', () => {
     const html = generateReplayHtml({ log });
     expect(html.indexOf(EMBED_SCRIPT_ORDER_SCRIPT)).toBeGreaterThan(-1);
     expect(html.indexOf(EMBED_SCRIPT_ORDER_SCRIPT)).toBeLessThan(html.indexOf('replay-embed.js'));
@@ -160,10 +142,7 @@ describe('Replay iframe HTML', () => {
     ]);
   });
 
-  test('the battle starts at the frame\'s top edge, and no title shows under the controls (round 77)', () => {
-    // User request 28.10.2026: a band of 21 px stood above the battle (the body's 12 px plus the 9 px the embed
-    // puts above it), and the title under the controls ("Branch Simulation", or the players) pushed the page past
-    // the frame's 480 px, so it scrolled for nothing.
+  test('the battle starts at the frame\'s top edge, and no title shows under the controls', () => {
     const html = generateReplayHtml({ log, title: 'Branch Simulation', format: 'gen9ou', p1: 'Alice', p2: 'Bob' });
     const styles = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
     expect(styles).toContain('body{padding:0 0 12px;background:#344b6c;}');
@@ -173,7 +152,7 @@ describe('Replay iframe HTML', () => {
     expect(html).toContain('<title>Branch Simulation</title>');
   });
 
-  test('the frame height in layout.css is REPLAY_FRAME_HEIGHT (round 77)', () => {
+  test('the frame height in layout.css is REPLAY_FRAME_HEIGHT', () => {
     const css = readFileSync(fileURLToPath(new URL('../../src/styles/layout.css', import.meta.url)), 'utf8');
     const rule = /\.ps-iframe-wrap iframe \{[^}]*min-height: (\d+)px;/.exec(css);
     expect(Number(rule?.[1])).toBe(REPLAY_FRAME_HEIGHT);
@@ -213,11 +192,7 @@ describe('Replay iframe HTML', () => {
   test('replaces the embed FontAwesome face with the given woff2 behind the loader', () => {
     const html = generateReplayHtml({ log, fontAwesomeWoff2Url: 'https://host.test/fonts/fa.woff2' });
 
-    // Same family/weight/style as font-awesome.css: for duplicate @font-face
-    // descriptors the later rule wins, and the embed appends its stylesheets
-    // to <head> — a rule in the body always cascades after them. The upstream
-    // woff2 (stale glyph bboxes, one Firefox sanitizer warning per glyph) is
-    // then never fetched.
+    // The later @font-face wins for equal descriptors, and a rule in the body cascades after the embed's stylesheets.
     expect(html).toContain("font-family: 'FontAwesome'");
     expect(html).toContain("src: url('https://host.test/fonts/fa.woff2') format('woff2')");
     expect(html).toContain('font-weight: normal');
@@ -235,10 +210,7 @@ describe('Replay iframe HTML', () => {
       .filter(body => !body.includes('replay-embed.js'));
     expect(html.indexOf('mozInputSource')).toBeLessThan(html.indexOf('replay-embed.js'));
 
-    // A Gecko-like prototype: reading the native accessor is what Firefox
-    // logs its deprecation for — the shim must replace it, keeping the
-    // touch semantics battle-tooltips.ts relies on (=== 5 suppresses the
-    // tooltip a stray tap would open).
+    // Firefox logs a deprecation for the native accessor: the shim replaces it and keeps `=== 5` (no stray tooltip).
     const proto: Record<string, unknown> = {};
     Object.defineProperty(proto, 'mozInputSource', {
       configurable: true,
@@ -258,8 +230,6 @@ describe('Replay iframe HTML', () => {
     expect(get.call({ pointerType: 'touch' })).toBe(5);
     expect(get.call({ pointerType: 'pen' })).toBe(2);
     expect(get.call({ pointerType: 'mouse' })).toBe(1);
-    // Firefox fires compat mouseover as a plain MouseEvent; the preceding
-    // pointerover carries the source that the getter must remember.
     listeners['pointerover']({ pointerType: 'touch' });
     expect(get.call({})).toBe(5);
   });

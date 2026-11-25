@@ -1,21 +1,5 @@
-/**
- * Round 59 (T91), lever dispatch: the pre-check (round 58 prototype
- * 'mirror', docs/perf/probes/2026-09-24-r58/patch/dispatch-mirror.ts).
- * runEvent asks every Pokemon, side and the field whether anyone handles an
- * event; almost never does anyone. The pre-check walks exactly the control
- * flow of findEventHandlers, but each "does this effect carry on<Event>?" is
- * one map lookup per (dex, event, effect id). When nobody can answer it
- * returns what runEvent returns for an empty handler list; when someone
- * might, the original runs untouched (order, ties, PRNG).
- *
- * Attached per battle as its own runEvent (the prototype stays the sim's,
- * so battles of package users stay untouched); a copy carries it along. It
- * steps aside when the battle's runEvent is no longer this function (review
- * round 58: compare against the attached function), when discovery or
- * getters are not the prototype's, at event depth 8, with onEffect, and for
- * array targets. Assumes nobody writes on* handlers onto dex effects at
- * runtime; the guard spec greps for that.
- */
+// Walks findEventHandlers' control flow with one lookup per (dex, event, effect id); the original runs if any may.
+// Assumes nobody writes on* handlers onto dex effects at runtime (the guard spec greps for that).
 import type { Battle } from '@pkmn/sim';
 import { simFastCounters, simFastFlags } from './state.ts';
 
@@ -63,7 +47,6 @@ let originals: Originals | null = null;
 let tables = new WeakMap<object, Map<string, EventTable>>();
 let probe: 'no-abilities' | null = null;
 
-/** Test hook (the counter-check): a pre-check blind to abilities must break the identity spec. */
 export function setDispatchProbe(mode: 'no-abilities' | null): void {
   probe = mode;
   tables = new WeakMap();
@@ -94,9 +77,8 @@ function directBits(effect: Bag, event: string): number {
   if (effect[`onFoe${event}`] !== undefined) bits |= FOE;
   if (effect[`onAny${event}`] !== undefined) bits |= ANY;
   if (effect[`onSource${event}`] !== undefined) bits |= SOURCE;
-  // getCallback's SwitchIn fallbacks, counted wide: onStart in every generation since 0.10.12 (gen 5 on before), and
-  // a gen 3 weather ability's onAfterEntryHazard on turn 0 (battle.mjs getCallback). No SwitchIn reaches runEvent in
-  // 0.10.12 (fieldEvent runs it in every generation), so this guards future versions.
+  // getCallback's SwitchIn fallbacks (battle.mjs): onStart in every gen, onAfterEntryHazard for a gen 3 weather ability
+  // No SwitchIn reaches runEvent today (fieldEvent runs it), so this guards future sim versions.
   if (event === 'SwitchIn' && (effect.onStart !== undefined || effect.onAfterEntryHazard !== undefined)) bits |= ALL;
   return bits;
 }
@@ -134,7 +116,6 @@ function objBits(table: EventTable, effect: Bag, event: string): number {
   return bits;
 }
 
-/** findPokemonEventHandlers(pokemon, prefix + event) would find something under this mask. */
 function pokemonHas(battle: BattleView, table: EventTable, mon: MonView, event: string, mask: number): boolean {
   const conditions = battle.dex.conditions;
   if (cachedBits(table.cond, conditions, mon.status, event) & mask) return true;
@@ -152,12 +133,11 @@ function sideHas(battle: BattleView, table: EventTable, side: SideView, event: s
   return false;
 }
 
-/** The target and every active that alliesAndSelf() or foes() could reach (a superset of both filters). */
 function activeHas(battle: BattleView, table: EventTable, mon: MonView, event: string, prefixed: boolean): boolean {
   if (pokemonHas(battle, table, mon, event, ON)) return true;
   if (!prefixed) return false;
   for (const side of battle.sides) {
-    if (!side) return true; // a battle under construction: let the original decide
+    if (!side) return true;
     const mine = side === mon.side || side === mon.side.allySide;
     for (const active of side.active) {
       if (active && pokemonHas(battle, table, active, event, mine ? ALLY | ANY : FOE | ANY)) return true;
@@ -174,7 +154,7 @@ function sidesHave(battle: BattleView, table: EventTable, target: SideView, even
     const mask = sideMask(side === target || side === target.allySide, prefixed);
     if (bubbleDown) {
       for (const active of side.active) {
-        if (!active) return true; // the original would throw here; let it
+        if (!active) return true;
         if (mask !== 0 && pokemonHas(battle, table, active, event, mask)) return true;
       }
     }
@@ -193,7 +173,6 @@ function fieldHas(battle: BattleView, table: EventTable, event: string): boolean
   return !!battle.events && battle.events[`on${event}`] !== undefined;
 }
 
-/** True when the original findEventHandlers(target, event, source) could find a handler. */
 function anyHandler(battle: BattleView, o: Originals, target: unknown, event: string, source: MonView | null): boolean {
   const table = eventTable(battle, event);
   const prefixed = !UNPREFIXED.has(event);
@@ -210,7 +189,6 @@ function anyHandler(battle: BattleView, o: Originals, target: unknown, event: st
   return fieldHas(battle, table, event);
 }
 
-/** The battle runs the prototype's discovery and getters, and its runEvent is still this function. */
 function stock(battle: BattleView, o: Originals): boolean {
   if (battle.runEvent !== runEventFast) return false;
   for (let i = 0; i < DISCOVERY.length; i++) if (battle[DISCOVERY[i]] !== o.discovery[i]) return false;
@@ -236,7 +214,6 @@ function runEventFast(this: BattleView, eventid: string, target?: unknown, sourc
   return relayVar;
 }
 
-/** Attaches the pre-check as the battle's own runEvent, unless a format or mod script already owns one. */
 export function attachDispatch(battle: Battle): void {
   const view = battle as unknown as BattleView;
   if (view.runEvent === runEventFast) return;

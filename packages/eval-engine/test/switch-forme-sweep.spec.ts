@@ -8,43 +8,25 @@ import { toId } from '@fulllifegames/replay-core';
 import { battleOf } from './power-oracle';
 import { RULESETS, become, forcedBoard, fingerprint, mon } from './forme-boards';
 
-/**
- * Round 88 (#103): a body keeps its identity across an in-battle forme change. The switch resolver once cut a suffix list ('tera',
- * 'stellar', 'terastal') off the bench body's id and compared the rest with the choice's id raw: an Ogerpon that had terastallized
- * (Ogerpon-Teal-Tera on the bench) could not be switched back in by the chip the app builds from the body it holds (`ogerpontealtera`),
- * and neither could a Terapagos that had stood on the field (Terapagos-Terastal, Terapagos-Stellar). The rule now comes from the
- * battle's Dex: two species are one body when their `battleOnly` families meet.
- *
- * Held here against the simulator, in every generation and mod the corpus plays (gen 3 to 9 and the Champions mod), singles and doubles,
- * for every species the Dex gives a `battleOnly` origin: the benched body takes the forme with the simulator's own `formeChange`, and the
- * resolver reads three choices (the chip of the body now, a choice recorded on the origin before the change, a choice recorded on the
- * forme once the body is back on the origin), with and without a nickname. Each resolves to the body's own bench position and leaves
- * the battle as it found it. The scene of #103 and the Terapagos scene are rows of their own, played through real choices.
- */
 
-/** The slot's chip as the app builds it (state.ts, SwitchRow.tsx): the species the body holds now, its name. */
 const chipOf = (body: Pokemon): Extract<BranchSlotChoice, { kind: 'switch' }> =>
   ({ kind: 'switch', speciesId: toId(body.species.name), pokemonName: body.name });
 
-/** The forced slots of the side: the actives that fainted. */
 const forcedSlots = (battle: Battle): boolean[] => battle.sides[0].active.map(body => !!body && body.fainted);
 
-/** Resolves `choice` on every forced slot and returns the command, or the error. The battle is proven unchanged. */
 function resolve(battle: Battle, choice: BranchSlotChoice): string {
   const required = forcedSlots(battle);
   const before = fingerprint(battle);
   const resolved = resolveSideChoices(battle as SimBattle, 'p1', required.map(on => (on ? choice : null)), required);
   expect(fingerprint(battle), 'the resolver reads the battle and changes nothing').toBe(before);
-  // Doubles: the command passes the slots that need nothing ("pass, switch 3").
   return resolved.ok ? resolved.command.replace(/^(pass, )+/, '') : resolved.error;
 }
 
 const NICKNAME = 'Nick';
 
 describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(type => ({ rules, type }))))(
-  '$rules.label $type: the switch resolver reads a body by its Dex family (#103)',
+  '$rules.label $type: the switch resolver reads a body by its Dex family',
   ({ rules, type }) => {
-    /** A board of its own per test: a forme change runs the simulator's events, and a row never inherits another's abilities. */
     const fresh = () => {
       const battle = forcedBoard(rules, type);
       return {
@@ -69,7 +51,6 @@ describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(ty
           const origin = dex.species.get(originName);
           const name = kind === 'plain' ? origin.baseSpecies || origin.name : NICKNAME;
           const scenes: [string, string, string][] = [
-            // [scene, species the body holds, id the choice names]
             ['the chip of the body now', forme.name, toId(forme.name)],
             ['a choice recorded on the origin', forme.name, toId(origin.name)],
             ['a choice recorded on the forme', origin.name, toId(forme.name)],
@@ -93,7 +74,6 @@ describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(ty
       become(decoy, wellspring.name, 'Mask2');
       expect(resolve(battle, { kind: 'switch', speciesId: toId(teal.name), pokemonName: 'Mask' })).toBe(position(target));
       expect(resolve(battle, { kind: 'switch', speciesId: toId(wellspring.name), pokemonName: 'Mask2' })).toBe(position(decoy));
-      // The Wellspring-Tera chip with only the Teal-Tera body left: no switch, the error names the missing body.
       decoy.fainted = true;
       expect(resolve(battle, { kind: 'switch', speciesId: toId(wellspring.name), pokemonName: 'Mask2' })).toMatch(/no longer available/);
     });
@@ -104,7 +84,6 @@ describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(ty
   'in-battle formes through real choices, $rules.label $type',
   ({ rules, type }) => {
     const doubles = type === 'doubles';
-    /** The star enters on the fodder's slot, changes forme as the Dex says (Tera, Tera Shift), leaves, and its partner faints: the forced replacement. */
     function played(star: PokemonSet, tera: boolean) {
       const fodder = mon(rules, 'Magikarp', ['splash'], { level: 1 });
       const p1 = doubles ? [mon(rules, 'Pikachu', ['splash']), fodder, star, mon(rules, 'Eevee', ['splash'])] : [fodder, star, mon(rules, 'Eevee', ['splash'])];
@@ -128,7 +107,7 @@ describe.each(RULESETS.flatMap(rules => (['singles', 'doubles'] as const).map(ty
     }
     const where = (battle: Battle, body: Pokemon) => `switch ${battle.sides[0].pokemon.indexOf(body) + 1}`;
 
-    test('#103 Ogerpon-Teal-Tera after Tera: the chip, and the choice recorded before Tera', () => {
+    test('Ogerpon-Teal-Tera after Tera: the chip, and the choice recorded before Tera', () => {
       const { battle, body } = played(mon(rules, 'Ogerpon', ['splash'], { name: 'Mask', ability: 'Defiant', teraType: 'Grass' }), true);
       expect(body.species.name).toBe('Ogerpon-Teal-Tera');
       expect(resolve(battle, chipOf(body))).toBe(where(battle, body));

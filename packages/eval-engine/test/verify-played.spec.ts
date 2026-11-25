@@ -8,25 +8,16 @@ import { createLocalTreeExecutor, searchTreesOrchestrated, type TreeExecutor } f
 import type { EvalCellJob, EvalSettings, MctsTreeStats } from '../src/types';
 import type { PlayedAction } from '../src/played';
 
-/**
- * Round 63 (T78): the verify step checks the played row and column in both
- * game types, and a doubles tree's boundary cells come from the pair plan.
- * Before, the verify set was support × support plus the ranked top three,
- * and a doubles tree flagged no boundary cell (planCellEvents gives up on
- * comma choices), so VGC 2629703929 t13 never priced Flare Blitz's 58 %
- * kill on Solgaleo and p2's winning Psychic Fangs read as an inaccuracy.
- */
 
 const position = (name: string) =>
   JSON.parse(readFileSync(new URL(`./fixtures/positions/${name}.json`, import.meta.url), 'utf-8')) as {
     serialized: string; tera?: EvalSettings['tera']; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'];
   };
 
-describe('the played row and column join the verify set (round 63, T78)', () => {
+describe('the played row and column join the verify set', () => {
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
   const cell = (i: number, j: number, visits: number, mean: number) =>
     ({ key: cellKey(i, j), visits, total: mean * (visits + 1) - mean, value: mean, ended: false });
-  // Five p1 rows from a clear best (A) to a clear worst (E); E×X is starved, every other cell is rich and agrees.
   const rows = [[0.5, 0.4], [0.1, 0.1], [0, 0], [-0.3, -0.3], [-0.6, -0.6]];
   const mk = (p1: string[], p2: string[]): MctsTreeStats => ({
     p1Options: p1.map(choice => ({ choice, label: choice })), p2Options: p2.map(choice => ({ choice, label: choice })),
@@ -44,18 +35,17 @@ describe('the played row and column join the verify set (round 63, T78)', () => 
       const trees = [mk([...p1], [...p2]), mk([...p1], [...p2]), mk([...p1], [...p2])];
       const merged = mergeMctsTrees(trees);
       const pairs = (jobs: EvalCellJob[]) => jobs.map(job => cellKey(job.i, job.j));
-      // E is neither support nor among the ranked top three: today it is never checked.
       expect(pairs(starvedSupportCells(trees, merged))).not.toContain(cellKey(4, 0));
       const focus = { played: { p1: 4 } };
       const jobs = rowCompletedCells(trees, merged, starvedSupportCells(trees, merged, focus), focus);
       expect(pairs(jobs)).toContain(cellKey(4, 0));
-      expect(pairs(jobs)).not.toContain(cellKey(4, 1)); // rich and agreeing: no job
+      expect(pairs(jobs)).not.toContain(cellKey(4, 1));
       expect(jobs.length).toBeLessThanOrEqual(VERIFY_CELL_CAP);
     });
   }
 });
 
-describe('played options from keepPlayed (round 63, T78)', () => {
+describe('played options from keepPlayed', () => {
   const move = (name: string, extra: Partial<PlayedAction> = {}): PlayedAction => ({ kind: 'move', name, ...extra } as PlayedAction);
   const ranked = (choices: [string, string, number][]) => choices.map(([choice, label, ev]) => ({ choice, label, ev, worstCase: ev, expected: ev, punishedBy: null }));
 
@@ -83,7 +73,7 @@ describe('played options from keepPlayed (round 63, T78)', () => {
   });
 });
 
-describe('doubles boundary cells come from the pair plan (round 63, T78)', () => {
+describe('doubles boundary cells come from the pair plan', () => {
   const settingsOf = (fixture: ReturnType<typeof position>): EvalSettings => ({
     depth: 1, samples: 1, mode: 'mcts', tera: fixture.tera ?? true, sleepClause: fixture.sleepClause, keepPlayed: fixture.keepPlayed ?? undefined,
   });
@@ -119,9 +109,6 @@ describe('doubles boundary cells come from the pair plan (round 63, T78)', () =>
     for (const job of check.jobs) expect(job.deepen).toBeUndefined();
     for (const job of verify.jobs) expect(job.deepen).toBeDefined();
     expect(verify.jobs.length).toBeLessThanOrEqual(VERIFY_CELL_CAP);
-    // The check round asks exactly the cells the visits leave out; a checked cell the pair plan priced with
-    // classes becomes a boundary cell and a starved-support job, one it did not price stays out of that list
-    // (it may still join by row completion).
     const merged = mergeMctsTrees(doubles.trees);
     const played = playedIndices(doubles.trees, merged, position('gen9vgc2026regi-2629703929-t13').keepPlayed);
     const checks = boundaryCheckCells(doubles.trees, merged, { played });

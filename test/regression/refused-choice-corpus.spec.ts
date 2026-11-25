@@ -3,26 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { toId } from '@fulllifegames/replay-core';
 import { CORPUS, rebuildThrough } from './rebuild-through';
 
-/**
- * Round 89 (#143): a move the simulator refuses turned the whole side to `default`. Each row rebuilds a corpus game through the turn,
- * like the bank does: the turn adds no refusal, and the side keeps the actions the log shows (the switch of a partner, the move lines of
- * both bodies, the Tera or Mega click). The unit and sweep rows are in `packages/eval-engine/test/refused-choice-stand-in.spec.ts`.
- *
- * Round 89 (lane M): a row that passes without a refusal due tests nothing, so every row that is not a guard also asserts that the click
- * the log shows is unplayable on the board at the start of the turn (the request lacks the move, or lists it disabled): without the
- * stand-in the simulator would refuse it. A row whose scene drifts away turns red there. A guard row asserts only what the turn adds.
- *
- * Round 89 (#139): the rows 902024 turn 24 and 2694097898 turn 6 showed a Ditto that copied a Darkrai or a Dragonite and played a move of
- * the copied body. The inference now books such a move to its target, so the built copy holds it and the click is playable at the start
- * of the turn: the two scenes moved to `transform-booking-corpus.spec.ts`. The singles and Doubles OU rows now read a reflected and a
- * danced move (a click that names a move the body never knew), which the stand-in still replaces.
- */
-
-/**
- * `side`: the side whose actions the row reads (the other side's block drifts by its own cause); both when absent.
- * `click`: the body and the move the log shows for it (`|move|` or `|cant|`), unplayable at the turn's start.
- * `guard`: the turn after the shape, a row that holds the text and has no refusal due.
- */
+// `side`: the side the row reads (both when absent); `click`: the logged move, unplayable at the turn's start;
+// `guard`: a row that holds the text and has no refusal due.
 interface Row { id: string; turn: number; type: string; what: string; side?: 'p1' | 'p2'; click?: { slot: string; move: string }; guard?: true }
 
 const ROWS: Row[] = [
@@ -34,17 +16,15 @@ const ROWS: Row[] = [
   { id: 'gen9championsvgc2026regmb-2674079451', turn: 5, type: 'Champions VGC', what: 'Encore then Disable on Toxapex', click: { slot: 'p2b', move: 'Infestation' } },
 ];
 
-/** The actions of a block the choice decides: the move and switch lines, with the actor and the move or body. */
 const actionsOf = (lines: string[]): string[] =>
   lines.filter(line => /^\|(?:move|switch|-terastallize|-mega)\|/.test(line) && !line.includes('[from]')).map(line => line.split('|').slice(1, 4).join('|'));
 
-describe('a refused choice keeps the rest of the side (#143)', () => {
+describe('a refused choice keeps the rest of the side', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id} turn ${row.turn}: ${row.what}`, async () => {
       const { logged, emitted, refusals } = await rebuildThrough(row.id, row.turn);
       const earlier = row.turn > 1 ? await rebuildThrough(row.id, row.turn - 1) : null;
       if (row.click) {
-        // The board at the start of the turn: the click of the log is no choice of its request.
         const body = earlier!.battle.sides[Number(row.click.slot[1]) - 1].active['abcd'.indexOf(row.click.slot[2])];
         const offered = body.getMoveRequestData().moves.find(entry => toId(entry.move) === toId(row.click!.move));
         expect(!offered || !!offered.disabled, `${row.click.move} of ${row.click.slot} is unplayable at the start of the turn`).toBe(true);

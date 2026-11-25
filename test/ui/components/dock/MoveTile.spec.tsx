@@ -9,11 +9,6 @@ import { fullMoveTitle, koShort, shownType } from '../../../../src/lib/move-dama
 import { pickerStateFromSnapshot } from '../../../../src/lib/picker-state';
 import { moveOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the cases of the old MoveBtn spec that the tile keeps (name, PP, type, played and forced
- * flags, the Z-Move name, the KO verdict and its tooltip, disabled moves) and the type-at-use case of round 67 (T85). The compact
- * chips of Basic are gone. Which bars a tile shows is `dock-tile.spec.ts`; which move a click picks is `TurnDock.choices.spec.tsx`.
- */
 const bar = (over: Partial<TileBar> = {}): TileBar => ({ label: '', hp: 100, min: 30, max: 35, range: '30-35%', ko: '', title: '30% - 35%', ...over });
 
 function tile(over: Partial<MoveTileProps> = {}) {
@@ -54,8 +49,6 @@ describe('MoveTile', () => {
     expect(screen.getByText('→ Tectonic Rage')).toBeInTheDocument();
   });
 
-  // Round 83 (the user, 01.11.2026: "we still have run-over text"): the calc's sentence wrapped onto a second line, so tiles in a
-  // row stood at different heights. The tile shows the short verdict; the tooltip keeps the range and the whole sentence.
   test('a bar shows the short KO verdict in place of the range, and keeps the whole sentence in its tooltip', () => {
     const sentence = 'guaranteed 2HKO after Leftovers recovery';
     const damage = { moveName: 'Earth Power', minPercent: 66.8, maxPercent: 78.8, range: '66.8% - 78.8%', koChance: sentence };
@@ -92,10 +85,6 @@ describe('MoveTile', () => {
   });
 });
 
-/**
- * Round 67 (T85): the tile shows the type the move lands with. The fast snapshot picker labels Ivy Cudgel of Ogerpon-Wellspring
- * Water, and the tile colors and names it Water, before the exact position arrives.
- */
 const mon = (name: string, active: boolean): TurnSnapshot['p1']['pokemon'][number] => ({
   name, speciesForme: name, hp: 100, maxhp: 100, hpPercent: 100, status: '', fainted: false, isActive: active,
   boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 100, gender: '',
@@ -106,7 +95,7 @@ const set = (species: string, moves: string[]): PokemonSet => ({
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
 });
 
-describe('move tile type at use (T85)', () => {
+describe('move tile type at use', () => {
   test('the snapshot picker\'s Ivy Cudgel renders as a Water tile', () => {
     const snapshot: TurnSnapshot = {
       turn: 4,
@@ -119,7 +108,6 @@ describe('move tile type at use (T85)', () => {
     const [cudgel] = state.p1MovesBySlot[0];
     render(tile({ move: cudgel, type: shownType(cudgel, false), bars: [] }).ui);
     expect(screen.getByText('Water')).toHaveClass('ps-type-tag');
-    // the tinted tile carries its full type color as --type (typeTileVars)
     expect(screen.getByRole('button', { name: /Ivy Cudgel/ }).style.getPropertyValue('--type')).toBe('#6890F0');
   });
 });

@@ -4,33 +4,17 @@ import * as championsMod from '@pkmn/mods/champions';
 import { belongsToOthers, boostItemIds, changesSpeed } from '../src/spreads/boost-items';
 import { registerChampionsDex, rulesDex } from '../src/rules-dex';
 
-/**
- * Round 89 (#75 step 2, ruling 27): the item rung swaps in only items the Dex says boost damage, so the list it reads must be the simulator's own.
- * `boostItemIds` derives it from the damage hooks of the Dex (`onModifyAtk`, `onModifySpA`, `onBasePower`, `onModifyDamage`), with no name in code.
- * This sweep holds that derivation to the simulator in every generation the corpus plays (2 to 9) and the Champions mod: every item of the generation
- * is put in the hand of an attacker on a twin battle, and the simulator's own `getDamage` answers, with and without the item, for one move of every
- * type and category, for the moves that carry each flag, against a neutral body and one the move is super effective on (Expert Belt). An item that
- * raises the damage of any of them is a damage-boost item.
- *  - Every such item is in `boostItemIds`, but the Generation 2 pair below.
- *  - Every item `boostItemIds` lists and the generation holds raised the damage of some move: the list holds no item that does nothing.
- * The Generation 2 pair: the Light Ball and the Thick Club raise their holder's stat in that generation's own stat calculation (`gen2/scripts`, "in
- * Generation 2 this happens in stat calculation directly"), so the Dex gives the items no damage hook and the rung never offers them there. Two
- * items of one species pair in one old generation; the rung is conservative there, which is the safe side.
- * A hit with the holder's own species items (Light Ball, Soul Dew, the Plates, the masks) is played by the species the Dex names in `itemUser`.
- * The rung also asks two more questions of the Dex, held here: which items change Speed (`changesSpeed`: the Scarf's, the Iron Ball's hook) and
- * which belong to other species (`belongsToOthers`: the `itemUser` list).
- */
+// Gen 2's Light Ball and Thick Club raise the stat in the generation's own stat calculation (gen2/scripts):
+// the Dex gives them no damage hook, so the rung never offers them there (the safe side).
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
 interface World { name: string; format: string; dex: ReturnType<typeof Dex.forGen>; rules: ReturnType<typeof rulesDex> }
 const WORLDS: World[] = [2, 3, 4, 5, 6, 7, 8, 9].map(gen => ({ name: `Generation ${gen}`, format: `gen${gen}customgame`, dex: Dex.forGen(gen), rules: rulesDex(gen) }));
 WORLDS.push({ name: 'Champions mod', format: 'gen9championscustomgame', dex: Dex.dexes.champions as World['dex'], rules: rulesDex(0) });
 
-/** Items whose boost the simulator plays outside any item hook, by generation. */
 const NO_HOOK: Record<string, string[]> = { 'Generation 2': ['lightball', 'thickclub'] };
 
 const DEFENDERS = ['Mew', 'Slowbro', 'Charizard', 'Blastoise', 'Venusaur', 'Pikachu', 'Onix', 'Gyarados', 'Machamp', 'Gengar', 'Snorlax', 'Scizor', 'Weavile', 'Clefable', 'Dragonite', 'Alakazam', 'Steelix', 'Tyranitar', 'Skarmory'];
-/** Flags that say nothing about damage. */
 const PLAIN_FLAGS = new Set(['protect', 'mirror', 'metronome', 'contact', 'distance', 'defrost', 'bypasssub', 'cantusetwice', 'failcopycat', 'failinstruct', 'failmimic', 'noassist', 'nosleeptalk', 'noparentalbond', 'allyanim', 'nonsky', 'failencore', 'futuremove']);
 
 const set = (species: string): PokemonSet => ({
@@ -38,7 +22,6 @@ const set = (species: string): PokemonSet => ({
   ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, nature: 'Hardy', gender: '',
 }) as PokemonSet;
 
-/** One move of every type and category, and the first damaging move of every flag the Dex knows, as ids. */
 function sampleMoves(dex: World['dex']): string[] {
   const picked = new Map<string, string>();
   for (const move of dex.moves.all()) {
@@ -51,7 +34,6 @@ function sampleMoves(dex: World['dex']): string[] {
   return [...new Set(picked.values())];
 }
 
-/** The items of the generation that raise the damage of some sampled hit, played on the simulator. */
 function raisers(world: World): { raising: Set<string>; held: Set<string> } {
   const { dex } = world;
   const moves = sampleMoves(dex);
@@ -84,7 +66,6 @@ function raisers(world: World): { raising: Set<string>; held: Set<string> } {
         const [attacker] = battle.p1.active;
         const [defender] = battle.p2.active;
         const hit = (itemId: string): number | undefined => {
-          // The twin answers one hit at a time: the log and the event depth start fresh, the PRNG on the same seed, no critical hit.
           battle.sentLogPos = battle.log.length;
           battle.eventDepth = 0;
           attacker.volatiles = {} as never;
@@ -115,7 +96,6 @@ describe('the damage-boost items of the Dex are what the simulator plays', () =>
       expect(missed, 'the simulator raises the damage, the list lacks the item').toEqual(NO_HOOK[world.name] ?? []);
       const idle = [...listed].filter(id => held.has(id) && !raising.has(id)).sort();
       expect(idle, 'the list holds an item of the generation that raised no hit').toEqual([]);
-      // The sample is wide enough to say anything: a Choice item, a type item, the Life Orb or the like reach.
       expect(raising.size).toBeGreaterThan(14);
     }, 240_000);
   }
@@ -129,7 +109,6 @@ describe('the two other questions the item rung asks of the Dex', () => {
     expect(belongsToOthers(gen9, 'Gengar', 'Light Ball')).toBe(true);
     expect(belongsToOthers(gen9, 'Pikachu', 'Light Ball')).toBe(false);
     expect(belongsToOthers(gen9, 'Gengar', 'Life Orb')).toBe(false);
-    // The Dex is the oracle: every Speed hook is read from it, nothing is listed.
     const hooked = gen9.items.all().filter(item => typeof (item as unknown as Record<string, unknown>).onModifySpe === 'function').map(item => item.name);
     for (const name of hooked) expect(changesSpeed(gen9, name), name).toBe(true);
     expect(hooked).toContain('Choice Scarf');

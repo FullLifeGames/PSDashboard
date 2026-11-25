@@ -4,26 +4,12 @@ import { createBranchStateFromBattle } from '../src/branch/state';
 import type { SimBattle } from '../src/branch/types';
 import { FORMATS, moveCommand, setOf, sideId, startBattle } from './branch-rule-battles';
 
-/**
- * Round 77, A-3: Magnezone (Magnet Pull) stood against Melmetal, the picker offered five switch chips,
- * and Execute failed with "Can't switch: The active Pokémon is trapped". The simulator refuses a switch
- * while `pokemon.trapped` is set in a move request (side.js chooseSwitch), whatever put it there: a
- * trapping ability (Shadow Tag, Arena Trap, Magnet Pull), a trapping move (Mean Look, Block, Spider
- * Web, the binding moves, Octolock, Ingrain, No Retreat, Jaw Lock, Anchor Shot and the rest the Dex
- * knows), a locked move. What frees it (a Ghost type, Shed Shell) is the simulator's rule too.
- *
- * The sweep plays every move of the Dex once from a No Guard source against the victim, and every
- * ability the Dex gives a trap handler, then asks the simulator's own `choose` whether the victim may
- * switch and compares: the picker's chip is disabled exactly when the simulator refuses. The victim
- * stands on either side, in singles and in doubles. The scene of the report is one row (Magnet Pull
- * against a Steel type).
- */
+// The simulator refuses a switch while `pokemon.trapped` is set in a move request (side.js chooseSwitch).
 
 interface Victim { species: string; item?: string }
 const PLAIN: Victim = { species: 'Pikachu' };
 const swapCommand = (doubles: boolean) => (doubles ? 'switch 3, move 1' : 'switch 2');
 
-/** The picker's view: whether every chip of slot A is disabled for trapping (all or none, never a mix). */
 function chipsTrapped(battle: SimBattle, victimSide: number): boolean {
   const state = createBranchStateFromBattle(battle, [], {});
   const chips = (victimSide === 0 ? state.p1SwitchesBySlot : state.p2SwitchesBySlot)[0];
@@ -33,7 +19,6 @@ function chipsTrapped(battle: SimBattle, victimSide: number): boolean {
   return trapped.length > 0;
 }
 
-/** The simulator's answer: may slot A switch to the first bench body? */
 function simulatorRefusesSwitch(battle: SimBattle, victimSide: number, doubles: boolean): boolean {
   return !battle.choose(sideId(victimSide), swapCommand(doubles));
 }
@@ -50,7 +35,6 @@ function play(format: typeof FORMATS[number], victimSide: number, setup: Setup):
   const victimTurn = doubles ? 'move Splash, move Splash' : 'move Splash';
   const sourceTurn = setup.move ? moveCommand(battle, setup.move, doubles) : (doubles ? 'move Splash, move Splash' : 'move Splash');
   if (!battle.choose(sideId(victimSide), victimTurn) || !battle.choose(sideId(1 - victimSide), sourceTurn)) return null;
-  // Only a plain next turn is compared: a move that left a replacement open or ended the game has no switch to ask about.
   const side = battle.sides[victimSide];
   if (battle.ended || side.requestState !== 'move' || side.active[0].fainted) return null;
   return battle;
@@ -75,7 +59,6 @@ describe('A-3 the switch chips follow the simulator on trapping', () => {
           expect(picker, move.name).toBe(refused);
           if (refused) trappedBy.push(move.id);
         }
-        // The sweep reached the trapping moves: the binding family, Mean Look and its kin all show up.
         expect(compared).toBeGreaterThan(500);
         expect(trappedBy.length).toBeGreaterThanOrEqual(8);
       });

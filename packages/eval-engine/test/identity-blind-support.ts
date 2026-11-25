@@ -13,18 +13,8 @@ import { summarizeTurn } from '../src/summary';
 import { detectSacks, parsePlayedActions, turnEvents } from '../src/played';
 import { resolveTeraPreference } from '../src/tera';
 
-/**
- * Round 72, T238: a nickname or a shiny flag never reaches the engine's words or its numbers. The built sets carry the
- * replay's names now, so every `name` the simulator holds can be a nickname. The turn analysis of a position (the
- * search, the played actions, the tiers, the sentence) must read the same when every name is the species and no body is
- * shiny. The position comes from one reconstruction; the second reading rewrites it, text for text, to the names the
- * build gave before round 72 (the name of each nicknamed body becomes its base species, `shiny` goes), so the two
- * readings differ in nothing but the names. The failure names the first differing path: a body-name read that reaches a
- * report sentence stops this lane, and the reader of it is the file to name.
- *
- * The regular spec (`identity-blind.spec.ts`) reads four fixture replays; the full run over every fixture replay with a
- * nicknamed or shiny body is the lane probe `identity-blind-full.vt.ts` (about 80 s), run before a merge.
- */
+// The second reading rewrites the position to species names (a nicknamed body becomes its base species, `shiny` goes),
+// so the two readings differ only in the names.
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const FIXTURES = ['packages/eval-engine/test/fixtures', 'packages/eval-engine/test/fixtures/champions', 'packages/replay-core/test/fixtures'];
@@ -45,7 +35,6 @@ export function replays(): Array<{ tag: string; replay: ReplayData }> {
   return found;
 }
 
-/** The first path at which two values differ, or null. */
 export function firstDifference(a: unknown, b: unknown, path = ''): string | null {
   if (Object.is(a, b)) return null;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return `${path}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`;
@@ -57,12 +46,10 @@ export function firstDifference(a: unknown, b: unknown, path = ''): string | nul
   return null;
 }
 
-/** Reads the replay's positions at the given shares of its snapshots twice (as built, and with every name the species) and requires equal results. */
 export async function expectNameBlind(replay: ReplayData, shares: readonly number[]): Promise<void> {
   const format = getBranchSimulatorFormat(replay);
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
-  // Each nicknamed body's name becomes the base species the simulator gave an unnamed body; a shiny flag goes.
   const renames = [...p1Team, ...p2Team].flatMap(set => {
     const base = Dex.species.get(set.species).baseSpecies;
     return set.name && set.name !== set.species && set.name !== base ? [[set.name, base] as const] : [];
@@ -95,7 +82,6 @@ export async function expectNameBlind(replay: ReplayData, shares: readonly numbe
     };
     const withNames = read(named);
     const plain = plainly(named);
-    // The rewrite changes names only, and it finds a name to change: a nicknamed or shiny body stands in every position.
     expect(plain, `turn ${turn}: the rewrite found no name to change`).not.toBe(named);
     const without = read(plain);
     expect(firstDifference(withNames, without), `${replay.id ?? ''} turn ${turn}`).toBeNull();

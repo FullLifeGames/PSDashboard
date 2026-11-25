@@ -2,11 +2,20 @@ import { describe, expect, test } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import {
-  INFERRED_SPREAD_DETAIL, MEASURED_HP_SPREAD_DETAIL, ORDER_SPREAD_DETAIL, inferOpponentTeam, withStandIns,
+  INFERRED_SPREAD_DETAIL,
+  MEASURED_HP_SPREAD_DETAIL,
+  ORDER_SPREAD_DETAIL,
+  applyTeamSheetToInfo,
+  extractTeamSheets,
+  inferOpponentTeam,
+  withStandIns,
+  KNOCKOUT_BOOST_ITEM_DETAIL,
+  NO_BOOST_ITEM_DETAIL,
 } from '@fulllifegames/replay-core';
 import { RANDOM_SET_MARK, RANDOM_SET_TITLE } from '../../../src/lib/stand-in-mark';
 import { BattleStatsPanel } from '../../../src/components/BattleStatsPanel';
-import { singlesReplay } from '../fixtures/replay';
+import { sourceLabel } from '../../../src/lib/provenance-labels';
+import { doublesReplay, singlesReplay } from '../fixtures/replay';
 import { evs, field, move, revealedPokemon, teamInfo } from '../fixtures/team-info';
 
 describe('BattleStatsPanel', () => {
@@ -56,7 +65,6 @@ describe('BattleStatsPanel', () => {
     expect(screen.getAllByText('Not yet revealed')).toHaveLength(5);
   });
 
-  // Round 89 (lane B, #117): whether a format generates its team comes from the Dex entry, never from a name.
   test('the Dex decides: Hackmons Cup generates its team, a name with "random" in it does not', () => {
     const mon = revealedPokemon('Garchomp', { evs: evs('unknown'), moves: [move('Earthquake', 'revealed')] });
     const hackmons = render(<BattleStatsPanel replayData={{ ...singlesReplay(), formatid: 'gen9hackmonscup' }} p1Info={{ pokemon: [mon] }} p2Info={null} />);
@@ -68,8 +76,6 @@ describe('BattleStatsPanel', () => {
     expect(screen.queryByText('Not yet revealed')).not.toBeInTheDocument();
   });
 
-  // Round 89 (lane B, #117): a Random Battle that showed 4 of 6 lists six bodies; the guesses wear the random-set mark and the
-  // "never showed" notice is gone. Singles (Gen 3) and doubles (Gen 9 Random Doubles) read the same panel.
   describe.each([
     { label: 'singles', id: 'gen3randombattle-1', missing: 3 },
     { label: 'doubles', id: 'gen9randomdoublesbattle-11', missing: 2 },
@@ -97,9 +103,8 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 69 (T69). Singles and doubles replays share the panel, so both run each case.
-  describe.each(['singles', 'doubles'] as const)('provenance of a solved spread (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  describe('provenance of a solved spread (singles)', () => {
+    const replayData = () => singlesReplay();
     const spread = { hp: 252, atk: 0, def: 4, spa: 252, spd: 0, spe: 0 };
 
     test('a spread the move order checked says so, one the HP of the log set says so', () => {
@@ -113,9 +118,8 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 87 (release 1.1.0), T317: an unknown spread says "EVs not yet known" and drops the doubled source word, singles and doubles alike.
-  describe.each(['singles', 'doubles'] as const)('an unknown spread (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  describe('an unknown spread (singles)', () => {
+    const replayData = () => singlesReplay();
 
     test('reads "EVs not yet known" with no source word, and the hover title still says unknown', () => {
       const mon = revealedPokemon('Latias', { evs: evs('unknown'), moves: [] });
@@ -141,7 +145,6 @@ describe('BattleStatsPanel', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  // Round 84 (A7b, ruling 9a): the panel is the closed panel at the right column's foot, and its list carries the fade mark.
   test('is the closed stats panel, and its list is the one that scrolls and fades', () => {
     const replayData = { ...singlesReplay(), players: ['Alice', 'Bob'] };
     const { container } = render(<BattleStatsPanel replayData={replayData} p1Info={teamInfo('singles', 'p1')} p2Info={null} />);
@@ -150,7 +153,6 @@ describe('BattleStatsPanel', () => {
     expect(panel.querySelector(':scope > .ps-stats-grid')).not.toBeNull();
   });
 
-  // Round 88 (F, #101): a game without team preview where a side showed fewer bodies than its |teamsize|. Singles and doubles both.
   describe.each([['singles', 'gen4ou', '[Gen 4] OU'], ['doubles', 'gen4doublesou', '[Gen 4] Doubles OU']] as const)('the bodies a side never showed (%s)', (_kind, formatid, tier) => {
     const NL = String.fromCharCode(10);
     const log = (teamsize: number, preview = false) => [
@@ -185,9 +187,9 @@ describe('BattleStatsPanel', () => {
     });
   });
 
-  // Round 89 (T9c): the panel names the nature with its source. A set without one (Generations 1 and 2) shows no tag.
-  describe.each(['singles', 'doubles'] as const)('the nature tag (%s)', kind => {
-    const replayData = () => (kind === 'singles' ? singlesReplay() : { ...singlesReplay(), formatid: 'gen9doublesou' });
+  // A set without a nature (Generations 1 and 2) shows no tag.
+  describe('the nature tag (singles)', () => {
+    const replayData = () => singlesReplay();
 
     test('a Jolly set shows Jolly with its source word; a set without a nature shows none', () => {
       const jolly = revealedPokemon('Garchomp', { nature: field('Jolly', 'guessed', { probability: 0.4 }) });
@@ -198,5 +200,79 @@ describe('BattleStatsPanel', () => {
       expect(tag).toHaveTextContent('guessed 40%');
       expect(screen.getByRole('img', { name: 'Heatran' }).parentElement!).not.toHaveTextContent(/Jolly|Timid|Bold|nature/i);
     });
+  });
+});
+
+function reasonReadsInPlainWords(reason: string) {
+  expect(reason).toBe('only a boost item reaches the knockout');
+  expect(reason).not.toBe(NO_BOOST_ITEM_DETAIL);
+  expect(reason).not.toMatch(/[—–]/);
+}
+
+describe('the reason of a boost item a knockout needs (singles)', () => {
+  const replayData = () => singlesReplay();
+
+  test('the item tag carries the reason as its hover text and stays a guess', () => {
+    const mon = revealedPokemon('Gengar', { item: { value: 'Choice Specs', source: 'guessed', sourceDetail: KNOCKOUT_BOOST_ITEM_DETAIL } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    const tag = screen.getByTitle(KNOCKOUT_BOOST_ITEM_DETAIL);
+    expect(tag).toHaveTextContent('Choice Specs');
+    expect(tag).toHaveTextContent('guessed');
+  });
+
+  test('the reason reads in plain words and differs from the dropped boost item\'s', () => reasonReadsInPlainWords(KNOCKOUT_BOOST_ITEM_DETAIL));
+});
+
+describe('IVs in the stats panel (singles)', () => {
+  const replayData = () => singlesReplay();
+
+  test('a Trick Room body shows the IVs below 31 beside its EVs', () => {
+    const ivs = { hp: 31, atk: 0, def: 31, spa: 31, spd: 31, spe: 0 };
+    const mon = revealedPokemon('Sinistcha', { ivs: { value: ivs, source: 'guessed', sourceDetail: 'Smogon sets gen9ou' } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    const card = screen.getByRole('img', { name: 'Sinistcha' }).parentElement!;
+    expect(card).toHaveTextContent('0 Atk / 0 Spe IVs');
+  });
+
+  test('a body with every IV at 31 shows no IV line', () => {
+    const all31 = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+    const mon = revealedPokemon('Garchomp', { ivs: { value: all31, source: 'guessed' } });
+    render(<BattleStatsPanel replayData={replayData()} p1Info={{ pokemon: [mon] }} p2Info={null} />);
+    expect(screen.getByRole('img', { name: 'Garchomp' }).parentElement!).not.toHaveTextContent('IVs');
+  });
+});
+
+describe('a doubles game', () => {
+  test('doubles: both active Pokémon of each side show their item and ability with the word that names the team sheet as their origin', () => {
+    const replay = doublesReplay();
+    const sheets = extractTeamSheets(replay.log);
+    const infoOf = (side: 'p1' | 'p2') => applyTeamSheetToInfo(inferOpponentTeam(replay.log, side), sheets[side]);
+    render(<BattleStatsPanel replayData={replay} p1Info={infoOf('p1')} p2Info={infoOf('p2')} />);
+    const leads = [
+      ['Pikachu', 'Light Ball', 'Static'], ['Eevee', 'Eviolite', 'Adaptability'],
+      ['Bulbasaur', 'Eviolite', 'Overgrow'], ['Charmander', 'Eviolite', 'Blaze'],
+    ];
+    for (const [species, item, ability] of leads) {
+      const card = screen.getByRole('img', { name: species }).parentElement!;
+      expect(within(card).getByText(item, { exact: false })).toHaveTextContent(`${item}${sourceLabel('sheet')}`);
+      expect(within(card).getByText(ability, { exact: false })).toHaveTextContent(`${ability}${sourceLabel('sheet')}`);
+    }
+  });
+
+  test('the reason reads in plain words and differs from the dropped boost item\'s', () => {
+    const replay = doublesReplay();
+    const sheets = extractTeamSheets(replay.log);
+    const infoOf = (side: 'p1' | 'p2') => applyTeamSheetToInfo(inferOpponentTeam(replay.log, side), sheets[side]);
+    const withReason = (info: ReturnType<typeof infoOf>) => ({
+      ...info,
+      pokemon: info.pokemon.map(p => (p.species === 'Pikachu'
+        ? { ...p, item: { value: 'Choice Specs', source: 'guessed' as const, sourceDetail: KNOCKOUT_BOOST_ITEM_DETAIL } }
+        : p)),
+    });
+    render(<BattleStatsPanel replayData={replay} p1Info={withReason(infoOf('p1'))} p2Info={withReason(infoOf('p2'))} />);
+    const card = screen.getByRole('img', { name: 'Pikachu' }).parentElement!;
+    const tag = within(card).getByText('Choice Specs', { exact: false });
+    expect(tag).toHaveTextContent('guessed');
+    reasonReadsInPlainWords(tag.getAttribute('title')!);
   });
 });

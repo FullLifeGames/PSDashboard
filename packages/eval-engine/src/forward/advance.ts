@@ -4,16 +4,8 @@ import type { RollScripts } from './scripted-prng.ts';
 import { answerFollowUps, applyChoice, resolveForcedSwitches } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
-/**
- * One-turn advances under a fixed seed: the search's advance (greedy
- * forced-switch resolution) and the hax-alignment trial that answers
- * forced switches from the protocol's replacement species.
- */
 
-/**
- * Advances one full turn under a fixed seed. The returned position is at a
- * normal turn boundary or game end; the input position is never mutated.
- */
+/** Advances one full turn under a fixed seed, to a turn boundary or the game end; never mutates the input position. */
 export function advancePosition(
   position: SimPosition,
   p1Choice: string,
@@ -24,22 +16,13 @@ export function advancePosition(
 }
 
 export interface AdvanceOptions {
-  /**
-   * Round 42: stop at the first forced-switch request no pivot follow-up
-   * answers, so the tree can search the replacement as a decision node
-   * instead of taking the greedy static pick. Default: resolve greedily.
-   */
+  /** Stops at the first forced-switch request no pivot follow-up answers, for the tree to search; default: greedy. */
   stopAtForcedSwitch?: boolean;
-  /** Round 43: dice on demand for the named moves (scripted-prng.ts); the log still decides the outcome class. */
+  /** Dice on demand for the named moves (scripted-prng.ts); the log still decides the outcome class. */
   scripts?: RollScripts;
 }
 
-/**
- * advancePosition plus the battle.log delta of THIS advance only — the
- * cell-blend classifier reads outcome classes from these lines. With
- * `stopAtForcedSwitch` the child may sit at an open switch request
- * (`pendingSwitch`); its log then ends at that request.
- */
+/** advancePosition plus this advance's log delta; with `stopAtForcedSwitch` the child may sit at an open switch. */
 export function advancePositionWithLog(
   position: SimPosition,
   p1Choice: string,
@@ -64,13 +47,12 @@ export function advancePositionWithLog(
 }
 
 export interface TrialAdvanceResult {
-  /** Lines emitted by THIS advance only (battle.log delta). */
   log: string[];
   ended: boolean;
   winner: string | null;
 }
 
-/** First bench slot matching the species/name id, or null. */
+// 1-based bench slot of the species or name, or null.
 function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): number | null {
   const wanted = toId(species);
   if (wanted === '') return null;
@@ -85,20 +67,6 @@ function benchSlotForSpecies(battle: Battle, sideIdx: 0 | 1, species: string): n
   return null;
 }
 
-/**
- * Hax-alignment trial: like advancePosition, but returns the emitted log so
- * the caller can score the seed's rolls against the protocol, and answers
- * forced-switch requests from the PROTOCOL's replacement species instead of
- * the greedy eval pick (queues per side, in logged order — singles-exact;
- * a multi-slot doubles request or an untranslatable species falls back to
- * the greedy resolution). Throws on a rejected choice — the caller treats
- * that trial as failed. Search behavior (advancePosition) is unchanged.
- */
-/**
- * Answers one side's forced-switch request from the protocol queue: true
- * when the queued species mapped to a bench slot and the sim accepted the
- * switch; false (queue untouched or cleared choice) otherwise.
- */
 function answerFromQueue(battle: Battle, side: Side, queues: { p1: string[]; p2: string[] }): boolean {
   const sideId = side.id as 'p1' | 'p2';
   const request = side.activeRequest as { forceSwitch?: boolean[] } | null;
@@ -114,6 +82,7 @@ function answerFromQueue(battle: Battle, side: Side, queues: { p1: string[]; p2:
   return false;
 }
 
+/** advancePosition with forced switches answered from the protocol's replacement queues; throws on a reject. */
 export function trialAdvanceLog(
   position: SimPosition,
   p1Choice: string,
@@ -139,8 +108,7 @@ export function trialAdvanceLog(
       if (!answerFromQueue(battle, side, queues)) unresolved = true;
     }
     if (unresolved) {
-      // Doubles multi-forced, empty queue, or a rejected translation:
-      // greedy resolution finishes every pending request (and any cascades).
+      // Doubles multi-forced, empty queue or a rejected translation: the greedy resolution finishes every request.
       resolveForcedSwitches(battle, seed);
       break;
     }

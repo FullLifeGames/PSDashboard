@@ -16,7 +16,7 @@ describe('ConfirmBanner', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  test('a caller names its own proceed button (H14a, H16a); the default stays Replace', async () => {
+  test('a caller names its own proceed button; the default stays Replace', async () => {
     const onProceed = vi.fn();
     render(<ConfirmBanner message="This edit makes 3 played turns invalid." proceedLabel="Apply edit" onProceed={onProceed} onCancel={vi.fn()} />);
     expect(screen.queryByRole('button', { name: 'Replace' })).toBeNull();
@@ -24,7 +24,7 @@ describe('ConfirmBanner', () => {
     expect(onProceed).toHaveBeenCalledTimes(1);
   });
 
-  test('both buttons share one wrapper, so a narrow column never leaves Cancel alone on a line (FT-1)', () => {
+  test('both buttons share one wrapper, so a narrow column never leaves Cancel alone on a line', () => {
     render(<ConfirmBanner message="The variation has 3 played turns. Discarding drops them." proceedLabel="Discard variation" onProceed={vi.fn()} onCancel={vi.fn()} />);
     const proceed = screen.getByRole('button', { name: 'Discard variation' });
     const cancel = screen.getByRole('button', { name: 'Cancel' });

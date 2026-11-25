@@ -1,12 +1,4 @@
-// The bank's data as one gzipped tar (round 71, bank in GitHub Actions).
-//
-// A CI job has no .fit-corpus and no .smogon-cache; the bank reads both. packData writes their files (the names the
-// fingerprint hashes, calibration-fingerprint.mjs dataFileNames) into a POSIX ustar archive in code unit order, with
-// fixed modes, owners and times, so two packs of the same folders give the same tar; gzip runs at a fixed level.
-// The archive's identity is the sha256 of the tar (the same on every platform); a download is checked against the
-// sha256 of the gzipped file it fetched. unpackData reads the archive back and refuses, before it writes anything,
-// every entry that is not a regular file under the two folders: a link, a folder entry, a parent step, an absolute
-// or drive path, a backslash, a damaged header.
+// The bank's data as one gzipped tar; fixed modes, owners, times and gzip level make equal folders give equal bytes.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -17,22 +9,17 @@ const BLOCK = 512;
 const GZIP_LEVEL = 9;
 const sha256 = data => createHash('sha256').update(data).digest('hex');
 
-/** One field of a ustar header: ASCII text, NUL padded. */
 function writeText(header, offset, length, text) {
   const bytes = Buffer.from(text, 'utf8');
   if (bytes.length > length) throw new Error(`tar field too long for "${text}"`);
   bytes.copy(header, offset);
 }
 
-/** One octal number field of a ustar header, zero padded, NUL terminated. */
 function writeOctal(header, offset, length, value) {
   writeText(header, offset, length, value.toString(8).padStart(length - 1, '0'));
 }
 
-/**
- * One ustar entry: the 512-byte header and the content padded to whole blocks. `type` is the ustar type flag ('0'
- * a regular file; the specs build '2' links and '5' folders to show that unpackData refuses them).
- */
+/** One ustar entry of 512-byte header and padded content; `type` is the ustar type flag ('0' a regular file). */
 export function tarEntry(name, data, { type = '0', linkName = '' } = {}) {
   const header = Buffer.alloc(BLOCK);
   writeText(header, 0, 100, name);
@@ -54,17 +41,11 @@ export function tarEntry(name, data, { type = '0', linkName = '' } = {}) {
   return Buffer.concat([header, body, padding]);
 }
 
-/** The end of a tar: two empty blocks. */
 export function tarEnd() {
   return Buffer.alloc(2 * BLOCK);
 }
 
-/**
- * Packs the data folders under `root`. `selection` names, per folder, the relative file names to pack, or null for
- * every file the folder holds (dataFileNames). Returns the gzipped archive, its sha256 (what a download is checked
- * against), the sha256 of the plain tar (the archive's identity), the file count and, per folder, the hash of the
- * packed files in the fingerprint's recipe: what the folder hashes to once a checkout holds exactly these files.
- */
+/** Packs the data folders under `root`; `selection` names the files per folder, null for all of them. */
 export function packData(root, selection = Object.fromEntries(CACHE_DIRS.map(dir => [dir, null]))) {
   const parts = [];
   const dirs = {};
@@ -90,7 +71,6 @@ const readText = (block, offset, length) => {
 };
 const readOctal = (block, offset, length) => parseInt(readText(block, offset, length).trim() || '0', 8);
 
-/** The entry's path, or the reason it is refused: only a plain relative path inside one of the data folders. */
 function refusal(name, dirs) {
   if (name.includes('\\')) return 'a backslash';
   if (name.startsWith('/') || /^[A-Za-z]:/.test(name)) return 'an absolute path';
@@ -100,10 +80,7 @@ function refusal(name, dirs) {
   return null;
 }
 
-/**
- * Unpacks a gzipped archive of packData into `root`. Every entry is checked before the first file is written; a
- * refused entry throws and leaves `root` untouched. Returns the number of files written.
- */
+/** Unpacks a packData archive into `root`; a refused entry throws before the first file is written. */
 export function unpackData(gz, root, dirs = CACHE_DIRS) {
   const tar = gunzipSync(gz);
   const entries = [];
@@ -119,7 +96,7 @@ export function unpackData(gz, root, dirs = CACHE_DIRS) {
     const type = readText(block, 156, 1) || '0';
     const size = readOctal(block, 124, 12);
     if (type !== '0') throw new Error(`unpackData refuses "${name}": not a regular file (type ${type})`);
-    // packData never writes the ustar prefix field (every name fits the 100-byte field), so an entry with one is foreign.
+    // packData never writes the ustar prefix field (every name fits 100 bytes), so an entry with one is foreign.
     if (readText(block, 345, 155) !== '') throw new Error(`unpackData refuses "${name}": a name prefix packData never writes`);
     const reason = refusal(name, dirs);
     if (reason) throw new Error(`unpackData refuses "${name}": ${reason}`);
@@ -136,10 +113,7 @@ export function unpackData(gz, root, dirs = CACHE_DIRS) {
   return { files: entries.length };
 }
 
-/**
- * The bytes at `url`, fetched again after a network error, a server error or a rate limit; a client error such as a 404
- * fails at once (round 72: a CI job met HTTP 504 on the data release, and the run's merge lost its slices).
- */
+/** The bytes at `url`, retried on network, server and rate-limit errors; a client error such as 404 fails at once. */
 export async function downloadWithRetry(url, { fetcher = fetch, attempts = 4, pauses = [5000, 15000, 30000] } = {}) {
   let last = '';
   for (let attempt = 0; attempt < attempts; attempt++) {

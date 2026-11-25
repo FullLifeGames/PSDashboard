@@ -13,17 +13,8 @@ import { fetchSmogonSetAssumptions } from '../../../src/lib/smogon-sets';
 import { fetchSmogonUsageStats } from '../../../src/lib/smogon-stats';
 import { realReplayWorkerClient } from '../fixtures/worker';
 
-/**
- * The drift pin for round 52: the bank grades through `buildAppTeams`, so
- * the app's own chain — the enrich memos of useTeamKnowledge, the real
- * spread solve in the replay worker, `buildReplayTeams` — must keep landing
- * on the same sets. Change the chain without changing `buildAppTeams` and
- * this test turns red before the bank measures a team nobody sees. The two
- * option blocks are shared code (src/lib/team-build-options.ts): a change
- * there moves both sides at once and stays invisible here.
- */
+// The option blocks are shared (src/lib/team-build-options.ts): a change there moves both sides and shows no diff here.
 
-/** Every Smogon URL the chain asks for, and whether the harness pins it. */
 const unpinned: string[] = [];
 const pinnedFetcher = (async (input: string | URL | Request) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -46,7 +37,6 @@ const serialized = (spreads: Map<string, SpreadCandidate>) =>
   [...spreads.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, candidate]) => `${key} ${JSON.stringify(candidate)}`);
 
 describe('the app chain and buildAppTeams', () => {
-  // A gen6 singles game with hidden-power evidence and a known item flip, and a gen9 doubles game.
   test.each([
     'smogtours-gen6ou-648453',
     'smogtours-gen9doublesou-912045',
@@ -67,7 +57,6 @@ describe('the app chain and buildAppTeams', () => {
       replayData,
       p1Info: inferOpponentTeam(replayData.log, 'p1'),
       opponentInfo: inferOpponentTeam(replayData.log, 'p2'),
-      // useReplay hands the damage judge over with the infos it loaded them with (round 67, T130).
       itemJudge: judgeItemsByDamage,
       observations: parsed.observations,
       speedOrders: parsed.speedOrders,
@@ -79,8 +68,7 @@ describe('the app chain and buildAppTeams', () => {
     };
     const { result } = renderHook(() => useTeamKnowledge(inputs));
 
-    // The hidden-power module arrives lazily; the enrich memos re-form with
-    // the resolver, and only that settled state is what the sweep builds on.
+    // The hidden-power module arrives lazily: only the state settled after the resolver is what the sweep builds on.
     const beforeResolver = result.current.effectiveP1Info;
     await waitFor(() => expect(result.current.effectiveP1Info).not.toBe(beforeResolver), { timeout: 60_000 });
 

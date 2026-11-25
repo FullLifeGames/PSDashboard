@@ -1,52 +1,4 @@
 // Runs the calibration bench in parallel slices and merges the dumps.
-//
-//   node scripts/run-calibration.mjs [--slices 6] [--out .calibration/<stamp>]
-//                                    [--env KEY=VALUE ...] [--tranche NAME]
-//                                    [--reuse] [--dry-run]
-//
-// Each slice is one Playwright process over test/regression/eval-calibration.spec.ts
-// with EVAL_CALIBRATION=1, EVAL_CALIBRATION_SLICE=i/N, and its own dump
-// (<out>/slice-i.jsonl; console in <out>/slice-i.log). The measurement line
-// is EVAL_CALIBRATION_MODE=auto EVAL_CALIBRATION_SMOGON=1; --env overrides or
-// adds variables, --tranche restricts the corpus to one stratum. Afterwards
-// the dumps merge into <out>/merged.jsonl (sorted by replay id, then turn,
-// the order the harness sums in), the harness's aggregate lines print and
-// land in <out>/summary.txt, and <out>/run.json keeps the configuration,
-// exit codes, and wall times. A red slice still merges; the exit code stays
-// non-zero then. Slices are independent (one replay belongs to exactly one
-// slice), so the merged aggregate equals a single-process run.
-//
-// Base reuse (round 70). run.json also keeps the run's fingerprint, its
-// fraction (quick tier, below), the sha256 of merged.jsonl, the count of
-// replays lost to HTTP errors and a `complete` flag. The fingerprint covers the
-// git tree ids of the tracked inputs at HEAD (packages, src, test/regression,
-// scripts, package-lock.json and the config files), a content hash of
-// .smogon-cache and .fit-corpus, the lever env (the run's own and the ambient
-// EVAL_* variables) and the Node version; scripts/calibration-fingerprint.mjs
-// holds the recipe. Two runs with the same fingerprint give the same rows, so
-// --reuse looks under .calibration/ for a finished run that carries the current
-// one. When it finds one, it prints that folder as its last line, starts
-// nothing, creates no --out folder and exits 0. A tree with an uncommitted
-// change under the inputs never reuses, and its run never serves as a base
-// (run.json marks it dirty). Without a match --reuse runs as usual and names the
-// input groups that differ from the closest finished run. Runs from before this
-// change carry no fingerprint and never match. --dry-run prints the fingerprint
-// and the decision and starts nothing: with --reuse it exits 0 when a base
-// exists and 3 when a run would start; without --reuse it exits 0.
-//
-// Quick tier (round 70). --env EVAL_CALIBRATION_FRACTION=0.25 keeps a quarter
-// of the universe (test/regression/bank-universe.ts: the same replays every time,
-// each tranche and family in proportion). run.json records the fraction, the
-// fingerprint covers it, and scripts/paired-calibration.mjs pairs a quick run
-// against a full base on the rows both hold.
-//
-// CI jobs (round 71). --slice-range a..b runs only slices a to b of --slices N
-// into --out and writes job.json there instead of merged.jsonl and run.json, so
-// --reuse never takes a job for a run. --merge <dir> (once per job folder) checks
-// that the jobs make one run (same slice count, env, fraction, commit and
-// fingerprint, every slice once), copies their slice files into --out and writes
-// merged.jsonl, summary.txt and run.json as a local run of all slices would
-// (scripts/calibration-jobs.mjs).
 import { spawn } from 'node:child_process';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -128,10 +80,9 @@ function stamp() {
   return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-/** A replay the harness could not fetch (`skipping <id>: HTTP <status>`): the run lacks its rows, so it cannot serve as a base. */
+// A replay the harness could not fetch: the run lacks its rows, so it cannot serve as a base.
 const HTTP_SKIP = /skipping \S+: HTTP \d+/;
 
-/** Counts the lines of a stream that match `pattern`, across the borders of its chunks. */
 function lineCounter(pattern) {
   let tail = '';
   return {
@@ -195,12 +146,10 @@ function commitHash() {
   }
 }
 
-/** The first three paths and a count of the rest. */
 function listed(paths) {
   return paths.slice(0, 3).join(', ') + (paths.length > 3 ? `, +${paths.length - 3} more` : '');
 }
 
-/** The start line about the fingerprint: its short value and whether a run on it can serve as a base. */
 function fingerprintLine(fingerprint) {
   if (fingerprint.value === null) return `fingerprint: none (${fingerprint.problem}); this run cannot serve as a base`;
   const state = fingerprint.dirty
@@ -209,7 +158,6 @@ function fingerprintLine(fingerprint) {
   return `fingerprint ${shortValue(fingerprint.value)} (${state})`;
 }
 
-/** The line that says why --reuse found nothing to reuse. */
 function noReuseLine(decision, fingerprint) {
   if (decision.reason === 'unavailable') return `reuse: skipped, ${decision.detail}`;
   if (decision.reason === 'dirty') {
@@ -222,7 +170,6 @@ function noReuseLine(decision, fingerprint) {
   return `${head}; the closest, ${nearest.name} (commit ${nearest.run.commit ?? 'unknown'}), differs in ${shownDiffs || 'nothing that the recipe names'}`;
 }
 
-/** What the final fingerprint line says about the finished run. */
 function recordedLine(record, failures, httpSkips) {
   if (record.value === null) return `fingerprint none recorded in run.json; this run cannot serve as a base (${record.problem})`;
   const why = [];
@@ -234,7 +181,6 @@ function recordedLine(record, failures, httpSkips) {
   return `fingerprint ${shortValue(record.value)} recorded in run.json; ${state}`;
 }
 
-/** The slice lines of a finished run or job, one per slice. */
 function sliceLines(results) {
   return results.map(result => {
     const state = result.code === 0 ? 'ok' : `exit ${result.code}`;
@@ -244,7 +190,6 @@ function sliceLines(results) {
   });
 }
 
-/** Writes merged.jsonl and summary.txt of `dumps` into outDir; returns the rows, the text written and the summary lines. */
 function writeMerged(outDir, dumps) {
   const merged = mergeDumps(dumps);
   const mergedText = merged.map(sample => JSON.stringify(sample)).join('\n') + (merged.length > 0 ? '\n' : '');
@@ -254,7 +199,6 @@ function writeMerged(outDir, dumps) {
   return { merged, mergedText, lines };
 }
 
-/** --merge: joins the job folders of one CI run into a run folder (scripts/calibration-jobs.mjs checks them first). */
 function mergeJobs(options) {
   const jobs = options.merge.map(dir => {
     const path = resolve(ROOT, dir);
@@ -356,7 +300,6 @@ async function main() {
   const failures = results.filter(result => result.code !== 0 || !existsSync(result.dump));
   const httpSkips = results.reduce((sum, result) => sum + result.httpSkips, 0);
   if (options.sliceRange) {
-    // A CI job: its slices and job.json stay for --merge; the run's rows come from the merge of all its jobs.
     console.log('');
     for (const line of sliceLines(results)) console.log(line);
     const record = fingerprintRecord(start, computeFingerprint({ root: ROOT, env: fingerprintEnv, slices: options.slices }));

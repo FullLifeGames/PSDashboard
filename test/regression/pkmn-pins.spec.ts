@@ -2,12 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { MANIFESTS, PKMN_EXACT, planPkmnUpgrade } from '../../scripts/upgrade-pkmn.mjs';
 
-/**
- * Round 70 (T43): eval-engine's speed layer copies classes of one @pkmn/sim version and checks no hash in the
- * browser, so every manifest pins @pkmn/sim and @pkmn/mods to one exact version and a library user cannot pull
- * another simulator under it. `npm run upgrade:pkmn [version]` moves the whole release train at once.
- */
-
 type Manifest = Record<string, Record<string, string> | undefined>;
 const read = (path: string): Manifest => JSON.parse(readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')) as Manifest;
 const specsOf = (manifest: Manifest, name: string): string[] =>
@@ -27,7 +21,7 @@ describe('the simulator pin', () => {
     expect(versions.size).toBe(1);
   });
 
-  test('the package READMEs name the version the manifests pin (round 80: both still said 0.10.11 a release after 0.10.12)', () => {
+  test('the package READMEs name the version the manifests pin (both still said 0.10.11 a release after 0.10.12)', () => {
     const pinned = read('packages/eval-engine/package.json').peerDependencies?.['@pkmn/sim'];
     for (const readme of ['packages/eval-engine/README.md', 'packages/replay-core/README.md']) {
       const named = [...readFileSync(new URL(`../../${readme}`, import.meta.url), 'utf8').matchAll(/`@pkmn\/sim` (\d+\.\d+\.\d+)/g)]

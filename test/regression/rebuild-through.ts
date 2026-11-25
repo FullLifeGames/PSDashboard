@@ -8,17 +8,11 @@ import { bankTeamsFor } from './bank-build';
 import { emittedBlock } from './forced-reconstruction-support';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * Round 89 (#131, #144, #135): the corpus rows of lane C rebuild a game through one turn, like the bank does, and compare the turn's
- * emitted block with the log's block. `refusalsOfTurn` counts the refusals the turn itself adds.
- */
-
 type Fixture = ReplayData & { formatid: string };
 
 /** The games sit in the local fit corpus (`.fit-corpus`), which a clone lacks: the rows then skip. */
 export const CORPUS = (id: string): string => join('.fit-corpus', `${id}.json`);
 
-/** The log's lines of a turn: from its `|turn|` line to the next, without the `|upkeep` marker. */
 export function logBlock(log: string, turn: number): string[] {
   const lines = log.split('\n');
   const from = lines.indexOf(`|turn|${turn}`);
@@ -40,8 +34,7 @@ export async function rebuildThrough(id: string, through: number) {
     choiceLocks: buildChoiceLockContext(replay.log, { p1Team, p2Team }, parsed.observations),
     bringOnly: replayBringOnly(replay, parseReplayLog(replay.log)) ?? undefined,
     deadlineMs: 600_000,
-    // The bank's and the app's correction (`passInstrument.perTarget`): an empty capture turns on the snapshot correction of HP and
-    // faints at every boundary of the pass.
+    // The bank's and the app's correction: an empty capture turns on the snapshot correction of HP and faints.
     capturePositions: { snapshotFor, onPosition: () => {} },
   });
   return {
@@ -49,17 +42,15 @@ export async function rebuildThrough(id: string, through: number) {
     emitted: publicLines(emittedBlock(runtime.battleStream.battle!.log, through)),
     refusals: runtime.choiceErrors.count,
     lastError: runtime.choiceErrors.last,
-    /** The rebuilt battle at the start of turn `through + 1`. */
     battle: runtime.battleStream.battle!,
   };
 }
 
-/** The refusals the turn itself adds: the count through the turn less the count through the turn before (earlier turns keep their own causes). */
 export async function refusalsOfTurn(id: string, through: number, upTo: number): Promise<number> {
   return upTo - (through > 1 ? (await rebuildThrough(id, through - 1)).refusals : 0);
 }
 
-/** The public half of a battle log: the simulator writes each private line twice (`|split|pN`, the owner's line, the spectator's line). */
+/** The public half of a log: the simulator writes each private line twice after `|split|pN` (owner's, public). */
 export function publicLines(lines: string[]): string[] {
   const out: string[] = [];
   for (let index = 0; index < lines.length; index++) {

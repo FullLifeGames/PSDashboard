@@ -1,9 +1,4 @@
-/**
- * Release versions and tags: the version helpers of scripts/publish-packages.mjs and the check that the local tags hold
- * every release tag below the version being released (round 77, release gate 29.10.2026, "6a"). Without the tags fetched,
- * the plan compared against an older release (v0.7.1 was missing locally on 28.10.) and would have published a package
- * that had not moved.
- */
+// Without the release tags fetched, the plan compares against an older release and publishes an unmoved package.
 
 /** [major, minor, patch] of `1.2.3` or `v1.2.3`, else null. */
 export const parseVersion = text => {
@@ -11,7 +6,6 @@ export const parseVersion = text => {
   return match ? match.slice(1, 4).map(Number) : null;
 };
 
-/** Whether version `a` sorts below version `b`. */
 export const lower = (a, b) => {
   for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] < b[i];
   return false;
@@ -25,7 +19,6 @@ export function remoteTagNames(lsRemoteOutput) {
   return [...new Set(names)];
 }
 
-/** The remote's release tags below `version` that the local tags lack. */
 export function missingReleaseTags(version, localTags, remoteTags) {
   const current = parseVersion(version);
   if (!current) throw new Error(`root version ${version} is not major.minor.patch`);

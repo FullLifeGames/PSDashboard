@@ -8,30 +8,8 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * Round 89 (SB-2, P1; user ruling 21.11.2026): a stat drop stops counting while its holder can leave the field by its own
- * switch. The simulator clears every stage on switch-out, so a drop is a liability only for a holder that cannot leave: a
- * trapped body (`pokemon.trapped`, written at the end of every turn and for a hard-locked move when the request is written) or
- * a side with no living bench (`battle.canSwitch(side) > 0`). `canSwitchOut` (score/switch-out.ts) is the one reading of that
- * rule; this sweep holds it to the simulator.
- *
- * Every question runs on a twin battle in debug-free custom games, singles and doubles, in every generation the corpus plays
- * (3 to 9) and on the Champions mod:
- *  1. Census: every Dex entry with a trap handler (ability, item, move condition, condition) in each generation is one the
- *     sweep names below; a new entry turns the row red.
- *  2. Trap rows: every Dex move clicked once by the foe at the holder and once by the holder, one turn played to its end, then
- *     the simulator's answer (`switch N` accepted or refused) against `canSwitchOut` and against the legal choices of the
- *     search (`forward/choices.ts` keeps its own reading of the request: a deliberate copy, held here). Every trapping move that
- *     the first pass finds is replayed on the other holder types (a Ghost, a flying Steel, a grounded Steel) and without a bench.
- *  3. Ability rows: every trapping ability of the generation on the foe (and on the foe's partner in doubles), Shed Shell on
- *     the holder, the four holder types, a living and a fainted bench; the Commander pair in Gen 9 doubles.
- *  4. Drop rows: every Dex move with a negative stage for its user or its target (read from `self.boosts`, `selfBoost`,
- *     `boosts`, `secondary` and `secondaries`, never listed by name) played so the drop lands; with a living bench the drop does
- *     not stand and the switch leaves the body with every stage at 0; with the bench fainted, or behind Shadow Tag, it stands
- *     and the simulator refuses the switch. One Intimidate row (the rule reads stages, whatever made them).
- *  5. Every reading leaves the battle as it was (`fingerprint`).
- * `DICE_SWEEPS=full` plays every generation; a plain run plays Gen 9 and Champions, singles and doubles.
- */
+// The simulator clears every stage on switch-out, so a drop counts only for a holder that cannot leave.
+// `DICE_SWEEPS=full` plays every generation; a plain run plays Gen 9 and Champions.
 
 await loadSimMods('gen9championscustomgame');
 
@@ -52,13 +30,13 @@ const ALL_MODES: Mode[] = [
 const MODES = FULL ? ALL_MODES : ALL_MODES.filter(mode => mode.gen === 9);
 const dexOf = (mode: Mode) => (mode.champions ? battleOf(mode.format, [set('Pikachu', ['splash']), set('Pikachu', ['splash'])], [set('Pikachu', ['splash']), set('Pikachu', ['splash'])]).dex : Dex.forGen(mode.gen));
 
-// The trap handlers of the Dex (sim/battle.js endTurn runs TrapPokemon, then MaybeTrapPokemon; the Foe variants are the foe's).
+// sim/battle.js endTurn runs TrapPokemon, then MaybeTrapPokemon; the Foe variants are the foe's.
 const OWN = ['onTrapPokemon', 'onMaybeTrapPokemon'] as const;
 const FOE = ['onFoeTrapPokemon', 'onFoeMaybeTrapPokemon'] as const;
 const has = (entry: unknown, names: readonly string[]): boolean => !!entry && names.some(name => typeof (entry as Record<string, unknown>)[name] === 'function');
 const traps = (entry: unknown): boolean => has(entry, OWN) || has(entry, FOE);
 
-/** What the census names. A Dex entry with a trap handler that is not here fails the census: add its row to the sweep first. */
+// A Dex entry with a trap handler missing here fails the census: add its row to the sweep first.
 const DECLARED = {
   abilities: ['arenatrap', 'magnetpull', 'runaway', 'shadowtag'],
   items: ['shedshell'],
@@ -70,7 +48,6 @@ function census(mode: Mode) {
   const dex = dexOf(mode);
   return {
     abilities: dex.abilities.all().filter(traps).map(entry => entry.id).sort(),
-    // an ability that traps the foes (Shadow Tag) and one that frees its own holder (Champions' Run Away, as Shed Shell does)
     trappers: dex.abilities.all().filter(entry => has(entry, FOE)).map(entry => entry.name),
     escapes: dex.abilities.all().filter(entry => has(entry, OWN)).map(entry => entry.name),
     items: dex.items.all().filter(traps).map(entry => entry.id).sort(),
@@ -81,8 +58,6 @@ function census(mode: Mode) {
 
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown; id: string }) =>
   move.exists && move.gen <= 9 && !move.isMax && !move.isZ && move.id !== 'struggle';
-
-// ---------- boards ----------
 
 type Bench = 'living' | 'fainted' | 'none';
 interface BoardOptions {
@@ -95,7 +70,6 @@ interface Board { battle: Battle; mode: Mode }
 const sets = (mode: Mode, species: string, moves: string[], extra: Partial<PokemonSet> = {}): PokemonSet =>
   set(species, moves, mode.champions ? { evs: SP, level: 50, ...extra } : extra);
 
-/** Holder = p1 slot 0, foe = p2 slot 0; a Splashing Snorlax stands next to each in doubles, and one body waits on each bench. */
 function board(mode: Mode, o: BoardOptions = {}): Board {
   const mine = [sets(mode, o.holder ?? 'Snorlax', [...(o.holderMoves ?? []), 'splash'], { ...(o.holderLevel ? { level: o.holderLevel } : {}), ...o.holderExtra })];
   const foes = [sets(mode, o.foe ?? 'Snorlax', [...(o.foeMoves ?? []), 'splash'], { ...(o.foeLevel ? { level: o.foeLevel } : {}), ...o.foeExtra })];
@@ -113,7 +87,7 @@ function board(mode: Mode, o: BoardOptions = {}): Board {
     body.fainted = true;
     battle.sides[0].pokemonLeft--;
   }
-  // a drop with a chance lands: randomChance (accuracy, crits) is forced on, and the secondary roll (`random(100)`) reads 0
+  // randomChance is forced on and the secondary roll (`random(100)`) reads 0, so a drop with a chance lands.
   battle.forceRandomChance = true;
   (battle as unknown as { random: () => number }).random = () => 0;
   return { battle, mode };
@@ -121,7 +95,6 @@ function board(mode: Mode, o: BoardOptions = {}): Board {
 
 const splashSlot = (mon: Pokemon): number => mon.moveSlots.findIndex(slot => slot.id === 'splash') + 1;
 
-/** A click that keeps `slot`'s body where it is: Splash, or the first move its request offers (a locked move is its only one). */
 function stay(side: Side, slot: number): string {
   const request = side.activeRequest as { active?: { moves: { id: string; disabled?: boolean }[] }[] } | null;
   const list = request?.active?.[slot]?.moves ?? [];
@@ -129,14 +102,12 @@ function stay(side: Side, slot: number): string {
   return `move ${(splash >= 0 ? splash : Math.max(0, list.findIndex(move => !move.disabled))) + 1}`;
 }
 
-/** The click of one side: the lead's first move (with `target`) or Splash, the partner Splashes. */
 function click(side: Side, attacks: boolean, target: string): string {
   const lead = side.active[0];
   const first = attacks ? `move 1${target}` : `move ${splashSlot(lead)}`;
   return side.active.length > 1 ? `${first}, move ${splashSlot(side.active[1])}` : first;
 }
 
-/** One turn: each side clicks (the tested move for the side that attacks), a target is tried where the move wants one. */
 function playTurn(b: Board, attacker: 'p1' | 'p2' | null): boolean {
   const targets = b.mode.doubles ? ['', ' 1', ' -2'] : [''];
   for (const [index, id] of (['p1', 'p2'] as const).entries()) {
@@ -150,7 +121,6 @@ function playTurn(b: Board, attacker: 'p1' | 'p2' | null): boolean {
   return true;
 }
 
-/** Both sides at an ordinary move request again (a pivot or a faint raised a forced switch: the default answers it). */
 function settle(b: Board): boolean {
   for (let round = 0; round < 4; round++) {
     if (b.battle.ended) return false;
@@ -161,19 +131,13 @@ function settle(b: Board): boolean {
   return false;
 }
 
-/** The switch click of one slot to the first bench body (the other slot of a doubles side takes the default). */
 function switchClick(side: Side, slot: number): string {
   const bench = side.pokemon.findIndex((mon, index) => index >= side.active.length && !mon.fainted) + 1 || side.active.length + 1;
   if (side.active.length === 1) return `switch ${bench}`;
   return slot === 0 ? `switch ${bench}, ${stay(side, 1)}` : `${stay(side, 0)}, switch ${bench}`;
 }
 
-/**
- * The legal choices of the search offer a switch to this side (a deliberate copy of the rule, forward/choices.ts). Singles: the
- * choice list holds a switch. Doubles: some choice holds a switch for some slot; the list pairs the slots, so one slot's switch
- * depends on the other (a partner whose moves a live Imprison bars can only switch itself), and a slot-wise comparison would
- * read the pairing, not the rule.
- */
+// The choice list pairs the slots in doubles (a partner under a live Imprison can only switch itself).
 function offersSwitch(battle: Battle, id: 'p1' | 'p2'): boolean | null {
   const choices = legalChoices(createRootPosition(serializeLiveBattle(battle), 'standard'), id).map(option => option.choice);
   if (choices.length === 0) return null;
@@ -182,7 +146,6 @@ function offersSwitch(battle: Battle, id: 'p1' | 'p2'): boolean | null {
 
 interface Reading { label: string; ours: boolean; sim: boolean; legal: boolean | null; pure: boolean }
 
-/** Our reading, the legal choices and the simulator's answer for one body. The battle is spent afterwards: it only sees the click. */
 function read(b: Board, id: 'p1' | 'p2', slot: number, label: string): Reading {
   const side = b.battle.sides[id === 'p1' ? 0 : 1];
   const mon = side.active[slot];
@@ -203,7 +166,6 @@ function mismatchOf(reading: Reading): string | null {
   return null;
 }
 
-/** Every active body of the board; in doubles the search's side-wide offer is held against the simulator's answer for any slot. */
 function readAll(b: Board, label: string): Reading[] {
   const readings: Reading[] = [];
   const slots = b.mode.doubles ? [0, 1] : [0];
@@ -232,8 +194,6 @@ function judge(readings: Reading[], mismatches: string[]): void {
   }
 }
 
-// ---------- 1. census ----------
-
 describe.each(ALL_MODES.filter(mode => !mode.doubles))('census of the trap handlers: $name', mode => {
   test('every ability, item, move and condition with a trap handler is one the sweep names', () => {
     const found = census(mode);
@@ -241,7 +201,6 @@ describe.each(ALL_MODES.filter(mode => !mode.doubles))('census of the trap handl
     expect(found.items.filter(id => !DECLARED.items.includes(id))).toEqual([]);
     expect(found.moves.filter(id => !DECLARED.moves.includes(id))).toEqual([]);
     expect(found.conditions.filter(id => !DECLARED.conditions.includes(id))).toEqual([]);
-    // and the lists the rows below play are the Dex's, not these names: a name that the Dex dropped leaves the sweep with a hole
     expect(found.abilities.length).toBeGreaterThanOrEqual(2);
     expect(found.items).toEqual(['shedshell']);
     expect(found.moves).toEqual(DECLARED.moves);
@@ -249,13 +208,10 @@ describe.each(ALL_MODES.filter(mode => !mode.doubles))('census of the trap handl
   });
 });
 
-// ---------- 2. trap rows ----------
-
 const HOLDERS = [['a Ghost', 'Gengar'], ['a flying Steel', 'Skarmory'], ['a grounded Steel', 'Aggron']] as const;
 
 describe.each(MODES)('trap rows by move: $name', mode => {
   const every = dexOf(mode).moves.all().filter(playable);
-  // a plain run plays every fourth move (the trapping ones always, they are read from the Dex); `DICE_SWEEPS=full` plays them all
   const sourceOfTrap = (move: (typeof every)[number]) => DECLARED.moves.includes(move.id) || ['trapped', 'partiallytrapped'].some(id =>
     move.volatileStatus === id || move.self?.volatileStatus === id || move.secondary?.volatileStatus === id
     || [move.onHit, move.onTryHit, move.secondary?.onHit, move.self?.onHit].some(handler => String(handler).includes(`'${id}'`)));
@@ -284,7 +240,6 @@ describe.each(MODES)('trap rows by move: $name', mode => {
     }
     expect(played).toBeGreaterThan(moves.length);
     expect(mismatches).toEqual([]);
-    // the declared trapping moves are sources the Dex names: each one leaves a body that cannot switch (Sky Drop needs two turns and a light holder, below)
     for (const id of DECLARED.moves.filter(id => id !== 'skydrop')) if (moves.some(move => move.id === id)) expect(trapping.has(id), `${id} traps`).toBe(true);
     console.info(`${mode.name}: ${moves.length} of ${every.length} moves, ${played} turns played, ${trapping.size} moves leave a body that cannot switch: ${[...trapping].join(' ')}`);
   });
@@ -311,8 +266,6 @@ describe.each(MODES)('trap rows by move: $name', mode => {
     expect(mismatches).toEqual([]);
   });
 });
-
-// ---------- 3. ability rows ----------
 
 describe.each(MODES)('trap rows, Sky Drop: $name', mode => {
   test('a light holder lifted over two turns: the lifted body cannot switch, canSwitchOut is the simulator\'s answer after each turn', () => {
@@ -355,7 +308,6 @@ describe.each(MODES)('trap rows by ability and item: $name', mode => {
           }
         }
       }
-      // the same ability on both sides: a body with the ability is not trapped by it
       const mirror = board(mode, { holderExtra: { ability }, foeExtra: { ability } });
       if (idleTurn(mirror) && settle(mirror)) { rows++; judge(readAll(mirror, `${ability} on both sides`), mismatches); }
     }
@@ -388,15 +340,12 @@ describe.each(MODES.filter(mode => mode.doubles && mode.gen === 9 && !mode.champ
   });
 });
 
-// ---------- 4. drop rows ----------
-
 type Role = 'self' | 'target';
 interface Drop { role: Role; stats: string[] }
 
 const negatives = (boosts: unknown): string[] =>
   Object.entries((boosts ?? {}) as Record<string, number>).filter(([, stage]) => stage < 0).map(([stat]) => stat);
 
-/** The negative stages a move can write, by who gets them, read from the Dex entry (never listed by name). */
 function dropsOf(move: ReturnType<typeof Dex.moves.get>): Drop[] {
   const drops: Drop[] = [];
   const add = (role: Role, boosts: unknown) => { const stats = negatives(boosts); if (stats.length) drops.push({ role, stats }); };
@@ -411,7 +360,6 @@ function dropsOf(move: ReturnType<typeof Dex.moves.get>): Drop[] {
   return drops;
 }
 
-/** What the simulator and the rule say about one landed drop: the switch is accepted or refused as `canSwitchOut` reads, and the premise holds. */
 function dropMismatches({ b, holder, foe }: { b: Board; holder: Pokemon; foe: Pokemon }, label: string, bench: Bench | 'shadowtag'): string[] {
   const out: string[] = [];
   const stages = Object.entries(holder.boosts).filter(([, stage]) => stage < 0);
@@ -421,11 +369,9 @@ function dropMismatches({ b, holder, foe }: { b: Board; holder: Pokemon; foe: Po
   if (ours !== sim) out.push(`${label}: canSwitchOut ${ours}, the simulator ${sim ? 'accepts' : 'refuses'}`);
   if (standing === ours) out.push(`${label}: the drop ${standing ? 'stands' : 'does not stand'} for a holder that ${ours ? 'can' : 'cannot'} switch out`);
   if (bench === 'living' && !ours && !holder.trapped) out.push(`${label}: free holder read as unable to switch`);
-  // Memento: the Shadow Tag holder faints with its move, and its trap with it
   const trapperGone = bench === 'shadowtag' && foe.fainted;
   if (bench !== 'living' && ours && !trapperGone) out.push(`${label}: a holder behind ${bench} read as free`);
   if (sim) {
-    // the premise of the rule: the switch clears every stage
     b.battle.choose('p2', 'default');
     if (holder.isActive || Object.values(holder.boosts).some(stage => stage !== 0)) out.push(`${label}: the simulator kept ${JSON.stringify(holder.boosts)} on the switched-out body`);
   }
@@ -439,10 +385,8 @@ describe.each(MODES)('drop rows: $name', mode => {
   const dropMoves = dex.moves.all().filter(playable).map(move => ({ move, drops: dropsOf(move) })).filter(entry => entry.drops.length > 0);
   const trapper = (mode: Mode) => dexOf(mode).abilities.get('shadowtag').name;
 
-  /** The holder is the body that carries the drop: p1 for a drop on the user, p1 as the target of p2's move for a drop on the target. */
   function played(entry: (typeof dropMoves)[number], role: Role, bench: Bench | 'shadowtag'): { b: Board; holder: Pokemon; foe: Pokemon } | null {
     const mover = role === 'self' ? 'p1' : 'p2';
-    // the weak mover keeps the bulky Fire body alive, so a secondary drop lands on a body that did not faint
     const b = board(mode, {
       holder: 'Typhlosion', foe: 'Typhlosion', bench: bench === 'shadowtag' ? 'living' : bench,
       ...(mover === 'p1' ? { holderMoves: [entry.move.id], holderLevel: 5 } : { foeMoves: [entry.move.id], foeLevel: 5 }),

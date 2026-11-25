@@ -1,10 +1,10 @@
 import { ENGINE_PROTOCOL, type EngineRequest, type EngineResponse } from './protocol.ts';
 
+/** The outcome of `validateEngineResponse`: the response, or every error found. */
 export type EngineCheck = { ok: true; response: EngineResponse } | { ok: false; errors: string[] };
 
 const inRange = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= -1 && value <= 1;
 
-/** The side's values: one per option, nothing else, each on the scale. */
 function valueErrors(side: 'p1' | 'p2', ids: string[], values: unknown): string[] {
   if (!values || typeof values !== 'object') return [`values.${side} must be an object of option id to value`];
   const record = values as Record<string, unknown>;
@@ -16,7 +16,6 @@ function valueErrors(side: 'p1' | 'p2', ids: string[], values: unknown): string[
   ];
 }
 
-/** The optional matrix: every option of each side once, and a full grid of values on the scale. */
 function matrixErrors(request: EngineRequest, matrix: unknown): string[] {
   if (matrix === undefined) return [];
   if (!matrix || typeof matrix !== 'object') return ['matrix must be an object with p1, p2 and values'];
@@ -34,10 +33,7 @@ function matrixErrors(request: EngineRequest, matrix: unknown): string[] {
   return grid ? [] : ['matrix.values must have one row per matrix.p1 entry and one column per matrix.p2 entry, each from -1 to 1'];
 }
 
-/**
- * The checks every answer passes before the dashboard reads it; the conformance tool (check-engine)
- * runs the same ones, so an engine that passes there is read here.
- */
+/** The checks every answer passes before the dashboard reads it; `check-engine` runs the same ones. */
 export function validateEngineResponse(request: EngineRequest, value: unknown): EngineCheck {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { ok: false, errors: ['the answer must be a JSON object'] };
   const response = value as Partial<EngineResponse>;

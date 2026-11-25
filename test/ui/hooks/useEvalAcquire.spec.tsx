@@ -44,7 +44,6 @@ describe('useEvalAcquire', () => {
     const onPosition = vi.fn();
     await result.current.makeSweepAcquireAll(6)(report, onPosition);
     expect(source.acquireAll).toHaveBeenCalledWith(6, report, onPosition, undefined);
-    // Round 79 (T290): the replacement callback rides along as the fifth argument, only when the sweep has one.
     const onReplacement = vi.fn();
     await result.current.makeSweepAcquireAll(6)(report, onPosition, undefined, onReplacement);
     expect(source.acquireAll).toHaveBeenLastCalledWith(6, report, onPosition, undefined, onReplacement);
@@ -71,7 +70,6 @@ describe('useEvalAcquire', () => {
     const { result, rerender } = renderHook((props: Inputs) => useEvalAcquire(props), { initialProps: inputs({ source, dwellEnabled: true }) });
     expect(source.acquireExact).not.toHaveBeenCalled();
 
-    // Scrubbing restarts the timer; only the settled turn is acquired.
     act(() => vi.advanceTimersByTime(500));
     rerender(inputs({ source, dwellEnabled: true, viewTurn: 4 }));
     act(() => vi.advanceTimersByTime(500));
@@ -115,8 +113,6 @@ describe('useEvalAcquire', () => {
     await act(async () => { release('{"turn":2}'); await vi.runAllTimersAsync(); });
   });
 
-  // Round 82 (A7e): the dwell timer of a turn that fires while another acquisition runs used to drop the turn for good (nothing
-  // re-ran the effect when the acquisition ended), so a picker stayed approximate until the user scrubbed again.
   test('the turn the pointer settled on while another acquire ran is acquired when that one ends', async () => {
     vi.useFakeTimers();
     const releases: ((value: string) => void)[] = [];
@@ -135,7 +131,6 @@ describe('useEvalAcquire', () => {
     expect(source.acquireExact).toHaveBeenCalledTimes(2);
     expect(source.acquireExact).toHaveBeenLastCalledWith(13, expect.any(Function));
     await act(async () => { releases[1]('{"turn":13}'); await vi.runAllTimersAsync(); });
-    // a turn that stored its position is not acquired again
     expect(source.acquireExact).toHaveBeenCalledTimes(2);
   });
 });

@@ -5,13 +5,7 @@ import {
   expectExecutedLoggedTurn, lightEngine, loadDockReplay, loggedTurn, openVariationHistory, variationPanel,
 } from './dock-helpers';
 
-/**
- * Round 84 (turn dock), step A6c: the tasks of the spec's success criteria 1 to 5 at 1366 x 768 with no variation standing, each
- * held to its click count (loading the fixture and waiting for the exact pickers do not count; Done is never needed, Execute
- * closes the tray). Doubles OU runs on turn 5 of `gen9doublesou-2693620934`, where all four active slots acted (plan C2): Zapdos
- * Knock Off and Dragonite Rock Slide on one side, Farigiraf Trick Room and Glimmora Sludge Bomb on the other. The Tera and Mega
- * tasks are in `turn-dock-vgc.spec.ts`, counted on their own.
- */
+// Click counts exclude loading and waiting for the exact pickers; Done is never needed, Execute closes the tray.
 const DOUBLES = 'gen9doublesou-2693620934';
 const TURN = 5;
 const doublesReplay = dockReplays.find(replay => replay.id === DOUBLES)!;
@@ -90,9 +84,6 @@ test.describe('Doubles OU, turn 5, no variation standing', () => {
   });
 
   test('task 5, a What-if move: 6 clicks (chip, "Dice · What if", the field, the option, "Load move", Execute); the plan predicted 8', async ({ page }) => {
-    // The plan counted a second chip click and the loaded tile. The rebuild that "Load move" starts seeds the loaded move as the
-    // slot's pending choice (useAppController), so the chip names it at once and Execute follows. The other slots start empty at
-    // that fresh tip, the engine fills them, and the pressed Execute waits for the fill.
     test.setTimeout(300_000);
     const clicks = new Clicks();
     await clicks.click(dockChip(page, 'p1b'));

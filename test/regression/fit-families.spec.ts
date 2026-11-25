@@ -1,18 +1,26 @@
 import { describe, expect, test } from 'vitest';
 import {
-  dumpSamples, familyOf, familyReports, liftHolds, parseKTable, parseModelForms, parseWeightSet, phaseKReports, rootScaleReports, rulesetOfId, withModelForms, withoutHoldout, withoutUnratedLadder,
+  dumpSamples,
+  familyOf,
+  familyReports,
+  liftHolds,
+  parseKTable,
+  parseModelForms,
+  parseWeightSet,
+  phaseKReports,
+  rootScaleReports,
+  rulesetOfId,
+  withModelForms,
+  withoutHoldout,
+  withoutUnratedLadder,
   type FamilySample,
 } from './fit-families';
 import { mulberry32 } from './fit-helpers';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
-/**
- * Round 65: the refit per family (rule set × game type), on samples read from
- * calibration-bank dumps (the corpus measured like the app), without the
- * holdout, clustered by set.
- */
 
 const K = { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } };
 const leaf = (tanh: number, doubles: boolean, ff: number) => {
@@ -20,7 +28,6 @@ const leaf = (tanh: number, doubles: boolean, ff: number) => {
   return 2 / (1 + Math.exp(-(k.k0 + k.k1 * ff) * tanh)) - 1;
 };
 
-/** A synthetic family: outcomes drawn from the true weights over two features, scores captured under the start weights [2, 2], one game per set. */
 function synthetic(prefix: string, gameType: 'singles' | 'doubles', truth: number[], games: number, seed: number): FamilySample[] {
   const random = mulberry32(seed);
   const out: FamilySample[] = [];
@@ -69,7 +76,7 @@ describe('fit families', () => {
     expect(samples[1]).toMatchObject({ ruleset: 'standard', gameType: 'doubles', set: 'standard-doubles|carol|dave' });
   });
 
-  test('round 66: ladder games without a rating leave the fit, tournament games and rated ladder games stay', () => {
+  test('ladder games without a rating leave the fit, tournament games and rated ladder games stay', () => {
     const dir = mkdtempSync(join(tmpdir(), 'fit-families-'));
     const dump = join(dir, 'merged.jsonl');
     const row = (id: string, tranche: string, rating: number | null) => JSON.stringify({
@@ -107,15 +114,11 @@ describe('fit families', () => {
     expect(doubles.proposed.doubles.bodies).toBe(2);
     expect(singles.proposed.singles.matchup).toBeLessThan(doubles.proposed.doubles.matchup);
     expect(singles.games).toBe(220);
-    // A score that the start weights do not give back stops the report.
     expect(() => familyReports([{ ...samples[0], score: 0.9 }, ...samples.slice(1)], names, families, () => K,
       { seeds: 2, folds: 5, draws: 4, minGames: 20 }, leaf)).toThrow(/identity/);
   });
 
-  // Round 74 (T163, T263): a capture with search holds the root value in `score`, which no start table gives back. The
-  // dump says it came from a search by the root fields only a search writes (gameValue, the decided sweep, the proven
-  // forced win); the weight fit then needs the features, the outcome and the start tables, and skips the identity.
-  describe('round 74 (T163, T263): a weight fit on a dump from a search', () => {
+  describe('a weight fit on a dump from a search', () => {
     const row = (id: string, extra: Record<string, unknown>, g = [1, 2]) => JSON.stringify({
       id, turn: 2, tranche: 'fit-ladder', phase: 'early', gameType: 'singles', score: 0.1, faintedFraction: 0, p1Won: true, lastPair: false, g, ...extra,
     });
@@ -133,9 +136,7 @@ describe('fit families', () => {
         expect(dumpSamples([dumpOf(row('gen9ou-3', field))], () => ['a', 'b'])[0].search, JSON.stringify(field)).toBe(true);
       }
       expect(dumpSamples([dumpOf(staticRow('gen9ou-4'), staticRow('gen9ou-5'))], () => ['a', 'b']).map(sample => sample.search)).toEqual([false, false]);
-      // A dump written before round 67 has no root fields at all: static.
       expect(dumpSamples([dumpOf(row('gen9ou-6', {}))], () => ['a', 'b'])[0].search).toBe(false);
-      // The flag is per dump file: a static file next to a search file keeps its identity check.
       const mixed = dumpSamples([dumpOf(staticRow('gen9ou-7')), dumpOf(row('gen9ou-8', { gameValue: -0.1 }))], () => ['a', 'b']);
       expect(mixed.map(sample => sample.search)).toEqual([false, true]);
     });
@@ -145,7 +146,6 @@ describe('fit families', () => {
     const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
 
     test('the identity is skipped for samples of a search dump, and the fit runs on their features and outcomes', () => {
-      // The roots a search returns: no start table gives them back.
       const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 1).map(sample => ({ ...sample, score: 0.37, search: true }));
       expect(() => familyReports(samples.map(sample => ({ ...sample, search: false })), names, families, () => K, options, leaf)).toThrow(/identity/);
       const reports = familyReports(samples, names, families, () => K, options, leaf);
@@ -162,9 +162,7 @@ describe('fit families', () => {
     });
   });
 
-  // Rule R2 of round 65: a weight the first pass flags (a flipped sign, a band wider than twice its value) is held, and the family refits once.
   test('a flagged weight is held in a second pass, which the report gives beside the first', () => {
-    // The truth runs the second feature against its start sign: the first pass flips it and flags it.
     const samples = synthetic('gen9ou', 'singles', [3, -1.5], 260, 7);
     const names = ['bodies', 'matchup'];
     const families = [{ name: 'standard-singles', singles: [2, 2], doubles: [2, 2] }];
@@ -176,9 +174,7 @@ describe('fit families', () => {
     expect(entry.secondPassHeld).toEqual(['shared:matchup']);
   });
 
-  // Round 67 (T138): once Champions prices its own scale, a Champions capture holds leaf values under the Champions K:
-  // the identity check and the refit read the K of each family's rule set.
-  test('round 67 (T138): the identity and the refit read the K of each family\'s rule set', () => {
+  test('the identity and the refit read the K of each family\'s rule set', () => {
     const championsK = { singles: { k0: 1.6, k1: 4.4 }, doubles: { k0: 1.9, k1: 4.2 } };
     const kOf = (ruleset: string) => (ruleset === 'champions' ? championsK : K);
     const leafOf = (tanh: number, doubles: boolean, ff: number, ruleset: string) => {
@@ -191,30 +187,23 @@ describe('fit families', () => {
     const families = [{ name: 'standard-singles', singles: [2, 2], doubles: [2, 2] }, { name: 'champions-singles', singles: [2, 2], doubles: [2, 2] }];
     const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
     expect(familyReports(samples, names, families, kOf, options, leafOf).identity).toEqual({ samples: samples.length, off: 0 });
-    // One K for every family cannot give the Champions capture back.
     expect(() => familyReports(samples, names, families, () => K, options, leaf)).toThrow(/identity/);
   });
 
-  // Round 69 (T102): a capture is made under the tables of its day; a weight adopted since moves the start tables, and
-  // `captured` names the capture-time weights the identity check starts from (the fit and its baseline stay at today's tables).
-  test('round 69 (T102): the identity starts from the capture-time weights when a table has moved since', () => {
+  test('the identity starts from the capture-time weights when a table has moved since the capture', () => {
     const samples = synthetic('gen9ou', 'singles', [3, 1], 220, 3);
     const names = ['bodies', 'matchup'];
     const moved = [{ name: 'standard-singles', singles: [3, 2], doubles: [3, 2] }];
     const options = { seeds: 2, folds: 5, draws: 4, minGames: 20 };
     expect(() => familyReports(samples, names, moved, () => K, options, leaf)).toThrow(/identity/);
     expect(() => familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 2 } }, leaf)).not.toThrow();
-    // A capture-time weight that is wrong still stops the fit.
     expect(() => familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 5 } }, leaf)).toThrow(/identity/);
-    // The report's baseline is today's table, not the captured one.
     const report = familyReports(samples, names, moved, () => K, { ...options, captured: { bodies: 2, matchup: 2 } }, leaf).families['standard-singles'];
     if (!('weights' in report)) throw new Error('no report');
     expect(report.weights.find(weight => weight.name === 'bodies')?.hand).toBe(3);
   });
 
-  // Round 67 (T138): Pokémon Champions prices its own scale. The phase K of a family comes back from its own games:
-  // the static's tanh under the family's tables, outcomes against k0 + k1 × the fainted share.
-  test('round 67 (T138): the phase K of a family comes back from its own games', () => {
+  test('the phase K of a family comes back from its own games', () => {
     const random = mulberry32(67);
     const truth = (ff: number) => 1 + 4 * ff;
     const samples: FamilySample[] = [];
@@ -228,7 +217,6 @@ describe('fit families', () => {
         });
       }
     }
-    // The bank prices the last pair by its race: those positions never meet the leaf K.
     const lastPairs = samples.slice(0, 50).map(sample => ({ ...sample, game: `${sample.game}-last`, p1Won: !sample.p1Won, lastPair: true }));
     const families = [{ name: 'champions-singles', singles: [2, 2], doubles: [2, 2] }, { name: 'champions-doubles', singles: [2, 2], doubles: [2, 2] }];
     const reports = phaseKReports([...samples, ...lastPairs], families, () => K, 20);
@@ -242,9 +230,7 @@ describe('fit families', () => {
     expect(report.buckets.late.brierFitted).toBeLessThan(report.buckets.late.brierToday);
     expect(report.spread.k1.lo).toBeLessThan(report.fitted.k1);
   });
-  // Round 69 (T102, decision 17; T49 and T42 share the tool): a column at 0 in both tables is held, and a fit frees it by name.
-  describe('round 69: new columns, lifted holds and model-form columns', () => {
-    /** Outcomes from weights that run with the fainted share: the first feature weighs w0 + w0Phase x ff. Scores are captured under the start weights [2, 2]. */
+  describe('new columns, lifted holds and model-form columns', () => {
     function phased(prefix: string, gameType: 'singles' | 'doubles', w0: number, w0Phase: number, games: number, seed: number, root = false): FamilySample[] {
       const random = mulberry32(seed);
       const out: FamilySample[] = [];
@@ -281,16 +267,13 @@ describe('fit families', () => {
         expect(formed.names).toEqual(['bodies', 'matchup', 'bodies@phase']);
         expect(formed.families[0]).toMatchObject({ singles: [2, 2, 0], doubles: [2, 2, 0] });
         expect(formed.samples[0].g[2]).toBeCloseTo(samples[0].g[0] * samples[0].faintedFraction, 12);
-        // The identity check still holds: the derived column weighs 0 in the start tables.
         const held = report(formed.samples, family, formed.names, formed.families, {});
         expect(held.weights.find(weight => weight.name === 'bodies@phase')).toMatchObject({ free: false, fit: 0 });
-        // Lifted, with the rest of the table at the hand weights: the phase part comes back.
         const lifted = report(formed.samples, family, formed.names, formed.families, { only: ['bodies', '*@phase'] });
         const side = gameType === 'doubles' ? lifted.proposed.doubles : lifted.proposed.singles;
         expect(side.matchup).toBe(2);
         expect(Math.abs(side.bodies - 1)).toBeLessThan(0.7);
         expect(Math.abs(side['bodies@phase'] - 5)).toBeLessThan(1.5);
-        // The plain table (no derived column) fits the same games worse out of fold.
         const plain = report(samples, family, names, tables(family), { only: ['bodies'] });
         expect(lifted.summary.pooled.meanLogLossDelta).toBeLessThan(plain.summary.pooled.meanLogLossDelta);
         expect(lifted.verdict.adopt).toBe(true);
@@ -338,16 +321,9 @@ describe('fit families', () => {
   });
 });
 
-/**
- * Round 69 (T163, decision 20): the leaf K on the search's root values. A search capture holds the root
- * value v in wp units; its logit is 2 atanh(v), and a family's scale c0 + c1 ff of sigmoid(c logit)
- * against the outcome says how far the search's own values sit from honest (the search averages leaf values,
- * so it re-inflates or flattens them).
- */
 describe('root scale of search values', () => {
   const SCALE = (ff: number, c0: number, c1: number) => c0 + c1 * ff;
 
-  /** Root values from a search whose logit z is c_true(ff) times too big (or too small) a reading of the odds. */
   function searched(prefix: string, gameType: 'singles' | 'doubles', c0: number, c1: number, games: number, seed: number): FamilySample[] {
     const random = mulberry32(seed);
     const out: FamilySample[] = [];
@@ -378,18 +354,14 @@ describe('root scale of search values', () => {
     expect(report.n).toBe(rows.length);
     expect(report.sets).toBe(900);
     expect(report.capturedK).toEqual(k);
-    // k0 and k1 trade off against each other: the scale in the middle of the games is the steady reading.
     for (const ff of [0.2, 0.4, 0.6]) expect(Math.abs(report.scale.k0 + report.scale.k1 * ff - SCALE(ff, 0.7, 0.3))).toBeLessThan(0.1);
-    // K' is the K of the capture times the scale: the line through the product on the rows' own phases.
     const at = (ff: number) => (k.k0 + k.k1 * ff) * SCALE(ff, 0.7, 0.3);
     for (const ff of [0.1, 0.4, 0.7]) expect(Math.abs(report.kPrime.k0 + report.kPrime.k1 * ff - at(ff)) / at(ff)).toBeLessThan(0.1);
-    // The fitted scale reads the same games better than the capture's own values.
     for (const bucket of ['early', 'mid', 'late'] as const) {
       expect(report.buckets[bucket].n).toBeGreaterThan(100);
       expect(report.buckets[bucket].logLossFitted).toBeLessThan(report.buckets[bucket].logLossToday);
       expect(report.buckets[bucket].brierFitted).toBeLessThan(report.buckets[bucket].brierToday);
     }
-    // The 90 percent band of K' at a third fainted holds the true K' there.
     const third = report.spread.at.find(entry => Math.abs(entry.ff - 1 / 3) < 1e-9)!;
     expect(third.k).toBeCloseTo((k.k0 + k.k1 / 3) * (report.scale.k0 + report.scale.k1 / 3), 10);
     expect(third.lo).toBeLessThan(at(1 / 3));
@@ -427,7 +399,6 @@ describe('root scale of search values', () => {
     expect(captured('standard')).toEqual(K);
     expect(captured('vgc')).toEqual(K);
     expect(captured('champions').doubles).toEqual({ k0: 1.86, k1: 4.17 });
-    // A stamp that lacks a rule set, or a K, stops the report instead of reading today's table.
     expect(() => parseKTable(JSON.stringify({ standard: K }))).toThrow(/vgc/);
     expect(() => parseKTable(JSON.stringify({ standard: K, vgc: K, champions: { singles: K.singles, doubles: { k0: 1 } } }))).toThrow(/champions.*doubles/);
   });
@@ -436,8 +407,29 @@ describe('root scale of search values', () => {
     const rows = searched('gen9doublesou', 'doubles', 1, 0, 200, 53);
     const other = () => ({ singles: K.singles, doubles: { k0: K.doubles.k0 + 0.5, k1: K.doubles.k1 } });
     expect(() => rootScaleReports(rows, kOf, other, 10)).toThrow(/standard-doubles.*capture/);
-    // Singles rows do not care for the doubles table of the stamp.
     const singles = searched('gen9ou', 'singles', 1, 0, 200, 59);
     expect(() => rootScaleReports(singles, kOf, other, 10)).not.toThrow();
+  });
+});
+
+describe('scripts/k-stamp.mjs writes the K table the leaf resolves', () => {
+  const run = () => spawnSync(process.execPath, ['scripts/k-stamp.mjs'], { cwd: process.cwd(), encoding: 'utf8' });
+
+  test('parseKTable reads the stamp for every rule set and game type', () => {
+    const result = run();
+    expect(result.status, result.stderr).toBe(0);
+    const stamp = parseKTable(result.stdout);
+    for (const ruleset of ['standard', 'vgc', 'champions'] as const) {
+      for (const gameType of ['singles', 'doubles'] as const) expect(stamp(ruleset)[gameType], `${ruleset} ${gameType}`).toEqual(JSON.parse(result.stdout)[ruleset][gameType]);
+    }
+  });
+
+  test('the stamp holds today\'s five family values', () => {
+    const stamp = JSON.parse(run().stdout);
+    expect(stamp).toEqual({
+      standard: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
+      vgc: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 2.98, k1: 0.88 } },
+      champions: { singles: { k0: 2.28, k1: 1.49 }, doubles: { k0: 1.86, k1: 4.17 } },
+    });
   });
 });

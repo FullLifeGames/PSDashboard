@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BetaMark, SupportLinks } from '../../../src/components/SupportLinks';
 
-describe('the support links (round 77, user gate 28.10.2026: 1a with "by Bene (FullLifeGames)", mobile a)', () => {
+describe('the support links', () => {
   test('Report issue calls its handler; the creator link opens fulllifegames.com in a new tab', async () => {
     const onReportIssue = vi.fn();
     render(<SupportLinks embed={false} onReportIssue={onReportIssue} />);

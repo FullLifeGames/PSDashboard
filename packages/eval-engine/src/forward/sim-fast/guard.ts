@@ -1,13 +1,5 @@
-/**
- * Round 59 (T91): the hash gate. The pre-check and the rule-table lever rely
- * on these @pkmn/sim functions doing exactly what the pinned release does
- * (PINNED_SIM_HASHES below names it). Under Node
- * the layer hashes their source (FNV-1a over Function.prototype.toString:
- * synchronous, no node:crypto in engine code) at first use and steps back
- * (status hash-mismatch) when one changed; forced mode throws. A browser
- * bundle prints minified source, so there the pin and CI stand guard and the
- * host decides (state.ts).
- */
+// Under Node the layer hashes the source of the sim functions it relies on (FNV-1a over toString) at first use;
+// a change steps it back (forced mode throws). A browser bundle prints minified source: there the pin and CI guard.
 import { Battle, Pokemon, toID } from '@pkmn/sim';
 import { simFormats } from '@fulllifegames/replay-core';
 import { breakSimFast, onNode } from './state.ts';
@@ -23,14 +15,7 @@ const FUNCTIONS: readonly [keyof SimProtos, string, readonly string[]][] = [
   ['formats', 'DexFormats', ['getRuleTable']],
 ];
 
-/**
- * @pkmn/sim 0.10.15 (round 87, release 1.1.0: the 14 hashes carry over from 0.10.12, since battle, field and dex-formats stay
- * byte-identical and pokemon.mjs changes only inside transformInto); the ESM and CJS builds print three of these functions
- * differently. Round 78 re-pinned three of
- * them after a review against 0.10.11: runEvent changed only its syntax (`sourceEffect?.effectType`), getCallback's
- * SwitchIn fallback now holds in every generation (dispatch.ts counts it wide), and getRuleTable rewrote the tag rules,
- * which the layer does not read.
- */
+/** FNV-1a hashes of the sim functions the layer relies on, per build of the pinned @pkmn/sim (ESM and CJS differ). */
 export const PINNED_SIM_HASHES: Readonly<Record<'esm' | 'cjs', HashTable>> = {
   esm: {
     'Battle.runEvent': '95ef43d6', 'Battle.findEventHandlers': 'a7e357a8', 'Battle.findPokemonEventHandlers': 'e6d2de11',
@@ -69,7 +54,6 @@ export function hashSources(protos: SimProtos): Record<string, string> {
 let pinned: Readonly<Record<string, HashTable>> = PINNED_SIM_HASHES;
 let verdict: boolean | null = null;
 
-/** Test hook: another pin table (null restores the real one); the next use checks again. */
 export function setPinnedHashes(table: Readonly<Record<string, HashTable>> | null): void {
   pinned = table ?? PINNED_SIM_HASHES;
   verdict = null;
@@ -90,7 +74,6 @@ function check(): boolean {
   return false;
 }
 
-/** True when the layer may run: in a browser always (the host decided), under Node when one build's pins match. */
 export function guardPasses(): boolean {
   if (verdict === null) verdict = onNode() ? check() : true;
   return verdict;

@@ -9,7 +9,6 @@ import { pokemon } from '../fixtures/sim-state';
 
 const { snapshots } = replayFixture('singles');
 
-/** Round 84 (A7f, ruling 18a): the panel starts closed under a one-line toggle; these cases read what stands inside it. */
 const toggle = () => screen.getByRole('button', { name: /Variation moves/ });
 function renderOpen(ui: ReactElement) {
   const result = render(ui);
@@ -36,7 +35,6 @@ describe('BranchHistoryPanel', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  // Round 84 (A7f, ruling 18a): at 150 % the open panel slid under the sticky dock, so it sits closed like the turn explanation.
   test('it starts closed: the toggle counts the turns, the body and the hint are hidden, and a click opens and closes it', () => {
     render(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3)]} snapshots={snapshots} onNavigate={vi.fn()} />);
     expect(toggle()).toHaveTextContent('▸ Variation moves · 2 turns');
@@ -96,7 +94,6 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
-  // Round 77 (C7): the panel does not know singles from doubles; an ended tip offers no play on.
   test('an ended tip says the game ends there and no longer invites to continue', async () => {
     const onNavigate = vi.fn();
     renderOpen(<BranchHistoryPanel branchStartTurn={2} history={[entry(2), entry(3)]} snapshots={snapshots} onNavigate={onNavigate} ended />);
@@ -105,7 +102,6 @@ describe('BranchHistoryPanel', () => {
     expect(onNavigate).toHaveBeenCalledWith({ turn: 4, line: 'variation' });
   });
 
-  // Round 88 (T348, #84): a replacement on both sides is stored as an entry of kind turn with the number of the entry before it.
   test.each([
     ['singles', 1],
     ['doubles', 2],
@@ -189,7 +185,6 @@ describe('BranchHistoryPanel', () => {
   });
 });
 
-// Round 82 (forced dice), step A7c, decision 6a: a row lists the dice the user forced in its turn and says which took no effect.
 describe('the dice of a turn in its row', () => {
   const marks = (p1: { label: string; noEffect?: string }[], p2: { label: string; noEffect?: string }[] = []) => ({ p1, p2 });
   const diceLine = () => screen.getByRole('group', { name: 'Forced dice' });
@@ -227,7 +222,6 @@ describe('the dice of a turn in its row', () => {
   });
 });
 
-/** Round 84 (A7i, ruling 20a): the caller hands in the buttons for the toggle line, a line under it, and the saved rows for the body. */
 describe('the slots of the toggle line', () => {
   const slots = (onOpenChange = vi.fn()) => ({
     actions: <><button type="button">Save here</button><button type="button">Share here</button></>,

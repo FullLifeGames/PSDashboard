@@ -8,18 +8,7 @@ import { pairKoOdds } from '../src/pair/odds';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * Round 70 (N1): the one-turn odds model prices a move's accuracy from the stage table and its crit from the move's own
- * ratio, and `unpriceable` sends a pair it cannot price to the plain seed average. Its guard named eleven of the
- * eighteen items and abilities of Gen 9 that carry a handler on a crit or accuracy event (Wide Lens, Zoom Lens, Bright
- * Powder, Lax Incense, Compound Eyes, Hustle, Sand Veil, Snow Cloak, Victory Star, Tangled Feet, Wonder Skin); Leek,
- * Stick, Lucky Punch, Razor Claw, Scope Lens, Merciless and Super Luck passed, and the comment said they "fail closed".
- * The guard now reads the rule from the simulator's Dex: a holder of an item or ability with a handler on the
- * ModifyAccuracy or ModifyCritRatio event (the holder's own, a foe's, an ally's, the source's or any) is unpriceable. This
- * census walks every item and ability of every generation and the Champions mod (@pkmn/dex strips the handlers, so it
- * reads the simulator's Dex), and each effect with a crit or accuracy handler is either guarded or listed below with the
- * reason it stays out; a handler the test has not seen fails it. The guard's answers leave the live battle as it was.
- */
+// @pkmn/dex strips the handlers, so the census reads the simulator's Dex.
 
 await loadSimMods('gen9championsou');
 
@@ -29,14 +18,11 @@ const RULES: Rules[] = [
   { name: 'Pokémon Champions', gen: 9, format: 'gen9championscustomgame', level: 50, evs: { hp: 32, atk: 32, def: 0, spa: 32, spd: 2, spe: 0 } },
 ];
 
-/** The handlers that change the number the model prices: the accuracy or the crit rate. */
 const MODIFIES = /^on(Any|Foe|Ally|Source)?Modify(Accuracy|CritRatio)$/;
-/** A handler of the family that leaves both numbers to the model: the event that skips the roll or blocks the crit. */
 const PRICED = new Set(['onAnyAccuracy', 'onCriticalHit']);
 const FAMILY = /Accuracy|Crit/;
 const NOT_A_HANDLER = /(Priority|SubOrder|Order)$/;
 
-/** The effects that carry a family handler and stay unguarded, each with the reason (played below). */
 const EXCLUDED: Record<string, string> = {
   'ability:noguard': 'moveAccuracy gives a move of a No Guard side accuracy 1, the number the simulator uses',
   'ability:battlearmor': 'the calc gives a crit-proof defender the normal roll for a crit, so the crit-weighted share is exact at any rate',
@@ -62,7 +48,6 @@ function effectsOf(battle: Battle, gen: number): Found[] {
 const keyOf = (found: Found) => `${found.kind}:${found.id}`;
 const guardedByRule = (found: Found) => found.handlers.some(handler => MODIFIES.test(handler));
 
-/** Snorlax (attacker) against Blissey (defender), both standing in front. */
 function scene(rules: Rules, format = rules.format): Battle {
   const mon = (species: string, moves: string[]): PokemonSet => set(species, moves, { level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
   return battleOf(format, [mon('Snorlax', ['hydropump', 'bodyslam', 'tackle'])], [mon('Blissey', ['splash'])]);
@@ -75,7 +60,6 @@ function place(mon: Pokemon, found: Pick<Found, 'kind' | 'id'>): void {
 
 const bodies = (battle: Battle) => ({ attacker: battle.sides[0].active[0]!, defender: battle.sides[1].active[0]! });
 
-/** Whether the guard fires with the effect on one seat; the call leaves the battle as it found it. */
 function guardFires(battle: Battle, found: Found, seat: 'attacker' | 'defender'): boolean {
   const { attacker, defender } = bodies(battle);
   const holder = bodies(battle)[seat];
@@ -89,7 +73,7 @@ function guardFires(battle: Battle, found: Found, seat: 'attacker' | 'defender')
   return fires;
 }
 
-describe.each(RULES)('$name: the items and abilities with a crit or accuracy handler (round 70, N1)', rules => {
+describe.each(RULES)('$name: the items and abilities with a crit or accuracy handler', rules => {
   const battle = scene(rules);
   const found = effectsOf(battle, rules.gen);
 
@@ -118,7 +102,7 @@ describe.each(RULES)('$name: the items and abilities with a crit or accuracy han
   });
 });
 
-describe('Gen 9: the census in numbers (round 70, N1)', () => {
+describe('Gen 9: the census in numbers', () => {
   test('eighteen effects are guarded, the five listed stay out', () => {
     const battle = scene(RULES[RULES.length - 2]);
     const found = effectsOf(battle, 9);
@@ -130,14 +114,13 @@ describe('Gen 9: the census in numbers (round 70, N1)', () => {
   });
 });
 
-/** The exclusions above, each played where its effect exists. */
 const PLAYED = ['ability:battlearmor', 'ability:disguise', 'ability:iceface', 'ability:noguard', 'ability:shellarmor'];
 
 test('every exclusion has a play below', () => {
   expect(Object.keys(EXCLUDED).sort()).toEqual(PLAYED);
 });
 
-describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, played (round 70, N1)', rules => {
+describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, played', rules => {
   const exists = (key: string) => effectsOf(scene(rules), rules.gen).some(effect => keyOf(effect) === key);
   const asHolder = (battle: Battle, id: string, seat: 'attacker' | 'defender') => place(bodies(battle)[seat], { kind: 'ability', id });
 
@@ -165,7 +148,6 @@ describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, pla
       (defender as { hp: number }).hp = hp;
       return boundaryEvent(battle, attacker, defender, 'bodyslam');
     };
-    // Where a crit kills and a normal hit does not, a defender that blocks the crit loses the difference.
     let hp = defender.maxhp;
     while (hp > 8 && !((reads(hp)?.critKillRolls ?? 0) > (reads(hp)?.normalKillRolls ?? 0))) hp -= 8;
     expect(hp, 'a straddling HP exists').toBeGreaterThan(8);
@@ -186,7 +168,7 @@ describe.each(RULES.filter(rules => rules.gen >= 3))('$name: the exclusions, pla
   });
 });
 
-describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer (round 70, N1)', () => {
+describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer', () => {
   const rules = RULES[RULES.length - 2];
   const newly = ['item:leek', 'item:stick', 'item:luckypunch', 'item:razorclaw', 'item:scopelens', 'ability:merciless', 'ability:superluck'];
   const effects = (keys: string[]) => keys.map((key): Found => ({ kind: key.startsWith('item') ? 'item' : 'ability', id: key.split(':')[1], name: key, handlers: [] }));
@@ -210,7 +192,6 @@ describe('Gen 9: a newly guarded effect behaves like Wide Lens in every consumer
       return battleOf('gen9doublescustomgame', [mon('Snorlax', ['hydropump', 'splash']), mon('Blissey', ['splash'])], [mon('Pikachu', ['splash']), mon('Chansey', ['splash'])]);
     };
     const option = 'move hydropump 1, move splash';
-    // The foe's HP where Hydro Pump's kill is a roll: its odds are an event for a body without the effect.
     const plain = doubles();
     const foe = plain.sides[1].active[0]!;
     let hp = foe.maxhp;

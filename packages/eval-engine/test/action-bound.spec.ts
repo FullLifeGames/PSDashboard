@@ -15,15 +15,6 @@ import { parsePlayedActions, parsePlayedActionsDoubles, turnEvents, type FellMar
 import { CHAMPIONS, mon, playClicks, RULES, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 89 (#108): the order bound of a body that fell before it acted. `ruledOutMoves` reads the simulator's queue for the body's
- * moves and the logged actions before its fall (`queuePlace`, the dice answered by `activated`): a move is out when it stands
- * certainly ahead of one of them (a higher priority bracket, or the same bracket and a higher speed while no line moved a speed; a tie
- * is no proof), and a chosen switch is out whenever the log shows an action before the fall. The rows play every move of the body against
- * the logged action on a copy under both answers of the dice: the moves ruled out are exactly the moves that act first under both.
- * Rows: doubles 2710981835 turn 7 (the report of #108), singles smogtours-gen9ou-671362 turn 9 (Prankster Grafaiai) and Champions
- * singles gen9championsou-2691527224 turn 14 (Rillaboom's Grassy Glide in Grassy Terrain).
- */
 await loadSimMods('gen9championsou');
 
 const ANSWERS = [false, true] as const;
@@ -45,7 +36,6 @@ describe('the shared order rules', () => {
   });
 });
 
-/** Whether `own` acts ahead of the foe's logged action in one turn on a copy: true ahead, false behind or never (knocked out first). */
 function actsFirst(board: Battle, clicks: { p1: string; p2: string }, ownSlot: string, foeSlot: string, chance: boolean): boolean {
   const copy = copyOf(board);
   copy.prng = new FixedDice({ chance });
@@ -57,7 +47,6 @@ function actsFirst(board: Battle, clicks: { p1: string; p2: string }, ownSlot: s
   return own >= 0 && (foe < 0 || own < foe);
 }
 
-/** The moves of the body of side 0, slot a, that act ahead of the foe's action under both answers of the dice. */
 function firstUnderBoth(board: Battle, click: (id: string, slot: number) => { p1: string; p2: string }, ownSlot: string, foeSlot: string): string[] {
   const body = board.sides[0].active[0]!;
   return body.moveSlots.map(slot => slot.id).filter((id, index) =>
@@ -112,7 +101,6 @@ describe('doubles: replay 2710981835 turn 7', () => {
     const acting = firstUnderBoth(board, click, 'p1a', 'p2a');
     expect([...bound.moves].sort()).toEqual(acting);
     expect(bound.switchOut).toBe(true);
-    // The report: Extreme Speed (+2) and Protect (+4) are out, Dragon Pulse and Thunderbolt are not.
     expect(bound.moves.every(id => ['extremespeed', 'protect'].includes(id))).toBe(true);
     if (moves) expect([...bound.moves].sort()).toEqual(['extremespeed', 'protect']);
     else expect(bound.moves).toEqual([]);
@@ -131,7 +119,6 @@ describe('doubles: replay 2710981835 turn 7', () => {
     const dragonite = scene.battle.sides[0].active[0]!;
     const floette = scene.battle.sides[1].active[0]!;
     expect(dragonite.getActionSpeed()).toBeLessThan(floette.getActionSpeed());
-    // The mover is faster than the body: no move of the body is certainly ahead, with or without the speed proof.
     for (const speedMoved of [false, true]) {
       expect(ruledOutMoves(scene.battle, dragonite, { ...mark(), speedMoved }).moves).toEqual([]);
     }
@@ -145,7 +132,6 @@ interface Row {
   body: { species: string; ability: string; item: string; moves: string[] };
   foe: { species: string; move: string; item?: string };
   grassy?: boolean;
-  /** The moves the Dex gives the first bracket of the body's queue: those that must be out. */
   expected: string[];
 }
 const GEN9 = RULES.find(entry => entry.generation === 9 && entry !== CHAMPIONS)!;
@@ -166,7 +152,6 @@ function boardOfRow(row: Row, foe = row.foe): Battle {
   return board;
 }
 
-/** The mark the parse gives for the row's turn: the foe's move, the lines of `extra`, then the fall of the body. */
 function markOf(row: Row, board: Battle, extra: string[] = []): FellMark {
   const lines = [`|move|p2a: ${row.foe.species}|${board.dex.moves.get(row.foe.move).name}|p1a: ${row.body.species}`, ...extra, `|faint|p1a: ${row.body.species}`];
   return parsePlayedActions(lines, rules).fell!.p1![0]!;

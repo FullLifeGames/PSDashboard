@@ -1,91 +1,34 @@
-/**
- * The sack shapes of one turn's protocol: which faint reads as a deliberate
- * feed (low HP, a healthy switch-in, a body that stayed, or a switch-in the
- * entry hazards took). Detection only; the verdict layer (grading.ts)
- * decides which shape earns the sack framing. Pure — no @pkmn/sim imports,
- * main-bundle safe. Moved out of played.ts in round 63.
- */
+/** The sack shapes of one turn's protocol; detection only, pure, no @pkmn/sim import (main-bundle safe). */
 
 import { dexOf, type GameRules, type RulesDex, type TurnSnapshot, toId, type SideId } from '@fulllifegames/replay-core';
 import { CHANCE_CANT } from '../dice-events.ts';
 
-/** A Pokémon fed to the opponent while nearly dead — its loss cost almost nothing. */
+/** A Pokémon fed to the opponent on purpose or nearly dead; the shape flags tell which gate (grading.ts) applies. */
 export interface SackInfo {
   name: string;
-  /**
-   * Round 63: the fed body's species (the pre-turn snapshot's forme, or the
-   * switch line's details) — the verdict layer matches it against the
-   * opposing near-decided target. Absent when neither names it.
-   */
   species?: string;
   hpFraction: number;
-  /**
-   * The fed body was HEALTHY (switched in and fainted the same turn above
-   * the low-HP threshold) — a simplification-sack CANDIDATE. Unlike low-HP
-   * feeds, the verdict layer only honors it while the engine's own scores
-   * call the game decisively won on both sides of the sack.
-   */
+  /** Switched in and fainted the same turn above the low-HP threshold; honored only while decisively ahead. */
   healthy?: boolean;
-  /**
-   * The fed body STAYED on the field (already active at turn start, never
-   * entered this turn) and fainted above the low-HP threshold — a
-   * deliberate-feed CANDIDATE (573756 t68). The verdict layer honors it
-   * only when the realized outcome landed on the played line's priced
-   * floor (the accepted worst case is what happened — no upside luck)
-   * and the windowed payoff over the safe guarantee clears the read margin.
-   */
+  /** Active at turn start, never entered this turn, fainted above the low-HP threshold: a deliberate-feed candidate. */
   stayed?: true;
-  /**
-   * Verdict-layer stamp (analysis.ts) — never set by detection: the stayed
-   * feed's windowed payoff repaid the FULL regret with the read margin on
-   * top, so the verdict cleared entirely instead of demoting one band.
-   */
+  /** Set by the verdict layer (analysis.ts), never by detection: the stayed feed repaid the regret with the margin. */
   verified?: true;
-  /**
-   * The fainted body's OWN action this turn failed by dice — its move
-   * missed, or a dice |cant| (full paralysis, flinch, freeze, sleep) held
-   * it. The verdict layer refuses the feed framing when that move carried a
-   * knock-out: a hit would have kept the body alive (573756 t73: +4
-   * Garchomp at 11 % moved first, Fire Fang missed, Body Press killed it —
-   * a roll, not a trade).
-   */
+  /** The body's action failed by dice (a miss or a dice `|cant|`); no feed when that move carried a knock-out. */
   rolled?: 'miss' | 'cant';
-  /**
-   * Round 63 (T17): the body was switched in during the turn's switch phase
-   * (before any move) and the entry hazards took it before it acted — the
-   * attack aimed at it hits nothing and the next body comes in free
-   * (653785 t19: Weavile into Stealth Rock). Rides on the low-HP or the
-   * healthy shape; the verdict layer gates it on its own.
-   */
+  /** Switched in in the switch phase and taken by entry hazards before acting: the attack aimed at it hits nothing. */
   hazard?: true;
-  /**
-   * Round 64 (T123): the side's other bodies that fainted on the same turn,
-   * as the protocol names them. The sentence names the rest, so a turn that
-   * cost two bodies does not read as one (912045 t1: Ogerpon and Rillaboom
-   * to Make It Rain).
-   */
   alsoFell?: string[];
-  /**
-   * Round 67 (T135, rule A): the sack shape of each body in `alsoFell`, in
-   * protocol order (null = a plain loss with no sack shape). The verdict
-   * reads them all: the framing holds only when every fallen body earns it.
-   */
+  /** The sack shape of each body in `alsoFell`, in protocol order (null = a plain loss). */
   others?: (SackInfo | null)[];
 }
 
-/** Below this pre-turn HP fraction a faint reads as a sacrifice, not a loss. */
 const SACK_HP_THRESHOLD = 0.15;
 
-/** Latest deliberate switch-in per slot ident this turn (drags excluded). */
+// Latest deliberate switch-in per slot ident this turn; drags are excluded.
 type Entered = Map<string, { name: string; species: string; hpFraction: number }>;
 
-/**
- * The sack a faint line reads as, in shape order: the low-HP feed (pre-turn
- * snapshot at or below the threshold), the healthy simplification
- * candidate (deliberately switched in this turn above the threshold), or
- * the stay-and-die candidate (active since the turn began, above the
- * threshold); undefined when the faint is a plain loss.
- */
+// Shapes in order: low-HP feed, healthy switch-in, stay-and-die; undefined for a plain loss.
 function sackForFaint(
   side: SideId,
   slot: string,
@@ -102,15 +45,11 @@ function sackForFaint(
   if (pokemon && pokemon.hpPercent / 100 <= SACK_HP_THRESHOLD) {
     return { name, species: pokemon.speciesForme, hpFraction: pokemon.hpPercent / 100 };
   }
-  // The healthy candidate stands on the switch line alone — a body first
-  // REVEALED by the sack switch-in is absent from the pre-turn snapshot.
+  // Healthy stands on the switch line alone: a body first revealed by the switch-in is not in the pre-turn snapshot.
   const fed = entered.get(`${side}${slot}`);
   if (fed && fed.hpFraction > SACK_HP_THRESHOLD) {
     return { name, species: fed.species, hpFraction: fed.hpFraction, healthy: true };
   }
-  // STAY-AND-DIE CANDIDATE: active since the turn began (neither switched
-  // nor dragged in this turn) and above the low-HP threshold. The verdict
-  // layer decides whether certainty + payoff justify the feed framing.
   if (!fed && !dragged.has(`${side}${slot}`) && pokemon &&
     pokemon.hpPercent / 100 > SACK_HP_THRESHOLD) {
     return { name, species: pokemon.speciesForme, hpFraction: pokemon.hpPercent / 100, stayed: true };
@@ -118,30 +57,23 @@ function sackForFaint(
   return undefined;
 }
 
-/** An entry hazard by the Dex: a move that lays a side condition on the foe side (Stealth Rock, Spikes). */
 const isEntryHazard = (dex: RulesDex, effect: string): boolean => {
   const move = dex.moves.get(effect);
   return move.exists && !!move.sideCondition && move.target === 'foeSide';
 };
 
-/** What one turn's lines told the sack detector before each faint. */
 interface SackScan {
-  /** The game's own Dex (round 75, T160). */
   dex: RulesDex;
   entered: Entered;
-  /** Slots force-dragged in this turn — a drag is never a deliberate feed. */
+  /** Slots force-dragged in this turn: a drag is never a deliberate feed. */
   dragged: Set<string>;
-  /** Slots whose own action the dice failed this turn (a miss, a dice |cant|). */
   rolled: Map<string, 'miss' | 'cant'>;
-  /** A move line has passed: later switch-ins are pivots or replacements, not the turn's switch phase. */
+  /** A move line has passed: later switch-ins are pivots or replacements, not the switch phase. */
   moved: boolean;
-  /** Slots switched in during the switch phase. */
   switchPhase: Set<string>;
-  /** Switch-phase slots the entry hazards brought to 0 HP. */
   hazardFell: Set<string>;
 }
 
-/** Records one non-faint line; true when the line was consumed. */
 function noteSackLine(scan: SackScan, line: string): boolean {
   const switchMatch = line.match(/^\|switch\|(p[12][a-d]): ([^|]+)\|([^|]*)\|(\d+)\/(\d+)/);
   if (switchMatch) {
@@ -178,26 +110,7 @@ function noteSackLine(scan: SackScan, line: string): boolean {
   return false;
 }
 
-/**
- * Detects per-side sacrifices in one turn's events. Three shapes:
- * - LOW-HP FEED: an own Pokémon fainted that already stood at
- *   ≤ SACK_HP_THRESHOLD when the turn began (per the pre-turn snapshot) —
- *   a deliberate low-cost play, graded as a sack unconditionally.
- * - HEALTHY SIMPLIFICATION CANDIDATE: a body deliberately SWITCHED IN this
- *   turn (never dragged) that fainted before the turn ended, entering above
- *   the threshold (entry HP from the switch line, pre-chip). Marked
- *   `healthy` — the verdict layer honors it only while the engine's scores
- *   call the game decisively won on both sides of the sack (GPL T35).
- * - STAY-AND-DIE CANDIDATE: a body active since the turn began (neither
- *   switched nor dragged in this turn) that fainted above the threshold.
- *   Marked `stayed` — the verdict layer honors it only when the realized
- *   outcome landed on the played line's priced floor and the windowed
- *   payoff clears the read margin (573756 t68).
- * A switch-phase entry the hazards took before it acted adds `hazard` to
- * its low-HP or healthy shape (round 63). The side's other faints of the
- * turn ride along as `alsoFell` (round 64) with their shapes as `others`
- * (round 67, rule A: the verdict judges every fallen body).
- */
+/** Per-side sacrifices in one turn's events: low-HP feed, `healthy`, `stayed`; `hazard` and `alsoFell` ride along. */
 export function detectSacks(
   events: string[],
   snapshotBefore: TurnSnapshot | null,
@@ -219,7 +132,6 @@ export function detectSacks(
   return { ...sideSack('p1', fallen.p1), ...sideSack('p2', fallen.p2) };
 }
 
-/** One faint's sack shape with its roll and hazard marks, or null for a plain loss. */
 function faintShape(side: SideId, slot: string, name: string, snapshotBefore: TurnSnapshot, scan: SackScan): SackInfo | null {
   const sack = sackForFaint(side, slot, name, snapshotBefore, scan.entered, scan.dragged);
   if (!sack) return null;
@@ -232,11 +144,6 @@ function faintShape(side: SideId, slot: string, name: string, snapshotBefore: Tu
   };
 }
 
-/**
- * The side's sack: its first sack-shaped faint, with every other own faint
- * of the turn in protocol order as `alsoFell` (round 64, names) and
- * `others` (round 67, shapes; null = a plain loss).
- */
 function sideSack(side: SideId, fallen: { name: string; sack: SackInfo | null }[]): { p1?: SackInfo; p2?: SackInfo } {
   const first = fallen.findIndex(entry => entry.sack !== null);
   if (first < 0) return {};

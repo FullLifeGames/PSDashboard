@@ -7,22 +7,13 @@ import { snapshotAt } from '../lib/eval-acquire';
 import { lineAnchor, type LineConfirm, type LinesHost } from '../lib/line-view';
 import { useWinPaths } from './useWinPaths';
 
-/** The replace-confirm text, as every other way into a variation words it. */
 const replaceMessage = (turn: number, span: { startTurn: number; length: number }) =>
   `Play this line from turn ${turn}: replace the existing variation from turn ${span.startTurn} ` +
   `(${span.length} ${span.length === 1 ? 'turn' : 'turns'})?`;
 
-/** The question a click raised: the line, its turn and the variation it asked about (a question about another one is stale). */
 interface AskedReplace { line: EvalLine; turn: number; span: { startTurn: number; length: number } }
 
-/**
- * Round 89 (#104), step G3: the click on ▶ Play. The line is the history of a variation (`lineHistory`), and the variation
- * restore every saved variation takes (`restoreVariation`) rebuilds the game at the graded turn and plays it with the dice the line
- * names. An existing variation goes only after the replace confirm; the pointer follows the new tip, where Let it play out
- * continues with the simulator's own dice. Step G4b: the confirm is the hook's own `confirm`, which the clicked line's block shows
- * (the dock's banner stood out of sight from the right column); it is derived from the variation in hand, so a question about a
- * variation that has since changed is gone without an effect.
- */
+/** The click on ▶ Play: the line becomes a variation from the graded turn, with its dice, after the replace confirm. */
 export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn: number) => void; confirm: LineConfirm | null } {
   const { restoreVariation } = app.board.deviation;
   const { timeline } = app.board;
@@ -33,7 +24,6 @@ export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn
   const run = useCallback((line: EvalLine, turn: number) => {
     setAsked(null);
     setPlayOutNotice(null);
-    // a click on a line shows the engine's view of what stands, as a click on an engine row does
     if (!prefs.auto) setPrefs({ ...prefs, auto: true });
     setVariationScores([]);
     followNextTip();
@@ -57,7 +47,6 @@ export function usePlayLine(app: AppController): { onPlay: (line: EvalLine, turn
   return { onPlay, confirm };
 }
 
-/** The host of the Lines section: the game's rules, the field at the graded turn's start and ▶ Play. */
 export function useLinesHost(app: AppController, replayData: ReplayData): LinesHost {
   const { onPlay, confirm } = usePlayLine(app);
   const winPaths = useWinPaths(app, replayData);

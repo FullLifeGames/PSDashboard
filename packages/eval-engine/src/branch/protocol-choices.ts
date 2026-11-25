@@ -60,32 +60,25 @@ export function extractLeads(log: string): { p1Leads: PokemonIdent[]; p2Leads: P
   return { p1Leads, p2Leads };
 }
 
-/** Round 89 (#138): whether a body is the species by the Dex of its battle in the species it has of its own, before a Transform (Ditto copying Porygon-Z). */
 function isOwnSpeciesBody(pokemon: SimPokemon, species: string): boolean {
   return sameBodyForme(pokemon.battle.dex, pokemon.baseSpecies?.name, species);
 }
 
-/**
- * Round 88 (#103): whether a body is the species by the Dex of its battle (one body in another forme counts) or by its name.
- * Round 89 (#138): a body that holds a Transform (Imposter, the move) is also its own species: the log names a Ditto `Ditto` while the
- * simulator's body carries the species it copied. The simulator keeps that species in `baseSpecies`; a forme change that lasts the game
- * (a Mega) moves it too, and `sameBodyForme` ties the two.
- */
+// The log names a Transformed Ditto `Ditto`, the sim's body carries the copied species; `baseSpecies` keeps its own,
+// and a forme change that lasts the game (a Mega) moves it too, so `sameBodyForme` ties the two.
 function isSpeciesBody(pokemon: SimPokemon, species: string): boolean {
   return isOwnSpeciesBody(pokemon, species) || sameBodyForme(pokemon.battle.dex, pokemon.species?.name, species) || toId(pokemon.name || '') === toId(species);
 }
 
-/**
- * The party slot (1-based) of the living bench body that is `species`, or null. `taken`: slots another answer of the same choice sent
- * already (the simulator refuses one body in two slots: "can only switch in once").
- */
+/** The party slot (1-based) of the living bench body that is `species`, or null; `taken`: slots already sent. */
+// The simulator refuses one body in two slots ("can only switch in once").
 export function findSpeciesSlot(battle: SimBattle, sideIdx: number, species: string, taken?: ReadonlySet<number>): number | null {
   const side = battle.sides[sideIdx];
   // An empty id (a name without Latin letters) is no key: it is a prefix of every species.
   if (toId(species) === '') return null;
 
-  // Round 89 (#118): the Dex only. The second pass (a shared prefix of the ids) tied Mew to Mewtwo and Porygon to Porygon2; over 7,032 corpus
-  // games it answered one lookup, Greninja-Ash against a "Greninja" slot, which `formeFamily` now ties through the Dex.
+  // The Dex only: a shared id prefix would tie Mew to Mewtwo and Porygon to Porygon2. Greninja-Ash against a 'Greninja'
+  // slot is `formeFamily`'s tie (branch/body-forme.ts), through the Dex.
   const index = side.pokemon.findIndex((pokemon, at) => !pokemon.isActive && !pokemon.fainted && !taken?.has(at + 1) && isSpeciesBody(pokemon, species));
   return index >= 0 ? index + 1 : null;
 }
@@ -94,7 +87,6 @@ export function findSlotBySpecies(battle: SimBattle, sideIdx: number, species: s
   return findSpeciesSlot(battle, sideIdx, species, taken) ?? findFirstAvailableSwitchSlot(battle, sideIdx, taken);
 }
 
-/** Round 89 (#144, b): `taken` skips the bench bodies another answer of the same choice sent. */
 export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number, taken?: ReadonlySet<number>): number {
   const side = battle.sides[sideIdx];
   for (let i = 0; i < side.pokemon.length; i++) {
@@ -103,11 +95,7 @@ export function findFirstAvailableSwitchSlot(battle: SimBattle, sideIdx: number,
   return 2;
 }
 
-/**
- * Round 89 (#131): the party slot (1-based) of the fainted body a Revival Blessing request brings back: the body the log names (by the
- * name the simulator carries, else by species), else the first fainted body that is not taken, which is the body the simulator's own
- * `default` revives. Null where the party has none.
- */
+/** The party slot (1-based) of the fainted body a Revival Blessing brings back: the log's, else the first not taken. */
 export function findFaintedSlot(battle: SimBattle, sideIdx: number, name: string | undefined, taken?: ReadonlySet<number>): number | null {
   const side = battle.sides[sideIdx];
   const fainted = (pokemon: SimPokemon, at: number) => !pokemon.isActive && pokemon.fainted && !taken?.has(at + 1);
@@ -117,39 +105,22 @@ export function findFaintedSlot(battle: SimBattle, sideIdx: number, name: string
   return index >= 0 ? index + 1 : null;
 }
 
-/** A body by the exact name the simulator carries (the replay's own), else by the species of its own, else by its current species or the id of its name; an empty id is no key. */
+/** A body by its exact sim name, else by its own species, else by its current species or its name's id. */
 export function findPokemonOnSide(side: SimSide, species: string): SimPokemon | null {
   const exact = species ? side.pokemon.find(pokemon => pokemon.name === species) : undefined;
   if (exact || toId(species) === '') return exact ?? null;
-  // A body by the species of its own comes first: a Ditto that copied the Pikachu of its bench is not that Pikachu's line (round 89, #138).
+  // The own species comes first: a Ditto that copied the Pikachu of its bench is not that Pikachu's line.
   return side.pokemon.find(pokemon => isOwnSpeciesBody(pokemon, species)) ?? side.pokemon.find(pokemon => isSpeciesBody(pokemon, species)) ?? null;
 }
 
-/**
- * The slot's default when its protocol shows no action: `pass` for a slot the sim itself passes (fainted, or a Tatsugiri
- * commanding a Dondozo: side.js getChoiceIndex, read through `nextChoosingSlot`), else the enabled move of the lowest priority
- * at 0 or below, else the first enabled move. A `move` for a commanding slot went to the partner's slot, the sim rejected the
- * side's whole choice, and the half-built choice counted as done, so no repair committed the turn (round 72, T246c).
- * Round 88 (T325, #61): the log shows no action because the body fainted before it moved or flinched, so the foe acted first,
- * and the first move (Fake Out, Shadow Sneak, Protect) could run ahead of the foe the log shows first (653785 t23, 2628340185
- * t23, 2663093831 t9 and t10, 2695803506 t1, 2629703929 t9). The slowest move keeps the logged order, as it does for a body that
- * switched out before it acted.
- * Round 89 (#111): "slowest" is the simulator's priority of the action, not the Dex's (`actionPriority`: Prankster, Gale Wings, Triage,
- * Stall, Quick Draw and the rest of the handlers change the queue's order), and there is no cut at 0: a body that knows only priority
- * moves takes the slowest of them, as its order is the nearest to the logged one.
- * Round 88 (X2): a body whose turn shows a `|cant|` line (a flinch, a full paralysis) has its place in the log's order, so the
- * slowest move can put it behind an action the log shows after that line (2663093831 t9: Trick Room, -7, put p1's Sinistcha behind
- * the Shadow Ball that knocked it out, and its flinch never came): `cantStandIn` reads the move that keeps its place.
- */
+// `pass` for a slot the sim passes itself (fainted, Tatsugiri commanding: side.js getChoiceIndex); else the request
+// move slowest in the sim's queue (`actionPriority`, no cut at 0), keeping the logged order; `|cant|`: `cantStandIn`.
 function defaultMoveChoice(battle: SimBattle, active: SimPokemon | null | undefined, events: string[] = [], ident = ''): string {
   if (!active || nextChoosingSlot(active.side, active.position) !== active.position) return 'pass';
   const firstMove = active.moveSlots[0];
   if (!firstMove) return 'pass';
-  // `move N` resolves against the request's entries, not `moveSlots`: on a
-  // locked request the two differ, and the entry has no target. The default
-  // is the first ENABLED entry: a choice-locked body that flinched
-  // (gen9vgc2026regi-2630452654 t4, Miraidon locked into Snarl) had `move 1`
-  // disabled, and the rejected side choice cost its partner the Encore.
+  // `move N` indexes the request's entries, not `moveSlots` (they differ on a locked request; the entry has no target).
+  // The default is the first ENABLED entry: a rejected side choice costs the partner its action.
   const requestMoves = active.getMoveRequestData().moves;
   const slowest = cantStandIn(battle, active, events, ident) ?? slowestRequestMove(active, events);
   const slowestIndex = slowest ? requestMoves.findIndex(move => move.id === slowest) : -1;
@@ -177,19 +148,8 @@ function moveChoiceForActive(active: SimPokemon | null | undefined, moveName: st
   return `move ${moveIndex >= 0 ? moveIndex + 1 : moveId}`;
 }
 
-/**
- * An Encore that lands BEFORE its target moves bends the click onto the
- * encored move, and the protocol shows that move, not the click. Sending it
- * back runs a Protect at +4 ahead of the Encore, and the sim counts an
- * Encore on a target that has already moved one turn longer
- * (gen9vgc2026regi-2629703929: locked t6 to t8 instead of t6 and t7, and the
- * second Encore failed against the first). The click is unknown; what is
- * known is that it ran after the Encore. The stand-in is the request's
- * lowest-priority other move at priority 0 or below, which the Encore then
- * bends exactly as it did in the game. No such move: the line stays the
- * choice, as before round 55. Round 89 (#111): "priority 0 or below" is the simulator's bracket of the action (`actionPriority`), so a
- * Prankster status move (Dex 0, queue +1) is cut like a Protect.
- */
+// An Encore that lands BEFORE its target moves bends the click: the log shows the encored move, not the click.
+// The stand-in is the slowest other request move at priority 0 or below (`actionPriority`); none: the line stays.
 function clickBehindEncore(
   events: string[],
   moveLineIndex: number,
@@ -205,22 +165,14 @@ function clickBehindEncore(
   return slowestRequestMove(active, events, { exceptId: toId(shownMove), cutAtZero: true });
 }
 
-/** Whether the body's request or move slots carry the move. */
 function knowsMove(active: SimPokemon, moveName: string): boolean {
   const moveId = toId(moveName);
   return active.getMoveRequestData().moves.some(move => move.id === moveId || toId(move.move) === moveId) ||
     active.moveSlots.some(slot => toId(slot.id || slot.move) === moveId);
 }
 
-/**
- * Round 89 (#143): the move to send for a move the log shows. The simulator refuses a move the body's request lacks and a move the request
- * marks disabled (`side.js` chooseMove), and a refusal sends the whole side's `default`: a logged switch does not happen, a Tera or Mega
- * click is lost, and the partner loses its action. The Struggle of a Choice-locked body, a move an Encore then a Disable ended, a drifted
- * volatile and a move at 0 PP reach it. A move the request offers enabled stays. One it lacks or disables becomes a stand-in of the
- * request by the rule of `clickBehindBlockedMove` (the first enabled move of the shown move's Dex category and the simulator's
- * `actionPriority`, else the slowest). A Z-move or Max move that the request offers (`canZMove`, `maxMoves`) stays: the simulator maps its
- * name onto the base move (`side.js` 423-434). No stand-in (no enabled move): the shown move, refused as before.
- */
+// The sim refuses a move the request lacks or marks disabled (side.js chooseMove) and defaults the whole side: such a
+// move becomes `clickBehindBlockedMove`'s stand-in; a Z or Max move the request offers stays (side.js 423-434).
 function playableMove(active: SimPokemon | null | undefined, moveName: string, events: string[]): string {
   if (!active) return moveName;
   const moveId = toId(moveName);
@@ -234,14 +186,7 @@ function playableMove(active: SimPokemon | null | undefined, moveName: string, e
   return clickBehindBlockedMove(active, moveName, events) ?? moveName;
 }
 
-/**
- * The click behind a `|cant|` move the body's set lacks (round 67, T108). The
- * move never ran: its blocker stopped it. The stand-in is one of the body's
- * own moves the same blocker stops, the first enabled request move with the
- * shown move's Dex category and the simulator's priority of the action, `actionPriority` (752301 t1: Landorus, built without
- * Taunt, clicks Stealth Rock, and the same-turn Taunt stops it as it stopped
- * the Taunt in the game); else the slowest move. Null: no enabled move.
- */
+// The first enabled request move of the shown move's category and priority, so the same blocker stops it.
 function clickBehindBlockedMove(active: SimPokemon, shownMove: string, events: string[]): string | null {
   const dex = active.battle.dex;
   const shown = dex.moves.get(shownMove);
@@ -254,12 +199,7 @@ function clickBehindBlockedMove(active: SimPokemon, shownMove: string, events: s
   return alike?.id ?? slowestRequestMove(active, events);
 }
 
-/**
- * Round 89 (#111): the request's enabled move that stands last in the simulator's queue (`actionPriority` of the body, the first of a tie),
- * the order a body whose log shows no action keeps behind the foe's logged one. The chance answer is the turn's own: yes when its lines show
- * the activation of the body's Quick Claw, Custap Berry or Quick Draw (`activated`). No cut at 0 unless `cutAtZero` (the Encore stand-in:
- * its click ran after the Encore, so a move of a higher bracket is no click), and `exceptId` leaves one move out. Null: no such move.
- */
+// The enabled request move last in the sim's queue (the first of a tie); `activated`: Quick Claw, Custap, Quick Draw.
 function slowestRequestMove(active: SimPokemon, events: string[], { exceptId = '', cutAtZero = false } = {}): string | null {
   const chance = activated(active.battle, active, events);
   let standIn: { id: string; priority: number } | null = null;
@@ -272,14 +212,7 @@ function slowestRequestMove(active: SimPokemon, events: string[], { exceptId = '
   return standIn?.id ?? null;
 }
 
-/**
- * Replays the protocol's gimmick markers (Tera / Mega / Ultra Burst) as
- * choice modifiers. Without them the reconstructed sim never transforms —
- * every later position then carries an unspent gimmick on an untransformed
- * Pokémon, and the eval recommends a Mega that already happened. Gated on
- * the sim actually offering the gimmick so an unknown item can never
- * produce a rejected choice.
- */
+// The protocol's gimmick marker (Tera, Mega, Ultra Burst) as a choice modifier, or the rebuilt sim never transforms.
 function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemon | null | undefined): string {
   if (!active) return '';
   for (const line of events) {
@@ -290,10 +223,8 @@ function gimmickSuffixForSlot(events: string[], ident: string, active: SimPokemo
   return '';
 }
 
-/**
- * The click a `|move|` line of the slot shows. The aim is the log's target; a line that hides its target (a move the game stopped before it
- * animated) asks the simulator which aim makes the move fail as logged (round 89, #136), and an aim answered earlier stands.
- */
+// The aim is the log's target; a line that hides it (a move stopped before it animated) asks the sim which aim
+// fails as logged, and an aim answered earlier stands.
 function choiceFromMoveLine(
   events: string[], lineIndex: number, line: string, side: 'p1' | 'p2', activeSlot: number, battle: SimBattle, aiming: Aiming,
 ): string {
@@ -323,11 +254,8 @@ function getChoiceForSlot(
 
   for (const [lineIndex, line] of events.entries()) {
     if (line.startsWith(`|switch|${ident}`) && !line.includes('[from]')) {
-      // The body left before it acted: its item ejected it (2658662321 t2:
-      // Salt Cure hit Hatterene, its Eject Button brought Walking Wake) or it
-      // fainted (gen 3 replaces before upkeep). The click is unknown and the
-      // sim cancels it as the body leaves; the slowest move lets the hit
-      // land first, as in the game.
+      // The body left before it acted (ejected by its item, or fainted in gen 3, which replaces before upkeep):
+      // the click is unknown and the sim cancels it as the body leaves; the slowest move lets the hit land first.
       if (answersForcedRequest(events, lineIndex, ident, battle.dex)) {
         const active = battle.sides[sideIdx].active[activeSlot];
         const standIn = active ? slowestRequestMove(active, events) : null;
@@ -339,8 +267,6 @@ function getChoiceForSlot(
       return `switch ${findSlotBySpecies(battle, sideIdx, species)}`;
     }
 
-    // A move another effect dispatched for the body (Magic Bounce, Dancer, Magic Coat, Snatch) is no click: the body's own line comes
-    // later in the block, or the body did not click a move (round 89, #135).
     if (line.startsWith(`|move|${ident}`) && !isRelayedMoveLine(line, battle.dex)) {
       return choiceFromMoveLine(events, lineIndex, line, side, activeSlot, battle, aiming);
     }
@@ -354,35 +280,20 @@ function getChoiceForSlot(
   return defaultChoiceForSlot(events, ident, battle, battle.sides[sideIdx].active[activeSlot]);
 }
 
-/**
- * No action line for the slot: the body flinched, slept, was fully
- * paralyzed, or fell before it moved. A gimmick clicked on that turn still
- * happened (the sim resolves it before any move runs), so the fallback
- * carries it like the branches above: 8 of 207 Tera clicks over the bank's
- * replays took this path and left 13 positions one Tera body short (round
- * 54). `pass` takes no modifier, the sim rejects it.
- */
+// No action line: flinch, sleep, full paralysis, or a fall before moving. A gimmick clicked that turn still happened
+// (the sim resolves it before any move), so the fallback carries it; `pass` takes no modifier, the sim rejects it.
 function defaultChoiceForSlot(events: string[], ident: string, battle: SimBattle, active: SimPokemon | null | undefined): string {
   const fallback = defaultMoveChoice(battle, active, events, ident);
   return fallback.startsWith('move ') ? `${fallback}${gimmickSuffixForSlot(events, ident, active)}` : fallback;
 }
 
-/**
- * A |cant| that names a move is the choice the player committed before it
- * was blocked (same-turn Taunt, Imprison, flinch). Falling through to
- * `move 1` instead played Uxie's U-turn on a taunted Stealth Rock turn and
- * pulled the pivot switch a turn early — the first domino of a replay-wide
- * desync. A reason-only |cant| (slp, par) keeps scanning: a Sleep Talk
- * turn carries both that line and the |move| line the scan should find, and
- * so does a |cant| with [of], the blocker's line (Dazzling, Queenly Majesty,
- * Armor Tail) about the foe's move (round 67, T108). Undefined: scan on.
- */
+// A |cant| naming a move is the choice committed before it was blocked (same-turn Taunt, Imprison, flinch); a
+// reason-only |cant| (slp, par) keeps scanning, and so does one with [of], a blocker's line (Dazzling). Else scan on.
 function choiceFromCant(
   events: string[], line: string, ident: string, battle: SimBattle, active: SimPokemon | null | undefined,
 ): string | undefined {
   const shownMove = line.includes('[of]') ? undefined : line.split('|')[4]?.trim();
   if (!shownMove) return undefined;
-  // Round 89 (#143): an Encore before the `cant` line bent the click, and the line shows the encored move, not the click.
   const encored = clickBehindEncore(events, events.indexOf(line), ident, active, shownMove);
   const asked = encored ?? (active && !knowsMove(active, shownMove) ? clickBehindBlockedMove(active, shownMove, events) : shownMove);
   if (!asked) return defaultChoiceForSlot(events, ident, battle, active);

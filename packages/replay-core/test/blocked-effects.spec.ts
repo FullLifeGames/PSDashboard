@@ -3,15 +3,6 @@ import { describe, expect, test } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { play, type PlayBody } from './blocked-effects-play';
 
-/**
- * Round 89 (#110): a landed effect rules out the abilities that would have refused it. Rows on written and played logs: the scene
- * of the issue (Doubles OU 2663093831: Intimidate and a Rock Slide flinch land on Dragonite, so it holds no Inner Focus), the
- * same effects in singles, in doubles and under the Champions mod, the ally's guard (Flower Veil, Sweet Veil), and every case where
- * the log proves nothing: an attacker that may ignore the target's ability, Neutralizing Gas, an Illusion user on the team, an
- * effect the body dealt itself, a reflected drop, a swapped ability, the last ability the species has. Every log except the
- * fixture's comes from @pkmn/sim. The sweep over every ability of every generation and mod is `blocked-effects-sweep.spec.ts`.
- */
-
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
 const CHAMPIONS = 'gen9championsdoublescustomgame';
@@ -22,9 +13,7 @@ const ruledOut = (log: string, side: 'p1' | 'p2', species: string): string[] =>
 const mon = (species: string, ability: string, moves: string[] = ['Splash']): PlayBody => ({ species, ability, moves });
 const FILLER = mon('Chansey', 'Natural Cure');
 
-/** A singles scene: p1 uses its first move into p2's lead on turn 1, p2 splashes. */
 const singles = (source: PlayBody, target: PlayBody) => play({ format: SINGLES, p1: [source, FILLER], p2: [target, FILLER], turns: [{ p1: 'move 1', p2: 'move 1' }] });
-/** A doubles scene: p1's first body uses its first move at p2's first body (a spread move needs no aim), the rest splash. */
 const doubles = (source: PlayBody, target: PlayBody, partner: PlayBody = FILLER, aim = ' 1', format = DOUBLES) =>
   play({ format, p1: [source, FILLER, FILLER, FILLER], p2: [target, partner, FILLER, FILLER], turns: [{ p1: `move 1${aim}, move 1`, p2: 'move 1, move 1' }] });
 
@@ -48,13 +37,12 @@ describe('Doubles OU 2663093831: the Intimidate and the Rock Slide flinch rule o
     expect(ruledOut(lines.slice(0, intimidate - 1).join('\n'), 'p1', 'Dragonite')).toEqual([]);
   });
 
-  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the rule-out of indirect damage (Levitate is no ability of Sinistcha, #150)', () => {
+  test('Sinistcha took the same drop and flinch and holds no ability they refuse: it keeps the rule-out of indirect damage (Levitate is no ability of Sinistcha)', () => {
     expect(ruledOut(fixture.log, 'p1', 'Sinistcha')).toEqual(['magicguard']);
   });
 });
 
 describe('an Intimidate that a Transform copied: the log names the ability, so the drop still rules out the guards', () => {
-  // Doubles OU 2543203909 turn 5: Mew transforms into Incineroar and Intimidate lowers the Attack of Dragonite.
   const copied = (target: PlayBody, format = DOUBLES) => play({
     format, p1: [mon('Mew', 'Synchronize', ['Transform']), FILLER, FILLER, FILLER], p2: [mon('Incineroar', 'Intimidate'), target, FILLER, FILLER],
     turns: [{ p1: 'move 1 1, move 1', p2: 'move 1, move 1' }],
@@ -80,7 +68,7 @@ describe('an Intimidate that a Transform copied: the log names the ability, so t
     expect(ruledOut(log, 'p2', 'Dragonite')).toEqual(['innerfocus']);
   });
 
-  // Singles has no row: the foe of the copier is the body it copied from, and that body's Intimidate is on the log already.
+  // Singles has no row: the copier's foe is the body it copied from, and that body's Intimidate is on the log already.
 });
 
 describe('a landed flinch rules out the ability that refuses it', () => {
@@ -118,7 +106,7 @@ describe('a landed stat drop, status, confusion or Taunt rules out the guard aga
     expect(ruledOut(log, 'p2', 'Kangaskhan').sort()).toEqual(['innerfocus', 'scrappy']);
   });
 
-  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (Sneasel cannot hold Levitate, so the Ground hit rules out nothing else, #150)', () => {
+  test('a secondary drop (Mud-Slap, accuracy) rules out Keen Eye (Sneasel cannot hold Levitate, so the Ground hit rules out nothing else)', () => {
     expect(ruledOut(singles(mon('Smeargle', '', ['Mud-Slap']), mon('Sneasel', 'Pickpocket')), 'p2', 'Sneasel').sort()).toEqual(['keeneye']);
   });
 

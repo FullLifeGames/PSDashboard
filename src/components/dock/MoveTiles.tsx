@@ -8,10 +8,6 @@ import { BarLegend } from './BarLegend';
 import { MoveTile } from './MoveTile';
 import { TargetRow } from './TargetRow';
 
-/**
- * Round 84 (turn dock): the move tiles of an open tray, the targets of the pending move below them, and the legend of the bars.
- * A tile click picks its move on the preselected target, with the gimmick the slot's pending move holds (`ctx.modifier`).
- */
 export function MoveTiles({ slot, hpByLabel, onChoice }: {
   slot: DockSlotModel;
   hpByLabel: Record<string, number>;

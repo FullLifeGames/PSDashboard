@@ -7,13 +7,8 @@ import { calcMove } from '../src/calc/move';
 import { makePokemonInfo } from '../src/branch/pokemon-info';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * Round 67 (decision 30, merge): @smogon/calc 0.11 does not know Pokémon Champions. The engine's one builder
- * (calcPokemon) gives a body of a Champions battle (the battle's mod) EV = 8·SP − 4 and every IV 31, so the
- * calculator's stats equal the simulator's on the Champions mod. Checker: every body of Champions battles over the
- * Champions species and six natures, read off the simulator (bodyOf) and built by calcPokemon, against the
- * simulator's stored stats and maximum HP.
- */
+// @smogon/calc does not know Champions: calcPokemon gives a body EV = 8·SP − 4 and every IV 31, so its stats
+// equal the simulator's stored stats and maximum HP on the Champions mod.
 type Stat = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
 const STATS: Stat[] = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const GRID = [0, 1, 2, 15, 31, 32];
@@ -33,8 +28,7 @@ function checkerSets(): PokemonSet[] {
   } as PokemonSet)));
 }
 
-describe('the engine prices a Champions body as the simulator plays it (decision 30)', () => {
-  // The doubles run: the VGC format loads the same mod and the same Stat Points body (stats do not depend on the game type).
+describe('the engine prices a Champions body as the simulator plays it', () => {
   for (const formatid of ['gen9championsou', 'gen9championsvgc2026regmcbo3']) test(`calcPokemon on bodyOf gives the simulator's stats on every Champions body (${formatid})`, () => {
     const gen = calcGenerationFor(9, 'champions');
     const sets = checkerSets();
@@ -57,7 +51,6 @@ describe('the engine prices a Champions body as the simulator plays it (decision
       }
     }
     expect(wrong.slice(0, 10)).toEqual([]);
-    // Species names @smogon/calc 0.11 does not know even through calcSpecies: their bodies go uncompared.
     expect(unknown.size, [...unknown].join(', ')).toBeLessThan(championsSpecies().length / 10);
   });
 

@@ -4,12 +4,7 @@ import type { useEvaluation } from './useEvaluation';
 
 type Evaluation = ReturnType<typeof useEvaluation>;
 
-/**
- * Helpers of the dock fill's trigger (`useDockFill.ts`). Round 89 (SB-10): the fill key a user's stop belongs to. A stop marks its
- * position by the view's tag; the fill key also carries the history length, so the next request of the same turn (a replacement
- * answered) is a position of its own. The key is read when the mark first shows, which is the commit of the stop itself. The callback
- * answers whether the stop belongs to `key`.
- */
+/** The fill key of a user's stop, with the history length so a replacement's request is its own position. */
 export function useStoppedKey(evaluation: Pick<Evaluation, 'stopped'>, evalViewKey: string) {
   const seen = useRef<{ mark: Evaluation['stopped']; key: string | null }>({ mark: null, key: null });
   return useCallback((key: string): boolean => {
@@ -19,21 +14,13 @@ export function useStoppedKey(evaluation: Pick<Evaluation, 'stopped'>, evalViewK
   }, [evaluation.stopped, evalViewKey]);
 }
 
-/**
- * The result the run for the position answered with, or null: a finished result, or (round 89, SB-7) the partial result of a run the
- * user stopped; and a result the position did not already have (`before`).
- */
+/** The run's answer: a finished or stopped partial result the position did not already have (`before`); else null. */
 export function fillAnswer(status: Evaluation['status'], stopped: boolean, result: EvalResult | null, attempted: boolean, before: EvalResult | null): EvalResult | null {
   const finished = status === 'done' || (status === 'stale' && stopped);
   return finished && attempted && result !== before ? result : null;
 }
 
-/**
- * The result that stood when the position began: only a newer one belongs to it. Round 84 (A7h): `foreign` marks a run that was
- * under way when the position began (the replacement's run, when a forced replacement was just sent: the next request of the turn
- * has the same `evalViewKey`, so the tag cannot tell the two apart). Its result belongs to the request before; once it is over,
- * whatever stands is its result and the new base.
- */
+/** The result standing at the position's start; `foreign`: a run then under way, answering the request before. */
 export interface FillBase { key: string; result: EvalResult | null; foreign: boolean }
 
 export function useFillBase(key: string, result: EvalResult | null, running: boolean) {

@@ -14,12 +14,7 @@ export { recordEvalError } from './evaluation/sweep-types';
 export { coverageNotice, withEvalGapNotice } from './evaluation/graph-sweep';
 export type { EvalGraphState } from './evaluation/graph-sweep';
 
-/**
- * The evaluation surface: panel preferences, the single-position evaluate
- * path, and the whole-game graph sweep — composed over one shared worker
- * client, one in-memory result cache, and one run counter (bumping it is
- * how any path cancels whatever else was running).
- */
+/** Preferences, single evaluation and game sweep on one client; bumping the run counter cancels whatever else ran. */
 export function useEvaluation() {
   const { prefs, prefsRef, persistPrefs } = usePrefsState();
   const { graph, setGraph, graphDataRef, stopGraphPaint, clearGraph, dropGraphFrom } = useGraphState();
@@ -27,9 +22,7 @@ export function useEvaluation() {
   const clientRef = useRef<EvalWorkerClient | null>(null);
   const cacheRef = useRef(new Map<string, CachedEval>());
   const runRef = useRef(0);
-  // A concrete engine pinned over the prefs for single evaluations — the
-  // fast play-out sets it for the length of its run and releases it after.
-  // A ref, not a pref: never stored, never shown as the panel's setting.
+  // Pinned over the prefs for single evaluations: a ref, never stored, never shown as the panel's setting.
   const engineOverrideRef = useRef<TurnEvalSettings | null>(null);
   const setEngineOverride = useCallback((override: TurnEvalSettings | null) => {
     engineOverrideRef.current = override;
@@ -52,7 +45,6 @@ export function useEvaluation() {
 
   const runGraphSweep = useGraphSweepRunner({ runRef, clientRef, cacheRef, prefsRef, cancel, setGraph, graphDataRef });
 
-  // Round 89 (#104, G13): the early-lines stage's search and its write into a turn's stored result.
   const { searchLines, attachLines } = useEarlyLinesIO({ clientRef, cacheRef, graphDataRef, setGraph });
 
   return {

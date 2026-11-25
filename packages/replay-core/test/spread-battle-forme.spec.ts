@@ -8,13 +8,6 @@ import { readableOrders } from '../src/spreads/order-limit';
 import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../src/types';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Round 69 (T190, spec decision 8): a hit by or on a battle forme (a Mega, Aegislash-Blade, Ogerpon's Tera mask) belongs to the
- * set of the species it came from and prices on the forme's own stats. The log names the forme the mon wears at the line, the
- * team the base species; before this the solver found no set for 'Golisopod-Mega' and dropped the hit (840 of 2 851 hits on the
- * Champions OU holdout, 19 of 2 373 in the Gen 9 bank). The Dex names the origin (battleOnly, changesFrom, a Mega Stone's
- * megaStone); the oracle is the simulator: every scene is a real battle where the forme changes and the hit lands.
- */
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -38,16 +31,11 @@ const chansey = (cfg: Cfg) => body(cfg, 'Chansey', '', 'Natural Cure', ['Splash'
 
 interface Played {
   log: string;
-  /** What the simulator took off the defender, and its maximum HP. */
   damage: number;
   maxHp: number;
   sets: { p1: PokemonSet[]; p2: PokemonSet[] };
 }
 
-/**
- * One turn on the simulator: p1's first mon uses `move` on p2's first mon, one of them evolving (`mega`) or changing forme by the
- * move itself. A scene is clean when nothing crit and the defender kept some HP; null otherwise.
- */
 function play(cfg: Cfg, sets: { p1: PokemonSet[]; p2: PokemonSet[] }, move: string, mega: 'p1' | 'p2' | null, seed: number): Played | null {
   const battle = new Battle({
     formatid: toID(cfg.id), seed: [1, 2, 3, seed],
@@ -84,14 +72,13 @@ const spreadOf = (set: PokemonSet) => ({ evs: set.evs as PokemonEvs, nature: set
 const outside = (range: { min: number; max: number }, fraction: number) => fraction < range.min - 1e-9 || fraction > range.max + 1e-9;
 const partnered = (cfg: Cfg, sets: PokemonSet[], partner: PokemonSet) => (cfg.doubles ? [...sets, partner] : sets);
 
-/** The observation of the first hit p1's mon landed, as the parser reads it from the log. */
 function firstHit(played: Played): DamageObservation {
   const observations = parseReplayLogWithObservations(played.log).observations.filter(obs => obs.attackerSide === 'p1' && obs.defenderSide !== 'p1');
   expect(observations).toHaveLength(1);
   return observations[0];
 }
 
-describe('formeOrigin reads the origin of a battle forme from the Dex (T190)', () => {
+describe('formeOrigin reads the origin of a battle forme from the Dex', () => {
   const dexes: [string, ReturnType<typeof Dex.forGen>][] = [['gen 9', Dex.forGen(9)], ['champions', Dex.dexes.champions as ReturnType<typeof Dex.forGen>]];
   for (const [label, dex] of dexes) {
     test(`${label}: every battle forme the Dex holds maps to a base the set can carry, every other species to none`, () => {
@@ -111,7 +98,6 @@ describe('formeOrigin reads the origin of a battle forme from the Dex (T190)', (
           const base = dex.species.get(origin);
           expect(base.exists, `${species.name} <- ${origin}`).toBe(true);
           expect(base.name).not.toBe(species.name);
-          // The base is a species a team carries: it is not itself a forme made in battle.
           expect(base.battleOnly, `${origin} carried by a set`).toBeFalsy();
           expect(base.isMega, `${origin} is no Mega`).toBeFalsy();
         }
@@ -135,7 +121,7 @@ describe('formeOrigin reads the origin of a battle forme from the Dex (T190)', (
   });
 });
 
-describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', () => {
+describe('a hit by a Mega reaches the base set and prices at the Mega', () => {
   const ATTACKERS = [
     // Attack 84 to 130 and Tough Claws (the Mega's ability, not Blaze) on a contact move.
     { forme: 'Charizard-Mega-X', base: 'Charizard', item: 'Charizardite X', ability: 'Blaze', move: 'Dragon Claw', nature: 'Adamant', stat: 'atk' },
@@ -153,12 +139,10 @@ describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', (
         expect(scenes.length).toBeGreaterThanOrEqual(2);
         for (const played of scenes) {
           const obs = firstHit(played);
-          // The log names the forme the mon wears when it strikes.
           expect(obs.attackerSpecies).toBe(attacker.forme);
           const ctx = buildSolveContext([obs], played.sets, cfg.id, []);
           const attackerKey = keyOf('p1', attacker.base);
           const defenderKey = keyOf('p2', 'Corviknight');
-          // The hit keeps its place: one key per mon, the base species', and the solver kept it for both.
           expect([...ctx.byMon.keys()].sort()).toEqual([attackerKey, defenderKey].sort());
           const read = ctx.byMon.get(attackerKey)!;
           expect(read).toHaveLength(1);
@@ -171,7 +155,6 @@ describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', (
           expect(fraction).toBeGreaterThanOrEqual(range.min - 1e-9);
           expect(fraction).toBeLessThanOrEqual(range.max + 1e-9);
           expect(observationError(ctx, seen, attackerKey, attackerSpread)).toBe(0);
-          // The scene is no scene if the base species rolled the same: the Mega's own stats put the hit outside the base's range.
           const asBase = rollRange(ctx, { ...seen, attackerForme: undefined } as typeof seen, attackerSpread, defenderSpread)!;
           expect(outside(asBase, fraction)).toBe(true);
         }
@@ -207,7 +190,7 @@ describe('a hit by a Mega reaches the base set and prices at the Mega (T190)', (
   }
 });
 
-describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade (T190)', () => {
+describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade', () => {
   for (const cfg of CFGS) {
     test(`${cfg.name}: Flash Cannon after the stance change rolls at Blade's Special Attack, Shield's does not contain it`, () => {
       const sets = () => ({
@@ -238,7 +221,7 @@ describe('Aegislash-Blade reaches the Aegislash set and prices at the Blade (T19
   }
 });
 
-describe('the observation key stays the base key (T190)', () => {
+describe('the observation key stays the base key', () => {
   test('a hit by a forme the team does not name is dropped as before; the sets name the base only', () => {
     const cfg = CFGS[0];
     const sets = { p1: [body(cfg, 'Skarmory', '', 'Sturdy', ['Brave Bird'], 'Impish', { hp: 252 })], p2: [blissey(cfg)] };
@@ -258,14 +241,13 @@ describe('the observation key stays the base key (T190)', () => {
     };
     const ctx = buildSolveContext([obs], sets, cfg.id, []);
     expect([...ctx.byMon.keys()].sort()).toEqual(['p1:ogerponwellspring', 'p2:blissey']);
-    // The calculator builds the Tera mask (the Dex's ability, Embody Aspect) and prices the move: no hit is skipped as unreadable.
     const [seen] = ctx.byMon.get('p1:ogerponwellspring')!;
     expect(seen).toMatchObject({ attackerSpecies: 'Ogerpon-Wellspring', attackerForme: 'Ogerpon-Wellspring-Tera' });
     expect(rollRange(ctx, seen, spreadOf(sets.p1[0]), spreadOf(sets.p2[0]))).not.toBeNull();
   });
 });
 
-describe('an order read for a Mega names the base set too (T190, the Mega-Z orders of order-limit)', () => {
+describe('an order read for a Mega names the base set too (the Mega-Z orders of order-limit)', () => {
   test('Garchomp-Mega-Z moving first is a race of the Garchomp set on the Mega\'s own Speed', () => {
     const cfg = CFGS[0];
     const sets = { p1: [body(cfg, 'Garchomp', 'Garchompite Z', 'Rough Skin', ['Dragon Claw'], 'Jolly', { spe: 252 })], p2: [blissey(cfg)] };

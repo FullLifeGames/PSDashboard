@@ -5,16 +5,6 @@ import { registerChampionsDex, rulesDex, type RulesDex } from '../src/rules-dex'
 import { ppEaters } from '../src/inference/item-triggers';
 import { maxPpOf } from '../src/inference/pp-trigger';
 
-/**
- * Round 89 (#132): the sweep behind the Leppa Berry rule. The rule rests on two readings of the simulator that this file holds to
- * the simulator itself, in every generation and mod the corpus plays (Generations 1 to 9 and the Champions mod), for singles and
- * doubles:
- *  - which items eat when a slot of their holder sits at 0 PP (`ppEaters`): the stand-in's verdict for every item of the Dex
- *    against the simulator playing a Splash turn that spends the holder's last PP (the PP comes back, or it does not);
- *  - the maximum PP of a move (`maxpp`), asked on a twin of the battle's format (`maxPpOf`), against the slot a battle of the
- *    realm's own tiers holds for the same move (Champions computes PP its own way).
- */
-
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
 interface Realm { name: string; gen: number; champions?: boolean; singles: string; doubles: string; tiers: string[] }
@@ -33,7 +23,6 @@ const startOf = (battle: Battle, size: number) => {
 };
 const firstSpecies = (dex: RulesDex) => dex.species.all().find(entry => entry.gen <= dex.gen && !entry.isNonstandard)!.name;
 
-/** Whether the simulator gives a holder PP back in the turn that spends its last one: the holder's only move has 1 PP left, and it splashes. */
 function simEats(format: string, dex: RulesDex, itemName: string, doubles: boolean): boolean {
   const species = firstSpecies(dex);
   const holder = [mk(species, itemName, ['Splash'])];
@@ -46,12 +35,13 @@ function simEats(format: string, dex: RulesDex, itemName: string, doubles: boole
   slot.pp = 1;
   battle.choose('p1', doubles ? 'move 1, move 1' : 'move 1');
   battle.choose('p2', doubles ? 'move 1, move 1' : 'move 1');
-  // The move must have run (Assault Vest disables Splash, a confusion hit stops it before it spends PP) and its slot must hold PP again.
+  // The move must have run (Assault Vest disables Splash, a confusion hit stops it) and its slot must hold PP again.
   return slot.used && slot.pp > 0;
 }
 
-describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => {
-  // What the Dex holds: Leppa Berry from Generation 3, Mystery Berry from Generation 2 (its Dex entry keeps the handler in later generations, as a past item).
+describe('the items that eat at 0 PP, stand-in against simulator', () => {
+  // Leppa Berry from Generation 3, Mystery Berry from Generation 2 (its Dex entry keeps the handler in later
+  // generations, as a past item).
   const PINNED: Record<string, string[]> = {
     'Generation 1': [], 'Generation 2': ['mysteryberry'], 'Generation 3': ['leppaberry', 'mysteryberry'], 'Generation 4': ['leppaberry', 'mysteryberry'],
     'Generation 5': ['leppaberry', 'mysteryberry'], 'Generation 6': ['leppaberry', 'mysteryberry'], 'Generation 7': ['leppaberry', 'mysteryberry'],
@@ -68,7 +58,6 @@ describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => 
     for (const format of [realm.singles, ...(Dex.formats.get(realm.doubles).exists ? [realm.doubles] : [])]) {
       const doubles = format === realm.doubles;
       for (const item of items) {
-        // Every item in singles; in doubles the eaters and one item in eight (the handlers do not read the game type).
         if (doubles && !eaters.has(item.id) && played++ % 8) continue;
         let ate: boolean;
         try {
@@ -81,7 +70,6 @@ describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => 
       }
     }
     expect(wrong).toEqual([]);
-    // The realm has the doubles format the corpus plays, except Generations 1 and 2 (no doubles in those games).
     if (realm.gen > 2) expect(Dex.formats.get(realm.doubles).exists, `${realm.doubles} exists`).toBe(true);
   }, 240_000);
 
@@ -91,7 +79,7 @@ describe('the items that eat at 0 PP, stand-in against simulator (#132)', () => 
   });
 });
 
-describe('the maximum PP of a move, twin against a battle of the realm\'s tiers (#132)', () => {
+describe('the maximum PP of a move, twin against a battle of the realm\'s tiers', () => {
   test.each(REALMS.map(realm => [realm.name, realm] as const))('%s: every move of the Dex', (_name, realm) => {
     const dex = dexOf(realm);
     const moves = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen);

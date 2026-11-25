@@ -3,12 +3,6 @@ import { readTeamPaste } from '../../../src/lib/new-game/start';
 import { teamOfInfo } from '../../../src/lib/new-game/edit-team';
 import { infoOfTeam } from '../../../src/hooks/useNewGame';
 
-/**
- * Round 89 (lane H, #105), stage H4: Edit Player on a game converts the editor's team info back to the sets the record holds. A
- * team goes to the stats panel's info and back unchanged in every field the simulator plays: species, item, ability, moves,
- * nature, EVs, IVs, level and Tera type.
- */
-
 const TEAM = `Garchomp (M) @ Rocky Helmet
 Ability: Rough Skin
 Level: 50

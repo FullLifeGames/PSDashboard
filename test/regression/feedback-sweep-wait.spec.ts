@@ -2,25 +2,17 @@ import { describe, expect, test } from 'vitest';
 import type { Page } from '@playwright/test';
 import { guardedEvaluate, waitForSweepEnd } from '../e2e-feedback/sweep-wait';
 
-/**
- * Round 88 (T328, #64): the feedback harness stops on a dead renderer within minutes. Round 86's 573756 test ran
- * out of memory in the renderer: every worker closed, the page's timer stopped, `page.evaluate` never returned and
- * Playwright raised no `crash` event, so the run held the machine for the whole 40 minute test timeout.
- * A fake page stands for each state; the poll times are scaled down to milliseconds. The harness is the same for
- * singles, doubles and VGC (it reads the debug handle after the sweep and knows no game type).
- */
 
+// An out-of-memory renderer stops the page's timer: `page.evaluate` never returns and no `crash` event comes.
 const FAST = { pollMs: 5, evalTimeoutMs: 15 };
 
 interface Poll {
   running: boolean;
   done: number;
   total: number;
-  /** The early-lines stage (`__psEarlyLines`); absent on a page that mounts none. */
   stage?: { active: boolean; done: number; total: number } | null;
 }
 
-/** A page whose evaluate never settles: the dead renderer. */
 function deadPage(): { page: Page; calls: () => number } {
   let calls = 0;
   const page = {
@@ -33,7 +25,6 @@ function deadPage(): { page: Page; calls: () => number } {
   return { page, calls: () => calls };
 }
 
-/** A page that answers each evaluate with the next poll state; the last state repeats. */
 function scriptedPage(states: (Poll | null | 'hang')[]): { page: Page; calls: () => number } {
   let calls = 0;
   const page = {
@@ -54,9 +45,7 @@ describe('waitForSweepEnd on a dead renderer', () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(calls()).toBe(3);
-    // Three timeouts of 15 ms and two polls of 5 ms, far under a second even on a loaded machine.
     expect(Date.now() - started).toBeLessThan(2_000);
-    // The report keeps determinism diffs clean: the reason names no elapsed seconds and no timings.
     expect(result.reason).not.toMatch(/\d/);
     expect(result.reason).toMatch(/renderer/i);
   });
@@ -84,7 +73,7 @@ describe('waitForSweepEnd on a dead renderer', () => {
   });
 });
 
-describe('waitForSweepEnd and the early-lines stage (round 89, G13b)', () => {
+describe('waitForSweepEnd and the early-lines stage', () => {
   const stage = (active: boolean, done: number) => ({ active, done, total: 3 });
 
   test('the sweep ending is not the end: the dump waits for the stage, so two runs dump the same lines', async () => {

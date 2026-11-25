@@ -17,7 +17,6 @@ const pools: EditorPools = {
   allAbilities: ['Intimidate', 'Rough Skin', 'Sand Veil'],
 };
 
-/** All fields of one Pokémon over a live draft, as the editor's row composes them. */
 function Fields({ initial, withPools }: { initial: RevealedPokemonInfo; withPools: EditorPools | null }) {
   const draft = useTeamDraft([initial], withPools);
   const entry = draft.pokemon[0];
@@ -65,7 +64,6 @@ describe('team editor fields', () => {
     await userEvent.type(item, 'Mystery Orb');
     await userEvent.tab();
     expect(draftOf().item.value).toBe('Mystery Orb');
-    // The warning lives on the row; the field only records it.
     await userEvent.click(item);
     await userEvent.clear(item);
     await userEvent.type(item, 'load');
@@ -94,12 +92,10 @@ describe('team editor fields', () => {
     expect(draftOf().moves.map(move => move.name)).toEqual(['Protect', 'Scale Shot']);
   });
 
-  // Round 83 (T308, GitHub issue #2): the pickers offer the species' own entries first, then the rest of the generation.
   test('the move dropdown lists the species own moves first, then the other moves of the generation with a note', async () => {
     render(<Fields initial={revealedPokemon('Garchomp')} withPools={pools} />);
     await userEvent.click(screen.getByPlaceholderText('Add move...'));
     const names = within(screen.getByRole('listbox')).getAllByRole('option').map(option => option.textContent);
-    // Protect and Earthquake stand in the set already.
     expect(names).toEqual(['Fire Fang', 'Scale Shot', 'Stone Edge', 'Power Whip not learnable', 'Spore not learnable']);
     expect(screen.getByRole('option', { name: 'Fire Fang' })).toBeInTheDocument();
   });
@@ -129,7 +125,6 @@ describe('team editor fields', () => {
     expect(screen.queryByText(/not an ability of Garchomp/)).not.toBeInTheDocument();
   });
 
-  // Round 89 (T9c): the editor's captions read the source detail the way the stats panel does.
   test('a fitted spread and an inferred item keep their word in the captions', () => {
     const fitted = revealedPokemon('Garchomp', {
       evs: { ...evs('guessed', { hp: 252, atk: 0, def: 4, spa: 0, spd: 252, spe: 0 }), sourceDetail: INFERRED_SPREAD_DETAIL },

@@ -12,33 +12,11 @@ import { isPerfectAlignment } from '../../packages/eval-engine/src/hax-alignment
 import { playTurn } from '../../packages/eval-engine/test/arrival-turn';
 import { diffsOf, emittedBlock, FIXTURES, rebuild, type FixtureId, type GameType, type Rebuilt } from './forced-reconstruction-support';
 
-/**
- * Round 86 (the engine reads the dice), lane B, step B2 (T306): the rebuild plays each turn under the dice the log shows, not under
- * the best of sixteen seeds. The twelve feedback fixtures rebuilt like the app has 24 turns whose rebuild misses the log (the drift
- * line of round 85: singles 11, Doubles OU 8, VGC 5). The plan's probe played each of them with the log's dice (`lanes/B/plan.md`,
- * section 2); this spec holds its table.
- *
- * Rows by kind:
- * - resolved by forcing (8) and by the faint step (2), plus 648453 turn 7 (ruling Q3: a burn the simulator's damage roll blocks), perfect
- *   after B3 and B4. B3 flipped the eight of forcing to plain tests, B4a the three of the faint step;
- * - resolved by the slowest stand-in (3, round 88, T325): the log shows no action of a body that fainted or flinched before it moved, and the
- *   click that fills in takes the enabled move of the lowest priority at 0 or below, so the foe's logged action stays first;
- * - resolved by the accuracy of one hit (1, round 88, T337): 2628340185 turn 13 (ruling Q4), a Triple Axel whose log shows one hit: the
- *   die of hit 2 names the miss the log never writes (only `|-hitcount|1`), so the forced turn stops the chain where the game's did;
- * - resolved by the build (3, round 89, #110, #75; final gate P3a): the set reader rules out the ability a landed effect refutes, so Dragonite of
- *   2663093831 holds Multiscale, not Inner Focus, and turns 8 to 10 rebuild as the log shows them (they were named residuals of the build);
- * - named residuals (6): the turn stays imperfect for a cause that is no die of the log. A row
- *   holds the cause where the base and the forced turn share it, so a later fix moves a row to the gate by failing it;
- * - guards: the two turns the base plays perfectly by seed luck and a plain forced turn breaks (2629703929 turn 10, a failed second
- *   Protect; 2663093831 turn 11, a damage roll the faint step repairs), and the 330 other perfect turns, counted per replay;
- * - arrival rows: a branch adopted at a resolved turn, first turn with nothing changed, plays the block the reconstruction emitted.
- */
 
 type Row = { id: FixtureId; turn: number };
 const key = (row: Row): string => `${row.id} t${row.turn}`;
 const typeOf = (id: FixtureId): GameType => FIXTURES.find(fixture => fixture.id === id)!.type;
 
-/** Turns that forcing the log's dice resolves (B3). */
 const BY_FORCING: Row[] = [
   { id: 'smogtours-gen8ou-573756', turn: 72 }, { id: 'smogtours-gen8ou-573756', turn: 73 },
   { id: 'smogtours-gen8ou-573756', turn: 84 }, { id: 'smogtours-gen8ou-573756', turn: 130 },
@@ -46,33 +24,28 @@ const BY_FORCING: Row[] = [
   { id: 'gen9doublesou-2663093831', turn: 5 }, { id: 'smogtours-gen9doublesou-912045', turn: 5 },
   { id: 'gen9championsvgc2026regmc-2695803506', turn: 5 },
 ];
-/** Turns that the faint step resolves (B4): the damage roll decides a faint the log shows, or (648453 turn 7, ruling Q3) a die the roll blocks. */
 const BY_FAINT_STEP: Row[] = [
   { id: 'smogtours-gen6ou-649664', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 12 }, { id: 'smogtours-gen6ou-648453', turn: 7 },
 ];
-/** Turns that the slowest stand-in resolves (round 88, T325): the log shows no action of the body, and the first move (Fake Out, Protect) ran ahead of the foe. */
 const BY_STAND_IN: Row[] = [
   { id: 'smogtours-gen6ou-653785', turn: 23 }, { id: 'gen9vgc2026regi-2629703929', turn: 9 }, { id: 'gen9championsvgc2026regmc-2695803506', turn: 1 },
 ];
-/** Turns that the accuracy die of one hit resolves (round 88, T337): the log shows a multi-accuracy chain that broke, the miss of the next hit has no line. */
 const BY_HIT_DIE: Row[] = [{ id: 'gen9championsou-2628340185', turn: 13 }];
-/** Turns that the set reader resolves (round 89, #110, #75): the log shows a flinch and an Intimidate drop that Inner Focus would stop, so the build takes Multiscale. */
 const BY_BUILD: Row[] = [{ id: 'gen9doublesou-2663093831', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 9 }, { id: 'gen9doublesou-2663093831', turn: 10 }];
 const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE, ...BY_BUILD];
 
-interface Residual extends Row { cause: string; /** The diff of the emitted block against the log that the base and the forced turn share. */ stays: string | null }
+interface Residual extends Row { cause: string; stays: string | null }
 const RESIDUALS: Residual[] = [
   { id: 'smogtours-gen6ou-648453', turn: 4, cause: 'damage model: the simulator keeps Rotom alive that the log\'s hit knocked out (no step of the roll kills it)', stays: null },
-  { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (round 88, T325: no unlogged choice, the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
+  { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (no unlogged choice: the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
   { id: 'smogtours-gen9doublesou-912045', turn: 9, cause: 'build: an item (Throat Spray) the log disproves', stays: 'secondaries p1:ursaluna:boost:spa:1 log=0 sim=1' },
   { id: 'smogtours-gen9doublesou-912045', turn: 1, cause: 'damage model: the simulator deals half of the log\'s damage to Rillaboom', stays: 'faint log-only p2:rillaboom' },
   { id: 'gen9vgc2026regi-2630685175', turn: 3, cause: 'unlogged aim: a charge move\'s |move| line names no target (the aim sits in |-anim|)', stays: null },
   { id: 'gen9vgc2026regi-2630685175', turn: 9, cause: 'damage model and a premature end: the log\'s crit leaves Zamazenta alive, a forced crit ends the game in the simulator (ruling Q2: the fallback takes this turn)', stays: null },
 ];
-/** The turns the base plays perfectly and a plain forced turn breaks: the rebuild must keep them perfect. */
 const GUARDS: Row[] = [{ id: 'gen9vgc2026regi-2629703929', turn: 10 }, { id: 'gen9doublesou-2663093831', turn: 11 }];
 const NAMED = new Set([...RESOLVED, ...RESIDUALS, ...GUARDS].map(key));
-/** Perfect turns outside the named rows, per replay (330 of the 356 turns). */
+// Perfect turns outside the named rows, per replay (330 of the 356 turns).
 const OTHER_PERFECT: Record<FixtureId, number> = {
   'smogtours-gen8ou-573756': 134,
   'smogtours-gen8ou-562428': 22,
@@ -104,7 +77,7 @@ const shown = (row: Row): string => {
 };
 
 describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays the turn the log shows: %s', type => {
-  describe('resolved by forcing the logged dice (B3)', () => {
+  describe('resolved by forcing the logged dice', () => {
     for (const row of BY_FORCING.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -112,7 +85,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_FAINT_STEP.some(entry => typeOf(entry.id) === type))('resolved by the faint step (B4)', () => {
+  describe.skipIf(!BY_FAINT_STEP.some(entry => typeOf(entry.id) === type))('resolved by the faint step', () => {
     for (const row of BY_FAINT_STEP.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -120,7 +93,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_STAND_IN.some(entry => typeOf(entry.id) === type))('resolved by the slowest stand-in (T325)', () => {
+  describe.skipIf(!BY_STAND_IN.some(entry => typeOf(entry.id) === type))('resolved by the slowest stand-in', () => {
     for (const row of BY_STAND_IN.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -128,7 +101,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_HIT_DIE.some(entry => typeOf(entry.id) === type))('resolved by the accuracy of one hit (T337)', () => {
+  describe.skipIf(!BY_HIT_DIE.some(entry => typeOf(entry.id) === type))('resolved by the accuracy of one hit', () => {
     for (const row of BY_HIT_DIE.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -136,7 +109,7 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
     }
   });
 
-  describe.skipIf(!BY_BUILD.some(entry => typeOf(entry.id) === type))('resolved by the build (#110, #75)', () => {
+  describe.skipIf(!BY_BUILD.some(entry => typeOf(entry.id) === type))('resolved by the build', () => {
     for (const row of BY_BUILD.filter(entry => typeOf(entry.id) === type)) {
       test(`${key(row)}: the emitted block matches the log in faints and every die`, () => {
         expect(isPerfectAlignment(recordOf(row).actual), shown(row)).toBe(true);
@@ -170,19 +143,12 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 });
 
 describe('the counts of the drift line', () => {
-  // 24 turns of the named rows missed the log in round 85 (singles 11, Doubles OU 8, VGC 5, with Q3 and Q4); B3 resolved the eight of forcing, B4
-  // resolves the three of the faint step, T325 (round 88) the three of the stand-in, T337 the one of the hit die, #110 (round 89) the three of the build: the imperfect rows are the residuals
-  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2 after #110)', () => {
+  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
     expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 2, vgc: 2, total: 6 });
   });
 
-  // Round 86 (ruling C2): the turns the hybrid search plays under another seed than index 0
-  // 2630685175 turn 3 is a named residual (the aim of a charge move sits in |-anim|): the search keeps the seed whose unnamed dice fit best and the row stays imperfect
-  // Round 88 (gate of 08.11.2026): since X2 Sinistcha's flinch of 2663093831 turn 9 lands; the forced pass still misses the log (the built
-  // Dragonite holds Inner Focus), and the seed search finds a seed that fits the turn's other dice better.
-  // Round 89 (final gate, P3a, #110): the set reader rules Inner Focus out, Dragonite holds Multiscale, and turn 9 plays perfectly on the base seed
   test('the seeded turns of the twelve replays: only 2630685175 turn 3, a named residual', () => {
     const seeded = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'forced' && record.seed !== '1,2,3,4').map(record => `${key({ id, turn: record.turn })} ${record.seed}`));
     expect(seeded).toEqual([`${key({ id: 'gen9vgc2026regi-2630685175', turn: 3 })} 2,4,6,8`]);
@@ -190,32 +156,24 @@ describe('the counts of the drift line', () => {
     expect(isPerfectAlignment(recordOf({ id: 'gen9vgc2026regi-2630685175', turn: 3 }).actual)).toBe(false);
   });
 
-  // ruling Q2: a forced turn that ends a game the log goes on past is no reading of the log; the block falls back to the seed search
   test('the fallback turns of the twelve replays: only 2630685175 turn 9, and the records say so', () => {
     const fallbacks = FIXTURES.flatMap(({ id }) => [...rebuilt.get(id)!.records.values()].filter(record => record.via === 'fallback').map(record => key({ id, turn: record.turn })));
     expect(fallbacks).toEqual([key({ id: 'gen9vgc2026regi-2630685175', turn: 9 })]);
   });
 
-  // ruling Q2: the forced crit of 2630685175 turn 9 ends the game in the simulator, the fallback takes that turn, and the replay goes on
   test('every one of the 356 turns has a record', () => {
     const all = [...rebuilt.values()].reduce((sum, entry) => sum + entry.records.size, 0);
     expect(all).toBe(356);
   });
 });
 
-/**
- * The arrival: a branch opens at a turn of the replay (`adoptSerializedRuntime` of the position the reconstruction captured there)
- * and the user plays the first turn with nothing changed. The turn must show the block the reconstruction emitted, lines and HP,
- * and the log's block. The arrival and the rebuild play the same forced turn, the faint step included.
- */
 describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays the reconstruction\'s block: %s', (_label, row) => {
   async function arrival() {
     const built = rebuilt.get(row.id)!;
     const adopted = adoptSerializedRuntime({
       serialized: built.positions.get(row.turn)!, replayLog: built.replay.log, targetTurn: row.turn, snapshot: built.snapshotFor(row.turn),
     });
-    // Round 89 (#137): the app executes a branch's turn with `dice` (the first turn joins the log's dice: the random target and the drag the
-    // log shows); a plain stream write leaves the draws before the move in flight to the seed, which the rebuild forces
+    // A plain stream write leaves the draws before the move in flight to the seed; the app plays with `dice`.
     return { built, played: await playTurn(adopted, built.replay.log, row.turn, undefined, { p1: [], p2: [] }) };
   }
 
@@ -231,11 +189,6 @@ describe.each(RESOLVED.map(row => [key(row), row] as const))('the arrival plays 
   });
 });
 
-/**
- * The part player (the choices, then each forced replacement, every part through the dice module) plays what the one-`play` prototype of the
- * plan's probe plays, which writes the choices and the log's replacements in one go: both give the block the rebuild emitted, on all 24 turns of the
- * named rows (plan section 3, forced replacements).
- */
 describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))('the part player equals the one-play prototype: %s', (_label, row) => {
   test(`${typeOf(row.id)}: the lines of the turn from its boundary position`, () => {
     const built = rebuilt.get(row.id)!;
@@ -245,13 +198,11 @@ describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))(
     const forced = { p1: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p1', live.dex), p2: collectForcedSwitchSpecies(block.preUpkeep, block.postUpkeep, 'p2', live.dex) };
     const logged = loggedDiceAt(live, built.replay.log);
     const aligned = forcedBlock(live as never, block as never);
-    // the faint step's dice, as the rebuild plays them; null is the fallback, whose block the seed search emits
     const { dice, seed } = faintStep({ battle: live, expected: aligned.expectedEvents, seed: aligned.seedChoice.seed, choices, forced, bench: protocolBenchOf(built.replay.log, [...block.preUpkeep, ...block.postUpkeep], row.turn) }, logged);
     if (!dice) {
       expect(recordOf(row).via, key(row)).toBe('fallback');
       return;
     }
-    // Round 86 (ruling C2): the seed the faint step found for the dice no `DieKind` names, the seed the rebuild plays the turn under
     if (seed !== aligned.seedChoice.seed) live.resetRNG(seed);
     const start = live.log.length;
     playForcedTurn({
@@ -276,12 +227,6 @@ describe.each([...RESOLVED, ...RESIDUALS].map(row => [key(row), row] as const))(
   });
 });
 
-/**
- * Round 86 (B4b, the phantom procs): smogtours-gen8ou-573756 built from the log alone gives Clefable its first ability, Cute Charm, and
- * Conscripts (a Toxapex) hits it with Knock Off on turn 1. The log shows no Attract. The forced turn answered only the dice the log shows,
- * so the hidden dice of seed 0 said yes to the 30 percent proc and Conscripts carried `attract` from turn 2 to turn 10. The app's own
- * build (a Smogon set with Magic Guard) never meets that die; a build from the log alone, as the engine package's helpers use, does.
- */
 describe('a proc the log does not show: 573756 built from the log alone', () => {
   let naked: Rebuilt;
   beforeAll(async () => { naked = await rebuild('smogtours-gen8ou-573756', { naked: true }); }, 120_000);

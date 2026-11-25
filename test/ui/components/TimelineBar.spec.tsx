@@ -13,7 +13,6 @@ function props(overrides: Partial<Props> = {}): Props {
   };
 }
 
-/** The position label next to the slider ("T3/10", "T0", "End"). */
 const positionLabel = () => screen.getByRole('slider').closest('.ps-branch-bar')!.querySelector('span[style*="min-width"]')!.textContent;
 
 describe('TimelineBar', () => {
@@ -29,6 +28,13 @@ describe('TimelineBar', () => {
     expect(wired.onNavigate).toHaveBeenCalledWith({ turn: 7, line: 'main' });
     expect(screen.queryByRole('button', { name: 'Discard variation' })).toBeNull();
     expect(screen.queryByRole('group', { name: 'Line selector' })).toBeNull();
+  });
+
+  test('the bar is always there: the title, the slider, and no "Branch Here" button', () => {
+    render(<TimelineBar {...props()} />);
+    expect(screen.getByText('Timeline')).toBeVisible();
+    expect(screen.getByRole('slider', { name: 'Timeline turn selector' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Branch Here/ })).toBeNull();
   });
 
   test('the arrows step the turn; the first step back opens the team preview, T0 is pressed there', async () => {
@@ -47,7 +53,6 @@ describe('TimelineBar', () => {
     expect(wired.onNavigate).toHaveBeenLastCalledWith({ turn: 1, line: 'main' });
   });
 
-  // Round 77 (swarm B6): after viewing turn 9, T0 left the thumb on turn 9 while the label read T0.
   test('turn 0 puts the slider thumb at the start of the range', () => {
     const { rerender } = render(<TimelineBar {...props({ viewTurn: 9 })} />);
     expect(screen.getByRole('slider')).toHaveValue('9');
@@ -62,7 +67,6 @@ describe('TimelineBar', () => {
     expect(screen.getByText('End')).toBeInTheDocument();
   });
 
-  // Round 77 (swarm A-6): the variation's ended tip reads as the main line's end does.
   test('the ended tip of a variation reads End and the total counts played turns', () => {
     const ended = props({
       viewTurn: 7, maxTurn: 5, variationSpan: { startTurn: 4, length: 3 }, viewingVariation: true, viewLine: 'variation',
@@ -74,7 +78,6 @@ describe('TimelineBar', () => {
 
     rerender(<TimelineBar {...ended} viewTurn={6} />);
     expect(positionLabel()).toBe('T6/6');
-    // A variation that has not ended keeps counting its tip.
     rerender(<TimelineBar {...ended} viewTurn={7} variationEnded={false} />);
     expect(positionLabel()).toBe('T7/7');
   });
@@ -97,7 +100,6 @@ describe('TimelineBar', () => {
     expect(wired.onDiscard).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (#105, H7, finding 2): a game's tip turn that waits for its replacement is the main line's next turn.
   test('an idle game tip keeps the slider and shows no stripe, no line chips and no Discard variation', () => {
     render(<TimelineBar {...props({ viewTurn: 5, maxTurn: 4, variationSpan: { startTurn: 4, length: 1 }, viewingVariation: true, viewLine: 'variation', branching: true, idle: true })} />);
     expect(screen.getByRole('slider')).toHaveAttribute('max', '5');

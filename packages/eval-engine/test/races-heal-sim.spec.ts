@@ -7,16 +7,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 76 (T258): the heal rate of a move from the simulator. A heal move without a ratio in the Dex (Shore Up: half
- * the HP, two thirds in sand; the Moonlight family: by weather; Jungle Healing: a quarter; Heal Pulse: the target's HP,
- * which in singles is the foe's) used to fall back to one half. healProfile now plays the move on a twin battle under
- * the live weather and terrain and reads the HP the click leaves per turn over a full cycle of the sleep and wish
- * moves. This sweep plays every heal move of the Dex in every generation and the Champions mod, under every weather
- * and the Grassy terrain, on a live battle, and holds healProfile to what it saw. The scenes: Shore Up in sand, the
- * Moonlight family, a heal pulse in singles (it heals the foe).
- */
-
 await loadSimMods('gen9championscustomgame');
 
 const CHAMPIONS = 'gen9championscustomgame';
@@ -28,7 +18,6 @@ const plain = (moves: string[], item = ''): PokemonSet => ({
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
 });
 
-/** `float`: the healer holds an Air Balloon, so the Grassy terrain's upkeep heal does not hide in the delta (Rest fills the HP and caps it). */
 function duel(format: string, moves: string[], foe = 'Chansey', float = false): Battle {
   const battle = new Battle({
     formatid: toID(format), seed: '1,2,3,4' as never,
@@ -47,7 +36,6 @@ function withField(battle: Battle, field: Field): Battle {
   return battle;
 }
 
-/** The HP a click of the move leaves per turn on a live battle: a user reset to a quarter of its HP and a foe to full HP before every turn, a cycle of WINDOW turns, the field's own chip taken off (a Harden control). */
 function gained(format: string, moveId: string, field: Field, foe: string): number {
   const battle = withField(duel(format, [moveId], foe, field.terrain !== ''), field);
   const user = battle.sides[0].active[0]!;
@@ -63,7 +51,6 @@ function gained(format: string, moveId: string, field: Field, foe: string): numb
   return total / (WINDOW * user.maxhp);
 }
 
-/** The rate against one foe; a heal that differs between a Chansey and a Machamp follows the foe (Strength Sap) and keeps the proxy of one half. */
 function playedRate(format: string, moveId: string, field: Field): number {
   const [weak, strong] = ['Chansey', 'Machamp'].map(foe => Math.max(0, gained(format, moveId, field, foe) - gained(format, 'harden', field, foe)));
   return Math.abs(weak - strong) > 0.005 ? 1 / 2 : weak;
@@ -76,7 +63,7 @@ const read = (format: string, moveId: string, field: Field): number => {
 
 const NONE: Field = { weather: '', terrain: '' };
 
-describe('healProfile reads the heal the simulator plays (T258)', () => {
+describe('healProfile reads the heal the simulator plays', () => {
   test('scenes: Shore Up heals half in clear weather and two thirds in sand; Heal Pulse heals the foe, not the user', () => {
     expect(read('gen9customgame', 'shoreup', NONE)).toBeCloseTo(1 / 2, 2);
     expect(read('gen9customgame', 'shoreup', { weather: 'sandstorm', terrain: '' })).toBeCloseTo(2 / 3, 2);
@@ -125,7 +112,7 @@ describe('healProfile reads the heal the simulator plays (T258)', () => {
     const [user, sandUser] = [clear.sides[0].active[0]!, sand.sides[0].active[0]!];
     expect(healProfile(user, clear).rate).toBeCloseTo(1 / 2, 2);
     expect(healProfile(sandUser, sand).rate).toBeCloseTo(2 / 3, 2);
-    // Jungle Healing (a quarter) and Heal Pulse (the target's HP: 0 for the user) never beat Shore Up; with only those two the rate is the quarter.
+    // Jungle Healing heals a quarter and Heal Pulse the target's HP (0 for the user): the rate is the quarter.
     const weak = battleOf(format, [set('Palossand', ['healpulse', 'junglehealing']), set('Snorlax', ['splash'])], [set('Snorlax', ['splash']), set('Snorlax', ['splash'])]);
     expect(healProfile(weak.sides[0].active[0]!, weak).rate).toBeCloseTo(1 / 4, 2);
   });

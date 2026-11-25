@@ -17,47 +17,19 @@ export type { ReconstructParams, ReplacementPoint } from './branch/runtime.ts';
 export { adoptSerializedRuntime } from './branch/adopt.ts';
 export type { AdoptParams } from './branch/adopt.ts';
 
-// @pkmn/sim's random-format rulesets reference Node's `global` object (e.g.
-// `global.Config?.potd` in rulesets), which doesn't exist in browsers and made
-// every Random Battle branch die with an uncaught ReferenceError (B2).
+// Random-format rulesets of @pkmn/sim read Node's `global` (`global.Config?.potd`), which browsers lack;
+// without it every Random Battle branch dies with a ReferenceError.
 if (typeof (globalThis as Record<string, unknown>).global === 'undefined') {
   (globalThis as Record<string, unknown>).global = globalThis;
 }
 
-/**
- * The end-of-reconstruction correction chain a per-target run applies to
- * its final battle — for a caller-owned battle (the clone-and-correct
- * single-pass path, see onRawBoundary). Mirrors the tail of
- * reconstructBranchRuntime exactly: snapshot correction when a snapshot
- * exists, then the request refresh, in that order.
- */
+/** The end-of-reconstruction correction chain for a caller-owned battle, in `reconstructBranchRuntime`'s order. */
 export function applyTargetCorrections(battle: SimBattle, snapshot: TurnSnapshot | null | undefined): void {
   if (snapshot) correctBattleFromSnapshot(battle, snapshot);
   refreshRequestsFromLiveState(battle);
 }
 
-/**
- * Post-reconstruction sanity check (B7): detects wedged states — no pending
- * request on a live battle, or a forced switch that has no eligible switch-in —
- * so the UI can offer a way out instead of silently dead-ending.
- */
-/**
- * Did this reconstruction actually ARRIVE at `turn` as a live position?
- * `validateBranchRuntime` deliberately accepts an ended battle (branching
- * into a finished line is a legal, explained state), so callers that use
- * the final battle AS a specific turn's position need this stricter test:
- *
- * - short of the turn  → the replay wedged on the way there;
- * - `ended`            → always an artifact for a sampled turn, because a
- *   sampled turn lies BEFORE the real game's end; an ended arrival means
- *   the diverging choice replay killed a side the real game kept (the
- *   premature-end cascade, gen9draft-2058494320 from turn 56 unhealed).
- *   The calibration harness applies the same invariant when scoring.
- *
- * Without it the eval sweep stored a prematurely-ended battle as the LAST
- * turn's position, and the graph showed a single phantom ±1.00 point at
- * the far right with every other turn a gap (2026-08-12 report).
- */
+/** Whether the reconstruction reached `turn` as a live position; an ended battle fails. */
 export function reconstructionReached(runtime: BranchRuntime, turn: number): boolean {
   if (runtime.timedOut) return false;
   const battle = runtime.battleStream.battle;
@@ -65,6 +37,7 @@ export function reconstructionReached(runtime: BranchRuntime, turn: number): boo
   return battle.turn >= turn;
 }
 
+/** An error message when the battle is wedged (timed out, no pending request, no eligible switch-in), else null. */
 export function validateBranchRuntime(runtime: BranchRuntime): string | null {
   if (runtime.timedOut) {
     return 'Reconstruction timed out before reaching this turn. Try branching from a nearby turn.';

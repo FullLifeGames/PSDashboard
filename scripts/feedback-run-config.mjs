@@ -1,15 +1,5 @@
-// .feedback-run.json of a feedback/<name> branch (round 89, feedback runs in GitHub Actions).
-//
-// The feedback workflow (.github/workflows/feedback.yml) treats the file as untrusted input, as bank.yml does with
-// .bank-run.json: this script validates it against an allowlist, and the workflow passes only the run index of its
-// matrix to the shell.
-//
-//   node scripts/feedback-run-config.mjs check           validate; print the plan; write runs (a JSON list of run
-//                                                        indices) and name to $GITHUB_OUTPUT when the variable is set
-//   node scripts/feedback-run-config.mjs compare <dir>   compare the artifacts <dir>/feedback-run-<i> of every run
-//
-// The file: { "name": "r89-fbci-try", "runs": 3 }. A run is one whole `npm run test:feedback` with FEEDBACK_DUMP=1 on
-// its own runner; the compare job asks whether all runs wrote the same bytes.
+// Validates the .feedback-run.json of a feedback/<name> branch and compares the runs' artifacts.
+// The file is untrusted input: the workflow passes only the run index of its matrix to the shell.
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,17 +8,12 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const CONFIG_FILE = '.feedback-run.json';
 export const DEFAULT_RUNS = 3;
 export const MAX_RUNS = 5;
-/** The folder a run's artifact unpacks into, under the compare job's download folder: feedback-run-<index>. */
 export const ARTIFACT_PREFIX = 'feedback-run-';
 
 const NAME = /^[a-z0-9-]{1,40}$/;
 const ALLOWED_KEYS = new Set(['name', 'runs']);
 
-/**
- * What the harness writes into docs/reports (test/e2e-feedback/feedback-drift.spec.ts) and the artifact keeps: one full
- * dump per replay (FEEDBACK_DUMP=1), the drift report as JSON and as Markdown, and the run's log.
- * test/regression/feedback-workflow.spec.ts holds these patterns to the harness's own file names.
- */
+/** The files the harness writes into docs/reports (FEEDBACK_DUMP=1); workflows.spec.ts pins these patterns. */
 export const DUMP_FILE = /^feedback-full-[A-Za-z0-9._-]+\.json$/;
 export const DRIFT_JSON = 'feedback-drift.json';
 export const DRIFT_MARKDOWN = 'feedback-drift.md';
@@ -46,11 +31,7 @@ export function validateRunConfig(raw) {
   return { name, runs };
 }
 
-/**
- * The drift report minus what two runs of one engine may differ in: the date and the wall times (JSON), the line with
- * the commit and date and the line with the wall times (Markdown). The harness writes both on purpose
- * (test/e2e-feedback/report.ts), so a byte comparison of the report files would never hold.
- */
+/** The drift report minus date and wall times, which differ between two runs by design. */
 export function normalizeDrift(name, text) {
   if (name === DRIFT_JSON) {
     const report = JSON.parse(text);
@@ -63,11 +44,7 @@ export function normalizeDrift(name, text) {
   return text.split(/\r?\n/).filter(line => !line.startsWith('- Commit:') && !line.startsWith('- Wall time:')).join('\n');
 }
 
-/**
- * Compares the runs: `folders` maps a run index to the files of its folder (name to text). Every dump of the first run
- * must exist in each other run with the same bytes, and no other run may hold a dump the first lacks; the two drift
- * files compare after normalizeDrift. Returns { dumps, problems }.
- */
+/** `folders`: run index to its files (name to text); returns { dumps, problems }. */
 export function compareRuns(folders) {
   const indices = [...folders.keys()].sort((a, b) => a - b);
   const problems = [];
@@ -94,7 +71,6 @@ export function compareRuns(folders) {
   return { dumps: dumpNames.length, problems };
 }
 
-/** The run folders under `dir` (feedback-run-<index>), read into the maps compareRuns takes. */
 export function readRunFolders(dir) {
   const folders = new Map();
   if (!existsSync(dir)) return folders;

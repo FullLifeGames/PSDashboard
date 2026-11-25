@@ -7,7 +7,7 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 ![PS Dashboard at turn 12 of a Gen 8 OU tournament game: the replay and the turn dock on the left, the evaluation and the turn's analysis on the right](./public/ps-dashboard.png)
 
 - **Use it:** [release](https://fulllifegames.com/Tools/PSDashboard/) · [nightly](https://fulllifegames.github.io/PSDashboard/) · [all hosted builds](https://fulllifegames.github.io/PSDashboard/versions/)
-- **Read more:** [ARCHITECTURE.md](./ARCHITECTURE.md) for how the code works · [EVALUATION.md](./EVALUATION.md) for what the engine computes and how far to trust it · [ENGINES.md](./ENGINES.md) for plugging in an engine of your own
+- **Read more:** [ARCHITECTURE.md](./ARCHITECTURE.md) for how the code works · [EVALUATION.md](./EVALUATION.md) for what the engine computes and how far to trust it · [ENGINES.md](./ENGINES.md) for plugging in an engine of your own · [ARCHITECTURE-DETAILS.md](./ARCHITECTURE-DETAILS.md) and [EVALUATION-DETAILS.md](./EVALUATION-DETAILS.md) for the mechanisms behind them
 
 ## What it does
 
@@ -82,8 +82,8 @@ The app posts `ps-embed-ready` once it accepts replays and answers every `ps-loa
 - [packages/replay-core](./packages/replay-core/): `@fulllifegames/replay-core`, replay logs to snapshots, revealed teams, simulator sets, and fitted spreads. No network, no DOM.
 - [packages/eval-engine](./packages/eval-engine/): `@fulllifegames/eval-engine`, position reconstruction, search, grading, and the game report.
 - `test/regression/`: Vitest specs for the app code and the measurement harnesses; `test/ui/`: component and hook specs under jsdom.
-- `test/e2e/`: Playwright browser flows, one file per theme; `test/e2e-build/`: a smoke test of the minified bundle; `test/e2e-feedback/`: the expert-feedback drift suite.
-- `scripts/`: release, pack, lint-ratchet, and calibration tooling; `examples/`: the embed host page; `packages/eval-engine/examples/engine-python/`: a sample engine; `public/`: static assets.
+- `test/e2e/`: Playwright browser flows, one file per theme; `test/e2e-capture/`: the capture of the saved engine results the browser flows seed; `test/e2e-build/`: a smoke test of the minified bundle; `test/e2e-feedback/`: the expert-feedback drift suite.
+- `scripts/`: bank, feedback, fit corpus, lint-ratchet, release, and test tooling ([scripts/README.md](./scripts/README.md) says how to call each script); `examples/`: the embed host page; `packages/eval-engine/examples/engine-python/`: a sample engine; `public/`: static assets.
 - [Issues](https://github.com/FullLifeGames/PSDashboard/issues) hold the open work, [milestones](https://github.com/FullLifeGames/PSDashboard/milestones) the releases it belongs to, and [docs/completed/](./docs/completed/) the finished rounds. [AGENTS.md](./AGENTS.md) holds the working rules for agents and contributors.
 
 ## Development
@@ -98,12 +98,18 @@ npm run dev              # local Vite server
 
 | Command | What it checks |
 | --- | --- |
-| `npm run lint` | ESLint with size and complexity ceilings and import zones |
+| `npm run lint` | ESLint with size and complexity ceilings, import zones, the name ratchet, the comment rules (shape and history) with their line ratchet, the spec-file ratchet, the rule for test titles and spec file names and the dash rule for the text the app shows |
 | `npm run build` | the production bundle |
 | `npm run build:packages` | compiles both packages to their `dist/` |
+| `npm run bench:eval` | the engine bench: forward-model and search throughput on a six against six position, printed to the console (outside the suite) |
 | `npm run test:regression` | the Vitest suite in four projects: app, replay-core, eval-engine, ui (`npx vitest` for watch mode, `--changed` for the tests behind your edits) |
 | `npm run test:ui` | the app suite alone: components and hooks under jsdom with Testing Library |
-| `npm run test:e2e` | browser flows against fixture replays |
+| `npm run test:coverage` | the whole Vitest suite with the v8 coverage provider (`@vitest/coverage-v8`, pinned to vitest's version); it writes `coverage-final.json` and the summary to `.calibration/coverage/` and takes about an hour on devbox |
+| `node scripts/cov-compare.mjs <before> <after> <root>` | two `coverage-final.json` files of the same source: statements, branches, functions and lines per package, and every item the first covers and the second does not (exit 1; exit 2 when a source file changed between the runs) |
+| `node scripts/rows-collect.mjs <out.json> [vitest list arguments]` | the rows of the suite by project and full name, listed without playing them (`vitest list --json --staticParse=false`: the files run to collect, so helper-registered sweep parts are listed); set `DICE_SWEEPS=full` for the full list |
+| `node scripts/rows-compare.mjs <before.json> <after.json> [--map <table.json>] [--expect-lost <names.json>] [--expect-gained <names.json>]` | two such lists: rows lost or gained (exit 1); a table maps renamed rows by exact name or prefix; the two flags name the rows a change removes or adds on purpose, and exit 0 only when exactly those differ |
+| `npm run test:e2e` | browser flows against fixture replays; rows that judge a view seed saved engine results, `EVAL_STORE=live` runs them live |
+| `npm run capture:eval-store` | captures those saved engine results again (`-- --only <replay id>` for one replay); run it when a seeded row fails and names it |
 | `npm run test:build` | the minified bundle, driven in a browser |
 | `npm run test:feedback` | the expert-feedback drift report, on demand; it writes its report to `docs/reports/`, which stays local |
 | `npm run knip` | unused files, exports, and dependencies |
@@ -111,14 +117,14 @@ npm run dev              # local Vite server
 | `npm run pack:smoke` | packs both packages and runs their README examples from the tarballs |
 | `npx @fulllifegames/eval-engine check-engine <url>` | an engine endpoint against the engine protocol ([ENGINES.md](./ENGINES.md)) |
 
-CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and on pull requests, in six required jobs and a seventh, informational one in three parts: the Node suites, the eval-engine project twice more with the simulator speed layer forced off and on (`EVAL_SIM_FAST=0` and `1`), the dice sweeps over every move of the Dex (`DICE_SWEEPS=full`), the other sweep specs under the same switch (three parts, not required yet), the browser flows, and a smoke test of the production build with `npm run pack:smoke`. A branch can run the same jobs by hand with `workflow_dispatch`. Two more workflows start only from a pushed branch: [bank.yml](./.github/workflows/bank.yml) runs the calibration bank (`bank/<name>`) and [feedback.yml](./.github/workflows/feedback.yml) runs the feedback corpus several times and compares the runs byte for byte (`feedback/<name>`). The pages workflow lints before it deploys.
+CI ([test.yml](./.github/workflows/test.yml)) runs on every push to master and on pull requests, in nine required checks: the Node suites (the app, replay-core and ui projects), the eval-engine project twice with the simulator speed layer forced off and forced on (`EVAL_SIM_FAST=0` and `1`; the only runs of that project), the dice sweeps over every move of the Dex (`DICE_SWEEPS=full`), the other sweep specs under the same switch (three parts, each a check of its own), the browser flows (three parts side by side and a last job named `Browser flows` that gates them), and a smoke test of the production build with `npm run pack:smoke`. A branch can run the same jobs by hand with `workflow_dispatch`. Two more workflows start only from a pushed branch: [bank.yml](./.github/workflows/bank.yml) runs the calibration bank (`bank/<name>`) and [feedback.yml](./.github/workflows/feedback.yml) runs the feedback corpus several times and compares the runs byte for byte (`feedback/<name>`). The pages workflow lints before it deploys.
 
 ### Contributing
 
-- Report a bug with the form under [Issues](https://github.com/FullLifeGames/PSDashboard/issues/new/choose) ("Report issue" in the app fills most of it); a new report starts with the label `needs triage`. Changes reach `master` through pull requests that pass the six jobs of the test workflow.
-- New files stay under the lint ceilings of 300 lines per file, 60 per function, and complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin.
-- `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), and nothing under `src/lib` imports the UI.
-- Keep the knip report empty; internal helpers stay unexported.
+- Report a bug with the form under [Issues](https://github.com/FullLifeGames/PSDashboard/issues/new/choose) ("Report issue" in the app fills most of it); a new report starts with the label `needs triage`. Changes reach `master` through pull requests that pass the nine required checks of the test workflow.
+- New files stay under the lint ceilings of 300 lines per file, 60 per function, and complexity 15. Older files sit on shrink-only pins in `eslint.ratchet.mjs`; `node scripts/update-lint-ratchet.mjs` re-measures them and refuses to raise a pin. The same script holds the number of spec files per test project in `spec-count-ratchet.json`: the count only falls, and a new spec file goes with a new source module, sweep or browser flow (`--allow-raise` raises it; the pull request names the module).
+- `eslint.zones.mjs` makes the layering a lint error: a package never reaches `src/`, replay-core never imports the engine, the app imports the packages by name (dynamic imports go through `src/lib/lazy/`), nothing under `src/lib` imports the UI, and `branch/execute.ts` imports the simulator and the dice module as types only (it loads the dice module on demand).
+- Keep the knip report empty; internal helpers stay unexported. `npm run knip` and `npm run lint` run in CI, in the required job `Production build smoke` of the test workflow (and `npm run lint` again in the Pages workflow), so a merge needs both clean.
 - Package barrels (`packages/*/src/index.ts`) are the public API. After widening one, run `UPDATE_API_SNAPSHOT=1 npm run test:regression -- test/regression/package-api.spec.ts`.
 - A package behavior gets its spec under `packages/<name>/test/`. A spec that needs app code goes under `test/regression/`, a component or hook spec under `test/ui/`, and a browser flow into the matching theme file under `test/e2e/`.
 

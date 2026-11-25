@@ -7,26 +7,14 @@ import { boostedFraction, pairThreat, singleMoveFraction } from '../src/score/th
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 69 (T42 part 1, decision 15): the doubles hints see the active pair.
- * Two attacks on one foe count more than the same attacks on two foes when
- * only the pair KOs; a redirection move is priced as the partner's damage it
- * covers; a Protect that denies the foes a KO only the pair can make carries a
- * tempo term. The orderings are held against the simulator: the same turns are
- * played there. Singles hints stay what they were (the terms live in the
- * combined path only).
- */
-
 const FORMAT = 'gen9doublescustomgame';
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
 const hintOf = (battle: Battle, side: 'p1' | 'p2', choice: string) => combinedOptionHints(rootOf(battle), side, [option(choice)])[0];
 const SUPPORT_FLOOR = 0.25;
-/** A move a battle can use: real, not a Max or Z move, not from a later game. */
 const playable = (move: { exists: boolean; gen: number; isMax?: unknown; isZ?: unknown }) => move.exists && move.gen <= 9 && !move.isMax && !move.isZ;
 
-/** Foe HP lost in one turn when p1 plays `p1Choice` against two Splashing foes. */
 function damageOf(build: () => Battle, p1Choice: string, foe = 0): number {
   const battle = build();
   const mon = battle.sides[1].active[foe]!;
@@ -36,7 +24,7 @@ function damageOf(build: () => Battle, p1Choice: string, foe = 0): number {
   return before - mon.hp;
 }
 
-describe('pair focus: two slots on one foe (round 69, T42)', () => {
+describe('pair focus: two slots on one foe', () => {
   const PIKACHU = () => set('Pikachu', ['splash', 'thunderbolt'], { ability: 'Static' });
   const foes = () => [splash('Snorlax'), splash('Snorlax')];
   const base = (foeHp?: number) => () => {
@@ -67,7 +55,6 @@ describe('pair focus: two slots on one foe (round 69, T42)', () => {
     const same = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 1');
     const split = hintOf(battle, 'p1', 'move thunderbolt 1, move thunderbolt 2');
     expect(same).toBeGreaterThan(split);
-    // Each attack on its own is read as before: the split combo is the plain sum of its two fractions.
     const mon = battle.sides[0].active[0]!;
     const fraction = singleMoveFraction(mon, battle.sides[1].active[0]!, 'thunderbolt', battle);
     expect(split).toBeCloseTo(2 * fraction, 10);
@@ -92,7 +79,6 @@ describe('pair focus: two slots on one foe (round 69, T42)', () => {
   });
 });
 
-/** The simulator's own answer to "does this move turn a foe's single-target hit away from the partner". */
 function redirectedInSim(moveId: string): boolean {
   const build = () => battleOf(FORMAT,
     [set('Blissey', [moveId, 'splash'], { ability: 'No Ability' }), set('Blissey', ['splash'])],
@@ -109,7 +95,7 @@ function redirectedInSim(moveId: string): boolean {
   return aimed.partner === aimed.partnerMax && aimed.user < control.user;
 }
 
-describe('redirection (round 69, T42)', () => {
+describe('redirection', () => {
   const CLEFAIRY = (move: string) => set('Clefairy', [move, 'splash'], { ability: 'Magic Guard' });
   const GARCHOMP = () => set('Garchomp', ['splash', 'dragonclaw'], { ability: 'Sand Veil' });
   const board = (move: string) => battleOf(FORMAT, [CLEFAIRY(move), GARCHOMP()], [splash('Pikachu'), splash('Pikachu')]);
@@ -121,7 +107,6 @@ describe('redirection (round 69, T42)', () => {
     const covered = hintOf(battle, 'p1', `move ${move}, move dragonclaw 1`) - partner;
     expect(covered).toBeCloseTo(partner, 10);
     expect(covered).toBeGreaterThan(SUPPORT_FLOOR);
-    // Next to a partner with no damaging move it stays what any support move is.
     expect(hintOf(battle, 'p1', `move ${move}, move splash`)).toBeCloseTo(2 * SUPPORT_FLOOR, 10);
   });
 
@@ -133,14 +118,13 @@ describe('redirection (round 69, T42)', () => {
     expect(claimed.map(move => move.id).sort()).toEqual(['followme', 'ragepowder']);
     for (const move of moves) {
       const seen = redirectedInSim(move.id);
-      // Ally Switch lands the user in the partner's slot, a swap of places that the same probe sees as a hit on the user.
+      // Ally Switch lands the user in the partner's slot, a swap the same probe sees as a hit on the user.
       if (move.id === 'allyswitch') continue;
       expect(`${move.id} ${seen}`).toBe(`${move.id} ${redirectsFoes(dex, move)}`);
     }
   });
 });
 
-/** Whether the simulator's Tackle from the foe is stopped by `moveId` on the user (the log's own "move: <name>" activation). */
 function stopsHitInSim(moveId: string): boolean {
   const battle = battleOf(FORMAT,
     [set('Blissey', [moveId, 'splash']), set('Blissey', ['splash'])],
@@ -150,13 +134,12 @@ function stopsHitInSim(moveId: string): boolean {
   return battle.log.some(line => /^\|-activate\|p1a: .*\|move: /.test(line));
 }
 
-describe('Protect tempo and Fake Out (round 69, T42)', () => {
+describe('Protect tempo and Fake Out', () => {
   test('the Dex sweep: the moves the code calls shields stop a Tackle in the simulator', () => {
     const dex = battleOf(FORMAT, [splash('Pikachu'), splash('Pikachu')], [splash('Pikachu'), splash('Pikachu')]).dex;
     const moves = dex.moves.all().filter(move => playable(move) && move.stallingMove && move.target === 'self');
     expect(moves.length).toBeGreaterThan(5);
     for (const move of moves) {
-      // Endure only keeps the user at 1 HP when a hit would KO: a Tackle at full HP shows no activation.
       expect(`${move.id} ${stopsHitInSim(move.id)}`).toBe(`${move.id} ${shieldsFromHits(dex, move)}`);
     }
   });
@@ -178,7 +161,6 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
       return before - mon.hp;
     })();
     const hp = Math.floor(hit * 1.35);
-    // From the simulator: both foes hit slot 1 and it faints; one alone does not.
     const turn = (p2: string) => {
       const battle = build(hp)();
       battle.choose('p1', 'move 1, move 1');
@@ -192,8 +174,6 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
     const threatened = protector();
     threatened.sides[0].active[0]!.sethp(hp);
     expect(hintOf(threatened, 'p1', 'move protect, move splash')).toBeGreaterThan(hintOf(threatened, 'p1', 'move splash, move splash'));
-    // Round 70 (gate of 13.10. 20:26, 3a): a healthy Snorlax in front of two Dragon Claws now earns the damage the Protect denies
-    // (protect-tempo-hints.spec.ts); with no damaging foe there is nothing to deny and the Protect stays the floor.
     const idleFoes = battleOf(FORMAT, [set('Snorlax', ['splash', 'protect']), splash('Blissey')], [splash('Garchomp'), splash('Garchomp')]);
     expect(hintOf(idleFoes, 'p1', 'move protect, move splash')).toBeCloseTo(hintOf(idleFoes, 'p1', 'move splash, move splash'), 10);
   });
@@ -207,7 +187,7 @@ describe('Protect tempo and Fake Out (round 69, T42)', () => {
   });
 });
 
-describe('singles hints stay what they were (round 69, T42)', () => {
+describe('singles hints stay what they were', () => {
   test('moves are the damage fraction (status moves 0), switches the threat differential', () => {
     const battle = battleOf('gen9customgame',
       [set('Clefairy', ['followme', 'protect', 'moonblast', 'thunderbolt']), set('Garchomp', ['dragonclaw']), splash('Blissey')],

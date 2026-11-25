@@ -2,22 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { Battle, BattleStreams, Teams, type PokemonSet } from '@pkmn/sim';
 import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 
-/**
- * Round 72, T238: scenes the simulator writes itself. A game of the simulator, played through its battle stream, yields
- * the spectator log (the log a replay holds: no `shiny` on `|poke|` lines, the disguise of an Illusion on the field).
- * The teams built from that log must switch in with the lines the game wrote: the body that entered as
- * `|switch|p1a: NOT ICT|Landorus-Therian, L50, M, shiny|` exists in the branch battle with that name and those details,
- * for singles and for doubles, from a switch, a drag and a replace, through an Illusion, a Transform and a team preview
- * that leaves two bodies out. A body the log never shows keeps the species as its name and no shiny: the line a replay
- * would have written for it.
- */
-
 const set = (name: string, species: string, extra: Partial<PokemonSet> = {}): PokemonSet => ({
   name, species, item: '', ability: 'No Ability', moves: ['Tackle', 'Dragon Tail', 'Transform'], nature: 'Serious', gender: '', level: 100,
   evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, ...extra,
 });
 
-/** The spectator log of a scripted game: each command line is written to the omniscient stream in order. */
 async function play(format: string, p1: PokemonSet[], p2: PokemonSet[], commands: string[]): Promise<string> {
   const streams = BattleStreams.getPlayerStreams(new BattleStreams.BattleStream());
   const chunks: string[] = [];
@@ -32,7 +21,6 @@ async function play(format: string, p1: PokemonSet[], p2: PokemonSet[], commands
 
 const ENTRY = /^\|(?:switch|drag|replace)\|(p[12])[a-d]?: ([^|]*)\|([^|]*)/;
 
-/** The entry lines the game wrote that no body of the branch battle reproduces by name and details. */
 function unreproduced(log: string, format: string): string[] {
   const { p1Team, p2Team } = buildTeamsFromReplay(log);
   const battle = new Battle({
@@ -48,7 +36,6 @@ function unreproduced(log: string, format: string): string[] {
   return missing;
 }
 
-/** The sets the build made for one side, by species. */
 function builtSide(log: string, side: 'p1' | 'p2'): Record<string, { name: string; shiny: boolean }> {
   const built = buildTeamsFromReplay(log);
   return Object.fromEntries((side === 'p1' ? built.p1Team : built.p2Team).map(mon => [mon.species, { name: mon.name, shiny: !!mon.shiny }]));
@@ -79,7 +66,6 @@ describe('scenes the simulator wrote: the built sets switch in with the same lin
     expect(log).toMatch(/\|switch\|p1a: Blossom\|Amoonguss, L50, F, shiny\|/);
     expect(unreproduced(log, format)).toEqual([]);
     expect(builtSide(log, 'p1').Incineroar).toEqual({ name: 'Sir Bench', shiny: false });
-    // Whimsicott stayed on the bench: no line shows it, so its set keeps the species and no shiny flag.
     expect(builtSide(log, 'p1').Whimsicott).toEqual({ name: 'Whimsicott', shiny: false });
     expect(builtSide(log, 'p2').Zorua).toEqual({ name: 'Fox', shiny: true });
   });
@@ -118,7 +104,6 @@ describe('scenes the simulator wrote: the built sets switch in with the same lin
     expect(unreproduced(log, format)).toEqual([]);
     const mine = builtSide(log, 'p1');
     expect(mine.Amoonguss).toEqual({ name: 'Mine 0', shiny: true });
-    // Rillaboom (index 4) and Gholdengo (index 5) never entered: the preview line carries no name and no shiny flag.
     expect(mine.Rillaboom).toEqual({ name: 'Rillaboom', shiny: false });
     expect(mine.Gholdengo).toEqual({ name: 'Gholdengo', shiny: false });
   });

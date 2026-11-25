@@ -9,20 +9,7 @@ import {
 import { swept } from './screen-sweep-moves';
 import type { SimView } from './sim-views';
 
-/**
- * Round 86 (T310, GitHub issue #3): the turns of a screen name the item that held it. Reflect, Light Screen and Aurora Veil last
- * five turns, eight with Light Clay; the log shows the start and the end of a screen but never the item. The inference reads
- * the screen's lifetime from the log (a start in the action phase, an end in the residual phase of a later turn) and holds it
- * to the Dex's own turns (`conditionTurns`, held to the simulator by `screen-turns-sweep.spec.ts`):
- *  - the lifetime of the plain turns rules Light Clay out for the setter, the lifetime of Light Clay's turns proves it;
- *  - nothing is read when the turns prove nothing: a removal (the screen ends in the action phase), a screen moved by Court
- *    Change, a screen still standing at the log's end, an item that did not count (Klutz, Embargo, Magic Room), an item the
- *    log showed change, an Illusion team, a generation without the item (Generations 1 to 3).
- * These rows were red before the reader (step C2 of lane C, `test.fails`); step C3 built the reader and flipped them to `test`.
- * The rows that read nothing pass both before and after; they guard the cases a careless reader would get wrong.
- * Every log below comes from the simulator, in singles and in doubles (the setter in either slot), in the simulator's own style
- * and with the log's `|t:|` lines taken out (a reconstructed log).
- */
+// Reflect, Light Screen and Aurora Veil last five turns, eight with Light Clay; the log never shows the item.
 const red = test;
 
 const SCENE_FILES = {
@@ -82,12 +69,11 @@ describe('the two scenes of the issue', () => {
   });
 });
 
-/** The scene of a holder: Alpha's setter uses the screen on turn 1 and the log runs ten turns (a plain screen ended on turn 5, Light Clay's on turn 8). */
 const scene = (screen: string, holder: Holder, extra: Partial<SceneOptions> = {}): SceneOptions =>
   ({ holder, screen, turns: 10, ...extra });
 const SNORLAX = 'Snorlax';
 
-describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S4, the setter\'s item from the turns: $name', view => {
+describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the setter\'s item from the turns: $name', view => {
   const dex = asRulesDex(view);
   for (const screen of screenMoves(view)) {
     const items = [...(conditionTurns(dex, screen)?.byItem ?? [])];
@@ -113,7 +99,6 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('S4, the setter\'s i
   }
 });
 
-/** The rows where the turns prove nothing: each plays the control (the verdict the reader gives without the cause) and then the cause. */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove nothing: $name', view => {
   const screen = 'reflect';
   const slot = view.doubles ? 1 : 0;
@@ -153,7 +138,6 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
 
   red('an Illusion user on the team: the setter may be the user\'s disguise, no verdict (where the generation has Illusion)', () => {
     expect(ruledOut(control({ species: SNORLAX }), 'p1', SNORLAX)).toBe(true);
-    // Round 86 (C3): the generation decides, read from the Dex. Where the ability does not exist, a bench the log never shows holds no disguise.
     const illusion = view.dex.abilities.get('illusion');
     const hasIllusion = illusion.exists && illusion.gen <= view.dex.gen;
     expect(ruledOut(control({ species: SNORLAX }, { bench: [{ species: 'Zoroark', ability: 'Illusion' }] }), 'p1', SNORLAX)).toBe(!hasIllusion);
@@ -170,31 +154,23 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('the turns prove not
   });
 });
 
-/**
- * The ruling after C1: a start whose move line carries `[from]` (a Snatch that steals the screen, a move called by Copycat) is
- * set by the body that line names, and that body's item decides the turns. A reader that credits the body of the earlier
- * `|move|` line instead gets a wrong verdict: these rows hold the scenes where it would. They pass today and must keep passing.
- * The Snatch rows come from the Dex's `snatch` flag, the Copycat row from the Dex's move.
- */
+// A start whose move line carries `[from]` (Snatch, Copycat) is set by the body that line names; its item decides.
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 4))('a screen set through another move: $name', view => {
   const snatchable = screenMoves(view).filter(id => view.dex.moves.get(id).flags.snatch);
 
   test.each(snatchable)('Snatch steals %s: the stolen screen is the snatcher\'s, the original setter reads nothing', screen => {
     const options = { screen, turns: 10, foeMoves: { 1: 'snatch' } };
-    // the setter holds Light Clay and the snatcher nothing: five turns on the snatcher's side, no rule-out for the setter
     const plain = playScene(view, { ...options, holder: { species: SNORLAX, item: LIGHT_CLAY }, foe: { species: 'Abomasnow', ability: 'Snow Warning' } });
     expect(screenLines(plain).filter(line => line.kind === 'start').map(line => line.side), 'the stolen screen stands on the snatcher side').toEqual(['p2']);
     expect(plain).toContain('[from] Snatch');
     expect(ruledOut(plain, 'p1', SNORLAX)).toBe(false);
-    // the snatcher holds Light Clay and the setter nothing: eight turns on the snatcher's side, no proof for the setter
     const clay = playScene(view, { ...options, holder: { species: SNORLAX }, foe: { species: 'Abomasnow', ability: 'Snow Warning', item: LIGHT_CLAY } });
     expect(proven(clay, 'p1', SNORLAX)).toBe('');
     expect(ruledOut(clay, 'p2', 'Abomasnow')).toBe(false);
   });
 
   test('Copycat sets the screen: the copier\'s item decides, so the verdict names the copier or nothing', () => {
-    // Singles only: in doubles the ally and the foe's partner move between the copied Reflect and the copy, so Copycat repeats
-    // their Splash; the Snatch rows above hold the `[from]` rule in doubles.
+    // Singles only: in doubles other bodies move between the screen and the copy, so Copycat repeats their Splash.
     const copycat = view.dex.moves.get('copycat');
     if (view.doubles || !copycat.exists || copycat.gen > view.dex.gen) return;
     const log = playScene(view, {
@@ -218,17 +194,10 @@ describe.each(RULE_VIEWS.filter(view => view.dex.gen < 4))('no table before Ligh
   });
 });
 
-/**
- * S3, the removers and the silent movers, found by playing every move of the rule set against a board with a screen on each
- * side (Reflect on p1's, Light Screen on p2's, set by `addSideCondition`): a move that ends a screen in the action phase is a
- * remover, a move that changes which side holds a screen with no line is a silent mover. For each found move the log of a
- * game where p1 plays it on the screen's plain last turn must give a verdict to a side only when its screen ran out on its own
- * side in the residual phase, and the control without the move gives both sides their verdict.
- */
 describe.each(RULE_VIEWS.filter(view => view.dex.gen >= 2 && screenMoves(view).length >= 2))('S3, removers and movers of screens: $name', view => {
   const found = swept(view);
   const both = (log: string): [boolean, boolean] => [ruledOut(log, 'p1', SNORLAX), ruledOut(log, 'p2', 'Vaporeon')];
-  // Round 86 (C3): before Generation 4 no item changes a screen's turns (Light Clay debuts there), so no screen gives a verdict.
+  // Light Clay debuts in Generation 4: before it no item changes a screen's turns.
   const verdicts = (clean: [boolean, boolean]): [boolean, boolean] => (view.dex.gen >= 4 ? clean : [false, false]);
 
   test('the sweep found the removers and movers the rule set has', () => {

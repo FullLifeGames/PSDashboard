@@ -2,11 +2,6 @@ import type { DieOffer, DieWords, ForcedDie } from '@fulllifegames/eval-engine';
 import { resultWord } from '../../lib/branch-dice';
 import type { StepDamage } from '../../lib/branch-rolls';
 
-/**
- * Round 82 (forced dice), step A7a, decision 9a: the damage roll as a select over the steps of the generation (16, and 39 in Gens
- * 1 and 2), each with the damage the calculator gives, and the shortcuts Min, Max and Lowest KO roll. "As rolled" gives the die back
- * to the seed. A forced crit on the target switches the numbers to the crit's (the panel's preview prices the move as a crit).
- */
 
 const percentOf = (damage: number, maxhp: number): number => (maxhp > 0 ? Math.round(damage / maxhp * 1000) / 10 : 0);
 
@@ -17,7 +12,6 @@ export interface RollSelectProps {
   words: DieWords;
   /** The calculator's damage for each step; absent where the calculator gives none (a fixed damage). */
   rolls: StepDamage | undefined;
-  /** The user forced a crit on this target: the numbers are the crit's. */
   crit: boolean;
   onToggle: (die: ForcedDie) => void;
 }
@@ -29,7 +23,6 @@ function stepText(offer: DieOffer, step: number, words: DieWords, rolls: StepDam
   return `${word} · ${percentOf(damage, rolls!.maxhp)}%${damage >= rolls!.hp ? ' · KO' : ''}`;
 }
 
-/** The lowest step that takes the foe down: the first whose damage reaches its HP, null when none does. */
 const lowestKo = (rolls: StepDamage | undefined): number | null => {
   const index = rolls ? rolls.damage.findIndex(damage => damage >= rolls.hp) : -1;
   return index < 0 ? null : index;

@@ -8,19 +8,7 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { mon, RULES, RULES_WITH_DOUBLES, type Mode, type Rules } from './dice-fixtures';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 89 (#138): the game's switch-out ends a body's volatiles. Two corrections of the rebuild differed from the simulator's own switch.
- *
- * 1. A body the simulator switched out and the game dragged back into the OTHER slot (Doubles OU 2553498001 turn 5: Sableye, taunted,
- *    leaves p2b for Rillaboom; Roar on p2a drags it into p2a) got the volatiles of its exit back. The check for a switch-out in the block
- *    asked about the slot the body entered, not the slot it left.
- * 2. The body a correction displaces from a slot kept its volatiles on the bench (Champions VGC 2685328963: Sableye kept its Taunt and
- *    entered turn 7 with it). The simulator's switch calls `clearVolatile` on the old active.
- *
- * Rows: the scenes on the simulator in doubles (1) and in singles and doubles (2), both correction paths (the protocol's lines and the
- * snapshot); then a sweep over every rule set the corpus plays (Gens 1 to 9 and Champions, singles and doubles): every condition of the
- * Dex put on a body as a volatile, the simulator's own switch on one board and the correction on its twin, the same volatiles after.
- */
+// The simulator's switch calls `clearVolatile` on the old active; the rebuild's corrections must match it.
 await loadSimMods('gen9championsou');
 
 const ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
@@ -45,10 +33,8 @@ async function toTurn(session: Awaited<ReturnType<typeof open>>['session'], turn
 describe('a body the game dragged into the other slot after its switch-out (doubles)', () => {
   const p1 = [set('Pikachu', 'Static', ['Taunt', 'Splash']), set('Snorlax', 'Immunity', ['Splash'])];
   const p2 = [set('Ogerpon', 'Defiant', ['Tackle', 'Splash']), set('Sableye', 'Prankster', ['Tackle', 'Splash']), set('Rillaboom', 'Overgrow', ['Splash']), set('Pidgey', 'Keen Eye', ['Splash'])];
-  // Turn 1: Taunt lands on Sableye (p2b). Turn 2: it switches out for Rillaboom in the simulator.
   const turn1 = '>p1 move 1 2, move 1\n>p2 move 1 1, move 1 1';
   const turn2 = '>p1 move 2, move 1\n>p2 move 1 1, switch 3';
-  // The game: Rillaboom takes p2b, then Roar drags Sableye into p2a.
   const events = ['|switch|p2b: Rillaboom|Rillaboom, M|100/100', '|drag|p2a: Sableye|Sableye, M|100/100'];
 
   async function scene(): Promise<SimBattle> {
@@ -71,14 +57,12 @@ describe('a body the game dragged into the other slot after its switch-out (doub
 
   test('a body that re-enters the slot it left still starts fresh', async () => {
     const battle = await scene();
-    // The game: Rillaboom takes p2b, is knocked out, and Sableye comes back to p2b.
     correctActivesFromProtocol(battle, ['|switch|p2b: Rillaboom|Rillaboom, M|100/100', '|faint|p2b: Rillaboom', '|switch|p2b: Sableye|Sableye, M|100/100']);
     expect(ids(battle, 1, 'Sableye')).toEqual([]);
   });
 
   test('a body the game kept on its slot gets the volatiles the guessed exit took (one entry, no other body left)', async () => {
     const battle = await scene();
-    // The game never switched Sableye out: its one entry line is the protocol's own switch-in, with nobody leaving before it.
     correctActivesFromProtocol(battle, ['|switch|p2b: Sableye|Sableye, M|100/100']);
     expect(battle.sides[1].active[1]).toBe(bodyOf(battle, 1, 'Sableye'));
     expect(ids(battle, 1, 'Sableye')).toContain('taunt');
@@ -105,7 +89,6 @@ describe.each([
   ['singles', 'gen9customgame', [set('Pikachu', 'Static', ['Taunt', 'Splash'])], [set('Sableye', 'Prankster', ['Tackle', 'Splash']), set('Rillaboom', 'Overgrow', ['Splash']), set('Pidgey', 'Keen Eye', ['Splash'])], '>p1 move 1\n>p2 move 1', 1],
   ['doubles', 'gen9doublescustomgame', [set('Pikachu', 'Static', ['Taunt', 'Splash']), set('Snorlax', 'Immunity', ['Splash'])], [set('Sableye', 'Prankster', ['Tackle', 'Splash']), set('Ogerpon', 'Defiant', ['Tackle', 'Splash']), set('Rillaboom', 'Overgrow', ['Splash']), set('Pidgey', 'Keen Eye', ['Splash'])], '>p1 move 1 1, move 1\n>p2 move 1 1, move 1 1', 2],
 ] as const)('the body a correction displaces leaves the way the simulator\'s switch leaves it (%s)', (_label, format, p1, p2, turn1) => {
-  /** Sableye (p2a) is taunted and stays in the simulator's turn; the game put Rillaboom on p2a. */
   async function scene(): Promise<SimBattle> {
     const { session, battle } = await open(format, [...p1], [...p2]);
     session.writeSim(turn1);
@@ -137,7 +120,6 @@ describe.each([
   });
 });
 
-/** Every condition of the Dex and every volatile a move sets: the ids a body can carry in `volatiles` (an id that is none is harmless to the clear). */
 function conditionIds(battle: Battle): string[] {
   const ids = new Set(Object.keys((battle.dex.data as unknown as { Conditions: object }).Conditions));
   for (const move of battle.dex.moves.all()) if (move.volatileStatus) ids.add(move.volatileStatus);
@@ -172,7 +154,6 @@ describe('the sweep: the correction leaves the volatiles the simulator\'s switch
     const out = mark(truth);
     const displaced = mark(rebuilt);
 
-    // The simulator's own switch on one board, the correction on its twin.
     const incoming = truth.sides[1].pokemon[bench];
     truth.actions.switchIn(incoming, slot);
     const entering = rebuilt.sides[1].pokemon[bench];

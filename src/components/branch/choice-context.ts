@@ -2,7 +2,6 @@ import type { BranchMoveOption, BranchSwitchOption } from '../../hooks/useBranch
 import type { BranchSlotModifiers, BranchMoveModifier, BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { toId } from '@fulllifegames/replay-core';
 
-/** What turning a button click into a choice needs: the active gimmick and the side's options. */
 export interface ChoiceContext {
   modifier: BranchMoveModifier | null;
   modifierAvailable: boolean;
@@ -13,7 +12,6 @@ export interface ChoiceContext {
 function withModifier(choice: BranchSlotChoice, ctx: ChoiceContext): BranchSlotChoice {
   const { modifier, modifierAvailable, moves, modifiers } = ctx;
   if (choice.kind !== 'move' || !modifier || !modifierAvailable) return choice;
-  // A Z toggle only applies to moves that actually have a Z option.
   if (modifier === 'zmove') {
     const moveIndex = moves.findIndex(candidate => toId(candidate.name) === choice.moveId);
     if (moveIndex < 0 || !modifiers.zMoves[moveIndex]) return choice;

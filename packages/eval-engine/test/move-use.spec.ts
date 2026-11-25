@@ -3,10 +3,6 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { landedMove } from '../src/score/move-facts';
 import { active, bench, clickTera, set, simUse, singles } from './move-oracle';
 
-/**
- * Round 57 (T73): the rule table answers like the simulator for every active
- * carrier, and like the active body for a benched one.
- */
 const ours = (battle: Battle, attacker: Pokemon, defender: Pokemon, id: string) =>
   landedMove(attacker, defender, battle.dex.moves.get(id), battle);
 
@@ -16,7 +12,7 @@ function expectSim(battle: Battle, attacker: Pokemon, defender: Pokemon, id: str
   return answer;
 }
 
-describe('body rules: form, item, user type, abilities (round 57)', () => {
+describe('body rules: form, item, user type, abilities', () => {
   test('Liquid Voice turns a sound move to Water, not Moonblast', () => {
     const battle = singles('gen9customgame', [set('Primarina', ['hypervoice', 'moonblast', 'psychicnoise'], { ability: 'Liquid Voice' })], [set('Gengar', ['splash'])]);
     const [primarina, gengar] = [active(battle, 0), active(battle, 1)];
@@ -88,7 +84,7 @@ describe('body rules: form, item, user type, abilities (round 57)', () => {
   });
 });
 
-describe('field rules: Weather Ball, Terrain Pulse (round 57)', () => {
+describe('field rules: Weather Ball, Terrain Pulse', () => {
   test('Weather Ball follows the rain, doubled; an Umbrella and Cloud Nine cancel it', () => {
     const rain = singles('gen9customgame', [set('Pelipper', ['weatherball'], { ability: 'Drizzle' })], [set('Gengar', ['splash'])]);
     expect(expectSim(rain, active(rain, 0), active(rain, 1), 'weatherball')).toMatchObject({ type: 'Water', basePower: 100 });
@@ -116,7 +112,7 @@ describe('field rules: Weather Ball, Terrain Pulse (round 57)', () => {
   });
 });
 
-describe('Tera rules (round 57)', () => {
+describe('Tera rules', () => {
   test('Tera Blast: Normal before the click, the Tera type after, physical when Attack leads', () => {
     const battle = singles('gen9customgame', [set('Dragonite', ['splash', 'terablast'], { teraType: 'Fairy', nature: 'Adamant', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } })], [set('Garchomp', ['splash'])]);
     expect(expectSim(battle, active(battle, 0), active(battle, 1), 'terablast')).toMatchObject({ type: 'Normal', category: 'Special' });
@@ -147,7 +143,7 @@ describe('Tera rules (round 57)', () => {
   });
 });
 
-describe('Hidden Power (round 57)', () => {
+describe('Hidden Power', () => {
   test('gen 3: type, power and a category by type', () => {
     const battle = singles('gen3customgame', [set('Arcanine', ['hiddenpowerelectric'])], [set('Charizard', ['splash'])]);
     const answer = expectSim(battle, active(battle, 0), active(battle, 1), 'hiddenpower');

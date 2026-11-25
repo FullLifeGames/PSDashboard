@@ -8,11 +8,7 @@ import type { WinPathsRequest } from '../src/endgame/win-paths/types';
 import { branchOf, mon, runTurn, type Commands } from './branch-dice-support';
 import { set } from './move-oracle';
 
-/**
- * Round 89 (#130): boards of the win-path specs. A board is a fresh game of a custom format whose bodies the spec sets
- * (`prepare`), serialized as the app serializes a live battle; `play` replays a line on a fresh branch of the same board the way the
- * app plays a variation (each step's slot choices resolved on the rebuilt battle, the dice forced from the slot choices).
- */
+/** A custom game set up by `prepare`, serialized like a live battle; `play` replays a line on a fresh branch of it. */
 export interface Board {
   format: string;
   p1: ReturnType<typeof set>[];
@@ -30,14 +26,12 @@ export async function serializedBoard(board: Board, seed = '1,2,3,4'): Promise<{
   return { runtime, serialized: JSON.stringify(State.serializeBattle(runtime.battleStream.battle!)) };
 }
 
-/** A line played as a variation on a fresh branch of the board; the branch's battle after its last step. */
 export async function playLine(board: Board, line: EvalLine, seed: string): Promise<Battle> {
   const runtime = await branchOf(board.format, board.p1, board.p2, seed);
   board.prepare?.(runtime.battleStream.battle!);
   return playLineOn(runtime, line);
 }
 
-/** A line played on a branch the caller built (a corpus scene's reconstruction); the branch's battle after its last step. */
 export async function playLineOn(runtime: Runtime, line: EvalLine): Promise<Battle> {
   for (const step of line.steps) {
     const battle = runtime.battleStream.battle!;

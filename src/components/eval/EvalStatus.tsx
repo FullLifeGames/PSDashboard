@@ -5,11 +5,8 @@ export interface PlayOutProgress {
   startTurn: number;
   turns: number;
   atTurn: number | null;
-  /** The run uses the depth-1 matrix on every turn (the fast option). */
   fast?: boolean;
-  /** Stop was pressed with a turn in flight (round 89, #119): the run ends when that turn landed. */
   stopping?: boolean;
-  /** Round 89 (#105): the run plays a new game; its line is the main line, not a gold variation. */
   game?: boolean;
 }
 
@@ -31,12 +28,6 @@ function PlayOutProgressLine({ playOutProgress }: { playOutProgress: PlayOutProg
   );
 }
 
-/** The run state under the header: play-out, reconstruction, search progress, error, staleness. */
-/**
- * The line under a stale result. Round 89 (SB-7): a search the user stopped says what it left: the first level of a search is the
- * quick estimate (a forced replacement's arrival values, a normal turn's depth-1 matrix), a later partial is the result so far.
- * Any other stale result stands for a position that changed.
- */
 function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
   return (
     <div role={stoppedAt === null ? undefined : 'status'} style={{ fontSize: 11, color: '#b6a46a', marginBottom: 4 }}>
@@ -47,7 +38,6 @@ function StaleLine({ stoppedAt }: { stoppedAt: number | null }) {
   );
 }
 
-/** The note of a stale result, or of a stop that kept nothing (round 89, SB-9: the search stopped before its first result). */
 function StopNote({ status, stoppedAt, stoppedEmpty }: { status: EvalStatusKind; stoppedAt: number | null; stoppedEmpty: boolean }) {
   if (status === 'stale') return <StaleLine stoppedAt={stoppedAt} />;
   if (status !== 'idle' || !stoppedEmpty) return null;
@@ -64,9 +54,7 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
   reconstructProgress: { turn: number; target: number } | null;
   progress: SearchProgress | null;
   error: string | null;
-  /** Round 89 (SB-7): the depth of the partial result a user stop kept; null when the stale result is no stopped run. */
   stoppedAt?: number | null;
-  /** Round 89 (SB-9): the user stopped the search before any partial result; nothing was kept. */
   stoppedEmpty?: boolean;
 }) {
   return (

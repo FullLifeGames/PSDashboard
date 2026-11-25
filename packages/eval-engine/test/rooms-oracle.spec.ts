@@ -1,23 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { ROOMS } from '../src/pair/snapshot';
-import { ALL_VIEWS, battleIn, mon, oracleTagAbove, type SimView } from './sim-views';
+import { ALL_VIEWS, battleIn, mon, type SimView } from './sim-views';
 
-/**
- * Round 72 (T235), plan row 14: `ROOMS` in pair/snapshot.ts names the pseudo-weathers the damage calculator's Field reads
- * (isGravity, isMagicRoom, isWonderRoom). The Dex has more pseudo-weathers; the question for the list is which of them change
- * a damage roll. This spec adds each pseudo-weather the view's moves set to a battle and asks the simulator for the damage of
- * six hits (a physical and a special Normal hit, a Ground move at a Flying target, a Normal hit at a Ground target, an
- * Electric and a Fire hit, and a Life Orb hit) with and without it. The pseudo-weathers that change one of them are:
- *  - the three of ROOMS, in every view that has the move (Gravity, Magic Room, Wonder Room);
- *  - FINDING W8: Mud Sport, Water Sport and Ion Deluge (which Plasma Fists sets as well) change the roll and the calculator's
- *    Field has no flag for them, so the pair snapshot prices those hits without them (Ion Deluge, Plasma Fists, Mud Sport and
- *    Water Sport are Past moves in Generation 9; Mud Sport and Water Sport are live in Generations 3 to 8).
- * Trick Room and Fairy Lock change no roll. The hand list stays as it is; the unlisted three are named for the integrator.
- */
 
-const SPEC = 'packages/eval-engine/test/rooms-oracle.spec.ts';
-
-/** Pseudo-weathers that change a roll but are not in ROOMS (finding W8). */
 const UNKEYED = ['iondeluge', 'mudsport', 'watersport'];
 
 interface Scenario { name: string; user: string; item?: string; move: string; target: string }
@@ -36,7 +21,6 @@ const isReal = (view: SimView, kind: 'moves' | 'items', id: string): boolean => 
   return entry.exists && entry.isNonstandard !== 'Future';
 };
 
-/** The damage the simulator gives the hit, on a battle where `prepare` has run. */
 function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType<typeof battleIn>, user: ReturnType<typeof battleIn>['sides'][0]['pokemon'][0]) => void): unknown {
   const battle = battleIn(view,
     [mon(scenario.user, ['splash'], scenario.item ? { item: scenario.item } : {}), mon('Blissey', ['splash'])],
@@ -47,15 +31,11 @@ function damage(view: SimView, scenario: Scenario, prepare?: (battle: ReturnType
   let move = battle.dex.getActiveMove(scenario.move);
   move.willCrit = false;
   battle.setActiveMove(move, user, target);
-  move = battle.runEvent('ModifyType', user, target, move, move) as typeof move; // Ion Deluge turns Normal moves Electric here
+  move = battle.runEvent('ModifyType', user, target, move, move) as typeof move; // Ion Deluge: Normal becomes Electric
   return battle.actions.getDamage(user, target, move);
 }
 
-describe('ROOMS is held to the simulator (round 72)', () => {
-  test('the list carries its oracle tag', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/pair/snapshot.ts', 'const ROOMS', SPEC)).toBe(true);
-  });
-
+describe('ROOMS is held to the simulator', () => {
   describe.each(ALL_VIEWS)('$name', view => {
     const pseudoWeathers = [...new Set(view.dex.moves.all()
       .filter(move => isReal(view, 'moves', move.id) && move.pseudoWeather)

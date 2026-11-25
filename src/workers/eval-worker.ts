@@ -9,24 +9,16 @@ import { isReplayJob, type ReplayJobRequest, type ReplayJobResponse } from '../l
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
 const post = (message: EvalWorkerResponse) => scope.postMessage(message);
-/** Round 59: every final answer carries the speed layer's status and its counters since the last one. */
 const settle = (message: EvalWorkerResponse) => post({ ...message, simFast: takeSimFastReport() });
 const postReplay = (message: ReplayJobResponse) => scope.postMessage(
   message.type === 'replayProgress' || message.type === 'replayPosition' ? message : { ...message, simFast: takeSimFastReport() },
 );
-/** MCTS iterations between two progress messages. */
 const PROGRESS_EVERY = 10;
 
-// One executor (with its matchup cache and lazily deserialized root) is
-// reused across every message about the same position under the same rule
-// set (round 65: the rule set picks the static's weight table).
+// One executor serves every message about the same position under the same rule set (it picks the weight table).
 const executors = new Map<string, SearchExecutor>();
 
-/**
- * Round 67 (T139): every search message names its rule set. A missing one
- * is a caller's bug, answered with an error instead of the standard weights
- * (which would price a VGC or Champions position with the wrong table).
- */
+// A missing rule set is a caller's bug: answered with an error, as the standard weights would misprice a VGC position.
 function requireRuleset(ruleset: StaticRuleset | undefined): StaticRuleset {
   if (!ruleset) throw new Error('evaluation worker: a search message without a rule set');
   return ruleset;
@@ -46,21 +38,17 @@ function executorFor(serializedBattle: string, named: StaticRuleset | undefined)
 
 scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobRequest>) => {
   const message = event.data;
-  // Round 59: the host's speed-layer levers ride on every message (workers see no localStorage).
+  // The host's speed-layer levers ride on every message (workers see no localStorage).
   adoptSimFastStamp(message);
-  // The replay jobs (spread solve, reconstruction) ride the same script in
-  // their own worker instance (ReplayWorkerClient). Their handlers load on
-  // demand: they carry replay-core's team builder, the standalone dex, and
-  // the learnsets, which the evaluation pool never needs.
+  // The replay jobs ride this script in their own worker instance; their handlers load on demand (builder, dex, sets).
   if (isReplayJob(message)) {
     const { handleReplayJob } = await import('../lib/replay-jobs/handlers');
     await handleReplayJob(message, postReplay);
     return;
   }
-  // Round 61: search messages carry the search budget (iterations per tree).
   adoptSearchBudgetStamp(message);
   try {
-    // Round 67 (T145): a Champions position revives on the Champions mod, which nothing in this worker loaded before.
+    // A Champions position revives on the Champions mod, which nothing else in this worker loads.
     await loadSimModsFor(message.serializedBattle);
     if (message.type === 'search') {
       requireRuleset(message.settings.ruleset);
@@ -73,15 +61,12 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
     } else if (message.type === 'mctstree') {
       requireRuleset(message.settings.ruleset);
       const tree = mctsTreeSearch(message.serializedBattle, message.settings, message.seedOffset, {
-        // Every iteration reports; one message per ten (plus the last) is
-        // all a progress bar can show, and each message is a main-thread
-        // clone plus a render (round 38: the play-out's frozen panel).
         onProgress: progress => {
           if (progress.done % PROGRESS_EVERY === 0 || progress.done >= progress.total) {
             post({ type: 'progress', id: message.id, progress });
           }
         },
-        // Round 89 (SB-9): tree 0 of a search with a listener streams its interim result (every 150 iterations); the others ask for none.
+        // Tree 0 streams its interim result (every 150 iterations); the others ask for none.
         ...(message.partials && { onPartial: partial => post({ type: 'partial', id: message.id, result: partial }) }),
       });
       settle({ type: 'mctsTreeResult', id: message.id, tree });
@@ -101,7 +86,6 @@ scope.onmessage = async (event: MessageEvent<EvalWorkerRequest | ReplayJobReques
       const lines = await executorFor(message.serializedBattle, message.ruleset).lines!(message.input);
       settle({ type: 'linesResult', id: message.id, lines });
     } else if (message.type === 'job') {
-      // Round 89 (#130): a job the user asked for runs on a worker of its own and streams each step the moment it is done.
       const result = runOnRequestJob(message.serializedBattle, requireRuleset(message.ruleset), message.job, step => post({ type: 'jobStep', id: message.id, step }));
       settle({ type: 'jobResult', id: message.id, result });
     }

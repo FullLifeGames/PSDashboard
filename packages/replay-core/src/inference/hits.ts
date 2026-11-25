@@ -9,53 +9,36 @@ import { arg, hasKw, identOf, keyOf, namesEffect, ofIdent, type LogLine } from '
 import { toId } from '../ids.ts';
 import { standingScreens } from '../dex-facts/index.ts';
 
-/**
- * The clean hits each opponent Pokémon dealt (round 67, T130): the damage
- * judge (team/item-damage.ts) recomputes them per item candidate. The
- * inference walks the log with its own @pkmn/client Battle (spec decision
- * 19: one client per inference) and reads, just before each damage line,
- * what the calculator needs: both parties' formes, levels, Tera, boosts,
- * status and HP, the weather, the terrain, the screens, Helping Hand, the
- * other Pokémon on the field, and whether the move line names spread
- * targets. A hit counts once per target: a second damage line from the same
- * move (multi-hit, Parental Bond) drops it, as do crits and every
- * [from]-attributed line. Singles and doubles alike: unlike the parser's
- * damage observations (singles only, the spread solver's input), these feed
- * only the item judge.
- */
+// A hit counts once per target: a second damage line of the move, a crit and every [from]-attributed line drop it.
+// Singles and doubles alike, unlike the parser's damage observations (singles only).
 
 type ClientPokemon = NonNullable<ReturnType<Battle['getPokemon']>>;
 
-/** The client's marks for an item a Pokémon took from another one. */
 const ACQUIRED = new Set(['tricked', 'stolen', 'bestowed', 'harvested']);
-/** Lines after which no move is resolving ('' a blank line, "done" the "|" line). */
+// '' is a blank line, "done" the bare `|` line.
 const ACTION_ENDS = new Set(['', 'done', 'move', 'switch', 'drag', 'cant', 'turn', 'upkeep']);
-/** Moves that swap stats the calculator cannot see. */
+// Stat swaps the calculator cannot see stay with both Pokémon until they leave the field.
 const STAT_SWAPS = new Set(['Power Split', 'Guard Split']);
 
-/** A hit on one target of the resolving move; `lines` counts its damage lines. */
 interface TargetHit {
   hit: LoggedHit;
   lines: number;
 }
 
-/** The resolving move of an opponent attacker. */
 interface PendingMove {
   attacker: string;
   move: string;
   spread: boolean;
   crits: Set<string>;
   targets: Map<string, TargetHit>;
-  /** The item a Pokémon held just before an `-enditem` inside this move (a weakening berry, a gem): the item the hit counted. */
+  /** The item held just before an `-enditem` inside this move (a weakening berry, a gem): the item the hit counted. */
   itemsBefore: Map<string, { held: string; changed: boolean }>;
 }
 
 export interface HitWalk {
   battle: Battle;
   pending: PendingMove | null;
-  /** Clean hits per opponent attacker ("p2: Nick"). */
   hits: Map<string, LoggedHit[]>;
-  /** Pokémon whose stats a Power Split, Guard Split or Power Trick changed since they entered. */
   swapped: Set<string>;
   /** Neutralizing Gas appeared: from then on any ability may be off. */
   neutralized: boolean;
@@ -68,7 +51,7 @@ function newWalk(state: InferrerState): HitWalk {
   return { battle: new Battle(generationsFor(tier)), pending: null, hits: new Map(), swapped: new Set(), neutralized: false, format: tier };
 }
 
-/** The stat an active Protosynthesis or Quark Drive raises: the client keeps it on the volatile ('protosynthesis' or 'quarkdrive', `stat` 'atk'). */
+// The client keeps the raised stat on the `protosynthesis` or `quarkdrive` volatile (`stat` 'atk').
 function boostedStatOf(mon: ClientPokemon): string {
   const volatile = mon.volatiles.protosynthesis ?? mon.volatiles.quarkdrive;
   const stat = (volatile as { stat?: unknown } | undefined)?.stat;
@@ -88,7 +71,6 @@ function party(mon: ClientPokemon, counted?: { held: string; changed: boolean })
   };
 }
 
-/** What the calculator cannot reproduce from the record at this hit; '' when nothing. */
 function doubtOf(walk: HitWalk, attacker: ClientPokemon, defender: ClientPokemon): string {
   const pseudo = walk.battle.field.pseudoWeather as Record<string, unknown>;
   if (walk.neutralized) return 'neutralizing gas';
@@ -102,7 +84,6 @@ function doubtOf(walk: HitWalk, attacker: ClientPokemon, defender: ClientPokemon
   return attacker.volatiles.embargo ? 'embargo' : '';
 }
 
-/** The hit as the client stands just before its damage line applies. */
 function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon, defender: ClientPokemon, gen: number): LoggedHit {
   const { battle } = walk;
   const others = [...battle.p1.active, ...battle.p2.active]
@@ -120,7 +101,6 @@ function recordHit(walk: HitWalk, pending: PendingMove, attacker: ClientPokemon,
   };
 }
 
-/** A damage line of the resolving move, read before it applies: the first opens the target's hit, a second spoils it. */
 function noteDamage(walk: HitWalk, line: LogLine, gen: number) {
   const pending = walk.pending;
   const target = arg(line, 1);
@@ -136,7 +116,6 @@ function noteDamage(walk: HitWalk, line: LogLine, gen: number) {
   pending.targets.set(target, { hit: recordHit(walk, pending, attacker, defender, gen), lines: 1 });
 }
 
-/** The same damage line after it applied: the HP it left and whether that reading is only a floor. */
 function settleDamage(walk: HitWalk, line: LogLine) {
   const entry = walk.pending?.targets.get(arg(line, 1));
   const defender = walk.battle.getPokemon(arg(line, 1) as ClientIdent);
@@ -147,7 +126,6 @@ function settleDamage(walk: HitWalk, line: LogLine) {
   entry.hit.lowerBound = after === 0 || defender.hp === 1;
 }
 
-/** The move ended: each target hit once, without a crit, with damage, becomes a clean hit of its attacker. */
 function closeMove(walk: HitWalk) {
   const pending = walk.pending;
   walk.pending = null;
@@ -159,12 +137,8 @@ function closeMove(walk: HitWalk) {
   }
 }
 
-/**
- * The first `-enditem` of a Pokémon inside the resolving move, before its own damage line: the item ended while the damage was
- * resolved (a weakening berry, a gem), so the hit counted it. The client is read before the line applies, with the item the line
- * names when the log had not shown it (the idiom of protocol/item-reading.ts, round 73, T210 group 5). An item that ends after its
- * holder's damage line is gone only for the next hit.
- */
+// An `-enditem` before the holder's own damage line (weakening berry, gem) ended during the damage: the hit counted it;
+// one after that line is gone only for the next hit. The client is read before the line applies.
 function noteItemEnd(walk: HitWalk, line: LogLine) {
   const pending = walk.pending;
   const ident = arg(line, 1);
@@ -176,7 +150,6 @@ function noteItemEnd(walk: HitWalk, line: LogLine) {
   pending.itemsBefore.set(ident, { held: mon.item || toId(arg(line, 2)), changed: !!mon.lastItem || ACQUIRED.has(mon.itemEffect) });
 }
 
-/** Stat swaps the calculator cannot see stay with both Pokémon until they leave the field. */
 function noteSwaps(walk: HitWalk, line: LogLine) {
   if (line.cmd === 'switch' || line.cmd === 'drag') walk.swapped.delete(keyOf(arg(line, 1)));
   const effect = Protocol.parseEffect(arg(line, 2));
@@ -185,12 +158,6 @@ function noteSwaps(walk: HitWalk, line: LogLine) {
   for (const ident of [arg(line, 1), ofIdent(line)]) if (ident) walk.swapped.add(keyOf(ident));
 }
 
-/**
- * The line handler: closes the resolving move at each action boundary,
- * opens a move of the opponent side, records the hits of its damage lines,
- * and feeds the line to the client.
- */
-/** A line of the resolving move: an opponent's move opens it, a crit marks its target, a plain damage line opens a hit. */
 function noteMoveLine(walk: HitWalk, state: InferrerState, line: LogLine) {
   if (line.cmd === 'move' && identOf(arg(line, 1))?.side === state.opponentSide) {
     walk.pending = { attacker: arg(line, 1), move: toId(arg(line, 2)), spread: hasKw(line, 'spread'), crits: new Set(), targets: new Map(), itemsBefore: new Map() };
@@ -209,7 +176,7 @@ export function collectHits(state: InferrerState, line: LogLine) {
   noteSwaps(walk, line);
   if (namesEffect(line, 'Neutralizing Gas')) walk.neutralized = true;
   try {
-    // The client reads the same parse; copies, so its handlers cannot change what the next handler reads.
+    // Copies: the client's handlers must not change what the next handler reads.
     walk.battle.add([...line.args] as Protocol.ArgType, { ...line.kwArgs } as Protocol.BattleArgsKWArgType);
   } catch {
     // A line the client cannot apply (a synthetic log's impossible order) is skipped, as the parser does.
@@ -217,10 +184,7 @@ export function collectHits(state: InferrerState, line: LogLine) {
   if (line.cmd === '-damage' && !hasKw(line, 'from')) settleDamage(walk, line);
 }
 
-/**
- * At the end of the walk the hits go onto their attackers' infos. A team that
- * may hold an Illusion user gets none: any attacker could be the disguise.
- */
+/** A team that may hold an Illusion user gets no hits: any attacker could be the disguise. */
 export function attachHits(state: InferrerState) {
   const walk = state.hitWalk;
   if (!walk) return;

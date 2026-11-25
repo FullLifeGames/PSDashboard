@@ -3,13 +3,8 @@ import type { FlipTurn } from '../src/dice/flip';
 import { copyOf } from '../src/sim-ask/copy';
 import { playClicks, standing } from './dice-fixtures';
 
-/**
- * Round 89 (A6-1, ruling 24): the boards and the oracle the flip specs share. A turn is the board's clicks played on a copy of it;
- * the live board is only read. The oracle is the simulator's own `randomChance`: a spy over the stream of a plain turn writes down
- * the numerator and the denominator of every call, with the event and the effect that were running when it was made.
- */
+// The oracle is the simulator's own `randomChance`: a spy over the stream of a plain turn records every call.
 
-/** A turn of the board's clicks: every fork is a copy at the board's turn with a stream at the board's place. */
 export function turnOf(board: Battle, clicks: { p1: string; p2: string }): FlipTurn {
   return {
     fork: () => {
@@ -24,7 +19,6 @@ export function turnOf(board: Battle, clicks: { p1: string; p2: string }): FlipT
 
 export interface Called { chance: number; numerator: number; denominator: number; event: string | undefined; effect: string | undefined }
 
-/** Every `randomChance` of a plain turn on a copy of the board, in order, as the simulator passes it. */
 export function chancesCalled(board: Battle, clicks: { p1: string; p2: string }): Called[] {
   const battle = turnOf(board, clicks).fork();
   const natural = battle.prng;
@@ -44,5 +38,4 @@ export function chancesCalled(board: Battle, clicks: { p1: string; p2: string })
   return called;
 }
 
-/** What a question to the simulator may leave behind on the live board: its bodies, the log, the stream, the turn (AGENTS.md, the sweep proves the live battle unchanged). */
 export const liveState = (board: Battle): string => `${standing(board)}|${board.log.length}|${board.prng.getSeed()}`;

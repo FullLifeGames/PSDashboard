@@ -1,15 +1,11 @@
-/**
- * Item-sensitivity probe plumbing: pure JSON surgery on serialized battle
- * positions (State.serializeBattle output) — no battle is built here (the Dex of the position's
- * format only names the Choice items), so the main-thread sweep can prepare probe
- * positions and hand them to the worker like any other serialized position.
- */
+/** Item-sensitivity probes as pure JSON surgery on serialized positions: no battle is built on the main thread. */
 
 import { choiceItems, dexOf, formatRules, sideIndex, toId } from '@fulllifegames/replay-core';
 
+/** A guessed-item mon and the usage-plausible items to probe it with. */
 export interface SensitivityTarget {
   species: string;
-  /** Usage-plausible alternative items (rule-outs already applied), in order. */
+  /** Usage-plausible alternatives, rule-outs already applied. */
   items: string[];
 }
 
@@ -22,20 +18,14 @@ interface SerializedMon {
 }
 
 interface SerializedBattleShape {
-  /** The format the position was serialized under (State.serializeBattle): its generation and mod pick the Dex. */
+  /** The format the position was serialized under: its generation and mod pick the Dex. */
   formatid?: string;
   sides?: { pokemon?: SerializedMon[] }[];
 }
 
 const monSpecies = (mon: SerializedMon): string => mon.set?.species ?? '';
 
-/**
- * The probe combos for one flagged side: opposing guessed-item mons that
- * were INVOLVED in the turn (active, or named by a switch label among the
- * opposing side's played/best labels), round-robin over each mon's
- * alternatives so two involved mons both get probed before a second item
- * does, capped at `cap` combos (each combo costs two pair-evals).
- */
+/** Probe combos for one flagged side: opposing guessed-item mons involved, round-robin over alternatives, to `cap`. */
 export function selectProbeCombos(
   serialized: string,
   opposing: 'p1' | 'p2',
@@ -71,12 +61,7 @@ export function selectProbeCombos(
   return combos;
 }
 
-/**
- * The serialized position with `species`' held item swapped to `item` —
- * null when the species is not on that side. A removed Choice item also
- * drops the choicelock volatile: the lock only ever existed because the
- * GUESSED item fabricated it.
- */
+/** The position with `species`' item swapped to `item` (null when absent); a removed Choice item drops its lock. */
 export function patchSerializedItem(
   serialized: string,
   side: 'p1' | 'p2',

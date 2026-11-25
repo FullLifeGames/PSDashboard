@@ -3,11 +3,6 @@ import { offeredDice, serializeLiveBattle } from '@fulllifegames/eval-engine';
 import { pickerFromSerialized, pickerStateFromSerialized } from '../../../src/lib/picker-state';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
-/**
- * Round 82 (forced dice), step A7b: a stored exact position keeps its deserialized battle for the offers of the dice chips.
- * Before, `pickerStateFromSerialized` read the state off the battle and dropped it, so a viewed replay position had no battle to
- * ask which dice a move draws.
- */
 const BOARDS = {
   singles: { p1: [setOf('Noivern', ['airslash', 'splash'])], p2: [setOf('Snorlax', ['splash'])] },
   doubles: {

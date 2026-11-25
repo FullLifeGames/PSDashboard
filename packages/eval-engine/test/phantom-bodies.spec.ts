@@ -10,19 +10,9 @@ import { buildForcedSwitchChoice } from '../src/branch/corrections';
 import { faintedSlots, logGoesOn, mayDisguise, shownBodyIds, type ProtocolBench } from '../src/branch/team-order';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * Round 73 (T250): a side that shows fewer species than its bring count keeps all six bodies, because the bring lists are
- * trimmed together or not at all (replay-format.ts, the symmetric rule of game 452654). At a forced replacement the protocol
- * never answers, the rebuild used to send the first living body of the bench: a phantom the player never brought
- * (gen9championsvgc2026regmbbo3-2687970740: Rotom-Heat and Swampert fought for Power Police's side). The game leaves the slot
- * empty; the simulator accepts that pass only when no living body waits on the bench, so the rebuild retires the bench bodies
- * the whole protocol never shows and answers pass.
- */
-
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
 
-/** The live pass the app and the bank run, built the way the app builds the teams (bring lists not passed unless the replay trims them). */
 async function boundaries<T>(replay: Replay, turns: number[], read: (battle: Battle) => T) {
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });
@@ -122,13 +112,11 @@ function board(format: string, p1: PokemonSet[], p2: PokemonSet[], choices: [str
   return battle;
 }
 
-/** What the protocol says about the side: these bodies shown, and by default a faint on both slots in the block. */
 const benchOf = (species: string[], fainted = [0, 1], goesOn = true): ProtocolBench => ({
   shown: new Set(species.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, ''))), fainted: new Set(fainted), goesOn,
 });
 const livingNames = (battle: LiveBattle, side: 0 | 1) => battle.sides[side].pokemon.filter(entry => !entry.fainted).map(entry => entry.name);
 
-/** Memento: the user faints whatever else happens, so the side must replace the slot (p2's request is a forced switch). */
 const SINGLES_P1 = [mon('Pikachu', 'Static', ['Splash'])];
 const DOUBLES_P1 = [mon('Pikachu', 'Static', ['Splash']), mon('Eevee', 'Run Away', ['Splash']), mon('Gible', 'Sand Veil', ['Splash'])];
 const memento = (species: string) => mon(species, 'Soundproof', ['Memento']);

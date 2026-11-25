@@ -3,34 +3,19 @@ import { Dex } from '@pkmn/sim';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { landedMove, POWER_MOVES } from '../src/score/move-facts';
 import { set } from './move-oracle';
-import { oracleTagAbove } from './oracle-tag';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * Round 63 (T81): the static asks the simulator for a move's power at use,
- * but only the handlers listed in POWER_MOVES. This census keeps the list
- * honest: every power handler of the Dex (basePowerCallback, onBasePower,
- * damageCallback) in every generation the bank and the corpus play is
- * either asked or named below with the reason it stays out; every asked
- * handler leaves the battle as it was; and each asked move's memo class
- * covers what its answer reads.
- */
-
 const EXCLUDED: Record<string, string> = {
-  // The turn in progress: the queue, this turn's hits, the move that called it, the hit number.
   assurance: 'turn', avalanche: 'turn', revenge: 'turn', payback: 'turn', boltbeak: 'turn', fishiousrend: 'turn',
   pursuit: 'turn', round: 'turn', firepledge: 'turn', grasspledge: 'turn', waterpledge: 'turn',
   stompingtantrum: 'turn', temperflare: 'turn', lashout: 'turn', fusionbolt: 'turn', fusionflare: 'turn',
   beatup: 'turn', trumpcard: 'turn',
-  // The hit number: asked once per hit by the multi-hit step (move-facts.ts hitsFactor, test/multi-hit.spec.ts).
   tripleaxel: 'per hit', triplekick: 'per hit',
-  // Writes the battle, draws from the PRNG or writes the log.
   furycutter: 'writes', rollout: 'writes', iceball: 'writes', ficklebeam: 'writes', risingvoltage: 'writes',
-  // Counters the rebuilt battle does not pin (volatile layers, a field counter, the fallen of the last turn). Last Respects and
-  // Rage Fist left the list in round 76 (T265): the rebuild plays the hits, and totalFainted is pinned from the snapshot.
+  // Last Respects and Rage Fist are asked: the rebuild plays the hits, and totalFainted is pinned from the snapshot.
   spitup: 'unpinned', echoedvoice: 'unpinned', retaliate: 'unpinned',
-  // Priced by a rule of the static: the halving moves and the level moves (fixedDamage), Tera Blast and
-  // Hidden Power (move-use.ts); the reactive moves and Final Gambit read 0 by design; Psywave rolls.
+  // Priced by a rule of the static: halving and level moves, Tera Blast and Hidden Power (move-use.ts);
+  // the reactive moves and Final Gambit read 0 by design; Psywave rolls.
   superfang: 'own', naturesmadness: 'own', ruination: 'own', terablast: 'own', hiddenpower: 'own',
   counter: 'own', mirrorcoat: 'own', metalburst: 'own', comeuppance: 'own', finalgambit: 'own', psywave: 'own',
   guardianofalola: 'own',
@@ -44,11 +29,7 @@ function handlerIds(gen: number): string[] {
     .map(move => move.id);
 }
 
-describe('power handlers of the Dex (round 63, T81)', () => {
-  test('POWER_MOVES carries its oracle tag (round 72, T235)', () => {
-    expect(oracleTagAbove('packages/eval-engine/src/score/move-facts.ts', 'export const POWER_MOVES', 'packages/eval-engine/test/power-handlers-census.spec.ts')).toBe(true);
-  });
-
+describe('power handlers of the Dex', () => {
   test.each(GENS)('gen %d: every move with a power handler is asked or excluded with a reason', gen => {
     const unknown = handlerIds(gen).filter(id => !POWER_MOVES.has(id) && !(id in EXCLUDED));
     expect(unknown).toEqual([]);
@@ -74,7 +55,6 @@ describe('power handlers of the Dex (round 63, T81)', () => {
   });
 
   test("each asked move's memo class covers what its answer reads", () => {
-    // Facts a fork changes without touching pairKey; the memo class must cover every one that moves an answer.
     const live: [string, (battle: Battle, user: Pokemon, target: Pokemon) => void][] = [
       ['user HP', (_, user) => { user.hp = Math.floor(user.maxhp / 5); }],
       ['target HP', (_, __, target) => { target.hp = Math.floor(target.maxhp / 5); }],

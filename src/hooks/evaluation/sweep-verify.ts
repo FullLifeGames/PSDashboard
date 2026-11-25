@@ -6,15 +6,7 @@ import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-cl
 import { registerPatchedWorlds } from '../../lib/eval/world-positions';
 import { matchOrPhantom, type SweepEnv } from './sweep-types';
 
-/**
- * The tier a flagged turn re-adjudicates at: matrix pairs one depth up.
- * ENGINE-INDEPENDENT — an MCTS-line flag verifies at the same matrix-d2
- * tier the d1 matrix line gets. Sound because the verdict statistic
- * (bestDeep − playedDeep vs the threshold) is internal to the deep pass,
- * and pair valuation under any settings already runs as matrix subsearches
- * (playedOutcomeSettings). null = no tier left (the ladder caps at the
- * engine's depth 3).
- */
+/** The tier a flagged turn re-adjudicates at: matrix pairs one depth up; null when the ladder (cap 3) is spent. */
 export function verificationDeepSettings(settings: AppEvalSettings): AppEvalSettings | null {
   if ((settings.mode ?? 'matrix') === 'mcts') {
     return { ...settings, depth: 2, mode: 'matrix', keepPlayed: undefined };
@@ -23,14 +15,7 @@ export function verificationDeepSettings(settings: AppEvalSettings): AppEvalSett
   return { ...settings, depth: (settings.depth + 1) as 2 | 3, mode: 'matrix', keepPlayed: undefined };
 }
 
-/**
- * Deep re-search before a misplay verdict sticks (chess.com's sacrifice
- * verification): for each side whose played choice trails the best by
- * the regret threshold, value the played and best pairs at the matrix
- * verification tier (verificationDeepSettings — the line engine that
- * raised the flag is irrelevant to the deep verdict). Flag checks are
- * pure — the position is only acquired when needed.
- */
+/** Deep re-search before a misplay verdict sticks; the position is acquired only when a flag needs it. */
 export async function verifyFlagged(
   env: SweepEnv,
   getSerialized: () => Promise<string>,
@@ -85,7 +70,7 @@ async function runProbeCombos(env: SweepEnv, args: {
   for (const combo of combos) {
     const patched = patchSerializedItem(serialized, opposing, combo.species, combo.item);
     if (!patched) continue;
-    // Round 89 (#124): the edited item is valued in every world of a short-side position (a world without the body leaves the blend).
+    // The edited item is valued in every world of a short-side position; a world without the body leaves the blend.
     registerPatchedWorlds(serialized, patched, world => patchSerializedItem(world, opposing, combo.species, combo.item));
     env.clientRef.current ??= new EvalWorkerClient();
     const playedEv = await env.clientRef.current.evalPair(patched, p1Choice.choice, p2Choice.choice, probeSettings);
@@ -110,7 +95,6 @@ async function probeSide(env: SweepEnv, args: {
   const chosen = side === 'p1' ? p1Choice : p2Choice;
   const best = result.perSide[side][0];
   if (!best || best.ev - chosen.ev < REGRET_THRESHOLD) return null;
-  // The deep pass already acquitted this side — nothing left to soften.
   const sign = side === 'p1' ? 1 : -1;
   const deepSide = turnVerified?.[side];
   if (deepSide && Math.max(0, sign * (deepSide.bestDeep - deepSide.playedDeep)) < REGRET_THRESHOLD) return null;
@@ -125,15 +109,7 @@ async function probeSide(env: SweepEnv, args: {
   return probes.length > 0 ? probes : null;
 }
 
-/**
- * Item-sensitivity probes for sides still flagged AFTER verification:
- * re-evaluate the played and best pairs with an opposing guessed item
- * swapped for its next usage candidates (≤2 combos per side = ≤4 extra
- * pair-evals). Probes run at the sweep's own settings; pair valuation is
- * engine-independent (an MCTS line's pairs value as matrix subsearches),
- * and the acquit statistic compares only probe EVs with each other.
- * Acquit-only downstream (analyzeTurn) — this only gathers evidence.
- */
+/** Item-sensitivity probes for still-flagged sides, at most 2 combos per side; downstream they only acquit. */
 export async function probeSensitivity(
   env: SweepEnv,
   getSerialized: () => Promise<string>,

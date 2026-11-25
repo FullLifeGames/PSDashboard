@@ -3,7 +3,6 @@ import { sideIndex } from '@fulllifegames/replay-core';
 
 export const GRAPH_HEIGHT = 72;
 export const GRAPH_PAD_X = 6;
-/** The colours of the Game review's marks on the graph, and of their legend (round 89). */
 export const REVIEW_COLORS = { p1: '#8ac', p2: '#c8a' } as const;
 
 export interface GraphScales {
@@ -21,11 +20,6 @@ export function graphScales(width: number, first: number, lastTurn: number): Gra
 
 export interface GapLink { x1: number; y1: number; x2: number; y2: number }
 
-/**
- * Consecutive non-null runs become path segments; gaps get a faint dashed
- * connector so an isolated final point (late-game reconstruction gaps end
- * in the decided ±1 position) reads as the line's ending, not debris.
- */
 export function mainLinePaths(scores: (number | null)[], { x, y }: GraphScales): { segments: string[]; gapLinks: GapLink[] } {
   const segments: string[] = [];
   const gapLinks: GapLink[] = [];
@@ -55,24 +49,17 @@ export function mainLinePaths(scores: (number | null)[], { x, y }: GraphScales):
 export interface VariationSeries {
   startTurn: number;
   scores: (number | null)[];
-  /**
-   * Round 70 (T216): the fainted share of the variation's own board before each turn (shares[turn - 1], like the
-   * scores). The tooltip and the panel's bar print at it; a missing or null entry reads the opening map. The main
-   * line's share of the same turn number is another board and never stands in.
-   */
+  /** The fainted share of the variation's own board before each turn (`shares[turn - 1]`); never the main line's. */
   shares?: (number | null)[];
 }
 export interface VariationPoint { turn: number; px: number; py: number; score: number; share?: number | null }
 
-/** The x-domain stretches past the replay when the variation is longer. */
 export function lastVariationTurnOf(variation: VariationSeries | null | undefined): number {
   return variation
     ? variation.scores.reduce<number>((max, value, index) => (value !== null ? index + 1 : max), 0)
     : 0;
 }
 
-/** Variation overlay: anchored at the branch point's main value; points
- *  are only the ACTUALLY evaluated variation positions. */
 export function variationOverlay(
   variation: VariationSeries | null | undefined, scores: (number | null)[], { x, y }: GraphScales,
 ): { points: VariationPoint[]; path: string; end: number } {
@@ -101,11 +88,7 @@ export function variationOverlay(
 
 export interface HitBand { y: number; height: number }
 
-/**
- * Round 77 (C8): on a turn where both lines have a point, the two hit areas share the whole column and split it at
- * the middle between the points, so the nearer point wins at any width. Equal heights give the main line the upper
- * band, as the gold area is drawn after it.
- */
+/** The hit areas split the column between the two points; equal heights give the main line the upper band. */
 export function splitHitColumn(mainY: number, goldY: number): { main: HitBand; gold: HitBand } {
   const boundary = Math.min(GRAPH_HEIGHT, Math.max(0, (mainY + goldY) / 2));
   const upper: HitBand = { y: 0, height: boundary };
@@ -113,7 +96,6 @@ export function splitHitColumn(mainY: number, goldY: number): { main: HitBand; g
   return mainY <= goldY ? { main: upper, gold: lower } : { main: lower, gold: upper };
 }
 
-/** The split bands of every turn where the main line and the variation both have a point, by turn. */
 export function sharedHitBands(
   points: VariationPoint[], scores: (number | null)[], y: GraphScales['y'],
 ): { main: Map<number, HitBand>; gold: Map<number, HitBand> } {
@@ -132,11 +114,6 @@ export function sharedHitBands(
 export type DecidedSignal = { side: 'p1' | 'p2'; species: string } | null;
 export interface DecidedSpan { x1: number; x2: number; side: 'p1' | 'p2'; species: string }
 
-/**
- * Round 15: consecutive decided turns of the same side become one thin
- * strip along that side's edge; a lone decided turn draws as a dot (round
- * linecap). The calibrated line itself is never bent.
- */
 export function decidedSpans(
   decided: DecidedSignal[] | undefined, scores: (number | null)[], x: GraphScales['x'],
 ): DecidedSpan[] {
@@ -158,15 +135,9 @@ export function decidedSpans(
   return spans;
 }
 
-/** The graph and the panel read one map (round 69, T51): the node of a turn prints at that turn's fainted share. */
 const pct = (score: number, faintedFraction?: number | null) => winPercent(score, faintedFraction);
 
-/**
- * A node IS the estimate before its turn; the movement INTO it was the
- * previous turn's doing. Clicks stay on the node's own turn (a shifted
- * click felt like landing one node back) — the tooltip names the producer
- * and the selection glow shows the clicked turn's own movement.
- */
+// A node is the estimate before its turn: clicks stay on its own turn, the tooltip names the producing turn.
 function nodeLabel(args: {
   turn: number; score: number; blunders: Set<number>; first: number;
   decided: DecidedSignal[] | undefined; playerNames: [string, string]; faintedFractions?: (number | null)[];
@@ -181,16 +152,12 @@ function nodeLabel(args: {
   return `Before turn ${turn}${arrival}: ${playerNames[0]} ${pct(score, share)}% · ${playerNames[1]} ${100 - pct(score, share)}%${swing}${decidedNote}`;
 }
 
-/** Tooltip of a main-line hit column: the node's label, or why the turn has no point. */
 export function hitTitle(args: {
   index: number; score: number | null; evalErrors: (string | null)[] | undefined;
   blunders: Set<number>; first: number; decided: DecidedSignal[] | undefined; playerNames: [string, string];
-  /** The fainted share per turn (graph.faintedFractions): the point prints at its own turn's share. */
   faintedFractions?: (number | null)[];
 }): string {
   const { index, score, evalErrors } = args;
-  // Gap turns (reconstruction wedges, unswept ends) stay clickable —
-  // the turn view then offers "Analyze this position".
   if (score === null) {
     return evalErrors?.[index]
       ? `Turn ${index + 1} · could not be evaluated: ${evalErrors[index]} · click to open`
@@ -199,12 +166,10 @@ export function hitTitle(args: {
   return nodeLabel({ ...args, turn: index + 1, score });
 }
 
-/** Tooltip of a variation point: it prints at the share of the variation's own board, as the panel's bar does for that position. */
 export function variationHitTitle(playerNames: [string, string], point: VariationPoint): string {
   return `Variation, before turn ${point.turn}: ${playerNames[0]} ${pct(point.score, point.share)}% · ${playerNames[1]} ${100 - pct(point.score, point.share)}%`;
 }
 
-/** The T0 diamond's tooltip: the preview estimate plus each side's best and played lead. */
 export function leadTooltip(playerNames: [string, string], leadScore: number, leadDetail: LeadAnalysis | null | undefined): string {
   const lines = [`Team preview: ${playerNames[0]} ${pct(leadScore)}% · ${playerNames[1]} ${100 - pct(leadScore)}%`];
   const stripLead = (label: string) => label.replace(/^Lead /, '');
@@ -222,10 +187,6 @@ export function leadTooltip(playerNames: [string, string], leadScore: number, le
   return lines.join('\n');
 }
 
-/**
- * The selected turn's movement: its node → the next node (what that play
- * produced), drawn as a thicker glow under the line.
- */
 export function highlightEdge(args: {
   currentTurn: number; scores: (number | null)[]; hasLead: boolean; leadScore: number | null | undefined;
   first: number; scales: GraphScales;
@@ -239,7 +200,6 @@ export function highlightEdge(args: {
     : null;
 }
 
-/** The pointer's score on ITS line, or null when there is nothing to mark. */
 export function ringScore(args: {
   currentLine: 'main' | 'variation' | undefined; variation: VariationSeries | null | undefined;
   scores: (number | null)[]; currentTurn: number; hasLead: boolean; leadScore: number | null | undefined; first: number;

@@ -5,14 +5,9 @@ import { bankTeamsFor } from './bank-build';
 import { CORPUS } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * Round 89 (#132): a Pokémon that spends a move's last PP and shows no item line held no Leppa Berry. Champions OU 2692599072
- * turn 5: Pawmot uses Revival Blessing, its only PP, and no berry line follows; the rebuilt Pawmot held the Leppa Berry of the
- * Smogon set, ate it and offered Revival Blessing a second time. Each row reads a corpus game (local: the rows skip without
- * `.fit-corpus`) through the bank's and the app's build with the disk-cached Smogon data. The unit rows and the sweep that holds the
- * rule to the simulator are in `packages/replay-core/test/leppa-refuted.spec.ts` and `pp-trigger-sweep.spec.ts`.
- */
+// Local: the rows skip without `.fit-corpus`.
 
+// A Pokémon that spends a move's last PP and shows no item line held no Leppa Berry.
 interface Row { id: string; type: string; side: 'p1' | 'p2'; body: string; what: string; leppa: boolean }
 
 const ROWS: Row[] = [
@@ -23,7 +18,6 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-/** The built item of the side's body of that species. */
 async function builtItem(id: string, side: 'p1' | 'p2', body: string): Promise<string> {
   const replay = JSON.parse(readFileSync(CORPUS(id), 'utf-8')) as Replay;
   const parsed = parseReplayLogWithObservations(replay.log);
@@ -34,7 +28,7 @@ async function builtItem(id: string, side: 'p1' | 'p2', body: string): Promise<s
   return String(set.item ?? '');
 }
 
-describe('a move that ran out of PP with no Leppa Berry line leaves no Leppa Berry in the build (#132)', () => {
+describe('a move that ran out of PP with no Leppa Berry line leaves no Leppa Berry in the build', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.type} ${row.id}: ${row.what}`, async () => {
       const item = await builtItem(row.id, row.side, row.body);

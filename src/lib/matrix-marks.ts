@@ -1,15 +1,9 @@
 import type { EvalMatrix, EvalResult, RankedChoice, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { worstReply } from './worst-reply';
 
-/** A cell of the matrix by its row (P1's choice) and its column (P2's choice). */
 export type MatrixCellAt = readonly [row: number, column: number];
 
-/**
- * Round 89 (B7a): what the matrix dialog marks. The played row and column and the engine's best row and column come from the card's
- * analysis; each worst cell is the cell `worstReply` names for the played choice of its side (basis `cell` only), the rule the Hard mode
- * line reads, so the dialog and the line never disagree. P1's worst cell is the lowest cell of the played row, P2's the highest cell of
- * the played column (the matrix holds P1's chance to win). Every field is null where the analysis or the result does not name it.
- */
+/** What the matrix dialog marks; P1's worst cell is the lowest of the played row, P2's the highest of its column. */
 export interface MatrixMarks {
   playedRow: number | null;
   playedColumn: number | null;
@@ -19,7 +13,6 @@ export interface MatrixMarks {
   worstP2: MatrixCellAt | null;
 }
 
-/** The index of a ranked choice in one side's axis: by its choice id, by its label for a result cached before the ids existed; null when absent. */
 function indexOnAxis(choices: readonly string[] | undefined, labels: readonly string[], entry: Pick<RankedChoice, 'choice' | 'label'> | null | undefined): number | null {
   if (!entry) return null;
   const at = choices ? choices.indexOf(entry.choice) : labels.indexOf(entry.label);
@@ -36,10 +29,7 @@ function worstCell(result: EvalResult, matrix: EvalMatrix, side: 'p1' | 'p2', pl
   return side === 'p1' ? [own, reply] : [reply, own];
 }
 
-/**
- * The marks of one turn. A turn that tracked no played action (`playedTracking` false) marks no played choice, and neither does a
- * side knocked out before it moved (`neverActed`): its log shows no choice, the engine's stand-in is no play (655336 t27).
- */
+/** The marks of one turn; no played choice when `playedTracking` is false or a side was knocked out before it moved. */
 export function matrixMarks(result: EvalResult, matrix: EvalMatrix, analysis: TurnAnalysis): MatrixMarks {
   const tracked = analysis.playedTracking !== false;
   const p1Played = tracked && !analysis.p1.neverActed ? analysis.p1.played : null;

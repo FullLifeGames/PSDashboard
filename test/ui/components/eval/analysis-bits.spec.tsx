@@ -18,7 +18,6 @@ describe('ExplorableLabel', () => {
     expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
   });
 
-  // Round 89 (#153, HM-2): the title names which reply the opponent gives, by the Setup setting.
   test('the title says which reply the opponent plays, off and on', () => {
     const { rerender } = render(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads={false} />);
     expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
@@ -51,7 +50,6 @@ describe('EngineRow', () => {
     expect(onExplore).toHaveBeenCalledWith(best);
   });
 
-  // Round 89 (#153, HM-2): the untracked row (a doubles card) names the reply too.
   test('the explore title follows the Setup setting', () => {
     const best = rankedChoice('move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus', 0.3);
     const { rerender } = render(<EngineRow name="Alice" side={sideAnalysis({ best, played: null })} onExplore={vi.fn()} />);
@@ -69,7 +67,6 @@ describe('EngineRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  // Round 89 (LN-4): the untracked row reads the line the Lines section shows, too.
   test('the follow-up reads the result\'s line for the row, not the principal variation', () => {
     const label = 'Fake Out → Rillaboom + Spore → Tornadus';
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null, null] });

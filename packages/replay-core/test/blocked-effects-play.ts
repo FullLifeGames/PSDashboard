@@ -2,11 +2,9 @@ import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex } from '../src/rules-dex';
 
-/** Round 89 (#110): plays whole battles on @pkmn/sim for blocked-effects.spec.ts and blocked-effects-sweep.spec.ts. */
-
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
-export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; item?: string; /** The nickname the log shows (the species by default). */ name?: string }
+export interface PlayBody { species: string; ability: string; moves?: string[]; level?: number; item?: string; name?: string }
 
 export const setOf = (body: PlayBody): PokemonSet => ({
   name: body.name ?? body.species, species: body.species, item: body.item ?? '', ability: body.ability, moves: body.moves ?? ['Splash'], nature: 'Hardy', gender: '',
@@ -15,17 +13,13 @@ export const setOf = (body: PlayBody): PokemonSet => ({
 
 export interface PlayOptions {
   format: string;
-  /** Each side's bodies in team order; in doubles the first two lead. */
   p1: PlayBody[];
   p2: PlayBody[];
-  /** One entry per turn: the raw `choose` text of each side. */
   turns: { p1: string; p2: string }[];
   seed?: string;
-  /** Side p2 never acts: its moves abort before they start (the landed-hit sweep plays the hit before the target's own action, as the twin does). */
   idle?: boolean;
 }
 
-/** The public log of a battle played through `choose` (the `|split|` pairs reduced to the spectator's line). */
 export function play(options: PlayOptions): string {
   const teams = { p1: options.p1.map(setOf), p2: options.p2.map(setOf) };
   const battle = new Battle({

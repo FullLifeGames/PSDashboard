@@ -1,14 +1,6 @@
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 
-/**
- * Synthetic endgames for the round-34 truth bench: small positions (at
- * most three living bodies) whose exact value the solver can reach and
- * whose shape names one estimator weakness each (fixed-damage races,
- * accuracy kills, walls against breakers, stall, PP locks, priority,
- * level gaps, two against one, and the doubles counterparts). Singles
- * run on gen9customgame, doubles on gen9doublescustomgame.
- */
 export interface EndgameFixture {
   name: string;
   about: string;
@@ -46,7 +38,6 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid = 'gen9
   return battle;
 }
 
-/** Sets the first active's HP per side; null keeps full HP. */
 function withHp(battle: Battle, hp: [number | null, number | null]): Battle {
   hp.forEach((value, index) => {
     if (value !== null) battle.sides[index].active[0]!.sethp(value);
@@ -54,17 +45,15 @@ function withHp(battle: Battle, hp: [number | null, number | null]): Battle {
   return battle;
 }
 
-/** A level-5 partner that faints before the position is taken (the sim refuses one-mon doubles teams). */
+// A level-5 partner that faints before the position is taken: the sim refuses one-mon doubles teams.
 const filler = (name: string): PokemonSet => makeSet(name, 'Pikachu', ['Tackle'], 5);
 
-/** Faints the second slot of the named sides so the doubles board holds the living bodies the fixture names. */
 function faintPartners(battle: Battle, sides: number[]): Battle {
   for (const index of sides) battle.sides[index].active[1]!.faint();
   battle.resolveFaints();
   return battle;
 }
 
-/** A doubles 1v1: two-mon teams whose partners are fainted. */
 function doublesPair(p1: PokemonSet, p2: PokemonSet, hp: [number | null, number | null] = [null, null]): Battle {
   const battle = makeBattle([p1, filler('Pika')], [p2, filler('Chu')], 'gen9doublescustomgame');
   return withHp(faintPartners(battle, [0, 1]), hp);
@@ -120,7 +109,6 @@ export const ENDGAME_FIXTURES: EndgameFixture[] = [
   singles('fixed-vs-ghost', 'Fixed damage into a Ghost',
     () => makeBattle([makeSet('Egg', 'Chansey', ['Seismic Toss'])], [makeSet('Gar', 'Gengar', ['Shadow Ball'])])),
   singles('choice-locked', 'Scarf lock into an immune target', () => {
-    // One played turn sets the lock: Earthquake into Corviknight, Roost back.
     const battle = makeBattle(
       [makeSet('Chomp', 'Garchomp', ['Earthquake', 'Stone Edge'], 100, { item: 'Choice Scarf' })],
       [makeSet('Corv', 'Corviknight', ['Brave Bird', 'Roost'])],

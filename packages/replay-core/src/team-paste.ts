@@ -5,13 +5,7 @@ import { itemSetValue, manualEvs, manualField, manualMove, unknownEvs, unknownFi
 import { toId } from './ids.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
-/**
- * Pasted-team reader (G15). Round 72 (T241): the text goes through the library, `Teams.import` of @pkmn/sim (which
- * delegates to @pkmn/sets), and this file keeps only what the app's shape needs on top: the set without a move line is
- * no set (that rejects garbage like "asdf asdf"), at most four moves, `evs` and `ivs` absent when the paste has no such
- * line, the item without its placeholders. packages/replay-core/test/team-text.spec.ts holds the reading to the hand
- * parser it replaced.
- */
+/** A set read from a pasted team (`Teams.import` of @pkmn/sim), with the item stripped of its placeholders. */
 export interface PastedSet {
   species: string;
   nickname?: string;
@@ -25,7 +19,7 @@ export interface PastedSet {
   moves: string[];
 }
 
-/** The listed stats clamp to [0, max]: the library keeps what the paste says, the sim's own limit comes later. */
+// The library keeps what the paste says; the sim's own limit comes later.
 function clampStats(stats: Partial<PokemonEvs>, max: number): PokemonEvs {
   const clamp = (value: number | undefined) => Math.min(max, Math.max(0, value ?? 0));
   return { hp: clamp(stats.hp), atk: clamp(stats.atk), def: clamp(stats.def), spa: clamp(stats.spa), spd: clamp(stats.spd), spe: clamp(stats.spe) };
@@ -46,16 +40,14 @@ function pastedSetOf(set: PokemonSet): PastedSet {
   };
 }
 
+/** Reads a pasted team export into app-shaped sets: at most four moves, `evs` and `ivs` absent without such a line. */
 export function parsePastedTeam(teamText: string): PastedSet[] {
   const team = Teams.import(normalizeLineEndings(teamText)) ?? [];
-  // A set with no move line comes back without a `moves` array, whatever the type says.
+  // A set with no move line is no set (rejects "asdf asdf"); the library returns it without a `moves` array.
   return team.filter(set => (set.moves?.length ?? 0) > 0).map(pastedSetOf);
 }
 
-/**
- * Overlays a pasted team onto the revealed/guessed team info so the stats
- * panel shows the paste as green "manual" knowledge (G15).
- */
+/** Overlays a pasted team as "manual" knowledge, by species or base name; `matched` counts bodies that took a set. */
 export function applyPastedTeam(
   info: OpponentTeamInfo,
   sets: PastedSet[],
@@ -71,7 +63,6 @@ export function applyPastedTeam(
     const set = byId.get(toId(entry.species)) ?? byId.get(toId(entry.species.split('-')[0]));
     if (!set) return entry;
     matched += 1;
-    // Round 88 (F, #101): the user's own set replaces a stand-in's guess, so the body is no stand-in any more.
     const { standIn: guessed, ...body } = entry;
     void guessed;
     return {
@@ -90,17 +81,14 @@ export function applyPastedTeam(
   return { info: { pokemon }, matched };
 }
 
+/** How many pasted sets name a species of the team, by species or by base name. */
 export function countMatchingSpecies(info: OpponentTeamInfo | null, sets: PastedSet[]): number {
   if (!info) return 0;
   const teamIds = new Set(info.pokemon.flatMap(entry => [toId(entry.species), toId(entry.species.split('-')[0])]));
   return sets.filter(set => teamIds.has(toId(set.species)) || teamIds.has(toId(set.species.split('-')[0]))).length;
 }
 
-/**
- * Round 89 (#105): the stats panel's team info for a team the user typed himself (a new game): every field the paste gives is
- * his own knowledge ("manual"), every field it leaves out stays unknown. It is the overlay of `applyPastedTeam` on an empty
- * body per set, so reading the same paste again changes nothing.
- */
+/** The team info of a team the user typed: every field the paste gives is "manual", the rest stays unknown. */
 export function teamInfoOfSets(sets: PastedSet[]): OpponentTeamInfo {
   const empty: OpponentTeamInfo = {
     pokemon: sets.map(set => ({

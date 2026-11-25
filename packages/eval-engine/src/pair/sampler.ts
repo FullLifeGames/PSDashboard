@@ -1,9 +1,8 @@
 import type { Battle, PRNGSeed } from '@pkmn/sim';
 import type { MatchupCache } from '../eval-function.ts';
 import { advancePosition, positionBattle, type SimPosition } from '../forward-model.ts';
-import { PROBE_SEEDS } from '../cell-blend.ts';
 import type { CellBlendClass } from '../types.ts';
-import { leafValue, SEARCH_SEEDS } from '../search/leaf.ts';
+import { BASE_DRAWS, leafValue } from '../search/leaf.ts';
 import type { CellSample } from '../search/cell-sampler.ts';
 import { drawPlain, firstDraw, outcomeGroups, stateGroups, VERIFY_STATE_RULE, type StateGroup } from '../search/verify-cell.ts';
 import { cellSeeds } from '../search/root-quantile.ts';
@@ -14,21 +13,11 @@ import { readPattern, type EntriesFor, type PairEvent, type PairOutcome, type Pa
 import { eventSecondaries } from '../search/secondary-classes.ts';
 import type { PairScript } from './prng.ts';
 
-/**
- * Round 56: a doubles root cell priced as the weighted mix of its outcome
- * classes. The first natural draw names the events; the heaviest outcome no
- * draw showed yet is drawn next with the dice answering that one event the
- * other way (everything before it replays as drawn); each class weighs the
- * product of its events' probabilities. Stops at a coverage of 0.95, after
- * eight draws, or when no candidate carries 0.01 of mass. A cell without
- * events keeps today's plain path; a rule the plan does not price sends the
- * cell to the plain mean over eight natural draws (spec rules A to G).
- */
+// The first natural draw names the events; the heaviest unseen outcome is drawn next, its event answered the other way.
+// It stops at coverage 0.95, after eight draws, or when no candidate carries 0.01 of mass; unpriced rules use the mean.
 
-/** Draws per cell, base draws included. */
 export const PAIR_DRAW_BUDGET = 8;
-/** The fallback's natural draws: the five search seeds and the first three probe seeds. */
-export const FALLBACK_SEEDS: readonly PRNGSeed[] = [...SEARCH_SEEDS, ...PROBE_SEEDS.slice(0, 3)];
+export const FALLBACK_DRAWS = BASE_DRAWS + 3;
 const COVER_TARGET = 0.95;
 const COVER_MIN = 0.8;
 const COVER_MAX = 1.02;
@@ -45,19 +34,17 @@ export type PairCell =
 interface Branch { seed: PRNGSeed; scripts: ReadonlyMap<string, PairScript>; from: number }
 interface Found {
   key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch; child: SimPosition;
-  /** Round 64: every draw of the class, the plan's in order, then the verify pool's. */
   draws: PairDraw[];
 }
 interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome; tokens?: string[] }
 interface Cell {
   root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; entriesFor: EntriesFor; plainDraws?: number;
-  /** Round 89 (#60, T324): the cell's own seed list, slot s where slot s of the fixed lists stood (the matrix's first draw is slot 0). */
+  /** The cell's own seed list, slot s where slot s of the fixed lists stood (the matrix's first draw is slot 0). */
   seeds: readonly PRNGSeed[];
 }
 
 const memos = new WeakMap<SimPosition, Map<string, KillTable | null>>();
 
-/** Kill tables memoized per root (the doubles trees read them through `pair/tree-key.ts`, round 86). */
 export function tablesFor(root: SimPosition): TableFor {
   let memo = memos.get(root);
   if (!memo) {
@@ -74,10 +61,6 @@ const drawn = (cell: Cell, seed: PRNGSeed, scripts: ReadonlyMap<string, PairScri
 const read = (cell: Cell, draw: PairDraw): PatternRead =>
   readPattern(draw.records, draw.log, positionBattle(cell.root).dex, cell.tableFor, cell.entriesFor);
 
-/**
- * Round 86 (T305): the entries a hit's move would draw, read from the simulator on the root's battle (`secondaryChances`), for a
- * hit that recorded none (a miss, a kill) and so offers the classes of its dice as alternatives. Null when the question is refused.
- */
 export function entriesOf(battle: Battle): EntriesFor {
   return key => {
     const [user, rest = ''] = key.split(':');
@@ -87,12 +70,7 @@ export function entriesOf(battle: Battle): EntriesFor {
   };
 }
 
-/**
- * Rule F: the plain mean over the eight fallback seeds; the first natural
- * draw is reused where there is one. Round 63 (T16): a verify cell draws
- * `plainDraws` seeds (the fallback's eight first) and hands their outcome
- * groups on.
- */
+// Rule F: the plain mean over the eight fallback seeds; a verify cell draws `plainDraws` seeds.
 function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent: number): PairCell {
   if (cell.plainDraws) {
     const draws = cell.seeds.slice(0, cell.plainDraws).map((seed, index) =>
@@ -104,7 +82,7 @@ function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent:
   const leaves: number[] = [];
   let firstChild = first?.child;
   let ended = first?.ended ?? false;
-  cell.seeds.slice(0, FALLBACK_SEEDS.length).forEach((seed, index) => {
+  cell.seeds.slice(0, FALLBACK_DRAWS).forEach((seed, index) => {
     if (index === 0 && first) {
       leaves.push(first.leaf);
       return;
@@ -118,11 +96,10 @@ function fallbackCell(cell: Cell, first: PairDraw | null, reason: string, spent:
     leaves.push(leafValue(battle, cell.matchupCache));
   });
   const value = leaves.reduce((sum, leaf) => sum + leaf, 0) / leaves.length;
-  const draws = spent + FALLBACK_SEEDS.length - (first ? 1 : 0);
+  const draws = spent + FALLBACK_DRAWS - (first ? 1 : 0);
   return { kind: 'sample', sample: { value, ended, firstChild: firstChild! }, via: 'fallback', reason, draws };
 }
 
-/** Every outcome of an event behind the branch's own flip that carries at least MIN_MASS. */
 function candidatesOf(found: Found): Candidate[] {
   const out: Candidate[] = [];
   let prefix = 1;
@@ -142,7 +119,7 @@ function candidatesOf(found: Found): Candidate[] {
   return out;
 }
 
-/** The heaviest untried candidate; ties go to the smaller id, so every run draws the same. */
+// Ties go to the smaller id, so every run draws the same.
 function nextCandidate(candidates: Map<string, Candidate>, tried: Set<string>): Candidate | null {
   let best: Candidate | null = null;
   for (const candidate of candidates.values()) {
@@ -154,11 +131,8 @@ function nextCandidate(candidates: Map<string, Candidate>, tried: Set<string>): 
 
 const sameTokens = (a: readonly string[], b: readonly string[]): boolean => a.join('+') === b.join('+');
 
-/**
- * Rule F7: the prefix replayed as drawn and the flipped event came out as asked ('hit' asks for any hit; a hit-nokill with the effects
- * that came true named). The prefix compares keys and outcomes only: a flip that drops a later hit's damage roll moves the natural
- * stream under an earlier hit's secondary die, so the effects of the prefix may come out the other way (the draw books its own class).
- */
+// Rule F7: the prefix replayed as drawn and the flipped event came out as asked. The prefix compares keys and outcomes:
+// a flip that drops a later hit's damage roll moves the stream under an earlier secondary die, so effects may differ.
 function landed(events: PairEvent[], candidate: Candidate): boolean {
   const index = candidate.prefix.length;
   for (let i = 0; i < index; i++) {
@@ -187,13 +161,7 @@ function record(found: Map<string, Found>, candidates: Map<string, Candidate>, p
 
 const coverage = (found: Map<string, Found>) => [...found.values()].reduce((sum, entry) => sum + entry.weight, 0);
 
-/**
- * Round 64 (T119): a verify cell's classes take the rest of the doubles
- * pool's natural seeds (the plan's own natural draws are the first ones);
- * a draw that reads into a found class joins it, any other read is left
- * out. Class keys, weights and one-ply means stay the plan's. Returns the
- * states of the classes whose draws differ.
- */
+// A verify cell's classes take the doubles pool's remaining natural seeds; a draw reading into a found class joins it.
 function poolStates(cell: Cell, found: Map<string, Found>, natural: number): Map<string, StateGroup[]> {
   for (const seed of cell.seeds.slice(natural, VERIFY_STATE_RULE.doubles.pool)) {
     const draw = drawn(cell, seed, NO_SCRIPTS);
@@ -208,7 +176,6 @@ function poolStates(cell: Cell, found: Map<string, Found>, natural: number): Map
   return states;
 }
 
-/** Rule G: the class means weighted by the class weights over the coverage, in the CellBlend shape deepening and the verify merge read. */
 function blended(found: Map<string, Found>, first: PairDraw, cover: number, classGroups?: Map<string, StateGroup[]>): CellSample {
   const classes: CellBlendClass[] = [...found.values()].map(entry => ({
     key: entry.key, weight: entry.weight / cover, leafSum: entry.leafSum, count: entry.count, hasFirst: entry.hasFirst, ended: entry.ended,
@@ -221,13 +188,12 @@ function blended(found: Map<string, Found>, first: PairDraw, cover: number, clas
   };
 }
 
-/** Rules A.4 and E: the remaining base seeds, then the flips, then the coverage check. */
 function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   const found = new Map<string, Found>();
   const candidates = new Map<string, Candidate>();
   record(found, candidates, firstPattern, first, { seed: cell.seeds[0], scripts: NO_SCRIPTS, from: -1 }, true);
   let draws = 1;
-  const base = Math.max(1, Math.min(cell.samples, SEARCH_SEEDS.length));
+  const base = Math.max(1, Math.min(cell.samples, BASE_DRAWS));
   for (let s = 1; s < base; s++) {
     const draw = drawn(cell, cell.seeds[s], NO_SCRIPTS);
     draws += 1;
@@ -249,7 +215,6 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   }
   const cover = coverage(found);
   if (cover < COVER_MIN || cover > COVER_MAX) return fallbackCell(cell, first, cover < COVER_MIN ? 'low-cover' : 'over-cover', draws);
-  // Natural draws so far: the base seeds, the first of the cell's list.
   const states = cell.plainDraws ? poolStates(cell, found, base) : undefined;
   return { kind: 'sample', sample: blended(found, first, cover, states), via: 'plan', reason: null, draws };
 }

@@ -6,22 +6,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build, type Plugin } from 'vite';
 import { censusOf, type Census } from './state-readers-built-entry';
 
-/**
- * Round 89 (#149, decision 1a): the board key's table of readers comes from `String(handler)` of the simulator's Dex, in the
- * app's own realm (the main thread, the eval workers), which runs the PRODUCTION BUILD of the simulator. A build can rewrite a
- * handler's source (a minifier that renames properties, folds a branch or inlines a call), and then the browser would key other
- * fields than Node does, and the hit memo and the end-of-turn memo would answer for boards they should keep apart, or split
- * boards that are one. This spec builds `test/regressio./state-readers-built-entry.ts` with the app's own Vite
- * configuration (vite.config.ts: its minifier, its target, its resolve rules, `keepNames`) and runs the bundle in Node next to
- * the source: per Dex entry of Generations 1 to 9 and of the Champions mod, per handler (the event) and per consumer (the hit,
- * the end of the turn), the properties the scan finds, the ids it names, and the reads of the simulator's methods must be the
- * same. The Dex entries are those of the bundle's own copy of @pkmn/sim, which is the copy of the source run.
- */
+// The Dex entries are those of the bundle's own copy of @pkmn/sim.
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 const ENTRY = fileURLToPath(new URL('./state-readers-built-entry.ts', import.meta.url));
 
-/** The census of the entry bundled with the app's build settings; `plugins` are extra, for the control that a rewriting build is seen. */
 async function builtCensus(plugins: Plugin[] = []): Promise<Census> {
   const result = await build({
     root: ROOT,
@@ -44,7 +33,6 @@ async function builtCensus(plugins: Plugin[] = []): Promise<Census> {
   }
 }
 
-/** The keys whose values differ between the two censuses (a key on one side only counts), as `key: node [..] built [..]`. */
 function differences(node: Census, built: Census): string[] {
   const out: string[] = [];
   for (const key of new Set([...Object.keys(node), ...Object.keys(built)])) {
@@ -55,7 +43,6 @@ function differences(node: Census, built: Census): string[] {
   return out;
 }
 
-/** A build that renames one property wherever it appears: what a property-mangling minifier does to a handler's source. */
 const renameProperty = (from: string, to: string): Plugin => ({
   name: 'rename-property',
   enforce: 'pre',

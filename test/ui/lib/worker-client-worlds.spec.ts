@@ -3,13 +3,6 @@ import { blendValues, blendWorlds, type EvalResult, type EvalWorkerRequest, type
 import { installFakeWorker, FakeWorker } from '../fixtures/worker';
 import { clearWorldPositions, registerWorldPositions, worldPositionsOf } from '../../../src/lib/eval/world-positions';
 
-/**
- * Round 89 (#124): the worker client is the one place every evaluation passes, so it is where a short-side game's worlds blend. A
- * position the registry knows runs once per world, one after the other, and comes back blended by usage; a position it does not know
- * runs once, as before. The orchestrator is a stand-in that asks the pool one question about the position it was handed, so the
- * spec reads which positions reached the pool, in which order and under which cancel rules. Singles and doubles take the same path:
- * the registry holds opaque position strings, and the choice ids below are the one string every world shares.
- */
 const engine = vi.hoisted(() => ({ afterWorld: null as null | ((position: string) => void) }));
 vi.mock('@fulllifegames/eval-engine', async importOriginal => {
   const actual = await importOriginal<typeof import('@fulllifegames/eval-engine')>();
@@ -24,7 +17,6 @@ vi.mock('@fulllifegames/eval-engine', async importOriginal => {
 });
 
 const SCORES: Record<string, number> = { A: 0.2, B: 0.6, C: -0.4, Z: 0.9 };
-/** The three worlds of one turn: A the heaviest, then B, then C. */
 const WORLDS = [{ position: 'A', weight: 0.5 }, { position: 'B', weight: 0.3 }, { position: 'C', weight: 0.2 }];
 
 function resultFor(position: string): EvalResult {
@@ -37,7 +29,6 @@ const settings = { depth: 1 as const, samples: 1, tera: false, ruleset: 'vgc' as
 const positionsSent = (type: EvalWorkerRequest['type']) =>
   FakeWorker.requests.filter(request => request.type === type).map(request => (request as { serializedBattle: string }).serializedBattle);
 
-/** The pool answers a choices question with the position it was asked about, and a cell with the position's own score. */
 function answer(request: EvalWorkerRequest): EvalWorkerResponse[] {
   if (request.type === 'choices') return [{ type: 'choicesResult', id: request.id, info: { position: request.serializedBattle } as never }];
   if (request.type === 'cells') {

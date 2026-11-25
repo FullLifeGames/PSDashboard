@@ -15,18 +15,8 @@ import { forceSwitches } from './corrections.ts';
 import { extractPokemonInfo, makePokemonInfo, shownPercent } from './pokemon-info.ts';
 
 
-/**
- * The type a move lands with (round 67, T85): the simulator's own reading on
- * the active body, in the order of battle-actions.js useMoveInner (the
- * move's ModifyType, then everyone's), so Ivy Cudgel follows the mask, Tera
- * Blast the Tera type after the click, the -ate family and Liquid Voice
- * their abilities. Asked with debug lines off: a custom-game format runs in
- * debug mode, and a handler's debug line would land in the log (the idiom
- * of score/move-facts.ts onField). The battle's catalog type when the
- * simulator refuses. Round 70 (T215): the quick picker asks it of a one-Pokémon
- * twin of a snapshot body (snapshot-move-types.ts), so both pickers label a
- * move with the same reading.
- */
+/** The type a move lands with, as the simulator reads it on the active body; the catalog type when it refuses. */
+// Order of battle-actions.js useMoveInner. Debug lines are off: a custom-game format's debug mode would log them.
 export function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): string {
   const log = battle as unknown as { debugMode: boolean };
   const debug = log.debugMode;
@@ -44,19 +34,7 @@ export function typeAtUse(battle: SimBattle, active: SimPokemon, id: string): st
   }
 }
 
-/**
- * The type each retyping move lands with after the Tera click (round 69,
- * T182): the simulator's own terastallize runs on a copy of the battle (the
- * Ogerpon masks, Terapagos-Terastal to Terapagos-Stellar and the Tera type
- * come with it) and typeAtUse reads the copy's active body. Asked only for a
- * body that can still terastallize and only for the moves whose dex entry has
- * an onModifyType hook (Tera Blast, Tera Starstorm, Ivy Cudgel, Revelation
- * Dance, ...), so the usual state build pays no copy. The live battle is never
- * touched; a copy the simulator refuses (or a click it refuses, as for an
- * Ogerpon with a foreign Tera type) leaves the move without a label. `moveIds`
- * names the moves to ask for when they are not the body's own slots (the quick
- * picker lists the guessed set's moves).
- */
+/** The type each retyping move lands with after the Tera click, via `typeAtUse` on a copy that terastallized. */
 export function typesUnderTera(
   battle: SimBattle, active: SimPokemon, moveIds: readonly string[] = active.moveSlots.map(move => move.id || move.move),
 ): Map<string, string> {
@@ -77,17 +55,7 @@ export function typesUnderTera(
   return labels;
 }
 
-/**
- * The moves a body can click, with the flags of the simulator's own request (round 77, A-1): getMoves
- * disables a move at 0 PP and for every reason the Dex gives (Disable, Taunt, Encore, Torment, Imprison,
- * Heal Block, Gravity, Throat Chop, Choice and Assault Vest, a move that cannot repeat), so the picker
- * reads the request and does not keep a list of reasons. A move the slot itself flags (a hidden disable
- * the singles request keeps from the player) stays disabled too. A request that offers a move the body
- * does not carry (Struggle when every move is empty) adds that button, and a move the request leaves out
- * (a locked turn lists only the locked move) cannot be clicked. A locked entry the Dex does not know
- * (Recharge after Hyper Beam) is the turn's one choice: it shows by the request's own name, without a
- * target or a type (round 77; before, a recharge turn offered no button at all).
- */
+// getMoves flags a move disabled for every reason the Dex gives, so the picker keeps no list; a slot's own flag stays.
 function makeMoves(
   active: SimPokemon | null | undefined,
   activeSlot: number,
@@ -169,8 +137,7 @@ const EMPTY_SLOT_MODIFIERS: BranchSlotModifiers = {
 function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefined): BranchSlotModifiers {
   if (!active || active.fainted) return EMPTY_SLOT_MODIFIERS;
 
-  // The sim maintains once-per-battle availability on the Pokémon itself
-  // (consumed gimmicks are nulled there); Z availability is a dynamic check.
+  // Once-per-battle availability lives on the Pokémon (a spent gimmick is nulled); Z availability is a dynamic check.
   const teraType = active.canTerastallize || null;
   const canMegaEvo = !!active.canMegaEvo;
   const canUltraBurst = !!active.canUltraBurst;
@@ -184,15 +151,10 @@ function makeSlotModifiers(battle: SimBattle, active: SimPokemon | null | undefi
   return { teraType, canMegaEvo, canUltraBurst, zMoves };
 }
 
-/**
- * The switch chips of one slot. A Pokémon the simulator holds (`trapped` in a move request: a trapping
- * ability or move, a locked move) cannot switch out, and side.js chooseSwitch refuses the choice, so the
- * chips carry the flag (round 77, A-3). A forced replacement is no switch out of a held body: no flag.
- */
+// A held body (`trapped` in a move request) cannot switch out (side.js chooseSwitch): the chips carry the flag.
 function makeSwitches(side: SimSide, activeSlot: number, forced: boolean): BranchSwitchOption[] {
   const activeNames = new Set(side.active.filter(Boolean).map(active => active.name));
   const held = side.active[activeSlot];
-  // A fainted active nobody replaces (the bench cannot fill every forced slot, round 77 B1) has no switch to make.
   if (!forced && (!held || held.fainted)) return [];
   const trapped = !forced && !!held.trapped;
   return side.pokemon
@@ -260,6 +222,7 @@ function emptyState(log: string[], choices: BranchChoices): BranchSimState {
   };
 }
 
+/** The picker state of a runtime's battle: moves, switches, field, force-switch flags and the pending choices. */
 export function createBranchState(
   battleStream: BattleStreams.BattleStream | null,
   log: string[],
@@ -268,7 +231,6 @@ export function createBranchState(
   return createBranchStateFromBattle(battleStream?.battle, log, choices);
 }
 
-/** One side's per-slot views: active infos, move lists, switch lists. */
 function sideSlots(battle: SimBattle, sideIndex: 0 | 1) {
   const side = battle.sides[sideIndex];
   const forced = forceSwitches(battle, sideIndex);
@@ -276,7 +238,7 @@ function sideSlots(battle: SimBattle, sideIndex: 0 | 1) {
     forced,
     activeSlots: side.active.map((active, index) => active ? makePokemonInfo(active, true, index) : null),
     movesBySlot: side.active.map((active, index) => makeMoves(active, index, forced[index] ?? false, battle)),
-    // After the moves: a locked move marks its body trapped when the sim writes the request data (pokemon.js getMoveRequestData).
+    // After the moves: a locked move marks its body trapped in the request data (pokemon.js getMoveRequestData).
     switchesBySlot: side.active.map((_, index) => makeSwitches(side, index, forced[index] ?? false)),
     modifiersBySlot: side.active.map(active => makeSlotModifiers(battle, active)),
   };
@@ -291,8 +253,7 @@ function fieldState(battle: SimBattle): BranchSimState['field'] {
   };
 }
 
-/** Same picker state, but from a bare Battle — used for stored positions
- *  (deserialized without a stream) by the unified timeline's pickers. */
+/** The picker state from a bare Battle, for stored positions deserialized without a stream. */
 export function createBranchStateFromBattle(
   battle: SimBattle | null | undefined,
   log: string[],
@@ -340,12 +301,7 @@ export function createBranchStateFromBattle(
   };
 }
 
-/**
- * Position record for the unified timeline: the state AFTER an executed
- * entry, in the eval engine's stable serialization. Failure degrades to
- * null — the entry stays navigable via the sim log, it just cannot be
- * evaluated or picked from without a rebuild.
- */
+/** The state AFTER an executed entry in the engine's stable serialization; null on failure (needs a rebuild). */
 export function captureSerializedPosition(battle: SimBattle | null | undefined): string | null {
   if (!battle) return null;
   try {
@@ -355,29 +311,18 @@ export function captureSerializedPosition(battle: SimBattle | null | undefined):
   }
 }
 
-/**
- * The turn-0 position: a fresh battle sitting at team preview, before either
- * side has ordered its team — the lead decision the eval engine can search.
- * Null for formats without team preview (older gens). Deterministic seed so
- * every caller serializes the identical position.
- */
+/** The turn-0 position at team preview (null without one), on a fixed seed so every caller serializes the same one. */
 export function serializePreviewPosition(
   format: string,
   p1Team: PokemonSet[],
   p2Team: PokemonSet[],
-  /** Bring-limited replays: the preview holds only the brought species, so
-   *  the lead enumeration prices real pairs instead of a phantom pool.
-   *  Callers pass both sides or nothing; an unmatchable list keeps both
-   *  teams whole (same trim as the branch reconstruction, round 89), and
-   *  `guessed` marks the trailing names of a list that are guesses. */
   bringOnly?: { p1: string[]; p2: string[]; guessed?: { p1: number; p2: number } } | null,
 ): string | null {
   try {
     const trimmed = trimTeamsToBring(p1Team, p2Team, bringOnly, formatRules(format));
     const battle = new Battle({
-      // The raw format string, never toID: clause suffixes ride along as
-      // "@@@Sleep Clause Mod", and toID mangles them into an unknown format
-      // WITHOUT team preview — every draft replay lost its turn 0 that way.
+      // The raw format string, never toID: toID mangles clause suffixes ("@@@Sleep Clause Mod") into an unknown format
+      // WITHOUT team preview (every draft replay lost its turn 0).
       formatid: format as ID,
       seed: '1,2,3,4',
       p1: { name: 'p1', team: Teams.pack(trimmed.p1) },

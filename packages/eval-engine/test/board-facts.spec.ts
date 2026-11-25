@@ -9,26 +9,11 @@ import { CHAMPIONS, mon, playClicks, RULES, type Mode } from './dice-fixtures';
 import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 89 (#145, step A6-0): the board facts. Two draws of one cell are the same board when they differ only by what the dice of
- * the roll decide (the damage, the crit, the hit count) or by the turn's own bookkeeping. The prover (A6-2) reads this to tell which
- * chance dice of a cell moved the board and which only moved a number. The facts are the memo key's state (`endgame/key.ts`) without
- * the roll fields and the bookkeeping, and nothing reads them yet: this step holds the rule against the simulator.
- *
- * What the rows hold:
- *  1. The roll fields and the nominal aim of a move that takes no chosen target leave the facts alone; in doubles, in every rule set
- *     the corpus plays (Gens 3 to 9 and the Champions mod), and in singles for the roll fields.
- *  2. PP, a status counter, a volatile, a boost, the item, the ability, the field's duration, the weather and a body's HP outside the
- *     roll fields each move the facts. So does the aim of a move that takes a chosen target (a lock re-aims on it).
- *  3. A source scan of the installed @pkmn/sim and @pkmn/mods builds: every read of a dropped bookkeeping key is one of the reads
- *     pinned below, each inside the turn that wrote the key (the simulator resets the flags at the end of the turn).
- */
 await loadSimMods('gen9championsou');
 
 const DOUBLES = SWEEP_CASES.filter(entry => entry.mode === 'doubles');
 const bodiesOf = (battle: Battle): Pokemon[] => battle.sides.flatMap(side => side.pokemon);
 
-/** One turn of a sweep board: the attacker uses the move, everyone else splashes. */
 function turnOf(rules: (typeof RULES)[number], moveId: string, mode: Mode, seed: string): Battle {
   const board = sweepBoard(rules, moveId, mode, seed);
   const target = dexOfRules(rules).moves.get(moveId).target;
@@ -36,7 +21,6 @@ function turnOf(rules: (typeof RULES)[number], moveId: string, mode: Mode, seed:
   return board;
 }
 
-/** The target types a click does not choose (the simulator's own list: `battle.actions.targetTypeChoices`). */
 const unchosen = (battle: Battle, moveId: string): boolean => !battle.actions.targetTypeChoices(battle.dex.moves.get(moveId).target);
 
 describe('the facts leave the roll fields and a nominal aim alone', () => {
@@ -160,11 +144,8 @@ describe.each([RULES[8], CHAMPIONS])('what the facts keep, $name', rules => {
   });
 });
 
-/**
- * Round 89 (A6-2): a finished battle has no later turn, so nothing reads what it holds beyond the winner. A game that ends in the middle of a
- * turn leaves the rest of the turn's actions in the queue (their nominal targets differ between draws), and the battle's last move is the
- * move of whichever action ran last; the prover returns at `battle.ended` before it reads either (`prove`).
- */
+// A finished battle has no later turn: a game that ends mid-turn leaves the rest of the turn's actions in the queue
+// (their nominal targets differ between draws); the prover returns at `battle.ended` before it reads them (`prove`).
 describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
   const finished = (winner: 'p1' | 'p2'): Battle => {
     const board = battleOf(rules.singles, [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['quickattack'] : ['tackle'] })], [mon(rules, { species: 'Pikachu', moves: winner === 'p1' ? ['tackle'] : ['quickattack'] })]);
@@ -177,7 +158,6 @@ describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
     const a = finished('p1');
     const b = finished('p1');
     expect(a.ended && b.ended).toBe(true);
-    // the queue holds the actions the game did not reach: a draw with other nominal targets leaves other leftovers
     expect(a.queue.list.length, 'the finished turn left its queue').toBeGreaterThan(0);
     b.queue.clear();
     b.lastMove = null;
@@ -186,15 +166,8 @@ describe.each([RULES[8], CHAMPIONS])('a finished battle, $name', rules => {
   });
 });
 
-/**
- * The source scan. A dropped key is safe only when no handler reads what a turn wrote in a later turn. The simulator ends every turn
- * with the resets (`Battle.endTurn`: `lastSuccessfulMoveThisTurn`, `moveThisTurn`, `statsRaisedThisTurn`, `statsLoweredThisTurn`), and
- * every read pinned here sits in a handler that runs while the turn runs: Burning Jealousy and Alluring Voice (stages raised this
- * turn), Lash Out (lowered this turn), Fusion Flare and Fusion Bolt (the move before this one), the Gen 1 and Gen 2 "already moved"
- * test in the move runner. `lastMoveTargetLoc` is the one key with a read in a later turn (Instruct, a locked or charging body):
- * those moves take a chosen target, so the facts keep the aim for them (rows above). A new reader in an updated simulator fails the
- * pin below and has to be classified here before the facts may drop its key.
- */
+// A dropped key is safe only if no handler reads it in a later turn: `Battle.endTurn` resets the this-turn flags.
+// `lastMoveTargetLoc` is read later (Instruct, a locked or charging body), so the facts keep the aim.
 describe('the simulator reads a dropped key only where the facts keep it (source scan)', () => {
   const require = createRequire(import.meta.url);
   const roots = ['@pkmn/sim', '@pkmn/mods'].map(name => {
@@ -206,7 +179,6 @@ describe('the simulator reads a dropped key only where the facts keep it (source
     item.isDirectory() ? files(`${dir}/${item.name}`) : item.name.endsWith('.js') ? [`${dir}/${item.name}`] : []);
   const sources = roots.flatMap(({ name, root }) => files(root.replace(/\/$/, '')).map(path => ({ file: `${name}:${path.slice(root.length)}`, lines: readFileSync(path, 'utf8').split('\n') })));
 
-  /** The lines that read the key: a mention that is no comment and no plain assignment of the key. */
   function readsOf(key: string): string[] {
     const mention = new RegExp(`\\b${key}\\b`);
     const assign = new RegExp(`\\.${key}\\s*=[^=]`);
@@ -253,7 +225,7 @@ describe('the simulator reads a dropped key only where the facts keep it (source
     expect(reset.test(endTurn.slice(0, endTurn.indexOf('\n    }\n') + 1)), `${key} reset in Battle.endTurn`).toBe(true);
   });
 
-  test('the roll fields are the round 88 list plus the hit data of A5f-1', () => {
+  test('the roll fields are the damage and HP fields and the move\'s hit data', () => {
     expect([...ROLL_FIELDS].sort()).toEqual(['damage', 'damageValue', 'hp', 'hurtThisTurn', 'lastDamage', 'moveHitData', 'totalDamage']);
   });
 });

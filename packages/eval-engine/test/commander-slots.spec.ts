@@ -12,17 +12,8 @@ import type { SimBattle } from '../src/branch/types';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 85 (T320): a Tatsugiri that commands a Dondozo passes its slot (side.js getChoiceIndex skips fainted and commanding
- * actives), and the simulator's request marks the body (`side.pokemon[i].commanding`, pokemon.js getSwitchRequestData). The branch layer
- * counted every living active as a slot that must choose, so the dock waited for a pick in the commanding slot, mapped no engine
- * line onto the side (one part for two slots), and a pick there went to the Dondozo and made the simulator refuse the side's
- * choice. The scene: Scarlet/Violet VGC 2556366252 turn 3, Tatsugiri-Curly inside the opposing Dondozo.
- *
- * Held against the simulator for every species the battle's Dex gives Commander, in both rule sets, with Commander on either
- * side or both and the Tatsugiri in slot a and in slot b: the required slots equal the slots the request asks, the engine's best
- * line maps onto them, and the command built from one pick per required slot is accepted with each move on its own body.
- */
+// A commanding Tatsugiri passes its slot (side.js getChoiceIndex); the request marks it (`side.pokemon[i].commanding`,
+// pokemon.js getSwitchRequestData), so the branch layer must not count that slot as one that chooses.
 
 await loadSimMods('gen9championsou');
 
@@ -38,7 +29,6 @@ const COMMANDERS: { label: string; commanders: ('p1' | 'p2')[] }[] = [
 ];
 const SLOTS = [{ label: 'a', commanderFirst: true }, { label: 'b', commanderFirst: false }];
 
-/** The species of the battle's own Dex that can have Commander and take the field as they are (no forme that needs an item or a battle). */
 function commanderSpecies(format: string): Species[] {
   const pair = [set('Pikachu', ['Splash']), set('Snorlax', ['Splash'])];
   const probe = battleOf(format, pair, pair);
@@ -48,14 +38,13 @@ function commanderSpecies(format: string): Species[] {
 
 const sideIndex = (side: 'p1' | 'p2') => (side === 'p1' ? 0 : 1);
 
-/** What the simulator's request asks of each active slot: true where the slot chooses (not fainted, not commanding). */
 function askedSlots(battle: Battle, side: 'p1' | 'p2'): boolean[] {
   // The request lists the side's bodies in party order, the actives first (side.js getRequestData).
   const request = battle.sides[sideIndex(side)].activeRequest as { side?: { pokemon?: { commanding?: boolean }[] } } | null;
   return battle.sides[sideIndex(side)].active.map((pokemon, slot) => !!pokemon && !pokemon.fainted && !request?.side?.pokemon?.[slot]?.commanding);
 }
 
-describe.each(RULES)('$name: the branch layer asks only the slots the simulator asks (round 85, T320)', rules => {
+describe.each(RULES)('$name: the branch layer asks only the slots the simulator asks', rules => {
   const species = commanderSpecies(rules.format);
 
   test('the Dex gives at least one species Commander', () => {
@@ -88,13 +77,11 @@ describe.each(RULES)('$name: the branch layer asks only the slots the simulator 
           const required = requiredChoicesForActiveSlots(actives, forced);
           expect(required, `${side}: the slots that must choose`).toEqual(asked);
 
-          // The engine's best line (one part per slot the simulator asks) maps onto the asked slots.
           const best = legalChoices(createRootPosition(serializeBattleStable(battle)), side)[0];
           const mapped = evalChoiceToSlotChoices(best.choice, movesBySlot, switchesBySlot, best.label, required);
           expect(mapped, `${side}: the engine line "${best.choice}" maps onto the slots`).not.toBeNull();
           asked.forEach((asks, slot) => expect(!!mapped?.[slot], `${side} slot ${slot} holds a part of the line`).toBe(asks));
 
-          // One pick per required slot (its first move, at its first target) builds a command the simulator accepts.
           const picks = required.map((needs, slot): BranchSlotChoice | null => {
             const move = movesBySlot[slot]?.[0];
             if (!needs || !move) return null;
@@ -105,7 +92,6 @@ describe.each(RULES)('$name: the branch layer asks only the slots the simulator 
           if (!resolved.ok) continue;
           const own = battle.sides[sideIndex(side)];
           expect(battle.choose(side, resolved.command), `${side}: "${resolved.command}" ${own.choice.error}`).toBe(true);
-          // Each move lands on the body whose slot picked it.
           const movers = own.choice.actions.filter(action => action.choice === 'move').map(action => action.pokemon?.position);
           expect(movers).toEqual(required.flatMap((needs, slot) => (needs ? [slot] : [])));
         }

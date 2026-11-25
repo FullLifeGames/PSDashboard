@@ -14,7 +14,6 @@ function FieldCaption({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 9, color: '#8899aa', marginBottom: 2 }}>{children}</div>;
 }
 
-/** The species' own abilities, the other abilities of the generation, and whether the user's pick lies outside the species' own. */
 function abilityChoices(entry: RevealedPokemonInfo, pools: EditorPools | null) {
   const own = pools?.abilitiesBySpecies[entry.species] ?? [];
   const ownIds = new Set(own.map(toId));
@@ -82,8 +81,6 @@ export function ItemField({ entry, index, pools, draft }: FieldProps) {
       </FieldCaption>
       <ComboBox
         options={pools?.items ?? []}
-        // Annotations like "(consumed)" are battle knowledge, not
-        // part of the set — the editor works on the plain item.
         value={entry.item.source === 'manual' ? entry.item.value : itemSetValue(entry.item.value)}
         onChange={value => updateField(index, 'item', value)}
         onSelect={value => {
@@ -170,7 +167,6 @@ export function NatureField({ entry, index, pools, draft }: FieldProps) {
   );
 }
 
-/** How much of the format's total the spread has spent, in the format's own unit; none when the format has no total. */
 function evBudgetLine(evs: PokemonEvs, { perStat, total, statPoints }: EvLimits): string | null {
   if (total === null) return null;
   const spent = EV_STATS.reduce((sum, stat) => sum + (evs[stat.id] ?? 0), 0);
@@ -226,7 +222,6 @@ function MoveChips({ entry, index, pools, draft }: FieldProps) {
           <span style={{ color: '#9fb5d9', fontSize: 9 }}>
             {sourceLabel(move.source, move.probability)}
           </span>
-          {/* Only the user's own pick gets the note: a revealed or guessed move is the battle's or the engine's word. */}
           {move.source === 'manual' && isOutsidePool(pools?.movesBySpecies[entry.species], move.name) && (
             <span style={{ color: '#e0c080', fontSize: 9 }}>not learnable</span>
           )}
@@ -249,7 +244,6 @@ function MoveChips({ entry, index, pools, draft }: FieldProps) {
 
 function MoveAdder({ entry, index, pools, draft }: FieldProps) {
   const { moveDraft, setMoveDraft, addMove } = draft;
-  // The species' own moves first, then the rest of the generation; the dropdown lists what the set does not hold yet.
   const own = pools?.movesBySpecies[entry.species] ?? [];
   const ownIds = new Set(own.map(toId));
   const outside = own.length > 0 ? (pools?.allMoves ?? []).filter(name => !ownIds.has(toId(name))) : [];

@@ -19,7 +19,6 @@ describe('SideRow', () => {
     expect(screen.queryByText('difference:')).toBeNull();
   });
 
-  // Round 89 (#153, HM-2): the engine-move buttons of a row (the tick, the engine's line, the better line) carry the title of the Setup setting.
   test.each([[false, 'Play this turn in a variation; the opponent plays its top choice.'],
     [true, 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.']])(
     'the engine-move titles follow the setting (opponentReads %s)', (opponentReads, title) => {
@@ -39,7 +38,6 @@ describe('SideRow', () => {
     expect(screen.getByText('· worst vs Leech Seed')).toBeInTheDocument();
     expect(screen.getByText(`${winPctText(0.35)} better:`)).toBeInTheDocument();
     expect(screen.getByText('· worst vs Protect')).toBeInTheDocument();
-    // Two different moves differ wholesale: the labels tell the story, no condensed difference.
     expect(screen.queryByText('difference:')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Earthquake ↗' }));
     expect(onExplore).toHaveBeenCalledWith(side.best);
@@ -58,7 +56,6 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  // Round 89 (LN-4): the better line's "then ..." reads the line the Lines section shows for the row (one line per row on a card).
   test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
     const line = (steps: [string, string][], extra = {}) => ({
@@ -86,8 +83,8 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Weavile (60% HP)')).toHaveAttribute('title', expect.stringContaining('left in'));
   });
 
-  test('a stayed sack the window did not verify claims no payback (T123 point 4, the 573756 t68 shape without verified)', () => {
-    // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted, not verified (grading.ts sackVerdict).
+  test('a stayed sack the window did not verify claims no payback (the 573756 t68 shape without verified)', () => {
+    // A tiered stayed feed clears the payoff margin but not regret plus margin: demoted (grading.ts sackVerdict).
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { tier: 'inaccuracy', sacrifice: { name: 'Weavile', hpFraction: 0.77, stayed: true } })} />);
     const note = screen.getByText('· sacked Weavile (77% HP)');
     expect(note).toHaveAttribute('title', expect.stringContaining('payoff window'));
@@ -96,7 +93,7 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Weavile (77% HP)')).toHaveAttribute('title', expect.stringContaining('paid it back'));
   });
 
-  test('a regret over 1 shows the two win chances it spans, the real regret in the title (T123 point 8, 2630685175 t8 shape)', () => {
+  test('a regret over 1 shows the two win chances it spans, the real regret in the title (2630685175 t8 shape)', () => {
     const played = rankedChoice('move taunt 1, move bodypress 2', 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', -0.767);
     const best = rankedChoice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Calyrex-Ice', 0.92);
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { played, best, safe: best, regret: 1.687 })} />);
@@ -108,7 +105,7 @@ describe('SideRow', () => {
     expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
   });
 
-  test('a sack note names the other bodies the side lost on the turn (T123 point 10, 912045 t1 shape)', () => {
+  test('a sack note names the other bodies the side lost on the turn (912045 t1 shape)', () => {
     const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Ogerpon', hpFraction: 0.09, alsoFell: ['Rillaboom'] } })} />);
     expect(screen.getByText('· sacked Ogerpon (9% HP), also lost Rillaboom')).toBeInTheDocument();
     rerender(<SideRow name="Alice" side={sideAnalysis({ sacrifice: { name: 'Ogerpon', hpFraction: 0.09 } })} />);
@@ -139,7 +136,7 @@ describe('SideRow', () => {
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.12)})`)).toBeInTheDocument();
   });
 
-  test('a paid-off read on a turn its side lost shows no praise chip (T59, 912045 t9 shape)', () => {
+  test('a paid-off read on a turn its side lost shows no praise chip (912045 t9 shape)', () => {
     const read = sideAnalysis({ riskPaidOff: true, riskPayoff: 0.12, safe: rankedChoice('move protect', 'Protect', 0.05) });
     const { rerender } = render(<SideRow name="Alice" side={read} lostGround />);
     expect(screen.queryByText(/read paid off/)).toBeNull();
@@ -158,12 +155,11 @@ describe('SideRow', () => {
     expect(screen.getByText('· partner unseen')).toBeInTheDocument();
     expect(screen.getByText('± hinges on Kingambit')).toHaveAttribute('title', 'The verdict depends on a guessed item: Leftovers: fine · Air Balloon: mistake');
   });
-  test('the hindsight line shows only for a read that cleared the gate (T64), on a clean row and a mistaken one', () => {
+  test('the hindsight line shows only for a read that cleared the gate, on a clean row and a mistaken one', () => {
     const line = 'Against Iron Head, switching to Heatran was worth +28% more.';
     const read = { response: '→ Heatran', against: 'Iron Head', gain: 0.56 };
     const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: { ...read, shown: true, line } })} />);
     expect(screen.getByText(line)).toBeInTheDocument();
-    // A read the gate held back (few visits, or too close to the regret) says nothing on the row.
     rerender(<SideRow name="Alice" side={sideAnalysis({ hindsightRead: read })} />);
     expect(screen.queryByText(line)).toBeNull();
     expect(screen.queryByText(/was worth/)).toBeNull();
@@ -171,7 +167,7 @@ describe('SideRow', () => {
     expect(screen.getByText(line)).toBeInTheDocument();
   });
 
-  test('an unpunished risk whose safe line did as well against the reply that came says so in the chip title, never "the read came true" (round 89, B6a)', () => {
+  test('an unpunished risk whose safe line did as well against the reply that came says so in the chip title, never "the read came true"', () => {
     const held = { against: 'Toxic', playedValue: 0.189, safeValue: 0.19 };
     const side = misplayedSide('mistake', { riskUnpunished: true, safeAgainstClick: held });
     const { rerender } = render(<SideRow name="Alice" side={side} />);
@@ -181,24 +177,20 @@ describe('SideRow', () => {
       'The floor assumes Leech Seed; the opponent chose Toxic instead, and against that the safe line did as well or better.',
     );
     expect(screen.queryByText(/read paid off/)).toBeNull();
-    // Without the field (a result with no matrix) the old title stands.
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
     expect(screen.getByText(`${winDeltaText(-0.25)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
   });
 
-  test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way (round 89, G4d)', () => {
+  test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way', () => {
     const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09 });
     const { rerender } = render(<SideRow name="Alice" side={paid} />);
     expect(screen.getByText(`read paid off · ${winDeltaText(0.09)}`)).toBeInTheDocument();
     expect(screen.queryByText(/· inaccuracy/)).toBeNull();
-    // the side lost ground: the read is not praised, so the inaccuracy stays
     rerender(<SideRow name="Alice" side={paid} lostGround />);
     expect(screen.queryByText(/read paid off/)).toBeNull();
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
   });
 
-  // Round 89 (X1a part 1, 649664 T24 and T23): "played stayed in (KO'd before acting)" with "✓ the engine's move" printed the engine's
-  // description of a stand-in as a choice and ticked it. A body knocked out before it moved has no choice in the log.
   test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
     const standIn = rankedChoice('move painsplit', 'stayed in (KO’d before acting)', 0.11);
     const best = rankedChoice('move painsplit', 'Pain Split', 0.11);

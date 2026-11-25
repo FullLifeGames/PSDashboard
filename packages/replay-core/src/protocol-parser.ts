@@ -10,11 +10,12 @@ import { noteSurvivalMarker } from './protocol/survival-marker.ts';
 import { noteActivation, settleRacedFormes, settleScarfMovers } from './protocol/speed-evidence.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
+/** The turn snapshots of a replay log. */
 export function parseReplayLog(log: string): TurnSnapshot[] {
   return parseReplayLogWithObservations(log).snapshots;
 }
 
-/** A line reaches at most one evidence handler, in this fixed order. */
+// A line reaches at most one evidence handler, in this fixed order.
 function dispatch(state: ParserState, line: string) {
   if (line.startsWith('|gametype|')) {
     handleGametype(state, line);
@@ -42,11 +43,7 @@ function dispatch(state: ParserState, line: string) {
   }
 }
 
-/**
- * One pass over the protocol: the per-tag handlers read the client battle
- * BEFORE the line applies (status, boosts, HP at decision time), then the
- * line feeds the client and turn boundaries take their snapshot.
- */
+/** One pass over the log: the handlers read the client before each line applies, then the line feeds it. */
 export function parseReplayLogWithObservations(rawLog: string): {
   snapshots: TurnSnapshot[];
   observations: DamageObservation[];

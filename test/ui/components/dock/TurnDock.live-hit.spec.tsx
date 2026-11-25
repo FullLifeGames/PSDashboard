@@ -1,17 +1,12 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Battle, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { createBranchStateFromBattle } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
+import { simState } from '../../fixtures/sim-state';
 
-/**
- * Moved to the dock in round 84 (A3b): the tile of the open tray reads the range from its tooltip.
- * Round 73 (T202, design gate 3a): Hatterene's Expanding Force in Psychic Terrain against a lone Blissey behind a screen. The
- * calculator spreads the move over every foe and holds no screen factor for the one target the simulator plays, so the preview
- * hands the live battle of the branch to the engine and shows the simulator's own range. Without a live battle it shows no range.
- * The oracle is the simulator: it plays the move and the HP the foe loses lies in the shown range.
- */
+// The calc spreads the move over every foe and holds no screen factor for a lone target; the simulator plays it.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const STATS = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
@@ -20,7 +15,6 @@ const set = (species: string, moves: string[]): PokemonSet => ({
   evs: { ...STATS, hp: 252, atk: 252, spa: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 50, gender: '',
 });
 
-/** A doubles battle in Psychic Terrain in which the first foe stands alone behind a screen. */
 function loneFoeBehind(screen: string | null): Battle {
   const battle = new Battle({
     formatid: toID('gen9doublescustomgame'), seed: [1, 2, 3, 4],
@@ -36,7 +30,6 @@ function loneFoeBehind(screen: string | null): Battle {
   return battle;
 }
 
-/** The percent of Blissey's HP the simulator takes off when Hatterene plays the move. */
 function simulatorPercent(screen: string): number {
   const battle = loneFoeBehind(screen);
   const foe = battle.sides[1].active[0]!;
@@ -58,7 +51,6 @@ async function renderDock(screen: string | null, live: boolean) {
 }
 
 const RANGE = /(\d+(?:\.\d+)?)% - (\d+(?:\.\d+)?)%/;
-/** The range of a move tile: the calc's sentence in its tooltip (the tile itself shows whole percent). */
 const shownRange = (row: HTMLElement) => row.getAttribute('title') ?? '';
 
 describe('the dock: the preview of a forced spread on a lone foe behind a screen', () => {
@@ -83,5 +75,37 @@ describe('the dock: the preview of a forced spread on a lone foe behind a screen
     const row = await renderDock('lightscreen', false);
     await new Promise(resolve => setTimeout(resolve, 500));
     expect(shownRange(row)).toBe('');
+  });
+});
+
+type Props = Parameters<typeof TurnDock>[0];
+
+const props = (overrides: Partial<Props> = {}): Props => ({
+  simState: simState('singles'), executeError: null, executing: false, gen: 9,
+  onSetChoice: vi.fn(), onHypotheticalMove: vi.fn(), onExecuteTurn: vi.fn(), ...overrides,
+});
+
+const read = () => document.documentElement.style.getPropertyValue('--ps-dock-h');
+
+describe('the dock reports its height', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.style.removeProperty('--ps-dock-h');
+  });
+
+  test.each(['singles', 'doubles'] as const)('a %s dock writes --ps-dock-h and removes it when it unmounts', kind => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 132 } as DOMRect);
+    const { unmount } = render(<TurnDock {...props({ simState: simState(kind) })} />);
+    expect(read()).toBe('132px');
+    unmount();
+    expect(read()).toBe('');
+  });
+
+  test('the ended notice reports it as well, and a dock without a state reports nothing', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: 40 } as DOMRect);
+    const { rerender } = render(<TurnDock {...props({ simState: { ...simState('singles'), ended: true, winner: 'Alice' } })} />);
+    expect(read()).toBe('40px');
+    rerender(<TurnDock {...props({ simState: null })} />);
+    expect(read()).toBe('');
   });
 });

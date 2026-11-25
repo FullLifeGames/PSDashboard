@@ -4,20 +4,9 @@ import type { PokemonSet } from '@pkmn/sim';
 import { serializeLiveBattle, type EvalSettings, type EvalWorkerRequest, type EvalWorkerResponse } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../../src/lib/eval/worker-client';
 
-/**
- * Round 65: the pool's messages name the rule set of the position (Pokémon
- * Champions or standard), so the worker's executor reads the replay's
- * weight table in cells, sub-searches and proofs. Round 67 (T139): every
- * path names it, standard included. A caller without one fails before any
- * message, and the worker refuses a message without one, so a path that
- * drops its rule set fails its test instead of pricing with the standard
- * weights.
- */
-
 const posted: EvalWorkerRequest[] = [];
 const answered: EvalWorkerResponse[] = [];
 
-/** A scripted pool worker: a cell and a sub-search answer, anything else an error. */
 class FakeWorker {
   onmessage: ((event: MessageEvent<EvalWorkerResponse>) => void) | null = null;
   onerror: ((event: ErrorEvent) => void) | null = null;
@@ -31,7 +20,6 @@ class FakeWorker {
   terminate() {}
 }
 
-/** The real worker module on this thread; answers go back to the pool worker that asked, by message id. */
 const askers = new Map<number, RealWorker>();
 const scope = {
   onmessage: null as ((event: MessageEvent<EvalWorkerRequest>) => Promise<void>) | null,
@@ -40,7 +28,6 @@ const scope = {
     askers.get(message.id)?.deliver(message);
   },
 };
-/** The one message type whose rule set the stand-in drops on its way to the worker (null: none). */
 let dropped: EvalWorkerRequest['type'] | null = null;
 
 function withoutRuleset(request: EvalWorkerRequest): EvalWorkerRequest {
@@ -107,7 +94,6 @@ async function evaluateOnRealWorker(settings: EvalSettings) {
   }
 }
 
-/** Every message type the run sent names `ruleset`; dropping it on any one of them gets that message refused. */
 async function expectEveryPathGuarded(settings: EvalSettings) {
   await evaluateOnRealWorker(settings);
   const types = [...new Set(posted.map(request => request.type))];
@@ -154,7 +140,6 @@ describe('worker client rule set', () => {
     client.dispose();
   });
 
-  // Round 67 (T140): the played pair's sub-search filters a second sleep like the sweep does.
   test('a pair valued by a sub-search carries the Sleep Clause in its settings', async () => {
     vi.stubGlobal('Worker', FakeWorker);
     const client = new EvalWorkerClient();

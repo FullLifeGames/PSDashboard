@@ -9,6 +9,7 @@ import {
   type SmogonUsageStats,
 } from '../../src/lib/smogon-stats';
 import { smogonDataPath, withSmogonFallback } from '../../src/lib/smogon/hosts';
+import { fetcherKey } from '../../src/lib/smogon/fetcher-key';
 
 const usageStats: SmogonUsageStats = {
   format: 'gen9ou',
@@ -85,8 +86,7 @@ describe('Smogon usage stat enrichment', () => {
     ]);
   });
 
-  test('round 66 (T141): Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
-    // data.pkmn.cc keeps gen9championsvgc2026 (megas, Champions items and EV scale) beside gen9vgc2026.
+  test('Champions VGC reads its own year-level stats file, not the Scarlet/Violet one', () => {
     for (const format of ['gen9championsvgc2026regmb', 'gen9championsvgc2026regmcbo3']) {
       expect(buildSmogonStatsUrls(format).map(candidate => candidate.format)).toEqual([
         'gen9championsvgc2026', 'gen9doublesou', 'gen9ou', 'gen9ubers',
@@ -143,10 +143,8 @@ describe('Smogon usage stat enrichment', () => {
       fetcher,
     });
 
-    // The format's own data wins for species it covers…
     expect(stats?.format).toBe('gen9vgc2026');
     expect(stats?.pokemon.incineroar.moves.map(move => move.value)).toEqual(['Fake Out']);
-    // …and species it lacks merge in from the fallback files.
     expect(stats?.pokemon.annihilape.moves.map(move => move.value)).toEqual(['Rage Fist', 'Close Combat']);
     expect(stats?.pokemon.annihilape.moves[0].sourceDetail).toBe('Smogon gen9ubers latest');
   });
@@ -279,12 +277,6 @@ describe('Smogon usage stat enrichment', () => {
   });
 });
 
-/**
- * The displayed set guesses must be assembled by the SAME machinery the
- * simulator's team builder uses (curated selection + coherence vetoes) — the
- * GPL finding was Cobalion showing Body Press next to revealed Swords Dance
- * while the built team had already vetoed it.
- */
 describe('coherent move enrichment', () => {
   const detail = 'Smogon gen9ou 2026-03';
   const monInfo = (species: string, moves: OpponentTeamInfo['pokemon'][number]['moves']) => ({
@@ -326,9 +318,7 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats).pokemon[0];
 
-    // Body Press scales with Defense — Swords Dance does not serve it; Iron
-    // Head duplicates the revealed Heavy Slam's Steel damage. Both drop and
-    // the usage tail refills the display, exactly like the built team.
+    // Body Press scales with Defense, so Swords Dance does not serve it; Iron Head repeats Heavy Slam's Steel damage.
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Swords Dance', 'Heavy Slam', 'Stone Edge', 'Close Combat',
     ]);
@@ -351,9 +341,6 @@ describe('coherent move enrichment', () => {
   });
 
   test('revealed moves are immune however incoherent the pairing looks', () => {
-    // Revealed Body Press survives a pool whose boost serves Attack — proof
-    // is never second-guessed. (Stone Edge, not Close Combat: a Fighting
-    // fill would be same-type-redundant next to the revealed Body Press.)
     const info = monInfo('Cobalion', [{ name: 'Body Press', source: 'revealed' }]);
     const stats = statsFor('Cobalion', {
       moves: [['Swords Dance', 0.9], ['Stone Edge', 0.8]],
@@ -400,8 +387,6 @@ describe('coherent move enrichment', () => {
 
     const enriched = enrichTeamInfo(info, stats, sets).pokemon[0];
 
-    // The alternative covers the revealed Super Fang — its moves AND its item
-    // fill the display (the first set contradicts what we saw).
     expect(enriched.moves.map(move => move.name)).toEqual([
       'Super Fang', 'Air Slash', 'U-turn', 'Roost',
     ]);
@@ -448,5 +433,144 @@ describe('Smogon data host fallback', () => {
     const fetcher = withSmogonFallback(async url => { asked.push(url); return okJson({}); });
     await fetcher('https://replay.pokemonshowdown.com/x.json');
     expect(asked).toEqual(['https://replay.pokemonshowdown.com/x.json']);
+  });
+});
+
+const statsFetcher = (species: string, requested: string[]) => (async (input: RequestInfo | URL) => {
+  requested.push(String(input));
+  return new Response(JSON.stringify({
+    battles: 1_000,
+    pokemon: { [species]: { count: 100, moves: { Earthquake: 0.9 } } },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}) as typeof fetch;
+
+test('two fetchers in one process keep their own usage stats', async () => {
+  const fromFixtures = await fetchSmogonUsageStats('gen4ou', { fetcher: statsFetcher('Metagross', []) });
+  const fromCache = await fetchSmogonUsageStats('gen4ou', { fetcher: statsFetcher('Salamence', []) });
+
+  expect(Object.keys(fromFixtures!.pokemon)).toEqual(['metagross']);
+  expect(Object.keys(fromCache!.pokemon)).toEqual(['salamence']);
+});
+
+test('the same fetcher asks for each candidate file once', async () => {
+  const requested: string[] = [];
+  const fetcher = statsFetcher('Tyranitar', requested);
+
+  await fetchSmogonUsageStats('gen4ou', { fetcher });
+  await fetchSmogonUsageStats('gen4ou', { fetcher });
+
+  expect(requested).toEqual([
+    'https://data.pkmn.cc/stats/gen4ou.json',
+    'https://data.pkmn.cc/stats/gen4ubers.json',
+  ]);
+});
+
+test('no fetcher keys as global, every custom fetcher as itself', () => {
+  const fetcher = statsFetcher('Heatran', []);
+  const key = fetcherKey(fetcher);
+
+  expect(fetcherKey(undefined)).toBe('global');
+  expect(key).not.toBe('global');
+  expect(fetcherKey(fetcher)).toBe(key);
+  expect(fetcherKey(statsFetcher('Heatran', []))).not.toBe(key);
+});
+
+const statsBody = (species: string) => JSON.stringify({ pokemon: { [species]: { count: 100, moves: { Earthquake: 0.9 } } } });
+const ok = (species: string) => new Response(statsBody(species), { status: 200, headers: { 'content-type': 'application/json' } });
+const status = (code: number) => new Response('', { status: code });
+const abortError = () => new DOMException('signal is aborted without reason', 'AbortError');
+
+function fetcher(answer: (path: string, ask: number, init?: RequestInit) => Promise<Response> | Response) {
+  const asks = new Map<string, number>();
+  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname.replace(/^\/smogon\/data/, '');
+    const ask = (asks.get(path) ?? 0) + 1;
+    asks.set(path, ask);
+    return answer(path, ask, init);
+  }) as typeof fetch;
+  return { fn, asks: (path: string) => asks.get(path) ?? 0 };
+}
+
+describe('the usage-stats memo keeps answers only', () => {
+  test('an aborted load is forgotten: the next call fetches again', async () => {
+    const source = fetcher((path, ask, init) => {
+      if (init?.signal?.aborted) throw abortError();
+      return path === '/stats/gen8ou.json' && ask > 1 ? ok('Dragapult') : status(404);
+    });
+    const controller = new AbortController();
+    controller.abort();
+    await expect(fetchSmogonUsageStats('gen8ou', { fetcher: source.fn, signal: controller.signal })).rejects.toThrow();
+    const stats = await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    expect(Object.keys(stats?.pokemon ?? {})).toEqual(['dragapult']);
+  });
+
+  test('a caller that joins a load another caller then aborts asks again', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const source = fetcher(async (path, _ask, init) => {
+      await new Promise<void>((resolve, reject) => {
+        if (init?.signal?.aborted) return reject(abortError());
+        init?.signal?.addEventListener('abort', () => reject(abortError()));
+        void gate.then(resolve);
+      });
+      return path === '/stats/gen8ou.json' ? ok('Tyranitar') : status(404);
+    });
+    const first = new AbortController();
+    const leaving = fetchSmogonUsageStats('gen8ou', { fetcher: source.fn, signal: first.signal });
+    const joining = fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    first.abort();
+    release();
+    await expect(leaving).rejects.toThrow();
+    expect((await joining)?.pokemon.tyranitar).toBeDefined();
+  });
+
+  test('a network failure is forgotten: the next call fetches again', async () => {
+    let online = false;
+    const source = fetcher(path => {
+      if (!online) throw new TypeError('Failed to fetch');
+      return path === '/stats/gen8ou.json' ? ok('Landorus-Therian') : status(404);
+    });
+    expect(await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn })).toBeNull();
+    online = true;
+    const stats = await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    expect(stats?.pokemon['landorustherian']).toBeDefined();
+  });
+
+  test('a server error on every host is forgotten like a network failure', async () => {
+    let healthy = false;
+    const source = fetcher(path => (healthy && path === '/stats/gen8ou.json' ? ok('Corviknight') : status(healthy ? 404 : 503)));
+    expect(await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn })).toBeNull();
+    healthy = true;
+    expect((await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn }))?.pokemon.corviknight).toBeDefined();
+  });
+
+  test('a result with a failed fallback is returned but not kept', async () => {
+    let flaky = true;
+    const source = fetcher(path => {
+      if (path === '/stats/gen8ou.json') return ok('Garchomp');
+      if (path === '/stats/gen8ubers.json' && flaky) throw new TypeError('Failed to fetch');
+      return path === '/stats/gen8ubers.json' ? ok('Zacian') : status(404);
+    });
+    const first = await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    expect(Object.keys(first?.pokemon ?? {})).toEqual(['garchomp']);
+    flaky = false;
+    const second = await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    expect(Object.keys(second?.pokemon ?? {}).sort()).toEqual(['garchomp', 'zacian']);
+  });
+
+  test('a 404 from every source is an answer and stays: one ask per file', async () => {
+    const source = fetcher(() => status(404));
+    expect(await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn })).toBeNull();
+    expect(await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn })).toBeNull();
+    expect(source.asks('/stats/gen8ou.json')).toBe(1);
+    expect(source.asks('/stats/gen8ubers.json')).toBe(1);
+  });
+
+  test('stats that loaded stay: one ask per file', async () => {
+    const source = fetcher(path => (path === '/stats/gen8ou.json' ? ok('Heatran') : status(404)));
+    await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    const again = await fetchSmogonUsageStats('gen8ou', { fetcher: source.fn });
+    expect(again?.pokemon.heatran).toBeDefined();
+    expect(source.asks('/stats/gen8ou.json')).toBe(1);
   });
 });

@@ -6,11 +6,6 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A5: the engine fill at the live tip of a variation. A stub evaluation stands in for the worker: the
- * spec reads when a run starts, what the result writes, and what Execute does while the run is pending.
- */
-
 type Evaluation = ReturnType<typeof useEvaluation>;
 type Choices = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
@@ -33,7 +28,7 @@ function evaluationOf(shape: Shape = {}) {
   return { evaluation, setPrefs };
 }
 
-/** The branch's pending picks, as the real hook keeps them: written in place, read at the moment. */
+// Pending picks are written in place and read at the moment, as the real hook keeps them.
 function branchOf(kind: FormatKind) {
   const slots = kind === 'doubles' ? 2 : 1;
   const choices: Choices = { p1: Array(slots).fill(null), p2: Array(slots).fill(null) };
@@ -63,7 +58,6 @@ const onResultOf = (handleEvaluate: ReturnType<typeof inputsOf>['handleEvaluate'
   return options.onResult;
 };
 
-/** The doubles fixture result with a second side the fixture's own pickers can play. */
 const doublesResult = (): EvalResult => {
   const base = evalResult('doubles');
   return { ...base, perSide: { p1: base.perSide.p1, p2: [rankedChoice('move grassyglide 1, move tailwind', 'Grassy Glide → Incineroar + Tailwind', -0.25)] } };
@@ -82,7 +76,6 @@ describe('useDockFill: when a run starts', () => {
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     expect(handleEvaluate).toHaveBeenCalledTimes(1);
-    // The next position of the variation (a turn executed) is a new key.
     rerender({ ...wired, historyLength: 2, evalViewKey: 'variation:4' });
     expect(handleEvaluate).toHaveBeenCalledTimes(2);
     expect(setPrefs).not.toHaveBeenCalled();
@@ -147,7 +140,6 @@ describe('useDockFill: when a run starts', () => {
     const { wired, handleEvaluate, branch } = inputsOf('singles', { evaluation, liveEvalStatus: 'stale' });
     const { rerender } = renderHook((props: DockFillInputs) => useDockFill(props), { initialProps: wired });
     expect(handleEvaluate).not.toHaveBeenCalled();
-    // The Auto run is under way for this position, then lands: its result fills.
     rerender({ ...wired, evaluation: evaluationOf({ auto: true, status: 'searching', resultTag: 'variation:3' }).evaluation, liveEvalStatus: 'searching' });
     expect(handleEvaluate).not.toHaveBeenCalled();
     const landed = evalResult('singles');
@@ -174,7 +166,6 @@ describe('useDockFill: what the result writes', () => {
     branch.choices.p1[0] = user;
     const { result } = renderHook(() => useDockFill(wired));
     act(() => onResultOf(handleEvaluate)(doublesResult()));
-    // The best joint choice opens with Fake Out, so it disagrees with Flare Blitz: the second one decides.
     expect(branch.setChoice).not.toHaveBeenCalledWith('p1', expect.anything(), 0);
     expect(branch.setChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'ragepowder' }), 1);
     expect(branch.choices.p1[0]).toBe(user);
@@ -318,7 +309,6 @@ describe('useDockFill: the rule against jumping', () => {
     const { result } = renderHook(() => useDockFill(wired));
     act(() => result.current.holdTray({ side: 'p1', slot: 0 }));
     act(() => result.current.queueExecute());
-    // The dock closes the tray on the Execute press, before the result lands.
     act(() => result.current.holdTray(null));
     await act(async () => onResultOf(handleEvaluate)(doublesResult()));
     expect(branch.choices.p1[0]).not.toBeNull();
@@ -333,7 +323,6 @@ describe('useDockFill: a queued Execute dies with its run', () => {
     act(() => result.current.queueExecute());
     rerender({ ...wired, evaluation: evaluationOf({ status: 'error', resultTag: 'variation:3' }).evaluation });
     expect(result.current.waits).toBe(false);
-    // The user presses Evaluate by hand: a run, then a result for the same position.
     rerender({ ...wired, evaluation: evaluationOf({ status: 'searching', resultTag: 'variation:3' }).evaluation });
     expect(result.current.waits).toBe(false);
     await act(async () => {
@@ -355,7 +344,7 @@ describe('useDockFill: a queued Execute dies with its run', () => {
   });
 });
 
-describe('useDockFill: the engine\'s choice for a held slot waits until the tray closes (round 84, A7a, ruling 1a)', () => {
+describe('useDockFill: the engine\'s choice for a held slot waits until the tray closes', () => {
   const fakeOut = expect.objectContaining({ kind: 'move', moveId: 'fakeout', targetLoc: 1 });
 
   test('doubles: the held slot stays empty and its part of the joint choice is the deferred pick; the partner slot fills from the same choice', () => {
@@ -459,12 +448,11 @@ describe('useDockFill: the engine\'s choice for a held slot waits until the tray
   });
 });
 
-describe('useDockFill: a forced replacement is filled like any slot (round 84, A7a, ruling 2a)', () => {
+describe('useDockFill: a forced replacement is filled like any slot', () => {
   const heatran = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
   const fluttermane = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
   const wait = rankedChoice('wait', '(waiting)', 0);
 
-  /** The replacing side's ranked bench, the waiting side's single "wait" line (the evaluation at an open request). */
   const benchOf = (kind: FormatKind, side: 'p1' | 'p2') => {
     const label = { singles: { p1: 'Heatran', p2: 'Rotom-Wash' }, doubles: { p1: 'Flutter Mane', p2: 'Kingambit' } }[kind][side];
     return rankedChoice(kind === 'doubles' ? 'switch 3' : 'switch 2', `→ ${label}`, 0.2);

@@ -5,20 +5,12 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { SWEEP_CASES } from './dice-sweep-support';
 import { attackerOf, boardFor, defenderOf } from './board-key-support';
 
-/**
- * Round 89 (#149, step A8-6): what never reaches the board key. A key that carries the bookkeeping of the protocol (the log,
- * the PRNG's starting seed, the rule table, the format) makes every play of a board its own entry, and the memo then plays
- * again what it holds. `battle.queue` is a `read` field (Analytic, Sucker Punch, Fake Out and the like ask whether a body
- * still moves this turn), and the queue object points back at its battle: the key must follow the queue's list and leave the
- * back-reference out. Both consumers, every rule set, singles and doubles, with every `read` field of the table keyed (the
- * widest read set a board can have), so that no field hides behind "nothing on this board reads it".
- */
+// `battle.queue` is a `read` field and points back at its battle: the key follows the queue's list, not the back link.
 
 await loadSimMods('gen9championscustomgame');
 
 const everyRead = (): ReadSet => new Set(Object.values(BOARD_FIELDS).flatMap(fields => Object.entries(fields).filter(([, [hit, residual]]) => hit === 'read' || residual === 'read').map(([name]) => name)));
 
-/** Two boards of one case that differ only in the protocol's bookkeeping: the log, the PRNG's seed, the sent request. */
 function twins(rules: (typeof SWEEP_CASES)[number]['rules'], mode: 'singles' | 'doubles'): [Battle, Battle] {
   const first = boardFor(rules, mode, 'tackle');
   const second = boardFor(rules, mode, 'tackle');
@@ -52,12 +44,6 @@ describe('the board key leaves the bookkeeping of the protocol out', () => {
   });
 });
 
-/**
- * The display text of a body's type (`apparentType`, what the client shows after a type change; `types` carries the rule) and the
- * Leppa Berry bookkeeping of the simulator (`pendingStaleness`, `staleness`, which only a tie-break of a stalled battle reads) are
- * `read` fields: they enter the key where a handler of the board names them, and no hit and no end of the turn on a board without
- * such a handler reads them. The sweeps of test/board-key-readers.spec.ts hold the field to the simulator on a bare board.
- */
 describe('the display type and the Leppa bookkeeping split a key only where a handler reads them', () => {
   for (const { rules, mode, name } of SWEEP_CASES) {
     for (const consumer of ['hit', 'residual'] as Consumer[]) {

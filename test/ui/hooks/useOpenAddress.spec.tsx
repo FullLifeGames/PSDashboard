@@ -3,13 +3,6 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useOpenAddress } from '../../../src/hooks/useOpenAddress';
 import { savedRecord } from '../fixtures/saved-game';
 
-/**
- * Round 89 (lane H, #105), stage H4c (user ruling 13.11.2026, H12a): the address names what is open. A game is `?game=<id>`, a
- * replay loaded by link or id is `?replay=<id>`, a file has none. It is written with `replaceState` (the Back button leaves the app
- * as today), read once at start (a saved game opens at its tip, an unknown one is reported for the start page's notice), and left
- * alone in embed mode and behind a shared branch (`#branch=`). `?replay=` links keep loading byte for byte.
- */
-
 type Inputs = Parameters<typeof useOpenAddress>[0];
 const inputs = (overrides: Partial<Inputs> = {}): Inputs => ({
   embed: false, requestedGame: null, replayId: null, viewpoint: 'p1', byLink: false, openRecord: vi.fn().mockResolvedValue(undefined), ...overrides,

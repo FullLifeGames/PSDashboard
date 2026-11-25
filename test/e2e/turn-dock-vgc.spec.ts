@@ -5,17 +5,8 @@ import {
   lightEngine, loadDockReplay, loggedTurn, openVariationHistory, variationPanel,
 } from './dock-helpers';
 
-/**
- * Round 84 (turn dock), step A6c: the two VGC scenes, counted on their own at 1366 x 768 with no variation standing.
- * Scarlet/Violet VGC (task 4, Tera): turn 3 of `gen9vgc2026regi-2573391549`, where all four slots acted and Zacian terastallizes
- * (P2A). The user's side has not: chip P1A, "Tera (type)", Execute. The bench shows the four brought bodies only.
- * Champions VGC (Mega Evolve): turn 1 of `gen9championsvgc2026regma-2623421463`, before Blastoisinite is used (the game logs the
- * Mega Evolution in turn 2, and a side takes it once, so a later turn has none left to click): chip P2A, "Mega Evolve", Execute.
- * Champions has no Tera toggle. The bench lists the brought bodies only. A side that fielded its whole selection lists those bodies;
- * a short side (2625939941, the criterion 5 case: the user's side fielded three) lists its fielded bodies plus the guess of the
- * world the app plays, the heaviest (ADR 0024, round 89), so that game's bench is not pinned here. The bench is read on this second
- * game, where both sides fielded four (test/regression/dock-bring-fixture.spec.ts reads the lists without a world).
- */
+// A side takes Mega Evolution once, so only a turn before the logged one has it left to click.
+// The bench is read where both sides fielded four: a short side lists its fielded bodies plus a guessed world.
 const SV_VGC = 'gen9vgc2026regi-2573391549';
 const CHAMPIONS = 'gen9championsvgc2026regma-2625939941';
 const CHAMPIONS_PINNED = 'gen9championsvgc2026regma-2623421463';
@@ -45,7 +36,6 @@ test.describe('Scarlet/Violet VGC, turn 3', () => {
     const clicks = new Clicks();
     await clicks.click(dockChip(page, 'p1a'));
     const tray = dockTray(page);
-    // The team has six bodies and four were brought: two on the field, Miraidon and Landorus on the bench; Urshifu and Calyrex stay out.
     const bench = await benchNames(tray);
     expect(bench, 'bench of P1A').toHaveLength(2);
     expect(hasBody(bench, 'Miraidon') && hasBody(bench, 'Landorus')).toBe(true);
@@ -59,7 +49,6 @@ test.describe('Scarlet/Violet VGC, turn 3', () => {
     await clicks.click(execute(page));
     expect(clicks.count).toBe(3);
     await expect(variationPanel(page)).toContainText('Turn 3', { timeout: 90_000 });
-    // Both sides terastallized in the executed turn: the user's P1A and the logged P2A.
     await openVariationHistory(page);
     await expect(variationPanel(page).getByText(/\(Tera\)/).first()).toBeVisible();
     await expect(variationPanel(page)).toContainText(/Bleakwind Storm[^|]*\(Tera\)/);
@@ -87,7 +76,6 @@ test.describe('Champions VGC', () => {
     const clicks = new Clicks();
     await clicks.click(dockChip(page, 'p2a'));
     const tray = dockTray(page);
-    // P2 brought Blastoise, Vivillon, Pelipper and Basculegion (all four show in the game); Sneasler and Sinistcha stay home.
     const bench = await benchNames(tray);
     expect(bench, 'bench of P2A').toHaveLength(2);
     expect(hasBody(bench, 'Pelipper') && hasBody(bench, 'Basculegion')).toBe(true);

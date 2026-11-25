@@ -3,12 +3,7 @@ import { Battle, type PokemonSet } from '@pkmn/sim';
 import { deserializeBattleExact, serializeBattleStable } from '../src/forward/serialize';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-/**
- * Round 67 (T145), in a module graph of its own (vitest isolates files): before the Champions mod is loaded, a
- * Champions position must fail loudly instead of reviving as a rule-less gen 9 battle with Stat Points read as EVs;
- * registering the mod must leave every other format's battle as it was (the bank without Champions games stays
- * byte-identical).
- */
+// Own module graph (vitest isolates files): before the Champions mod loads, a Champions position must fail loudly,
 const set = (species: string, moves: string[]): PokemonSet => ({
   name: species, species, item: 'Leftovers', ability: '', moves, nature: 'Jolly', gender: '', level: 100,
   evs: { hp: 4, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
@@ -21,7 +16,7 @@ function playGen9Ou(): string {
   return serializeBattleStable(battle);
 }
 
-describe('the Champions mod is loaded before a Champions battle (T145)', () => {
+describe('the Champions mod is loaded before a Champions battle', () => {
   test('a Champions position without the mod fails loudly', () => {
     expect(() => deserializeBattleExact(JSON.stringify({ formatid: 'gen9championsou' }))).toThrow(/needs the Champions mod/);
     expect(() => deserializeBattleExact(JSON.stringify({ formatid: 'gen9championsdoublescustomgame' }))).toThrow(/needs the Champions mod/);

@@ -1,24 +1,18 @@
 import type { OpponentTeamInfo } from '@fulllifegames/replay-core';
 
-/**
- * Round 89 (T9c): the sets a user saved in the team editor of a replay survive a reload. One record per replay holds the saved
- * infos whole, as the editor wrote them (the form the state file of `Report issue` stores): a reload shows exactly what the session
- * showed. The record leaves the page's memory, so it carries a version; a record of another version is left in storage and ignored,
- * and the app keeps reading version 1. The import text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
- */
+// The record leaves the page's memory, so it carries a version: another version's record stays in storage, ignored.
+// The import text of a replay keeps its own key (`ps-replay-interceptor:sets:<id>`).
 
 export const TEAM_EDITS_VERSION = 1;
 
 export const teamEditsKey = (replayId: string): string => `ps-replay-interceptor:edits:${replayId}`;
 const importKey = (replayId: string): string => `ps-replay-interceptor:sets:${replayId}`;
 
-/** The saved sides: a side the user never edited is null and reads fresh from the inference. */
 export interface TeamEdits {
   p1: OpponentTeamInfo | null;
   p2: OpponentTeamInfo | null;
 }
 
-/** A readable team: an object whose bodies carry the fields the panels and the build read. */
 function isTeam(value: unknown): value is OpponentTeamInfo {
   if (typeof value !== 'object' || value === null || !Array.isArray((value as OpponentTeamInfo).pokemon)) return false;
   return (value as OpponentTeamInfo).pokemon.every(mon =>
@@ -26,10 +20,7 @@ function isTeam(value: unknown): value is OpponentTeamInfo {
     && typeof mon.item === 'object' && mon.item !== null && typeof mon.ability === 'object' && mon.ability !== null);
 }
 
-/**
- * A saved side fits the replay when it holds every species the log showed for that side. It may hold more: a game without team
- * preview gets stand-ins for the bodies it never showed, and an edit saved with them keeps them.
- */
+// A saved side may hold more than the log showed: a game without team preview gets stand-ins, and an edit keeps them.
 function fits(saved: OpponentTeamInfo | null, shown: OpponentTeamInfo): boolean {
   if (saved === null) return true;
   if (!isTeam(saved) || saved.pokemon.length < shown.pokemon.length) return false;
@@ -37,7 +28,6 @@ function fits(saved: OpponentTeamInfo | null, shown: OpponentTeamInfo): boolean 
   return shown.pokemon.every(mon => species.has(mon.species));
 }
 
-/** Writes the replay's saved edit. A store that refuses the write (full or blocked) leaves the edit for this session only. */
 export function saveTeamEdits(replayId: string, edits: TeamEdits): void {
   try {
     localStorage.setItem(teamEditsKey(replayId), JSON.stringify({ version: TEAM_EDITS_VERSION, ...edits }));
@@ -46,11 +36,7 @@ export function saveTeamEdits(replayId: string, edits: TeamEdits): void {
   }
 }
 
-/**
- * The saved edit of a replay, or null for none, an unreadable record, another version, or sides that do not fit the replay's
- * inferred teams (a record left by a different build of the same id). Nothing is deleted: a record this version cannot read stays
- * for the version that wrote it.
- */
+/** Nothing is deleted: a record this version cannot read stays for the version that wrote it. */
 export function loadTeamEdits(replayId: string, inferred: { p1: OpponentTeamInfo; p2: OpponentTeamInfo }): TeamEdits | null {
   try {
     const raw = localStorage.getItem(teamEditsKey(replayId));
@@ -65,7 +51,6 @@ export function loadTeamEdits(replayId: string, inferred: { p1: OpponentTeamInfo
   }
 }
 
-/** The text of the last sets import of a replay, or null for none (or a blocked store). */
 export function readImportText(replayId: string): string | null {
   try {
     return localStorage.getItem(importKey(replayId));
@@ -74,7 +59,6 @@ export function readImportText(replayId: string): string | null {
   }
 }
 
-/** Removes the stored import text: a saved edit holds the import already, because the editor started from it. */
 export function forgetImportText(replayId: string): void {
   try {
     localStorage.removeItem(importKey(replayId));

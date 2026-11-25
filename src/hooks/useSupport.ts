@@ -18,7 +18,6 @@ interface SupportApp {
   board: BoardController;
 }
 
-/** Everything the file holds except the built teams, read at event time. */
 function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInputs, 'builtSets'> {
   const { replay, branch, evaluation, knowledge, shared } = app.ctx;
   const { timeline, deviation } = app.board;
@@ -28,7 +27,6 @@ function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInpu
     app: { version: APP_VERSION, commit: APP_COMMIT, url: window.location.href, embed: replay.embed },
     browser: { userAgent: navigator.userAgent, width: window.innerWidth, height: window.innerHeight, pixelRatio: window.devicePixelRatio },
     replay: replay.replayData,
-    // Round 89 (#105, H5): a game's file carries its record (no key for a replay)
     game: app.ctx.newGame.record,
     knowledge: { teamText: knowledge.teamText, editedP1Info: knowledge.editedP1Info, editedP2Info: knowledge.editedP2Info },
     variation: { startTurn: branch.variationStartTurn, branching: branch.branching, history: branch.history },
@@ -40,7 +38,6 @@ function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInpu
       draft: transients.draftChoices,
       live: { p1: branch.simState?.p1Choices ?? [], p2: branch.simState?.p2Choices ?? [] },
     },
-    // In the order a reader looks for them: the execute error under the pickers first.
     messages: {
       executeError: branch.executeError,
       branchDivergence: deviation.branchDivergence,
@@ -57,7 +54,6 @@ function gatherInputs(app: SupportApp, createdAt: string): Omit<SupportStateInpu
   };
 }
 
-/** The whole file: the inputs plus the teams the app builds now (cached spreads only, never a new solve). */
 async function captureState(app: SupportApp, createdAt: string): Promise<SupportState> {
   const { replayData } = app.ctx.replay;
   const builtSets = replayData
@@ -77,10 +73,8 @@ function downloadJson(value: unknown, fileName: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** One macrotask: the state set before it has rendered, and the latest controller holds it. */
 const settle = () => new Promise(resolve => window.setTimeout(resolve, 0));
 
-/** A game's file opens the game from its record first (round 89, #105, H5): the record is saved in this browser and shown at its tip. */
 async function openStateGame(latest: React.RefObject<SupportApp>, state: SupportState): Promise<void> {
   const record = state.game;
   if (!record) return;
@@ -92,7 +86,6 @@ async function openStateGame(latest: React.RefObject<SupportApp>, state: Support
   if (!(await waitForGame(latest, record.id))) throw new Error(`The game ${record.id} did not open.`);
 }
 
-/** Sets, variation, pointer and drafts of a saved state, onto the loaded replay of that state (a game's file opens its game first). */
 async function restoreState(latest: React.RefObject<SupportApp>, file: unknown): Promise<void> {
   const problem = supportStateProblem(file);
   if (problem) throw new Error(problem);
@@ -122,19 +115,13 @@ async function restoreState(latest: React.RefObject<SupportApp>, file: unknown):
 
 type StateHandle = { capture: () => Promise<SupportState>; restore: (state: unknown) => Promise<void> };
 
-/**
- * Round 77 (user gate 28.10.2026, "1a 2a 3a 4a 5a"): the support side of the app. "Report issue" opens a
- * dialog (user request 28.10.2026) that offers the state file and the filled issue form, each one click
- * away; `window.__psState` captures and restores a state for the reproduction script
- * (test/e2e/repro-state.spec.ts).
- */
+/** "Report issue": the state file and the filled issue form; `window.__psState` serves test/e2e/repro-state.spec.ts. */
 export function useSupport(app: SupportApp) {
   const latest = useRef(app);
   useEffect(() => {
     latest.current = app;
   });
   const [report, setReport] = useState<IssueReport | null>(null);
-  /** The file as the app stood when the user clicked "Report issue"; the download waits for it. */
   const captureRef = useRef<Promise<SupportState> | null>(null);
   const reportIssue = useCallback(() => {
     const createdAt = new Date().toISOString();

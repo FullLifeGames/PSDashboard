@@ -5,10 +5,6 @@ import { computePreviewDamage } from '../../../src/lib/branch-damage';
 import { rollsFor } from '../../../src/lib/branch-rolls';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
-/**
- * Round 82 (forced dice), step A7a: the damage preview of the panel with forced dice. The move a slot has chosen lists the damage
- * of each step of the roll, and a forced crit prices that move (on that target) as a crit. Other moves keep the plain preview.
- */
 type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
 
 function preview(battle: Battle, choices: Picks) {

@@ -4,9 +4,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult, EvalSettings } from '@fulllifegames/eval-engine';
 import { evalGraph, evalResult } from '../fixtures/eval-result';
 
-// Round 77 (C1): a single evaluation started while a sweep runs used to bump the shared run counter without clearing the
-// sweep's running flag, so "analyzing… turn 0/2" and Cancel stayed on screen for good. The sweep is the same code for
-// singles and doubles (the game type only picks the engine), so the specs run on the sweep's own surface.
+// The sweep is the same code for singles and doubles (the game type only picks the engine).
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings) => Promise<EvalResult>),
 }));
@@ -32,7 +30,6 @@ const matrixPrefs = { depth: 1 as const, samples: 1 as const, mode: 'matrix' as 
 const position = JSON.stringify({ sides: [{ pokemon: [{ hp: 100, fainted: false }] }] });
 
 beforeEach(() => {
-  // The sweep's searches never answer: the sweep stays running until something stops it.
   script.evaluate = () => new Promise<EvalResult>(() => {});
 });
 afterEach(() => localStorage.clear());
@@ -42,7 +39,7 @@ const miniSweep = (from: number, to: number) => ({
   cacheKeyFor: (turn: number) => `replay:${turn}:fp`, acquireFor: () => async () => position, playedFor: () => null,
 });
 
-describe('a single evaluation and a running sweep (C1)', () => {
+describe('a single evaluation and a running sweep', () => {
   test('a manual Evaluate stops the sweep and the graph says where it stopped; the Analyze buttons come back at once', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));
@@ -90,7 +87,7 @@ describe('a single evaluation and a running sweep (C1)', () => {
   });
 });
 
-describe('the auto re-evaluation waits for a running sweep (C1)', () => {
+describe('the auto re-evaluation waits for a running sweep', () => {
   const { replayData, snapshots } = replayFixture('singles');
   const sources = { teamText: '', effectiveP1Info: null, effectiveP2Info: null, usageStats: { stats: null }, setAssumptions: { assumptions: null }, hpEvidence: [], getInferredSpreads: async () => undefined } as never;
   const viewInputs = (evaluation: ReturnType<typeof useEvaluation>) => ({

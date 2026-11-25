@@ -8,68 +8,35 @@ import { toId } from '../ids.ts';
 import { teamSizes } from '../replay-format.ts';
 import { spentToMax } from './pp-trigger.ts';
 
-/**
- * Four more items the protocol rules out by a trigger it shows without the
- * item's line (round 69, T168, decision 34), in the shape of trigger-evidence.ts:
- * the action opens a window, the next action boundary closes it, and an item
- * whose own handler would have fired shows no line.
- *  - Lum Berry eats on a status or a confusion (onUpdate, onAfterSetStatus);
- *  - Sitrus Berry eats at half HP (onUpdate) unless Heal Block stops the heal
- *    (onTryEatItem);
- *  - Eject Button switches its holder out after a damaging hit of another
- *    Pokémon (onAfterMoveSecondary) while a teammate can come in;
- *  - Red Card sends the hit's attacker away (onAfterMoveSecondary) while the
- *    attacker's side can switch.
- * Round 89 (#132) adds a fifth rule, in the same shape: a slot of an opponent Pokémon spent to its maximum PP and no berry line
- * (Leppa Berry, Mystery Berry in Generation 2 eat at 0 PP), with the PP read in pp-trigger.ts.
- * Each condition is read by running the item's own handler on a stand-in
- * holder: the half-HP line, the status and confusion test, the switch and
- * the Commander guards are the simulator's, not typed here. The gates are the
- * simulator's too: a Pokémon ignores its item under Embargo, Magic Room or Klutz;
- * a foe with an ability that has onFoeTryEatItem (Unnerve, As One) stops a
- * berry; Sheer Force removes a move's secondary effects and with them
- * onAfterMoveSecondary; one spread move sends only the first Eject Button or
- * Red Card away. Every fact runs through @pkmn/sim in item-triggers.spec.ts.
- * Only items still unknown and never swapped are ruled out, and a team that
- * may hold an Illusion user is not judged (ruleOutUnknown, item-evidence.ts).
- */
+// Design: EVALUATION.md "Rule-outs".
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
 type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard' | 'pp';
 
-/** What opens a rule: a status, a confusion, a shown HP, or a damaging hit by another Pokémon. */
 interface Trigger {
   rule: Rule;
   holder: string;
   ident: string;
-  /** The hit's attacker and move (Eject Button, Red Card). */
   hit?: { attacker: string; attackerIdent: string; move: string };
-  /** What the status or confusion stand-in carries (Lum Berry). */
   kind?: 'status' | 'confusion';
-  /** The move the holder used (the PP rule). */
   move?: string;
 }
 
 export interface ItemTriggerWatch {
-  /** The Pokémon on each field position of both sides ("p1a"): its ident as the entry line wrote it. */
+  /** Each field position ("p1a") to the ident the entry line wrote. */
   slots: Map<string, string>;
   fainted: Set<string>;
-  /** The latest HP text of each opponent Pokémon, by side and nickname. */
   hp: Map<string, string>;
   healBlocked: Set<string>;
-  /** The move resolving now, with its attacker; a spread move's immune target does not end it. */
+  /** The move resolving now; a spread move's immune target does not end it. */
   move: { attacker: string; move: string } | null;
-  /** The triggers of the action since the last boundary. */
   pending: Trigger[];
-  /** An Eject Button, Red Card or Eject Pack spent itself inside the window: no hit is judged (one spread move sends once). */
+  /** An Eject Button, Red Card or Eject Pack spent itself inside the window: no hit is judged. */
   doubt: boolean;
-  /** The log names an ability that stops a foe's berry (Unnerve may arrive by Trace or Skill Swap). */
   unnerveNamed: boolean;
-  /** The team size of each side, read once. */
   sizes: Map<string, number>;
 }
 
-/** The field and the conditions that trigger-evidence.ts already tracks for the opponent. */
 export interface TriggerGates {
   magicRoom: boolean;
   embargoed: ReadonlySet<string>;
@@ -82,7 +49,7 @@ export const SENDERS = new Set(['ejectbutton', 'redcard', 'ejectpack']);
 
 const stoppersByDex = new WeakMap<RulesDex, { ids: Set<string>; names: string[] }>();
 
-/** The abilities of the generation that stop a foe's berry: those with onFoeTryEatItem (Unnerve, As One). */
+// Abilities that stop a foe's berry: those with `onFoeTryEatItem` (Unnerve, As One).
 function stoppersOf(dex: RulesDex) {
   let found = stoppersByDex.get(dex);
   if (!found) {
@@ -95,7 +62,6 @@ function stoppersOf(dex: RulesDex) {
 
 export function newItemTriggerWatch(state: InferrerState): ItemTriggerWatch {
   const { names } = stoppersOf(dexOf(state));
-  // The raw text rules out almost every line before the effect parser reads it.
   const heads = names.map(name => name.replace(/ \(.*\)$/, ''));
   return {
     slots: new Map(), fainted: new Set(), hp: new Map(), healBlocked: new Set(), move: null, pending: [], doubt: false, sizes: new Map(),
@@ -103,9 +69,8 @@ export function newItemTriggerWatch(state: InferrerState): ItemTriggerWatch {
   };
 }
 
-/** How many Pokémon a side brought: the `|teamsize|` the log prints last (VGC brings 4 of 6), else the preview, else the entries. */
+/** How many Pokémon a side brought: the last `|teamsize|` (VGC brings 4 of 6), else the preview, else the entries. */
 export function teamSizeOf(state: InferrerState, side: string): number {
-  // Round 88 (F, #101): the one `|teamsize|` reader of replay-core.
   const sized = teamSizes(state.lines.map(line => line.raw))[side as 'p1' | 'p2'];
   if (sized !== null && sized !== undefined && sized > 0) return sized;
   const preview = state.lines.filter(line => line.cmd === 'poke' && arg(line, 1) === side).length;
@@ -115,13 +80,11 @@ export function teamSizeOf(state: InferrerState, side: string): number {
     .map(line => keyOf(arg(line, 1)))).size;
 }
 
-/** One handler of the item as the replay's generation has it (undefined when the item does not exist there yet). */
 function handlerOf(state: InferrerState, itemId: string, name: string): ItemHandler | undefined {
   const item = dexOf(state).items.get(itemId) as unknown as Record<string, unknown> & { exists: boolean; gen: number };
   return item.exists && item.gen <= state.gen ? item[name] as ItemHandler | undefined : undefined;
 }
 
-/** Whether the item's handler eats the berry when the holder looks like this. */
 function eats(handler: ItemHandler | undefined, holder: object): boolean {
   if (!handler) return false;
   let ate = false;
@@ -133,7 +96,7 @@ function eats(handler: ItemHandler | undefined, holder: object): boolean {
   return ate;
 }
 
-/** A stand-in holder with HP and one slot at this PP: what an item's `onUpdate` reads of a Pokémon (Leppa Berry: any slot at 0 PP; Mystery Berry: the last move's slot). */
+// What an item's `onUpdate` reads: Leppa Berry any slot at 0 PP, Mystery Berry the last move's slot.
 function holderWithSlot(pp: number) {
   const slot = { id: 'standin', move: 'Stand-in', pp, maxpp: 10 };
   const volatiles: Record<string, object> = {};
@@ -145,11 +108,7 @@ function holderWithSlot(pp: number) {
 
 const eatersByDex = new WeakMap<RulesDex, ReadonlySet<string>>();
 
-/**
- * Round 89 (#132): the items of the Dex's generation that eat when a slot of the holder is at 0 PP (Leppa Berry; Mystery Berry in
- * Generation 2): each item's `onUpdate` eats on the stand-in with its slot at 0 PP and not with it full, so Sitrus Berry at the
- * stand-in's full HP does not count. pp-trigger-sweep.spec.ts holds the set to the simulator for every item of every generation and mod.
- */
+/** The items that eat when a slot of the holder is at 0 PP (Leppa Berry; Mystery Berry in Generation 2). */
 export function ppEaters(dex: RulesDex): ReadonlySet<string> {
   let found = eatersByDex.get(dex);
   if (!found) {
@@ -162,16 +121,10 @@ export function ppEaters(dex: RulesDex): ReadonlySet<string> {
   return found;
 }
 
-/** Whether the item id is the Sitrus Berry, the berry sitrusEatsAt judges (round 73, T214: the rebuild asks it for the build's item). */
+/** Whether the item id is the Sitrus Berry, the berry `sitrusEatsAt` judges. */
 export const isSitrusBerry = (itemId: string): boolean => itemId === ('sitrusberry' satisfies Rule);
 
-/**
- * Whether Sitrus Berry would have been eaten at the HP the log shows. The
- * display rounds (a percentage up, the Champions mod down, pixels down), and
- * every form puts the real ratio below one display unit above what it shows,
- * so the berry is judged at that bound: a shown 49/100 eats, 50/100 does not
- * (item-triggers.spec.ts holds the bound against the simulator's displays).
- */
+/** Whether Sitrus Berry would have eaten at the shown HP, judged at the display's upper bound (49/100 eats). */
 export function sitrusEatsAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
@@ -179,25 +132,20 @@ export function sitrusEatsAt(dex: RulesDex, shown: string): boolean {
   return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: health.hp + 1, maxhp: health.maxhp });
 }
 
-/**
- * The reverse question (round 73, T214): whether the Sitrus Berry certainly stays uneaten at the HP the log shows. The display
- * hides up to one unit, so the berry is judged at the lowest ratio the shown text allows (a shown 51/100 is above half, a shown
- * 50/100 may be exactly half). An exact text (the player's own side, neither 100 nor 48 as the maximum) is read as it stands.
- */
+/** Whether the Sitrus Berry certainly stays uneaten at the shown HP: judged at the lowest ratio the text allows. */
 export function sitrusKeptAt(dex: RulesDex, shown: string): boolean {
   const health = Protocol.parseHealth(shown as Protocol.PokemonHPStatus);
   if (!health || health.fainted || !health.hp) return false;
   const item = dex.items.get('sitrusberry') as unknown as { exists: boolean; gen: number; onUpdate?: ItemHandler };
-  // The display forms are hp-display.ts's (a percentage or the pixel bar hides up to one unit); this reader judges at one unit below in every mode, the Champions floor included.
+  // The percentage and pixel bar hide up to one unit: judged one unit below in every mode, Champions included.
   const lowest = formOf(health.maxhp, false) === 'exact' ? health.hp : health.hp - 1 + 1e-6;
-  // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about the threshold.
+  // A generation whose Update handler eats at no HP (the Dex moves the berry to another event) says nothing about it.
   return item.exists && item.gen <= dex.gen && eats(item.onUpdate, { hp: 1, maxhp: health.maxhp }) && !eats(item.onUpdate, { hp: lowest, maxhp: health.maxhp });
 }
 
 const sideOf = (key: string) => key.slice(0, 2);
 const activeKeys = (watch: ItemTriggerWatch) => new Set([...watch.slots.values()].map(keyOf));
 
-/** Whether the side has a Pokémon that could come in: the team it brought, less its field and its faints. */
 function benchOf(state: InferrerState, watch: ItemTriggerWatch, side: string): number {
   const fielded = [...watch.slots.values()].filter(ident => identOf(ident)?.side === side).length;
   const fainted = [...watch.fainted].filter(key => sideOf(key) === side).length;
@@ -205,7 +153,6 @@ function benchOf(state: InferrerState, watch: ItemTriggerWatch, side: string): n
   return (watch.sizes.get(side) ?? 0) - fielded - fainted;
 }
 
-/** An Eject Button or Red Card handler run on stand-ins, with the board the log shows. */
 function sends(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates, trigger: Trigger): boolean {
   const handler = handlerOf(state, trigger.rule, 'onAfterMoveSecondary');
   const hit = trigger.hit;
@@ -231,7 +178,7 @@ function sends(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGate
   return used;
 }
 
-/** Sheer Force turns a move's secondary effects off, and the simulator skips onAfterMoveSecondary with them. */
+// Sheer Force turns a move's secondary effects off, and the simulator skips `onAfterMoveSecondary` with them.
 function sheerForced(state: InferrerState, trigger: Trigger): boolean {
   const hit = trigger.hit;
   if (!hit) return false;
@@ -248,7 +195,6 @@ function sheerForced(state: InferrerState, trigger: Trigger): boolean {
   return !!move.hasSheerForce || !ability.onModifyMove;
 }
 
-/** Whether a foe of the holder may have an ability that stops its berry (a foe of unknown species may). */
 function foeStopsBerry(state: InferrerState, watch: ItemTriggerWatch, holder: string): boolean {
   if (watch.unnerveNamed) return true;
   const stoppers = stoppersOf(dexOf(state)).ids;
@@ -259,12 +205,10 @@ function foeStopsBerry(state: InferrerState, watch: ItemTriggerWatch, holder: st
   });
 }
 
-/** The holder ignores its item: Magic Room, Embargo, or an ability it may have (Klutz). */
 function ignoresItem(state: InferrerState, gates: TriggerGates, trigger: Trigger): boolean {
   return gates.magicRoom || gates.embargoed.has(trigger.holder) || possibleAbilities(state, trigger.ident)?.has('klutz') !== false;
 }
 
-/** Whether the item's handler would have fired for this trigger, and the log shows no line. */
 function wouldShow(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates, trigger: Trigger): boolean {
   if (trigger.rule === 'lumberry') {
     const holder = trigger.kind === 'confusion' ? { status: '', volatiles: { confusion: {} } } : { status: 'psn', volatiles: {} };
@@ -278,13 +222,11 @@ function wouldShow(state: InferrerState, watch: ItemTriggerWatch, gates: Trigger
   return !watch.fainted.has(attacker) && !sheerForced(state, trigger) && sends(state, watch, gates, trigger);
 }
 
-/** Round 89 (#132): the items that eat at 0 PP, when the log shows the move's last PP spent and no line of a berry came (pp-trigger.ts). */
 function ppItemsOut(state: InferrerState, watch: ItemTriggerWatch, trigger: Trigger): readonly string[] {
   if (foeStopsBerry(state, watch, trigger.holder) || !spentToMax(state, trigger.ident, trigger.move ?? '')) return [];
   return [...ppEaters(dexOf(state))];
 }
 
-/** The window's close: a trigger whose item would have fired and whose holder is still on the field rules the item out. */
 function judge(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates) {
   const pending = watch.pending;
   const doubt = watch.doubt;
@@ -302,7 +244,6 @@ function open(watch: ItemTriggerWatch, trigger: Trigger) {
   if (!watch.pending.some(other => other.holder === trigger.holder && other.rule === trigger.rule)) watch.pending.push(trigger);
 }
 
-/** A Pokémon entered a position: whoever stood there left and judges nothing, and the newcomer's HP opens Sitrus Berry. */
 function onEntry(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key: string) {
   const position = arg(line, 1).slice(0, 3);
   watch.slots.set(position, arg(line, 1));
@@ -310,14 +251,12 @@ function onEntry(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, k
   noteHp(state, watch, arg(line, 1), key, arg(line, 3));
 }
 
-/** An HP text of an opponent Pokémon: kept, and Sitrus Berry watches it. */
 function noteHp(state: InferrerState, watch: ItemTriggerWatch, ident: string, key: string, text: string) {
   if (!key.startsWith(state.opponentSide) || !text) return;
   watch.hp.set(key, text);
   open(watch, { rule: 'sitrusberry', holder: key, ident });
 }
 
-/** A damaging hit of another Pokémon into an opponent Pokémon that stays up: Eject Button and Red Card watch it. */
 function onHit(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key: string) {
   const pending = watch.move;
   if (!pending || hasKw(line, 'from') || keyOf(pending.attacker) === key) return;
@@ -326,12 +265,10 @@ function onHit(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key
   for (const rule of ['ejectbutton', 'redcard'] as const) open(watch, { rule, holder: key, ident: arg(line, 1), hit });
 }
 
-/** A status or a confusion on an opponent Pokémon. */
 function onStatus(watch: ItemTriggerWatch, line: LogLine, key: string, kind: 'status' | 'confusion') {
   open(watch, { rule: 'lumberry', holder: key, ident: arg(line, 1), kind });
 }
 
-/** Lines about an opponent Pokémon. */
 function onOpponentLine(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key: string) {
   const tag = line.cmd;
   if (tag === '-status') onStatus(watch, line, key, 'status');
@@ -340,18 +277,17 @@ function onOpponentLine(state: InferrerState, watch: ItemTriggerWatch, line: Log
     noteHp(state, watch, arg(line, 1), key, arg(line, 2));
     if (tag === '-damage') onHit(state, watch, line, key);
   } else if (tag === '-enditem') watch.pending = watch.pending.filter(trigger => trigger.holder !== key);
-  // A move of the holder's own (a move another move called spends no PP of its own): the window judges its slot at the next boundary.
+  // A move another move called spends no PP of its own; only the holder's own move opens the PP window.
   else if (tag === 'move' && !hasKw(line, 'from')) open(watch, { rule: 'pp', holder: key, ident: arg(line, 1), move: arg(line, 2) });
 }
 
-/** Heal Block on a Pokémon, and an item that sent a Pokémon out in this window (it spent the switch the others would need). */
+// An item that sent a Pokémon out spent the switch the others would need.
 function noteDoubt(watch: ItemTriggerWatch, line: LogLine, key: string) {
   const tag = line.cmd;
   if (tag === '-enditem' && SENDERS.has(toId(arg(line, 2)))) watch.doubt = true;
   if ((tag === '-start' || tag === '-end') && toId(Protocol.parseEffect(arg(line, 2)).name) === 'healblock') watch.healBlocked[tag === '-start' ? 'add' : 'delete'](key);
 }
 
-/** Ally Switch: the Pokémon leaves its position for the numbered one and the one there takes its place. */
 function onSwap(watch: ItemTriggerWatch, line: LogLine) {
   const from = arg(line, 1).slice(0, 3);
   const to = `${from.slice(0, 2)}${'abcd'[Number(arg(line, 2))] ?? ''}`;
@@ -369,12 +305,7 @@ function onFaint(watch: ItemTriggerWatch, key: string) {
   for (const [position, ident] of watch.slots) if (keyOf(ident) === key) watch.slots.delete(position);
 }
 
-/**
- * The line handler: closes the window at each action boundary and judges its
- * triggers, then reads the line (the HP, the status, the hit) into the next
- * window. The residual phase's `upkeep` is no boundary: the simulator's last
- * update, and so a berry's line, comes after it.
- */
+/** The residual phase's `upkeep` is no boundary: the simulator's last update, and so a berry's line, comes after it. */
 export function watchItemTriggers(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates, line: LogLine) {
   const tag = line.cmd;
   const key = keyOf(arg(line, 1));

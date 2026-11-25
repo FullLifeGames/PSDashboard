@@ -6,25 +6,11 @@ import type {
   EvalCellJob, EvalCellValue, EvalChoiceOption, EvalResult, EvalSubSearchJob, ForcedWinInput, KoOddsMismatch, MctsTreeStats,
 } from '../types.ts';
 
-/**
- * Round 67 (T129): the search sees every board with its bench in one fixed
- * order. The order in which a rebuild keeps the bench in the simulator's team
- * list is not part of the game, but the search read it: the static sums over
- * the team in list order, and a tie among replacement hints (every singles
- * hint is 0 once the opposing active fell) falls to it, so two boards of one
- * game state parted at their first near tie (649664 t14: the switch to
- * Ferrothorn read best on one board and a blunder on the other). Every entry
- * point searches the board with each side's bench sorted by species and
- * nickname (the active slots stay where they are), names every choice that
- * leaves the search back in the slots of the board it was asked about, and
- * every choice that enters it in the canonical slots. Move targets name
- * active slots and stay as they are.
- */
+// Bench order is no part of the game, yet a near tie falls to it: the search sorts benches by species and nickname.
 
 type SideId = 'p1' | 'p2';
 
 export interface BenchOrder {
-  /** The board with each side's bench in canonical order: the string the search runs on. */
   readonly serialized: string;
   /** Per side, the given board's slot index of each canonical slot index (0-based). */
   readonly toGiven: readonly [readonly number[], readonly number[]];
@@ -34,21 +20,11 @@ export interface BenchOrder {
 
 const sideIndex = (side: SideId): 0 | 1 => (side === 'p1' ? 0 : 1);
 
-/**
- * Species id, then nickname, compared by code unit (no locale). The same key
- * reads off the serialized board ('[Species:<id>]' and set.name), so a board
- * already in canonical order is recognized without deserializing it.
- */
+// By code unit, no locale; the same key reads off the serialized board ('[Species:<id>]' and set.name).
 const benchKey = (speciesId: string, name: string | undefined): string => `${speciesId}\u0000${name ?? ''}`;
 const byKey = (a: { key: string; index: number }, b: { key: string; index: number }): number =>
   (a.key < b.key ? -1 : a.key > b.key ? 1 : a.index - b.index);
 
-/**
- * One side's canonical order as given slot indices: the active slots in
- * place, then the bench by species and nickname (equal keys keep their
- * order). Team preview seats nobody, so every body counts as bench there; a
- * board whose actives do not sit in their own slots keeps its order.
- */
 function canonicalOrder(side: Side): number[] {
   const slots = side.pokemon.map((_, index) => index);
   const seated = side.active.some(Boolean);
@@ -60,7 +36,6 @@ function canonicalOrder(side: Side): number[] {
 
 interface SerializedSide { active?: (string | null)[]; pokemon?: { species?: string; set?: { name?: string } }[] }
 
-/** Whether a serialized side's bench already sits in canonical order, read off the JSON (the same key as canonicalOrder). */
 function canonicalAsSerialized(side: SerializedSide | undefined): boolean {
   const active = side?.active ?? [];
   const fixed = active.some(Boolean) ? active.length : 0;
@@ -82,7 +57,6 @@ function computeBenchOrder(serialized: string): BenchOrder | null {
     if (canonicalAsSerialized(sides?.[0]) && canonicalAsSerialized(sides?.[1])) return null;
     battle = deserializeBattleExact(serialized);
   } catch {
-    // A board the exact deserializer cannot read is searched as given (the search reports its own error).
     return null;
   }
   const orders = [canonicalOrder(battle.sides[0]), canonicalOrder(battle.sides[1])];
@@ -98,26 +72,22 @@ function computeBenchOrder(serialized: string): BenchOrder | null {
   };
 }
 
-/** The last board asked about: the trees of one search ask four times in a row. */
 let last: { serialized: string; order: BenchOrder | null } | null = null;
 
-/** The canonical board and its slot maps; null when every bench already sits in canonical order (the board is searched as given). */
+/** The canonical board and its slot maps; null when every bench already sits in canonical order. */
 export function benchOrder(serialized: string): BenchOrder | null {
   if (last?.serialized !== serialized) last = { serialized, order: computeBenchOrder(serialized) };
   return last.order;
 }
 
-/** A choice with its slots mapped: `switch N` (a pivot's follow-up and doubles parts too) and team preview digits. */
 function mapSlots(choice: string, map: readonly number[]): string {
   const slot = (digits: string) => String(map[Number(digits) - 1] + 1);
   if (choice.startsWith('team ')) return `team ${[...choice.slice(5)].map(slot).join('')}`;
   return choice.replace(/switch (\d+)/g, (_match, digits: string) => `switch ${slot(digits)}`);
 }
 
-/** A choice of the canonical board named in the given board's slots. */
 export const choiceToGiven = (order: BenchOrder, side: SideId, choice: string): string => mapSlots(choice, order.toGiven[sideIndex(side)]);
 
-/** A choice of the given board named in the canonical board's slots. */
 export const choiceToCanonical = (order: BenchOrder, side: SideId, choice: string): string => mapSlots(choice, order.toCanonical[sideIndex(side)]);
 
 const optionsToGiven = <T extends EvalChoiceOption>(order: BenchOrder, side: SideId, options: T[]): T[] =>
@@ -127,7 +97,6 @@ const diagnosticToGiven = (order: BenchOrder, diagnostic: KoOddsMismatch): KoOdd
   ...diagnostic, p1Choice: choiceToGiven(order, 'p1', diagnostic.p1Choice), p2Choice: choiceToGiven(order, 'p2', diagnostic.p2Choice),
 });
 
-/** A result of the canonical board named in the given board's slots: the rankings, the matrix ids and the diagnostics (labels, lines and odds name species). */
 export function resultToGiven(order: BenchOrder, result: EvalResult): EvalResult {
   const rows = (side: SideId) => result.perSide[side].map(row => ({ ...row, choice: choiceToGiven(order, side, row.choice) }));
   const named: EvalResult = { ...result, perSide: { p1: rows('p1'), p2: rows('p2') } };
@@ -142,7 +111,7 @@ export function resultToGiven(order: BenchOrder, result: EvalResult): EvalResult
   return named;
 }
 
-/** One tree's statistics in the given board's slots (cell keys, odds and boundary cells stay index-aligned with the options). */
+/** One tree's statistics in the given board's slots; cell keys stay index-aligned with the options. */
 export const treeToGiven = (order: BenchOrder, tree: MctsTreeStats): MctsTreeStats => ({
   ...tree,
   p1Options: optionsToGiven(order, 'p1', tree.p1Options),
@@ -152,7 +121,6 @@ export const treeToGiven = (order: BenchOrder, tree: MctsTreeStats): MctsTreeSta
   result: resultToGiven(order, tree.result),
 });
 
-/** Partial results leave the search in the given board's slots too. */
 export const callbacksToGiven = <T extends MctsCallbacks>(order: BenchOrder, callbacks: T | undefined): T | undefined => (callbacks?.onPartial
   ? { ...callbacks, onPartial: (partial: EvalResult) => callbacks.onPartial!(resultToGiven(order, partial)) }
   : callbacks);
@@ -172,11 +140,7 @@ const inputToCanonical = (order: BenchOrder, input: ForcedWinInput): ForcedWinIn
   },
 });
 
-/**
- * An executor over the canonical board that speaks the given board's slots:
- * its option lists and diagnostics leave in them, cell and sub-search jobs
- * and the prover's root order arrive in them.
- */
+/** An executor over the canonical board that speaks the given board's slots in both directions. */
 export function executorToGiven(order: BenchOrder, executor: SearchExecutor): SearchExecutor {
   return {
     choices: async (tera, keepPlayed, sleepClause) => {

@@ -20,12 +20,9 @@ describe('tera allowance', () => {
   });
 
   test('auto restricts draft and custom formats to revealed species', () => {
-    // Draft leagues grant Tera per Pokémon — only what the replay proved.
     expect(resolveTeraPreference('auto', 'gen9customgame', draftLog)).toEqual({ p1: [], p2: ['Rhydon'] });
     expect(resolveTeraPreference('auto', 'gen9draft', draftLog)).toEqual({ p1: [], p2: ['Rhydon'] });
-    // Ladder formats: everyone genuinely may Tera once anyone did.
     expect(resolveTeraPreference('auto', 'gen9ou', draftLog)).toBe(true);
-    // No tera in the log → off, regardless of format.
     const quiet = draftLog.replace('|-terastallize|p2a: 61 Alphonse|Water\n', '');
     expect(resolveTeraPreference('auto', 'gen9customgame', quiet)).toBe(false);
     expect(resolveTeraPreference('auto', 'gen9ou', quiet)).toBe(false);

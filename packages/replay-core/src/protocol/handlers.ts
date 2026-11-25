@@ -12,7 +12,6 @@ import { survivedAtOne } from './survival-marker.ts';
 import type { HpText } from '../hp-display.ts';
 
 
-/** The two numbers of an HP text (`75/100`, `24/48g`), null for a faint or no text. */
 function hpTextOf(text: string): HpText | null {
   const match = text.match(/^(\d+)\/(\d+)/);
   return match && parseInt(match[1], 10) > 0 && parseInt(match[2], 10) > 0 ? { hp: parseInt(match[1], 10), maxhp: parseInt(match[2], 10) } : null;
@@ -27,13 +26,11 @@ function hpFractionOf(text: string): number | null {
   return denom > 0 ? parseInt(match[1], 10) / denom : null;
 }
 
-/** The stat the client's Protosynthesis or Quark Drive volatile names (the three letters of the `-start` effect). */
 function boostedStatOf(mon: Pokemon): string | undefined {
   const volatile = (mon.volatiles.protosynthesis ?? mon.volatiles.quarkdrive) as { stat?: string } | undefined;
   return volatile?.stat;
 }
 
-/** Supreme Overlord's count: the client adds the silent `-start|..|fallenN` as a volatile named by its effect. */
 function fallenOf(mon: Pokemon): number | undefined {
   for (const id of Object.keys(mon.volatiles)) {
     const count = /^fallen(\d+)$/.exec(id);
@@ -101,11 +98,7 @@ export function handleGen(state: ParserState, line: string) {
   if (parsed >= 1 && parsed <= 9) state.genNum = parsed as GenerationNum;
 }
 
-/**
- * Nonzero priority breaks the race premise in EITHER role — order
- * across priority brackets says nothing about speed. The round-37 rules
- * add what lets a first mover act early or a second mover act last.
- */
+// Nonzero priority breaks the race premise in either role: order across priority brackets says nothing about speed.
 function speedCleanliness(state: ParserState, ident: string, moveId: string): { cleanFirst: boolean; cleanSecond: boolean } {
   const priority = state.battle.gens.get(state.genNum).moves.get(moveId)?.priority ?? 0;
   const cleanFirst = priority === 0 && !speedContaminatedAt(state, ident, 'first') && !firstMoverContaminated(state, ident, moveId);
@@ -128,15 +121,13 @@ function pendingMoveFor(
 export function handleMove(state: ParserState, line: string) {
   const { battle } = state;
   const parts = line.split('|');
-  // Read the mover BEFORE battle.add — status/boosts at decision time.
+  // Read the mover before battle.add: status and boosts at decision time.
   const ident = parts[2] ?? '';
   const side: 'p1' | 'p2' = ident.startsWith('p1') ? 'p1' : 'p2';
   const mover = ident ? battle.getPokemon(ident as ClientIdent) : undefined;
   const moveId = toId(parts[3] ?? '');
-  // A copied action (Dancer, Instruct, a bounced status move) is a real hit
-  // for the damage fit but no race; a Pursuit on a switching target fired at
-  // the switch, so it claims no first place; a mover's second line (Sleep
-  // Talk's called move) is the same action as its first.
+  // A copied action (Dancer, Instruct, a bounced status move) hits but races nothing; a Pursuit on a switching
+  // target fired at the switch claims no first place; a mover's second line (Sleep Talk's called move) is one action.
   const race = !foreignAction(line);
   const clean = speedCleanliness(state, ident, moveId);
   const cleanFirst = clean.cleanFirst && !switchTriggered(line);
@@ -165,11 +156,7 @@ export function isActionBoundary(line: string): boolean {
     (line.startsWith('|-activate|') && line.includes('confusion'));
 }
 
-/**
- * The knocked-out target of the pending move lost a race: it is on the
- * other side (Earthquake and Explosion hit the partner too), had not
- * acted, was not rearranged, and nothing slows it regardless of Speed.
- */
+// Earthquake and Explosion hit the partner too, so the target must stand on the other side.
 function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingMove): boolean {
   return victim === lastMove.target && victim !== lastMove.attacker &&
     victim.slice(0, 2) !== lastMove.attacker.slice(0, 2) &&
@@ -177,13 +164,7 @@ function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingM
     !speedContaminatedAt(state, victim, 'second') && !secondMoverContaminated(state, victim, null);
 }
 
-/**
- * KO before the victim ever acted: a chosen switch would have resolved
- * BEFORE the attack and left a line, so the victim chose a move and
- * lost the speed race — the attacker was faster (GPL T36: Noivern KO'd
- * Iron Valiant before it moved; two-move-line extraction cannot see
- * this, yet it is how players actually read speed).
- */
+// A KO before the victim acted proves the attacker faster: a chosen switch would have resolved first and left a line.
 function recordFaintSpeedEvidence(state: ParserState, line: string) {
   const { lastMove, battle } = state;
   if (!(line.startsWith('|faint|') && lastMove)) return;
@@ -202,8 +183,6 @@ function recordFaintSpeedEvidence(state: ParserState, line: string) {
   }
 }
 
-/** A typeless Hidden Power that bounced off an immunity is type
- *  evidence — capture it before the context dies (spec ⑤ 2a). */
 function recordImmuneHiddenPower(state: ParserState, line: string) {
   const { lastMove, battle } = state;
   if (line.startsWith('|-immune|') && lastMove && lastMove.moveId === 'hiddenpower' &&
@@ -218,11 +197,7 @@ function recordImmuneHiddenPower(state: ParserState, line: string) {
   }
 }
 
-/**
- * Action boundary: a bare |-damage| after any of these (confusion
- * self-hit, Future Sight resolution, residuals) belongs to no pending
- * move — attributing it fabricates observations.
- */
+/** A bare `|-damage|` after a boundary (confusion self-hit, Future Sight, residuals) belongs to no pending move. */
 export function handleActionBoundary(state: ParserState, line: string) {
   recordFaintSpeedEvidence(state, line);
   recordImmuneHiddenPower(state, line);
@@ -238,9 +213,7 @@ export function handleActionBoundary(state: ParserState, line: string) {
   }
 }
 
-/** HP-type evidence is effectiveness-only, so crits and multi-hits do
- *  not disqualify it — but only the FIRST damage line of the move
- *  counts (spec ⑤ 2a). Singles only: the marker names the move's one target. */
+// Effectiveness-only evidence: crits and multi-hits do not disqualify it, only the first damage line counts; singles.
 function recordHiddenPowerHit(state: ParserState, defenderIdent: string, count: number) {
   const { lastMove, battle } = state;
   if (!lastMove || !state.singles) return;
@@ -255,15 +228,13 @@ function recordHiddenPowerHit(state: ParserState, defenderIdent: string, count: 
   }
 }
 
-/** The HP texts of a knockout: the defender's before it (the client still holds them) and the one the line shows, kept only when the defender stands after it (a survivor). */
 function shownFieldOf(defender: Pokemon, lineText: string, lethal: boolean): { defenderShown?: DamageObservation['defenderShown'] } {
   if (!lethal || !(defender.hp > 0 && defender.maxhp > 0)) return {};
   const after = hpTextOf(lineText);
   return { defenderShown: { before: { hp: defender.hp, maxhp: defender.maxhp }, ...(after ? { after } : {}) } };
 }
 
-/** Read the defender BEFORE battle.add applies the line — its current
- *  client HP is the pre-hit value. Null when the line is no reading. */
+// Read before battle.add applies the line: the client HP is the pre-hit value.
 function recordDamageObservation(state: ParserState, parts: string[], defenderIdent: string): DamageObservation | null {
   const { lastMove, battle } = state;
   if (!lastMove) return null;
@@ -301,12 +272,7 @@ function recordDamageObservation(state: ParserState, parts: string[], defenderId
   return observation;
 }
 
-/**
- * A damage line of the pending move. Singles: the move's one target. Doubles: any
- * mon but the attacker (a spread move also hits the partner, Dragon Darts the
- * second foe); a target hit twice loses its observation, a crit on a target
- * does too, and the others keep theirs.
- */
+/** Singles: the move's one target. Doubles: any mon but the attacker; a target hit twice or crit loses its reading. */
 export function handleDamage(state: ParserState, line: string) {
   const { lastMove } = state;
   if (!lastMove) return;
@@ -319,8 +285,7 @@ export function handleDamage(state: ParserState, line: string) {
   hit.count += 1;
   recordHiddenPowerHit(state, defenderIdent, hit.count);
   if (hit.count > 1) {
-    // Multi-hit: per-hit rolls are not individually solvable — drop
-    // the first hit's observation too.
+    // Multi-hit: per-hit rolls are not individually solvable, so the first hit's observation goes too.
     if (hit.observation) state.observations.splice(state.observations.indexOf(hit.observation), 1);
     hit.observation = null;
   } else if (!lastMove.crits.has(defenderIdent)) {
@@ -328,13 +293,7 @@ export function handleDamage(state: ParserState, line: string) {
   }
 }
 
-/**
- * Feed line to battle client. Synthetic logs (file drop-ins written by
- * external tools, e.g. video reconstructions) can carry impossible
- * orderings — an event targeting a mon that already fainted, idents that
- * never switched in. One bad line must not kill the whole replay: skip
- * it and keep parsing. Then capture the turn snapshot on |turn| lines.
- */
+/** Feeds the line to the client; a synthetic log's impossible order skips the line, not the replay. */
 export function feedLine(state: ParserState, line: string) {
   const { battle } = state;
   try {
@@ -344,11 +303,9 @@ export function feedLine(state: ParserState, line: string) {
       error instanceof Error ? error.message : error);
   }
 
-  // Capture turn 0 snapshot on the first |start| or |turn|
   if (!state.capturedInitial && (line.startsWith('|start') || line.startsWith('|turn|'))) {
     if (line.startsWith('|start')) {
       state.capturedInitial = true;
-      // Don't snapshot yet, wait for initial switches
       return;
     }
   }
@@ -356,12 +313,10 @@ export function feedLine(state: ParserState, line: string) {
   if (line.startsWith('|turn|')) {
     const turnNum = parseInt(line.split('|')[2], 10);
 
-    // If this is turn 1 and we haven't captured initial, do it now
     if (!state.capturedInitial) {
       state.capturedInitial = true;
     }
 
-    // Snapshot the state at the START of this turn (after all previous actions resolved)
     state.snapshots.push({
       turn: turnNum,
       p1: snapshotSide(battle.p1),
@@ -375,12 +330,7 @@ export function feedLine(state: ParserState, line: string) {
   }
 }
 
-/**
- * Capture final state after last turn (end of battle): the POST-GAME
- * end entry, stamped lastTurn + 1. Consumers deriving turn counts from
- * the snapshot list must not read it as a turn — see
- * replay-turns.finalPlayedTurn.
- */
+/** The end entry, stamped lastTurn + 1: turn counters must not read it as a turn (`finalPlayedTurn`). */
 export function appendFinalSnapshot(state: ParserState) {
   const { battle, snapshots, currentTurnLines } = state;
   if (currentTurnLines.length > 0) {

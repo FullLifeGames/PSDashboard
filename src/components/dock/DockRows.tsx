@@ -3,11 +3,6 @@ import type { TrayOpen } from '../../hooks/useTrayState';
 import type { DockModel, DockSlotModel, Side } from './dock-model';
 import { SlotChip } from './SlotChip';
 
-/**
- * Round 84 (turn dock): the chips in rows. Singles put both sides' chip in one row, doubles and VGC put one side's slots in the upper
- * row and the other's in the lower one, so a slot keeps its column. Round 88 (T316): the side the replay frame shows near comes
- * first (the left chip, the upper row), as it stands at the frame's foot; it is P1 until the frame is switched or opened with ?p2.
- */
 export function DockRows({ model, open, onToggle, nearSide = 'p1' }: {
   model: DockModel;
   open: TrayOpen | null;

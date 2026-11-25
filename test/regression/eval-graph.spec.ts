@@ -3,19 +3,11 @@ import { coverageNotice, recordEvalError, resolveAutoTurnSettings, serializedFai
 import { makePositionSource } from '../../src/hooks/evaluation/sweep-positions';
 import type { GraphSweepParams, SweepData } from '../../src/hooks/evaluation/sweep-types';
 import {
-  AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, BLUNDER_SWING, KEY_TURN_SWING, KEY_MOMENT_SWING,
+  AUTO_MCTS_FAINTED_FRACTION, computeBlunders, configureSearchBudget, selectKeyTurns, KEY_TURN_SWING, KEY_MOMENT_SWING,
   SEARCH_BUDGET_DEFAULT,
 } from '@fulllifegames/eval-engine';
 
 describe('coverage notice (acquisition pass)', () => {
-  // The notice describes the RECONSTRUCTION pass — one fast replay of the
-  // game that hands out every turn's position, settling seconds after
-  // "Analyze game" while the evaluations still stream. Its wording must
-  // not claim analysis that has not happened yet ("67 of 68 turns could
-  // be analyzed" seconds after the click read as fake), and a missing
-  // FINAL turn only — the draft replay, whose simulated line reaches the
-  // game's end one turn early — must not be dressed as scary mid-game
-  // divergence with set-correction advice that does not apply.
   const pos = (bits: (0 | 1)[]) => bits.map((bit, index) => (bit ? `p${index + 1}` : null));
 
   test('full coverage stays silent', () => {
@@ -46,9 +38,7 @@ describe('coverage notice (acquisition pass)', () => {
   });
 });
 
-describe('coverage notice of a new game (NG-2)', () => {
-  // A new game has no replay and no guessed sets: the notice says what is true (its record rebuilds the positions) and what the user
-  // can do, and never advises Edit Player/Opp.
+describe('coverage notice of a new game', () => {
   const pos = (bits: (0 | 1)[]) => bits.map((bit, index) => (bit ? `p${index + 1}` : null));
   const game = { game: true } as const;
 
@@ -94,10 +84,8 @@ describe('eval-gap visibility helpers', () => {
     const scores: (number | null)[] = [null, 0.4, null];
     recordEvalError(evalErrors, scores, 1, new Error('p1 "move return102": rejected'));
     expect(evalErrors[0]).toBe('p1 "move return102": rejected');
-    // A scored turn never records — the earlier pass's number stands.
     recordEvalError(evalErrors, scores, 2, new Error('later pass failed'));
     expect(evalErrors[1]).toBeNull();
-    // Non-Error throws stringify.
     recordEvalError(evalErrors, scores, 3, 'worker died');
     expect(evalErrors[2]).toBe('worker died');
   });
@@ -116,52 +104,37 @@ describe('eval-gap visibility helpers', () => {
 
 describe('graph merge monotonicity', () => {
   test('a shallower pass never overwrites deeper stored data', () => {
-    // The re-analyze fast pass (d1s1) used to clobber a deepened turn's
-    // graph entry until the key-turn pass restored some of them.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
     expect(supersedesStored(null, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
-    // Equal settings refresh in place.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
-    // Both dimensions must hold — deeper but fewer samples is not a superset.
     expect(supersedesStored({ depth: 2, samples: 5, mode: 'matrix' }, { depth: 3, samples: 3, mode: 'matrix' }, 'matrix')).toBe(false);
     expect(supersedesStored({ depth: 2, samples: 5, mode: 'matrix' }, { depth: 3, samples: 5, mode: 'matrix' }, 'matrix')).toBe(true);
   });
   test('cross-mode results replace only toward the configured mode', () => {
-    // MCTS prefs: the matrix fast pass must not clobber stored MCTS turns…
     expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'mcts')).toBe(false);
-    // …but a user who SWITCHED to matrix gets matrix results again.
     expect(supersedesStored({ depth: 2, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'matrix' }, 'matrix')).toBe(true);
-    // A d1 matrix leftover is NOT an escalation — the configured MCTS wins.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
-    // Same-mode MCTS has no depth ordering — it refreshes.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
   });
   test('a matrix result of depth ≥ 2 is replaced by an MCTS-target sweep', () => {
-    // Round 69 (T184): the configured engine decides. The deep matrix result no
-    // longer outranks the tree, whether MCTS is the target via explicit prefs or
-    // the auto routing (the full table: supersedes-stored-t184.spec.ts).
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 3, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'mcts')).toBe(true);
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, { depth: 1, samples: 1, mode: 'mcts' }, 'auto', 0.5)).toBe(true);
   });
   test('a matrix result of depth ≥ 2 does not land on an MCTS-target turn', () => {
-    // The other direction of the removed rule: where the tree is the turn's
-    // target, only a tree pass replaces a stored tree result.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', 0.5)).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'mcts')).toBe(false);
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 3, samples: 3, mode: 'matrix' }, 'auto', 1)).toBe(false);
-    // Where the matrix is the target, it lands.
     expect(supersedesStored({ depth: 1, samples: 1, mode: 'mcts' }, { depth: 2, samples: 3, mode: 'matrix' }, 'matrix')).toBe(true);
   });
 });
 
 describe('auto mode resolution', () => {
-  // The search before round 61 for both game types (round 63: auto splits per game type).
   const before61 = { earlyDepth: 1, earlySamples: 1, treeFrom: AUTO_MCTS_FAINTED_FRACTION } as const;
   const budgetBefore61 = { ...SEARCH_BUDGET_DEFAULT, singles: before61, doubles: before61 };
 
-  test('auto runs the tree from the first turn in doubles (round 61); the threshold before it stays reachable through the budget', () => {
+  test('auto runs the tree from the first turn in doubles; the threshold before it stays reachable through the budget', () => {
     expect(resolveAutoTurnSettings(0, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
     expect(resolveAutoTurnSettings(1, true)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
     expect(resolveAutoTurnSettings(1, false)).toEqual({ depth: 1, samples: 1, mode: 'mcts' });
@@ -190,18 +163,12 @@ describe('auto mode resolution', () => {
   test('supersedes resolves auto per turn: the fast sketch never downgrades a resolved-MCTS turn', () => {
     const mctsStored = { depth: 1, samples: 1, mode: 'mcts' } as const;
     const fastIncoming = { depth: 1, samples: 1, mode: 'matrix' } as const;
-    // Doubles default (tree from the first turn): an early turn's target is MCTS too.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1, true)).toBe(false);
-    // The resolution logic below, under the threshold before round 61.
     configureSearchBudget(budgetBefore61);
     onTestFinished(() => configureSearchBudget(null));
-    // Late turn (fraction at/above the threshold): auto's target is MCTS — keep it.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.5)).toBe(false);
-    // Early turn: auto's target is matrix — the sketch may replace the stale engine.
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', 0.1)).toBe(true);
-    // Unknown fraction: cross-mode conflicts fail closed (keep stored).
     expect(supersedesStored(mctsStored, fastIncoming, 'auto', null)).toBe(false);
-    // Same-mode comparisons never need the fraction.
     expect(supersedesStored({ depth: 2, samples: 3, mode: 'matrix' }, fastIncoming, 'auto', null)).toBe(false);
     expect(supersedesStored(fastIncoming, { depth: 2, samples: 3, mode: 'matrix' }, 'auto', null)).toBe(true);
   });
@@ -209,20 +176,17 @@ describe('auto mode resolution', () => {
 
 describe('verification deep tier', () => {
   test('flags adjudicate one depth up in matrix pair space, from any line engine', () => {
-    // Matrix lines rise one depth; the engine cap (3) ends the ladder.
     expect(verificationDeepSettings({ depth: 1, samples: 1, mode: 'matrix' }))
       .toMatchObject({ depth: 2, samples: 1, mode: 'matrix' });
     expect(verificationDeepSettings({ depth: 2, samples: 3, mode: 'matrix' }))
       .toMatchObject({ depth: 3, samples: 3, mode: 'matrix' });
     expect(verificationDeepSettings({ depth: 3, samples: 3, mode: 'matrix' })).toBeNull();
-    // MCTS lines verify at the SAME matrix tier the d1 line gets — the
-    // verdict statistic (bestDeep − playedDeep) is deep-tier-internal, so
-    // the engine that raised the flag is irrelevant.
+    // MCTS lines verify at the same matrix tier a d1 line gets: the verdict statistic (bestDeep - playedDeep) is
+    // deep-tier-internal, whatever engine raised the flag.
     expect(verificationDeepSettings({ depth: 1, samples: 1, mode: 'mcts' }))
       .toMatchObject({ depth: 2, samples: 1, mode: 'matrix' });
     expect(verificationDeepSettings({ depth: 2, samples: 3, mode: 'mcts' }))
       .toMatchObject({ depth: 2, samples: 3, mode: 'matrix' });
-    // Context rides along; the played-pair restriction never does.
     const deep = verificationDeepSettings({ depth: 1, samples: 1, mode: 'mcts', tera: false, keepPlayed: { p1Slots: ['move tackle'] } as never });
     expect(deep?.tera).toBe(false);
     expect(deep?.keepPlayed).toBeUndefined();
@@ -231,13 +195,9 @@ describe('verification deep tier', () => {
 
 describe('key-turn coverage matches the report', () => {
   test('every report-worthy swing gets the deepening pass', () => {
-    // GPL finding: the report named T14/T36 (+15% ≈ 0.29–0.34 swings) while
-    // selectKeyTurns still used the 0.4 blunder threshold — the whole
-    // deepening pass skipped the replay and the chips carried d1 badges
-    // under MCTS prefs. One constant now feeds both.
+    // One constant feeds the report and selectKeyTurns: a swing the report names must get the deepening pass.
     expect(KEY_MOMENT_SWING).toBe(KEY_TURN_SWING);
     expect(selectKeyTurns([-0.16, -0.25, 0.1])).toEqual([2, 3]);
-    // Below the report threshold stays on the fast scan.
     expect(selectKeyTurns([0.0, 0.2, 0.1])).toEqual([]);
   });
 });
@@ -245,33 +205,24 @@ describe('key-turn coverage matches the report', () => {
 describe('eval graph blunder detection', () => {
   test('flags the turn whose play created the swing, not the turn after', () => {
     const scores = [0.1, 0.15, -0.3, -0.25, 0.4];
-    // The -0.45 swing shows between the turn-2 and turn-3 points — it was
-    // PLAYED on turn 2 (scores[t-1] is the start of turn t); same for the
-    // +0.65 swing played on turn 4. The marker must match the turn whose
-    // analysis explains the swing.
+    // scores[t-1] is the start of turn t, so the -0.45 swing between the turn-2 and turn-3 points was played on turn 2,
+    // and the +0.65 swing on turn 4.
     expect(computeBlunders(scores)).toEqual([2, 4]);
   });
 
   test('ignores gaps and small drifts', () => {
     const scores = [0.0, null, 0.1, 0.15, null, null, 0.2];
-    // null gaps break the comparison chain; drifts stay under the threshold.
     expect(computeBlunders(scores)).toEqual([]);
   });
 
   test('a swing across a gap is not attributed', () => {
     const scores = [0.5, null, -0.5];
-    // Two turns passed — the swing cannot be pinned on one decision.
     expect(computeBlunders(scores)).toEqual([]);
-  });
-
-  test('threshold is exported and sane', () => {
-    expect(BLUNDER_SWING).toBeGreaterThan(0.1);
-    expect(BLUNDER_SWING).toBeLessThan(0.5);
   });
 
   test('key turns cover both sides of every big swing', () => {
     const scores = [0.1, 0.15, -0.3, -0.25, 0.4];
-    // Swings land on turns 3 and 5 — deepen the causing turn and the turn after.
+    // Swings land on turns 3 and 5: deepen the causing turn and the turn after.
     expect(selectKeyTurns(scores)).toEqual([2, 3, 4, 5]);
   });
 

@@ -6,31 +6,21 @@ import { dieLines, type TurnWindow } from '../../../src/lib/branch-dice-lines';
 import { diceMarksOf, sideMarkTexts } from '../../../src/lib/branch-dice-marks';
 import { diceBattle, setOf } from '../fixtures/dice-battle';
 
-/**
- * Round 89 (#114, F3; the user's ruling 31 on 13.11.2026): a move whose later hits roll accuracy (Dex `multiaccuracy`: Triple Axel,
- * Triple Kick, Population Bomb) shows one "Hits" row with the counts 1 to N under its "Hit" row, like the hit count of Bullet Seed. A
- * count k stands for the engine's per-hit dice as `chainResults` writes them (hits 2 to k land, hit k + 1 misses, count N is all
- * landing) and always sets the first hit. The history and the share link say "2 hits". The counts come from the Dex: no move name
- * stands in our code.
- */
 const battle = diceBattle({ p1: [setOf('Snorlax', ['splash'], { name: 'Nova' })], p2: [setOf('Vaporeon', ['splash'], { name: 'Wave' })] });
 const words = wordsOf(battle as never);
 
 const nameOf = (moveId: string, kind: DieName['kind'], extra: Partial<DieName> = {}): DieName => ({ slot: 'p1a', moveId, targetSlot: 'p2a', kind, ...extra });
 const YES_NO = [{ happens: true }, { happens: false }];
-/** The offers of one target as the engine names them (F1): the plain accuracy die, hits 2 to N, then the crit. */
 const offersOf = (moveId: string, hits: number, extra: Partial<DieName> = {}): DieOffer[] => [
   { name: nameOf(moveId, 'accuracy', extra), results: YES_NO },
   ...Array.from({ length: hits - 1 }, (_, index): DieOffer => ({ name: nameOf(moveId, 'accuracy', { ...extra, hit: index + 2 }), results: YES_NO })),
   { name: nameOf(moveId, 'crit', extra), results: YES_NO },
 ];
-/** What a click on the chip "k hits" hands over: the hit count die of the move and the target, with no hit number. */
 const count = (moveId: string, hits: number, extra: Partial<DieName> = {}): ForcedDie => ({ name: nameOf(moveId, 'hit-count', extra), result: { hits } });
 const plain = (moveId: string, happens = true, extra: Partial<DieName> = {}): ForcedDie => ({ name: nameOf(moveId, 'accuracy', extra), result: { happens } });
 const later = (moveId: string, hit: number, happens: boolean, extra: Partial<DieName> = {}): ForcedDie => ({ name: nameOf(moveId, 'accuracy', { ...extra, hit }), result: { happens } });
 const tags = (dice: readonly ForcedDie[]) => dice.map(entry => `${entry.name.kind}${entry.name.hit ?? ''}:${JSON.stringify(entry.result)}`);
 
-/** Every move of the Dex whose later hits roll accuracy, in every generation that has one: the counts are read from `multihit`. */
 const multiAccuracy = [3, 4, 5, 6, 7, 8, 9].flatMap(generation => Dex.forGen(generation).moves.all()
   .filter(move => (move as unknown as { multiaccuracy?: boolean }).multiaccuracy && typeof move.multihit === 'number')
   .map(move => ({ generation, id: move.id, hits: move.multihit as number })));
@@ -66,9 +56,6 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     }
   });
 
-  // Round 89 (F5, the wave-tester's finding 3): Tail Slap, Bullet Seed and the other moves of a random count (`multihit` as a range)
-  // offer the engine's own hit count, which the engine lists last; it belongs under the move's "Hit" row, where the folded Hits row of
-  // Triple Axel stands, so a user finds the counts in one place.
   test.each([['singles: slot p1a', 'p1a'], ['doubles: slot p1b of a four-slot dock', 'p1b']])('%s: the hit count of a random-count move stands right under the Hit row', (_label, slot) => {
     const realCount: DieOffer = { name: { slot, moveId: 'tailslap', kind: 'hit-count' }, results: [2, 3, 4, 5].map(hits => ({ hits })) };
     const offers = [...offersOf('tailslap', 1, { slot }), { name: nameOf('tailslap', 'damage-roll', { slot }), results: [{ roll: 0 }] } as unknown as DieOffer, realCount];
@@ -105,7 +92,7 @@ describe('the table folds the later hits into one Hits row (singles and doubles)
     expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'crit']);
   });
 
-  test('the hit count die of Bullet Seed stays a row of its own, now under the Hit row (F5)', () => {
+  test('the hit count die of Bullet Seed stays a row of its own, now under the Hit row', () => {
     const bullet: DieOffer = { name: { slot: 'p1a', moveId: 'bulletseed', kind: 'hit-count' }, results: [{ hits: 2 }, { hits: 3 }, { hits: 4 }, { hits: 5 }] };
     const table = diceTable([...offersOf('bulletseed', 1), bullet]);
     expect(table.rows.map(row => row.cells[0]!.name.kind)).toEqual(['accuracy', 'hit-count', 'crit']);
@@ -196,7 +183,6 @@ describe('the history and the share link read one entry per chain', () => {
 
   test('hit dice of one move and target fold into "Triple Axel: 2 hits" beside the first hit\'s mark', () => {
     const marks = diceMarksOf(report(entry(plain('tripleaxel')), entry(later('tripleaxel', 2, true)), entry(later('tripleaxel', 3, false))), words)!;
-    // round 89 (F5): a count already says the first hit lands, so the plain "Triple Axel: hits" mark does not stand beside it
     expect(sideMarkTexts(marks, 'p1')).toEqual(['Triple Axel: 2 hits']);
   });
 
@@ -236,7 +222,6 @@ describe('the history and the share link read one entry per chain', () => {
   test('a count that played in part (the target fainted on hit 3 of a forced 4) says so with the report\'s reason', () => {
     const stopped = { took: 'no-draw' as const, reason: 'Triple Axel ended after 3 hits', landed: 3 };
     const forced = report(entry(later('populationbomb', 2, true), { logIndex: 4 }), entry(later('populationbomb', 3, true), { logIndex: 5 }), entry(later('populationbomb', 4, true), stopped), entry(later('populationbomb', 5, false), stopped));
-    // round 89 (F5): the hits that landed are named; "(no effect)" is false for a chain that played three hits
     expect(diceMarksOf(forced, words)!.p1).toEqual([{ label: 'Population Bomb: 4 hits', noEffect: 'Triple Axel ended after 3 hits', played: 3 }]);
     expect(sideMarkTexts(diceMarksOf(forced, words), 'p1')).toEqual(['Population Bomb: 4 hits (3 landed)']);
     const lines = dieLines(forced, WINDOW, words);
@@ -255,8 +240,6 @@ describe('the history and the share link read one entry per chain', () => {
     expect(dieLines(unplayed, WINDOW, words).map(line => line.text)).toEqual(['Forced 2 hits had no effect: p1a did not use Triple Axel this turn']);
   });
 
-  // Round 89 (F5, the wave-tester's finding 5): a count the game cut short stands with its hit count ("The Pokémon was hit 1 time!"),
-  // not behind the end-of-turn lines (the weather's upkeep line) that the turn's end puts after the last action.
   test('the line of a count the target\'s faint cut short stands right after the hit count, before the weather line', () => {
     const log = ['|old', '|move|p1a: Nova|Triple Axel|p2a: Wave', '|-damage|p2a: Wave|0 fnt', '|-hitcount|p2: Wave|1', '|faint|p2a: Wave', '|-weather|Snowscape|[upkeep]', '|upkeep', '|turn|2'];
     const window: TurnWindow = { battleLog: log, battleStart: 1, shownLog: log, shownStart: 1, complete: true };
@@ -264,7 +247,6 @@ describe('the history and the share link read one entry per chain', () => {
     const lines = dieLines(report(entry(later('tripleaxel', 2, true), ended), entry(later('tripleaxel', 3, false), ended)), window, words);
     expect(lines.map(line => line.text)).toEqual(['Forced 2 hits, 1 landed: Triple Axel ended after 1 hit, so hit 2 was never rolled']);
     expect(lines[0].at).toBe(4);
-    // a count with no hit count in the log (the move never ran) keeps the end of the turn
     const quiet = ['|old', '|-weather|Snowscape|[upkeep]', '|upkeep'];
     const none = { took: 'no-draw' as const, reason: 'p1a did not use Triple Axel this turn' };
     expect(dieLines(report(entry(later('tripleaxel', 2, true), none)), { battleLog: quiet, battleStart: 1, shownLog: quiet, shownStart: 1, complete: true }, words)[0].at).toBe(2);

@@ -52,7 +52,6 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
           >
             {hasGraph ? 'Re-analyze' : 'Analyze game'}
           </button>
-          {/* Round 77 (C1): a single evaluation took the sweep over; the status names where it stopped. */}
           {graph.stopped && (
             <span role="status" style={{ color: '#e6b36a' }}>
               Analysis stopped at turn {graph.stopped.done} of {graph.stopped.total}.
@@ -64,11 +63,6 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
   );
 }
 
-/**
- * Round 89 (FB-1): what Analyze game does, with the configured mode. It was a line of text under the heading; it is the
- * heading's title now. Round 61: auto reads the search budget. Round 63 (T110): per game type; by default doubles run the
- * tree on every turn, singles the matrix until a quarter of all bodies fell. Round 67 (T109): no deeper stage per turn.
- */
 function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   const autoTreeEverywhere = autoTurnSettings(0, !!doubles).mode === 'mcts';
   const mode = prefs.mode === 'mcts' ? 'MCTS'
@@ -77,7 +71,6 @@ function graphTitle(prefs: EvalPreferences, doubles?: boolean): string {
   return `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
 }
 
-/** The replacement note of the card's turn: the points of the knockout block before it, when the sweep priced any. */
 function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnalysis; graph: EvalGraphState; playerNames: [string, string] }) {
   const records = graph.replacements?.[analysis.turn - 1];
   if (!records?.length) return null;
@@ -87,12 +80,10 @@ function ReplacementNote({ analysis, graph, playerNames }: { analysis: TurnAnaly
 interface TurnViewProps {
   report?: GameReport | null;
   onBackToReport: () => void;
-  /** Round 89 (#104, G4d): with a variation open the report is out of reach; this goes back to the main line, where it stands (the Line selector's "Main line"). Absent: nothing to return to. */
   onBackToMain?: () => void;
   result: EvalResult | null;
   currentTurn: number;
   graph: EvalGraphState;
-  /** A gap turn's analysis control (null when not applicable). */
   analyzeTurn: ReactNode;
   hasAnalyzeTurn: boolean;
   leadAnalysis?: LeadAnalysis | null;
@@ -100,19 +91,13 @@ interface TurnViewProps {
   playerNames: [string, string];
   reads?: { p1?: ReadRecommendation | null; p2?: ReadRecommendation | null } | null;
   onPickChoice?: (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
-  /** Round 89 (B7a): a cell of the card's matrix dialog plays its pair out (the panel's handler, the overview's). */
   onPickPair?: (p1: { choice: string; label: string }, p2: { choice: string; label: string }) => void;
-  /** Round 89 (#104): what the Lines section under the turn's rows needs of its host (absent: no section). */
   linesHost?: LinesHost;
-  /** Doubles replay: auto routes per game type, and the Lines section writes one row per player (EvalPanel passes its own prop through). */
   doubles?: boolean;
-  /** Round 89 (#105): the open tip of a new game (nobody has played it yet), else null or absent. */
   openTurn?: number | null;
-  /** Round 89 (#153, HM-2): the Setup setting "Opponent reads my move" is on: the card's engine-move buttons say so in their titles. */
   opponentReads?: boolean;
 }
 
-/** The way back from a variation names the Game review only while that section exists (ruling 49). */
 const backToMainTitle = (): string =>
   `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
 
@@ -141,20 +126,15 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
           Back to the main line
         </button>
       )}
-      {/* The sweep's recorded reason this turn is a hole — without
-          it a blank turn view reads as app breakage. */}
       {!result && currentTurn >= 1 && graph.evalErrors[currentTurn - 1] && (
         <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 4, maxWidth: 520 }}>
           ⚠ This turn could not be evaluated: {graph.evalErrors[currentTurn - 1]}
         </div>
       )}
-      {/* A gap turn has no result block below — its analysis
-          control is the one way to search it on its own. */}
       {!result && hasAnalyzeTurn && (
         <div style={{ marginTop: 4 }}>{analyzeTurn}</div>
       )}
       {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
-      {/* Round 79 (T290): the replacement after a knockout sits above the card of the turn that follows it. */}
       {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
       {!leadAnalysis && analysis && (
         <EvalTurnAnalysis
@@ -180,20 +160,13 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: VariationSeries | null;
   graphMaxTurn?: number;
   showReportView: boolean;
-  /** Round 89 (#104): the report's analysis of every turn: the Game review lists the graded ones, the graph marks them. */
   reviewAnalyses?: (TurnAnalysis | null)[] | null;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
 }
 
-/** The card's share per turn where the caller has it, else the sweep's own record (auto only). */
 const graphShares = ({ faintedShares, graph }: GameGraphSectionProps) => faintedShares ?? graph.faintedFractions;
 
-/**
- * Round 89 (FT-1): what the marks on the graph mean. A circle marks a graded turn (an inaccuracy, a mistake or a blunder, GLOSSARY.md)
- * of player 1, a square one of player 2, in the player's colour; the Game review lists the same turns. Only the sides that carry a mark
- * are named.
- */
 function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof reviewMarks>; playerNames: [string, string] }) {
   const sides = (['p1', 'p2'] as const).filter(side => marks.some(mark => mark.side === side));
   if (sides.length === 0) return null;
@@ -210,7 +183,6 @@ function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof rev
   );
 }
 
-/** The game graph with the Game review's marks on it (round 89). */
 function GraphView(props: GameGraphSectionProps) {
   const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
   const marks = useMemo(() => (gameReviewEnabled() ? reviewMarks(reviewAnalyses) : []), [reviewAnalyses]);
@@ -236,7 +208,6 @@ function GraphView(props: GameGraphSectionProps) {
   );
 }
 
-/** The report overview: the cards, then the Game review of the graded turns (round 89, #104). */
 function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: GameReport }) {
   const { graph, playerNames, selectTurn, reportLeads, reviewAnalyses, linesHost, doubles } = props;
   return (
@@ -258,7 +229,6 @@ function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: 
   );
 }
 
-/** The game graph with its controls, the report overview, or the selected turn's view. */
 export function GameGraphSection(props: GameGraphSectionProps) {
   const {
     onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph,
@@ -267,8 +237,6 @@ export function GameGraphSection(props: GameGraphSectionProps) {
   return (
     <div style={{ margin: '6px 0' }}>
       <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} title={graphTitle(prefs, doubles)} />
-      {/* A short or missing line says why — an unexplained blank graph
-          reads as a broken app rather than a diverged reconstruction. */}
       {graph.notice && (
         <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 2, maxWidth: 520 }}>
           ⚠ {graph.notice}

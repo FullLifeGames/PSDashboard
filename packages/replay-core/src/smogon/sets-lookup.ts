@@ -1,25 +1,20 @@
-/**
- * The published-set assumption model and its pure lookup: no network, no
- * cache. smogon-sets.ts fetches the sets and re-exports these names.
- */
 import { toId } from '../ids.ts';
 
+/** One published slot (ability, item or move): its value, where it came from and every option listed. */
 export interface SetAssumption {
   value: string;
   sourceDetail: string;
-  /**
-   * Every option of a published slot, `value` first; absent on a fixed slot:
-   * a move slot ("Heat Wave / Hidden Power Ice", round 63, T89) or the item
-   * ("Leftovers / Metal Coat", round 64, T120).
-   */
+  /** Every option of a published slot ("Leftovers / Metal Coat"), `value` first; absent on a fixed slot. */
   options?: string[];
 }
 
+/** A set assumption with the nature and EVs of a published spread. */
 export interface SetSpreadAssumption extends SetAssumption {
   nature: string;
   evs: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
 }
 
+/** What the published sets assume for one species: ability, item, moves, spread and IVs. */
 export interface PokemonSetAssumption {
   species: string;
   sourceDetail: string;
@@ -27,30 +22,24 @@ export interface PokemonSetAssumption {
   item?: SetAssumption;
   moves: SetAssumption[];
   spread?: SetSpreadAssumption;
-  /**
-   * The IVs the set lists (Trick Room Speed 0, Attack 0 on a special
-   * attacker); absent when it lists none, and the build then plays 31
-   * (round 64, T122). A list of IV options gives its first.
-   */
+  /** The IVs the set lists (Trick Room Speed 0); absent when it lists none (the build then plays 31). */
   ivs?: Partial<Record<'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe', number>>;
-  /**
-   * The species' OTHER published sets (this entry is the first). Coherent-set
-   * selection scores all of them against revealed evidence — curated sets are
-   * internally coherent by construction, unlike marginal assembly.
-   */
+  /** The species' other published sets; this entry is the first. */
   alternatives?: PokemonSetAssumption[];
 }
 
+/** The published-set assumptions of one format, by species id. */
 export interface SmogonSetAssumptions {
   format: string;
   source: string;
   pokemon: Record<string, PokemonSetAssumption>;
-  /** Per-species fetch failures ("Toxapex: Failed to fetch"); absent when every species resolved or was merely absent. */
+  /** Fetch failures, one "<species or random sets>: <message>" per entry; absent when none failed. */
   errors?: string[];
   /** Every set file that contributed, the format's own first, then the generation Ubers fallback. */
   formats?: string[];
 }
 
+/** The species' assumption by id, else by the entry's own species name; undefined when the sets hold none. */
 export function getSpeciesSetAssumption(
   assumptions: SmogonSetAssumptions | null | undefined,
   species: string,

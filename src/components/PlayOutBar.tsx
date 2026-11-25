@@ -2,17 +2,14 @@ import type { SearchBudget } from '@fulllifegames/eval-engine';
 import { readSearchBudget, treeThresholdText } from '../lib/eval/search-budget-setting';
 
 interface PlayOutBarProps {
-  /** `stopping` is set after Stop with a turn in flight (round 88, T347): the run ends when that turn landed. */
+  /** `stopping` is set after Stop with a turn in flight: the run ends when that turn landed. */
   playOut: { active: boolean; stopping?: unknown } | null;
   playOutNotice: { text: string; watchTurn: number } | null;
   hasVariation: boolean;
-  /** The viewed position is an ended game: nothing is left to play out (round 77, A-6). */
   ended?: boolean;
   viewTurn: number;
-  /** The turn 0 view is open: the run starts from the leads the picker shows (round 77, C2). */
   atTurnZero?: boolean;
   startDisabled: boolean;
-  /** The session option: depth-1 matrix on every turn of the run. */
   fastPlayOut: boolean;
   onStartPlayOut: () => void;
   onStopPlayOut: () => void;
@@ -20,7 +17,6 @@ interface PlayOutBarProps {
   onFastPlayOutChange: (fast: boolean) => void;
 }
 
-/** Round 67 (T111): where the fast run saves time, per game type, read from the search budget. */
 function fastTitle(budget: SearchBudget): string {
   const where = (split: SearchBudget['singles']) => {
     const threshold = treeThresholdText(split);
@@ -31,13 +27,10 @@ function fastTitle(budget: SearchBudget): string {
     'and reads weaker there: the tree looks several turns ahead, the matrix one turn.';
 }
 
-/** The running state: spinner, the fast marker, and Stop. */
 function RunningRow({ fastPlayOut, stopping, onStopPlayOut }: Pick<PlayOutBarProps, 'fastPlayOut' | 'onStopPlayOut'> & { stopping: boolean }) {
   return (
     <>
       <span className="ps-spinner" aria-hidden="true" />
-      {/* The detailed progress line lives in the Evaluation
-          panel (beside the growing graph) — one place, not two. */}
       <span style={{ fontSize: 11, color: '#f0c76b' }}>
         {stopping
           ? 'Stopping: the engine finishes the turn in flight, then stops.'
@@ -50,7 +43,6 @@ function RunningRow({ fastPlayOut, stopping, onStopPlayOut }: Pick<PlayOutBarPro
   );
 }
 
-/** The launcher with its hint and the fast option. */
 function StartRow({ viewTurn, atTurnZero, startDisabled, fastPlayOut, onStartPlayOut, onFastPlayOutChange }: Pick<PlayOutBarProps,
   'viewTurn' | 'atTurnZero' | 'startDisabled' | 'fastPlayOut' | 'onStartPlayOut' | 'onFastPlayOutChange'>) {
   return (
@@ -83,7 +75,6 @@ function StartRow({ viewTurn, atTurnZero, startDisabled, fastPlayOut, onStartPla
   );
 }
 
-/** "Let it play out" launcher, the fast option, the running notice, and the finished-line watch entry. */
 export function PlayOutBar({
   playOut, playOutNotice, hasVariation, ended = false, viewTurn, atTurnZero = false, startDisabled, fastPlayOut,
   onStartPlayOut, onStopPlayOut, onWatchFrom, onFastPlayOutChange,

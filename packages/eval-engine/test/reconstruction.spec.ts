@@ -14,7 +14,6 @@ function loadFixtureReplay() {
   };
 }
 
-// Saved from a real battle; gitignored (Gen9Draft-*), so tests using it skip when absent.
 const SAVED_REPLAY_HTML = fileURLToPath(new URL('../../../Gen9Draft-2026-01-06-2shy2shine-calleddxnnis.html', import.meta.url));
 
 function loadHtmlReplayLog(path: string): string {
@@ -152,14 +151,11 @@ describe('Replay reconstruction regression suite', () => {
       },
     });
 
-    // One pass produced every boundary before the target…
     expect([...captured.keys()]).toEqual([1, 2]);
     for (const [turn, state] of captured) {
       expect(JSON.parse(state).turn).toBe(turn);
       expect(JSON.parse(state).ended).toBe(false);
     }
-    // …and the runtime itself is the final position, same as a per-turn run
-    // (whose state fidelity the checkpoint test above already covers).
     expect(runtime.battleStream.battle?.turn).toBe(targetTurn);
   });
 
@@ -173,25 +169,6 @@ describe('Replay reconstruction regression suite', () => {
         targetTurn,
       });
     }
-  });
-
-  test.skip('documents a known divergence after the first fixture turn', async () => {
-    const fixture = loadFixtureReplay();
-    await expectReplayCheckpointToReconstruct({
-      format: fixture.formatid || 'gen9ou',
-      log: fixture.log,
-      targetTurn: 2,
-    });
-  });
-
-  test.skip('documents a known deeper-turn divergence in the saved replay', async ({ skip }) => {
-    skip(!existsSync(SAVED_REPLAY_HTML), 'local saved replay HTML is gitignored and not present');
-    const log = loadHtmlReplayLog(SAVED_REPLAY_HTML);
-    await expectReplayCheckpointToReconstruct({
-      format: 'gen9draft',
-      log,
-      targetTurn: 10,
-    });
   });
 
   test('keeps battle-only forme switches merged into the revealed base species', () => {
@@ -492,9 +469,6 @@ describe('Replay reconstruction regression suite', () => {
       ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
       level: 50,
     });
-    // Uxie's move 1 is U-turn: falling back to `move 1` for the blocked turn
-    // plays a pivot move the real game never saw and pulls the next Pokémon
-    // in a turn early — the first domino of the GPL replay-loop desync.
     const log = [
       '|gametype|singles',
       '|player|p1|Alice||',
@@ -530,10 +504,6 @@ describe('Replay reconstruction regression suite', () => {
 });
 
 describe('Turn-synchronized replay of a video-reconstructed log', () => {
-  // Synthetic GPL log (gpl-pipeline video reconstruction): no |upkeep| markers,
-  // Sleep Talk/Rest loops, and a taunt-blocked turn 1. Before the turn-sync
-  // guard the block replayer ran ~5 turns ahead of the simulator here, so
-  // pending state like Future Sight silently vanished from every branch.
   function loadGplReplay() {
     return JSON.parse(readFileSync(new URL('./fixtures/gpl-replay.json', import.meta.url), 'utf-8')) as ReplayData;
   }
@@ -542,13 +512,8 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
     const replay = loadGplReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
 
-    // Iron Valiant's Life Orb recoil and Uxie's Rocky Helmet chip (no [of]
-    // attribution in this log) both surface as revealed items.
     expect(p2Team.find(set => set.species === 'Iron Valiant')?.item).toBe('Life Orb');
     expect(p1Team.find(set => set.species === 'Uxie')?.item).toBe('Rocky Helmet');
-    // Rotom-Wash TRICKED its scarf away and received Black Sludge — the
-    // sludge's later self-damage reveals must not overwrite the set item
-    // (the old pin institutionalized exactly that pollution).
     expect(p2Team.find(set => set.species === 'Rotom-Wash')?.item).toBe('Choice Scarf');
   });
 
@@ -564,7 +529,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
       targetTurn: 2,
     });
 
-    // Turn 1: Uxie was taunted and never moved — it must still be in.
     expect(runtime.battleStream.battle?.turn).toBe(2);
     expect(runtime.battleStream.battle?.sides[0].active[0]?.species.name).toBe('Uxie');
   });
@@ -574,8 +538,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const snapshots = parseReplayLog(replay.log);
 
-    // Mirrors the eval sweep's call: per-turn snapshot corrections keep the
-    // sim's damage rolls from drifting away from the recorded HP.
     const runtime = await reconstructBranchRuntime({
       format: inferReplayFormatId(replay),
       p1Team,
@@ -591,8 +553,6 @@ describe('Turn-synchronized replay of a video-reconstructed log', () => {
 
     const battle = runtime.battleStream.battle!;
     expect(battle.turn).toBe(25);
-    // Turn 24 cast Future Sight at p2's slot; it lands on turn 26, so the
-    // pending slot condition must survive to the turn-25 branch point.
     expect(Object.keys(battle.sides[1].slotConditions[0] ?? {})).toContain('futuremove');
     expect(battle.sides[0].active[0]?.species.name).toBe('Uxie');
     expect(battle.sides[1].active[0]?.species.name).toBe('Rhydon');
@@ -604,7 +564,6 @@ describe('hax alignment records', () => {
     const replay = loadFixtureReplay();
     const { p1Team, p2Team } = buildTeamsFromReplay(replay.log);
     const snapshots = parseReplayLog(replay.log);
-    // The fixture carries |turn|1..4, so a target of 5 replays every block.
     const targetTurn = 5;
     const snapshot = snapshots.find(entry => entry.turn === targetTurn) ?? null;
 
@@ -615,16 +574,13 @@ describe('hax alignment records', () => {
     const first = await reconstruct();
     const second = await reconstruct();
 
-    // One record per block replayed (turns 1..targetTurn-1), ascending.
     expect(first.haxAlignment.map(record => record.turn))
       .toEqual(Array.from({ length: targetTurn - 1 }, (_, index) => index + 1));
     for (const record of first.haxAlignment) {
-      // Round 86 (T306): a turn plays under seed index 0 with the log's dice forced, no search (before: candidatesTried >= 1 and a searched seed)
       expect({ via: record.via, candidatesTried: record.candidatesTried, seed: record.seed }).toEqual({ via: 'forced', candidatesTried: 0, seed: '1,2,3,4' });
       expect(typeof record.actual.softMismatches).toBe('number');
       expect(record.actual.endedMismatch).toBe(false);
     }
-    // Determinism: the same replay plays the same seed schedule (draft T48).
     expect(second.haxAlignment.map(record => record.seed))
       .toEqual(first.haxAlignment.map(record => record.seed));
   });

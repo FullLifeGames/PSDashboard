@@ -15,25 +15,15 @@ import {
   type AnswerSide, type AnswersMode,
 } from './search/answers.ts';
 
-/**
- * Round 61: the tree search's orchestration, one place for the app and the
- * bank. Root parallelization over a FIXED number of trees (seed offsets
- * 0..N-1 from the search budget, never the pool size), merged by summed root statistics; cells the
- * merged equilibrium leans on with too few visits are re-priced with the
- * multi-seed sampler and deepened one ply (draft t56, round 33); the
- * forced-win prover runs on the result (round 35). The app passes its
- * worker pool, the bank an in-process executor.
- */
+/** A search executor that also runs one DUCT tree per seed offset. */
 export interface TreeExecutor extends SearchExecutor {
-  /**
-   * One DUCT tree with this seed offset. Round 89 (SB-9): `onPartial` asks the tree for its interim result (every 150 iterations); only
-   * tree 0 is asked, and only while a caller listens, so a search without a listener (the bank, the game analysis) computes none.
-   */
+  /** One DUCT tree for this seed offset; `onPartial` is asked of tree 0 only, and only while a caller listens. */
   tree(
     settings: EvalSettings, seedOffset: number, onProgress?: (progress: SearchProgress) => void, onPartial?: (result: EvalResult) => void,
   ): Promise<MctsTreeStats>;
 }
 
+/** A tree executor that runs every job in this realm on the serialized battle. */
 export function createLocalTreeExecutor(serializedBattle: string, ruleset: StaticRuleset = 'standard'): TreeExecutor {
   return {
     ...createLocalExecutor(serializedBattle, ruleset),
@@ -44,11 +34,7 @@ export function createLocalTreeExecutor(serializedBattle: string, ruleset: Stati
 
 const stopped = (callbacks?: OrchestratorCallbacks) => callbacks?.shouldStop?.() === true;
 
-/**
- * Round 89 (SB-9): tree 0's own interim result, handed on until a tree has finished (the merged partial below takes over then) and
- * only for a caller that listens. Reading it changes no node of the tree (`toResult` only reads), so the search is the same with and
- * without it. The other trees are asked for none.
- */
+// Reading tree 0's interim result changes no node (`toResult` only reads): the search is the same with and without it.
 function interim(offset: number, completed: MctsTreeStats[], callbacks?: OrchestratorCallbacks): ((result: EvalResult) => void) | undefined {
   const listener = callbacks?.onPartial;
   if (offset !== 0 || !listener) return undefined;
@@ -56,6 +42,7 @@ function interim(offset: number, completed: MctsTreeStats[], callbacks?: Orchest
 }
 
 function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks): Promise<MctsTreeStats[]> {
+  // A FIXED number of trees (seed offsets 0..N-1 from the search budget, never the pool size).
   const treeCount = searchBudget().trees;
   const doneByTree = new Array<number>(treeCount).fill(0);
   let totalPerTree = 1;
@@ -80,12 +67,6 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
   }));
 }
 
-/**
- * Round 33: one more ply for every verified cell, so a verified row is
- * priced at one depth. Round 63 (T16): the cells job itself goes one ply
- * deeper per outcome (every open class, a plain cell's outcome groups), so
- * the span now holds the sampling as well.
- */
 async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings: EvalSettings): Promise<EvalCellValue[]> {
   const deepen: EvalSettings = { depth: 1, samples: 1, tera: settings.tera, sleepClause: settings.sleepClause, ruleset: settings.ruleset };
   const started = Date.now();
@@ -94,12 +75,6 @@ async function verifyCells(executor: TreeExecutor, jobs: EvalCellJob[], settings
   return values;
 }
 
-/**
- * Round 63 (T78): a doubles tree ships no boundary list, so the pair plan
- * prices the support and played cells the visit stats leave out, in one
- * cells round without deepening; a cell it prices with classes is a
- * boundary cell. Singles has nothing to check.
- */
 async function pairPlanBoundary(
   executor: TreeExecutor, trees: MctsTreeStats[], merged: EvalResult, played: VerifyFocus['played'],
 ): Promise<Set<number>> {
@@ -109,17 +84,9 @@ async function pairPlanBoundary(
   return new Set(values.filter(value => value.blend).map(value => cellKey(value.i, value.j)));
 }
 
-/** The verify round's merge, the cells it priced and the focus it used (the answer round's re-check reads both). */
 export interface Verified { result: EvalResult; values: Map<number, EvalCellValue>; focus: VerifyFocus }
 
-/**
- * Starved-support verification: cells the merged equilibrium leans on with
- * too few pooled visits carry ONE chance outcome per tree; re-price them with
- * the matrix-grade multi-seed sampler before the verdict stands. Round 63
- * (T78): the played row and column count as support, and the pair plan
- * names the doubles boundary cells. The score is the visit mean either way;
- * only rankings sharpen.
- */
+// Re-prices thin cells with the multi-seed sampler; the score stays the visit mean, only rankings sharpen.
 async function verifiedMerge(
   executor: TreeExecutor, trees: MctsTreeStats[], settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<Verified> {
@@ -137,15 +104,12 @@ async function verifiedMerge(
     if (stopped(callbacks)) return unverified;
     return { result: perfSync('main:mcts-merge', () => mergeMctsTrees(trees, values)), values, focus };
   } catch {
-    // Verification is a refinement: a failed round degrades to the unverified merge.
     return unverified;
   }
 }
 
-/** What the answer round found for one side: the answers to add and the cells the depth check already priced one ply deeper. */
 interface SideAnswers { added: number[]; known: EvalCellValue[] }
 
-/** One side's answers to add: every unlisted one ('full'), or the candidates the deeper search confirms ('protect'). */
 async function sideAnswers(
   executor: TreeExecutor, view: AnswerSide, merged: EvalResult, mode: AnswersMode, deepen: EvalSettings,
 ): Promise<SideAnswers> {
@@ -168,10 +132,8 @@ async function sideAnswers(
   return { added, known: confirmedCells(view, refuting, deep, added) };
 }
 
-/** What the answer round priced for one side: the added answers and the extension's values (the graded ranking reads both). */
 interface SideGrade { view: AnswerSide; added: number[]; values: EvalCellValue[] }
 
-/** Every listed row against the side's added answers: one plain draw, the deep rows one ply deeper, the confirmed cells as they are. */
 async function sideExtension(
   executor: TreeExecutor, view: AnswerSide, found: SideAnswers, merged: EvalResult, deepen: EvalSettings,
 ): Promise<EvalCellValue[]> {
@@ -183,7 +145,6 @@ async function sideExtension(
   return [...found.known, ...await executor.evalCells(jobs)];
 }
 
-/** Each side's ranking over the listed and the added answers; a side without an added answer keeps the matrix's. */
 function gradedSides(grades: SideGrade[], merged: EvalResult, tree: MctsTreeStats): EvalResult['perSide'] {
   const [p1, p2] = grades.map(grade => (grade.added.length === 0
     ? merged.perSide[grade.view.side]
@@ -191,12 +152,7 @@ function gradedSides(grades: SideGrade[], merged: EvalResult, tree: MctsTreeStat
   return { p1, p2 };
 }
 
-/**
- * Round 69 (T149): when the answers change a side's best row, the new row's cells that no verify round priced get one
- * more verify round, picked by the first round's selectors over the new ranking and kept to the new best rows; the
- * merge and the rankings (`regrade`) are then redone once with the new values. Null when no best row changed or no cell
- * is left (a new best row the trees visited enough has none).
- */
+/** Null when no best row changed or no cell is left; else a verify round for the new best row, then `regrade`. */
 export async function recheckedRound(
   executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, perSide: EvalResult['perSide'],
   regrade: (merged: EvalResult) => EvalResult['perSide'], settings: EvalSettings,
@@ -216,17 +172,7 @@ export async function recheckedRound(
   return { ...remerged, perSide: regrade(remerged) };
 }
 
-/**
- * Round 67 (T128): the doubles root's answer round (search/answers.ts).
- * After the verify round each side is graded against the other side's legal
- * answers the tree did not list, each priced by one natural draw: 'protect'
- * adds the answers that beat the listed ones against the side's near-best
- * rows and still do one ply deeper (since b4), 'full' every unlisted one.
- * Round 69 (T149): the rows that can decide the ranking price an added
- * answer one deepened ply, and a changed best row is verified once more.
- * Like verification a refinement: a failed round keeps the verified merge,
- * and the score stays the visit mean.
- */
+/** The doubles answer round: grades each side against the other's unlisted legal answers; the score stays the mean. */
 export async function answerRound(
   executor: TreeExecutor, trees: MctsTreeStats[], round: Verified, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {
@@ -255,10 +201,7 @@ export async function answerRound(
   }
 }
 
-/**
- * Round 89 (#104): the lines of the turn, after the prover has had its say about the rows. A refinement like the verify round: an
- * executor without the job, an empty list and a failed replay leave the result as it is. Nothing reads `lines` to score or rank.
- */
+// A refinement: no job, an empty list or a failed replay leave the result as is; nothing scores from `lines`.
 async function withLines(executor: TreeExecutor, trees: MctsTreeStats[], result: EvalResult, settings: EvalSettings): Promise<EvalResult> {
   if (!executor.lines) return result;
   const requests = lineRequests(trees, result, settings);
@@ -275,6 +218,7 @@ async function withLines(executor: TreeExecutor, trees: MctsTreeStats[], result:
   return result;
 }
 
+/** Runs the trees, the verify round, the answer round, the prover and the lines, and returns the merged result. */
 export async function searchTreesOrchestrated(
   executor: TreeExecutor, settings: EvalSettings, callbacks?: OrchestratorCallbacks,
 ): Promise<EvalResult> {

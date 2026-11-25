@@ -35,8 +35,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: -0.25,
     }), names);
-    // Scores are wp-units; percents run through the calibrated display map
-    // (sigmoid(DISPLAY_K·s) — 0.1 → 55%, −0.25 → 39%).
+    // Percents run through sigmoid(DISPLAY_K * s): 0.1 gives 55%, -0.25 gives 39%.
     expect(summary).toContain('55%');
     expect(summary).toContain('39%');
     expect(summary).toContain('Beta played Recover');
@@ -44,8 +43,6 @@ describe('natural-language turn summaries', () => {
     expect(summary).toContain('then Draco Meteor · U-turn');
     expect(summary).not.toContain('→');
     expect(summary).not.toContain('setup move');
-    // The fixture's punishing reply ("Reply") was never clicked — the
-    // regret reads as an unpunished risk with neutral safe-line framing.
     expect(summary).toContain('a read: its floor risked Reply (down to 36%); Draco Meteor came instead.');
     expect(summary).toContain("The engine's safe line was switching to Dragapult");
     expect(summary).not.toContain('safer was');
@@ -87,9 +84,6 @@ describe('natural-language turn summaries', () => {
   });
 
   test('an untiered gamble that landed is praised as a read that paid off', () => {
-    // Draft T50-shaped: the played switch ties the engine pick by EV (no
-    // tier), gave up a mistake-sized floor, and the outcome beat the safe
-    // guarantee — the headline is the read, not "a quiet turn".
     const tied: EvalResult = {
       score: -0.05, interval: 0.02, depthCompleted: 1,
       perSide: {
@@ -171,12 +165,9 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.17, scoreAfter: 0.31,
       sacks: { p2: { name: 'Weavile', hpFraction: 0.8, stayed: true } },
     }), names);
-    // Payoff 0.254 repays only part of the 0.32 regret: demoted, not cleared.
     const summary = feed([-0.1, -0.05, null]);
     expect(summary).toContain('Beta fed Weavile (80% HP)');
     expect(summary).toContain('graded as a sacrifice, not a misplay');
-    // Payoff 0.464 ≥ regret 0.32 + margin 0.1: the verified wording names
-    // the repaid regret and no verdict band renders (573756 t68).
     const verified = feed([-0.1, -0.31, null]);
     expect(verified).toContain('Beta fed Weavile (80% HP)');
     expect(verified).toContain('verified as a win-condition sacrifice');
@@ -206,7 +197,6 @@ describe('natural-language turn summaries', () => {
       ...result,
       perSide: {
         p1: [choice('move reply', 'Reply', 0.2)],
-        // 0.45 wp-unit regret vs the −0.05 best: past the 20%-win-prob band.
         p2: [...result.perSide.p2, choice('move splash', 'Splash', -0.5)],
       },
     };
@@ -223,7 +213,6 @@ describe('natural-language turn summaries', () => {
   });
 
   test('an inaccuracy gets a light note even on a quiet turn', () => {
-    // U-turn at +0.10 ev vs Draco Meteor's +0.20: regret 0.10 — inaccuracy.
     const light: EvalResult = {
       ...result,
       perSide: {
@@ -239,7 +228,6 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: 0.1,
     }), names);
-    // Round 89 (FT-1): the card names the inaccuracy, so it says neither "quiet" nor that no one made a mistake.
     expect(summary).not.toContain('Neither side made a mistake.');
     expect(summary).not.toContain('quiet turn');
     expect(summary).toContain("Alpha's U-turn was an inaccuracy; Draco Meteor was slightly better");
@@ -259,8 +247,6 @@ describe('natural-language turn summaries', () => {
   });
 
   test('a hidden partner slot is disclosed in the summary', () => {
-    // p2's slot b was flinched: the grade is charitable (best consistent
-    // combo), and the summary must say so instead of pretending certainty.
     const doubles: EvalResult = {
       score: 0.1, interval: 0, depthCompleted: 1,
       perSide: {
@@ -292,7 +278,6 @@ describe('natural-language turn summaries', () => {
   });
 
   test('a one-detail difference is condensed into a why clause', () => {
-    // The VGC shape: same two moves, the only difference is the Mega.
     const doubles: EvalResult = {
       score: 0.4,
       interval: 0.05,
@@ -370,7 +355,7 @@ describe('natural-language turn summaries', () => {
       scoreAfter: -0.4,
     }), names);
     expect(summary).toContain('how the turn rolled');
-    // chanceDelta −0.55 wp-units = −28 win-probability points.
+    // chanceDelta -0.55 wp-units = -28 win-probability points.
     expect(summary).toContain('−28%');
     expect(summary).not.toContain('mistake');
   });
@@ -385,7 +370,7 @@ describe('natural-language turn summaries', () => {
       scoreAfter: 0.35,
     }), names);
     expect(summary).toContain('No single mistake');
-    // decisionDelta ~+0.11 / chanceDelta +0.14 wp-units → +5% / +7% points.
+    // decisionDelta about +0.11 / chanceDelta +0.14 wp-units = +5% / +7% points.
     expect(summary).toContain('+5%');
     expect(summary).toContain('+7%');
     expect(summary).not.toContain('quiet');
@@ -441,9 +426,7 @@ describe('natural-language turn summaries', () => {
       scoreBefore: 0.1,
       scoreAfter: null,
     }), names);
-    // Scores ARE wp-units now: percent display is linear ((s+1)/2), and
-    // Alpha's 0.15 regret sits below the wp-unit mistake band — it surfaces
-    // as the inaccuracy note instead of a decision clause.
+    // Percent display is linear ((s+1)/2).
     expect(summary).toContain('55%');
     expect(summary).toContain("Alpha's U-turn was an inaccuracy");
     expect(summary).toContain('Beta played Recover');
@@ -460,7 +443,7 @@ describe('natural-language turn summaries', () => {
     }), names);
     expect(summary).toContain('Beta played Recover');
     expect(summary).toContain('luck');
-    // chanceDelta −0.35 wp-units = −18 win-probability points.
+    // chanceDelta -0.35 wp-units = -18 win-probability points.
     expect(summary).toContain('−18%');
   });
 });
@@ -500,7 +483,7 @@ describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', (
     expect(summary).not.toContain('No single mistake');
   });
 
-  test('a shift turn names the hindsight read against the actual click (round 13)', () => {
+  test('a shift turn names the hindsight read against the actual click', () => {
     const wide: EvalResult = {
       score: 0.0, interval: 0.3, depthCompleted: 1,
       perSide: {
@@ -523,9 +506,8 @@ describe('round-5 narrative: breadth, conditionals, null guard, forced mixes', (
         p2Labels: ['Surf', 'Ice Beam', 'Roost', '→ Mandibuzz'],
         p1Choices: ['move ironhead', 'move earthpower', 'move recover', 'move toxic', 'switch 2'],
         p2Choices: ['move surf', 'move icebeam', 'move roost', 'switch 3'],
-        // p2 against the Iron Head actually clicked (row 0, own-p2 = −value):
-        // played Surf −0.30, → Mandibuzz +0.05 — a 0.35 read. p1 against the
-        // Surf actually clicked (column 0): played 0.30, best 0.32 — no read.
+        // p2 against the clicked Iron Head (row 0, own-p2 = -value): played Surf -0.30, Mandibuzz +0.05, a 0.35 read.
+        // p1 against the Surf actually clicked (column 0): played 0.30, best 0.32, no read.
         values: [
           [0.30, 0.10, 0.12, -0.05],
           [0.32, 0.11, 0.10, 0.08],
@@ -714,7 +696,7 @@ describe('forced-mix dedup against the conditional', () => {
   });
 });
 
-describe('odds grounding (round 6)', () => {
+describe('odds grounding', () => {
   test('a punished mistake grounds the played move\'s kill odds', () => {
     const punished: EvalResult = {
       score: 0.1, interval: 0.05, depthCompleted: 2,
@@ -803,7 +785,7 @@ describe('odds grounding (round 6)', () => {
   });
 });
 
-describe('streak clauses (round 6)', () => {
+describe('streak clauses', () => {
   const base: TurnAnalysis = {
     turn: 30, scoreBefore: 0.1, scoreAfter: 0.1, swing: 0,
     playedOutcome: null, decisionDelta: null, chanceDelta: null,
@@ -885,9 +867,7 @@ describe('round-13 narrative: entry-is-profit', () => {
     expect(summary).not.toContain('no live answer');
   });
 
-  test('a switch into a held mon names the standing holder (round 14)', () => {
-    // 648453 t13: the bench can only sacrifice into Lopunny — the sentence
-    // names the one standing mon still holding the pair.
+  test('a switch into a held mon names the standing holder', () => {
     const result: EvalResult = {
       score: 0.0, interval: 0.1, depthCompleted: 1,
       perSide: {
@@ -913,11 +893,8 @@ describe('round-13 narrative: entry-is-profit', () => {
   });
 });
 
-describe('the decided sweep in prose (round 15)', () => {
-  // 573756 t134–138: the locked endgame speaks — the announcement names the
-  // sweeper once, and on decided turns a chance swing TOWARD the decided
-  // side reads as the game resolving, not as luck.
-  const decidedResult = (score = -0.75): EvalResult => ({ // round 50: a bar that backs the sweep
+describe('the decided sweep in prose', () => {
+  const decidedResult = (score = -0.75): EvalResult => ({
     score, interval: 0, depthCompleted: 1,
     perSide: {
       p1: [choice('move tackle', 'Tackle', -0.2)],
@@ -951,14 +928,12 @@ describe('the decided sweep in prose (round 15)', () => {
     const summary = summaryAt({ scoreAfter: -1 });
     expect(summary).toContain('the decided game resolving toward Beta');
     expect(summary).not.toContain('how the turn rolled');
-    // Chance AGAINST the decided side stays genuine luck.
     const against = summaryAt({ scoreAfter: 0.55 });
     expect(against).toContain('how the turn rolled');
     expect(against).not.toContain('resolving toward');
   });
 
   test('the near-decided roll speaks its odds and its target', () => {
-    // No bar floor on the near stage: 573756 t73 stands at 0.596.
     const result = decidedResult(-0.2);
     result.unanswered = {
       p1: [], p2: [],

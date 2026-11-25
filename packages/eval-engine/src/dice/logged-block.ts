@@ -17,31 +17,15 @@ import { genShape } from './recognize.ts';
 import { loggedOptions } from './turn.ts';
 import { dieKey, type DiceReport, type DieName, type DieReport, type ForcedDie } from './types.ts';
 
-/**
- * Round 86 (the log's dice, T306): a logged turn through the dice module. The reconstruction used to replay a block's choices under the
- * best of sixteen seeds; now it plays them under the hidden dice of one frozen seed (index 0 of `ALIGNMENT_SEEDS`) with the dice the
- * log shows forced on top (ADR 0022). Three callers share this file: the reconstruction (`branch/runtime.ts`), the arrival
- * and the adopt (`branch/arrival-dice.ts`, which records the draws of the same turn), and the branch's first turn (`dice/turn.ts`
- * joins the same list to the user's dice).
- *
- * A block plays in parts: the choices of both sides, then every answer to a forced replacement that follows. Each part runs through
- * `playForcedTurn` with the whole turn's list, the way a `PendingTurn` carries a branch's list over a pause for a switch: a die an
- * earlier part drew is no draw in a later one, and every part ends the stream on the natural turn's seed at its place (decision D8), so
- * the parts chain into the whole turn.
- */
+/** A logged turn: a block plays under one frozen seed's hidden dice with the log's dice forced on top (ADR 0022). */
 
-/** The choices of both sides, as the stream writes them (`>p1 move 1`). */
 export interface BlockCommands { p1: string; p2: string }
 
-/**
- * The dice the log shows for a block: its lines and the commands the log's players sent, read against the battle that stands at the
- * move request of that turn (it names the clicked moves, the checks and the stalling conditions the log cannot).
- */
 export function forcedTurnDice(battle: Battle, lines: readonly string[], choices: BlockCommands): ForcedDie[] {
   return loggedDice(lines, loggedOptions(battle, choices));
 }
 
-/** The commands on a copy of the battle, as the stream writes them to the live one; a refused choice ends the play. */
+/** Writes the commands to a copy as the stream writes them to the live one; a refused choice throws. */
 export function chooseOnCopy(battle: Battle, commands: readonly { side: 'p1' | 'p2'; command: string }[]): void {
   for (const { side, command } of commands) {
     if (battle.choose(side, command)) continue;
@@ -53,22 +37,17 @@ export interface BlockPart {
   live: Battle;
   dice: readonly ForcedDie[];
   commands: readonly { side: 'p1' | 'p2'; command: string }[];
-  /** Writes the commands to the live battle (the stream's `writeSim`). */
   write: () => void;
   observe?: ForcedTurnInput['observe'];
   onDraw?: ForcedTurnInput['onDraw'];
 }
 
-/** One part of a block: the natural turn on a copy (a choice the copy refuses throws before the live battle is touched), then the real one. */
+/** The natural turn runs on a copy first, so a choice the copy refuses throws before the live battle is touched. */
 export function playBlockPart({ live, dice, commands, write, observe, onDraw }: BlockPart): DiceReport {
   return playForcedTurn({ live, forced: dice, observe, onDraw, play: battle => (battle === live ? write() : chooseOnCopy(battle, commands)) });
 }
 
-/**
- * A part of a block written to the live battle through the dice module. False means the module could not play it: the natural turn threw
- * (a choice the simulator refuses) before the live battle got anything, so the caller may write the part plain or search a seed. A throw
- * after the live write counts as played.
- */
+/** False: the natural turn threw before the live battle got anything; a throw after the live write counts as played. */
 export function writeBlockPart(part: BlockPart): boolean {
   const logLength = part.live.log.length;
   try {
@@ -89,19 +68,17 @@ export function forcedTurnDiceOrNull(battle: Battle, lines: readonly string[], c
 }
 
 
-/** What the log says about a side's bench for one block, read when a forced replacement first needs it. */
 export function protocolBenchOf(replayLog: string, lines: readonly string[], turn: number): (side: 'p1' | 'p2') => ProtocolBench {
   const cache: Partial<Record<'p1' | 'p2', ProtocolBench>> = {};
   return side => (cache[side] ??= { shown: shownBodyIds(replayLog, side), fainted: faintedSlots(lines, side), goesOn: logGoesOn(replayLog, turn) });
 }
 
-/** The choice as `applyChoice` submits it, so the natural turn's copy takes the same command the live copy does. */
 function submittable(battle: Battle, side: 'p1' | 'p2', choice: string): string {
   const [first] = choice.split(' > ');
   return submittableChoice(battle.sides[sideIndex(side)], first);
 }
 
-/** A forced slot whose body fainted: the request of a knockout (a pivot's or an ejected body's request has a living body in the slot). */
+// A forced slot whose body fainted (a pivot's request has a living body in the slot).
 function opensKnockout(battle: Battle): boolean {
   return [0, 1].some(index =>
     forceSwitches(battle as SimBattle, index).some((needed, slot) => needed && !!battle.sides[index].active[slot]?.fainted));
@@ -111,22 +88,17 @@ export interface BlockOnCopy {
   copy: Battle;
   dice: readonly ForcedDie[];
   choices: BlockCommands;
-  /** The species the log sends in for each forced replacement, per side. */
   forced: { p1: string[]; p2: string[] };
   bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined;
   observe?: ForcedTurnInput['observe'];
   onDraw?: ForcedTurnInput['onDraw'];
   /** Runs one part; the caller wraps it (the arrival mutes its recorder's own stream while a forced part plays). */
   around?: (run: () => void) => void;
-  /** Round 86 (T304): stop where a knockout opens a replacement request, the position the sweep's replacement round prices. A pivot's request is answered as the log answers it. */
+  /** Stop where a knockout opens a replacement request; a pivot's request is answered as the log answers it. */
   stopAtRequest?: boolean;
 }
 
-/**
- * Round 86 (the log's dice, T306): the whole block on a copy of the position, part by part as the rebuild plays it live (the choices of both
- * sides, then every answer to a forced replacement the log gives), each part through the dice module with the block's whole list. Throws where
- * the copy refuses a choice. The reports of every part, in order.
- */
+/** Each part gets the whole dice list (an earlier part's die is no draw in a later one); a refused choice throws. */
 export function playBlockOnCopy({ copy, dice, choices, forced, bench, observe, onDraw, around, stopAtRequest }: BlockOnCopy): DieReport[] {
   const reports: DieReport[] = [];
   const part = (answers: { side: 'p1' | 'p2'; choice: string }[]): void => {
@@ -155,31 +127,24 @@ export function playBlockOnCopy({ copy, dice, choices, forced, bench, observe, o
   return reports;
 }
 
-/** What the faint step needs of a block: the position at its move request, the log's events, the hidden dice's seed, and the answers the rebuild gives. */
 export interface BlockQuery {
   battle: Battle;
   expected: ProtocolEvents;
   seed: PRNGSeed;
   choices: BlockCommands;
-  /** The lines of the block in the log: a proc die the forced turn draws and no line names is forced not to happen (`quietProcs`). */
+  /** The block's lines: a proc die the forced turn draws and no line names is forced not to happen (`quietProcs`). */
   lines?: readonly string[];
-  /** The species the log sends in for each forced replacement, per side. */
   forced?: { p1: string[]; p2: string[] };
   bench?: (side: 'p1' | 'p2') => ProtocolBench | undefined;
 }
 
-/**
- * `dice` null: the forced turn ends a game the log goes on past, and the seed search takes the block. `quiet`: the proc dice added to the list.
- * `seed`: the hidden dice the list plays under; the query's seed unless the hybrid search (ruling C2) found another that fits the log better.
- */
+/** `dice` null: the forced turn ends a game the log goes on past (the seed search takes it). */
 export interface FaintStepResult { dice: ForcedDie[] | null; plays: number; quiet: number; seed: PRNGSeed }
 
-/** The damage rolls the forced turn drew, by die key: the name and the raw value of the first draw. */
 type Rolls = Map<string, { name: DieName; value: number }>;
 
 interface Trial { events: ProtocolEvents; rolls: Rolls; procs: Map<string, DieName>; reports: DieReport[]; log: readonly string[] }
 
-/** One play of the whole block with a list of dice on a fork of the position; null where the copy cannot play it. */
 function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie[], seed: PRNGSeed = query.seed): Trial | null {
   try {
     const copy = forkBattle({ serialized: checkpoint }, seed);
@@ -199,7 +164,6 @@ function trialOf(checkpoint: string, query: BlockQuery, dice: readonly ForcedDie
   }
 }
 
-/** The idents (`p1:name`, the form of the alignment's faint events) of the bodies that stood in each slot at the block's start or came in during it. */
 function identsBySlot(battle: Battle, log: readonly string[]): Map<string, Set<string>> {
   const bySlot = new Map<string, Set<string>>();
   const add = (slot: string, side: string, name: string): void => {
@@ -215,7 +179,7 @@ function identsBySlot(battle: Battle, log: readonly string[]): Map<string, Set<s
   return bySlot;
 }
 
-/** The steps a hit may take: all of them where the roll has 16 or fewer, 16 spread over the range where it has more (Gens 1 and 2 draw 39 values). */
+// All steps where the roll has 16 or fewer, 16 spread over the range where it has more (Gens 1 and 2 draw 39 values).
 function stepGrid(steps: number): number[] {
   if (steps <= 16) return Array.from({ length: steps }, (_, step) => step);
   return Array.from({ length: 16 }, (_, index) => Math.round((index * (steps - 1)) / 15));
@@ -223,19 +187,10 @@ function stepGrid(steps: number): number[] {
 
 interface Hit { name: DieName; order: number[] }
 
-/**
- * The bodies a mismatch of the trial points at. `up`: the log knocked the body out and the trial left it standing, so its hits must hit
- * harder. `down`: the trial knocked it out and the log did not, or a die the log shows could not land on it (the body fell first), so its
- * hits must hit softer.
- */
+// up: the log knocked the body out and the trial left it standing (its hits must hit harder). down: the trial knocked
+// it out and the log did not, or a logged die could not land on it (its hits must hit softer).
 interface Targets { up: ReadonlySet<string>; down: ReadonlySet<string> }
 
-/**
- * The damage-roll dice of the forced turn that hit a body of the mismatch, each with its steps in the order the faint step tries them: the
- * step the turn took first (the trial already played it), then the steps in the direction the log's faint asks for, nearest first. The
- * search moves every hit one place along its order at a time, clamped at the end of the roll, so a body that two hits decide gets the
- * highest roll of one hit and the middle roll of the other.
- */
 function hitsOn(trial: Trial, targets: Targets, bySlot: ReadonlyMap<string, ReadonlySet<string>>, gen: number): Hit[] {
   const roll = genShape(gen).roll;
   const grid = stepGrid(roll.steps);
@@ -264,14 +219,9 @@ function targetsOf(trial: Trial, expected: ProtocolEvents, bySlot: ReadonlyMap<s
   return { up, down };
 }
 
-/** One seed's turn: the list of dice with the phantom procs added, the trial that list plays, and what it cost. */
 interface Settled { dice: readonly ForcedDie[]; trial: Trial | null; plays: number; quiet: number }
 
-/**
- * Round 86 (T306, the phantom procs): a proc die the forced turn drew and the log does not show is forced not to happen, and the turn is
- * played again (a proc that stays away can let a body act that the proc stopped, and that body's hit draws its own procs: at most three
- * passes). A proc die belongs to the hidden dice of a seed, so every seed of the hybrid search settles its own.
- */
+// A proc that stays away can let a body act that the proc stopped, whose hit draws its own procs: at most three passes.
 function settle(checkpoint: string, query: BlockQuery, seed: PRNGSeed, forced: readonly ForcedDie[]): Settled {
   let dice = forced;
   let trial = trialOf(checkpoint, query, dice, seed);
@@ -288,27 +238,9 @@ function settle(checkpoint: string, query: BlockQuery, seed: PRNGSeed, forced: r
   return { dice, trial, plays, quiet };
 }
 
-/** What the faint step keeps while it searches: the list of dice, the seed it plays under, its trial and the trial's score against the log. */
 interface Best { dice: readonly ForcedDie[]; seed: PRNGSeed; trial: Trial; score: AlignmentScore; quiet: number }
 
-/**
- * Round 86 (the log's dice, T306, gate answer 2b with the rulings Q2 and Q3): the faint step. The log's dice leave the damage roll to the
- * hidden dice of the seed, and a roll can knock out a body the log's roll left standing, or the other way round. This plays the block on
- * copies, with the same parts the rebuild plays: when the forced turn is the log's turn (a perfect score) the list stays. When a faint
- * differs, or a die the log shows could not land (a burn on a body the simulator's roll knocked out first), it forces the damage roll of
- * the hits on those bodies, from the natural step in the direction the log's faint asks for, and keeps the first set of steps under which the turn is the log's turn
- * (faints and every die). Round 86 (ruling C1): without such a set, the first one that gives the log's faints and no ended mismatch with no more soft
- * mismatches than the natural turn has stands; one that misses a logged faint never does. None: the forced result stays, a named residual. A forced turn that ends a game the log goes on past is no
- * residual: `dice` null sends the block to the seed search, like a turn the copy cannot play.
- *
- * Round 86 (ruling C2, the hybrid): a turn that is still imperfect after the steps plays under seeds 1 to 15 of `ALIGNMENT_SEEDS` for the
- * dice no `DieKind` names (a sleep duration, the lock of Outrage and its random target, the move Metronome calls), with the forced list
- * kept, and keeps the best by (ended, faint, soft); a tie keeps the earlier seed, so seed 0 stays unless another is strictly better. The
- * result carries the seed the rebuild and the arrival play under.
- *
- * One function for the rebuild and the arrival, so both find the same steps and the same seed. At most one play of the forced turn, up to
- * three more for the phantom procs, fifteen of the steps, and for each of the fifteen seeds one play and up to three more for its procs.
- */
+/** The faint step (ADR 0022); a tie between seeds keeps the earlier one. */
 export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): FaintStepResult {
   let checkpoint: string;
   try {
@@ -317,7 +249,7 @@ export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): Fain
     return { dice: [...forced], plays: 0, quiet: 0, seed: query.seed };
   }
   const first = settle(checkpoint, query, query.seed, forced);
-  // a block the copy cannot play stays as it is: the live write refuses it the same way and the caller's fallback takes over
+  // A block the copy cannot play stays as it is: the live write refuses it too, and the caller's fallback takes over.
   if (!first.trial) return { dice: [...first.dice], plays: first.plays, quiet: first.quiet, seed: query.seed };
   let best: Best = { dice: first.dice, seed: query.seed, trial: first.trial, score: scoreAlignment(query.expected, first.trial.events), quiet: first.quiet };
   const result = (dice: readonly ForcedDie[] | null, plays: number, from: Best): FaintStepResult => ({ dice: dice && [...dice], plays, quiet: from.quiet, seed: from.seed });
@@ -333,12 +265,7 @@ export function faintStep(query: BlockQuery, forced: readonly ForcedDie[]): Fain
   return result(endsEarly ? null : best.dice, plays, best);
 }
 
-/**
- * The faint step's roll steps on the seed of the query: the forced damage roll of the hits on the bodies of the mismatch, each set tried in turn.
- * Round 86 (ruling C1): a set also stands when it is no perfect turn but gives the log's faints, no ended mismatch and no more soft
- * mismatches than the natural turn has (a soft mismatch no die mends, a body that acts in another order, must not cost the faint). The first
- * such set (`accepted`) stays unless a later one is perfect (`perfect`, which ends the search); a set that misses a logged faint is never taken.
- */
+// A set also stands with the log's faints, no ended mismatch and no more soft mismatches than the natural turn.
 function stepSets(checkpoint: string, query: BlockQuery, natural: Best): { perfect: Best | null; accepted: Best | null; plays: number } {
   const bySlot = identsBySlot(query.battle, natural.trial.log);
   const hits = hitsOn(natural.trial, targetsOf(natural.trial, query.expected, bySlot), bySlot, query.battle.gen);
@@ -350,7 +277,7 @@ function stepSets(checkpoint: string, query: BlockQuery, natural: Best): { perfe
     ...natural.dice.filter(die => !keys.has(dieKey(die.name))),
     ...hits.map((hit): ForcedDie => ({ name: hit.name, result: { step: hit.order[Math.min(index, hit.order.length - 1)] } })),
   ];
-  // Round 86 (B12): the last step is the extreme of every order. When even it misses a logged faint, no step between gives the faints, and the steps stop at this one play.
+  // The last step is the extreme of every order: when even it misses a logged faint, no step between gives it.
   let last: { index: number; trial: Trial } | null = null;
   if (longest > 2) {
     const trial = trialOf(checkpoint, query, setAt(longest - 1));
@@ -378,7 +305,6 @@ function stepSets(checkpoint: string, query: BlockQuery, natural: Best): { perfe
   return { perfect: null, accepted, plays };
 }
 
-/** Round 86 (ruling C2): seeds 1 to 15 for the dice no `DieKind` names, each with its own phantom procs; the strictly better score replaces, the first perfect one ends the search. */
 function seedSearch(checkpoint: string, query: BlockQuery, from: Best): { best: Best; plays: number } {
   let best = from;
   let plays = 0;

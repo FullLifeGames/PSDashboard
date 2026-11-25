@@ -9,22 +9,16 @@ interface Props {
   playerNames: [string, string];
   p1Options: LeadOption[];
   p2Options: LeadOption[];
-  /** 1 in singles, 2 in doubles — selection order is the slot order (a, b). */
   leadsPerSide: number;
-  /** Bring-limited formats (VGC 4 of 6, BSS 3 of 6): total picks per side.
-   *  Null brings the whole team, so only the leads are picked. */
+  /** Total picks per side in bring-limited formats (VGC 4 of 6); null brings the whole team. */
   bringCount: number | null;
-  /** A lead variation's recorded turn-0 choice: returning to T0 shows THAT
-   *  selection instead of the real game's defaults. */
   pickedLeads?: { p1: string[]; p2: string[] } | null;
-  /** True while the sim rebuilds or executes — blocks the start button. */
   executing: boolean;
   onStart: (leads: { p1: string[]; p2: string[] }) => void;
-  /** The complete selection on screen, null while it is unfinished or the panel leaves (the play-out starts from it). */
+  /** The complete selection, null while it is unfinished or when the panel leaves. */
   onPicksChange?: (leads: { p1: string[]; p2: string[] } | null) => void;
-  /** The side the replay frame shows near comes first, as in the turn dock's rows (round 89, #113). P1 until the frame is switched. */
   nearSide?: Side;
-  /** Round 89 (#105, H7): false for a game whose format has no Team Preview (Gen 1 to 4): the pick is the app's tool, and the words say so. A replay keeps the default. */
+  /** False for a format without Team Preview (Gens 1 to 4); a replay keeps the default. */
   teamPreview?: boolean;
 }
 
@@ -41,7 +35,6 @@ function panelIntro(bringCount: number | null, leadsPerSide: number, teamPreview
       : 'Turn 0 · team preview: pick each side’s lead and play the game from the start.';
 }
 
-/** What Start says: it names what is missing, as Execute does. Both sides short reads "Pick N per side"; one side short reads "Pick k more for P1". */
 function startLabel({ executing, ready, maxPicks, p1Picked, p2Picked }: { executing: boolean; ready: boolean; maxPicks: number; p1Picked: number; p2Picked: number }): string {
   if (executing) return 'Preparing…';
   if (ready) return 'Play from turn 0';
@@ -49,12 +42,6 @@ function startLabel({ executing, ready, maxPicks, p1Picked, p2Picked }: { execut
   return `Pick ${maxPicks - (p1Picked < maxPicks ? p1Picked : p2Picked)} more for ${p1Picked < maxPicks ? 'P1' : 'P2'}`;
 }
 
-/**
- * Turn 0 of the unified timeline: the team-preview decision. Replaces the turn dock while the pointer sits on T0 — pick each
- * side's lead (both slots in doubles) and, in bring-limited formats, the whole brought selection; then play the game from the
- * start as a variation. Round 84 (A7b, ruling 12b): it wears the dock's look and stands where the dock stands: the root is a dock
- * (`ps-dock ps-lead`), the intro is its status strip, P1 and P2 stand in rows of the bench's tiles, and Start takes Execute's place.
- */
 export function LeadPanel({ playerNames, p1Options, p2Options, leadsPerSide, bringCount, pickedLeads, executing, onStart, onPicksChange, nearSide = 'p1', teamPreview = true }: Props) {
   const maxPicks = bringCount ?? leadsPerSide;
   const { p1Leads, p2Leads, toggleP1, toggleP2 } = useLeadSelection({ p1Options, p2Options, pickedLeads, maxPicks });

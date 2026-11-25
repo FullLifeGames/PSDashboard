@@ -3,17 +3,8 @@ import { calcGenerationFor, type CalcGeneration } from './calc-gen.ts';
 import { rulesDex } from './rules-dex.ts';
 import { toId } from './ids.ts';
 
-/**
- * Round 68 (T186, decision 3 with D8): the one place that builds a calculator Pokémon from a species name, for the
- * engine (calc/body.ts), the spread solver (spreads/fit.ts), the item judge (team/item-damage.ts) and the app's picker.
- * The calculator's Champions generation 0 lists 359 species and lacks 35 the mod allows (Aegislash, the Vivillon
- * patterns, the Alcremie flavors, Minior-Meteor, the Ogerpon Tera formes, ...), and it lists no Pound: a name it
- * lacks used to throw (a skipped observation, a Speed of 0, a picker without numbers). Here such a species goes to the
- * calculator as the form it lists with equal values, else as overrides read from the Dex; a move it lacks is told apart
- * by `calcKnowsMove`, because the calculator builds it as a 0-damage Status move that would read as a miss.
- */
 
-/** What the builder reads of a Dex: the species rows. The engine hands the simulator's (the Champions mod's where it is loaded). */
+/** The species rows the builder reads of a Dex, the Champions mod's where it is loaded. */
 export interface SpeciesDex {
   currentMod?: string;
   species: { get(name: string): SpeciesRow };
@@ -31,25 +22,18 @@ interface SpeciesRow {
   abilities: { 0: string };
 }
 
+/** The options of the @smogon/calc Pokemon constructor. */
 export type CalcPokemonOptions = NonNullable<ConstructorParameters<typeof CalcPokemon>[2]>;
 
-/** The calculator generation's own number, the key of a memo (the simulator's generation is `simGenNum`). */
 const calcGenId = (calc: CalcGeneration): number => calc.num;
 
-/** The Dex a generation's species come from when the caller names none: the game generation's own (round 75, T160: the Champions generation reads the registered Champions Dex). */
 function defaultDex(calc: CalcGeneration): SpeciesDex {
   return rulesDex(calc.num as number) as unknown as SpeciesDex;
 }
 
-/** One answer per generation, dex and name. */
 const speciesMemo = new Map<string, string>();
 
-/**
- * The species as the calc knows it (round 67, T72). The calc refuses a name it does not list (Gastrodon-East, the
- * simulator's "Aegislash" for the Shield forme, color forms), so such a species goes to it as the form it lists with the
- * same base species in the Dex and the same base stats and types: the base species' own name first, then the calc's
- * order. Without such a form the name stays (`speciesOverrides` then builds it from the Dex).
- */
+/** The name the calculator lists for a species: an equal-valued form of the same base species when it lacks it. */
 export function calcSpecies(gen: number, name: string, dex?: SpeciesDex): string {
   const calc = calcGenerationFor(gen);
   const source = dex ?? defaultDex(calc);
@@ -62,6 +46,7 @@ export function calcSpecies(gen: number, name: string, dex?: SpeciesDex): string
   return known;
 }
 
+// The calculator's Champions generation 0 lacks 35 species the mod allows (Aegislash, Vivillon, Alcremie, Tera forms).
 function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string {
   if (calc.species.get(toId(name) as never)) return name;
   const species = dex.species.get(name);
@@ -73,17 +58,9 @@ function knownForm(calc: CalcGeneration, name: string, dex: SpeciesDex): string 
   return (forms.find(form => form.name === species.baseSpecies) ?? forms[0])?.name ?? name;
 }
 
-/** One answer per generation, dex and name: null for a species that needs none. */
 const overridesMemo = new Map<string, CalcPokemonOptions['overrides'] | null>();
 
-/**
- * The species as overrides, read from the Dex: a species the calculator's generation does not list and no equal-valued form
- * stands in for (Meloetta-Pirouette, Minior-Meteor, the Ogerpon Tera formes, Terapagos-Terastal in Champions' generation 0)
- * goes to the calc as the data the Dex holds, on its own name; the calc builds the stats, types and weight from it.
- * A species the calc lists with other base stats or types than the Dex takes the Dex's (round 78: Obliteryx 2.0 of
- * @pkmn 0.10.12 has a Special Defense of 78, @smogon/calc 0.12 lists 90).
- * Undefined when the calc lists the name with the Dex's values, or the Dex does not know it either (the calc refuses as before).
- */
+/** The overrides that make the calculator build a species it lacks or lists with other values; undefined when none. */
 export function speciesOverrides(gen: CalcGeneration, name: string, dex?: SpeciesDex): CalcPokemonOptions['overrides'] | undefined {
   const source = dex ?? defaultDex(gen);
   const key = `${calcGenId(gen)}|${source.currentMod ?? ''}|${name}`;
@@ -99,6 +76,7 @@ function dexOverrides(gen: CalcGeneration, name: string, dex: SpeciesDex): CalcP
   const species = dex.species.get(name);
   if (!species.exists) return undefined;
   const listed = gen.species.get(toId(name) as never);
+  // The Dex wins where the calculator lists other base stats or types (Obliteryx: Special Defense 78 vs 90).
   if (listed) {
     const stats = Object.keys(species.baseStats) as (keyof SpeciesRow['baseStats'])[];
     const same = stats.every(stat => listed.baseStats[stat] === species.baseStats[stat]) && listed.types.join('/') === species.types.join('/');
@@ -115,27 +93,20 @@ function dexOverrides(gen: CalcGeneration, name: string, dex: SpeciesDex): CalcP
   };
 }
 
-/**
- * A calculator Pokémon of any species the Dex knows, whatever the generation lists (the one builder of the four paths).
- * `dex` names the species data (default: the game generation's own Dex); the caller's own overrides win over the species'.
- */
+/** A calculator Pokémon of any species the Dex knows; the caller's overrides win over the species'. */
 export function buildCalcPokemon(gen: CalcGeneration, species: string, options: CalcPokemonOptions = {}, dex?: SpeciesDex): CalcPokemon {
   const known = calcSpecies(calcGenId(gen), species, dex);
   const overrides = speciesOverrides(gen, known, dex);
   return new CalcPokemon(gen, known, overrides ? { ...options, overrides: { ...overrides, ...options.overrides } } : options);
 }
 
-/** The species' base stats as the calculator will build them (the Dex's through the overrides, else the listed form's); undefined for a species neither knows. */
+/** The species' base stats as the calculator builds them; undefined for a species neither knows. */
 export function calcBaseStats(gen: CalcGeneration, species: string, dex?: SpeciesDex): SpeciesRow['baseStats'] | undefined {
   const known = calcSpecies(calcGenId(gen), species, dex);
   return speciesOverrides(gen, known, dex)?.baseStats ?? gen.species.get(toId(known) as never)?.baseStats;
 }
 
-/**
- * Whether the calculator's generation lists the move. A move it lacks (Pound in Champions' generation 0) builds as a
- * typeless 0-damage Status move, so a reader that judges the roll (the spread solver, the item judge) must treat the
- * move as unreadable: no judgment, no miss.
- */
+/** Whether the calculator lists the move; an unlisted one (Pound in Champions) builds as a 0-damage Status move. */
 export function calcKnowsMove(gen: CalcGeneration, name: string): boolean {
   return !!gen.moves.get(toId(name) as never);
 }

@@ -5,12 +5,6 @@ import { playedFromLines } from '../../src/hooks/usePositionPicker';
 import { dockReplays, fixtureReplay } from '../e2e/helpers';
 import { loggedTurn } from '../e2e/dock-helpers';
 
-/**
- * Round 84 (turn dock), step A6c: the task e2e compares the dock with the log through `loggedTurn`, which reads the lines apart
- * from the app. Here that reader is held against the app's played record on every turn of the e2e fixtures, so a wrong
- * expectation shows as a unit failure and not as a red e2e run: the same slots acted, with the same move or body, the same
- * gimmick, and a target label where the seed carries a target.
- */
 const replays = [fixtureReplay, ...dockReplays];
 
 describe.each(replays.map(replay => [replay.id, replay] as const))('%s', (_id, replay) => {
@@ -25,7 +19,6 @@ describe.each(replays.map(replay => [replay.id, replay] as const))('%s', (_id, r
       const record = playedFromLines(snapshots[turn]?.log, doubles, lines => parsePlayedActions(lines, rules), parsePlayedActionsDoubles);
       const read = loggedTurn(replay, turn);
       for (const side of ['p1', 'p2'] as const) {
-        // A singles record holds the one pick of a side in `p1` and `p2`; a doubles record holds a slot list.
         const slots = doubles ? (side === 'p1' ? record?.p1Slots : record?.p2Slots) ?? [] : [side === 'p1' ? record?.p1 ?? null : record?.p2 ?? null];
         slots.forEach((pick, index) => {
           const slot = `${side}${'ab'[index]}` as 'p1a';

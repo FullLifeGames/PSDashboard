@@ -4,10 +4,6 @@ import { loadSimMods } from '../src/forward/sim-mods';
 import { battleOf } from './power-oracle';
 import { set } from './move-oracle';
 
-/**
- * Round 88 (#103): the boards of the forme sweeps (`switch-forme-sweep.spec.ts`, `body-forme-sites.spec.ts`): every generation and mod the
- * corpus plays, singles and doubles, a bench where a body takes any forme by the simulator's own `formeChange`.
- */
 await loadSimMods('gen9championsou');
 
 export interface Ruleset { label: string; singles: string; doubles: string; level: number; evs?: PokemonSet['evs'] }
@@ -21,10 +17,6 @@ export const mon = (rules: Ruleset, species: string, moves: string[], extra: Par
 
 export type GameType = 'singles' | 'doubles';
 
-/**
- * A battle at p1's forced replacement: p1's level-1 Magikarp faints to Mewtwo's Psychic. The bench holds the target (an Eevee the
- * sweep turns into any forme) and a decoy of another species behind it, so a wrong pick shows as the wrong position.
- */
 export function forcedBoard(rules: Ruleset, type: GameType, bench: PokemonSet[] = []): Battle {
   const fodder = mon(rules, 'Magikarp', ['splash'], { level: 1 });
   const spare = bench.length > 0 ? bench : [mon(rules, 'Eevee', ['splash']), mon(rules, 'Meowth', ['splash'])];
@@ -39,7 +31,6 @@ export function forcedBoard(rules: Ruleset, type: GameType, bench: PokemonSet[] 
   return battle;
 }
 
-/** What the resolver must leave alone: the log, the dice, the requests and every body's own state (read only). */
 export function fingerprint(battle: Battle): string {
   return JSON.stringify({
     log: battle.log.length,
@@ -49,7 +40,6 @@ export function fingerprint(battle: Battle): string {
   });
 }
 
-/** The body takes a forme the way the simulator changes it in a battle (permanent, no source). */
 export function become(body: Pokemon, species: string, name: string): void {
   expect(body.formeChange(species, null, true), `the simulator changes ${body.name} into ${species}`).toBeTruthy();
   body.name = name;

@@ -7,425 +7,256 @@ import type { SimFastLever, SimFastReport } from './forward/sim-fast/state.ts';
 import type { SearchBudget } from './search/budget.ts';
 import type { StaticRuleset } from './score/weights.ts';
 
-/**
- * Which Pokémon may Terastallize in the search: a global switch, or per-side
- * species allow-lists — draft leagues grant Tera rights per Pokémon, so a
- * boolean would invent threats (and recommendations) that are illegal there.
- */
+/** Which Pokémon may Terastallize in the search: all or none, or per-side species allow-lists (draft leagues). */
 export type TeraAllowance = boolean | { p1: string[]; p2: string[] };
 
 /** Engine settings sent to the worker. */
 export interface EvalSettings {
   /** Turns ahead. 1 = full joint matrix only. */
   depth: 1 | 2 | 3;
-  /** Number of fixed PRNG seeds averaged per matrix cell. */
   samples: 1 | 3 | 5;
   /** Terastallize enumeration (default true = everyone). */
   tera?: TeraAllowance;
   /**
-   * Sleep Clause is enforced for this replay (custom-game reconstructions
-   * lose their @@@ rule suffix in serialization, so the sim can't say) —
-   * redundant sleep moves drop from candidate lists.
+   * Sleep Clause applies to this replay (a custom-game reconstruction loses its @@@ rule suffix, so the simulator
+   * cannot say); redundant sleep moves drop from the candidate lists.
    */
   sleepClause?: boolean;
-  /** 'mcts' runs the DUCT tree search instead of the fixed-depth matrix. */
   mode?: 'matrix' | 'mcts';
   /**
-   * Sweep hint (root only): the actions actually played this turn. The
-   * doubles candidate restriction keeps the matching combined option ranked
-   * so played-vs-best regret stays computable. Round 63 (T78): the verify
-   * step checks the played row and column in both game types; singles
-   * carries the played actions in p1 / p2 (option lists ignore them).
+   * Sweep hint (root only): the actions played this turn; the doubles candidate restriction keeps the matching option.
+   * Singles carries them in p1 / p2 (option lists ignore them).
    */
   keepPlayed?: {
     p1?: PlayedAction | null;
     p2?: PlayedAction | null;
     p1Slots?: (PlayedAction | null)[];
     p2Slots?: (PlayedAction | null)[];
-    /**
-     * Round 89 (#108): the marks of the bodies that fell before they acted (`PlayedTurn.fell`). The worker reads the order bound of
-     * them once per root, with the root battle, and ships it as `EvalResult.playedBounds`. Plain data; absent when no body fell.
-     */
+    /** The marks of bodies that fell before they acted (`PlayedTurn.fell`), shipped as `EvalResult.playedBounds`. */
     fell?: PlayedTurn['fell'];
   } | null;
-  /**
-   * Round 35: false skips the forced-win prover after the root search. The
-   * graph sweep's sketch pass sets it (every sketch is replaced by the full
-   * pass, so its proof would only cost); everything else proves.
-   */
+  /** false skips the forced-win prover after the root search (the graph sweep's sketch pass). */
   prove?: boolean;
-  /**
-   * Round 89 (#104): the rows whose lines the search should replay as the engine's lines, by label per side, instead of the merged
-   * result's best row. A host that grades a turn with another search (the matrix of an early singles turn) asks the tree for the lines
-   * of the rows that grade named. Absent: each side's best row. Part of the settings key only when present.
-   */
+  /** The rows whose lines the search replays as the engine's lines, by label per side; absent: the best rows. */
   lineRows?: { p1?: string[]; p2?: string[] };
-  /**
-   * Round 89 (#104, ruling G2b): the answers the host's card ranks first, by label and by the side whose lines they are (`p1` holds the
-   * labels of player 2's rows that player 1's lines should meet, best first). The donors meet them before the search's merged ranking.
-   */
+  /** The answers the host's card ranks first, by the side whose lines they are (`p1`: player 2's labels). */
   lineReplies?: { p1?: string[]; p2?: string[] };
   /**
-   * Round 89 (#104, G14b, ruling G9a option L): extra tree iterations per tree, run after the tree's result, cell statistics and
-   * ranking are final, aimed at the rows whose lines the card shows (the tree's best row and the played row, against the tree's top three
-   * answers) until each line holds two turns or the quota is spent. They descend below the root cells and never write the root's own statistics, so no score, rank or grade
-   * moves; only the visits a line reads grow. Absent or 0: no pass. A search that is stopped runs none. Part of the settings key only when present.
+   * Extra tree iterations per tree, run once result and ranking are final, aimed at the rows whose lines the card
+   * shows. They never write the root's statistics, so no score, rank or grade moves. Absent or 0: no pass.
    */
   linePass?: number;
   /**
-   * Round 65: the rule set the replay runs under (Pokémon Champions or the
-   * standard games), named by the host from the replay's format: the
-   * simulator reconstructs every doubles game as Doubles OU and knows no
-   * Champions format. The static applies its rule set's weight table at
-   * every leaf; absent means standard.
+   * The rule set the replay runs under (Pokémon Champions or standard), named by the host from the format: the
+   * simulator reconstructs every doubles game as Doubles OU and knows no Champions format. Absent means standard.
    */
   ruleset?: StaticRuleset;
 }
 
-/**
- * The auto engine mode's switch point: matrix search below this fainted
- * fraction, the DUCT tree at or above it (for full 6v6 boards: from the
- * third faint). Grid-tuned 2026-08-11 on the grand 826-position bed with
- * per-stratum robustness: the 0.00–0.25 plateau wins overall (+0.7 sign,
- * −0.002 brier vs the original 0.40) and 0.25 keeps the matrix side — and
- * with it verification and sensitivity probes —
- * through the opening while mid (+3.3 ladder) and doubles (+2.5 ladder)
- * take the tree's stronger reading. Lives here (not search.ts) so the UI
- * layer can import it without pulling @pkmn/sim into the main chunk.
- * Round 61 (T98): the auto mode reads its threshold from the search budget
- * (search/budget.ts), whose default ran the tree from the first turn; this
- * constant named the threshold before round 61 (bank measurement chains).
- * Round 63 (T110): it is again the singles default of the budget, where
- * turns below a quarter fainted run the matrix with three draws; doubles
- * keep the tree from the first turn.
- */
+/** The auto mode's switch point: matrix search below this fainted fraction, the DUCT tree at or above it. */
 export const AUTO_MCTS_FAINTED_FRACTION = 0.25;
 
 /** Panel preferences persisted in localStorage (worker only sees EvalSettings). */
 export interface EvalPreferences {
-  /** UI offers 1/2 only — depth 3 costs 3-4× for capped gains (the tree mode searches deeper). */
   depth: 1 | 2;
   samples: 1 | 3 | 5;
   /**
-   * 'mcts' runs the DUCT tree search; depth/samples then don't apply.
-   * 'auto' routes per turn on the position's fainted fraction — matrix
-   * (at the configured depth/samples) while boards are full, MCTS once
-   * bodies fall (AUTO_MCTS_FAINTED_FRACTION). Resolved to a concrete
-   * engine BEFORE dispatch: EvalSettings and stored per-turn results only
-   * ever carry 'matrix' or 'mcts'.
+   * 'mcts' ignores depth/samples; 'auto' routes per turn on the fainted fraction (AUTO_MCTS_FAINTED_FRACTION).
+   * Resolved before dispatch: EvalSettings and stored per-turn results only carry 'matrix' or 'mcts'.
    */
   mode: 'matrix' | 'mcts' | 'auto';
   /** Re-run automatically after each executed branch turn. */
   auto: boolean;
-  /**
-   * Evaluation as an always-on companion: Analyze game starts by itself when
-   * a replay loads, and fresh variation positions evaluate without the
-   * Evaluate button. Persisted — switching it on once keeps it on.
-   */
+  /** Analyze game starts when a replay loads, and fresh variation positions evaluate without the Evaluate button. */
   autoAnalyze: boolean;
   /**
-   * Round 89 (#153, Hard mode): the opponent answers each move the user plays with the reply that hurts that move most (`worstAnswer`):
-   * on a click of an engine move, in the turn dock and in a turn's lines. A preference of the app alone: no search setting, score,
-   * grade or report reads it. Absent: off.
+   * The opponent answers each move the user plays with the reply that hurts it most (`worstAnswer`). App only:
+   * no search setting, score, grade or report reads it. Absent: off.
    */
   hardMode?: boolean;
   /**
-   * Tera enumeration: 'auto' = only when the replay terastallized (and in
-   * draft/custom formats, only the Pokémon that did); 'revealed' forces the
-   * per-Pokémon restriction for any format.
+   * Tera enumeration: 'auto' = only when the replay terastallized (in draft/custom formats, only the Pokémon that did);
+   * 'revealed' forces the per-Pokémon restriction for any format.
    */
   tera: 'auto' | 'on' | 'off' | 'revealed';
 }
 
-/**
- * Analytic one-turn odds of an option's own damaging move against the
- * standing opposing active (round 6 expectation grounding): accuracy after
- * stage/weather modifiers × the crit-weighted share of damage rolls that KO.
- */
+/** Analytic one-turn odds of an option's damaging move on the opposing active: accuracy × crit-weighted KO share. */
 export interface KoOddsInfo {
   accuracy: number;
   killFraction: number;
-  /** Doubles (round 56): the slot's move and target the odds belong to, "Play Rough→Incineroar". Singles leaves it unset. */
+  /** Doubles: the slot's move and target the odds belong to, "Play Rough→Incineroar". Singles leaves it unset. */
   label?: string;
-  /** Round 69: the slot and species of the attacker that makes the odds (singles: slot 0), so a doubles label can name who attacks. */
+  /** The slot and species of the attacker that makes the odds (singles: slot 0). */
   attacker?: { slot: number; species: string };
 }
 
-/** One outcome class of a blended boundary cell (round 6). */
+/** One outcome class of a blended boundary cell. */
 export interface CellBlendClass {
-  /** The fold's class key (cell-blend.ts): 'miss', 'hit-kill', 'hit-nokill', or two sides joined with '|' ('hit-kill|none'). */
+  /** The fold's class key (cell-blend.ts): 'miss', 'hit-kill', 'hit-nokill', or two sides joined with '|'. */
   key: string;
   /** Analytic weight (normalized over the classes that were sampled). */
   weight: number;
-  /** Sum of the sampled children's leaf values in this class. */
   leafSum: number;
-  /** Number of sampled children in this class. */
   count: number;
   /** The first-seed child (the one deepening expands) lives in this class. */
   hasFirst: boolean;
-  /** Every sampled child of this class ended the game (its leaves are exact +-1). */
+  /** Every sampled child of this class ended the game (its leaves are exact: 1, -1 or 0). */
   ended: boolean;
-  /**
-   * Round 63 (T16): the class's representative child (its first draw) one
-   * ply deeper — set by the verify step on every open class.
-   */
+  /** The class's representative child one ply deeper; set by the verify step on every open class. */
   deepened?: number;
 }
 
-/**
- * A root boundary cell's analytic class blend. Deepening re-blends through
- * it (reblendValue) instead of overwriting the mixture with one branch.
- */
+/** A root boundary cell's analytic class blend; deepening re-blends through it (reblendValue), not with one branch. */
 export interface CellBlend {
   classes: CellBlendClass[];
-  /** The first-seed child's leaf value (swapped out on deepening). */
   firstLeaf: number;
 }
 
-/**
- * Round 70: one of the base draws that priced a root cell, the draws the
- * horizon-trend probe replays: the slot of its seed in the cell's list (round 89: `cellSeeds`; before, SEARCH_SEEDS)
- * and, for a speed-tied singles cell, the move order scripted into it.
- */
 export interface CellDraw {
+  /** The slot of the draw's seed in `cellSeeds`. */
   index: number;
+  /** In a speed-tied singles cell, the scripted move order. */
   first?: 'p1' | 'p2';
 }
 
-/**
- * Diagnostic: a boundary cell whose analytic outcome classes were not all
- * observed within the probe budget. The cell renormalizes over the found
- * classes instead of inventing values; the harness counts these.
- */
+/** Diagnostic: a boundary cell with analytic outcome classes unobserved within the probe budget; it renormalizes. */
 export interface KoOddsMismatch {
   i: number;
   j: number;
   p1Choice: string;
   p2Choice: string;
-  /** Class keys with analytic weight but no sampled representative after the probe budget. */
   missing: string[];
   analytic: Record<string, number>;
   sampled: Record<string, number>;
 }
 
-/**
- * One ranked option for a side. Values are from that side's OWN perspective
- * (p2 values are negated from the internal p1-perspective matrix).
- */
+/** One ranked option for a side; values are from that side's OWN perspective (p2's are negated p1 matrix values). */
 export interface RankedChoice {
-  /** Sim choice string, e.g. "move seismictoss", "move dracometeor terastallize", "switch 3". */
+  /** Sim choice string: "move seismictoss", "move dracometeor terastallize", "switch 3". */
   choice: string;
-  /** Display label, e.g. "Seismic Toss", "Tera + Draco Meteor", "→ Dragapult". */
   label: string;
-  /** Value after the opponent's best (most punishing) reply — the floor. */
+  /** Value after the opponent's most punishing reply: the floor. */
   worstCase: number;
-  /** Mean value over all opponent replies. */
   expected: number;
-  /**
-   * Expected value against the OPPONENT's equilibrium mixture (own
-   * perspective) — the primary grading reference. Choices in the
-   * equilibrium's support score ≈ the game value; dominated choices score
-   * below it. MCTS results solve the same equilibrium over tree-informed
-   * cells (2026-08-11) — ev semantics are engine-independent.
-   */
+  /** Expected value against the OPPONENT's equilibrium mixture (own perspective), the primary grading reference. */
   ev: number;
-  /** Label of the opponent reply achieving worstCase; null when the opponent has no choices. */
+  /** Label of the opponent reply that achieves worstCase; null when the opponent has no choices. */
   punishedBy: string | null;
-  /**
-   * Principal variation after the punishing reply: each step is the next
-   * turn's best pair of labels. Present only on choices the deepening search
-   * expanded (depth ≥ 2).
-   */
+  /** Principal variation after the punishing reply, one best pair of labels per turn; only where depth ≥ 2 expanded. */
   line?: { p1: string; p2: string }[];
-  /**
-   * Analytic kill odds of this option's own move vs the opposing pre-turn
-   * active — present only when a real boundary event exists (killFraction
-   * > 0, not a guaranteed kill). Cache-borne so narrative layers can quote
-   * true odds without re-computation.
-   */
+  /** Analytic kill odds of this option's move vs the pre-turn opposing active; only if 0 < killFraction < 1. */
   koOdds?: KoOddsInfo;
 }
 
+/** The result of one search: the score, each side's ranking and the evidence behind them. */
 export interface EvalResult {
-  /**
-   * [-1, +1] from p1's perspective. Full-matrix searches score at the solved
-   * game value (clamped into the maximin interval); pruned sub-searches and
-   * MCTS keep the guarantee midpoint.
-   */
+  /** [-1, +1] from p1's perspective: the solved game value (clamped into the maximin interval); else the midpoint. */
   score: number;
   /** Solved value of the root matrix game (p1 perspective), when a full matrix exists. */
   gameValue?: number;
-  /**
-   * Width of the [v1, v2] interval the true game value lies in. Near 0 = a
-   * stable line exists; wide = the turn hinges on out-predicting the
-   * opponent (a genuine toss-up).
-   */
+  /** Width of the [v1, v2] interval the true game value lies in: near 0 a stable line exists, wide a toss-up. */
   interval: number;
   depthCompleted: number;
   perSide: { p1: RankedChoice[]; p2: RankedChoice[] };
-  /**
-   * The solved root matrix (≤ 16×16, wp-units, p1 perspective) with the
-   * equilibrium mixes — carried on the result so the opponent-model Read
-   * lens can best-respond later without re-searching (cached results too).
-   */
+  /** The solved root matrix (≤ 16×16, wp-units, p1 perspective) with the equilibrium mixes, for the Read lens. */
   matrix?: EvalMatrix;
-  /**
-   * Boundary cells whose analytic classes went unsampled within the probe
-   * budget (advisory — the cells renormalized instead of inventing values).
-   * The feedback harness counts these per replay.
-   */
+  /** Boundary cells whose analytic classes went unsampled within the probe budget (advisory; cells renormalize). */
   koDiagnostics?: KoOddsMismatch[];
-  /**
-   * Root-position mons the OTHER side has no live race answer to (round 13,
-   * per side, species names) — narrative input for the entry-is-profit
-   * principle (648453 t13). Absent when empty or on sub-searches.
-   */
+  /** Root-position mons the OTHER side has no live race answer to (per side, species); absent when empty. */
   unanswered?: UnansweredProfile;
   /**
-   * Round 89 (#108): per side and slot, the moves (and the switch) a body that fell before it acted cannot have chosen, read once per
-   * root from the played turn's `fell` mark (`branch/action-bound.ts`). The grading drops those options before it matches a hidden slot
-   * to a row. Absent when no body fell, on sub-searches and on results cached before the field existed (they grade as before).
+   * Per side and slot, the moves (and the switch) a body that fell before it acted cannot have chosen
+   * (`branch/action-bound.ts`); grading drops them before it matches a hidden slot. Absent when no body fell.
    */
   playedBounds?: PlayedBounds;
-  /** Round 35: the forced win proven from this root, when one stands at or above MIN_FORCED_MASS; the score already carries its bar. */
+  /** The forced win proven from this root at or above MIN_FORCED_MASS; the score already carries its bar. */
   forcedWin?: ForcedWin;
-  /** Round 77: the engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
+  /** The engine that answered, when another one than this package's own search (the engine protocol, ENGINES.md). */
   engine?: { id: string; name: string; version?: string };
-  /**
-   * Round 70: the answer of a trend probe (EvalSubSearchJob.draw): this result's
-   * score minus the leaf of the draw's own child. Absent on every other search.
-   */
+  /** The answer of a trend probe (EvalSubSearchJob.draw): this result's score minus the draw's child leaf. */
   trend?: number;
   /**
-   * Round 89 (#104): the lines over the next turns, from the tree search: for each side its best row's line and its played row's line
-   * (one line when the two are the row), each a replay of the tree's line with every die at its likeliest result. Absent on a matrix
-   * search, on an engine that sends none and when the tree holds no line for the row. No score, ranking or grade reads it.
+   * The lines over the next turns, from the tree search: per side its best row's and played row's line, each with
+   * every die at its likeliest result. Absent on a matrix search or an engine that sends none. No grade reads it.
    */
   lines?: EvalLine[];
-  /**
-   * Round 89 (#104, G14b): the extra iterations per tree (`EvalSettings.linePass`) that made `lines`, written by the host that asked
-   * for them when it stores the lines. Absent: the lines come from the tree's own iterations alone. Nothing in the engine reads it.
-   */
+  /** The extra iterations per tree (`EvalSettings.linePass`) that made `lines`, written by the host; unread here. */
   linePass?: number;
 }
 
-/**
- * Round 89 (#104): one die a line names, with the chance of the result the line takes (the draw's own, absent when the simulator's draw
- * names none) and whether it could have gone the other way in a way the user wants to see (`shown`: ruling 33, question 3a). `ko`
- * counts the damage rolls of a die whose roll decides a knock-out.
- */
+/** One die a line names: the chance of its result (absent when the draw names none), `shown` if it could differ. */
 export interface LineDie { die: ForcedDie; chance?: number; shown: boolean; ko?: { rolls: number; of: number } }
 
-/** One side's click of a step: the engine's choice string and label, and the slot choices the branch layer replays (the dice ride on their holders). */
+/** One side's click of a step: the engine's choice string and label, and the slot choices the branch layer replays. */
 export interface LineChoice { choice: string; label: string; slots: (BranchSlotChoice | null)[] }
 
-/**
- * One step of a line: a turn, or a replacement after a faint or a pivot (`replacement` names the side that picks, `both` when both do;
- * the other side waits). `dice` are the dice the step names, each at its likeliest result.
- */
+/** One step of a line: a turn, or a replacement after a faint or a pivot (`replacement` names who picks). */
 export interface LineStep { p1: LineChoice; p2: LineChoice; replacement?: 'p1' | 'p2' | 'both'; dice: LineDie[] }
 
-/**
- * Round 89 (#104): the line of one row. `for` says which of the turn's two lines it is (the engine's best row, the row the player
- * played; one line carries both when they are the same row). `end` is the static evaluation after the last step from `side`'s view
- * (the value space of `RankedChoice.worstCase`), `endFainted` that position's fainted share. `cut` says why a line stops short of the
- * tree's own (a step no longer legal after the likeliest dice), `awaits` who the last position asks to send a body in (a pivot's or a faint's switch the tree made no choice for); `unforced` lists what the replay left to the stream (a die the draw
- * cannot name, a draw no die names), so the click depends on the seed there.
- */
+/** The line of one row; `for` says which of the turn's two lines it is (one line carries both when the rows agree). */
 export interface EvalLine {
   side: 'p1' | 'p2';
   label: string;
   choice: string;
   for: ('engine' | 'played')[];
   steps: LineStep[];
+  /** The static evaluation after the last step from `side`'s view (the value space of `RankedChoice.worstCase`). */
   end: number;
   endFainted: number;
   visits: number;
-  /**
-   * Round 89 (#153, Hard mode): `worst` marks the line of this row against the reply that hurts it most (`worstAnswer`), which a turn
-   * holds beside the row's usual line (same side, label and roles). Absent: the usual line, which meets the search's own top answers.
-   */
+  /** `worst`: the line of this row against the reply that hurts it most (`worstAnswer`); absent: the usual line. */
   versus?: 'worst';
+  /** Why the line stops short of the tree's own: a step no longer legal after the likeliest dice. */
   cut?: string;
-  /** The side (or both) the position after the last step asks to send a body in: a line ends when a choice is needed that the tree did not make. */
+  /** The side (or both) that must send a body in after the last step: a choice the tree did not make. */
   awaits?: 'p1' | 'p2' | 'both';
+  /** What the replay left to the stream (a die the draw cannot name, a draw no die names): the seed decides there. */
   unforced?: string[];
 }
 
 /** One step of a row's line as a tree carries it: both sides' choices by label and the visits of its cell. */
 export interface TreeLineStep { p1: string; p2: string; visits: number }
 
-/**
- * A tree's lines for each root row that holds one, by side and row label: up to three per row, the tree's own first (round 89, G12).
- * Round 89 (#153, Hard mode): `floor` is, by side and row label, the tree's line through the cell of the row's floor answer (the caller
- * names it) when that cell holds the visits a line needs; it stays apart from the lists the plain request's donors read. Absent: none.
- */
+/** A tree's lines per root row, by side and label (up to three, its own first); `floor`: through the floor answer. */
 export interface RowLines { p1: Record<string, TreeLineStep[][]>; p2: Record<string, TreeLineStep[][]>; floor?: { p1: Record<string, TreeLineStep[]>; p2: Record<string, TreeLineStep[]> } }
 
-/**
- * One line to replay: the row, the trees' lines for it best first (the next one stands in when a replay is cut) and the visits of the first.
- * Round 89 (#153): `versus: 'worst'` asks for the row's line against the reply that hurts it most (`worstAnswer`); absent: the usual line.
- */
+/** One line to replay: the row, the trees' lines for it best first (the next stands in when one is cut). */
 export interface LineRequest { side: 'p1' | 'p2'; label: string; for: ('engine' | 'played')[]; donors: TreeLineStep[][]; visits: number; versus?: 'worst' }
 
 /** The lines job: the requests, and the settings the root's options need to resolve the first labels. */
 export interface LinesInput { requests: LineRequest[]; tera?: TeraAllowance; sleepClause?: boolean; keepPlayed?: EvalSettings['keepPlayed'] }
 
-/**
- * One switch-in-stage row (round 14): every BENCHED enemy loses the entry
- * race to this mon, while the named standing active still holds the pair —
- * the expert's "no remaining switch-ins" state (648453 t13: Lopunny-Mega
- * held only by the standing Tornadus-T; the bench can only sacrifice).
- */
+/** A switch-in-stage row: every BENCHED enemy loses the entry race to this mon; the standing active still holds. */
 export interface EntryUnanswered {
   species: string;
-  /** Species of the standing active that still wins (or holds) the pair. */
   heldBy: string;
 }
 
-/**
- * Root unanswered-mon profile. `p1`/`p2` list mons no living enemy answers
- * at all (round 13); the optional entry lists carry the weaker round-14
- * stage — bench exhausted, active still holding. Entry lists are present
- * only when non-empty, so round-13 cache entries and pins read unchanged.
- */
-/**
- * Round 15: the board says the game is practically over — one mon clears
- * the WHOLE living enemy team in sequence and survives the accumulated
- * expected return fire, and the other side has no such mon. Pairwise
- * unanswered is a threat; this is stronger (648453 t13: Lopunny wins every
- * fresh pair yet dies to the series). Narrative/display input only — the
- * score path never reads it.
- */
+/** One mon clears the WHOLE living enemy team in sequence and survives the return fire; no score reads it. */
 export interface DecidedSweep {
   side: 'p1' | 'p2';
   species: string;
 }
 
-/**
- * Round 15: one high-odds click from decided — a boundary event against
- * the standing enemy active (accuracy × kill share, round 6) at or above
- * the near threshold removes it and the REST clears in sequence (573756
- * t73: a 95% Fire Fang away from the sweep).
- */
+/** One high-odds click from decided: a boundary event at the near threshold removes the enemy active. */
 export interface NearDecidedSweep {
   side: 'p1' | 'p2';
   species: string;
   /** accuracy × kill share of the unlocking click (≥ NEAR_DECIDED_ODDS). */
   odds: number;
-  /** Species of the standing enemy active the click removes. */
   removes: string;
-  /** Round 80 (T292): the click's move id and, in doubles, the target's location, as a played choice writes them. */
+  /** The click's move id and, in doubles, the target's location, as a played choice writes them. */
   click?: { move: string; target?: number };
 }
 
+/** What the proof leaves open: nothing, barring a crit, or on sampled damage rolls. */
 export type ForcedWinCaveat = 'none' | 'barring-crit' | 'sampled-rolls';
 
 /** The heaviest open outcome class of the proven root cell, for the sentence (own side's event only). */
 export interface ForcedWinOpen {
   side: 'p1' | 'p2';
   moveId: string;
-  /** Display name of the move ("Fire Fang"). */
   label: string;
   /** Analytic share of the proven outcome of this event (0.95 = the hit lands). */
   odds: number;
@@ -433,44 +264,31 @@ export interface ForcedWinOpen {
   kind: 'hit' | 'kill';
 }
 
-/**
- * Round 35: a forced win proven in the sim from the root: one own line
- * against every reply, per outcome class. `mass` is the proven share of
- * the outcome classes (a lower bound under the class model, caveat
- * named); `turns` the deepest proven line in own moves. `engineScore`
- * keeps the search's score before the bar. Present only at or above
- * MIN_FORCED_MASS.
- */
+/** A forced win proven in the sim from the root: one own line against every reply, per outcome class. */
 export interface ForcedWin {
   side: 'p1' | 'p2';
   turns: number;
+  /** The proven share of the outcome classes (a lower bound under the class model, caveat named). */
   mass: number;
   caveat: ForcedWinCaveat;
-  /** Round 89 (P2): the id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones the knock-out). Absent when no cell of the proof leans on a delay. */
+  /** The id of the stalling move whose repeats the proof delays (a foe that Protects again only postpones). */
   delay?: string;
-  /** Round 89 (P3): the root choice that proves the win, when the search's own list does not hold it (a sure strike from the legal combinations); absent when the choice is one of the list's. */
+  /** The root choice that proves the win, when the search's own list does not hold it (a sure strike). */
   choice?: string;
-  /** Round 89 (P4): the Dex names the card prints: of `delay` ("Protect"; a result without it says "a repeated stalling move") and of `choice` (the move that strikes first and, in doubles, its partner). */
+  /** The Dex names the card prints for `delay` ("Protect") and `choice` (the first striker, in doubles its partner). */
   delayName?: string; choiceNames?: { first: string; partner?: string };
   open?: ForcedWinOpen;
   engineScore: number;
-  /** Prover states expanded (both side attempts). */
   states: number;
 }
 
-/** The endgame scope (rounds 34 and 35): at most this many living bodies on the board. */
+/** The endgame scope: at most this many living bodies on the board. */
 export const ENDGAME_MAX_BODIES = 3;
-/** Proofs below this mass change nothing; a proof at exactly this mass (a coin flip) stays on the result without a bar (round 35). */
+/** Proofs below this mass change nothing; one at exactly this mass (a coin flip) stays on the result without a bar. */
 export const MIN_FORCED_MASS = 0.5;
-/**
- * Outside the small endgame the prover runs only when the search already
- * reads the board at this score or beyond (round 35 follow-up): on the
- * 90-position bank no proof stood below 0.6, one of ten between 0.6 and
- * 0.8, and 24 of 50 at 0.8 or more, while 42 of 573756's 51 decided turns
- * sit below 0.6 and would only pay the probe.
- */
+/** Outside the small endgame the prover runs only when the search already reads the board at this score or beyond. */
 export const PROVER_SCORE_FLOOR = 0.6;
-/** Proofs at or above this mass are spoken (round 35). */
+/** Proofs at or above this mass are spoken. */
 export const SPOKEN_MASS = 0.9;
 
 /** What the prover needs from a finished search (main-thread safe). */
@@ -480,11 +298,10 @@ export interface ForcedWinInput {
   rootOrder: { p1: string[]; p2: string[] };
   tera?: TeraAllowance;
   sleepClause?: boolean;
-  /** Round 65: the search's rule set (EvalSettings.ruleset), for the prover's statics. */
   ruleset?: StaticRuleset;
 }
 
-/** The prover's answer; `delay`, `choice` and their names (round 89, lane P) are the optional fields of `ForcedWin`, which the proof hands on unchanged. */
+/** The prover's answer; `delay`, `choice` and their names are `ForcedWin`'s optional fields, handed on unchanged. */
 export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice' | 'delayName' | 'choiceNames'> {
   mass: number;
   turns: number;
@@ -493,31 +310,29 @@ export interface ForcedWinProof extends Pick<ForcedWin, 'delay' | 'choice' | 'de
   /** p1-perspective static of the open root children, share-weighted; null without open root children. */
   openValue: number | null;
   states: number;
-  /** Matrix cells drawn (both side attempts); the prover's cost. */
   cells: number;
 }
 
+/** The side a proof is for, and the proof. */
 export interface ForcedWinOutcome { side: 'p1' | 'p2'; proof: ForcedWinProof }
 
+/** Root unanswered-mon profile: mons no living enemy answers at all, plus the entry lists (bench exhausted). */
 export interface UnansweredProfile {
   p1: string[];
   p2: string[];
   p1Entry?: EntryUnanswered[];
   p2Entry?: EntryUnanswered[];
-  /** Present only when exactly one side sweeps (round-14 caches read unchanged). */
+  /** Present only when exactly one side sweeps. */
   decided?: DecidedSweep;
   /** Present only when no decided sweep stands and exactly one side is a roll away. */
   nearDecided?: NearDecidedSweep;
 }
 
+/** The solved root matrix: labels, p1-perspective values and the equilibrium mixes. */
 export interface EvalMatrix {
   p1Labels: string[];
   p2Labels: string[];
-  /**
-   * Machine-readable choice ids aligned with the label arrays — the Read
-   * lens classifies and matches on these, never on display labels. Optional
-   * only for cached results written before the ids existed.
-   */
+  /** Machine-readable choice ids aligned with the label arrays: the Read lens matches on these, never on labels. */
   p1Choices?: string[];
   p2Choices?: string[];
   /** values[i][j]: p1-perspective wp-unit value of (p1Labels[i], p2Labels[j]). */
@@ -525,30 +340,19 @@ export interface EvalMatrix {
   /** Equilibrium average strategies, index-aligned with the label arrays. */
   mixes: { p1: number[]; p2: number[] };
   /**
-   * Round 69 (T64): what stands behind each cell of `values` (same indices):
-   * the tree visits pooled over the cell, and whether the verify step
-   * re-priced it. A one-or-two-visit cell is a guess, a verified one is not
-   * (the hindsight line shows its number only past 8 visits or verified).
-   * Absent on matrix-mode results (every cell matrix grade) and on results
-   * cached before the field existed.
-   * Round 69 (T178): `plan` is planCellEvents' answer for the cell (none: a
-   * deterministic pair; events: a priced roll; fail: a guard tripped) and
-   * `classes` the outcome classes of an events cell with their analytic
-   * weights (summing to 1). Both stay absent where the planner was not run
-   * (a sibling tree's own result). Round 70 (T217): a doubles result carries
-   * them for the played row and column only (the pair plan's answer,
-   * pair/root-plan.ts; the rest of the grid reads fail), and only when the
-   * search was given the played turn (keepPlayed).
+   * What stands behind each cell of `values` (same indices): the tree visits pooled over the cell, and whether the
+   * verify step re-priced it. A doubles result carries `plan` and `classes` for the played row and column only.
    */
   cells?: MatrixCell[][];
 }
 
-/** Round 69 (T178): what planCellEvents says about a root cell. */
+/** What planCellEvents says about a root cell: a deterministic pair, a priced roll, a guard tripped. */
 export type CellPlanKind = 'none' | 'events' | 'fail';
 
 /** One outcome class of a rolled cell (`miss`, `hit-kill`, `hit-nokill|hit-kill`) with its analytic weight. */
 export interface CellOutcomeClass { key: string; weight: number }
 
+/** What stands behind one cell of `EvalMatrix.values`. */
 export interface MatrixCell {
   visits: number;
   verified: boolean;
@@ -556,33 +360,30 @@ export interface MatrixCell {
   classes?: CellOutcomeClass[];
 }
 
-/**
- * Round 69 (T178): a root cell the planner answered for ('fail' cells are not listed): every singles cell and, since round 70
- * (T217), the doubles cells of the played row and column.
- */
+/** A root cell the planner answered for ('fail' cells are not listed): every singles cell, the doubles played cells. */
 export interface PlannedCell { key: number; plan: 'none' | 'events'; classes?: CellOutcomeClass[] }
 
 /** An exploitative recommendation: best response to the opponent MODEL. */
 export interface ReadRecommendation {
-  /** choiceId is the machine id ('move recover', 'switch 3'); absent only on cached reads predating ids. */
+  /** choiceId is the machine id ('move recover', 'switch 3'); absent on cached reads without ids. */
   choice: { label: string; ev: number; worstCase: number; choiceId?: string };
   /** Own-perspective EV against the model (wp-units). */
   net: number;
-  /** The model's top opponent probability — reads only surface when confident. */
+  /** The model's top opponent probability; reads only surface when confident. */
   confidence: number;
   breakdown: { label: string; prob: number; value: number }[];
 }
 
+/** The worker's progress report: `done` of `total` at the depth being searched. */
 export interface SearchProgress {
   done: number;
   total: number;
-  /** Depth currently being searched. */
   depth: number;
 }
 
 export type { EvalCellJob, EvalCellValue, EvalChoiceOption, EvalChoicesInfo, EvalSubSearchJob } from './executor-types.ts';
 
-/** One MCTS tree's root statistics — mergeable across parallel trees. */
+/** One MCTS tree's root statistics, mergeable across parallel trees. */
 export interface MctsTreeStats {
   p1Options: EvalChoiceOption[];
   p2Options: EvalChoiceOption[];
@@ -592,85 +393,39 @@ export interface MctsTreeStats {
   p2W: number[];
   visits: number;
   depth: number;
-  /** Root static (p1 perspective) — the unexpanded-cell fallback. */
+  /** Root static (p1 perspective), the unexpanded-cell fallback. */
   rootValue: number;
-  /**
-   * Round 77 (T267): the living Pokémon of each side at the root. With at most VERIFY_ENDGAME_LIVING left on each side
-   * the trees play the game to its end, and a rich, agreeing pool keeps its depth below VERIFY_DEPTH_FLOOR
-   * (mcts-merge.ts). Absent on trees from before, which keep the floor.
-   */
+  /** The living Pokémon of each side at the root (mcts-merge.ts: VERIFY_ENDGAME_LIVING, VERIFY_DEPTH_FLOOR). */
   living?: { p1: number; p2: number };
-  /**
-   * Per-option kill odds at the root (index-aligned with the option lists;
-   * absent for dead roots). Round 7: the merge attaches these to ranked
-   * rows — mcts-merge stays sim-free, so the worker ships the facts.
-   */
+  /** Per-option kill odds at the root (index-aligned with the option lists; absent for dead roots). */
   koOdds?: { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
-  /**
-   * Root cells with ≥1 priceable boundary event (planCellEvents kind
-   * 'events') — chance-suspect by construction: K fixed outcomes cannot
-   * represent an accuracy×killFraction split. Drives the verify sampler.
-   */
+  /** Root cells with a priceable boundary event (planCellEvents kind 'events'); they drive the verify sampler. */
   boundaryCells?: number[];
   /**
-   * Round 69 (T178): the planner's answer per singles root cell (none and
-   * events; a cell that is missing failed), with the outcome classes of the
-   * events cells. Shipped by the offset-0 tree beside boundaryCells; the
-   * merge writes it into EvalMatrix.cells. Round 70 (T217): a doubles root
-   * ships the pair plan's answer for the played row and column (the cells the
-   * card reads) when the search was given the played turn (settings.keepPlayed);
-   * absent otherwise.
+   * The planner's answer per singles root cell (a missing cell failed), shipped by the offset-0 tree into
+   * EvalMatrix.cells. A doubles root ships it for the played row and column when the search got keepPlayed.
    */
   plannedCells?: PlannedCell[];
-  /**
-   * Round 67 (T128): every legal choice of each side at a doubles root
-   * (legalChoices, the simulator's list), shipped by the offset-0 tree only:
-   * the answer round grades each side against the other side's answers the
-   * tree did not list. Absent for singles and on sibling trees.
-   */
+  /** Every legal choice of each side at a doubles root, shipped by the offset-0 tree only; absent for singles. */
   p1Legal?: EvalChoiceOption[];
   p2Legal?: EvalChoiceOption[];
-  /**
-   * Root-cell tree stats for the merged equilibrium ranking: `total` is the
-   * sum of every leaf value backed through the cell (expansion included),
-   * `value` the child's creation-time static (the one-visit prior).
-   */
+  /** Root-cell stats for the merged ranking: `total` sums the leaf values through the cell, `value` is the prior. */
   cells: {
     key: number; visits: number; total: number; value: number; ended: boolean;
-    /**
-     * The drawn child's outcome class on a boundary cell, when the
-     * classifier recognized it (round 33) — lets the merge pool trees per
-     * class instead of trusting one open class only.
-     */
+    /** The drawn child's outcome class on a boundary cell, when recognized: the merge pools trees per class. */
     classKey?: string;
-    /**
-     * Round 89 (#59, T322 block 1): the plan's chance of the drawn class (the Dex weight the sampler gives it, half of it in a tied
-     * singles cell), booked beside `classKey`. Absent on an unkeyed cell and on a class the fold names no weight for.
-     */
+    /** The plan's chance of the drawn class (half of the Dex weight in a tied singles cell). */
     classWeight?: number;
-    /**
-     * Round 43: a root chance cell's outcome classes with their subtree
-     * stats (`total` = leaves backed through the class, `value` = the
-     * class child's static, one prior each); the merge pools them per
-     * class. Absent on single-child cells.
-     */
-    classes?: { key: string; weight: number; visits: number; total: number; value: number; ended: boolean }[];
   }[];
   /** This tree's own ranked result (PV/punisher donor for the merge). */
   result: EvalResult;
-  /** Round 89 (#104): the tree's line for each root row that holds one, read by the lines job. Absent on trees from before. */
   rowLines?: RowLines;
 }
 
-/** Round 59: the speed-layer levers; round 61: the search budget. Both ride on every request (several carry no EvalSettings). */
 interface SimFastStamp { simFast?: readonly SimFastLever[]; searchBudget?: SearchBudget }
-/**
- * Round 65: the rule set of the position a message is about. The worker
- * keys its executors by position and rule set, so cells, sub-searches and
- * proofs read the statics of the replay's game.
- */
 interface RulesetStamp { ruleset?: StaticRuleset }
 
+/** A message to the engine worker. */
 export type EvalWorkerRequest = (
   | { type: 'search'; id: number; serializedBattle: string; settings: EvalSettings }
   | { type: 'mctstree'; id: number; serializedBattle: string; settings: EvalSettings; seedOffset: number; partials?: true }

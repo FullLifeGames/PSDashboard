@@ -8,11 +8,6 @@ import { appendTurn, newGameRecord, type NewGameRecord } from '../../src/lib/new
 import { gameStartParams } from '../../src/hooks/branch/game-rebuild';
 import { leadHistoryEntry, replayHistoryEntry } from '../../src/hooks/branch/replay-entry';
 
-/**
- * Round 89 (lane H, #105), stage H5: a new game played through the calls the hooks make, for the specs of the share link and the
- * state file (the invariant spec of H3, `new-game-log.spec.ts`, keeps its own copy of the loop with the re-adopting mode).
- */
-
 export const SIX: PokemonSet[] = ['Garchomp', 'Gengar', 'Dragonite', 'Tyranitar', 'Snorlax', 'Starmie'].map(species => ({
   name: species, species, item: '', ability: '', moves: ['Earthquake', 'Protect', 'Return', 'Substitute'], nature: '', gender: '',
   evs: { hp: 4, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100,
@@ -29,7 +24,6 @@ export const FAMILIES: Family[] = [
 type Side = 'p1' | 'p2';
 const id = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The default picks of a side at a request: its forced replacements, else a usable move of each live slot (the rotation varies the move). */
 function picks(state: BranchSimState, side: Side, rotate: number): (BranchSlotChoice | null)[] {
   const forced = state[`${side}ForceSwitches`];
   const taken = new Set<string>();
@@ -68,7 +62,6 @@ export const leadsOf = (family: Family) => {
   return { p1: list, p2: list, ...(family.bring ? { bring: true } : {}) };
 };
 
-/** A game of up to `turns` finished turns on `seed`, played the way the hooks play it, as the record the app would have saved. */
 export async function playRecord(family: Family, turns: number, seed = '7,8,9,10', teams: { p1: PokemonSet[]; p2: PokemonSet[] } = { p1: SIX, p2: SIX }): Promise<NewGameRecord> {
   await loadSimMods(family.format);
   const start = await startGameLog({ format: family.format, p1Team: teams.p1, p2Team: teams.p2, playerNames: ['Alice', 'Bob'], seed });

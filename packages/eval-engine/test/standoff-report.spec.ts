@@ -4,14 +4,6 @@ import { buildGameReport } from '../src/report';
 import { STANDOFF_MIN_TURNS, standoffsOf } from '../src/standoff';
 import type { RankedChoice } from '../src/types';
 
-/**
- * Round 79 (T285): a standoff is a run of at least STANDOFF_MIN_TURNS consecutive analyzed turns in which nobody fainted and
- * nobody switched (573756 turns 79 to 137: two burned Toxapex, p2's PP running out). Inside it the swing is the HP and PP
- * cycle of one position, so shifts, rolls and reads stay out of the key moments and the reads list; graded decisions (a
- * misplay, a decision moment) stay. The window comes from the analyses alone. Singles read playedRaw, doubles the slot
- * lists (a doubles label can carry a switch after another action); without played tracking a switch cannot be seen and
- * the rule stays closed.
- */
 
 const names: [string, string] = ['Alpha', 'Beta'];
 
@@ -22,16 +14,13 @@ const sw = { kind: 'switch' as const, name: 'Zapdos', species: 'Zapdos' };
 const sideOf = (extra: Partial<SideAnalysis> = {}): SideAnalysis =>
   ({ playedRaw: move, played: choice('Recover'), best: choice('Recover'), safe: null, regret: 0, ...extra });
 
-/** One turn at a constant fainted share (no faint inside it unless `after` differs). */
 const mk = (turn: number, over: Partial<TurnAnalysis> = {}): TurnAnalysis => ({
   turn, scoreBefore: -0.5, scoreAfter: -0.5, swing: 0, playedOutcome: null, decisionDelta: null, chanceDelta: null,
   attribution: 'quiet', playedTracking: true, faintedFraction: 0.75, faintedFractionAfter: 0.75,
   p1: sideOf(), p2: sideOf(), ...over,
 } as TurnAnalysis);
 
-/** A shift: a swing of 0.4 with no single culprit. */
 const shift = (turn: number): TurnAnalysis => mk(turn, { scoreBefore: -0.5, scoreAfter: -0.1, swing: 0.4, attribution: 'shift' });
-/** A paid-off read by p1 (a gain, so it stays on the list outside a standoff). */
 const readOf = (turn: number): TurnAnalysis => mk(turn, {
   scoreBefore: -0.5, scoreAfter: -0.3, swing: 0.2, attribution: 'p1-read',
   p1: sideOf({ riskPaidOff: true, riskPayoff: 0.28 }),
@@ -40,14 +29,13 @@ const misplayOf = (turn: number): TurnAnalysis => mk(turn, {
   p2: sideOf({ regret: 0.3, tier: 'blunder', played: choice('Recover'), best: choice('Scald') }),
 });
 
-/** Twelve quiet turns (1..12) with `edits` replacing single turns. */
 const game = (edits: TurnAnalysis[], count = 12): TurnAnalysis[] => {
   const byTurn = new Map(edits.map(analysis => [analysis.turn, analysis]));
   return Array.from({ length: count }, (_, i) => byTurn.get(i + 1) ?? mk(i + 1));
 };
 const turnsOf = (list: { turn: number }[]) => list.map(entry => entry.turn);
 
-describe('the standoff window (T285)', () => {
+describe('the standoff window', () => {
   test('twelve turns without a faint or a switch are one standoff', () => {
     expect(STANDOFF_MIN_TURNS).toBe(10);
     expect(standoffsOf(game([]))).toEqual([{ from: 1, to: 12 }]);
@@ -58,7 +46,6 @@ describe('the standoff window (T285)', () => {
   });
 
   test('a faint ends the run on its own turn: the faint turn is no standoff turn', () => {
-    // The fainted share changes between turn 6 and 7: turns 1-5 and 7-12 (5 and 6 turns) are no standoff.
     const faint = mk(6, { faintedFractionAfter: 0.875 });
     const after = [7, 8, 9, 10, 11, 12].map(turn => mk(turn, { faintedFraction: 0.875, faintedFractionAfter: 0.875 }));
     expect(standoffsOf(game([faint, ...after]))).toEqual([]);
@@ -104,7 +91,7 @@ describe('the standoff window (T285)', () => {
   });
 });
 
-describe('the report inside a standoff (T285)', () => {
+describe('the report inside a standoff', () => {
   test('a shift and a read inside the run leave the key moments and the reads', () => {
     const report = buildGameReport(game([shift(5), readOf(8)]), names, 'p2');
     expect(turnsOf(report.keyMoments)).toEqual([]);
@@ -142,7 +129,6 @@ describe('the report inside a standoff (T285)', () => {
   });
 
   test('the slot of a dropped standoff turn stays empty', () => {
-    // Turns 1-12 are a standoff holding the biggest shift; turns 13-17 are single moments outside it.
     const outside = [13, 14, 15, 16, 17].map(turn => mk(turn, {
       faintedFraction: 0.875, faintedFractionAfter: turn === 17 ? 1 : 0.875,
       scoreBefore: -0.5, scoreAfter: -0.5 + 0.3 + (turn - 13) * 0.01, swing: 0.3 + (turn - 13) * 0.01, attribution: 'shift' as const,
@@ -150,7 +136,6 @@ describe('the report inside a standoff (T285)', () => {
     const faint = mk(12, { faintedFractionAfter: 0.875, scoreBefore: -0.5, scoreAfter: -0.5 });
     const big = { ...shift(5), swing: 0.9, scoreAfter: 0.4 };
     const report = buildGameReport([...game([big, faint]), ...outside], names, 'p2');
-    // The faint turn 12 ends the run at 11. The top four by rank are 5, 17, 16, 15; turn 5 is inside the run and drops out.
     expect(turnsOf(report.keyMoments)).toEqual([15, 16, 17]);
   });
 

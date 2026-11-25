@@ -32,8 +32,6 @@ describe('legal option pools', () => {
     expect(getAbilityPool('Machoke', 2)).toEqual([]);
   });
 
-  // Round 83 (T308, GitHub issue #2): the editor takes a move or an ability the species cannot have, so it needs the
-  // generation's whole list next to the species' own pool.
   test('the whole move list of a generation holds what the species cannot learn and nothing the Dex does not know', () => {
     const gen9 = getEveryMovePool(9);
     expect(gen9).toEqual(expect.arrayContaining(['Spore', 'Power Whip', 'Earthquake']));
@@ -66,5 +64,25 @@ describe('legal option pools', () => {
     expect(getTeraTypePool(8)).toEqual([]);
     expect(NATURES).toHaveLength(25);
     expect(NATURES).toContain('Jolly');
+  });
+});
+
+describe('move pools of alternate formes', () => {
+  test('Rotom-Wash learns what Rotom learns, plus Hydro Pump', async () => {
+    const pool = await getMovePool('Rotom-Wash', 9);
+    expect(pool).toEqual(expect.arrayContaining(['Hydro Pump', 'Thunderbolt', 'Volt Switch', 'Will-O-Wisp']));
+  });
+
+  test('Necrozma-Dusk-Mane keeps Necrozma\'s moves next to its own', async () => {
+    const pool = await getMovePool('Necrozma-Dusk-Mane', 9);
+    expect(pool).toEqual(expect.arrayContaining(['Sunsteel Strike', 'Photon Geyser', 'Earthquake']));
+  });
+
+  test('prevos and the generation filter work as before', async () => {
+    expect(await getMovePool('Machoke', 3)).toContain('Low Kick');
+    expect(await getMovePool('Machoke', 3)).not.toContain('Close Combat');
+    const garchomp = await getMovePool('Garchomp', 9);
+    expect(garchomp).toContain('Earthquake');
+    expect(garchomp).not.toContain('Spore');
   });
 });

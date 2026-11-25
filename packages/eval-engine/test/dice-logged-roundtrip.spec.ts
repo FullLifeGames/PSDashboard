@@ -11,12 +11,6 @@ import {
 import { secondariesIn } from '../src/dice/secondaries';
 import { dexOfRules } from './dice-sweep-support';
 
-/**
- * Round 82 (forced dice), step A5: the simulator is the oracle of the log reader. A turn played on one seed writes a log;
- * its logged dice, forced on the same board under another seed, give a turn with the same accuracy, crits, secondaries,
- * hit counts, cants and move order. Every rule set the corpus plays, singles and doubles. The damage rolls stay with the
- * seed (the spec compares no HP).
- */
 await loadSimMods('gen9championsou');
 
 const par = (battle: Battle): void => void battle.sides[0].active[0]!.setStatus('par');
@@ -24,7 +18,6 @@ const confuse = (battle: Battle): void => void battle.sides[0].active[0]!.addVol
 
 interface RoundScene extends Scene { checks?: string[] }
 
-/** Chansey, the foe: it survives every hit of the scenes (a faint changes the turn for a reason that is no die), and outspeeds Snorlax. */
 const CHANSEY = (moves: string[]): Mon => ({ species: 'Chansey', moves });
 
 const SCENES: RoundScene[] = [
@@ -49,7 +42,6 @@ function optionsOf(rules: Rules, scene: RoundScene, mode: Mode): LoggedOptions {
 
 const SEEDS = 6;
 
-/** A multi-hit move whose hits crit unevenly: a die applies to every hit, so the log cannot be forced for it and the crits stay with the seed. */
 const unevenCrits = (log: string[]): boolean =>
   loggedActions(log).some(action => Object.entries(action.crits).some(([slot, crits]) => crits < (action.damaged[slot] ?? 0)));
 const PERFECT = (score: AlignmentScore): boolean => compareAlignment(score, { endedMismatch: false, faintMismatches: 0, softMismatches: 0 }) === 0;
@@ -81,7 +73,6 @@ describe.each(cases)('the log of a turn, forced on another seed, gives the same 
         const dice = loggedDice(log, options);
         if (dice.length === 0 || unevenCrits(log)) continue;
         played++;
-        // the natural turn on the other seed: does it differ from the log at all?
         const natural = boardOf(rules, scene, mode, seedOf(index + 40))!;
         const naturalStart = natural.log.length;
         playClicks(natural, clicks);

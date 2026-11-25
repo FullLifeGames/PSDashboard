@@ -7,12 +7,7 @@ import { summarizeTurn } from '../src/summary';
 import { formatLine } from '../src/prose/line';
 import type { EvalResult, RankedChoice } from '../src/types';
 
-/**
- * Round 63 (T18, decision 16): a main line never shows the waiting
- * placeholder. At a forced-switch node one side cannot act; the step reads
- * as the other side's click alone.
- */
-describe('T18 point 5: main lines without the waiting placeholder', () => {
+describe('main lines without the waiting placeholder', () => {
   test('singles: the waiting half of a step drops, both halves of a normal step stay', () => {
     expect(formatLine([
       { p1: '→ Keldeo', p2: '(waiting)' },

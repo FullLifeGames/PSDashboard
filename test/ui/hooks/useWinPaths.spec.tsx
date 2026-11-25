@@ -7,10 +7,6 @@ import { useWinPaths } from '../../../src/hooks/useWinPaths';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 
-/**
- * Round 89 (#130), step G8b: the hook behind the Endgame row. The worker client is a stand-in that records what it was asked and lets
- * the test finish its steps one by one; the hook is the only caller of the job.
- */
 interface Call { position: string; request: WinPathsRequest; ruleset: string; signal: AbortSignal; onStep: (step: WinStep) => void; finish: (paths: WinPaths) => void; fail: (error: Error) => void }
 const calls: Call[] = [];
 const disposed = vi.fn();
@@ -84,7 +80,6 @@ describe('useWinPaths', () => {
 
   test('the search for a turn asks the worker with the turn\'s ranking and shows the steps as they arrive', async () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g4', 'BKC')));
-    // BKC won: devin (p2) lost
     expect(hook.current.endgame?.loser).toBe('p2');
     act(() => hook.current.show(3, 'review'));
     expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', steps: [], status: 'positioning', from: 'review' });
@@ -98,7 +93,6 @@ describe('useWinPaths', () => {
       foeRanking: [{ choice: 'move scald', ev: 0.3 }, { choice: 'move hydropump', ev: 0.2 }], played: 'move highjumpkick', tera: true, sleepClause: true, ruleset: 'standard',
     });
     expect(hook.current.playedLabel(3)).toBe('High Jump Kick');
-    // a choice the log shows is no stand-in; the stand-in of a body knocked out before it moved is named so (G13b)
     expect(hook.current.playedNeverActed?.(3)).toBe(false);
     act(() => calls[0].onStep(step('stronger')));
     expect(hook.current.run?.steps.map(item => item.kind)).toEqual(['stronger']);

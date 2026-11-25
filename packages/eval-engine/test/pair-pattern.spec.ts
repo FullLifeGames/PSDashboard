@@ -18,12 +18,10 @@ const pattern = (value: PatternRead): Pattern => {
   return value as Pattern;
 };
 
-describe('a draw read as a class of the pair plan (round 56)', () => {
+describe('a draw read as a class of the pair plan', () => {
   test('the played cell: the Play Rough miss at 10 %, the Matcha Gotcha hit at 90 %, the sure Flare Blitz kill is no event', () => {
     const read1 = pattern(read(anchorRoot(), ...PLAYED));
-    // Round 86 (T305): the Matcha Gotcha burned Sinistcha's side in this draw, and the burn die (20 percent) is part of the class.
-    // Old expectation: the key ended in `=hit-nokill` and the weight was 0.09 (the miss at 10 percent times the hit at 90 percent).
-    // New: the key ends in `=hit-nokill+brn` and the weight multiplies the burn's chance (0.09 * 0.2).
+    // Weight 0.09 * 0.2: the miss (10 percent) times the hit (90 percent), times the burn die (20 percent).
     expect(read1.key).toBe('p1b:playrough>p2b=miss|p2a:matchagotcha>p1b=hit-nokill+brn');
     expect(read1.weight).toBeCloseTo(0.018, 9);
     const [playRough] = read1.events;
@@ -62,11 +60,7 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
     expect(read(root, 'move thunderbolt 1, move softboiled', 'move thunderbolt 1, move softboiled')).toEqual({ kind: 'fallback', reason: 'tie' });
   });
 
-  // In the built battles below every acting body has its own speed: two equal bodies on one priority are a
-  // speed tie, and the tie rule answers before the rule a test is about.
-  // Round 86 (T305): a flinch die on a target that moves later is part of the hit's class. Old expectation: the read fell back with
-  // `flinch-chance` (a name list of items and abilities decided it) and a real flinch fell back with `cant:flinch`. New: the read is a
-  // pattern, the recorded die names the flinch, and the other result of the die is an alternative with the script that asks for it.
+  // Every acting body has its own speed in the builds below: two equal bodies on one priority are a speed tie.
   describe('a flinch die (Extrasensory, one time in ten, into two bodies that move later)', () => {
     const root = doublesRoot(
       [pairSet('Fast', 'Aerodactyl', ['Extrasensory', 'Protect'], { nature: 'Jolly', evs: { hp: 0, atk: 252, def: 0, spa: 0, spd: 4, spe: 252 } }), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
@@ -109,9 +103,8 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
     expect(read(root, 'move doublekick 1, move softboiled', 'move softboiled, move softboiled')).toEqual({ kind: 'fallback', reason: 'multi-roll' });
   });
 
-  test('a crit ignores the attacker\'s drop: the margin rule does not hide its kill (final review, finding 1)', () => {
-    // Garchomp at -2 Atk: Dragon Claw deals 49 to 58, a crit ignores the drop and deals 145 to 172. Snorlax
-    // at 120 HP survives every normal roll, dies to every crit: the hit is an event with a 1-in-24 kill class.
+  test('a crit ignores the attacker\'s drop: the margin rule does not hide its kill', () => {
+    // Dragon Claw at -2 Atk deals 49 to 58, a crit 145 to 172: Snorlax at 120 HP dies to every crit, to no normal roll.
     const root = doublesRoot(
       [pairSet('Chomp', 'Garchomp', ['Dragon Claw', 'Protect']), pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect'])],
       [pairSet('Lax', 'Snorlax', ['Rest', 'Protect']), pairSet('Wall2', 'Chansey', ['Soft-Boiled', 'Protect'])],
@@ -137,7 +130,7 @@ describe('a draw read as a class of the pair plan (round 56)', () => {
   });
 });
 
-describe('pair choices and the rules before the dice (round 56)', () => {
+describe('pair choices and the rules before the dice', () => {
   test('a lone body in slot b owns the single part of its side\'s choice', () => {
     const root = doublesRoot(
       [pairSet('Gone', 'Pikachu', ['Protect']), pairSet('Rock', 'Tyranitar', ['Rock Slide', 'Protect'])],

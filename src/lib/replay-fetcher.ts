@@ -7,34 +7,19 @@ type ReplayResponse = Omit<ReplayData, 'formatid'> & Partial<Pick<ReplayData, 'f
 
 const REPLAY_HOST = 'https://replay.pokemonshowdown.com';
 
-/**
- * Extracts a replay id from a URL or bare id. Returns null for input that
- * cannot be a replay id (empty field, foreign URLs, stray characters) so the
- * app can explain the problem instead of fetching `/.json` (G1/G2).
- *
- * A private replay's `-{password}pw` suffix is part of the id and is KEPT —
- * the replay server parses it off itself, and stripping it here would ask for
- * a replay the server refuses to serve without the password (G22).
- */
+/** The replay id of a URL or bare id (null if none); a private replay's `-{password}pw` suffix stays part of it. */
 export function parseReplayUrl(input: string): string | null {
   const trimmed = input.trim();
-  // Round 77 (user request 28.10.2026): Showdown's short link psim.us/r/<id> names the same replay.
   const match = trimmed.match(/replay\.pokemonshowdown\.com\/([a-z0-9-]+)/i) ?? trimmed.match(/psim\.us\/r\/([a-z0-9-]+)/i);
   if (match) return match[1].toLowerCase();
 
-  // A bare id tolerates the Showdown query flags riding along (…?p2).
   const bare = trimmed.replace(/[?#].*$/, '').replace(/\.(json|log)$/i, '');
   if (/^[a-z0-9-]+$/i.test(bare) && bare.length > 0) return bare.toLowerCase();
 
   return null;
 }
 
-/**
- * The replay host sends no CORS headers on its 404s, so a missing replay and a
- * network failure are indistinguishable in the browser (G1): a rejected fetch
- * carries no status at all. Report the status when there is one and null when
- * the request never produced a response.
- */
+// The replay host sends no CORS headers on its 404s: a rejected fetch has no status, so a missing replay reads as null.
 async function requestReplay(url: string): Promise<Response | null> {
   try {
     return await fetch(url);
@@ -48,9 +33,7 @@ function describeFailure(id: string, status: number | null): string {
     ? `Replay "${id}" was not found (HTTP ${status}).`
     : `Could not load "${id}": the replay does not exist or the network request failed.`;
 
-  // A password suffix says the link is a private replay, where "not found" has
-  // its own specific causes — an incomplete copy of the link, a rotated
-  // password, or a replay set back to private-without-password (G22).
+  // A password suffix says the link is a private replay (incomplete copy, rotated password, or set back to private).
   const [, password] = splitReplayPassword(id);
   if (password) {
     return `${base} This is a private replay link: it only loads with the full "-…pw" password suffix intact, ` +
@@ -59,7 +42,6 @@ function describeFailure(id: string, status: number | null): string {
   return `${base} Double-check the replay id.`;
 }
 
-/** Reads a JSON replay payload, or null when the body is not replay JSON. */
 async function readReplayJson(res: Response): Promise<ReplayResponse | null> {
   const text = await res.text();
   if (!text.trim()) return null;
@@ -67,8 +49,7 @@ async function readReplayJson(res: Response): Promise<ReplayResponse | null> {
     const data = JSON.parse(text) as ReplayResponse | null;
     return data && typeof data === 'object' ? data : null;
   } catch {
-    // An HTML error page served with a 200 would otherwise surface to the user
-    // as `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`.
+    // An HTML error page served with a 200 is no replay JSON.
     return null;
   }
 }
@@ -86,12 +67,7 @@ function finalize(data: ReplayResponse): ReplayData {
   };
 }
 
-/**
- * Reads the Showdown viewer-perspective flag off a replay link: `…?p2`
- * renders the battle from player 2's side (`…?p1` names the default side
- * explicitly). The flag is the literal `p1`/`p2` query key (optionally among
- * other flags), never a substring of the id.
- */
+/** The Showdown viewer-perspective flag of a link (`…?p2`): the literal query key, never a substring of the id. */
 export function parseReplayViewpoint(input: string): 'p1' | 'p2' {
   const flag = input.trim().match(/[?&](p[12])(?=$|[&#=])/i);
   return flag ? flag[1].toLowerCase() as 'p1' | 'p2' : 'p1';
@@ -105,8 +81,6 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
     );
   }
 
-  // The viewer-perspective flag rides the LINK, not the payload — it applies
-  // whichever route ends up serving the battle.
   const viewpoint = parseReplayViewpoint(urlOrId);
   const withViewpoint = (data: ReplayData): ReplayData =>
     viewpoint === 'p2' ? { ...data, viewpoint } : data;
@@ -115,17 +89,12 @@ export async function fetchReplay(urlOrId: string): Promise<ReplayData> {
   const data = jsonRes?.ok ? await readReplayJson(jsonRes) : null;
   if (data && hasLog(data)) return withViewpoint(finalize(data));
 
-  // The log lives behind a second route on the replay server, and the two do
-  // not always answer alike — the JSON route can come back empty, non-JSON, or
-  // refused while `.log` still serves the battle. Falling back costs one
-  // request on a path that was already failing, and it is the documented way
-  // to ask for the log alone.
+  // The JSON route can come back empty, non-JSON or refused while `.log` still serves the battle.
   const logRes = await requestReplay(`${REPLAY_HOST}/${id}.log`);
   if (logRes?.ok) {
     const log = await logRes.text();
     if (log.trim() && /^\|/m.test(log)) {
-      // Metadata from the JSON route is still worth keeping when it arrived
-      // without a log — it carries the true format id, players, and uploadtime.
+      // Metadata from the JSON route (the true format id, players, uploadtime) is kept when it arrived without a log.
       return data ? withViewpoint(finalize({ ...data, log })) : withViewpoint(replayDataFromLog(log, id));
     }
   }

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { replayData } from '../fixtures/replay';
 import { stubReplayFetch } from '../fixtures/network';
 import { realReplayWorkerClient } from '../fixtures/worker';
-import { deleteGame, listGames, saveGame } from '../../../src/lib/new-game/store';
+import { deleteGame, listGames, loadGame, saveGame } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 import { playedRecord } from '../fixtures/played-game';
 import { encodeBranchShare, encodeShareJson, readShare } from '../../../src/lib/branch-share';
@@ -42,27 +42,20 @@ async function startOnLanding(names: [string, string] = ['Alice', 'Bob']) {
   await userEvent.click(within(dialog).getByRole('button', { name: 'Start' }));
 }
 
-/**
- * Round 89 (lane H, #105), stage H4: the dialog inside the app. The start page offers New game beside the loader; Start opens the
- * game at Team Preview with its title row, its lead picker and its save; a replay loaded afterwards is a replay again.
- */
 describe('a new game in the app', () => {
   test('Start on the start page opens the game: the title row names it, the lead picker offers both teams, the game is saved', async () => {
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
-    // Start saved the record at once (D-E1): no lead is played yet
     expect(listGames()).toHaveLength(1);
     expect(listGames()[0].players).toEqual(['Alice', 'Bob']);
-    // the address names the game (H12a), so a reload brings it back
-    expect(window.location.search).toBe(`?game=${listGames()[0].id}`);
+    await waitFor(() => expect(window.location.search).toBe(`?game=${listGames()[0].id}`));
     expect(screen.queryByRole('dialog', { name: 'New game' })).toBeNull();
     const bar = document.querySelector('.ps-topbar') as HTMLElement;
     expect(within(bar).getByText('New game')).toHaveClass('ps-newgame-tag');
     expect(within(bar).getByText('[Gen 9] OU')).toBeInTheDocument();
     expect(within(bar).getByText('Alice')).toBeInTheDocument();
     expect(within(bar).getByText('Bob')).toBeInTheDocument();
-    // the lead picker of turn 0 offers both teams' six bodies
     await waitFor(() => expect(screen.getAllByText('Garchomp').length).toBeGreaterThanOrEqual(2), { timeout: 30_000 });
     expect(screen.getByText(/Pick 1 per side|Play from turn 0/)).toBeInTheDocument();
   }, 90_000);
@@ -78,7 +71,6 @@ describe('a new game in the app', () => {
     expect(document.querySelector('.ps-loader-panel')).toHaveTextContent('open now');
     await userEvent.click(screen.getByRole('button', { name: 'New game' }));
     const dialog = await screen.findByRole('dialog', { name: 'New game' });
-    // the Game panel folded away behind the dialog
     expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
     expect(within(dialog).queryByText('Saved games')).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
@@ -128,7 +120,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 90_000);
 
-  test('a start with ?game=<id> of a game with one played turn opens it on its tip, turn 2, with the dock there (H4e)', async () => {
+  test('a start with ?game=<id> of a game with one played turn opens it on its tip, turn 2, with the dock there', async () => {
     const record = await playedRecord(1);
     window.history.replaceState(null, '', `/?game=${record.id}`);
     render(<App />);
@@ -138,9 +130,8 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  test('a finished game opened again shows its end as the live game did: the winner, no dock to play (H4h)', async () => {
+  test('a finished game opened again shows its end as the live game did: the winner, no dock to play', async () => {
     const played = await playedRecord(1);
-    // the last turn ends with the win instead of the next `|turn|` line: the game's end snapshot is its tip
     const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
     saveGame(finished);
     window.history.replaceState(null, '', `/?game=${finished.id}`);
@@ -153,7 +144,6 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  // Round 89 (#105, H7, finding 1): the Game menu copies the link of a game wherever it stands, with no variation open.
   async function copiedLink() {
     await userEvent.click(screen.getByRole('button', { name: 'Game' }));
     await userEvent.click(within(document.querySelector('.ps-loader-panel') as HTMLElement).getByRole('button', { name: 'Copy Share Link' }));
@@ -164,7 +154,7 @@ describe('a new game in the app', () => {
     return read.payload;
   }
 
-  test('a game at Team Preview copies its link: the game, no entry, no branch, the team preview as the view (H7)', async () => {
+  test('a game at Team Preview copies its link: the game, no entry, no branch, the team preview as the view', async () => {
     render(<App />);
     await startOnLanding();
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
@@ -174,7 +164,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 90_000);
 
-  test('a game with played turns copies its link on the main line and at the tip: every entry, no branch, the turn on screen (H7)', async () => {
+  test('a game with played turns copies its link on the main line and at the tip: every entry, no branch, the turn on screen', async () => {
     const record = await playedRecord(2);
     window.history.replaceState(null, '', `/?game=${record.id}`);
     render(<App />);
@@ -192,7 +182,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 150_000);
 
-  test('a finished game copies its link at the end (H7)', async () => {
+  test('a finished game copies its link at the end', async () => {
     const played = await playedRecord(1);
     const finished = { ...played, body: [...played.body.slice(0, played.body.findLastIndex(line => line.startsWith('|turn|'))), '|', '|win|Alice'] };
     saveGame(finished);
@@ -216,11 +206,9 @@ describe('a new game in the app', () => {
     expect(document.querySelector('.ps-topbar')).toBeNull();
   });
 
-  // Round 89 (#105, H5, ruling 31 H6a): a game's share link opens the game as a copy; the address names the copy.
-  test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy (H5)', async () => {
+  test('a game link (version 2) of a game this browser lacks opens it as a copy on its tip, the hash goes and the address names the copy', async () => {
     const played = await playedRecord(1);
     window.location.hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
-    // the sharer's game is not in this browser: the link comes from elsewhere
     deleteGame(played.id);
     render(<App />);
     await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 60_000 });
@@ -234,8 +222,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 120_000);
 
-  // Round 89 (#105, H7, finding 4): a second open of the same link finds the game it made before.
-  test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either (H7)', async () => {
+  test('a link whose game equals a saved game opens that game and makes no copy; the same link opened again makes none either', async () => {
     const played = await playedRecord(1);
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
     window.location.hash = hash;
@@ -253,7 +240,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 180_000);
 
-  test('a foreign link opened twice makes one copy, and the saved games of the browser stay (H7)', async () => {
+  test('a foreign link opened twice makes one copy, and the saved games of the browser stay', async () => {
     const played = await playedRecord(1);
     const other = await savedRecord(['Ann', 'Ben'], 0, '9,9,9,9');
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
@@ -273,7 +260,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 240_000);
 
-  test('a link whose main line goes past the saved game makes a copy (H7)', async () => {
+  test('a link whose main line goes past the saved game makes a copy', async () => {
     const played = await playedRecord(2);
     const hash = `#branch=${encodeBranchShare(makeGameSharePayload({ record: played }))}`;
     deleteGame(played.id);
@@ -286,9 +273,8 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 240_000);
 
-  test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood (H5)', async () => {
+  test('a game link with an open branch restores the branch from the game and puts the pointer where the sharer stood', async () => {
     const played = await playedRecord(2);
-    // the main line holds the lead and turn 1; the sharer's branch replays turn 2 from turn 1 and he stands on its tip
     const main = { ...played, entries: played.entries.slice(0, 2), turns: 1 };
     const payload = makeGameSharePayload({
       record: main, variation: { startTurn: 1, history: played.entries.slice(2) }, view: { turn: 2, line: 'variation' },
@@ -304,7 +290,7 @@ describe('a new game in the app', () => {
     await act(async () => {});
   }, 150_000);
 
-  test('a game link the reader cannot start says why on the start page and leaves the hash (H5)', async () => {
+  test('a game link the reader cannot start says why on the start page and leaves the hash', async () => {
     const played = await playedRecord(0);
     window.location.hash = `#branch=${encodeBranchShare({ ...makeGameSharePayload({ record: played }), teams: { p1: '', p2: '' } })}`;
     render(<App />);
@@ -314,10 +300,36 @@ describe('a new game in the app', () => {
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
   }, 60_000);
 
-  test('a link of a newer version names its version on the start page (H5)', async () => {
+  test('a link of a newer version names its version on the start page', async () => {
     window.location.hash = `#branch=${encodeShareJson({ version: 3, kind: 'game' })}`;
     render(<App />);
     expect(screen.getByRole('alert')).toHaveTextContent('This share link comes from a newer PS Dashboard (link version 3).');
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+  });
+
+  test('a version 1 link of a replay branch opens its read-only view with Load Original Replay; one that names a game offers New Replay only', async () => {
+    const branch = {
+      version: 1 as const, replayId: 'gen9ou-test-123', format: '[Gen 9] OU', formatid: 'gen9ou', players: ['Alice', 'Bob'] as [string, string], branchTurn: 2,
+      createdAt: '2026-04-29T08:00:00.000Z', choices: [{ turnNumber: 2, p1Choice: 'move 1', p2Choice: 'move 2' }],
+      finalLog: '|player|p1|Alice|\n|player|p2|Bob|\n|turn|1\n|turn|2',
+    };
+    window.location.hash = `#branch=${encodeBranchShare(branch)}`;
+    const { unmount } = render(<App />);
+    expect(screen.getByText('Shared Branch', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Load Original Replay' })).toBeInTheDocument();
+    unmount();
+    window.location.hash = `#branch=${encodeBranchShare({ ...branch, replayId: 'newgame-m7nj3hx23e' })}`;
+    render(<App />);
+    expect(screen.getByText('Shared Branch', { exact: true })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Replay' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load Original Replay' })).toBeNull();
+  });
+
+  test('a damaged game link says so on the start page and leaves no hash', () => {
+    window.location.hash = `#branch=${encodeShareJson({ version: 2, kind: 'game' })}`;
+    render(<App />);
+    expect(screen.getByRole('alert')).toHaveTextContent('invalid or damaged');
+    expect(window.location.hash).toBe('');
     expect(screen.getByText('Load Replay')).toBeInTheDocument();
   });
 
@@ -343,4 +355,155 @@ describe('a new game in the app', () => {
     expect(window.location.search).toBe(`?replay=${written}`);
     await act(async () => {});
   }, 90_000);
+});
+
+// The panel's own submit button is named "Load" as well, so the toggle is found by its class.
+const toggle = () => document.querySelector('.ps-loader-toggle') as HTMLElement;
+
+describe('the replay loader in the app', () => {
+  test('the start page shows the loader in the column; a loaded replay moves it to the Load button, and a load from there works', async () => {
+    const first = replayData('singles');
+    const second = { ...replayData('doubles'), id: 'gen9doubles-second' };
+    stubReplayFetch([first, second]);
+    render(<App />);
+
+    expect(screen.getByText('Load Replay')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified timeline workflow')).toBeInTheDocument();
+    expect(document.querySelector('.ps-topbar')).toBeNull();
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    await userEvent.clear(input);
+    await userEvent.type(input, `${first.id}{Enter}`);
+
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    expect(screen.queryByText('Load Replay')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
+    const load = screen.getByRole('button', { name: 'Game' });
+    expect(load.closest('.ps-topbar-actions')).not.toBeNull();
+    await userEvent.click(load);
+    const reopened = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    expect((reopened as HTMLInputElement).value).toContain(first.id);
+
+    await userEvent.clear(reopened);
+    await userEvent.type(reopened, `${second.id}{Enter}`);
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'false'), { timeout: 30_000 });
+    await act(async () => {});
+    expect(screen.queryByRole('textbox', { name: 'Replay URL or ID' })).toBeNull();
+    await userEvent.click(toggle());
+    expect((screen.getByRole('textbox', { name: 'Replay URL or ID' }) as HTMLInputElement).value).toContain(second.id);
+  });
+
+  test('Load with the Smogon hosts down names both notices in the top bar', async () => {
+    // The Smogon modules cache an earlier answer per format and species, and no other row loads the VGC fixture.
+    const replay = replayData('vgc');
+    const fetchMock = stubReplayFetch([replay]);
+    const served = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => (String(input).includes('replay.pokemonshowdown.com')
+      ? served(input, init)
+      : Promise.reject(new TypeError('Failed to fetch'))));
+    render(<App />);
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    await userEvent.clear(input);
+    await userEvent.type(input, `${replay.id}{Enter}`);
+    await screen.findByText('Smogon sets unavailable', undefined, { timeout: 30_000 });
+    expect(await screen.findByText('Smogon stats unavailable', undefined, { timeout: 30_000 })).toBeInTheDocument();
+  }, 90_000);
+});
+
+describe('the start page and the Load panel', () => {
+  test('the start page: one header with Beta, Report issue and the creator link; the featured draft link and a Load button; the three guide steps; the team paste', async () => {
+    render(<App />);
+    const header = document.querySelector('.ps-app-header') as HTMLElement;
+    expect(document.querySelectorAll('h1')).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PS Dashboard');
+    expect(header).toHaveTextContent('Beta');
+    expect(within(header).getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
+    expect(within(header).getByRole('link', { name: 'by Bene (FullLifeGames)' })).toHaveAttribute('href', 'https://fulllifegames.com');
+
+    const input = screen.getByRole('textbox', { name: 'Replay URL or ID' });
+    expect(input).toHaveValue('https://replay.pokemonshowdown.com/gen9draft-2058494320');
+    expect(screen.getByRole('button', { name: 'Load', exact: true })).toBeInTheDocument();
+    const guide = screen.getByLabelText('Unified timeline workflow');
+    for (const step of ['Find the decision point', 'Play a different move', 'Compare the lines']) expect(within(guide).getByText(step)).toBeInTheDocument();
+
+    const details = document.querySelector('details') as HTMLElement;
+    await userEvent.click(within(details).getByText(/Paste your team/));
+    expect(details).toHaveAttribute('open');
+    expect(within(details).getByRole('textbox')).toBeVisible();
+    expect(within(details).getByRole('button', { name: 'Save Team' })).toBeInTheDocument();
+  });
+
+  test('with a replay loaded the loader input holds its canonical link, the top bar carries the support links, and the Load panel closes on Escape and on a click on the match', async () => {
+    const replay = replayData('singles');
+    stubReplayFetch([replay]);
+    render(<App />);
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Replay URL or ID' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Replay URL or ID' }), `${replay.id}{Enter}`);
+    await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+    expect(document.querySelector('.ps-app-header')).toBeNull();
+    const links = document.querySelector('.ps-topbar .ps-support-links') as HTMLElement;
+    expect(links).toHaveTextContent('PS Dashboard');
+    expect(links).toHaveTextContent('Beta');
+    expect(within(links).getByRole('button', { name: 'Report issue' })).toBeInTheDocument();
+    expect(within(links).getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeInTheDocument();
+
+    await userEvent.click(toggle());
+    const panel = () => document.querySelector('.ps-loader-panel') as HTMLElement | null;
+    expect(screen.getByRole('textbox', { name: 'Replay URL or ID' })).toHaveValue(`https://replay.pokemonshowdown.com/${replay.id}`);
+    expect(panel()!.querySelector('input[aria-label="Load exported replay file"]')).not.toBeNull();
+    expect(panel()!.querySelector('summary')).not.toBeNull();
+    await userEvent.keyboard('{Escape}');
+    expect(panel()).toBeNull();
+    await userEvent.click(toggle());
+    expect(panel()).not.toBeNull();
+    await userEvent.click(document.querySelector('.ps-topbar-match') as HTMLElement);
+    expect(panel()).toBeNull();
+    await act(async () => {});
+  }, 60_000);
+});
+
+async function openGame(turns: number) {
+  const record = await playedRecord(turns);
+  window.history.replaceState(null, '', `/?game=${record.id}`);
+  render(<App />);
+  await waitFor(() => expect(document.querySelector('.ps-topbar')).not.toBeNull(), { timeout: 30_000 });
+  return record;
+}
+
+async function importWithoutProtect(): Promise<string> {
+  await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Import/Export Sets' }));
+  const dialog = await screen.findByRole('dialog', { name: 'Import / Export Sets' }, { timeout: 60_000 });
+  const field = dialog.querySelector('textarea') as HTMLTextAreaElement;
+  const typed = field.value.replace(/- Protect/g, '- Rest');
+  fireEvent.change(field, { target: { value: typed } });
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Import' }));
+  return typed;
+}
+
+describe('a team edit that cuts played turns asks first', () => {
+  beforeEach(() => { stubReplayFetch([]); });
+
+  test('Cancel leaves the game and its saved record as they were; Apply edit cuts it and says where the line ends', async () => {
+    const record = await openGame(3);
+    expect(record.turns).toBe(3);
+    const typed = await importWithoutProtect();
+    const question = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
+    expect(question).toHaveTextContent(/This edit makes \d+ played turns? invalid\./);
+    expect(question).toHaveTextContent('the game keeps its first turn');
+    expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
+    expect(loadGame(record.id)!.turns).toBe(3);
+    await userEvent.click(within(question).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(loadGame(record.id)!.turns).toBe(3);
+    expect(listGames()[0].turns).toBe(3);
+    expect(loadGame(record.id)!.teams).toEqual(record.teams);
+    const back = screen.getByRole('dialog', { name: 'Import / Export Sets' });
+    expect((back.querySelector('textarea') as HTMLTextAreaElement).value).toBe(typed);
+    await userEvent.click(within(back).getByRole('button', { name: 'Import' }));
+    const again = await screen.findByRole('alertdialog', undefined, { timeout: 120_000 });
+    await userEvent.click(within(again).getByRole('button', { name: 'Apply edit' }));
+    await waitFor(() => expect(loadGame(record.id)!.turns).toBe(1), { timeout: 120_000 });
+    expect(screen.queryByRole('dialog', { name: 'Import / Export Sets' })).toBeNull();
+    await waitFor(() => expect(screen.getByText(/The edited team cannot play every turn\. The game keeps its first turn/)).toBeInTheDocument());
+  }, 360_000);
 });

@@ -25,40 +25,29 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
     expect(await panel.locator('.ps-eval-graph circle').count()).toBeGreaterThan(0);
-    // The sweep finishes and offers a re-run.
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 60_000 });
 
-    // One IndexedDB read per sweep: the run prefetches the replay's stored
-    // evals instead of reading once per turn (the perf flag set above
-    // mirrors the stage table on window.__EVAL_PERF__).
     const perf = await page.evaluate(() => (window as unknown as { __EVAL_PERF__?: { stages: Record<string, { count: number }> } }).__EVAL_PERF__);
     expect(perf?.stages['cache-load']?.count).toBe(1);
 
-    // A completed sweep produces the game-level report.
     await expect(panel.locator('.ps-eval-report')).toBeVisible();
     await expect(panel.locator('.ps-eval-report')).toContainText('Game report');
 
-    // Turn 0: the team-preview lead evaluation adds its own graph point
-    // (the tooltip opens with "Team preview:" and names the best lead).
     await expect(panel.locator('.ps-eval-graph title:has-text("Team preview:")')).toHaveCount(1, { timeout: 60_000 });
 
-    // Selecting a point switches to that turn's view (played-vs-best).
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 1');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
 
-    // …and the back button returns to the report's cards.
     await panel.locator('button', { hasText: 'Game report' }).click();
     await expect(panel.locator('.ps-eval-report')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toBeHidden();
 
-    // Selecting the leads point opens the team-preview analysis.
     await panel.locator('.ps-eval-graph rect[data-turn="0"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Team preview');
     await expect(panel.locator('.ps-eval-analysis')).toContainText('led');
 
-    // The sweep persisted its results to IndexedDB…
     const storedCount = await page.evaluate(async () => new Promise<number>(resolve => {
       const open = indexedDB.open('ps-replay-interceptor-eval', 1);
       open.onsuccess = () => {
@@ -70,7 +59,6 @@ test.describe('PS Dashboard', () => {
     }));
     expect(storedCount).toBeGreaterThan(0);
 
-    // …so after a reload the graph re-analyzes from the store.
     await page.reload();
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('TestPlayer1', { exact: true }).first()).toBeVisible({ timeout: 10000 });
@@ -94,8 +82,6 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
-    // Selecting a turn re-targets EVERYTHING in one place: the analysis,
-    // the advantage bar, the ranked lists, and the matrix toggle.
     await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
     await expect(panel.locator('.ps-eval-bar')).toBeVisible();
@@ -119,16 +105,10 @@ test.describe('PS Dashboard', () => {
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
-    // Selecting a turn shows the stored depth-2 result — no silent
-    // re-search swaps the numbers. Round 67 (T109, gate answer 5b): an
-    // analyzed turn offers no deeper stage.
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.getByText(/^depth 2/)).toBeVisible({ timeout: 15_000 });
     await expect(panel.locator('button', { hasText: 'Think deeper' })).toHaveCount(0);
 
-    // Monotone merge: a later re-analyze at depth 1 must NOT downgrade the
-    // turn stored at depth 2.
-    // Round 89 (ruling 49): Depth lives in the Setup menu now.
     await pickDepth(page, '1');
     await panel.locator('button', { hasText: 'Re-analyze' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
@@ -153,10 +133,6 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-graph')).toBeVisible({ timeout: 180_000 });
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 120_000 });
 
-    // The analysis pipeline works on visit-ranked MCTS results too — and
-    // the convergence pass brings EVERY turn to the configured engine, not
-    // just the report-worthy swings ("I cannot configure anything for the
-    // graph line").
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toBeVisible();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('played');
@@ -171,39 +147,28 @@ test.describe('PS Dashboard', () => {
         JSON.stringify({ depth: 2, samples: 3, mode: 'auto', auto: false, tera: 'auto' }));
     });
     await page.reload();
-    // Offline usage payloads: deterministic teams, and the Smogon-loading
-    // guard settles so Analyze game is clickable.
     await routeSmogon(page, emptySmogon);
     await page.locator('input[aria-label="Load exported replay file"]')
       .setInputFiles(fixturePath('gpl-replay.html'));
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    // The auto pref round-trips into the dropdown and the caption names the routing.
     expect(await readDepth(page)).toBe('auto');
-    // The routing sits in the title of the Game graph heading (round 89: no description line takes room).
     await expect(panel.getByText('Game graph', { exact: true })).toHaveAttribute('title', /re-evaluates each turn with auto \(matrix early, MCTS late\)/);
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 300_000 });
 
-    // Turn 2: full boards — round 63 (T110): a singles game (GPL has no gametype line) prices them with the
-    // matrix and three draws until a quarter of all bodies fell; doubles would run the tree from the first turn.
+    // Singles prices full boards with the matrix until a quarter of all bodies fell; doubles run the tree at once.
     await panel.locator('.ps-eval-graph rect[data-turn="2"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('depth 1 · 3 samples');
 
-    // Turn 38: nine bodies down — the tree as before.
     await panel.locator('.ps-eval-graph rect[data-turn="38"]').click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 38', { timeout: 15_000 });
     await expect(panel.getByTitle('What produced the numbers shown for this turn.')).toHaveText('MCTS');
-    // Round 67 (T109, gate answer 5b): no analyzed turn offers a deeper stage.
     await expect(panel.locator('button', { hasText: 'Think deeper' })).toHaveCount(0);
   });
-  // Round 69 (T184, gate answer 8a of round 67): the configured engine decides what a sweep replaces. A matrix
-  // result of depth 2 no longer outranks the tree, so Re-analyze under an MCTS target (or Auto on a tree turn)
-  // replaces it. The truth table lives in test/regression/supersedes-stored-t184.spec.ts; these two drive the buttons.
   const STAGE_BADGE = 'What produced the numbers shown for this turn.';
 
-  /** Sweeps the loaded game at matrix depth 2, switches Depth (Setup menu) to `mode` and re-analyzes; turn 1 must read the new engine. */
   async function expectReanalyzeReplaces(page: Page, mode: 'mcts' | 'auto') {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
@@ -231,7 +196,6 @@ test.describe('PS Dashboard', () => {
     await page.locator('input[type="text"]').fill('gen9vgc-test');
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await expect(page.getByText('Alice', { exact: true }).first()).toBeVisible({ timeout: 10000 });
-    // Auto runs the tree from the first doubles turn, VGC counted as doubles.
     await expectReanalyzeReplaces(page, 'auto');
   });
 
@@ -248,8 +212,7 @@ test.describe('PS Dashboard', () => {
     await expectReanalyzeReplaces(page, 'mcts');
   });
 
-  // The gap turn's first analysis. The replay view never sits on the live tip, so a turn nobody swept offers the
-  // button; the fixtures hold 4 (singles) and 3 (VGC) turns, the 1-turn doubles fixture has no earlier turn to step to.
+  // The 1-turn doubles fixture has no earlier turn to step to.
   for (const { kind, replayId, player } of [
     { kind: 'singles', replayId: null, player: 'TestPlayer1' },
     { kind: 'doubles (VGC)', replayId: 'gen9vgc-test', player: 'Alice' },
@@ -266,7 +229,6 @@ test.describe('PS Dashboard', () => {
       await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
       await expect(page.getByText(player, { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-      // No sweep ran: step back from the end to turn 2, a turn with a later turn after it.
       const slider = page.locator('input[type="range"]');
       await expect(slider).toBeVisible({ timeout: 10000 });
       await slider.fill('2');
@@ -280,7 +242,6 @@ test.describe('PS Dashboard', () => {
 
       await expect(panel.locator('.ps-eval-analysis')).toContainText('Turn 2', { timeout: 240_000 });
       await expect(panel.getByTitle(STAGE_BADGE)).toHaveText(/^depth 1/, { timeout: 30_000 });
-      // The turn is stored now: the button is gone.
       await expect(analyze).toHaveCount(0);
     });
   }

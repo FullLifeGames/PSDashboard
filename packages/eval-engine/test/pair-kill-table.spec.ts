@@ -11,7 +11,6 @@ import { anchorRoot, doublesRoot, pairSet, PLAYED } from './pair-battles';
 
 const targetOf = (key: string) => key.slice(key.indexOf('>') + 1);
 
-/** Every roll of a draw against the table: the value for the drawn roll is the damage the log shows (at least the HP on a kill). */
 function check(drawn: PairDraw, alter: (snap: HitSnapshot) => HitSnapshot = snap => snap) {
   let checked = 0;
   let mismatched = 0;
@@ -34,7 +33,7 @@ function check(drawn: PairDraw, alter: (snap: HitSnapshot) => HitSnapshot = snap
 const draw = (root: ReturnType<typeof anchorRoot>, p1: string, p2: string, seed = '1,2,3,4') =>
   drawPair(root, p1, p2, seed as never, new Map(), createMatchupCache());
 
-describe('kill tables from the calc, checked at the drawn roll (round 56)', () => {
+describe('kill tables from the calc, checked at the drawn roll', () => {
   test('every roll of the anchor cells lands on the table to the HP', () => {
     const root = anchorRoot();
     const p1Options = legalChoices(root, 'p1', { tera: false }).map(option => option.choice);
@@ -56,7 +55,6 @@ describe('kill tables from the calc, checked at the drawn roll (round 56)', () =
   });
 
   test('a spread move against one living target takes no spread modifier', () => {
-    // Dazzling Gleam never misses, so the draw always rolls damage on the one target left.
     const gleam = pairSet('Gleam', 'Gardevoir', ['Dazzling Gleam', 'Protect']);
     const wall = pairSet('Wall', 'Blissey', ['Soft-Boiled', 'Protect']);
     const root = doublesRoot([gleam, wall], [pairSet('Target', 'Snorlax', ['Protect', 'Rest']), pairSet('Gone', 'Pikachu', ['Protect'])], battle => {
@@ -72,7 +70,6 @@ describe('kill tables from the calc, checked at the drawn roll (round 56)', () =
 
   test('a spread move against a protected partner keeps the spread modifier', () => {
     const root = anchorRoot();
-    // Mawile (p1b) protects: p2a's Matcha Gotcha still started against two targets, so p1a takes the spread modifier.
     const drawn = draw(root, 'move lifedew, move protect', 'move matchagotcha, switch 3');
     const intoSinistcha = drawn.records.find((record): record is RollRecord => record.kind === 'roll' && record.key === 'p2a:matchagotcha>p1a')!;
     expect(intoSinistcha.snapshot.spreadHit).toBe(true);
@@ -104,7 +101,6 @@ describe('kill tables from the calc, checked at the drawn roll (round 56)', () =
     expect(hand.snapshot.helpingHand).toBe(true);
     expect(hand.snapshot.defenderPartner).toBe('friendguard');
     expect(hand.snapshot.screens).toContain('reflect');
-    // Dragon Claw into Snorlax and Moonblast into Garchomp: both rolls land on their tables.
     expect(check(drawn)).toEqual({ checked: 2, mismatched: 0 });
   });
 

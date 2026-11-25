@@ -10,19 +10,13 @@ import type { EndgameChildren } from './children.ts';
 import { splitOutcome } from '../search/secondary-classes.ts';
 import { splitClassKey } from './prover-helping.ts';
 
-/**
- * The forced-win prover's candidate order and its open-branch fields
- * (moved out of prover.ts in round 67): the root tries the ranking's order,
- * inner nodes the kill odds, and a proof names the binding reply's open
- * children for the bar and the sentence.
- */
 
 export type Side = 'p1' | 'p2';
 export interface Proven {
   mass: number;
   turns: number;
   caveat: ForcedWinCaveat;
-  /** Round 89 (P2): the id of the stalling move whose repeat the proof delays (the delay rule, `endgame/delay-rule.ts`); absent when no cell of the proof leans on a delay. */
+  /** The stalling move whose repeat the proof delays; absent when no cell of the proof leans on a delay. */
   delay?: string;
 }
 export interface Cell extends EndgameChildren { reply: ChoiceOption; p1Choice: string; p2Choice: string }
@@ -30,10 +24,9 @@ export interface CellProof { cell: Cell; proofs: Proven[]; proven: Proven }
 
 export const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1');
 
-/** Won by the side: battle.winner is the player's name ('' on a tie). */
+/** Won by the side: `battle.winner` is the player's name ('' on a tie). */
 export const wonBy = (battle: Battle, side: Side): boolean => battle.ended && battle.winner === battle.sides[sideIndex(side)].name;
 
-/** The move id of a choice's first move part, or null for switches and passes. */
 export function firstMoveId(choice: string): string | null {
   for (const part of choice.split(',')) {
     const tokens = part.trim().split(' ');
@@ -42,7 +35,6 @@ export function firstMoveId(choice: string): string | null {
   return null;
 }
 
-/** Root: the ranking's order, unnamed options after it. */
 export function orderByRanking(options: ChoiceOption[], rootOrder: string[]): ChoiceOption[] {
   const rank = new Map(rootOrder.map((choice, index) => [choice, index]));
   return [...options].sort((a, b) => (rank.get(a.choice) ?? rootOrder.length) - (rank.get(b.choice) ?? rootOrder.length));
@@ -63,12 +55,10 @@ export function orderByOdds(battle: Battle, side: Side, options: ChoiceOption[])
   return options.map(option => ({ option, score: score(option) })).sort((a, b) => b.score - a.score).map(entry => entry.option);
 }
 
-/** The own side's open class of a cell, read from the child's group key against the cell's event plan. */
 export function openOf(root: Battle, cell: Cell, key: string | undefined, side: Side): ForcedWinOpen | undefined {
   const plan = planCellEvents(root, cell.p1Choice, cell.p2Choice);
   if (plan.kind !== 'events' || !key) return undefined;
-  // Round 89 (#115): the class key splits at its first colon (an effect id holds one itself), and an outcome keeps its effects
-  // behind a plus (`hit-nokill+brn`); the open class is read by its base outcome, as the helping rule reads it.
+  // An outcome keeps its effects behind a plus (`hit-nokill+brn`); the open class is read by its base outcome.
   const outcomes = splitClassKey(key)?.outcomes ?? [];
   return plan.events.map((event: CellEvent, index: number) => ({ event, outcome: outcomes[index] && splitOutcome(outcomes[index], event.secondary).base }))
     .filter(({ event }) => event.side === side)
@@ -81,7 +71,6 @@ export function openOf(root: Battle, cell: Cell, key: string | undefined, side: 
     .find(open => open !== undefined);
 }
 
-/** The binding reply (the cell with the least mass) and its open children, valued for the bar and the sentence. */
 export function openFields(root: Battle, side: Side, cells: CellProof[], cache: MatchupCache): Pick<ForcedWinProof, 'open' | 'openValue'> {
   if (cells.length === 0) return { openValue: null };
   const binding = cells.reduce((worst, proof) => (proof.proven.mass < worst.proven.mass ? proof : worst), cells[0]);
@@ -100,19 +89,7 @@ export function openFields(root: Battle, side: Side, cells: CellProof[], cache: 
   return { ...(open ? { open } : {}), openValue: sum / weight };
 }
 
-/**
- * Whether a drawn class is at least as bad for the side as a class no draw
- * showed, so the drawn class's proof carries over: the same turn order and
- * the same outcomes except one event, where the opponent's move MISSED
- * (never better for them than the hit the draws showed) or the side's own
- * move KNOCKED OUT (never worse for the side than the survived hit). A
- * class model leaks mass on rare outcomes otherwise: a 90% Toxic whose
- * three draws all hit left ten percent of a certain win unproven.
- *
- * Round 88 (T336): a class in which a secondary that only helps the mover fired is a third case, and it is decided by the
- * positions the cell drew, not by the keys (prover-helping.ts: helpedSources). A class the draws never showed (the forced-draw cap
- * reached, or a secondary class under MIN_CLASS_MASS) keeps the two cases above, because no position says what its effect did.
- */
+/** A drawn class dominates an unseen one differing in one event: the foe's move MISSED or the side's KNOCKED OUT. */
 export function dominates(drawnKey: string, missingKey: string, events: CellEvent[], side: Side): boolean {
   const [drawnClass, missingClass] = [splitClassKey(drawnKey), splitClassKey(missingKey)];
   if (!drawnClass || !missingClass || drawnClass.order !== missingClass.order) return false;

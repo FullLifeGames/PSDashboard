@@ -1,17 +1,5 @@
-// .bank-run.json of a bank/<name> branch (round 71, bank in GitHub Actions).
-//
-// The bank workflow (.github/workflows/bank.yml) treats the file as untrusted input. This script validates it against
-// an allowlist and starts scripts/run-calibration.mjs itself, without a shell, so no value of the file reaches a shell
-// line of the workflow; the workflow passes only the job index of its matrix.
-//
-//   node scripts/bank-run-config.mjs check          validate; print the plan; write jobs (a JSON list of job indices)
-//                                                  and name to $GITHUB_OUTPUT when the variable is set
-//   node scripts/bank-run-config.mjs job <index>    run the job's slices into .calibration/job-<index>
-//   node scripts/bank-run-config.mjs merge <dir>    merge the job folders <dir>/job-* into .calibration/<name>
-//
-// The file: { "name": "r71-bank-1", "jobs": 16, "slicesPerJob": 4, "env": { "EVAL_CALIBRATION_SOURCE": "holdout",
-// "EVAL_CALIBRATION_TRANCHE": "holdout-vgc" } }. jobs and slicesPerJob default to 16 and 4 (user gate 13.10., 2a);
-// job k runs slices k*slicesPerJob to k*slicesPerJob + slicesPerJob - 1 of jobs*slicesPerJob.
+// Validates .bank-run.json, which bank.yml treats as untrusted input, against an allowlist and runs run-calibration.mjs
+// without a shell, so no value of the file reaches a shell line.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -22,20 +10,18 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const CONFIG_FILE = '.bank-run.json';
 const HOLDOUT_MANIFEST = 'test/regression/fixtures/fit-holdout-manifest.json';
 
-/** The bank's own tranches (REPLAY_TRANCHES in test/regression/eval-calibration.spec.ts; test/regression/bank-run-config.spec.ts compares the two). */
+/** The bank's tranches; test/regression/bank-run-config.spec.ts compares them with the harness's REPLAY_TRANCHES. */
 export const BANK_TRANCHES = ['draft', 'ladder-0811', 'ladder-dou-0804', 'ladder-ou-0802', 'tournament-0811', 'tournament-0811b'];
-/** The fit corpus's tranches (test/regression/bank-universe.ts, fit-<source>). */
 export const FIT_TRANCHES = ['fit-ladder', 'fit-tournament'];
 
 const NAME = /^[a-z0-9-]{1,40}$/;
 const ENV_KEY = /^EVAL_CALIBRATION_[A-Z_]{1,40}$/;
 const ENV_VALUE = /^[A-Za-z0-9._/-]{1,100}$/;
-/** Keys the runner sets itself, or that write files to a path of the file's choosing. */
+// Keys the runner sets itself or that write files to a path the file chooses.
 const FORBIDDEN_KEYS = new Set(['EVAL_CALIBRATION', 'EVAL_CALIBRATION_SLICE', 'EVAL_CALIBRATION_DUMP', 'EVAL_CALIBRATION_POSITIONS']);
 const MAX_ENV_KEYS = 20;
 const ALLOWED_KEYS = new Set(['name', 'jobs', 'slicesPerJob', 'env']);
 
-/** The holdout tranches: holdout-<family> for every family of the holdout manifest. */
 export function holdoutTranches(root = ROOT) {
   const { sets } = JSON.parse(readFileSync(join(root, HOLDOUT_MANIFEST), 'utf8'));
   return [...new Set(sets.map(set => `holdout-${set.family}`))].sort();
@@ -43,10 +29,7 @@ export function holdoutTranches(root = ROOT) {
 
 const integerIn = (value, low, high) => Number.isInteger(value) && value >= low && value <= high;
 
-/**
- * The validated run: { name, jobs, slicesPerJob, slices, env }. Throws with every problem found; `tranches` lists the
- * tranche names EVAL_CALIBRATION_TRANCHE may take.
- */
+/** The validated run { name, jobs, slicesPerJob, slices, env }; throws with every problem found. */
 export function validateRunConfig(raw, tranches) {
   const problems = [];
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${CONFIG_FILE} must hold one JSON object`);
@@ -80,7 +63,6 @@ export function validateRunConfig(raw, tranches) {
   return { name, jobs, slicesPerJob, slices: jobs * slicesPerJob, env: Object.fromEntries(pairs) };
 }
 
-/** The argument vector of run-calibration.mjs for job `index` of a validated run. */
 export function jobArgs(config, index) {
   if (!integerIn(index, 0, config.jobs - 1)) throw new Error(`job index ${index} outside 0 to ${config.jobs - 1}`);
   const first = index * config.slicesPerJob;
@@ -88,7 +70,6 @@ export function jobArgs(config, index) {
   return ['--slices', String(config.slices), '--slice-range', `${first}..${first + config.slicesPerJob - 1}`, '--out', `.calibration/job-${index}`, ...envArgs];
 }
 
-/** The argument vector of run-calibration.mjs that merges the job folders under `dir`. */
 export function mergeArgs(config, dir, folders) {
   return [...folders.flatMap(folder => ['--merge', join(dir, folder)]), '--out', `.calibration/${config.name}`];
 }

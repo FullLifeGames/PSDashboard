@@ -1,19 +1,11 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, beforeEach } from 'vitest';
 import type { Battle, Pokemon, PokemonSet } from '@pkmn/sim';
-import { residualReader, residualStats } from '../src/score/residuals';
+import { residualReader, residualStats, resetResidualMemo } from '../src/score/residuals';
 import { statusResidual } from '../src/score/races';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { set } from './move-oracle';
 import { battleOf, fingerprint } from './power-oracle';
 
-/**
- * 13.10.2026 (the Swords Dance report on gen9draft-2058494320): the per-turn HP a body in a race gains or loses at
- * the end of the turn, from the simulator and not from a list of names. The reader plays three end-of-turns on a
- * copy of the battle (the HP of the actives set to 3/4 before each, so that no cap bends the reading) and gives the
- * mean loss per turn as a fraction of each active's max HP. Every scene is held to the simulator's own idle turns on a
- * second copy of the same board: Leech Seed (the seeded body loses, the active of the seeder's side heals), item
- * regeneration, weather, terrain, the statuses, in Scarlet and Violet, on the Champions mod and in an old generation.
- */
 
 await loadSimMods('gen9championscustomgame');
 
@@ -24,7 +16,6 @@ const mon = (species: string, extra: Partial<PokemonSet> = {}) => set(species, [
 
 const actives = (battle: Battle): Pokemon[] => battle.sides.flatMap(side => side.active.filter((entry): entry is Pokemon => !!entry));
 
-/** The simulator's own idle turns: HP back to 3/4 before each of three turns, everybody Splashing; the mean loss per turn. */
 function played(battle: Battle): number[] {
   const bodies = actives(battle);
   const lost = bodies.map(() => 0);
@@ -38,7 +29,6 @@ function played(battle: Battle): number[] {
   return lost.map(sum => sum / 3);
 }
 
-/** What the reader says for every active of a fresh copy, against the idle turns of another. */
 function readAgainstSimulator(build: () => Battle): { read: number[]; real: number[] } {
   const battle = build();
   const reader = residualReader(battle);
@@ -81,7 +71,6 @@ describe('the end of the turn, played on a copy', () => {
       return battle;
     };
     const rates = expectSimulator(build);
-    // p1 slot 0 Chansey, slot 1 Garchomp (the seeder), p2 slot 0 Snorlax, slot 1 Clefable (seeded).
     expect(rates[0]).toBe(0);
     expect(rates[1]).toBeLessThan(0);
     expect(rates[2]).toBe(0);
@@ -241,5 +230,108 @@ describe('the reader leaves the battle alone and answers for the actives', () =>
     reader(board.sides[1].active[0]!);
     reader(board.sides[0].active[0]!);
     expect(residualStats.plays).toBe(plays + 1);
+  });
+});
+
+describe('residual-memo-state', () => {
+
+
+  type Tweak = (battle: Battle) => void;
+  const mine = (battle: Battle, slot = 0): Pokemon => battle.sides[0].active[slot]!;
+  const foe = (battle: Battle, slot = 0): Pokemon => battle.sides[1].active[slot]!;
+  const none: Tweak = () => {};
+
+  interface Row { name: string; first: Tweak; second: Tweak; doublesOnly?: boolean }
+
+  const futureSight: Tweak = battle => {
+    const target = foe(battle);
+    const source = mine(battle);
+    battle.sides[1].addSlotCondition(target, 'futuremove', source);
+    Object.assign(battle.sides[1].slotConditions[target.position].futuremove, {
+      duration: 1, move: 'futuresight', source,
+      moveData: { id: 'futuresight', name: 'Future Sight', accuracy: 100, basePower: 120, category: 'Special', priority: 0, flags: { futuremove: 1 }, ignoreImmunity: false, effectType: 'Move', type: 'Psychic' },
+    });
+  };
+
+  // data/conditions.ts `futuremove` lands when the turn count has reached its `endingTurn` (`getOverflowedTurnCount`).
+  // A Wish heals by the same count.
+  const futureSightEnding = (turn: number, endingTurn: number): Tweak => battle => {
+    futureSight(battle);
+    battle.turn = turn;
+    const state = battle.sides[1].slotConditions[foe(battle).position].futuremove as unknown as { duration?: number; endingTurn: number };
+    delete state.duration;
+    state.endingTurn = endingTurn;
+  };
+
+  const wishAfter = (later: number): Tweak => battle => {
+    battle.turn = 10;
+    battle.sides[0].addSlotCondition(mine(battle), 'Wish', mine(battle));
+    battle.turn += later;
+  };
+
+  const toxic = (stage: number): Tweak => battle => {
+    mine(battle).setStatus('tox');
+    mine(battle).statusState.stage = stage;
+  };
+
+  const ROWS: Row[] = [
+    { name: 'a Future Sight pending in the foe slot against none', first: none, second: futureSight },
+    { name: 'a Future Sight that lands this turn against the same one a turn early (its ending turn, the battle turn)', first: futureSightEnding(47, 46), second: futureSightEnding(46, 46) },
+    { name: 'a Future Sight that lands this turn against one two turns away', first: futureSightEnding(47, 46), second: futureSightEnding(47, 48) },
+    { name: 'a Wish made this turn against the same Wish a turn later (the battle turn)', first: wishAfter(0), second: wishAfter(1) },
+    { name: 'a Wish in the own slot against none (control)', first: none, second: battle => { battle.sides[0].addSlotCondition(mine(battle), 'Wish', mine(battle)); } },
+    { name: 'a Leech Seed from the first slot against the second', doublesOnly: true,
+      first: battle => { foe(battle).addVolatile('leechseed', mine(battle, 0)); }, second: battle => { foe(battle).addVolatile('leechseed', mine(battle, 1)); } },
+    { name: 'a Leech Seed against none', first: none, second: battle => { foe(battle).addVolatile('leechseed', mine(battle, 0)); } },
+    { name: 'a toxic stage 1 against 6 (control)', first: toxic(1), second: toxic(6) },
+  ];
+
+  const FORMATS = [
+    ['Scarlet/Violet singles', 'gen9customgame'], ['Scarlet/Violet doubles', 'gen9doublescustomgame'],
+    ['Champions singles', 'gen9championscustomgame'], ['Champions doubles', 'gen9championsdoublescustomgame'],
+  ] as const;
+
+  function boardOf(format: string, tweak: Tweak): Battle {
+    const doubles = /doubles/.test(format);
+    const battle = battleOf(
+      format,
+      [set('Rillaboom', ['woodhammer', 'splash'], { ability: 'Grassy Surge' }), set('Clefable', ['splash'])],
+      [set('Dragonite', ['splash']), ...(doubles ? [set('Snorlax', ['splash'])] : [])],
+    );
+    tweak(battle);
+    return battle;
+  }
+
+  const slots = (battle: Battle): (Pokemon | null)[] => battle.sides.flatMap(side => side.active.map(pokemon => pokemon ?? null));
+  const reading = (battle: Battle): string => {
+    const reader = residualReader(battle);
+    return JSON.stringify(slots(battle).map(pokemon => (pokemon ? reader(pokemon) ?? null : null)));
+  };
+  const fresh = (battle: Battle): string => {
+    resetResidualMemo();
+    return reading(battle);
+  };
+
+  beforeEach(() => resetResidualMemo());
+
+  describe.each(FORMATS)('the end-of-turn memo reads the state of the board (%s)', (_name, format) => {
+    const doubles = /doubles/.test(format);
+    const toothless: string[] = [];
+
+    test.each(ROWS.filter(row => doubles || !row.doublesOnly).map(row => [row.name, row] as const))('%s: each reading is the reading of its own board, in both orders', (_row, row) => {
+      const boards = [boardOf(format, row.first), boardOf(format, row.second)];
+      const expected = boards.map(fresh);
+      if (expected[0] === expected[1]) toothless.push(row.name);
+      const wrong: string[] = [];
+      for (const order of [[0, 1], [1, 0]]) {
+        resetResidualMemo();
+        for (const index of order) if (reading(boards[index]) !== expected[index]) wrong.push(`${order.join('>')}: board ${index}`);
+      }
+      expect(wrong).toEqual([]);
+    });
+
+    test('the Future Sight and Leech Seed rows have teeth', () => {
+      expect(toothless.filter(name => /Future Sight|Leech Seed|Wish made/.test(name))).toEqual([]);
+    });
   });
 });

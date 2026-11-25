@@ -1,18 +1,10 @@
-/**
- * Round 59 (T91), lever rules: every gen9ou battle rebuilt its rule table
- * (14 to 17 % of a gen9ou search). @pkmn/sim stores a format's table only
- * when its ruleset repeals nothing (dex-formats.mjs:770), and gen9ou repeals
- * a rule. The lever stores the table once per format object, as the sim does
- * for every other format; the Battle constructor then takes it
- * (getRuleTable answers format.ruleTable first, dex-formats.mjs:520). Process
- * wide: the format object is shared, so reconstruction battles share it too.
- */
+// @pkmn/sim stores a format's rule table only when its ruleset repeals nothing (dex-formats.mjs:770); gen9ou does;
+// the lever stores it once per format object, as the sim does for other formats. Process wide.
 import { dexOfFormat, simFormats } from '@fulllifegames/replay-core';
 import { onSimFastChange, simFastCounters, simFastFlags } from './state.ts';
 
 type Format = ReturnType<ReturnType<typeof simFormats>['get']>;
 
-/** Formats whose table this module stored; the lever going off resets them to null. */
 const ours = new Set<Format>();
 let hooked = false;
 

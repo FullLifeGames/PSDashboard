@@ -5,11 +5,6 @@ import type { EvalLine, EvalResult, EvalSettings } from '@fulllifegames/eval-eng
 import { evalResult } from '../fixtures/eval-result';
 import { singlesLine } from '../fixtures/lines';
 
-/**
- * Round 89 (#104), step G13: the early-lines stage's two calls on the evaluation. `searchLines` runs one tree search on the shared
- * pool without cancelling the others and hands back the lines; `attachLines` writes them into the stored matrix result of a turn
- * (graph, memory cache and store) and nothing else.
- */
 const script = vi.hoisted(() => ({
   evaluate: null as null | ((serialized: string, settings: EvalSettings, opts?: { exclusive?: boolean }) => Promise<EvalResult>),
   saved: [] as Record<string, unknown>[],

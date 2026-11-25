@@ -3,10 +3,6 @@ import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
 import { panelFlags } from '../../../src/lib/dock-panel';
 import { simState } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A7a, ruling 2a: at a forced replacement Execute is ready when the side that replaces holds its picks;
- * the side that waits has nothing to choose (before, its empty slots kept "every slot chosen" false for good, and Execute was hidden).
- */
 const flags = (state: ReturnType<typeof simState>) => panelFlags(state, state.p1ActiveSlots, state.p2ActiveSlots);
 const heatran: BranchSlotChoice = { kind: 'switch', speciesId: 'heatran', pokemonName: 'Heatran' };
 const rotom: BranchSlotChoice = { kind: 'switch', speciesId: 'rotomwash', pokemonName: 'Rotom-Wash' };

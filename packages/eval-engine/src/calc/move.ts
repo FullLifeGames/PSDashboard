@@ -5,61 +5,30 @@ import type { CalcBody } from './body.ts';
 
 export { protectBlocks } from './protect.ts';
 
-/**
- * Round 67: the move as the calc must read it for this attacker, the other
- * half of the engine's one builder (calc/body.ts), used by ko-odds.ts,
- * damage-calc.ts and pair/kill-table.ts. The slot "Hidden Power" goes as the
- * type the simulator gives the attacker (hpType), and before gen 6 at the
- * power it gives (hpPower), where the calc reads the bare name as a Normal
- * move of power 60, 0 before gen 6 (T83). A move whose power rule calc 0.11
- * lacks (a history power: Last Respects, Rage Fist; round 76, T265) gets the power its own basePowerCallback in the Dex returns on the
- * attacker's facts: Last Respects by the side's fallen (T76;
- * test/calc-sim-inputs.spec.ts holds that the calc prices it at its listed
- * power whatever alliesFainted says, so the set empties once it learns it).
- * A body of a Champions battle uses its moves as the Champions mod defines
- * them: the calc's own Champions generation (0) agrees with the mod on every
- * legal damaging move but Pound, which it lacks, so a move the calc lacks or
- * reads at another power, type or category goes in as an override, read from
- * the mod's own Dex (round 68, T186; calc-champions-moves.spec.ts checks every
- * Champions move).
- */
 
 type CalcGen = CalcGeneration;
 type CalcMoveOptions = NonNullable<ConstructorParameters<typeof CalcMove>[2]>;
 
-/**
- * The power the move's own callback gives on the attacker's facts, or null to leave the calc its own. Round 76 (T265): the
- * moves are the history powers of replay-core (`historyPower`, the one rule the spread solver reads too): Last Respects by the
- * side's fallen, Rage Fist by the hits the body took; calc 0.12 counts neither.
- */
+// calc 0.12 prices Last Respects at its listed power whatever alliesFainted says, and counts no Rage Fist hits.
 function powerAtUse(gen: CalcGen, name: string, attacker: CalcBody): number | null {
   const dex = dexOfCalc(gen);
   return historyPower(dex, dex.moves.get(name).id, { fainted: attacker.totalFainted ?? 0, timesAttacked: attacker.timesAttacked ?? 0 });
 }
 
-/** The slot "Hidden Power" with the attacker's type, and its power before gen 6; any other move as named. */
+// The calc reads the bare name as a Normal move of power 60 (0 before gen 6).
 function typedHiddenPower(gen: CalcGen, name: string, attacker: CalcBody): { name: string; basePower: number | null } {
   if (toID(name) !== 'hiddenpower' || !attacker.hpType) return { name, basePower: null };
   return { name: `Hidden Power ${attacker.hpType}`, basePower: simGenNum(gen) < 6 && attacker.hpPower ? attacker.hpPower : null };
 }
 
-/**
- * A damaging move the simulator's generation plays typeless (Struggle in Gens 2 to 4: no type, so no item boost and no STAB)
- * goes to the calc typeless too (round 68, T186, decision 6): 0.12 lets Struggle take Normal items in those generations.
- * Read from the simulator's own move, no list.
- */
+// A damaging move the simulator plays typeless (Struggle in Gens 2 to 4) goes to the calc typeless too:
+// calc 0.12 lets it take Normal items.
 function typelessOverride(gen: CalcGen, name: string): { type: never } | null {
   const move = dexOfCalc(gen).moves.get(name);
   return move.exists && move.type === '???' && move.category !== 'Status' ? { type: '???' as never } : null;
 }
 
-/**
- * What the body's mod gives a move where the calc's data differs or has none (round 68, T186, decision 2): the calc's own
- * Champions generation (0) lists the mod's moves except for Pound, which it lacks, so a move whose power, type or
- * category differs, or which the calc has no data for, goes in with the values of the mod's Dex (loaded with its battle),
- * and the whole row (flags, target) when the calc has none; the caller's own overrides (a spread move into one foe) win over the mod's row. Negative priority stays out: the calc reads priority only as
- * "greater than zero", which has no damage effect.
- */
+// The caller's overrides win; the calc reads priority only as "greater than zero", so a negative one stays out.
 function modOverrides(gen: CalcGen, name: string, attacker: CalcBody, calc: CalcMove): CalcMoveOptions['overrides'] | null {
   const move = attacker.mod === CHAMPIONS_MOD ? dexOfCalc(gen).moves.get(name) : undefined;
   if (!move?.exists) return null;

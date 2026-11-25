@@ -3,12 +3,7 @@ import { Dex } from '@pkmn/sim';
 import { megaEvolution } from '../src/protocol/speed-evidence';
 import { generationsFor } from '../src/format-generations';
 
-/**
- * Round 69 (lane A's request, T190): the tempo evidence marks a forme change as a Mega Evolution from the Dex. The
- * Mega-Z formes of Champions (Garchomp-Mega-Z, Absol-Mega-Z) carry no isMega flag; the simulator's canMegaEvo reads
- * the holder's item (`megaStone`, a map from the base species to the forme), so the Dex says it for them too. The
- * check is about species and items, not the game type: a singles and a doubles log hold the same forme change line.
- */
+// The Mega-Z formes of Champions carry no `isMega` flag: the rule reads the holder's `megaStone`, as canMegaEvo does.
 const data = generationsFor('[Gen 9 Champions] OU').get(9);
 
 describe('megaEvolution reads the Mega formes from the Dex', () => {

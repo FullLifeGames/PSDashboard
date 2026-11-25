@@ -1,16 +1,9 @@
 import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 
-/** Safety ceiling per play-out run (spec: 100 executed entries). */
+/** Safety ceiling per play-out run, in executed entries. */
 export const PLAY_OUT_CAP = 100;
 
-/**
- * The "fast play-out" engine: the depth-1 matrix on every turn instead of
- * the Auto line, which runs the tree on every doubles turn and on singles
- * turns once a quarter of all bodies fell (the search budget's defaults,
- * search/budget.ts). A session option the user asks for: several times
- * faster wherever Auto runs the tree, and weaker there (the tree looks
- * several turns ahead).
- */
+/** The "fast play-out" engine: the depth-1 matrix every turn instead of Auto; faster where Auto runs the tree. */
 export const FAST_PLAY_OUT_SETTINGS = { depth: 1, samples: 1, mode: 'matrix' } as const;
 
 export type PlayOutStep =
@@ -18,18 +11,11 @@ export type PlayOutStep =
   | { kind: 'single'; side: 'p1' | 'p2'; choice: RankedChoice }
   | { kind: 'done'; reason: 'ended' | 'cap' | 'no-choices' };
 
-/** A side's best PLAYABLE choice. The eval ranks a waiting side (forced-
- *  switch interludes) as the 'wait' sentinel — nothing to submit there. */
+// The eval ranks a waiting side (a forced-switch interlude) as the 'wait' sentinel: nothing to submit.
 function actionable(choices: RankedChoice[]): RankedChoice | null {
   return choices.find(choice => choice.choice !== 'wait') ?? null;
 }
 
-/**
- * One decision of the engine-vs-engine loop ("Let it play out"): both
- * sides' top ranked choice, a single side's when the position is one-sided
- * (forced switches leave the other side waiting), or the stop verdict.
- * Pure — the caller owns execution and re-evaluation.
- */
 export function nextPlayOutStep(result: EvalResult, battleEnded: boolean, executed: number): PlayOutStep {
   if (battleEnded) return { kind: 'done', reason: 'ended' };
   if (executed >= PLAY_OUT_CAP) return { kind: 'done', reason: 'cap' };
@@ -41,15 +27,11 @@ export function nextPlayOutStep(result: EvalResult, battleEnded: boolean, execut
   return { kind: 'done', reason: 'no-choices' };
 }
 
-/**
- * The preferences a run gives back: the run switched Auto on for its evaluations, so the user's own setting returns
- * when it ends, by Stop, by finish or by Discard (round 77, C4). Null when nothing needs to change.
- */
+/** The preferences a run gives back (it switched Auto on, the user's setting returns); null when nothing changes. */
 export function prefsAfterRun<T extends { auto: boolean }>(prefs: T, run: { prevAuto: boolean }): T | null {
   return run.prevAuto ? null : { ...prefs, auto: false };
 }
 
-/** Human sentence for why a play-out ended (shown in the panel notice). */
 export function playOutDoneText(reason: 'ended' | 'cap' | 'no-choices', executed: number): string {
   const turns = `${executed} turn${executed === 1 ? '' : 's'}`;
   if (reason === 'ended') return `Play-out finished: the battle ended after ${turns}.`;

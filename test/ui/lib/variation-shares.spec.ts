@@ -3,14 +3,9 @@ import type { BranchHistoryEntry } from '../../../src/lib/branch-history';
 import { variationBoardShares } from '../../../src/lib/variation-shares';
 import { pokemon, type FormatKind } from '../fixtures/sim-state';
 
-/**
- * Round 70 (T216): the fainted share of the board a variation point stands on. The share counts fainted bodies over all
- * bodies of both sides, the measure the engine routes by (battleFaintedFraction), so the branch board and its search
- * read one phase. Expected values are counted by hand from the rosters below.
- */
+// Expected values are counted by hand from the rosters below.
 const BODIES: Record<FormatKind, number> = { singles: 6, doubles: 4 };
 
-/** One side's roster: `down` of its bodies fainted (hp 0, flag set), the rest healthy. */
 const roster = (kind: FormatKind, down: number) => Array.from({ length: BODIES[kind] }, (_, index) => (
   index < down ? pokemon(`Mon${index}`, { fainted: true, hp: 0, hpPercent: 0 }) : pokemon(`Mon${index}`)
 ));
@@ -28,7 +23,6 @@ describe.each(['singles', 'doubles'] as const)('variationBoardShares, %s', kind 
   test('every executed turn names the share of the board it ended on, at the turn that board opens', () => {
     const history = [entry(kind, [1, 0], { turnNumber: 4 }), entry(kind, [2, 1], { turnNumber: 5 }), entry(kind, [3, 2], { turnNumber: 6 })];
     const shares = variationBoardShares(history, 4);
-    // The shared prefix (turn 4 and before) has no variation board: only the main line stands there.
     expect(shares.slice(0, 4)).toEqual([null, null, null, null]);
     expect(shares[4]).toBeCloseTo(1 / total);
     expect(shares[5]).toBeCloseTo(3 / total);

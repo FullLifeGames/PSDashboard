@@ -6,15 +6,8 @@ import { backpropagate, selectAndExpand } from './descent.ts';
 import type { ExpansionContext } from './expansion.ts';
 import { LINE_MIN_VISITS, lineFrom, type Node } from './mcts-node.ts';
 
-/**
- * Round 89 (#104, G14b, ruling G9a option L): the line pass. After a tree has its result, cell statistics and ranking, a host may ask for
- * extra iterations (`EvalSettings.linePass`) that start at the cells whose lines the card shows and descend by the same decoupled UCB
- * below them. The second turn of a line then holds the visits a line needs, where the tree's own 600 iterations left it thin. The
- * iterations run on cells that already exist and write only below the root: the root's arrays, its visit count and every statistic
- * the result and the merge read stay as the tree left them, so no score, rank or grade moves; only `rowLines` reads more visits.
- */
+// The pass writes only below the root, so no score, rank or grade moves; only `rowLines` reads more visits.
 
-/** The largest quota a settings object may ask for (a sanity bound; the app asks for 300). */
 export const LINE_PASS_MAX = 5_000;
 
 /** The quota of a settings object: a whole number from 1 up, else none. */
@@ -25,14 +18,9 @@ export const linePassQuota = (settings: Pick<EvalSettings, 'linePass'>): number 
 
 const hasChoices = (node: Node): boolean => !node.ended && node.p1Options.length > 0 && node.p2Options.length > 0;
 
-/** The index of a row by label, -1 when the tree holds no such row. */
 const indexOfLabel = (options: { label: string }[], label: string | undefined): number => (label === undefined ? -1 : options.findIndex(option => option.label === label));
 
-/**
- * The root cells the pass aims at: for each side the rows the donors will ask a line for (`settings.lineRows`, else the tree's best row,
- * and the row the side played), against the tree's own top three answers of the other side, the columns `rowLines` reads. Only cells the
- * tree already expanded; keys in ascending order, so the pass is deterministic.
- */
+/** The root cells the pass aims at: wanted rows against the tree's top three answers, expanded only, keys ascending. */
 export function wantedCells(root: Node, result: EvalResult, settings: EvalSettings): number[] {
   const keys = new Set<number>();
   for (const side of ['p1', 'p2'] as const) {
@@ -49,7 +37,6 @@ export function wantedCells(root: Node, result: EvalResult, settings: EvalSettin
   return [...keys].sort((a, b) => a - b);
 }
 
-/** The rows of one side the donors will ask a line for: the named rows (else the tree's best row) and the row the side played. */
 function wantedRows(root: Node, result: EvalResult, settings: EvalSettings, side: 'p1' | 'p2'): number[] {
   // playedIndices reads the option lists of the first tree only
   const played = playedIndices([{ p1Options: root.p1Options, p2Options: root.p2Options } as MctsTreeStats], result, settings.keepPlayed);
@@ -60,10 +47,7 @@ function wantedRows(root: Node, result: EvalResult, settings: EvalSettings, side
   return rows;
 }
 
-/**
- * Round 89 (#153, Hard mode): the cell of each wanted row against its worst answer (`worstAnswer` of the tree's own result), when the
- * root holds it and `taken` (the plain wanted cells) does not. Keys in ascending order.
- */
+/** The cell of each wanted row against its worst answer, when the root holds it and `taken` does not; keys ascend. */
 export function floorCells(root: Node, result: EvalResult, settings: EvalSettings, taken: readonly number[]): number[] {
   const keys = new Set<number>();
   for (const side of ['p1', 'p2'] as const) {
@@ -81,14 +65,10 @@ export function floorCells(root: Node, result: EvalResult, settings: EvalSetting
   return [...keys].sort((a, b) => a - b);
 }
 
-/** Whether the line from a root cell already holds two turns: the graded turn and one after it. */
 const reaches = (root: Node, key: number): boolean => lineFrom(root, key, LINE_MIN_VISITS).length >= 2;
 
-/**
- * The pass: up to `quota` iterations, each starting at the next wanted cell whose line is still short, round robin, until every wanted
- * line holds two turns or the quota is spent. `firstIteration` is the tree's own iteration count, so the pass's expansions draw seeds the
- * tree did not use. Returns the iterations run. `shouldStop` is the search's own stop flag, read before each iteration.
- */
+// `firstIteration` is the tree's iteration count, so the expansions draw seeds the tree did not use.
+/** Up to `quota` round-robin iterations on wanted cells with a short line; returns the iterations run. */
 export function linePass(
   root: Node, wanted: readonly number[], quota: number, ctx: ExpansionContext, seedOffset: number, firstIteration: number, shouldStop?: () => boolean,
 ): number {
@@ -108,10 +88,7 @@ export function linePass(
   return used;
 }
 
-/**
- * The pass of a tree whose result is final: nothing when the settings ask for none, the search has no tree to run on (a dead root) or
- * it was stopped. `iterations` is the tree's own count, `shouldStop` the search's flag.
- */
+/** The pass of a tree whose result is final: nothing when none is asked, the root is dead or the search was stopped. */
 export function passAfterResult(
   root: Node, result: EvalResult, settings: EvalSettings, ctx: ExpansionContext | undefined, seedOffset: number, iterations: number, shouldStop?: () => boolean,
 ): void {
@@ -119,6 +96,5 @@ export function passAfterResult(
   if (quota === 0 || !ctx || shouldStop?.()) return;
   const plain = wantedCells(root, result, settings);
   const used = linePass(root, plain, quota, ctx, seedOffset, iterations, shouldStop);
-  // Round 89 (#153): what the plain cells left of the quota goes to the floor cells; their seeds follow the plain pass's
   if (used < quota) linePass(root, floorCells(root, result, settings, plain), quota - used, ctx, seedOffset, iterations + used, shouldStop);
 }

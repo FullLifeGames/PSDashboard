@@ -37,7 +37,6 @@ describe('EvalResultBlock', () => {
     const shared = { result, playerNames: names, onPickChoice, onPickPair };
     const { rerender } = render(<EvalResultBlock {...shared} status="done" />);
     await userEvent.click(screen.getByRole('button', { name: /Swords Dance/ }));
-    // the result the rows are from is the 4th argument (Hard mode reads the reply that hurts the clicked move most from it)
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[1], result.perSide.p2[0], result);
     await userEvent.click(screen.getByRole('button', { name: /Body Press/ }));
     expect(onPickChoice).toHaveBeenLastCalledWith('p2', result.perSide.p2[1], result.perSide.p1[0], result);
@@ -51,7 +50,6 @@ describe('EvalResultBlock', () => {
     expect(screen.getByTitle(/^Earthquake × Leech Seed:/).tagName).toBe('TD');
   });
 
-  // Round 89 (#153, HM-2): the ranked rows are an engine-move click target too; their title ends with the sentence of the other targets.
   test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply the opponent plays, by the Setup setting; a result with no handler has no click sentence', kind => {
     const shared = { result: evalResult(kind), playerNames: names, status: 'done' as const, onPickChoice: vi.fn() };
     const titles = () => [...document.querySelectorAll('button.ps-eval-choice')].map(button => button.getAttribute('title') ?? '');
@@ -85,7 +83,6 @@ describe('EvalResultBlock', () => {
   });
 });
 
-// Round 89 (LN-4): one card shows one line per row; the panel's ranked row reads the later steps of the line the Lines section shows.
 describe('EvalResultBlock: the row\'s "then ..." follows the Lines section', () => {
   const pick = (label: string, slots = 1) => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
   test.each([

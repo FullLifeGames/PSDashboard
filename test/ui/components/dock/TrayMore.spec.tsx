@@ -8,10 +8,6 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { displayName } from '../../../../src/lib/branch-history';
 import { simState, switchOption } from '../../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A3b: the free-choice picker and the What-if loader of the old FightSection spec, now parts of the
- * tray's "Dice · What if" section, plus the labels of the old switch-labels spec.
- */
 const pool = vi.hoisted(() => ({ list: ['Dragon Claw', 'Fire Fang'] as string[], calls: [] as unknown[][] }));
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async (...args: unknown[]) => { pool.calls.push(args); return pool.list; } }));
 
@@ -20,7 +16,6 @@ const doubles = simState('doubles');
 
 type WhatIfProps = Partial<Parameters<typeof WhatIfRow>[0]>;
 
-/** The What-if row over its own state, as the tray hosts it. */
 function WhatIfHost(props: WhatIfProps) {
   const [whatIfMove, setWhatIfMove] = useState('');
   const [whatIfReplace, setWhatIfReplace] = useState<string | null>(null);
@@ -137,7 +132,6 @@ describe('the What-if section of the tray (singles)', () => {
   });
 });
 
-/** The nickname-and-species label of a body: one rule for the history, the switch tiles and the picker. */
 describe('displayName in the picker', () => {
   test('a nicknamed body reads "Nickname (Species)", a body without a nickname reads its species alone', () => {
     expect(displayName('Power Police', 'Meowstic')).toBe('Power Police (Meowstic)');
@@ -166,7 +160,7 @@ describe('displayName in the picker', () => {
 describe.each([
   ['singles', singles, 'gen9championsou', /^P1\b/],
   ['doubles', doubles, 'gen9championsvgc2026regma', /^P1A\b/],
-] as const)('the tray of a %s Champions game (T8a)', (_kind, state, format, chip) => {
+] as const)('the tray of a %s Champions game', (_kind, state, format, chip) => {
   test('asks for the move pool with the format of the game', async () => {
     pool.calls.length = 0;
     render(<TurnDock simState={state} executeError={null} executing={false} gen={9} format={format} onSetChoice={vi.fn()} onHypotheticalMove={vi.fn()} onExecuteTurn={vi.fn()} />);

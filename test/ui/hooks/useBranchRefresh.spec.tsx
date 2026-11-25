@@ -16,7 +16,6 @@ const sources = {
   hpEvidence: [], getInferredSpreads: async () => undefined,
 } as unknown as TeamBuildSources;
 
-/** A branch session whose handles are spies; `isPreparing` mirrors begin/end. */
 function fakeSession(): BranchSession {
   let preparing = false;
   return {
@@ -52,7 +51,6 @@ describe('useBranchRefresh', () => {
     expect(wired.session.begin).not.toHaveBeenCalled();
   });
 
-  // Round 89 (#105): a game's own seed rides on the rebuild, a replay's rebuild names none (its default seed stays).
   test('the dice seed of a new game reaches the rebuild; a replay passes none', async () => {
     const game = args({ request: request(), gameSeed: '7,8,9,10', viewTurn: 0 });
     renderHook(() => useBranchRefresh(game));
@@ -102,7 +100,6 @@ describe('useBranchRefresh', () => {
     expect(options.bringOnly).toEqual({ p1: ['Garchomp'], p2: ['Great Tusk'] });
   }, 60_000);
 
-  // Round 77 (swarm D1): a rebuild that keeps no turn ends the variation and says so.
   test('a refresh that keeps no turn reports the ended variation and opens no branch window', async () => {
     const history = [{ turnNumber: 2, p1Choice: 'move earthquake', p2Choice: 'move leechseed', p1Active: null, p1ActiveSlots: [], p2Active: null, p2ActiveSlots: [], p1Pokemon: [], p2Pokemon: [] }];
     const wired = args({
@@ -121,7 +118,6 @@ describe('useBranchRefresh', () => {
     const { rerender } = renderHook((props: Args) => useBranchRefresh(props), { initialProps: wired });
     rerender({ ...wired, request: null });
     await new Promise(resolve => setTimeout(resolve, 50));
-    // The cancelled run neither ends the session nor clears a request it no longer owns.
     expect(wired.session.end).not.toHaveBeenCalled();
     expect(wired.clearRequest).not.toHaveBeenCalled();
   });

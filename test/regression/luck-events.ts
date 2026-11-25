@@ -1,10 +1,4 @@
-/**
- * Luck events against the favored side, read from the protocol from a
- * sample turn to the end (round 34, bank decomposition stage 1): crits
- * taken, own misses, and turns lost to paralysis, freeze, or flinch.
- * Sleep and confusion are not counted (they are usually self-inflicted
- * or chosen into). A missing turn line means the whole log counts.
- */
+/** Luck events against the favored side from a sample turn to the end; sleep and confusion are not counted. */
 export interface LuckCounts { crit: number; miss: number; cant: number }
 
 const CANT_REASONS = new Set(['par', 'frz', 'flinch']);

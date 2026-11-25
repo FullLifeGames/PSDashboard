@@ -9,15 +9,9 @@ import { DiceTable } from './DiceTable';
 import type { DockSlotModel } from './dock-model';
 import { ChoicePicker, WhatIfRow, type WhatIfState } from './WhatIfSection';
 
-/**
- * Round 84 (turn dock): the part of the tray behind "Dice · What if": the forced dice of the slot's move and of the turn, the
- * "What if it had…" loader and the list of all choices. The dice of the slot's move are a table (A4), with the dice of the turn
- * under it; the "What if" loader and the list are today's. The pool of moves loads when this section opens.
- */
 export function TrayMore({ slot, gen, format, diceViews, onChoice, onHypotheticalMove }: {
   slot: DockSlotModel;
   gen: number;
-  /** The game's format id: the What if list offers what the format's own rules allow. */
   format: string;
   diceViews: DiceViews;
   onChoice: (choice: BranchSlotChoice) => void;

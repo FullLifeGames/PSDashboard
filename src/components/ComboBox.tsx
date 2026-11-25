@@ -4,24 +4,19 @@ import { toId } from '@fulllifegames/replay-core';
 interface Props {
   options: string[];
   value: string;
-  /** Fires on every keystroke with the raw text. */
   onChange: (text: string) => void;
-  /** Fires when an option is committed — by click or by Enter. */
   onSelect: (option: string) => void;
-  /** Enter pressed while the text matches no option (free-text fallback). */
   onEnterFreeText?: (text: string) => void;
   onBlur?: () => void;
   placeholder?: string;
   ariaLabel?: string;
   disabled?: boolean;
-  /** A short note shown beside an option (the editor marks a move the species cannot learn). */
   optionNote?: (option: string) => string | undefined;
   inputStyle?: React.CSSProperties;
 }
 
 const MAX_VISIBLE_OPTIONS = 100;
 
-/** Prefix matches first, then substring matches; the raw list for an empty query. */
 function filterOptions(options: string[], value: string): string[] {
   const query = value.trim().toLowerCase();
   if (!query) return options;
@@ -43,7 +38,6 @@ interface KeyContext {
   onEnterFreeText?: (text: string) => void;
 }
 
-/** Arrow keys move the highlight, Escape closes, Enter commits the highlighted or exact option (else free text). */
 function comboKeyHandler(ctx: KeyContext) {
   return (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'ArrowDown') {
@@ -58,7 +52,7 @@ function comboKeyHandler(ctx: KeyContext) {
       return;
     }
     if (event.key === 'Escape') {
-      // An open list closes alone: the dialog around it keeps its edits. With the list closed the key reaches the dialog.
+      // An open list closes alone: the dialog around it keeps its edits.
       if (ctx.open) {
         event.stopPropagation();
         ctx.setOpen(false);
@@ -99,8 +93,7 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, optionNote, onCommi
             role="option"
             aria-selected={index === highlight}
             className={`ps-combobox-option${index === highlight ? ' ps-combobox-option-active' : ''}`}
-            // preventDefault keeps the input focused so blur cannot close
-            // the popup before the click lands.
+            // preventDefault keeps the input focused, so blur cannot close the popup before the click lands.
             onMouseDown={event => event.preventDefault()}
             onClick={() => onCommit(option)}
             onMouseEnter={() => onHighlight(index)}
@@ -122,7 +115,6 @@ function ComboBoxPopup({ idBase, filtered, highlight, value, optionNote, onCommi
   ) : null;
 }
 
-/** Keeps the highlighted option of an open popup in view. */
 function useScrollToHighlight(open: boolean, idBase: string, highlight: number) {
   useEffect(() => {
     if (!open) return;
@@ -130,11 +122,7 @@ function useScrollToHighlight(open: boolean, idBase: string, highlight: number) 
   }, [highlight, open, idBase]);
 }
 
-/**
- * Filterable single-select dropdown with proper commit semantics — clicking
- * an option selects it immediately, arrows + Enter work, no hidden
- * "press Enter to confirm" step. Replaces the browser-dependent <datalist>.
- */
+/** A filterable single-select dropdown with no <datalist>, whose behavior differs by browser. */
 export function ComboBox({
   options,
   value,
@@ -179,7 +167,6 @@ export function ComboBox({
           setOpen(true);
           setHighlight(0);
         }}
-        // Focus lists every option and highlights none, so Enter in an empty field commits nothing.
         onFocus={() => {
           setOpen(true);
           setHighlight(value.trim() ? 0 : -1);

@@ -7,12 +7,6 @@ import { chipKey } from '../../hooks/useTrayState';
 import type { DockSlotModel } from './dock-model';
 import { TypeTag } from './TypeTag';
 
-/**
- * Round 84 (turn dock): one slot's chip: its label, the body and its HP, and the slot's choice with where it came from. A click
- * opens the slot's tray. An empty chip says why it is empty. The chip keeps its box: the text clips, never wraps.
- * Round 84 (A7b, ruling 8a): the chip takes the tile's type edge on the left (`typeTileVars` of the type the tile shows) and, at its
- * right across both lines, the move's type tag or the sprite of the body that comes in. An empty chip has neither.
- */
 export function SlotChip({ slot, open, onToggle }: { slot: DockSlotModel; open: boolean; onToggle: () => void }) {
   const { pending, origin } = slot;
   const rules = useReplayRules();

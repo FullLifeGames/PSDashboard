@@ -122,6 +122,9 @@ A line that starts with the engine's best choice for a player, the opponent answ
 **Played line**:
 A line that starts with the choice the player made. A player who played the engine's choice gets one line.
 
+**Graded turn**:
+A turn on which a side's card prints an inaccuracy, a mistake or a blunder. A side without a played row or an engine row has no grade, and a mistake or blunder that the card replaces by a sacrifice or a read that paid off is not graded. An inaccuracy with a read that paid off is graded only when the side lost ground on the turn. A turn without a tracked played choice is skipped for both sides. The Game review lists graded turns, the graph marks them, and the early lines stage searches them.
+
 **Game review**:
 The panel under the game report that lists, per player, the graded turns (inaccuracy, mistake or blunder) with the played value, the engine's value, the loss, and the engine line and the played line with a ▶ Play button each. The graph marks the same turns, a circle for player 1 and a square for player 2, with a line under the graph that names each shape. A game that reached its endgame adds an Endgame row for the player who lost. Release 1.2.0 ships it switched off, behind `VITE_FEATURE_GAME_REVIEW` (`src/lib/feature-flags.ts`, off in every build); with the flag off the section, the marks and the line that names them are not drawn. It returns in 1.2.1.
 
@@ -179,3 +182,6 @@ A risk that cleared the same payoff margin but whose played choice did not beat 
 **Quiet turn**:
 A turn where the estimate moved less than a mistake band and no one earned a grade (attribution `quiet`). The card says "A quiet turn." only when it highlights nothing else; beside another sentence or a hindsight hint it says "Neither side made a mistake." and the badge reads "no mistake" instead of "quiet turn" (`quietVoice`). A card that names an unpunished risk or an inaccuracy starts with that sentence instead, and its badge reads "risk (unpunished)" or "small inaccuracy". Where a side carries a mistake or blunder tier, the card writes no quiet sentence beside the others; that case and a turn without played actions keep the badge "quiet turn".
 _Avoid_: calm turn, nothing happened
+
+**Standoff**:
+Ten or more consecutive turns at one fainted share in which nobody fainted and nobody switched (`standoffsOf` in the engine). The game report names the span ("Turns 12 to 24 were a standoff"), and the shifts, rolls and paid-off reads of those turns stay out of its key moments and read list; a graded decision inside the span still counts.

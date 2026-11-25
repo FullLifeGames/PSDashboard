@@ -9,16 +9,6 @@ import { reconstructBranchRuntime } from '../src/branch-engine';
 import { correctActivesFromProtocol, correctBattleFromSnapshot } from '../src/branch/corrections';
 import { serializeBattleStable } from '../src/forward-model';
 
-/**
- * Round 67 (T133): a body the boundary correction puts on the field (the sim
- * kept another body there) plays the switch-in the game showed, through the
- * simulator's own switch-in. Before, a repointed body never played it: 749828
- * t17, Roaring Moon without the Protosynthesis the protocol shows. A faint the
- * protocol shows before the switch-in counts first, and the snapshot
- * correction counts the faints it writes, so Supreme Overlord reads the
- * game's number of fallen allies.
- */
-
 type Replay = { id: string; format: string; formatid?: string; players: string[]; log: string };
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf-8')) as Replay;
 
@@ -36,7 +26,6 @@ function make(format: string, p1: PokemonSet[], p2: PokemonSet[]): Battle {
   return battle;
 }
 
-/** Plays turn 1 in the sim: the board then stands at the boundary the correction runs on. */
 function playTurn(battle: Battle, p1: string, p2: string, p1Forced?: string): Battle {
   battle.choose('p1', p1);
   battle.choose('p2', p2);
@@ -44,7 +33,6 @@ function playTurn(battle: Battle, p1: string, p2: string, p1Forced?: string): Ba
   return battle;
 }
 
-/** The sim's own public lines of the block that ends at |turn|boundary. */
 function simBlock(battle: Battle, boundary: number): string[] {
   const end = battle.log.lastIndexOf(`|turn|${boundary}`);
   const start = battle.log.lastIndexOf(`|turn|${boundary - 1}`, end);
@@ -98,8 +86,6 @@ describe('a body the correction puts in plays its switch-in through the simulato
   });
 
   test('a body the sim brought in and lost again in the block keeps its one entry', () => {
-    // The sim plays Landorus's switch-in (Intimidate), then Whirlwind drags it
-    // out; the protocol keeps it in. The repoint must not play Intimidate twice.
     const battle = playTurn(make('gen9customgame',
       [mon('Garchomp', 'Leftovers', 'Rough Skin', ['Swords Dance']), mon('Landorus-Therian', 'Leftovers', 'Intimidate', ['Earthquake'])],
       [mon('Skarmory', 'Leftovers', 'Sturdy', ['Whirlwind'])]), 'switch 2', 'move whirlwind');
@@ -166,7 +152,6 @@ describe('the faints the protocol shows count before the entry', () => {
     expect(body(battle, 0, 'Kingambit').abilityState.fallen).toBe(2);
   });
 
-  /** A protocol log of one turn: p1's lead faints to Great Tusk (or survives), Kingambit comes in. */
   const protocolTurn = (doubles: boolean, faints: boolean) => [
     '|player|p1|A|', '|player|p2|B|', `|gametype|${doubles ? 'doubles' : 'singles'}`, '|gen|9',
     '|poke|p1|Gholdengo|', '|poke|p1|Amoonguss|', '|poke|p1|Kingambit|', '|poke|p2|Great Tusk|', '|poke|p2|Garchomp|',
@@ -205,10 +190,6 @@ describe('the faints the protocol shows count before the entry', () => {
   });
 });
 
-/**
- * The live pass the app and the bank run (boundary capture with snapshot
- * correction, choice locks on); `read` sees each listed boundary's board.
- */
 async function boundaries<T>(replay: Replay, turns: number[], read: (battle: Battle) => T) {
   const { snapshots, observations, speedOrders } = parseReplayLogWithObservations(replay.log);
   const { p1Team, p2Team } = buildTeamsFromReplay(replay.log, { observations, speedOrders });

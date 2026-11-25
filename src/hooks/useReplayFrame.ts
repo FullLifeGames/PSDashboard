@@ -5,10 +5,9 @@ import { subscribeTablePart, tablePartPending, teambuilderTablePartUrl } from '.
 
 type FrameRef = React.RefObject<HTMLIFrameElement | null>;
 
-/** The side a frame shows near (round 88, T316). */
 export type FrameSide = 'p1' | 'p2';
 
-/** `id` names one request across its retries: the bridge runs a play seek with an id once (round 88, T347). */
+// `id` names one request across its retries: the bridge runs a play seek with an id once.
 const postSeek = (iframeRef: FrameRef, turn: number, autoPlay: boolean, id?: number) =>
   iframeRef.current?.contentWindow?.postMessage(id === undefined ? { type: 'ps-seek-turn', turn, autoPlay } : { type: 'ps-seek-turn', turn, autoPlay, id }, '*');
 
@@ -21,14 +20,13 @@ export function useReplayBlobUrl(args: {
   title?: string;
   initialSeek: { seekTurn?: number; autoPlay?: boolean };
   reportTurn: boolean;
-  /** Round 88 (T316): the document reports the side it shows near, and hides the two choosers (Color scheme, Music). */
+  /** The document reports the side it shows near, and hides the two choosers (Color scheme, Music). */
   reportSide?: boolean;
   hideChoosers?: boolean;
   viewpoint?: 'p1' | 'p2';
 }): string | null {
   const { documentLog, format, p1, p2, title, initialSeek, reportTurn, reportSide, hideChoosers, viewpoint } = args;
-  // Round 85 (T318): a frame opened right after the app starts waits for the teambuilder table's part (at most until
-  // TABLE_PART_WAIT_MS); the flag turns false once and stays false, so no frame that stands is rebuilt by it.
+  // Turns false once and stays false, so a standing frame is never rebuilt when the table part arrives.
   const tableWait = useSyncExternalStore(subscribeTablePart, tablePartPending, () => false);
   const blobUrl = useMemo(() => {
     if (!documentLog.trim() || tableWait) {
@@ -62,7 +60,6 @@ export function useReplayBlobUrl(args: {
   return blobUrl;
 }
 
-/** Listen for turn change messages from the iframe; remembers the last turn it reported. */
 export function useTurnReports(onTurnChange: ((turn: number) => void) | undefined, blobUrl: string | null) {
   const lastReportedTurnRef = useRef<number | null>(null);
 
@@ -87,10 +84,7 @@ export function useTurnReports(onTurnChange: ((turn: number) => void) | undefine
   return lastReportedTurnRef;
 }
 
-/**
- * Round 88 (T316): forwards the side the frame's own document shows near. The source check keeps a report of a document that is
- * going away from reaching the app; no callback adds no listener.
- */
+/** Forwards the side the frame's document shows near; a report of a document going away never reaches the app. */
 export function useSideReports(iframeRef: FrameRef, onSideChange: ((side: FrameSide) => void) | undefined) {
   useEffect(() => {
     if (!onSideChange) return;
@@ -104,7 +98,6 @@ export function useSideReports(iframeRef: FrameRef, onSideChange: ((side: FrameS
   }, [iframeRef, onSideChange]);
 }
 
-/** Seeks the frame to seekTurn (once for live frames; never for a turn the frame itself just reported). */
 export function useSeekTurn(args: {
   iframeRef: FrameRef;
   seekTurn: number | undefined;
@@ -118,9 +111,7 @@ export function useSeekTurn(args: {
   useEffect(() => {
     if (seekTurn == null) return;
     if (liveUpdates && didInitialLiveSeekRef.current) return;
-    // When the seekTurn change is just the echo of a turn the iframe itself
-    // reported (user pressed Play/Next inside the embed), re-seeking would
-    // pause playback after every turn (B9a) — skip it.
+    // seekTurn may only echo a turn the iframe reported (Play/Next inside the embed); re-seeking would pause playback.
     if (!liveUpdates && lastReportedTurnRef.current === seekTurn) return;
     const sendSeek = () => postSeek(iframeRef, seekTurn, !!autoPlay);
     didInitialLiveSeekRef.current = true;
@@ -149,12 +140,7 @@ export interface SeekRequest {
   play?: boolean;
 }
 
-/**
- * Explicit navigation/watch seeks (seekRequest): requests issued before this
- * frame instance mounted are stale — the initial seekTurn already positioned
- * it — so only seq bumps AFTER mount are sent. Short retry window because a
- * bump can land while the embed is still booting.
- */
+/** Seeks on navigation or watch requests; only seq bumps after mount count, the initial seekTurn already placed it. */
 export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | null) {
   const seenSeekSeqRef = useRef<number | null>(seekRequest?.seq ?? null);
   useEffect(() => {
@@ -171,12 +157,10 @@ export function useSeekRequests(iframeRef: FrameRef, seekRequest: SeekRequest | 
   }, [seekRequest, iframeRef]);
 }
 
-/** The lines of a log a frame holds (the embed skips blank lines). */
 export function frameLines(log: string): string[] {
   return log.split('\n').filter(Boolean);
 }
 
-/** True when `next` keeps every line of `previous` in order and adds lines only after them: a frame showing `previous` can append. */
 export function extendsLines(previous: string[], next: string[]): boolean {
   return previous.length <= next.length && previous.every((line, index) => line === next[index]);
 }
@@ -186,7 +170,7 @@ interface LiveAppendArgs {
   liveUpdates: boolean;
   reloadKey: string;
   blobUrl: string | null;
-  /** The log the document opened with, when it opened on less than `log`: the lines after it reach the frame as appends. */
+  /** The log the document opened with, when that is less than `log`: the lines after it arrive as appends. */
   documentLog?: string;
   log: string;
   seekTurn: number | undefined;
@@ -196,20 +180,10 @@ interface LiveAppendArgs {
 
 type SentLog = { key: string; blobUrl: string; lines: string[] };
 
-/**
- * Streams appended log lines into a live frame instead of rebuilding it.
- * The frame's bridge listens only once its document has loaded, and the
- * embed script comes from the network: lines posted before that were lost.
- * After one turn back and a new choice the frame reloaded for the rebuilt
- * line, and it never showed the new turn (round 77, user report
- * 28.10.2026). New lines wait for the frame's ready message and then go out
- * as one append.
- */
+/** Streams appended log lines into a live frame, after its ready message: the bridge listens only once loaded. */
 export function useLiveAppend(args: LiveAppendArgs) {
   const { iframeRef, liveUpdates, reloadKey, blobUrl, documentLog, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
-  /** The lines the frame holds, or holds once its bridge reports ready. */
   const sentLogRef = useRef<SentLog | null>(null);
-  /** The document whose bridge reported ready. */
   const readyRef = useRef<string | null>(null);
   const latestRef = useRef<LiveAppendArgs | null>(null);
   useEffect(() => {
@@ -230,7 +204,6 @@ export function useLiveAppend(args: LiveAppendArgs) {
   }, [liveUpdates, blobUrl, iframeRef]);
 }
 
-/** Posts the lines the frame lacks; a new document records the lines it opened with, and a frame not ready yet keeps them waiting. */
 function appendNewLines(args: LiveAppendArgs, sentLogRef: React.RefObject<SentLog | null>, ready: boolean): void {
   const { reloadKey, blobUrl, documentLog, log } = args;
   if (!blobUrl) return;
@@ -246,7 +219,6 @@ function appendNewLines(args: LiveAppendArgs, sentLogRef: React.RefObject<SentLo
   sentLogRef.current = { key: reloadKey, blobUrl, lines: frameLines(log) };
 }
 
-/** One append message with the lines after the ones the frame holds, when the log still extends them. */
 function postAppend(args: LiveAppendArgs, sent: SentLog): void {
   const { iframeRef, log, seekTurn, liveAppendMode, liveAppendTurn } = args;
   const lines = frameLines(log);

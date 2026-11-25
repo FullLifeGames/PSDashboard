@@ -5,16 +5,10 @@ import {
   type BranchEngineModule, type BranchHistoryEntry, type BattleStream, type SideId,
 } from './shared';
 
-/**
- * Re-applying a recorded history entry to a runtime, and the lead entry of a turn-0 start: the session's rebuild and the new
- * game's rebuild (`game-rebuild.ts`) both play entries through these (moved out of `session.ts`, round 89, #105).
- */
-
 export type ReplayEntryOutcome =
   | { ok: true; entry: BranchHistoryEntry }
   | { ok: false; error: string };
 
-/** The commands one recorded entry resolves to against the rebuilt battle. */
 function resolveEntryCommands(
   branchEngine: BranchEngineModule, battle: NonNullable<BattleStream['battle']>, entry: BranchHistoryEntry,
 ): { ok: true; commands: { side: SideId; command: string }[]; p1Command: string; p2Command: string } | { ok: false; error: string } {
@@ -58,12 +52,7 @@ function resolveEntryCommands(
   };
 }
 
-/**
- * Re-applies one recorded history entry against a freshly rebuilt runtime.
- * Choices are re-resolved by identity against the current request, so a team
- * edit can never silently replay the wrong move — mismatches abort with a
- * visible error instead (B1).
- */
+/** Choices are re-resolved by identity, so a team edit never replays the wrong move: a mismatch aborts. */
 export async function replayHistoryEntry(
   runtime: BranchRuntime,
   branchEngine: BranchEngineModule,
@@ -84,7 +73,6 @@ export async function replayHistoryEntry(
     log: runtime.log,
     choiceErrors: runtime.choiceErrors,
     commands: resolved.commands,
-    // the entry's slot choices carry the forced dice; a forced entry after a pause plays the rest of that turn with them (round 82)
     dice: { battle, p1Choices: entry.p1SlotChoices ?? [], p2Choices: entry.p2SlotChoices ?? [] },
   });
   if (!result.ok) return result;
@@ -93,8 +81,7 @@ export async function replayHistoryEntry(
     p1Choices: [],
     p2Choices: [],
   });
-  // The rebuild's own position replaces whatever the replayed entry carried —
-  // after a team edit the old capture no longer describes this battle.
+  // The rebuild's own position replaces the entry's: after a team edit the old capture no longer describes this battle.
   const serializedPosition = branchEngine.captureSerializedPosition(runtime.battleStream.battle);
   return {
     ok: true,
@@ -110,8 +97,7 @@ export async function replayHistoryEntry(
   };
 }
 
-/** The lead decision IS the variation's first entry: entry 0 plays
- *  "turn 0" and the position after it is the start of turn 1. */
+/** The lead decision is the variation's first entry: entry 0 plays "turn 0", and its position starts turn 1. */
 export function leadHistoryEntry(
   branchEngine: BranchEngineModule, runtime: BranchRuntime,
   leadOverride: { p1: string[]; p2: string[]; bring?: boolean }, startPosition: string | null,
@@ -120,8 +106,7 @@ export function leadHistoryEntry(
     p1Choices: [],
     p2Choices: [],
   });
-  // "lead A + B · back C + D" — the leads are the first active-count
-  // picks, the rest is the brought back line (VGC's 4 of 6).
+  // "lead A + B · back C + D": the first active-count picks lead, the rest is the brought back line (VGC 4 of 6).
   const activeCount = runtime.battleStream.battle?.sides[0]?.active.length ?? 1;
   const leadLabel = (list: string[]) => {
     const back = list.slice(activeCount);

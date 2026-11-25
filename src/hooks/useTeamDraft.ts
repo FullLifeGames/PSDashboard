@@ -5,7 +5,6 @@ import {
 } from '@fulllifegames/replay-core';
 import { canonicalMove, clampEv, evLimitsFor, evsBeside, withAddedMove, type EditorPools } from '../lib/team-editor';
 
-/** Legal pools load lazily — the editor stays usable as free text until then. */
 export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number, format = ''): EditorPools | null {
   const [pools, setPools] = useState<EditorPools | null>(null);
   const { pokemon: teamPokemon } = teamInfo;
@@ -42,7 +41,6 @@ export function useEditorPools(teamInfo: OpponentTeamInfo, gen: number, format =
 
 export type EditableField = 'ability' | 'item' | 'teraType' | 'nature';
 
-/** The editable team plus its per-Pokémon validation state and the edit handlers. */
 export function useTeamDraft(initial: RevealedPokemonInfo[], pools: EditorPools | null, format = '') {
   const limits = evLimitsFor(format, pools?.evLimit);
   const [pokemon, setPokemon] = useState<RevealedPokemonInfo[]>(initial);

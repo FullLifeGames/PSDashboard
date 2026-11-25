@@ -2,10 +2,6 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import { useLayoutHeight } from '../../../src/hooks/useLayoutHeight';
 
-/**
- * Round 84 (turn dock), A7b, ruling 9a: the layout's own height goes to the layout element as `--ps-layout-h` (the cap of the left
- * column), from a ResizeObserver; React state stays out of it. A height of 0 (no layout yet) writes nothing, so the CSS fallback holds.
- */
 function Probe({ height = 700 }: { height?: number }) {
   const attach = useLayoutHeight();
   return <div data-testid="layout" ref={element => { if (element) Object.defineProperty(element, 'clientHeight', { configurable: true, value: height }); attach(element); }} />;

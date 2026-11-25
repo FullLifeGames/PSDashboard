@@ -6,22 +6,11 @@ import { fileURLToPath } from 'node:url';
 import namesPlugin from '../../eslint.names.mjs';
 import { censusOf, loadUniverse, ROOT } from '../../scripts/name-census.mjs';
 
-/**
- * Round 72 (T236): the name ratchet. AGENTS.md says our code translates and reads library data and never writes species,
- * move, item or ability names; the lessons' census found about 440 such literals in packages/*\/src. The rule
- * names/no-new-dex-name counts a Dex name literal per file against scripts/name-baseline.json, which only shrinks: a pair that
- * is not in the baseline fails `npm run lint`, a pair that left the code does not.
- *
- * The rule reads names, not formats: a singles log and a doubles log reach it the same way, so there is no game-type case.
- * Its limit: it sees a new name per file (a second `reflect` in a file that has one passes); the twin detector
- * (test/regression/twin-lists.spec.ts) sees a new copy of a list across files.
- */
 
 const FILE = 'packages/eval-engine/src/zz-scratch.ts';
 const RULE = 'names/no-new-dex-name';
 const linter = new Linter();
 
-/** Lints a source text with the rule and an injected baseline; returns the rule's messages. */
 function lint(code: string, files: Record<string, string[]> = {}, filename = FILE): Linter.LintMessage[] {
   return linter.verify(
     code,
@@ -73,10 +62,10 @@ describe('names/no-new-dex-name', () => {
       "export * from 'metronome';",
       'const lazy = import(\'copycat\');',
       'const re = /copycat|metronome/;',
-      "const cut = 'Cut';", // three characters
-      "const word = 'status';", // not a Dex id
-      "const type = 'Psychic';", // a Dex move that is also a type
-      "const id = 'normal';", // a type id
+      "const cut = 'Cut';",
+      "const word = 'status';",
+      "const type = 'Psychic';",
+      "const id = 'normal';",
       "const stat = 'speed';",
       'const open = `copycat${cut}`;',
       "const nothing = 'Copy cat';",
@@ -115,14 +104,16 @@ describe('the rule in the repository config', () => {
   });
 });
 
+let universeOfTree: ReturnType<typeof loadUniverse> | undefined;
+let censusOfTree: Record<string, string[]> | undefined;
+const universe = () => (universeOfTree ??= loadUniverse());
+const census = () => (censusOfTree ??= censusOf(ROOT, universe()) as Record<string, string[]>);
+
 describe('the baseline against the tree', () => {
   const baseline = JSON.parse(readFileSync(fileURLToPath(new URL('../../scripts/name-baseline.json', import.meta.url)), 'utf8')) as { files: Record<string, string[]> };
-  const universe = loadUniverse();
-  const census = censusOf(ROOT, universe) as Record<string, string[]>;
-
   test('no file of packages/*/src holds a Dex name the baseline lacks', () => {
     const fresh: string[] = [];
-    for (const [file, ids] of Object.entries(census)) {
+    for (const [file, ids] of Object.entries(census())) {
       for (const id of ids) if (!baseline.files[file]?.includes(id)) fresh.push(`${file}: ${id}`);
     }
     expect(fresh).toEqual([]);
@@ -137,7 +128,7 @@ describe('the baseline against the tree', () => {
     expect(files.every(file => /^packages\/[^/]+\/src\//.test(file))).toBe(true);
   });
 
-  test('the census leaves out the lines a reviewed exception covers, as the rule does (round 72 merge)', async () => {
+  test('the census leaves out the lines a reviewed exception covers, as the rule does', async () => {
     const { filePairs } = await import('../../scripts/name-census.mjs');
     const text = [
       '// eslint-disable-next-line names/no-new-dex-name -- held by a spec',
@@ -145,14 +136,14 @@ describe('the baseline against the tree', () => {
       "export const B = 'sketch'; // eslint-disable-line names/no-new-dex-name -- reviewed",
       "export const C = 'mimic';",
     ].join('\n');
-    expect(filePairs(text, 'x.ts', universe).map((pair: { id: string }) => pair.id)).toEqual(['mimic']);
+    expect(filePairs(text, 'x.ts', universe()).map((pair: { id: string }) => pair.id)).toEqual(['mimic']);
   });
 
   test('the universe holds the four kinds and leaves out types, natures and stats', () => {
-    expect(universe.kindOf('Rocky Helmet')?.kind).toBe('item');
-    expect(universe.kindOf('Psychic')).toBeNull();
-    expect(universe.kindOf('Adamant')).toBeNull();
-    expect(universe.kindOf('speed')).toBeNull();
+    expect(universe().kindOf('Rocky Helmet')?.kind).toBe('item');
+    expect(universe().kindOf('Psychic')).toBeNull();
+    expect(universe().kindOf('Adamant')).toBeNull();
+    expect(universe().kindOf('speed')).toBeNull();
   });
 });
 
@@ -168,7 +159,7 @@ describe('scripts/update-name-baseline.mjs', () => {
   test('the shipped baseline is what the script would write from the tree', async () => {
     const { diffNames } = await import('../../scripts/update-name-baseline.mjs');
     const shipped = JSON.parse(readFileSync(fileURLToPath(new URL('../../scripts/name-baseline.json', import.meta.url)), 'utf8')) as { files: Record<string, string[]> };
-    const diff = diffNames(shipped.files, censusOf(ROOT, loadUniverse()));
+    const diff = diffNames(shipped.files, census());
     expect(diff.added).toEqual([]);
   });
 });

@@ -1,6 +1,3 @@
-/* Forms: text inputs, the filterable combobox, buttons, the range slider, the modal close button, and the EV grid (ComboBox, ModalDialog, TeamEditor, SetsImportExportPanel, ReplayLoader). */
-
-/* Modal close button — comfortable pointer/touch target (B18/G20) */
 .ps-modal-close {
   background: none;
   border: none;
@@ -15,14 +12,12 @@
 }
 .ps-modal-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
 
-/* EV inputs in the team editor (3×2 on narrow screens, B20) */
 .ps-ev-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 4px;
 }
 
-/* Inputs */
 .ps-input {
   background: rgba(0,0,0,0.3);
   border: 1px solid rgba(255,255,255,0.2);
@@ -35,7 +30,6 @@
   transition: border-color 0.2s;
 }
 
-/* Filterable dropdown with real commit-on-click (replaces <datalist>) */
 .ps-combobox {
   position: relative;
   flex: 1;
@@ -111,7 +105,6 @@
   border-color: #7c2937;
 }
 
-/* Range slider */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

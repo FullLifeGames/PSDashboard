@@ -1,0 +1,176 @@
+import { describe, expect, test } from 'vitest';
+import { byMildest, mistakeStep, type Slip } from '../src/endgame/win-paths/mistake';
+import { WinMeter } from '../src/endgame/win-paths/budget';
+import { fingerprint } from './power-oracle';
+import { mon, playLine, REQUEST, serializedBoard, won, type Board, playLineOn } from './win-paths-support';
+import { readFileSync } from 'node:fs';
+import type { ReplayData } from '@fulllifegames/replay-core';
+import { loadSimMods } from '../src/forward/sim-mods';
+import { serializeLiveBattle } from '../src/serialize';
+import { searchPosition } from '../src/search/position';
+import { reconstruct } from './arrival-turn';
+
+const SLIP: Board = {
+  format: 'gen9customgame',
+  p1: [mon('Snorlax', ['Tackle'])],
+  p2: [mon('Pikachu', ['Seismic Toss', 'Tackle', 'Splash', 'Growl'])],
+  prepare: battle => { battle.sides[0].pokemon[0].hp = 1; battle.sides[1].pokemon[0].hp = 1; },
+};
+const FOE_RANKING = [
+  { choice: 'move seismictoss', ev: 0.9 },
+  { choice: 'move tackle', ev: 0.8 },
+  { choice: 'move splash', ev: 0.1 },
+  { choice: 'move growl', ev: -0.2 },
+];
+const FIRST = { p1: 'move tackle', p2: 'move seismictoss' };
+const ASK = (extra = {}) => REQUEST('p1', { turn: 5, first: FIRST, foeRanking: FOE_RANKING, ...extra });
+
+describe('a mistake by the opponent, singles', () => {
+  test('the mildest lower-ranked choice that lets the side win is named, the dice it needs priced', async () => {
+    const { serialized } = await serializedBoard(SLIP);
+    const step = mistakeStep(serialized, ASK());
+    expect(step.status).toBe('found');
+    expect(step.deviation).toEqual({ turn: 5, label: 'Splash', rank: 3 });
+    expect(step.line!.steps).toHaveLength(1);
+    expect(step.line!.steps[0].p2.label).toBe('Splash');
+    expect(step.line!.steps[0].p1.label).toBe('Tackle');
+    expect(step.chance).toBeCloseTo(1, 12);
+    expect(step.spent.turns).toBeGreaterThan(0);
+  }, 60_000);
+
+  test('a ranking whose second choice wins names the second', async () => {
+    const { serialized } = await serializedBoard(SLIP);
+    const ranking = [FOE_RANKING[0], FOE_RANKING[2], FOE_RANKING[1], FOE_RANKING[3]];
+    const step = mistakeStep(serialized, ASK({ foeRanking: ranking }));
+    expect(step.deviation).toEqual({ turn: 5, label: 'Splash', rank: 2 });
+  }, 60_000);
+
+  test('the line replays through the branch engine to the side\'s win under two seeds', async () => {
+    const { serialized } = await serializedBoard(SLIP);
+    const step = mistakeStep(serialized, ASK());
+    for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(SLIP, step.line!, seed), 'p1'), seed).toBe(true);
+  }, 120_000);
+
+  test('the mildest by loss comes first, then the earlier turn, then the better rank', () => {
+    const slip = (turn: number, rank: number, loss: number): Slip => ({ turn, rank, loss });
+    const order = [slip(2, 2, 0.3), slip(1, 3, 0.5), slip(1, 2, 0.3), slip(3, 2, 0.1), slip(2, 3, 0.3)].sort(byMildest);
+    expect(order.map(item => [item.turn, item.rank])).toEqual([[3, 2], [1, 2], [2, 2], [2, 3], [1, 3]]);
+  });
+
+  test('none: one slip is not enough when the win needs the foe to stand still for three turns', async () => {
+    const board: Board = {
+      format: 'gen9customgame',
+      p1: [mon('Snorlax', ['Seismic Toss'])],
+      p2: [mon('Pikachu', ['Seismic Toss', 'Splash'])],
+      prepare: battle => { battle.sides[0].pokemon[0].hp = 80; battle.sides[1].pokemon[0].hp = 150; },
+    };
+    const { serialized } = await serializedBoard(board);
+    const step = mistakeStep(serialized, REQUEST('p1', { turn: 1, first: { p1: 'move seismictoss', p2: 'move seismictoss' }, foeRanking: [{ choice: 'move seismictoss', ev: 0.5 }, { choice: 'move splash', ev: 0 }] }));
+    expect(step).toMatchObject({ kind: 'mistake', status: 'none' });
+    expect(step.line).toBeUndefined();
+    expect(step.deviation).toBeUndefined();
+  }, 60_000);
+
+  test('a slip on a later turn: the ranking at the root lists only the first choice, the matrix ranks the later positions', async () => {
+    const board: Board = {
+      format: 'gen9customgame',
+      p1: [mon('Snorlax', ['Seismic Toss'])],
+      p2: [mon('Pikachu', ['Seismic Toss', 'Splash'])],
+      prepare: battle => { battle.sides[0].pokemon[0].hp = 80; battle.sides[1].pokemon[0].hp = 100; },
+    };
+    const { serialized } = await serializedBoard(board);
+    const request = REQUEST('p1', { turn: 7, first: { p1: 'move seismictoss', p2: 'move seismictoss' }, foeRanking: [{ choice: 'move seismictoss', ev: 0.5 }] });
+    const step = mistakeStep(serialized, request);
+    expect(step.status).toBe('found');
+    expect(step.deviation).toMatchObject({ turn: 8, label: 'Splash', rank: 2 });
+    expect(step.line!.steps).toHaveLength(2);
+    expect(step.line!.steps[0].p2.label).toBe('Seismic Toss');
+    expect(step.line!.steps[1].p2.label).toBe('Splash');
+    for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(board, step.line!, seed), 'p1'), seed).toBe(true);
+  }, 120_000);
+
+  test('a budget that ends the search first stops it and says so', async () => {
+    const { serialized } = await serializedBoard(SLIP);
+    const step = mistakeStep(serialized, ASK(), new WinMeter({ turns: 1 }));
+    expect(step.status).toBe('stopped');
+    expect(step.line).toBeUndefined();
+  }, 60_000);
+
+  test('the live battle stays as it was and two runs agree', async () => {
+    const { runtime, serialized } = await serializedBoard(SLIP);
+    const battle = runtime.battleStream.battle!;
+    const pokemon = battle.sides.flatMap(side => side.pokemon);
+    const before = fingerprint(battle, pokemon, 'tackle');
+    const one = mistakeStep(serialized, ASK());
+    const two = mistakeStep(serialized, ASK());
+    expect(fingerprint(battle, pokemon, 'tackle')).toBe(before);
+    expect(JSON.stringify(two)).toBe(JSON.stringify(one));
+  }, 60_000);
+});
+
+describe('a mistake by the opponent, doubles (2 v 2 bodies: the engine fixture builder cannot start a doubles game with one body)', () => {
+  const DOUBLES: Board = {
+    format: 'gen9doublescustomgame',
+    p1: [mon('Snorlax', ['Heat Wave']), mon('Pidgeot', ['Splash'])],
+    p2: [mon('Pikachu', ['Seismic Toss', 'Splash']), mon('Pikachu', ['Seismic Toss', 'Splash'])],
+    prepare: battle => {
+      battle.sides[0].pokemon[0].hp = 1;
+      for (const pokemon of battle.sides[1].pokemon) pokemon.hp = 1;
+    },
+  };
+
+  test('a slip by the pair is found from the one-turn matrix, and its line replays to the win under two seeds', async () => {
+    const { serialized } = await serializedBoard(DOUBLES);
+    const step = mistakeStep(serialized, REQUEST('p1', { turn: 3 }));
+    expect(step.status).toBe('found');
+    expect(step.deviation!.turn).toBe(3);
+    expect(step.deviation!.rank).toBeGreaterThan(1);
+    expect(step.line!.steps).toHaveLength(1);
+    expect(step.line!.steps[0].p1.slots.length).toBe(2);
+    expect(step.line!.steps[0].p2.slots.length).toBe(2);
+    expect(step.chance).toBeCloseTo(0.9 * 0.9, 12);
+    for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, step.line!, seed), 'p1'), seed).toBe(true);
+  }, 120_000);
+
+  test('none: one slip is not enough when the foes stand at full HP', async () => {
+    const board: Board = { ...DOUBLES, prepare: battle => { battle.sides[0].pokemon[0].hp = 1; for (const pokemon of battle.sides[1].pokemon) pokemon.hp = pokemon.maxhp; } };
+    const { serialized } = await serializedBoard(board);
+    const step = mistakeStep(serialized, REQUEST('p1', { turn: 3 }));
+    expect(step.status).toBe('none');
+    expect(step.line).toBeUndefined();
+  }, 120_000);
+});
+
+await loadSimMods('gen9championsou');
+
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/e2e-feedback/fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
+
+const SCENES = [
+  { id: '649664 t23, devin (singles)', name: 'smogtours-gen6ou-649664', turn: 23, side: 'p2', ruleset: 'standard', deviation: { turn: 24, label: 'Scald', rank: 2 } },
+  { id: 'Champions VGC 2695803506 t10, juacox300 (doubles 1 v 1)', name: 'gen9championsvgc2026regmc-2695803506', turn: 10, side: 'p2', ruleset: 'champions', champions: true, deviation: { turn: 10, label: 'Nasty Plot', rank: 2 } },
+] as const;
+
+async function run(scene: typeof SCENES[number]) {
+  const rebuild = () => reconstruct(('champions' in scene ? 'champions/' : '') + scene.name, scene.turn, fixture(scene.name));
+  const { runtime } = await rebuild();
+  const serialized = serializeLiveBattle(runtime.battleStream.battle!);
+  const ranking = searchPosition(serialized, { depth: 1, samples: 1, mode: 'matrix', ruleset: scene.ruleset, tera: true });
+  const foe = scene.side === 'p1' ? 'p2' : 'p1';
+  const first = { p1: ranking.perSide.p1[0].choice, p2: ranking.perSide.p2[0].choice };
+  const foeRanking = ranking.perSide[foe].map(row => ({ choice: row.choice, ev: row.ev }));
+  const step = mistakeStep(serialized, REQUEST(scene.side, { turn: scene.turn, first, foeRanking, ruleset: scene.ruleset, tera: true }));
+  return { step, rebuild, foeRanking: ranking.perSide[foe].map(row => `${row.label} ${row.ev.toFixed(3)}`) };
+}
+
+describe('the mistake step on the corpus', () => {
+  test.each(SCENES)('$id', async scene => {
+    const { step, rebuild, foeRanking } = await run(scene);
+    console.info(`${scene.id}: foe ranking ${foeRanking.join(' | ')} -> ${step.status} ${JSON.stringify(step.deviation)} chance ${step.chance} spent ${JSON.stringify(step.spent)} line ${step.line?.steps.map(item => `${item.p1.label} / ${item.p2.label}`).join(' > ')}`);
+    expect(step.status).toBe('found');
+    expect(step.deviation).toEqual(scene.deviation);
+    expect(step.chance).toBeGreaterThan(0.5);
+    expect(step.spent.cells).toBeLessThan(350);
+    expect(step.spent.turns).toBeLessThan(175);
+    expect(won(await playLineOn((await rebuild()).runtime, step.line!), scene.side)).toBe(true);
+  }, 300_000);
+});

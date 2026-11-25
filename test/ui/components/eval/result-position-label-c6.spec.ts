@@ -1,8 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { resultPositionLabel } from '../../../../src/components/eval/turn-copy';
 
-// Round 77 (C6): the heading over a live result names the position the result was computed for. The tag
-// ("main:<turn>", "variation:<turn>") is the same for singles and doubles; the game type does not change the label.
 describe('resultPositionLabel', () => {
   test('names the position of the result tag, not the one the pointer holds now', () => {
     expect(resultPositionLabel('variation:10', { viewTurn: 11, viewingVariation: true })).toBe('Turn 10 · variation');

@@ -35,15 +35,12 @@ describe('EvalPanel', () => {
     expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Earthquake/ }));
-    // round 89 (#153): the click hands the result along, for Hard mode
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0], result);
-    // Round 89 (ruling 49): Depth lives in the Setup menu now, not in the panel's header.
     expect(screen.queryByText('Depth')).toBeNull();
     await userEvent.selectOptions(within(screen.getByText('Tera')).getByRole('combobox'), 'on');
     expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, tera: 'on' });
   });
 
-  // Round 89 (#153, HM-2): the panel hands the stored `hardMode` preference to its ranked rows' titles.
   test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply by the hardMode preference', kind => {
     const wired = props({ status: 'done', result: evalResult(kind), onPickChoice: vi.fn() });
     const { rerender } = render(<EvalPanel {...wired} />);
@@ -52,8 +49,6 @@ describe('EvalPanel', () => {
     expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent reads your move and plays the reply'));
   });
 
-  // Round 77 (C7): Evaluate at a finished variation showed a 100 % bar and an empty line list. The panel says who won,
-  // as the branch panel does; the end of a game reads the same in singles and doubles.
   test('at a finished variation the panel names the winner instead of a bar and empty lines, and offers no Evaluate', () => {
     const stale = evalResult('singles', { score: 1, perSide: { p1: [], p2: [] } });
     const { rerender } = render(<EvalPanel {...props({ status: 'done', result: stale, onEvaluate: vi.fn(), showAuto: true, positionLabel: 'Turn 21 · variation', ended: { winner: 'Alice' } })} />);
@@ -82,7 +77,6 @@ describe('EvalPanel', () => {
     expect(screen.queryByRole('button', { name: /Earthquake/ })).toBeNull();
   });
 
-  // Round 89 (SB-7): a stopped search keeps its partial result as the position's answer, and the panel says what it is.
   test.each([['singles'], ['doubles']] as const)('%s: a stopped search says so, keeps its rows playable and never claims the position changed', async kind => {
     const onPickChoice = vi.fn();
     const result = evalResult(kind, { depthCompleted: 1 });
@@ -94,13 +88,11 @@ describe('EvalPanel', () => {
     expect(onPickChoice).toHaveBeenCalledTimes(1);
     rerender(<EvalPanel {...props({ status: 'stale', result, stoppedAt: 3, onPickChoice })} />);
     expect(screen.getByRole('status')).toHaveTextContent('Search stopped. Showing the result so far.');
-    // a stale result of a run nobody stopped keeps its text and its grey
     rerender(<EvalPanel {...props({ status: 'stale', result, onPickChoice })} />);
     expect(screen.getByText('Position changed; re-evaluate.')).toBeInTheDocument();
     expect(document.querySelector('.ps-eval-stale')).not.toBeNull();
   });
 
-  // Round 89 (SB-9): a stop before any partial result (a tree search before its first interim result) leaves no card; the panel says why.
   test.each([['singles', false], ['doubles', true]] as const)('%s: a search stopped before a first result says so beside Evaluate, and only then', (_kind, doubles) => {
     const onEvaluate = vi.fn();
     const { rerender } = render(<EvalPanel {...props({ status: 'idle', result: null, doubles, onEvaluate, stoppedEmpty: true })} />);
@@ -132,13 +124,11 @@ describe('EvalPanel', () => {
     expect(onSelectTurn).toHaveBeenCalledWith(6, undefined);
     expect(screen.getByText('Turn 3')).toBeInTheDocument();
     expect(screen.getByText('depth 1 · 1 sample')).toBeInTheDocument();
-    // Round 67 (T109, gate answer 5b): an analyzed turn offers no deeper stage.
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(onAnalyzeTurn).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: '← Game report' }));
     expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
 
-    // The slider, the arrows, or the T0 button move the analysis turn: that opens the turn view by itself.
     rerender(<EvalPanel {...wired} analysisTurn={4} currentTurn={4} analysis={turnAnalysis(4)} result={graph.results[3]} />);
     expect(screen.getByText('Turn 4')).toBeInTheDocument();
     await userEvent.click(document.querySelector('rect[data-turn="5"]')!);
@@ -147,9 +137,6 @@ describe('EvalPanel', () => {
     expect(onAnalyzeGame).toHaveBeenCalledTimes(1);
   });
 
-  // Round 89 (#104), G13b (tester, third pass): "Back to the main line" from a played win path opened the last turn's card, not the
-  // Game review the click came from. The panel returns to where the line was started: the review when it started from the review or
-  // the win-path panel, the card of its turn when it started from a card.
   describe.each([['singles', false], ['doubles', true]])('%s: back from a variation', (_kind, doubles) => {
     const graph = evalGraph(doubles ? 'doubles' : 'singles');
     const report = gameReport({ keyMoments: [turnAnalysis(6, { attribution: 'chance', swing: -0.4 })] });
@@ -166,11 +153,9 @@ describe('EvalPanel', () => {
       rerender(<EvalPanel {...inLine({ onBackToMain: back })} />);
       await userEvent.click(screen.getByRole('button', { name: 'Back to the main line' }));
       expect(back).toHaveBeenCalledWith(null);
-      // the report is back and the analysis turn moved in the same render (the main line's last turn)
       rerender(<EvalPanel {...replay({ analysisTurn: 12, currentTurn: 12, analysis: turnAnalysis(12) })} />);
       expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: '← Game report' })).toBeNull();
-      // a later move of the analysis turn opens the card as before
       rerender(<EvalPanel {...replay({ analysisTurn: 4, currentTurn: 4, analysis: turnAnalysis(4) })} />);
       expect(screen.getByRole('button', { name: '← Game report' })).toBeInTheDocument();
     });
@@ -189,7 +174,7 @@ describe('EvalPanel', () => {
     });
   });
 
-  test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card (H4h)', () => {
+  test('the open tip of a game names an open position in the turn view; the same turn of a replay keeps its card', () => {
     const graph = evalGraph();
     const base = props({ graph, analysis: turnAnalysis(4), result: graph.results[3], resultSettings: graph.settings[3], currentTurn: 4, analysisTurn: 4, graphMaxTurn: 12, onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn() });
     const { rerender } = render(<EvalPanel {...base} />);

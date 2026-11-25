@@ -3,36 +3,31 @@ import type { PokemonEvs } from '../types.ts';
 import { capToBudget, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Where a solved spread comes from (round 69, T69): damage lines fitted it, a proven move order decided it, the log's
- * maximum HP set its HP inside the guess, or no evidence measured it (a decided item or IV rides on the guess).
- */
+/** Where a solved spread comes from: damage lines, a proven move order, the log's maximum HP, or no evidence. */
 export type SpreadOrigin = 'damage' | 'order' | 'hp' | 'prior';
 
+/** A solved spread: EVs and nature, with what measured it and the item or IVs the evidence decided. */
 export interface SpreadCandidate {
   evs: PokemonEvs;
   nature: string;
-  /** Who checked the spread; an entry from before the origin existed reads as 'damage'. */
+  /** What measured the spread; absent reads as 'damage'. */
   origin?: SpreadOrigin;
-  /** An item the move-order evidence decided (round 37): 'Choice Scarf', or '' for "not the guessed Scarf". */
+  /** An item the move-order evidence decided: 'Choice Scarf', or '' for "not the guessed Scarf". */
   item?: string;
-  /**
-   * Why the item is decided: the move order (round 37), the damage lines dropped a guessed boost item (round 69, T26), or, since round 89 (#75),
-   * a knockout no spread reaches and a usage-listed boost item does ('boost': `item` names it).
-   */
+  /** Why the item is decided: the move order, a dropped guessed boost item, or a knockout's boost item (`item`). */
   itemReason?: 'moved-first' | 'moved-second' | 'no-boost' | 'boost';
-  /** IVs a seen move order needed (round 64: a Speed IV below 31 only when no other Speed keeps the order). */
+  /** IVs a seen move order needed (a Speed IV below 31 only when no other Speed keeps the order). */
   ivs?: PokemonEvs;
 }
 
+/** One rung of the ladder: a legal spread, scored with or without the set's item. */
 export interface CandidateRung {
   evs: PokemonEvs;
   nature: string;
-  /** '' scores the rung without the set's guessed boost item (round 69, T26); a name scores it with that item (round 89, #75); undefined keeps the set's item. */
+  /** '' scores the rung without the set's guessed boost item; a name scores it with that item; undefined: the set's. */
   item?: string;
 }
 
-/** The stat a nature boosts — for deciding whether a rung must neutralize it. */
 const NATURE_PLUS: Record<string, keyof PokemonEvs> = {
   adamant: 'atk', lonely: 'atk', brave: 'atk', naughty: 'atk',
   modest: 'spa', quiet: 'spa', mild: 'spa', rash: 'spa',
@@ -41,29 +36,8 @@ const NATURE_PLUS: Record<string, keyof PokemonEvs> = {
   timid: 'spe', jolly: 'spe', hasty: 'spe', naive: 'spe',
 };
 
-/**
- * The discrete ladder: offense {0, 252, 252+nature} × bulk {uninvested,
- * 252 HP, 252 HP + 252 Def(/SpD), +nature}. Offense-plus and bulk-plus
- * natures conflict (a nature boosts one stat), so those combinations are
- * skipped.
- *
- * Every rung INHERITS the prior and overrides only the dimensions the mon's
- * observations can actually measure: offense only with attacker
- * observations, bulk only with defender observations, and Speed never —
- * damage carries no Speed information, so a rung must not strip Speed EVs
- * or a speed nature the usage prior claims. A prior nature is neutralized
- * to Hardy only when it boosts a measured stat the rung claims uninvested.
- *
- * `keep` names prior stats the evidence cannot measure at all (an offense
- * seen only in knock-outs, a Speed no rung can bring in line with the
- * observed order): they stay at the prior's value and give way last in
- * the budget, after the rung's own claims (573756: the 0-Atk sweeper). A
- * kept Speed gives way to an offense claim the budget cannot express
- * beside it (round 41); a kept offense never gives way.
- */
 type RungOption = { evs?: Partial<PokemonEvs>; nature?: string };
 
-/** Offense {0, max, max + nature} — only with attacker observations. */
 function offenseRungs(offenseStat: 'atk' | 'spa', offensePlus: string, max: number, hasAttackerObs: boolean): RungOption[] {
   return hasAttackerObs
     ? [
@@ -74,7 +48,6 @@ function offenseRungs(offenseStat: 'atk' | 'spa', offensePlus: string, max: numb
     : [{}];
 }
 
-/** Bulk {uninvested, max HP, max HP + max Def(/SpD), + nature} — only with defender observations. */
 function bulkRungs(max: number, hasDefenderObs: boolean): RungOption[] {
   return hasDefenderObs
     ? [
@@ -88,17 +61,12 @@ function bulkRungs(max: number, hasDefenderObs: boolean): RungOption[] {
     : [{}];
 }
 
-/**
- * Speed rungs exist only under move-order evidence — Speed was never a
- * solved axis before (priors carried it); the observed order now is.
- */
 function speedRungs(speedPlus: string, max: number, hasSpeedObs: boolean): RungOption[] {
   return hasSpeedObs
     ? [{}, { evs: { spe: 0 } }, { evs: { spe: max } }, { evs: { spe: max }, nature: speedPlus }]
     : [{}];
 }
 
-/** The stats the mon's observations can actually measure. */
 function measuredStats(offenseStat: 'atk' | 'spa', hasAttackerObs: boolean, hasDefenderObs: boolean, hasSpeedObs: boolean): Set<keyof PokemonEvs> {
   return new Set<keyof PokemonEvs>([
     ...(hasAttackerObs ? [offenseStat as keyof PokemonEvs] : []),
@@ -107,10 +75,7 @@ function measuredStats(offenseStat: 'atk' | 'spa', hasAttackerObs: boolean, hasD
   ]);
 }
 
-/**
- * The rung's nature from its option natures; null when two options claim a
- * nature (they conflict) or when a kept stat's plus nature must stay.
- */
+// null when two options claim a nature or a kept stat's plus nature must stay.
 function rungNature(options: RungOption[], keepNature: boolean, priorNature: string): string | null {
   const natures = options.map(option => option.nature).filter((nature): nature is string => !!nature);
   if (natures.length > 1 || (keepNature && natures.length > 0)) return null;
@@ -123,33 +88,21 @@ export function natureOf(dex: RulesDex, plus: keyof PokemonEvs, minus: keyof Pok
   return dex.natures.all().find(nature => nature.plus === plus && nature.minus === minus)?.name ?? 'Hardy';
 }
 
-/**
- * A kept Speed keeps a nature that lowers it (round 63: the settled orders
- * may need it): a rung's plus nature takes Speed as its minus, a rung
- * without one keeps the prior's nature.
- */
+// A kept Speed keeps a nature that lowers it: the settled orders may need it.
 function slowNature(nature: string | null, ctx: LadderContext): string | null {
   if (!ctx.slowKept || nature === null) return nature;
   const plus = ctx.dex.natures.get(nature).plus as keyof PokemonEvs | undefined;
   return plus && nature !== ctx.priorNature ? natureOf(ctx.dex, plus, 'spe') : ctx.prior.nature;
 }
 
-/** The stats a measurement fixed (round 40: HP from the log's maximum HP). */
 const fixedStats = (fixed: Partial<PokemonEvs>): Set<keyof PokemonEvs> =>
   new Set((Object.keys(fixed) as (keyof PokemonEvs)[]).filter(stat => fixed[stat] !== undefined));
 
-/** Every positive claim of the rung survived the budget in full (fixed stats override their claims). */
 function expressed(evs: PokemonEvs, claimed: Partial<PokemonEvs>, fixed: Partial<PokemonEvs>): boolean {
   return (Object.entries(claimed) as [keyof PokemonEvs, number | undefined][])
     .every(([stat, value]) => !value || fixed[stat] !== undefined || (evs[stat] ?? 0) >= value);
 }
 
-/**
- * One rung's legal spread: the prior with the rung's overrides, rung-claimed
- * stats protected, prior carry-overs giving way first, kept prior stats
- * last (capToBudget). A fixed stat overrides the rung's claim on it and is
- * never shaved.
- */
 function composeRung(
   prior: SpreadCandidate, overrides: Partial<PokemonEvs>, keep: ReadonlySet<keyof PokemonEvs>, budget: EvBudget,
   fixed: Partial<PokemonEvs>,
@@ -162,7 +115,6 @@ function composeRung(
   return capToBudget({ ...ZERO_EVS, ...prior.evs, ...claimed }, protectedStats, budget, kept, fixedStats(fixed));
 }
 
-/** What every rung of one ladder shares. */
 interface LadderContext {
   dex: RulesDex;
   prior: SpreadCandidate;
@@ -172,27 +124,14 @@ interface LadderContext {
   offenseStat: 'atk' | 'spa';
   priorPlus: keyof PokemonEvs | undefined;
   priorNature: string;
-  /** Speed is kept and the prior's nature lowers it. */
   slowKept: boolean;
 }
 
-/**
- * A kept stat keeps its plus nature too: a bulk or offense nature would
- * lower the very stat the evidence cannot measure.
- */
+// A kept stat keeps its plus nature: another nature would lower the very stat the evidence cannot measure.
 const keepsNature = (keep: ReadonlySet<keyof PokemonEvs>, priorPlus: keyof PokemonEvs | undefined): boolean =>
   priorPlus !== undefined && keep.has(priorPlus);
 
-/**
- * The prior rung: the prior legalized around the same kept and fixed stats
- * as the composed ones (with the log's HP in place its carry-overs give way
- * in the same order). Every rung is LEGALIZED before scoring. Round 41:
- * when a kept offense and a kept Speed do not both fit beside the fixed
- * stats, the kept order shaves the offense; a second prior rung lets the
- * Speed give way instead, its speed nature neutralized. Knock-out lower
- * bounds and move orders decide between them; at equal error the prior's
- * own nature wins the tie (priorDistance).
- */
+// A second prior rung lets a kept Speed give way to a kept offense when both do not fit beside the fixed stats.
 function priorRungs(ctx: LadderContext): CandidateRung[] {
   const { prior, keep, fixed, budget } = ctx;
   const evs = { ...ZERO_EVS, ...prior.evs, ...fixed };
@@ -207,26 +146,14 @@ function priorRungs(ctx: LadderContext): CandidateRung[] {
   }];
 }
 
-/**
- * Round 69 (T26, spec decision 7): a kept Speed keeps its plus nature, which used to block every rung with a nature
- * of its own, and a Jolly attacker stayed 10 % short of the hits it dealt. The offense nature of the seen hit class
- * (the offense option's own: Adamant for physical lines, Modest for special) opens beside the kept Speed EVs; bestRung
- * prices the order the neutral Speed may no longer win, so the tempo gives way only when the fit error falls and every
- * observed order still holds. A bulk nature never opens, and a kept offense keeps its nature (round 33).
- */
+// The offense nature of the seen hit class opens beside the kept Speed EVs; bestRung prices the orders it may break.
 function heldTempoNature(ctx: LadderContext, options: RungOption[]): string | null {
   const natures = options.map(option => option.nature).filter((nature): nature is string => !!nature);
   const offenseNature = options[0]?.nature;
   return ctx.priorPlus === 'spe' && ctx.keep.has('spe') && offenseNature && natures.length === 1 ? offenseNature : null;
 }
 
-/**
- * One combination's rung, composed beside the kept stats and offered only
- * when the budget expresses every claim: a shaved claim would leave its
- * nature standing on nothing (round 40: "Calm 252 HP / 4 SpD / 252 Spe"
- * once Speed stays kept). When it cannot, the released form (round 41) is
- * the fallback; the prior rung stands behind both.
- */
+// Offered only when the budget expresses every claim: a shaved claim would leave its nature standing on nothing.
 function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung | null {
   const claimed: Partial<PokemonEvs> = Object.assign({}, ...options.map(option => option.evs ?? {}));
   const evs = composeRung(ctx.prior, claimed, ctx.keep, ctx.budget, ctx.fixed);
@@ -237,19 +164,8 @@ function offeredRung(ctx: LadderContext, options: RungOption[]): CandidateRung |
   return releasedRung(ctx, options, claimed, evs);
 }
 
-/**
- * Round 41: a kept Speed gives way to an offense claim the budget cannot
- * express beside it. A satisfied order measures nothing downward while
- * clean damage lines measure the offense; with the log's HP fixed, only
- * one of the two fits, and the measured one wins the room. The released
- * Speed loses its plus nature like a measured stat left uninvested, which
- * frees the offense-plus rung. The release is for the offense claim's own
- * room: a bulk claim never releases Speed, not even beside an offense
- * claim the budget did express (573756 t73: the 252-HP rung must not
- * strip it), and a kept offense never gives way (round 33). bestRung
- * decides between the released body and the 0-offense rungs; its order
- * check prices a released body that no longer moves first.
- */
+// A kept Speed gives way to an offense claim the budget cannot express beside it, never to a bulk claim;
+// a kept offense never gives way. bestRung prices a released body that no longer moves first.
 function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partial<PokemonEvs>, kept: PokemonEvs): CandidateRung | null {
   const offenseStarved = (kept[ctx.offenseStat] ?? 0) < (claimed[ctx.offenseStat] ?? 0);
   if (!ctx.keep.has('spe') || !offenseStarved) return null;
@@ -260,18 +176,12 @@ function releasedRung(ctx: LadderContext, options: RungOption[], claimed: Partia
   return expressed(evs, claimed, ctx.fixed) ? { evs, nature } : null;
 }
 
-/**
- * Round 69 (T132 point 1, spec decision 12): a Speed no move order measures keeps the prior. Damage carries no Speed
- * information, yet the budget gave the prior's Speed EVs to an offense or bulk claim for a fit-error difference of
- * 0.00004 to 0.00024 (562428 Victini, 2663108091 Samurott-Hisui, 750540 Iron Boulder: 25 bank sets). The EVs are fixed
- * like the log's HP, a claim the budget cannot express beside them is not offered, and the Speed is kept for the
- * nature policy (bulk natures never take it, the offense nature opens beside it: T26). A Speed a satisfied or
- * unrepairable order kept already (`keep`) stays round 41's, which lets a measured offense release it.
- */
+// A Speed no move order measures keeps the prior: damage carries no Speed information.
 function unmeasuredTempo(prior: SpreadCandidate, hasSpeedObs: boolean, keep: ReadonlySet<keyof PokemonEvs>): boolean {
   return !hasSpeedObs && !keep.has('spe') && (prior.evs.spe ?? 0) > 0;
 }
 
+/** The discrete ladder: offense, bulk and Speed combinations beside the prior rung, each inheriting the prior. */
 export function candidateLadder(
   dex: RulesDex,
   prior: SpreadCandidate,

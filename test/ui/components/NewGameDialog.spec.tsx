@@ -5,12 +5,6 @@ import { Dex } from '@pkmn/sim';
 import { NewGameDialog } from '../../../src/components/NewGameDialog';
 import { savedRecord } from '../fixtures/saved-game';
 
-/**
- * Round 89 (lane H, #105), stage H4: the New game dialog (user ruling 13.11.2026: a modal, the simulator's problems under the team
- * with Start possible, the simulator's whole format list searchable and grouped, a fresh dice seed per game that the user can read
- * and set). The real simulator runs under it: the format list, the team check and Start are the engine's.
- */
-
 const GOOD = `Garchomp @ Rocky Helmet
 Ability: Rough Skin
 EVs: 252 HP / 4 Def / 252 Spe
@@ -55,7 +49,6 @@ describe('the dialog', () => {
     rerender(<NewGameDialog {...props()} />);
     expect(screen.getByRole('dialog', { name: 'New game' })).toHaveAttribute('aria-modal', 'true');
     expect(start()).toBeDisabled();
-    // each empty box says what it lacks, under itself
     expect(within(team(1)).getByText('Paste a team for Player 1 to start.')).toBeInTheDocument();
     expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
     paste(1, GOOD);
@@ -80,7 +73,7 @@ describe('the dialog', () => {
 });
 
 describe('the format list', () => {
-  test('the open list scrolls into the dialog, so its footnote is not cut by the dialog\'s bottom edge (H4h)', async () => {
+  test('the open list scrolls into the dialog, so its footnote is not cut by the dialog\'s bottom edge', async () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
     try {
@@ -127,7 +120,6 @@ describe('the format list', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   }, 60_000);
 
-  // Round 89 (#105, H7, tester finding 10): the dialog reads the format's rules from the Dex, never a list of generations.
   test('the intro says Team Preview only for a format that has one; Gen 4 OU and Gen 9 OU read from the Dex', async () => {
     render(<NewGameDialog {...props()} />);
     expect(screen.getByText(/Start opens the game at Team Preview/)).toBeInTheDocument();
@@ -150,7 +142,7 @@ describe('the format list', () => {
 });
 
 describe('a team box', () => {
-  test('a sprite that does not load (a species no sprite sheet holds) drops out instead of showing its alt text (H4h)', () => {
+  test('a sprite that does not load (a species no sprite sheet holds) drops out instead of showing its alt text', () => {
     render(<NewGameDialog {...props()} />);
     paste(1, `Zzqxvwk\n- Tackle\n\n${GOOD}`);
     const read = document.querySelectorAll('.ps-newgame-read')[0] as HTMLElement;
@@ -184,7 +176,7 @@ describe('a team box', () => {
 
   const SEVEN = [...FOUR.split('\n\n'), 'Dragonite\n- Protect'].join('\n\n');
 
-  test('seven sets block Start: the reason stands under that box and the "plays as pasted" note goes (NG-2)', async () => {
+  test('seven sets block Start: the reason stands under that box and the "plays as pasted" note goes', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, SEVEN);
@@ -199,7 +191,7 @@ describe('a team box', () => {
     expect((await screen.findAllByText(NOTE, undefined, { timeout: 30_000 })).length).toBeGreaterThan(0);
   }, 60_000);
 
-  test('a side with no readable set blocks Start: its box says so, the note goes (NG-2)', async () => {
+  test('a side with no readable set blocks Start: its box says so, the note goes', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, 'Garchomp\nAbility: Rough Skin\n\nGliscor\nAbility: Poison Heal');
@@ -210,7 +202,7 @@ describe('a team box', () => {
     expect(screen.queryByText(NOTE)).toBeNull();
   }, 60_000);
 
-  test('a refused seed blocks Start under the seed field and the note goes; the simulator\'s problems alone do not block (NG-2)', async () => {
+  test('a refused seed blocks Start under the seed field and the note goes; the simulator\'s problems alone do not block', async () => {
     render(<NewGameDialog {...props()} />);
     paste(1, LEVITATE);
     paste(2, GOOD);
@@ -223,7 +215,7 @@ describe('a team box', () => {
     expect(screen.queryByText(NOTE)).toBeNull();
   }, 60_000);
 
-  test('a VGC team of six with a bring of four is no block: the six limit counts the pasted sets (NG-2)', async () => {
+  test('a VGC team of six with a bring of four is no block: the six limit counts the pasted sets', async () => {
     render(<NewGameDialog {...props()} />);
     await pickFormat('vgc 2025', '[Gen 9] VGC 2025 Reg I');
     paste(1, FOUR);
@@ -251,7 +243,6 @@ describe('the dice seed', () => {
     const field = screen.getByRole('textbox', { name: 'Seed' });
     const first = (field as HTMLInputElement).value;
     expect(first).toMatch(/^\d+,\d+,\d+,\d+$/);
-    // the row stands under the Format row, in the mock's words
     const format = document.querySelector('.ps-newgame-format') as HTMLElement;
     expect(format.nextElementSibling).toBe(document.querySelector('.ps-newgame-seed'));
     expect(screen.getByText('The same seed, teams and choices roll the same dice.')).toBeInTheDocument();
@@ -264,7 +255,6 @@ describe('the dice seed', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
     fireEvent.change(field, { target: { value: '1,2,3,4' } });
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
-    // a sodium seed of a Showdown input log is a seed too
     fireEvent.change(field, { target: { value: 'sodium,0123456789abcdef' } });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
@@ -290,7 +280,7 @@ describe('Start', () => {
     expect(box(1)).toHaveValue(GOOD);
   }, 60_000);
 
-  test('a species the format\'s Dex does not know is a problem under its box, and once the check has read it Start waits and says why (H4h, NG-2)', async () => {
+  test('a species the format\'s Dex does not know is a problem under its box, and once the check has read it Start waits and says why', async () => {
     const wired = props();
     render(<NewGameDialog {...wired} />);
     paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
@@ -350,7 +340,7 @@ describe('Start', () => {
 });
 
 describe('the saved games', () => {
-  test('the dialog holds only the new game: saved games are listed in the Game menu and on the start page, never here (H11a)', async () => {
+  test('the dialog holds only the new game: saved games are listed in the Game menu and on the start page, never here', async () => {
     await savedRecord();
     render(<NewGameDialog {...props()} />);
     expect(screen.getByRole('dialog', { name: 'New game' })).toBeInTheDocument();
@@ -359,11 +349,7 @@ describe('the saved games', () => {
   }, 60_000);
 });
 
-/**
- * Round 89 (lane H, #105), H16a: Start asks first when an unsaved variation is open. The question stands in the dialog (the dialog is
- * modal), keeps the pasted teams, and Cancel starts nothing. Singles and doubles start through the same line.
- */
-describe('Start with an unsaved variation open (H16a)', () => {
+describe('Start with an unsaved variation open', () => {
   for (const [label, search, name] of [['singles', 'gen9ou', '[Gen 9] OU'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU']]) {
     test(`${label}: the question comes before Start; Cancel starts nothing and keeps the teams, Discard variation starts the game`, async () => {
       const wired = props({ unsavedVariation: () => true });
@@ -412,12 +398,7 @@ describe('Start with an unsaved variation open (H16a)', () => {
   }, 60_000);
 });
 
-/**
- * Round 89 (lane H, #105), H18a and H20a (user ruling 13.11.2026). An empty seed field means a fresh seed, and the placeholder says
- * so. A pasted set without an ability starts with the species' first ability, written into the saved team; the team check names it
- * before Start. Singles and doubles run both.
- */
-describe('an empty seed field (H18a)', () => {
+describe('an empty seed field', () => {
   test('the placeholder names what an empty field does; an empty field starts the game on a fresh seed', async () => {
     const wired = props();
     render(<NewGameDialog {...wired} />);
@@ -434,7 +415,7 @@ describe('an empty seed field (H18a)', () => {
   }, 60_000);
 });
 
-describe('a pasted set without an ability (H20a)', () => {
+describe('a pasted set without an ability', () => {
   const NO_ABILITY = 'Gengar\n- Shadow Ball\n\nGarchomp\n- Earthquake';
   for (const [label, search, name, id] of [['singles', 'gen9ou', '[Gen 9] OU', 'gen9ou'], ['doubles', 'doubles ou', '[Gen 9] Doubles OU', 'gen9doublesou']]) {
     test(`${label}: the check says which ability each set plays, and Start writes it into the saved team`, async () => {
@@ -443,12 +424,11 @@ describe('a pasted set without an ability (H20a)', () => {
       await pickFormat(search, name);
       paste(1, NO_ABILITY);
       paste(2, GOOD);
-      // slot 0 of Garchomp, Sand Veil, is banned by Evasion Abilities Clause in both formats: the fill takes its next slot (X2a)
+      // Sand Veil (slot 0) is banned by Evasion Abilities Clause in both formats: the fill takes the next slot
       const abilityOf = (species: string) => (species === 'Garchomp' ? 'Rough Skin' : Dex.forGen(9).species.get(species).abilities['0']);
       expect(id).toBeTruthy();
       expect(await screen.findByText(`Gengar has no ability: plays ${abilityOf('Gengar')}.`, undefined, { timeout: 30_000 })).toBeInTheDocument();
       expect(screen.getByText(`Garchomp has no ability: plays ${abilityOf('Garchomp')}.`)).toBeInTheDocument();
-      // the other side pasted its abilities: no note under it
       expect(screen.queryByText(/Gliscor has no ability/)).toBeNull();
       await waitFor(() => expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled());
       await userEvent.click(screen.getByRole('button', { name: 'Start' }));

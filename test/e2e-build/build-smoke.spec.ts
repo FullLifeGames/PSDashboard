@@ -9,26 +9,7 @@ const fixtureReplay = JSON.parse(
   readFileSync(join(__dirname, '..', 'e2e', 'fixtures', 'replay.json'), 'utf-8'),
 );
 
-/**
- * PRODUCTION-BUILD smoke test. The dev suite runs against unminified
- * sources, which hid a build-only failure for as long as the feature has
- * existed: @pkmn/sim serializes battle references as
- * `[${obj.constructor.name}:id]`, so minified class names round-tripped
- * into objects that were no longer Pokemon/Side instances. Every search in
- * the worker threw `e?.getMoveRequestData is not a function`, the sweep
- * swallowed each one as a per-turn gap, and "Analyze game" produced an
- * EMPTY graph in the built app while dev looked perfect (2026-08-12).
- *
- * The guard is deliberately end-to-end and minimal: if a real position can
- * round-trip through the built worker and come back as a ranked search
- * result, class identity survived minification.
- */
-/**
- * Round 77 (the release check): the start load grew from 1,675 to 1,765 kB gzip when the engine protocol's request
- * builder reached the main thread through a static import, and with it the simulator's Pokemon class. The main thread
- * builds positions in workers and through the lazy facades of src/lib/lazy/; no file of the start load holds the
- * simulator. `getFullDetails` is a method name of @pkmn/sim's Pokemon that minification keeps.
- */
+// `getFullDetails` is a method name of @pkmn/sim's Pokemon that minification keeps.
 test('the start load holds no simulator code', async ({ request }) => {
   const html = await (await request.get('/')).text();
   const initial = [...html.matchAll(/(?:src|href)="\.?\/?(assets\/[^"]+\.js)"/g)].map(match => match[1]);
@@ -40,11 +21,6 @@ test('the start load holds no simulator code', async ({ request }) => {
   expect(carriers).toEqual([]);
 });
 
-/**
- * Round 81 (T298): a lazy chunk that a deploy removed. The first request for the replay parser's chunk answers 404, as
- * production did for a page built before the deploy of 1.0.2; the minified preload helper raises vite:preloadError,
- * the page reloads once, and the next load of the replay finds the chunk.
- */
 test('a lazy chunk missing after a deploy reloads the page once, and the next load works', async ({ page }) => {
   test.setTimeout(120_000);
   await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', route =>
@@ -80,11 +56,6 @@ test.describe.serial('production build', () => {
     await page.goto('/');
   });
 
-  /**
-   * Round 89 (ruling 49): the production build carries both feature flags off (src/lib/feature-flags.ts). Opponent reads my move has no
-   * Setup checkbox, though an earlier nightly stored hardMode true, and the Game review is neither on the page nor in the text of the
-   * panel; the Lines fold is still there. A dev server with the variables set shows both (test/e2e/hard-mode.spec.ts, game-review.spec.ts).
-   */
   test('the build ships Opponent reads my move and the Game review switched off', async ({ page }) => {
     test.setTimeout(120_000);
     await page.evaluate(() => {
@@ -104,6 +75,7 @@ test.describe.serial('production build', () => {
   });
 
   const analysisBySwitch: Record<string, string> = {};
+  // @pkmn/sim serializes `[${obj.constructor.name}:id]`: a minified class name round-trips into a plain object.
   for (const simFast of ['0', '1'] as const) {
     test(`the minified worker still evaluates positions (speed layer ${simFast}): the eval graph fills`, async ({ page }) => {
       test.setTimeout(240_000);
@@ -116,11 +88,6 @@ test.describe.serial('production build', () => {
       }, simFast);
       await page.reload();
 
-      // Any typed worker error is a build-integrity failure — collect them
-      // rather than only asserting the visible outcome, so a regression names
-      // its own cause instead of just "no points". Round 59: the tracer also
-      // keeps each worker's speed-layer reports, so the gate checks every
-      // evaluation worker on its own.
       await page.addInitScript(() => {
         type WorkerReports = { statuses: string[]; clones: number; dispatchAnswered: number; kinds: string[] };
         const store = window as unknown as { __workerErrors: string[]; __simFastByWorker: WorkerReports[] };
@@ -155,7 +122,6 @@ test.describe.serial('production build', () => {
       await panel.locator('button', { hasText: 'Analyze game' }).click();
       await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 180_000 });
 
-      // Points on the line == positions that survived the round trip.
       await expect(panel.locator('.ps-eval-graph circle')).not.toHaveCount(0);
       expect(await page.evaluate(() => (window as unknown as { __workerErrors: string[] }).__workerErrors)).toEqual([]);
 

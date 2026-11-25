@@ -5,15 +5,8 @@ import { useGameTeamEdit } from '../../../src/hooks/useGameTeamEdit';
 import { infoOfTeam } from '../../../src/hooks/useNewGame';
 import { SIX, startedRecord } from '../fixtures/new-game';
 
-/**
- * Round 89 (lane H, #105), stage H4: Edit Player and Edit Opp on a new game. The editor's team info becomes the side's sets, the
- * other side stays as the record holds it, the live branch stops and the editor closes before the record plays again; a line that
- * ends early says where. Round 89, H14a: an edit that makes played turns invalid asks first: the question names how many turns fall away
- * and that the open variation goes; Cancel changes nothing (no stop, no edit) and returns to the editor, which stayed open (hidden) with the text as typed.
- */
 describe('useGameTeamEdit', () => {
   type Inputs = Parameters<typeof useGameTeamEdit>[0];
-  /** A plan that keeps every turn unless the test says otherwise. */
   const keepAll = (record: Inputs['record']) => vi.fn().mockResolvedValue({ kept: record?.turns ?? 0, error: null });
   const edited = (index: number, move: string) => {
     const info = infoOfTeam(SIX);
@@ -90,7 +83,7 @@ describe('useGameTeamEdit', () => {
     expect(editTeams).not.toHaveBeenCalled();
   });
 
-  describe('an edit that makes played turns invalid asks before it cuts (H14a)', () => {
+  describe('an edit that makes played turns invalid asks before it cuts', () => {
     const cutRecord = async (format: string) => ({ ...(await startedRecord(format)), turns: 5 });
     const setup = async (format: string, variationOpen: boolean, kept = 2) => {
       const record = await cutRecord(format);
@@ -107,7 +100,6 @@ describe('useGameTeamEdit', () => {
       await waitFor(() => expect(result.current.confirm).not.toBeNull());
       expect(planTeams).toHaveBeenCalledTimes(1);
       expect(result.current.confirm!.message).toBe('This edit makes 3 played turns invalid. They fall away: the game keeps its first 2 turns, and the open variation goes.');
-      // the editor stays open under the question (hidden: `hold`); the branch, the record and the game stay as they were
       expect(order).toEqual([]);
       expect(result.current.hold).toBe(true);
       expect(editTeams).not.toHaveBeenCalled();

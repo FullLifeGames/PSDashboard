@@ -19,7 +19,7 @@ interface Props {
   branchTurn: number;
   history: BranchHistoryEntry[];
   finalLog: string;
-  /** A new game (round 89, #105, H5): its record and where the pointer stands. The branch then shares as a game (link version 2). */
+  /** A new game: its record and where the pointer stands. The branch then shares as a game (link version 2). */
   game?: { record: NewGameRecord; view: GameSharePayload['view'] } | null;
 }
 
@@ -28,13 +28,7 @@ export function shareUrl(encoded: string): string {
   return `${base}#branch=${encoded}`;
 }
 
-/**
- * The share link of the current branch and whether the clipboard took it. Once the field is filled it follows the variation: when
- * the inputs change (`build` is a new function), the link is built again during render (round 89: a line that replaced the
- * variation left the old link in the field), and a "Copied" belongs to the build it copied, so a changed variation shows none
- * until the next copy. The link in the field is the one the click built, so the clipboard and the field carry one timestamp, and
- * nothing is built before the first click (a game's link packs both teams).
- */
+// A "Copied" belongs to the build it copied; nothing is built before the first click.
 function useShareLink(build: () => SavedBranch) {
   const [built, setBuilt] = useState<{ build: () => SavedBranch; link: string } | null>(null);
   const [copiedFor, setCopiedFor] = useState<(() => SavedBranch) | null>(null);
@@ -61,17 +55,11 @@ const SAVED_NOTICE = 'Saved. The saved branches are listed under Variation moves
 
 const buttonStyle = { padding: '3px 8px', fontSize: 10 };
 
-/**
- * Round 84 (A7i, ruling 20a): the save and share logic of a branch, handed to the history panel as slots. The buttons stand on its
- * toggle line, the link field and the one line after a save under it, the saved rows in its body. The payload and the link logic
- * stay here; the panel imports no branch-share module.
- */
 export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, game = null }: Props): BranchHistorySlots {
   const [saved, setSaved] = useState<SavedBranch[]>(() => loadSavedBranches(replayData.id));
   const [justSaved, setJustSaved] = useState(false);
 
-  // Built when the user asks (a click) or, once a link is shown, when its inputs change; never per render before that. `game` is a
-  // fresh object each render, so the build depends on its fields.
+  // `game` is a fresh object each render, so the build depends on its fields.
   const gameRecord = game?.record ?? null;
   const viewTurn = game?.view?.turn ?? 0;
   const viewLine = game?.view?.line ?? 'main';
@@ -90,9 +78,7 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
     setJustSaved(true);
   };
 
-  // Opening a saved branch reuses the share-link flow: setting the hash
-  // triggers the app's hashchange handler (G16). A replay's branch shows the read-only view; a game's row is a version 2 link,
-  // which opens the branch in the game (H5).
+  // Setting the hash triggers the app's hashchange handler: the share-link flow.
   const openSaved = (entry: SavedBranch) => {
     window.location.assign(`#branch=${encodeBranchShare(entry)}`);
   };
@@ -116,7 +102,6 @@ export function useBranchSaveShare({ replayData, branchTurn, history, finalLog, 
       </>
     ),
     saved: <SavedList saved={saved} onOpen={openSaved} onRemove={removeSaved} />,
-    // The saved rows show once the body opens, so the line about the save has done its work.
     onOpenChange: open => { if (open) setJustSaved(false); },
   };
 }

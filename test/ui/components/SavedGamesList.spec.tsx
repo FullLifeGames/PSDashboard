@@ -5,11 +5,6 @@ import { SavedGamesList } from '../../../src/components/SavedGamesList';
 import { GAMES_INDEX_KEY, gameKey, listGames } from '../../../src/lib/new-game/store';
 import { savedRecord } from '../fixtures/saved-game';
 
-/**
- * Round 89 (lane H, #105, stage H4b; user ruling 13.11.2026, H11a): the saved games are listed in the Game menu and on the start
- * page, the three newest rows and "Show all N saved games"; the New game dialog holds none. One component serves both places.
- */
-
 type Props = Parameters<typeof SavedGamesList>[0];
 const props = (overrides: Partial<Props> = {}): Props => ({ onOpen: vi.fn(), currentId: null, ...overrides });
 const rows = () => Array.from(document.querySelectorAll<HTMLElement>('.ps-newgame-saved-row'));
@@ -51,7 +46,7 @@ describe('the saved games list', () => {
     expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
   }, 60_000);
 
-  test('a double click on the inline Delete deletes one game and opens none: the next row\'s Open slides under the pointer (H4h)', async () => {
+  test('a double click on the inline Delete deletes one game and opens none: the next row\'s Open slides under the pointer', async () => {
     await savedRecord(['Ann', 'Ben'], 1);
     await savedRecord(['Cleo', 'Dan'], 2);
     const onOpen = vi.fn().mockResolvedValue(undefined);

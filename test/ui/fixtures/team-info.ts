@@ -16,10 +16,6 @@ export const evs = (source: KnowledgeSource = 'unknown', value = { hp: 0, atk: 0
 
 const USAGE = 'Smogon gen9ou 2026-03';
 
-/**
- * One team member the stats panel and the editor can show: a revealed move,
- * a usage guess with its share, a manual item, guessed ability and spread.
- */
 export function revealedPokemon(species: string, overrides: Partial<RevealedPokemonInfo> = {}): RevealedPokemonInfo {
   return {
     species,

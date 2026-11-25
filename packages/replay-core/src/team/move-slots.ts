@@ -2,18 +2,9 @@ import type { RulesDex } from '../rules-dex.ts';
 import type { SetAssumption } from '../smogon/sets-lookup.ts';
 import { toId } from '../ids.ts';
 
-/**
- * Published move slots (round 63, T89): a Smogon set lists a slot either as
- * one move or as its options ("Heat Wave / Hidden Power Ice"). A slot holds
- * one move, so a seen option fills it; the build offers a fixed move before
- * any alternative (spec decision 11).
- */
+// A Smogon set lists a slot as one move or as its options ("Heat Wave / Hidden Power Ice"); a slot holds one move.
 
-/**
- * The key a move fills a slot with: every typed Hidden Power answers a
- * typeless one, because logs before gen 8 show "Hidden Power" without its
- * type (the enrichment dedups the same way).
- */
+/** The key a move fills a slot with: every typed Hidden Power answers a typeless one (logs before gen 8 show none). */
 export function slotMoveKey(dex: RulesDex, name: string): string {
   const move = dex.moves.get(name);
   const id = move.exists ? move.id as string : toId(name);
@@ -22,12 +13,7 @@ export function slotMoveKey(dex: RulesDex, name: string): string {
 
 const slotKeys = (dex: RulesDex, move: SetAssumption) => new Set((move.options ?? [move.value]).map(option => slotMoveKey(dex, option)));
 
-/**
- * The slots the revealed moves fill: one move per slot, as many slots as
- * the moves can fill together (a maximum matching), fixed slots tried
- * first. Two seen options of one slot fill it once (573756: "The Pex" lists
- * Toxic and Haze as one slot, the log shows both).
- */
+/** The slots the revealed moves fill: one move per slot, as many slots as the moves can fill (a maximum matching). */
 export function filledSlots(dex: RulesDex, moves: SetAssumption[], revealedKeys: Iterable<string>): Set<number> {
   const keys = moves.map(move => slotKeys(dex, move));
   const order = keys.map((_, index) => index).sort((a, b) => keys[a].size - keys[b].size);
@@ -48,13 +34,8 @@ export function filledSlots(dex: RulesDex, moves: SetAssumption[], revealedKeys:
   return new Set(holder.keys());
 }
 
-/**
- * The set's moves in the order the build offers them: a filled slot with
- * options drops out (the seen move already heads the pool), fixed moves come
- * first, then each open slot's first unseen option, then the open slots'
- * other options (the rest of the chosen set, which a short pool draws on
- * before usage, decision 12). A set without slots keeps its own array.
- */
+// A filled slot with options drops out: the seen move already heads the pool.
+/** The set's moves in the build's offer order: fixed moves, open slots' first unseen options, then their others. */
 export function slotOrderedMoves(dex: RulesDex, moves: SetAssumption[], revealedKeys: ReadonlySet<string>): SetAssumption[] {
   if (!moves.some(move => (move.options?.length ?? 0) > 1)) return moves;
   const filled = filledSlots(dex, moves, revealedKeys);

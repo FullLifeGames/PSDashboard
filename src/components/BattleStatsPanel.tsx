@@ -1,5 +1,5 @@
 import {
-  inferReplayFormatId, missingBodies, teamSizes,
+  generatesTeam, inferReplayFormatId, missingBodies, teamSizes,
   type OpponentTeamInfo,
   type PokemonEvsInfo,
   type PokemonFieldInfo,
@@ -11,7 +11,6 @@ import { useScrollFade } from '../hooks/useScrollFade';
 import { sourceAccent, sourceLabel } from '../lib/provenance-labels';
 import { SpriteImg } from './SpriteImg';
 import { useReplayRules } from '../lib/replay-rules';
-import { generatesTeam } from '../lib/random-sets';
 import { standInMarkOf } from '../lib/stand-in-mark';
 import { typeBg } from '../lib/type-colors';
 
@@ -29,7 +28,6 @@ function formatFieldValue(field: PokemonFieldInfo): string {
 
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' } as const;
 
-/** Round 87 (release 1.1.0), T317: the tag's words for a spread nobody has revealed; it carries no source word, since "unknown" is the whole claim. */
 const EVS_UNKNOWN = 'EVs not yet known';
 
 function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
@@ -43,15 +41,12 @@ function formatEvs(evs: PokemonEvsInfo, isRandomFormat: boolean): string {
   ] as const;
   const nonZero = labels.filter(([, value]) => value > 0);
   if (nonZero.length === 0) {
-    // Random sets run fixed 85 EVs across the board; "0 EVs" would be
-    // misleading for unknown spreads too (G21).
     if (isRandomFormat && evs.source === 'unknown') return '85 EVs each (random set)';
     return evs.source === 'unknown' ? EVS_UNKNOWN : '0 EVs';
   }
   return `${nonZero.map(([label, value]) => `${value} ${label}`).join(' / ')} EVs`;
 }
 
-/** The IVs the build plays when any is below 31 (a Trick Room body); '' when every IV is 31 or none is known. */
 function formatIvs(ivs: PokemonEvsInfo | undefined): string {
   if (!ivs || ivs.source === 'unknown') return '';
   const lowered = (['hp', 'atk', 'def', 'spa', 'spd', 'spe'] as const)
@@ -89,8 +84,6 @@ function MetaTag({
       <span
         style={{
           marginLeft: 6, color: sourceAccent(field.source), fontSize: 9, textTransform: 'uppercase',
-          // Type-colored pills (Tera) drown the accent — back it with a
-          // dark chip so the source stays readable on any type color.
           ...(background ? { background: 'rgba(0,0,0,0.45)', padding: '0 3px', borderRadius: 2 } : {}),
         }}
       >
@@ -118,7 +111,6 @@ function MoveTag({ move }: { move: PokemonMoveInfo }) {
   );
 }
 
-/** The EV or IV line with the source of its numbers. */
 function SpreadTag({ info, text }: { info: PokemonEvsInfo; text: string }) {
   return (
     <span
@@ -185,10 +177,6 @@ function PokemonEntry({ poke, isRandomFormat }: { poke: RevealedPokemonInfo; isR
   );
 }
 
-/**
- * Round 88 (F, #101): the bodies of a side that the log's `|teamsize|` counts and the panel could not fill, in a game without team
- * preview: the engine plays the side with the bodies shown. No stats file (a Random Battle) or an unreachable one leaves this notice.
- */
 function missingNotice(log: string, side: 'p1' | 'p2', built: number): string | null {
   const missing = missingBodies(log, built, side);
   const size = teamSizes(log)[side];
@@ -202,8 +190,6 @@ function TeamColumn({ label, playerName, info, isRandomFormat, notice }: {
   isRandomFormat: boolean;
   notice: string | null;
 }) {
-  // Random battles always run six Pokémon — show the not-yet-revealed slots
-  // instead of implying the team is complete (G21).
   const hiddenSlots = isRandomFormat ? Math.max(0, 6 - info.pokemon.length) : 0;
 
   return (
@@ -230,14 +216,9 @@ function TeamColumn({ label, playerName, info, isRandomFormat, notice }: {
   );
 }
 
-/**
- * Round 84 (turn dock), A7b (ruling 9a): a closed panel at the foot of the right column. The heading stays; the list scrolls inside
- * the panel and fades out over its last 36 px while more follows (stats-panel.css).
- */
 export function BattleStatsPanel({ replayData, p1Info, p2Info }: Props) {
   const fadeRef = useScrollFade();
   if (!p1Info && !p2Info) return null;
-  // Round 89 (#117): the Dex entry decides whether the format generates its team, never a name.
   const isRandomFormat = generatesTeam(inferReplayFormatId(replayData));
 
   return (

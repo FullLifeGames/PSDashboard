@@ -4,14 +4,6 @@ import type { PokemonSet } from '@pkmn/sim';
 import { configureSearchBudget, parseSearchBudget, serializeLiveBattle, type EvalResult, type EvalSettings, type EvalWorkerRequest, type EvalWorkerResponse } from '@fulllifegames/eval-engine';
 import { EvalWorkerClient } from '../../../src/lib/eval/worker-client';
 
-/**
- * Round 89 (SB-9, gate finding BROKEN 1): a tree search streamed no result until a whole tree had ended, so a Cancel in the first
- * seconds of a doubles or VGC replacement kept nothing. The pool now asks tree 0 (and only tree 0) for its interim result, and only
- * when the caller listens: the game analysis and the play-out pass no `onPartial` and get no extra work. Rows run the real worker
- * module on this thread behind a stand-in pool, for a doubles battle and a singles battle (singles from a quarter fainted runs
- * the tree too).
- */
-
 const posted: EvalWorkerRequest[] = [];
 const answered: EvalWorkerResponse[] = [];
 
@@ -81,7 +73,7 @@ afterEach(() => {
 });
 
 async function evaluate(serialized: string, onPartial?: (result: EvalResult) => void) {
-  // The main thread reads the tree count before the first message stamps the budget, so the lean budget is set on both routes.
+  // The main thread reads the tree count before the first message stamps the budget: set the lean one on both routes.
   localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=2,iterations=200');
   configureSearchBudget(parseSearchBudget('trees=2,iterations=200'));
   onTestFinished(() => { localStorage.removeItem('ps-replay-interceptor:search-budget'); configureSearchBudget(null); });

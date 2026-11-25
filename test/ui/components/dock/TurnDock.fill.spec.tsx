@@ -1,18 +1,15 @@
 import { describe, expect, test, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { BranchSlotChoice } from '@fulllifegames/eval-engine';
+import type { BranchSlotChoice, BranchSimState } from '@fulllifegames/eval-engine';
 import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import type { DockFillView } from '../../../../src/hooks/useDockFill';
 import { simState, type FormatKind } from '../../fixtures/sim-state';
+import { useState } from 'react';
+import { mergeChoices, seedChoices } from '../../../../src/lib/dock-seed';
+import type { PlayedAtPosition } from '../../../../src/lib/played-pick';
 
-// The legal move pool is heavy dex data; a fixed pool keeps the what-if row deterministic here.
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw', 'Fire Fang'] }));
-
-/**
- * Round 84 (turn dock), step A5: what the dock shows of the engine's fill at the live tip: a placeholder of the chip's own size
- * while the run is pending, the origin mark on a filled chip, the note while the game analysis runs, and the waiting Execute.
- */
 
 type Props = Parameters<typeof TurnDock>[0];
 
@@ -107,7 +104,6 @@ describe('TurnDock fill, marks', () => {
     const props = renderDock('singles', fill, { onSetChoice: vi.fn(() => { order.push('set'); }) }, state);
     await userEvent.click(chip('P1'));
     await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Stone Edge/ }));
-    // round 89 (#153): the pick goes along, for Hard mode
     expect(fill.onUserChoice).toHaveBeenCalledWith('p1', 0, expect.objectContaining({ moveId: 'stoneedge' }));
     expect(props.onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ moveId: 'stoneedge' }), 0);
     expect(order).toEqual(['user', 'set']);
@@ -159,7 +155,7 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the open tray, %s
     expect(fill.holdTray).toHaveBeenLastCalledWith(null);
   });
 
-  test('a click on a chip arms the fill (Q19 b, the trigger at a replay turn)', async () => {
+  test('a click on a chip arms the fill (the trigger at a replay turn)', async () => {
     const fill = fillOf();
     renderDock(kind, fill);
     expect(fill.arm).not.toHaveBeenCalled();
@@ -227,7 +223,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
     await closed(() => userEvent.click(chip(first)));
     await closed(() => userEvent.keyboard('{Escape}'));
     await closed(() => userEvent.click(document.body));
-    // Another chip's tray closes the first one's and opens its own.
     await userEvent.click(chip(first));
     vi.mocked(fill.release).mockClear();
     await userEvent.click(chip(second));
@@ -250,7 +245,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
     const state = simState(kind, others);
     const fill = withDeferred(deferredMove);
     const props = renderDock(kind, fill, {}, state);
-    // The label counts the deferred pick as chosen.
     expect(execute()).toBeEnabled();
     expect(execute()).toHaveTextContent('Execute Turn');
     await userEvent.click(chip(first));
@@ -270,7 +264,6 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, the engine\'s cho
 });
 
 describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacement, %s', (kind) => {
-  // P1 replaces: singles its only slot, doubles slot B (the other slot plays on); P2 waits.
   const slot = kind === 'doubles' ? 1 : 0;
   const forcedChip = kind === 'doubles' ? 'P1B' : 'P1';
   const waitingChip = kind === 'doubles' ? 'P2A' : 'P2';
@@ -339,8 +332,7 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, a forced replacem
   });
 });
 
-describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', () => {
-  // P1 replaces both bodies; P2 waits. The engine holds slot A with Flutter Mane; the user's bench click is in slot B.
+describe('TurnDock fill, two forced slots of one side (doubles)', () => {
   const flags = { p1ForceSwitch: true, p1ForceSwitches: [true, true] };
   const flutter: BranchSlotChoice = { kind: 'switch', speciesId: 'fluttermane', pokemonName: 'Flutter Mane' };
   const urshifu: BranchSlotChoice = { kind: 'switch', speciesId: 'urshifu', pokemonName: 'Urshifu' };
@@ -384,11 +376,6 @@ describe('TurnDock fill, two forced slots of one side (ruling 16a, doubles)', ()
 });
 
 
-/**
- * Round 89 (#153, HM3b, user gate 15.11.2026): "Back to the engine's pick" in the open tray of a slot that holds a user pick that
- * differs from what the fill chose. The click asks the fill (`restore`) for the choice and writes it like any pick, but without telling
- * the fill that the user chose: the slot is the engine's again. Singles and doubles; in doubles per slot.
- */
 describe.each(['singles', 'doubles'] as const)('TurnDock fill, Back to the engine\'s pick, %s', (kind) => {
   const first = kind === 'doubles' ? 'P1A' : 'P1';
   const engineMove = kind === 'doubles' ? move('flareblitz', 'Flare Blitz', 2) : move('earthquake', 'Earthquake');
@@ -465,5 +452,137 @@ describe.each(['singles', 'doubles'] as const)('TurnDock fill, Back to the engin
     await userEvent.click(chip(first));
     await userEvent.click(back()!);
     expect(props.onSetChoice).not.toHaveBeenCalled();
+  });
+});
+
+type Sides = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+
+const DOUBLES_PLAYED: PlayedAtPosition = {
+  p1: null, p2: null,
+  p1Slots: [{ kind: 'move', name: 'Fake Out', targetLoc: 2 }, { kind: 'move', name: 'Spore' }],
+  p2Slots: [{ kind: 'switch', name: 'Kingambit', species: 'Kingambit' }, null],
+};
+
+function Harness({ base, played, spies }: { base: BranchSimState; played: PlayedAtPosition; spies: Partial<Props> }) {
+  const [draft, setDraft] = useState<Sides>({ p1: base.p1Choices.map(() => null), p2: base.p2Choices.map(() => null) });
+  const seed = seedChoices(played, base);
+  const effective = mergeChoices(seed, draft);
+  const state = { ...base, p1Choices: effective.p1, p2Choices: effective.p2, p1Choice: effective.p1[0] ?? null, p2Choice: effective.p2[0] ?? null };
+  return (
+    <TurnDock
+      simState={state} seed={seed} played={played} executeError={null} executing={false} gen={9}
+      onSetChoice={(side, choice, slot = 0) => {
+        spies.onSetChoice?.(side, choice, slot);
+        setDraft(current => ({ ...current, [side]: current[side].map((held, index) => (index === slot ? choice : held)) }));
+      }}
+      onHypotheticalMove={vi.fn()} onExecuteTurn={spies.onExecuteTurn ?? vi.fn()}
+    />
+  );
+}
+const tray = () => within(document.querySelector('.ps-tray') as HTMLElement);
+
+describe('TurnDock, doubles', () => {
+  test('a seeded position shows one chip per slot with the played choice and its origin', () => {
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
+    expect(chip('P1A')).toHaveTextContent('Fake Out → P2B');
+    expect(chip('P1A')).toHaveAttribute('data-origin', 'played');
+    expect(chip('P1B')).toHaveTextContent('Spore');
+    expect(chip('P2A')).toHaveTextContent('→ Kingambit');
+    expect(chip('P2A')).toHaveAttribute('data-origin', 'played');
+    expect(document.querySelectorAll('.ps-dock-chip')).toHaveLength(4);
+    expect([...document.querySelectorAll('.ps-dock-row')].map(row => row.querySelectorAll('.ps-dock-chip').length)).toEqual([2, 2]);
+  });
+
+  test('a chip click opens the tray of that slot, a second click closes it', async () => {
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
+    expect(chip('P1A')).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.ps-tray')).toBeNull();
+    await userEvent.click(chip('P1A'));
+    expect(chip('P1A')).toHaveAttribute('aria-expanded', 'true');
+    expect(tray().getByRole('button', { name: /Flare Blitz/ })).toBeInTheDocument();
+    expect(tray().getByRole('button', { name: /Flutter Mane/ })).toBeInTheDocument();
+    await userEvent.click(chip('P1B'));
+    expect(chip('P1A')).toHaveAttribute('aria-expanded', 'false');
+    expect(chip('P1B')).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(chip('P1B'));
+    expect(document.querySelector('.ps-tray')).toBeNull();
+  });
+
+  test('a tile click replaces the slot choice, and the chip drops its played origin', async () => {
+    const onSetChoice = vi.fn();
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{ onSetChoice }} />);
+    await userEvent.click(chip('P1A'));
+    await userEvent.click(tray().getByRole('button', { name: /Flare Blitz/ }));
+    expect(onSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'move', moveId: 'flareblitz', targetLoc: expect.any(Number) }), 0);
+    expect(chip('P1A')).toHaveTextContent('Flare Blitz');
+    expect(chip('P1A')).not.toHaveAttribute('data-origin', 'played');
+    expect(chip('P1B')).toHaveAttribute('data-origin', 'played');
+  });
+
+  test('Execute sends the effective choices: the seed under the picks', async () => {
+    const onExecuteTurn = vi.fn();
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{ onExecuteTurn }} />);
+    expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
+    await userEvent.click(chip('P2B'));
+    await userEvent.click(tray().getByRole('button', { name: /Taunt/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Execute Turn' }));
+    expect(onExecuteTurn).toHaveBeenCalledTimes(1);
+    const sent = onExecuteTurn.mock.calls[0][0] as Sides;
+    expect(sent.p1.map(choice => (choice?.kind === 'move' ? choice.moveId : choice?.kind))).toEqual(['fakeout', 'spore']);
+    expect(sent.p1[0]).toMatchObject({ targetLoc: 2 });
+    expect(sent.p2[0]).toMatchObject({ kind: 'switch', speciesId: 'kingambit' });
+    expect(sent.p2[1]).toMatchObject({ kind: 'move', moveId: 'taunt' });
+  });
+
+  test('a pending move shows one target button per foe with its slot and name, and a press moves the highlight', async () => {
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
+    await userEvent.click(chip('P1B'));
+    await userEvent.click(tray().getByRole('button', { name: /^Pollen Puff/ }));
+    const first = tray().getByTitle(/^Pollen Puff into Rillaboom/);
+    const second = tray().getByTitle(/^Pollen Puff into Tornadus/);
+    expect(first).toHaveTextContent('P2A Rillaboom');
+    expect(second).toHaveTextContent('P2B Tornadus');
+    await userEvent.click(second);
+    expect(second).toHaveClass('ps-target-btn-selected');
+    expect(first).not.toHaveClass('ps-target-btn-selected');
+  });
+
+  test('a slot without a logged action reads "no logged move · choose", and Execute waits for it', () => {
+    render(<Harness base={simState('doubles')} played={DOUBLES_PLAYED} spies={{}} />);
+    expect(chip('P2B')).toHaveTextContent('no logged move · choose');
+    expect(chip('P2B')).not.toHaveAttribute('data-origin', 'played');
+    expect(screen.getByRole('button', { name: 'Select all active choices' })).toBeDisabled();
+  });
+});
+
+describe('TurnDock, singles', () => {
+  const played: PlayedAtPosition = { p1: { kind: 'move', name: 'Earthquake' }, p2: { kind: 'switch', name: 'Rotom-Wash', species: 'Rotom-Wash' } };
+
+  test('one row holds both chips, and Execute is ready when both sides are seeded', async () => {
+    const onExecuteTurn = vi.fn();
+    render(<Harness base={simState('singles')} played={played} spies={{ onExecuteTurn }} />);
+    expect([...document.querySelectorAll('.ps-dock-row')].map(row => row.querySelectorAll('.ps-dock-chip').length)).toEqual([2]);
+    expect(chip('P1')).toHaveTextContent('Earthquake');
+    expect(chip('P2')).toHaveTextContent('→ Rotom-Wash');
+    await userEvent.click(screen.getByRole('button', { name: 'Execute Turn' }));
+    await waitFor(() => expect(onExecuteTurn).toHaveBeenCalledTimes(1));
+    expect(onExecuteTurn.mock.calls[0][0]).toMatchObject({ p1: [{ moveId: 'earthquake' }], p2: [{ kind: 'switch', speciesId: 'rotomwash' }] });
+  });
+
+  test('a tile pick and a choice from the tray\'s picker each fill an empty chip as the user\'s own pick', async () => {
+    render(<Harness base={simState('singles')} played={{ p1: null, p2: null }} spies={{}} />);
+    expect(chip('P1')).toHaveAttribute('data-empty', 'true');
+    await userEvent.click(chip('P1'));
+    await userEvent.click(tray().getByRole('button', { name: /Earthquake/ }));
+    expect(chip('P1')).toHaveTextContent('Earthquake');
+    expect(chip('P1')).not.toHaveAttribute('data-empty', 'true');
+
+    expect(chip('P2')).toHaveAttribute('data-empty', 'true');
+    await userEvent.click(chip('P2'));
+    await userEvent.click(tray().getByRole('button', { name: /Dice · What if/ }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Choice picker for P2' }), 'switch:2');
+    expect(chip('P2')).not.toHaveAttribute('data-empty', 'true');
+    expect(chip('P2')).not.toHaveAttribute('data-origin', 'played');
+    expect(chip('P2')).toHaveTextContent('→ ');
   });
 });

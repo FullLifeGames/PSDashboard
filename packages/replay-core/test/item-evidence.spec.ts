@@ -4,13 +4,6 @@ import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { contactLands } from '../src/inference/item-evidence';
 import { rulesDex } from '../src/rules-dex';
 
-/**
- * Items the protocol rules out by a line it does NOT show (round 63, T80).
- * Every log here comes from @pkmn/sim, so the simulator, not a hand-kept
- * list, says what a holder shows: each case first checks the sim fact, then
- * what the inference reads from the same log for the side p2.
- */
-
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {
   return {
     name: species, species, item, ability, moves, nature: 'Hardy', level, gender: '',
@@ -19,12 +12,7 @@ function set(species: string, item: string, ability: string, moves: string[], le
   };
 }
 
-/**
- * The spectators' log: each `|split|` keeps its public line, as a replay does.
- * `format` defaults to OU, whose rules fix each species' abilities; Balanced
- * Hackmons lets any species hold any ability, and the inference then judges
- * nothing that hangs on an ability (round 64, T125).
- */
+// `format` defaults to OU, which fixes each species' abilities; Balanced Hackmons judges nothing about abilities.
 function play(p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9, format = 'ou'): string {
   const battle = new Battle({
     formatid: toID(doubles ? `gen${gen}doubles${format}` : `gen${gen}${format}`), seed: '1,2,3,4',
@@ -47,7 +35,7 @@ const ruledOut = (log: string, species: string) =>
 const wall = () => set('Mew', '', 'Synchronize', ['Recover', 'Psychic Noise', 'Tackle']);
 const shown = (log: string, item: string) => log.includes(`[from] item: ${item}`);
 
-describe('Life Orb shows its recoil on every hit (T80)', () => {
+describe('Life Orb shows its recoil on every hit', () => {
   test('singles: a damaging hit without the recoil rules Life Orb out', () => {
     const attacker = (item: string) => [set('Garchomp', item, 'Rough Skin', ['Earthquake'], 50)];
     expect(shown(play([wall()], attacker('Life Orb'), [['move recover', 'move earthquake']]), 'Life Orb')).toBe(true);
@@ -84,7 +72,7 @@ describe('Life Orb shows its recoil on every hit (T80)', () => {
   });
 });
 
-describe('Leftovers and Black Sludge show their heal below full HP (T80)', () => {
+describe('Leftovers and Black Sludge show their heal below full HP', () => {
   const tank = (item: string) => set('Snorlax', item, 'Thick Fat', ['Curse', 'Protect']);
   const hitter = () => set('Machamp', '', 'No Guard', ['Close Combat', 'Bulk Up'], 50);
 
@@ -105,7 +93,6 @@ describe('Leftovers and Black Sludge show their heal below full HP (T80)', () =>
   test('full HP or Heal Block rule nothing out', () => {
     const full = play([hitter()], [tank('Expert Belt')], [['move bulkup', 'move curse']]);
     expect(ruledOut(full, 'Snorlax')).not.toContain('leftovers');
-    // Psychic Noise blocks healing for two turns: the sim shows no heal, the inference stays out.
     const blocker = set('Mew', '', 'Synchronize', ['Psychic Noise'], 100);
     const blocked = (item: string) => play([blocker], [tank(item)], [['move psychicnoise', 'move curse']]);
     expect(shown(blocked('Leftovers'), 'Leftovers')).toBe(false);
@@ -113,10 +100,8 @@ describe('Leftovers and Black Sludge show their heal below full HP (T80)', () =>
   });
 });
 
-describe('Illusion hides who stands on the field (round 63 review, issue 2)', () => {
+describe('Illusion hides who stands on the field', () => {
   test('a side that may hold an Illusion user rules nothing out by absence (Zoroark-Hisui as Dondozo)', () => {
-    // Zoroark-Hisui (Choice Specs) takes the shape of the last party member:
-    // the log names Dondozo while the sand chips it and its Shadow Balls land.
     const sand = set('Tyranitar', '', 'Sand Stream', ['Calm Mind']);
     const zoroark = set('Zoroark-Hisui', 'Choice Specs', 'Illusion', ['Shadow Ball'], 50);
     const dondozo = set('Dondozo', 'Leftovers', 'Unaware', ['Rest']);
@@ -127,7 +112,7 @@ describe('Illusion hides who stands on the field (round 63 review, issue 2)', ()
   });
 });
 
-describe('Rocky Helmet shows its damage on every contact hit (T80, decision 13)', () => {
+describe('Rocky Helmet shows its damage on every contact hit', () => {
   const holder = (item: string) => set('Skarmory', item, 'Sturdy', ['Roost']);
   const tackle: [string, string][] = [['move tackle', 'move roost']];
 
@@ -148,13 +133,12 @@ describe('Rocky Helmet shows its damage on every contact hit (T80, decision 13)'
   });
 });
 
-describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120, decision 19)', () => {
+describe('Rocky Helmet from the generation of Protective Pads on', () => {
   const holder = (item: string, ability = 'Sturdy') => set('Skarmory', item, ability, ['Knock Off', 'Roost']);
   const ou = (p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false, gen = 9) =>
     play(p1, p2, turns, doubles, gen, 'ou');
 
   test('singles gen 9: an attacker whose Leftovers were knocked off hits without helmet damage: Rocky Helmet ruled out', () => {
-    // Turn 1 the attacker's item is unknown when it hits; turn 2 it holds nothing, as the log showed (573756 Melmetal).
     const attacker = set('Rattata', 'Leftovers', 'Guts', ['Tackle']);
     const knocked: [string, string][] = [['move tackle', 'move knockoff'], ['move tackle', 'move roost']];
     expect(shown(ou([attacker], [holder('Rocky Helmet')], knocked), 'Rocky Helmet')).toBe(true);
@@ -180,7 +164,6 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
 
   test('a punch from a Punching Glove holder makes no contact: nothing is ruled out', () => {
     const glove = set('Hitmonchan', 'Punching Glove', 'Iron Fist', ['Mach Punch', 'Tackle']);
-    // Frisk on the holder's side shows the attacker's Punching Glove.
     const frisker = holder('Shed Shell', 'Frisk');
     const punch = ou([glove], [frisker], [['move machpunch', 'move roost']]);
     expect(punch).toMatch(/\|-item\|p1a: Hitmonchan\|Punching Glove\|\[from\] ability: Frisk/);
@@ -206,8 +189,7 @@ describe('Rocky Helmet from the generation of Protective Pads on (round 64, T120
   });
 });
 
-describe('Shell Bell heals its holder after a hit below full HP (round 64, T120, decision 19)', () => {
-  // Mew moves first and chips the slow attacker, whose hit then shows the heal (or not).
+describe('Shell Bell heals its holder after a hit below full HP', () => {
   const chip = () => set('Mew', '', 'Synchronize', ['Tackle', 'Recover', 'Psychic Noise']);
   const slow = (item: string, ability = 'Thick Fat', moves = ['Body Slam']) => set('Snorlax', item, ability, moves);
   const ou = (p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][], doubles = false) => play(p1, p2, turns, doubles, 9, 'ou');
@@ -237,11 +219,9 @@ describe('Shell Bell heals its holder after a hit below full HP (round 64, T120,
   });
 });
 
-describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 64, decision 20)', () => {
+describe('the slot map, gen 4 Life Orb and free abilities', () => {
   test('doubles: after Ally Switch the slot map follows the swap, so a benched Leftovers holder is not judged', () => {
-    // Singles is not affected: Ally Switch fails without a partner. Snorlax holds Leftovers,
-    // Psychic Noise keeps them silent for two turns, Ally Switch moves Snorlax to slot a,
-    // and slot a switches out: the benched Snorlax shows no heal and must not be judged.
+    // Singles is not affected: Ally Switch fails without a partner.
     const p1 = [set('Mew', '', 'Synchronize', ['Tackle']), set('Blissey', '', 'Natural Cure', ['Seismic Toss', 'Psychic Noise'])];
     const p2 = [
       set('Kadabra', '', 'Synchronize', ['Ally Switch', 'Calm Mind']), set('Snorlax', 'Leftovers', 'Thick Fat', ['Curse']),
@@ -282,15 +262,13 @@ describe('T125 point 4: the slot map, gen 4 Life Orb and free abilities (round 6
     const p1 = [wall(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
     const doubles = play(p1, [guarded, set('Talonflame', '', 'Gale Wings', ['Roost'])],
       [['move recover, move softboiled', 'move tackle 1, move roost']], true, 9, 'customgame')
-      // The sim knows no doubles format with free abilities; the log names Balanced Hackmons (round 67 gate: a custom
-      // game keeps each species to its own abilities).
+      // The sim knows no doubles format with free abilities; the log names Balanced Hackmons.
       .replace(/\|tier\|[^\n]*/, '|tier|[Gen 9] Balanced Hackmons');
     expect(ruledOut(doubles, 'Rattata')).not.toContain('lifeorb');
   });
 });
 
-describe('a one-hit KO and Life Orb, per generation (review of round 64)', () => {
-  // A level-30 target: Sheer Cold's accuracy grows with the level gap, so the KO lands.
+describe('a one-hit KO and Life Orb, per generation', () => {
   const target = () => [set('Snorlax', '', 'Thick Fat', ['Rest'], 30)];
   const lapras = (item: string) => [set('Lapras', item, 'Shell Armor', ['Sheer Cold'])];
   const ohko = (item: string, gen: number) => play(target(), lapras(item), [['move rest', 'move sheercold']], false, gen, 'ou');

@@ -12,29 +12,18 @@ import { clicksAccepted, dexOfRules, forcedOn, sweepMoves, type DexMove } from '
 import { set } from './move-oracle';
 import { fingerprint } from './power-oracle';
 
-// Round 88 (T344, #80): a charge move that skips its charge turn fires at once, so its dice belong to the turn of the click.
-// For every Dex move with the flag `charge`, in every rule set the corpus plays, singles, doubles and VGC (a team of six), under
-// each skip the simulator knows (the move's weather, Primordial Sea and Desolate Land, Power Herb, Mega Sol) and each block of a
-// skip (Utility Umbrella, Cloud Nine and Air Lock, Klutz, Embargo, Magic Room): the oracle is the natural turn on a copy (the user
-// holds a volatile of the move afterwards when it charged). A move that charged offers no dice; a move that fired offers every die
-// the natural turn drew and none the simulator never draws. The offer leaves the live battle as it was.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
-/** The kinds of die the offer covers (a charge turn draws none of them). */
 const OFFERED_KINDS = new Set(['accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'stalling', 'power']);
 
 interface Outfit { ability?: string; item?: string }
 interface Scene {
   id: string;
-  /** The user's ability and item. */
   a?: Outfit;
-  /** The ability of the foe in front (Cloud Nine, Air Lock). */
   foe?: Outfit;
-  /** A weather ability on the field from beside the user (the ally in doubles, the foe in singles). */
   setter?: string;
-  /** A weather set on the field directly. */
   weather?: string;
   embargo?: boolean;
   magicRoom?: boolean;
@@ -67,7 +56,6 @@ const has = (rules: Rules, kind: 'items' | 'abilities' | 'moves', id: string): b
   return entry.exists && entry.gen <= dex.gen && !entry.isNonstandard;
 };
 
-/** The names a scene needs from the Dex: the rule set lacks one, the scene does not exist there. */
 function playable(rules: Rules, scene: Scene): boolean {
   const names: [Parameters<typeof has>[1], string | undefined][] = [
     ['abilities', scene.a?.ability], ['items', scene.a?.item], ['abilities', scene.foe?.ability], ['abilities', scene.setter], ['moves', scene.embargo ? 'embargo' : undefined],
@@ -84,7 +72,6 @@ function mon(rules: Rules, species: string, moves: string[], outfit: Outfit = {}
   });
 }
 
-/** The board of a row: the user (Pikachu with the move) and the foe in front, in doubles an ally and a second foe beside them, in VGC four more per side. */
 function boardOf(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, moveId: string): Battle {
   const doubles = mode === 'doubles';
   const attacker = mon(rules, FAST, [moveId], scene.a ?? {}, 'M');
@@ -111,7 +98,6 @@ function boardOf(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, moveId: s
 
 const chargingOf = (user: Pokemon, moveId: string): boolean => Object.values(user.volatiles).some(volatile => (volatile as { move?: string }).move === moveId);
 
-/** The dice the natural turn draws for the move of the slot, by key, and what the simulator did with the move. */
 function naturalTurn(board: Battle, clicks: { p1: string; p2: string }, moveId: string): { keys: string[]; charged: boolean; ran: boolean } {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -125,7 +111,6 @@ function naturalTurn(board: Battle, clicks: { p1: string; p2: string }, moveId: 
     watch.uninstall();
   }
   const lines = copy.log.slice(start);
-  // a move the weather or the field stops (Dive under Desolate Land) fails with a line of the user and runs nothing
   const ran = !lines.some(line => /^\|-(fail|notarget)\|p1a/.test(line));
   return { keys: [...recording.record.keys()].filter(key => key.startsWith(`p1a:${moveId}:`)), charged: chargingOf(copy.sides[0].active[0], moveId), ran };
 }
@@ -171,12 +156,10 @@ function exercise(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, move: De
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
   for (const key of natural.keys) {
     const [, , target, kind] = key.split(':');
-    // a die the state cannot name before the hit stays unoffered: a self effect set in the move's own `onTryHit`, an accuracy aimed at the user
     const lateSelf = kind === 'self-effect' && typeof (dexOfRules(rules).moves.get(move.id) as unknown as { onTryHit?: unknown }).onTryHit === 'function';
     if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && target !== 'p1a') problems.push(`fires, but the offer lacks ${key}`);
   }
   if (dice.length === 0) return problems;
-  // every offered die, forced, is drawn (the accuracy forced to hit so the dice behind it run)
   const forced: ForcedDie[] = dice.map(offer => ({ name: offer.name, result: offer.name.kind === 'accuracy' ? { happens: true } : offer.results[0] }));
   const { report } = forcedOn(board, clicks, forced);
   for (const shown of report.forced.filter(entry => entry.took === 'no-draw' && /^the simulator drew no/.test(entry.reason ?? ''))) {
@@ -185,10 +168,8 @@ function exercise(rules: Rules, mode: Mode, vgc: boolean, scene: Scene, move: De
   return problems;
 }
 
-/** Every charge move the rule set plays, through the shared selection (a plain run plays a sample; `DICE_SWEEPS=full` plays all). The reported scenes below name their moves. */
 const chargeMoves = (rules: Rules): DexMove[] => sweepMoves(rules, move => !!move.flags.charge, false).moves;
 
-/** The rule sets and game types of the sweep: singles everywhere, doubles from Gen 3, VGC (a team of six) in Scarlet/Violet and Champions. */
 const CASES: { rules: Rules; mode: Mode; vgc: boolean; name: string }[] = RULES.flatMap(rules => [
   { rules, mode: 'singles' as const, vgc: false, name: `${rules.name} singles` },
   ...(rules.doubles ? [{ rules, mode: 'doubles' as const, vgc: false, name: `${rules.name} doubles` }] : []),
@@ -249,7 +230,6 @@ describe('the reported scenes', () => {
   });
 
   test('the sweep saw both outcomes', () => {
-    // read after the rows above ran: both a move that fired and a move that charged stood in the sweep
     expect(sum.fired).toBeGreaterThan(0);
     expect(sum.charged).toBeGreaterThan(0);
   });

@@ -1,0 +1,141 @@
+import { test, expect, describe } from 'vitest';
+import { Battle, State, Teams, toID } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
+import { advancePosition, createRootPosition, positionBattle, serializeBattleStable } from '../src/forward-model';
+import { evalFeatures, evaluatePosition } from '../src/eval-function';
+import { readFileSync } from 'node:fs';
+import { buildTeamsFromReplay, type SmogonUsageStats } from '@fulllifegames/replay-core';
+
+function makeSet(name: string, species: string, moves: string[], extra?: Partial<PokemonSet>): PokemonSet {
+  return {
+    name, species, item: '', ability: 'No Ability', moves,
+    nature: 'Hardy',
+    evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+    ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+    level: 50, gender: '',
+    ...extra,
+  };
+}
+
+function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[]): Battle {
+  const battle = new Battle({
+    formatid: toID('gen6customgame'),
+    seed: '1,2,3,4',
+    p1: { name: 'Alpha', team: Teams.pack(p1Sets) },
+    p2: { name: 'Beta', team: Teams.pack(p2Sets) },
+  });
+  if (battle.sides.some(side => side.requestState === 'teampreview')) {
+    battle.choose('p1', `team ${p1Sets.map((_, index) => index + 1).join('')}`);
+    battle.choose('p2', `team ${p2Sets.map((_, index) => index + 1).join('')}`);
+  }
+  return battle;
+}
+
+const serialize = (battle: Battle) => JSON.stringify(State.serializeBattle(battle));
+
+describe('searched mechanics stay honest', () => {
+  test('Intimidate drops the foe attack on a searched switch-in', () => {
+    const root = createRootPosition(serialize(makeBattle(
+      [makeSet('Snorlax', 'Snorlax', ['Protect']), makeSet('Gyarados', 'Gyarados', ['Protect'], { ability: 'Intimidate' })],
+      [makeSet('Lopunny', 'Lopunny', ['Protect'])],
+    )));
+    const child = positionBattle(advancePosition(root, 'switch 2', 'move protect', '1,2,3,4'));
+    expect(child.sides[0].active[0]!.species.name).toBe('Gyarados');
+    expect(child.sides[1].active[0]!.boosts.atk).toBe(-1);
+  });
+
+  test('Dragon Dance grants +1/+1 through advance and the static eval pays a premium', () => {
+    const mkRoot = () => createRootPosition(serialize(makeBattle(
+      [makeSet('Dragonite', 'Dragonite', ['Dragon Dance', 'Splash'])],
+      [makeSet('Chansey', 'Chansey', ['Protect'])],
+    )));
+    const afterDD = advancePosition(mkRoot(), 'move dragondance', 'move protect', '1,2,3,4');
+    const ddBattle = positionBattle(afterDD);
+    expect(ddBattle.sides[0].active[0]!.boosts.atk).toBe(1);
+    expect(ddBattle.sides[0].active[0]!.boosts.spe).toBe(1);
+    const afterNoop = advancePosition(mkRoot(), 'move splash', 'move protect', '1,2,3,4');
+    expect(evalFeatures(positionBattle(afterDD)).boosts).toBeGreaterThan(evalFeatures(positionBattle(afterNoop)).boosts);
+  });
+
+  test('Regenerator heals a third on a searched switch-out', () => {
+    const battle = makeBattle(
+      [makeSet('Chansey', 'Chansey', ['Protect'])],
+      [makeSet('Slowbro', 'Slowbro', ['Protect'], { ability: 'Regenerator' }), makeSet('Lopunny', 'Lopunny', ['Protect'])],
+    );
+    const bro = battle.sides[1].active[0]!;
+    bro.hp = Math.floor(bro.maxhp * 0.4);
+    const child = positionBattle(advancePosition(createRootPosition(serialize(battle)), 'move protect', 'switch 2', '1,2,3,4'));
+    const benched = child.sides[1].pokemon.find(pokemon => pokemon.species.name === 'Slowbro')!;
+    expect(benched.hp).toBe(Math.min(bro.maxhp, Math.floor(bro.maxhp * 0.4) + Math.floor(bro.maxhp / 3)));
+  });
+
+  test('Rocky Helmet chips a searched contact attacker by a sixth — and not through Protect', () => {
+    const protectedTurn = positionBattle(advancePosition(createRootPosition(serialize(makeBattle(
+      [makeSet('Lopunny', 'Lopunny', ['Pound'])],
+      [makeSet('Skarmory', 'Skarmory', ['Protect'], { item: 'Rocky Helmet' })],
+    ))), 'move pound', 'move protect', '1,2,3,4'));
+    const shielded = protectedTurn.sides[0].active[0]!;
+    expect(shielded.hp).toBe(shielded.maxhp);
+
+    const contactTurn = positionBattle(advancePosition(createRootPosition(serialize(makeBattle(
+      [makeSet('Lopunny', 'Lopunny', ['Pound'])],
+      [makeSet('Skarmory', 'Skarmory', ['Roost'], { item: 'Rocky Helmet' })],
+    ))), 'move pound', 'move roost', '1,2,3,4'));
+    const chipped = contactTurn.sides[0].active[0]!;
+    expect(chipped.maxhp - chipped.hp).toBe(Math.floor(chipped.maxhp / 6));
+  });
+
+  test('a benched mon below hazard-entry HP stops counting (effHp 0)', () => {
+    const build = () => {
+      const battle = makeBattle(
+        [makeSet('Skarmory', 'Skarmory', ['Stealth Rock', 'Spikes'])],
+        [makeSet('Slowbro', 'Slowbro', ['Protect']), makeSet('Lopunny', 'Lopunny', ['Protect'])],
+      );
+      battle.choose('p1', 'move stealthrock'); battle.choose('p2', 'move protect');
+      battle.choose('p1', 'move spikes'); battle.choose('p2', 'move protect');
+      return battle;
+    };
+    const healthy = build();
+    const hurt = build();
+    const benched = hurt.sides[1].pokemon.find(pokemon => pokemon.species.name === 'Lopunny')!;
+    benched.hp = Math.floor(benched.maxhp * 0.10);
+    const evHealthy = evaluatePosition(positionBattle(createRootPosition(serializeBattleStable(healthy))));
+    const evHurt = evaluatePosition(positionBattle(createRootPosition(serializeBattleStable(hurt))));
+    expect(evHurt).toBeGreaterThan(evHealthy);
+  });
+});
+
+const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/regression/fixtures/${name}.json`, import.meta.url), 'utf-8'));
+const SCENE: string = fixture('smogtours-gen4ou-544639').log;
+
+function gen4Stats(): SmogonUsageStats {
+  const payload = fixture('stats-gen4ou-trimmed') as { pokemon: Record<string, { count: number; teammates: Record<string, number> }> };
+  const pokemon: SmogonUsageStats['pokemon'] = {};
+  for (const [name, entry] of Object.entries(payload.pokemon)) {
+    pokemon[name.toLowerCase().replace(/[^a-z0-9]/g, '')] = {
+      species: name, rawCount: entry.count, abilities: [], items: [], moves: [], spreads: [],
+      teammates: Object.entries(entry.teammates).map(([value, probability]) => ({ value, probability, sourceDetail: 'test' })),
+    };
+  }
+  return { format: 'gen4ou', month: 'test', source: 'test', pokemon };
+}
+
+function turnOneScore(usageStats: SmogonUsageStats | null): { score: number; p1: number } {
+  const { p1Team, p2Team } = buildTeamsFromReplay(SCENE, usageStats ? { usageStats } : {});
+  const battle = new Battle({
+    formatid: 'gen4ou' as never, seed: [1, 2, 3, 4],
+    p1: { name: 'p1', team: Teams.pack(p1Team) }, p2: { name: 'p2', team: Teams.pack(p2Team) },
+  });
+  return { score: evaluatePosition(battle), p1: p1Team.length };
+}
+
+describe('turn 1 of smogtours-gen4ou-544639', () => {
+  test('3 bodies against 6 read as a clear loss, 6 against 6 as an even game', () => {
+    const short = turnOneScore(null);
+    expect(short.p1).toBe(3);
+    expect(short.score).toBeLessThan(-0.6);
+    const filled = turnOneScore(gen4Stats());
+    expect(filled.p1).toBe(6);
+    expect(Math.abs(filled.score)).toBeLessThan(0.2);
+  });
+});

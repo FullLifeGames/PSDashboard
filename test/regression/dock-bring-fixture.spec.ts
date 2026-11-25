@@ -5,16 +5,7 @@ import { replayBench } from '../../src/lib/bench';
 import { dockReplays } from '../e2e/helpers';
 import { loggedTurn } from '../e2e/dock-helpers';
 
-/**
- * Round 84 (turn dock), step A6d: the Champions VGC scene that proves a bring-limited bench. `replayBringOnly` pins the bring
- * lists only when BOTH sides fielded all four bodies during the game, and returns null otherwise (by design, for the evaluation:
- * a pinned four against an open six overrates the open side). The first Champions fixture (2625939941) is such a game: the user's
- * side fielded three. Round 88 (T314, #55) filters the bench per side (`replayBench`, src/lib/bench.ts): P2 fielded four, so its
- * bench lists those four, and the list of P1 stays empty when `replayBench` reads the log without a world. Since round 89 (ADR 0024)
- * the rebuild of this game trims both teams: P2 plays its four, P1 plays its three fielded bodies plus the guess of the heaviest
- * world, and the app passes that world to `replayBench`; this spec reads the lists of the log alone. The second fixture (2623421463)
- * pins both sides, so the bench of P2A lists the two brought bodies and leaves the two that stayed home out.
- */
+// `replayBringOnly` pins the bring lists only when BOTH sides fielded all four bodies, and returns null otherwise.
 const byId = (id: string) => dockReplays.find(replay => replay.id === id)!;
 const OPEN = byId('gen9championsvgc2026regma-2625939941');
 const PINNED = byId('gen9championsvgc2026regma-2623421463');
@@ -28,7 +19,7 @@ describe('the Champions VGC fixtures and the bring lists', () => {
     expect(replayBringOnly(OPEN, parseReplayLog(OPEN.log))).toBeNull();
   });
 
-  test('the first fixture still lists the four bodies of P2 on the bench (round 88, T314): without a world the bench is per side', () => {
+  test('the first fixture still lists the four bodies of P2 on the bench: without a world the bench is per side', () => {
     const bench = replayBench(OPEN, parseReplayLog(OPEN.log));
     expect(bench?.lists.p1).toEqual([]);
     expect([...(bench?.lists.p2 ?? [])].sort()).toEqual(['Aerodactyl', 'Farigiraf', 'Kingambit', 'Sylveon']);
@@ -39,7 +30,6 @@ describe('the Champions VGC fixtures and the bring lists', () => {
     expect(pinned).not.toBeNull();
     expect([...pinned!.p2].sort()).toEqual(['Basculegion', 'Blastoise', 'Pelipper', 'Vivillon-Pokeball']);
     expect(pinned!.p1).toHaveLength(4);
-    // P2 has six bodies in the team preview; Sneasler and Sinistcha-Masterpiece stay home, so a bench that lists them is wrong.
     const team = [...PINNED.log.matchAll(/^\|poke\|p2\|([^,|]+)/gm)].map(match => match[1]);
     expect(team).toHaveLength(6);
     expect(team.filter(name => !pinned!.p2.includes(name)).sort()).toEqual(['Sinistcha-Masterpiece', 'Sneasler']);

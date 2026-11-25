@@ -23,45 +23,24 @@ import type {
   CellOutcomeClass, EvalResult, EvalSettings, KoOddsInfo, MctsTreeStats, PlannedCell, SearchProgress, TeraAllowance, UnansweredProfile,
 } from './types.ts';
 
-/**
- * DUCT (decoupled UCT) Monte-Carlo tree search, the engine's tree mode.
- * Both sides select their choice independently via UCB over their own
- * statistics (the correct formulation for simultaneous moves), new leaves
- * are valued by the static eval (no rollouts, foul-play style), and values
- * backpropagate along the joint path. Fully deterministic: chance is fixed
- * per-cell at creation time from the iteration-indexed seed list from the
- * third ply on; the first two plies price chance as nodes over the outcome
- * classes (search/expansion.ts, round 43). The node machinery (creation,
- * the UCB pick, the principal variation, the tree-informed matrix) lives
- * in search/mcts-node.ts.
- */
+// DUCT (decoupled UCT) Monte-Carlo tree search: leaves valued by the static eval, chance fixed per cell.
 
-/** Iterations per tree at the default budget; the budget in force sets them (round 61, search/budget.ts). */
+/** Iterations per tree at the default budget; the budget in force (search/budget.ts) sets the real count. */
 export const MCTS_ITERATIONS = SEARCH_BUDGET_DEFAULT.iterations;
 const PARTIAL_EVERY = 150;
 export { WIDENING_BASE, WIDENING_VISITS_PER_SLOT, wideningWindow } from './search/mcts-node.ts';
 
+/** Progress, partial-result and stop hooks of one search run. */
 export interface MctsCallbacks {
   onProgress?(progress: SearchProgress): void;
   onPartial?(result: EvalResult): void;
   shouldStop?(): boolean;
 }
 
-/** Root per-option kill odds, index-aligned with the node's option lists. */
 type RootKoOdds = { p1: (KoOddsInfo | null)[]; p2: (KoOddsInfo | null)[] };
 
-/**
- * HYBRID SEMANTICS (corpus-gated 2026-08-11): the RANKINGS are the same
- * equilibrium solve the matrix mode runs, over the tree-informed cells —
- * visit counts allocate search effort, they are not the verdict (under
- * hint-ordered widening a hint-anchored move can stay most-visited while
- * the tree's own values refute it: draft t58 Knock Off into a Rest loop).
- * The SCORE keeps the visit-mean formulation — the tree's value
- * information concentrates where its visits went, and the full-delegation
- * equilibrium score measured −1.0 sign on the paired bed (dilution across
- * thin static cells), so the score line stays bit-identical to the
- * standing records while the recommendations upgrade.
- */
+// The RANKINGS are the matrix mode's equilibrium solve over the tree-informed cells; visits allocate effort only.
+// The SCORE keeps the visit mean: the full-delegation equilibrium score diluted across thin static cells.
 function toResult(
   root: Node,
   maxDepth: number,
@@ -82,24 +61,19 @@ function toResult(
   const j = topVisitedIndex(root.p2N);
   const v1 = i >= 0 ? root.p1W[i] / root.p1N[i] : root.value;
   const v2 = j >= 0 ? root.p2W[j] / root.p2N[j] : root.value;
-  // rankedToResult wrote the matrix mode's score; the visit mean replaces it unless EVAL_TREE_SCORE says otherwise (T114).
   result.score = treeScore((v1 + v2) / 2, result.score);
   result.interval = Math.abs(v2 - v1);
   if (result.perSide.p1.length > 0) {
     const line = principalVariation(root);
     if (line.length > 1) result.perSide.p1[0].line = line.slice(1);
   }
-  // Rows are ranked (reordered), so the odds match by choice string and
-  // only real events attach — the shared root-payload contract.
+  // Rows are ranked (reordered), so the odds match by choice string and only real events attach.
   if (koOdds) attachKoOdds(result, koOddsMapsFor(root.p1Options, root.p2Options, koOdds));
-  // Round 13: root narrative payload, same contract as search.ts.
   if (unanswered && hasUnansweredContent(unanswered)) result.unanswered = unanswered;
-  // Round 89 (#108): the order bound of a body that fell before it acted, read once per root like the profile.
   if (playedBounds) result.playedBounds = playedBounds;
   return result;
 }
 
-/** Progress after every iteration; a partial result every PARTIAL_EVERY iterations before the last. */
 function reportIteration(
   callbacks: MctsCallbacks | undefined,
   root: Node,
@@ -116,7 +90,7 @@ function reportIteration(
   }
 }
 
-/** Round 89 (#59, ruling D2): the root quantiles of a tree inside the budget's tree count; a lone tree has no strata to spread, and a tree past the count keeps the stream. */
+// A lone tree has no strata to spread, and a tree past the budget's count keeps the stream.
 function treeQuantiles(serializedBattle: string, seedOffset: number, trees: number | undefined): RootClassBook['quantiles'] {
   if (trees === undefined || trees < 2 || seedOffset < 0 || seedOffset >= trees) return undefined;
   return { salt: positionSalt(serializedBattle), offset: seedOffset, trees };
@@ -143,24 +117,17 @@ function runMcts(
     };
   }
 
-  // Analytic per-option kill odds, computed once at the root (narrative
-  // payload — value pricing is the verify sampler's job).
   const rootBattle = positionBattle(root.position);
   const koOdds: RootKoOdds = {
     p1: koOddsForOptions(rootBattle, 'p1', root.p1Options.map(option => option.choice)),
     p2: koOddsForOptions(rootBattle, 'p2', root.p2Options.map(option => option.choice)),
   };
-  // Round 13: root unanswered-mon profile, once per root like the ko odds.
   const unanswered = unansweredMons(rootBattle, matchupCache);
-  // Round 89 (#108): the order bound of the played turn's fallen bodies, on the root battle, once per root.
   const playedBounds = playedBoundsOf(rootBattle, settings.keepPlayed?.fell);
   const ctx: ExpansionContext = {
     tera, matchupCache, sleepClause: settings.sleepClause,
-    // Round 42: a forced switch after a knock-out is a decision node of the tree; the matrix, verify, play-out and prover resolve it greedily.
-    stopAtForcedSwitch: true,
   };
   const book: RootClassBook = { battle: rootBattle, events: new Map(), keys: new Map(), weights: new Map() };
-  // Round 89 (#59, ruling D2): only a tree inside the budget's tree count spreads its root dice; a lone tree has no strata to spread.
   book.quantiles = treeQuantiles(serializedBattle, seedOffset, trees);
 
   let maxDepth = 1;
@@ -178,7 +145,7 @@ function runMcts(
   return { root, maxDepth, result, koOdds, rootClassKeys: book.keys, rootClassWeights: book.weights, ctx };
 }
 
-/** Round 67 (T129): the tree runs on the board with its bench in canonical order and names its choices in the given board's slots. */
+/** Runs the tree on the board with its bench in canonical order and names its choices in the given board's slots. */
 export function mctsSearch(
   serializedBattle: string,
   settings: EvalSettings,
@@ -197,7 +164,7 @@ function mctsSearchOn(serializedBattle: string, settings: EvalSettings, callback
   return result;
 }
 
-/** One parallel tree's run: root statistics plus its own ranked result (round 67: on the canonical bench, named in the given slots). */
+/** One parallel tree's run: root statistics plus its own ranked result, on the canonical bench in the given slots. */
 export function mctsTreeSearch(
   serializedBattle: string,
   settings: EvalSettings,
@@ -209,15 +176,10 @@ export function mctsTreeSearch(
   return treeToGiven(order, treeSearchOn(order.serialized, settings, seedOffset, callbacksToGiven(order, callbacks)));
 }
 
-/** A rolled cell's classes in the order the cards print them: heaviest first, ties by key. */
 const sortedClasses = (weights: Map<string, number>): CellOutcomeClass[] =>
   [...weights].map(([key, weight]) => ({ key, weight })).sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
 
-/**
- * Round 69 (T178): the outcome classes of a rolled root cell. One event folds in its own order; two events fold in
- * the order one advance of the cell shows (slot 0 of the cell's seed list, round 89); an order the log does not settle gives no
- * classes (the cell still reads events). Analytic weights, summing to 1.
- */
+/** The outcome classes of a rolled root cell (weights sum to 1); an order the log does not settle gives none. */
 export function classesOf(root: Node, p1Choice: string, p2Choice: string, events: CellEvent[]): CellOutcomeClass[] | undefined {
   const first = events.length === 1
     ? events[0].side
@@ -225,13 +187,8 @@ export function classesOf(root: Node, p1Choice: string, p2Choice: string, events
   return first ? sortedClasses(foldClassWeights(events, first)) : undefined;
 }
 
-/**
- * Round 70 (T217): the pair plan's answer for the cells a replay turn's card reads from a doubles root: the played row against
- * every column and every row against the played column (settings.keepPlayed names them; a side whose click is not among the
- * options adds nothing). The luck sentences read the played cell, the hindsight gate the best row's and the played row's cell
- * against the click, the odds clause the same two; a full grid would draw a pair plan for each of some 170 to 300 cells. A
- * cell the plan hands to the plain mean is left out, like a failed singles cell. Undefined without a played side to plan for.
- */
+// The cells a replay turn's card reads: the played row against every column, every row against the played column.
+// A full grid would draw a pair plan for each of some 170 to 300 cells.
 function planPlayedCross(root: Node, settings: EvalSettings): PlannedCell[] | undefined {
   const rowOption = findPlayedOption(root.p1Options, settings.keepPlayed?.p1Slots);
   const columnOption = findPlayedOption(root.p2Options, settings.keepPlayed?.p2Slots);
@@ -256,12 +213,8 @@ function planPlayedCross(root: Node, settings: EvalSettings): PlannedCell[] | un
   return planned;
 }
 
-/**
- * The planner's answer for every cell of a singles root (one calc per damaging pair, the boundary flags of the
- * verify selection) and, round 69 (T178), the cells it answered for with their outcome classes. A cell that failed
- * (a guard tripped) is left out of `plannedCells`. Round 70 (T217): a doubles root has no analytic plan and no boundary
- * list (the pair plan decides it in the verify step); it ships the pair plan's answer for the played cross (planPlayedCross).
- */
+// A failed cell (a guard tripped) is left out of `plannedCells`. A doubles root has no analytic plan or boundary list:
+// the pair plan decides it in the verify step, and it ships the played cross instead.
 function planRootCells(root: Node, settings: EvalSettings): { boundaryCells: number[]; plannedCells: PlannedCell[] | undefined } {
   const battle = positionBattle(root.position);
   if (battle.gameType === 'doubles') return { boundaryCells: [], plannedCells: planPlayedCross(root, settings) };
@@ -292,13 +245,8 @@ function treeSearchOn(
   callbacks?: MctsCallbacks,
 ): MctsTreeStats {
   const { root, maxDepth, result, koOdds, rootClassKeys, rootClassWeights, ctx } = runMcts(serializedBattle, settings, callbacks, seedOffset, searchBudget().trees);
-  // Boundary flags for the merge's verify selection. Analytic only (one
-  // calc per damaging pair, no sim advances) and identical across trees,
-  // and the merge reads trees[0] alone — so only the offset-0 tree pays
-  // the i×j calc scan; sibling trees ship an empty list that nothing reads.
-  // Round 63 (T78): a doubles tree ships no list. The analytic plan gives
-  // up on every combined choice, and the pair plan that prices doubles
-  // cells decides their boundary in the verify step (verify-select.ts).
+  // Boundary flags for the merge's verify selection: analytic, identical across trees, so only offset 0 pays the scan.
+  // A doubles tree ships no list: the pair plan decides its boundary in the verify step (verify-select.ts).
   const doubles = positionBattle(root.position).gameType === 'doubles';
   const { boundaryCells, plannedCells } = seedOffset === 0 && !root.ended && root.p1Options.length > 0 && root.p2Options.length > 0
     ? planRootCells(root, settings)
@@ -307,12 +255,12 @@ function treeSearchOn(
   const sides = positionBattle(root.position).sides;
   const living = { p1: sides[0].pokemon.filter(mon => !mon.fainted).length, p2: sides[1].pokemon.filter(mon => !mon.fainted).length };
   const cells = [...root.children.entries()].map(([key, child]) => cellStats(key, child, rootClassKeys.get(key), rootClassWeights.get(key)));
-  // Round 69 (T64): a single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
+  // A single tree is never merged (mergeMctsTrees returns this result), so it writes its own cell visits.
   if (result.matrix) {
     const visits = new Map(cells.map(cell => [cell.key, cell.visits]));
     result.matrix.cells = matrixCells(root.p1Options.length, root.p2Options.length, key => visits.get(key) ?? 0, undefined, plannedCells);
   }
-  // Round 89 (#104, G14b, option L): everything the result and the merge read is final above; the pass writes below the root only.
+  // Everything the result and the merge read is final above; the pass writes below the root only.
   passAfterResult(root, result, settings, ctx, seedOffset, searchBudget().iterations, callbacks?.shouldStop);
   return {
     p1Options: root.p1Options.map(option => ({ choice: option.choice, label: option.label })),
@@ -329,23 +277,20 @@ function treeSearchOn(
     ...(doubles ? {} : { boundaryCells }),
     ...(plannedCells ? { plannedCells } : {}),
     ...legal,
-    // Round 89 (#104, G12): every root row's lines, against this tree's own top three rows of the other side
+    // Every root row's lines, against this tree's own top three rows of the other side.
     rowLines: rowLines(root, { p1: result.perSide.p1.slice(0, 3).map(row => row.label), p2: result.perSide.p2.slice(0, 3).map(row => row.label) }, undefined, floorLabels(result)),
-    // Root-cell stats for the merged equilibrium (Map order is insertion
-    // order — deterministic under the fixed seed schedule).
+    // Map order is insertion order: deterministic under the fixed seed schedule.
     cells,
     result,
   };
 }
 
-/** Round 67 (T128): both sides' legal choices at a live doubles root, for the answer round (shipped by the offset-0 tree). */
 function rootLegal(root: Node, tera: TeraAllowance): Pick<MctsTreeStats, 'p1Legal' | 'p2Legal'> {
   if (root.ended || root.p1Options.length === 0 || root.p2Options.length === 0) return {};
   const options = (side: 'p1' | 'p2') => legalChoices(root.position, side, { tera }).map(option => ({ choice: option.choice, label: option.label }));
   return { p1Legal: options('p1'), p2Legal: options('p2') };
 }
 
-/** The searched root node itself — for tests that inspect the tree's structure. */
 export function mctsRoot(serializedBattle: string, settings: EvalSettings, seedOffset = 0): Node {
   return runMcts(serializedBattle, settings, undefined, seedOffset).root;
 }

@@ -43,7 +43,6 @@ function turn(serialized: string, p1: string, p2: string, seed: PRNGSeed): strin
   return `${child.serialized}\n${stableLog(log)}`;
 }
 
-/** First 3x3 options with Tera, both seeds: child and log of every turn, plus the layer's report. */
 function turns(position: FixturePosition, levers: readonly SimFastLever[]): { lines: string[]; report: SimFastReport } {
   return withSimFast(levers, () => {
     const root = createRootPosition(position.serialized);
@@ -102,14 +101,13 @@ describe('lever dispatch: the pre-check', () => {
     const [a] = legalChoices(root, 'p1');
     const [b] = legalChoices(root, 'p2');
     advancePositionWithLog(root, a.choice, b.choice, SEEDS[0]);
-    // Clone stays on, dispatch goes off: the next fork copies the on-phase root template, which carries runEventFast as its own runEvent.
+    // Clone stays on and dispatch goes off: the next fork copies the on-phase root template with its runEventFast.
     configureSimFast(['clone']);
     takeSimFastReport();
     const stale = advancePositionWithLog(root, a.choice, b.choice, SEEDS[1]);
     const staleCounters = takeSimFastReport().counters;
     expect(staleCounters).toMatchObject({ ruleTables: 0, dispatchCalls: 0, dispatchAnswered: 0, fallbacks: 0 });
     expect(staleCounters.clones).toBeGreaterThan(0);
-    // Everything off: today's path.
     configureSimFast([]);
     takeSimFastReport();
     const again = advancePositionWithLog(root, a.choice, b.choice, SEEDS[1]);

@@ -11,7 +11,7 @@ The second attempt that ADR 0009 waited for came in another shape and needed non
 The decision of round 89:
 
 - **Deleted.** `CHANCE_NODES`, `CHANCE_MAX_DEPTH`, `TREE_FORCED_CAP`, `GROUP_SEEDS`, `GROUP_MAX_DEPTH`, `groupedDraw`, `search/chance-node.ts`, `groupedChildren` in `search/outcome-children.ts`, the chance branches of `selectAndExpand`, `lineFrom` and `treeMatrix`, `eval-mcts-chance.spec.ts` and the `groupedChildren` rows of two other specs. `cellStats` moved to `search/mcts-node.ts` and writes decision cells only.
-- **Kept.** `classChildren` and `drawChild` in `search/outcome-children.ts` (the endgame solver, the forced-win prover), the class book of the root cells (`singleChild`, `doublesRootChild`), and the merge's reader of `cells[].classes` (`pooledChanceValue`, `classPoolEntry` in `search/merge-pool.ts`) with the optional `classes` field of `MctsTreeStats`. Nothing writes that field any more; its removal is a follow-up that touches the engine's tree statistics type and its specs.
+- **Kept.** `classChildren` and `drawChild` in `search/outcome-children.ts` (the endgame solver, the forced-win prover), and the class book of the root cells (`singleChild`, `doublesRootChild`). The merge's reader of `cells[].classes` (`pooledChanceValue`, `classPoolEntry` in `search/merge-pool.ts`) and the optional `classes` field of `MctsTreeStats` stayed at first, because nothing writes the field and removing it touches the tree statistics type and its specs. Round 90 (#173) deleted both: the merge pools a cell by `keyedCell`, then by the visit pool.
 - **Lossless.** The deleted paths were unreachable, so no score, line or dump moves, and no cache version, protocol or API version changes.
 
 ## Considered options

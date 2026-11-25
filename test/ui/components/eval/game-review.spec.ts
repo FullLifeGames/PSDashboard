@@ -1,20 +1,26 @@
 import { describe, expect, test } from 'vitest';
-import { buildGameReport, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewDiffers, reviewMarks } from '../../../../src/components/eval/game-review';
+import {
+  buildGameReport,
+  winDeltaText,
+  winPctText,
+  type EvalLine,
+  type EvalResult,
+  type SideAnalysis,
+  type TurnAnalysis,
+  lostGround,
+} from '@fulllifegames/eval-engine';
+import { gameReview, gradedTier, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../../fixtures/lines';
 
-/** Round 89 (#104), step G4, ruling 33 (4a): the Game review lists the graded turns only, as the turn cards grade them. */
 const host: LinesHost = { rules: { gen: 9, mod: undefined } };
-/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and Pepitopalotin's Hydro Pump are each side's top choice. */
 const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
 const withLines = (lines?: EvalLine[]): EvalResult => ({
   ...evalResult('singles'), ...(lines ? { lines } : {}), perSide: { p1: topped(['Draining Kiss', 'Surf']), p2: topped(['Hydro Pump', 'Hyper Voice']) },
 });
 
-/** A side that played Hyper Voice where the engine's best was Hydro Pump (the labels of the line fixtures). */
 const gradedP2 = (tier: 'inaccuracy' | 'mistake' | 'blunder', overrides: Partial<SideAnalysis> = {}): SideAnalysis => {
   const best = rankedChoice('move 1', 'Hydro Pump', 0.1);
   const played = rankedChoice('move 2', 'Hyper Voice', -0.24 + (tier === 'inaccuracy' ? 0.3 : 0));
@@ -32,11 +38,10 @@ describe('gradedTier: the turn card\'s own reading of "graded"', () => {
   test('a sack and a read that paid off are shown on the card in place of the regret chip, so they are not graded', () => {
     expect(gradedTier(gradedP2('mistake', { sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBeNull();
     expect(gradedTier(gradedP2('blunder', { riskPaidOff: true }))).toBeNull();
-    // an inaccuracy keeps its chip beside the sack, as the card shows it
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true, sacrifice: { name: 'Kingambit', hpFraction: 0.1, healthy: false } as SideAnalysis['sacrifice'] }))).toBe('inaccuracy');
   });
 
-  test('a read that paid off speaks for an inaccuracy too, unless the side lost ground (round 89, G4d: the report lists the read)', () => {
+  test('a read that paid off speaks for an inaccuracy too, unless the side lost ground (the report lists the read)', () => {
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }))).toBeNull();
     expect(gradedTier(gradedP2('inaccuracy', { riskPaidOff: true }), true)).toBe('inaccuracy');
     expect(gradedTier(gradedP2('inaccuracy'), true)).toBe('inaccuracy');
@@ -96,7 +101,7 @@ describe('gameReview, singles', () => {
     expect(view[1].rows[1].grade).toBe('blunder');
   });
 
-  test('a row reads "played" for a choice and says no choice was shown for a body knocked out before it moved (round 89, X1a part 1)', () => {
+  test('a row reads "played" for a choice and says no choice was shown for a body knocked out before it moved', () => {
     expect(view[1].rows[0].playedText).toBe(`played Hyper Voice ${winPctText(0.06)}`);
     const standIn = rankedChoice('move 2', 'stayed in (KO’d before acting)', -0.24);
     const knockedOut = gameReview({
@@ -124,7 +129,7 @@ describe('gameReview, singles', () => {
   });
 });
 
-describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line (G4b)', () => {
+describe('gameReview: the engine of a row is the turn card\'s engine choice, and its line is that choice\'s line', () => {
   const rowOf = (side: SideAnalysis, lines: EvalLine[], swing = 0.05) => {
     const analyses: (TurnAnalysis | null)[] = [turnAnalysis(1, { p2: side, swing })];
     const view = gameReview({ analyses, results: [withLines(lines)], playerNames: SINGLES_NAMES, doubles: false, host });
@@ -144,7 +149,6 @@ describe('gameReview: the engine of a row is the turn card\'s engine choice, and
     const row = rowOf(gradedP2('mistake', { riskUnpunished: true, safe }), [singlesLine, playedLine]);
     expect(row.engineWord).toBe('safe');
     expect(row.engine).toBe(`Surf ${winPctText(0.02 - 0.2)}`);
-    // the engine's own line belongs to Hydro Pump, which is not the card's choice here
     expect(row.lines.map(line => line.role)).toEqual(['played']);
   });
 
@@ -173,9 +177,8 @@ describe('gameReview, doubles', () => {
       'then Mstr_Hawk replaces: → Zamazenta-Crowned, ' +
       'then pixelfrost: Fake Out → Zamazenta-Crowned + Protect; Mstr_Hawk: Behemoth Bash → Rillaboom + Protect',
     );
-    // the block is the section's own: doubles rows, one per player
     expect(line.block.rows.length).toBeGreaterThan(3);
-    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out (round 89, G16)
+    // the engine's label of a replacement with a slot that passes ends in "+ pass"; the line's words leave it out
     const passing = { ...doublesLine, steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)) };
     const again = gameReview({ analyses, results: [null, null, null, { ...results[3]!, lines: [passing] }], playerNames: DOUBLES_NAMES, doubles: true, host });
     expect(again[0].rows[0].lines[0].text).toContain('then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost');
@@ -196,12 +199,6 @@ describe('gameReview, doubles', () => {
   });
 });
 
-/**
- * Round 89 (#104), G4d: the report page said "read paid off +9%" and, one list below, "inaccuracy −9%" for the same click. The
- * report lists a read from `riskPaidOff` unless the side lost ground, and keeps it off its misplays; the review and the marks
- * read the same two facts through `gradedTier`. The real report is built for every combination, singles (p2) and doubles (both
- * sides graded on one turn).
- */
 describe('the review and the report list one verdict per side', () => {
   const combos = [
     { tier: 'inaccuracy', paid: false }, { tier: 'inaccuracy', paid: true },
@@ -220,7 +217,7 @@ describe('the review and the report list one verdict per side', () => {
       .flatMap(view => view.rows).some(row => row.turn === 2 && row.side === 'p2');
     expect(reviewed, 'rows and marks agree').toBe(marked);
     expect(listedRead && marked, 'a listed read is not graded').toBe(false);
-    // a paid-off read the side did not lose ground on is listed; a graded side is a misplay or an inaccuracy the report does not list as a read
+    // a paid-off read without lost ground is listed; a graded side is a misplay or inaccuracy, not a read
     if (paid && swing < 0) expect(listedRead).toBe(true);
   });
 
@@ -230,8 +227,7 @@ describe('the review and the report list one verdict per side', () => {
   });
 });
 
-/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number; a line that differs from its row is told apart. */
-describe('gameReview: the end of each line beside its row (G10)', () => {
+describe('gameReview: the end of each line beside its row', () => {
   test('singles: each line ends at its own value and knows whether it differs from the row the head prints', () => {
     const analyses: (TurnAnalysis | null)[] = Array.from({ length: 20 }, () => null);
     analyses[19] = turnAnalysis(20, { p2: gradedP2('inaccuracy') });
@@ -241,7 +237,7 @@ describe('gameReview: the end of each line beside its row (G10)', () => {
     const [engine, played] = view[1].rows[0].lines;
     expect(engine.end).toBe(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`);
     expect(played.end).toBe(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`);
-    // the engine row prints 0.1 and the line ends at 0.06 (a different print), the played row 0.06 against a line at -0.24
+    // the engine row prints 0.1 and its line ends at 0.06; the played row 0.06 against a line at -0.24
     expect(engine.block.row).toBe(winPctText(0.1));
     expect(played.block.row).toBe(winPctText(0.06));
     expect(engine.block.differs).toBe(true);
@@ -276,8 +272,7 @@ describe('gameReview: the end of each line beside its row (G10)', () => {
   });
 });
 
-/** Round 89 (#104), step G11 (ruling G8a): the review's line text names the rank of the first answer. */
-describe('gameReview: the answer of each line (G11)', () => {
+describe('gameReview: the answer of each line', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
 
   test('singles: the first answer carries its rank in the result\'s ranking, a later answer does not', () => {
@@ -289,7 +284,6 @@ describe('gameReview: the answer of each line (G11)', () => {
     const [engine, played] = view[1].rows[0].lines;
     expect(engine.text).toBe("Hydro Pump vs Draining Kiss (Tzon's second choice in this search), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
     expect(played.text).toBe("Hyper Voice vs Draining Kiss (Tzon's second choice in this search)");
-    // a result without a ranking names no rank
     results[19] = { ...withLines([singlesLine]), perSide: { p1: [], p2: [] } };
     const bare = gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host });
     expect(bare[1].rows[0].lines[0].text).toBe("Hydro Pump vs Draining Kiss (not among Tzon's ranked choices), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
@@ -308,11 +302,11 @@ describe('gameReview: the answer of each line (G11)', () => {
   });
 });
 
-describe('gameReview: Hard mode (round 89, #153)', () => {
+describe('gameReview: Hard mode', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
   const hard: LinesHost = { ...host, hardMode: true };
   const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
-  /** Surf is the reply the search rates lowest for Hydro Pump: the highest cell of its column in p1's view (0.4, so p2's row reads -0.4). */
+  // Surf is the reply the search rates lowest for Hydro Pump: p1's highest cell of its column, 0.4 (p2's row: -0.4).
   const withMatrix = (lines: EvalLine[]): EvalResult => ({
     ...withLines(lines), perSide: { p1: ranking(['Draining Kiss', 'Surf']), p2: ranking(['Hydro Pump', 'Hyper Voice']) },
     matrix: { p1Labels: ['Draining Kiss', 'Surf'], p2Labels: ['Hydro Pump', 'Hyper Voice'], p1Choices: ['move 0', 'move 1'], p2Choices: ['move 0', 'move 1'], values: [[0.1, 0], [0.4, -0.1]], mixes: { p1: [1, 0], p2: [1, 0] } },
@@ -343,5 +337,28 @@ describe('gameReview: Hard mode (round 89, #153)', () => {
     expect(lines).toHaveLength(1);
     expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
     expect(lines[0].block.worstNote).toBe('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.');
+  });
+});
+
+const best = rankedChoice('move 1', 'Hydro Pump', 0.1);
+const played = rankedChoice('move 2', 'Hyper Voice', -0.05);
+const risk = (tier: 'inaccuracy' | 'mistake', overrides: Partial<SideAnalysis> = {}): SideAnalysis => ({
+  ...sideAnalysis(), played, best, safe: best, regret: 0.15, tier,
+  safeAgainstClick: { against: 'Protect', playedValue: 0.325, safeValue: 0.454 }, ...overrides,
+});
+
+describe('a risk that the safe line matched against the click is graded', () => {
+  test.each(['inaccuracy', 'mistake'] as const)('%s: graded without the read credit', tier => {
+    expect(gradedTier(risk(tier))).toBe(tier);
+  });
+
+  test.each(['inaccuracy', 'mistake'] as const)('%s: with the credit it is no grade', tier => {
+    expect(gradedTier(risk(tier, { riskPaidOff: true }))).toBeNull();
+  });
+
+  test('the review lists the graded side of a turn', () => {
+    const analysis = turnAnalysis(8, { p1: risk('inaccuracy'), p2: sideAnalysis() });
+    expect(gradedSides([analysis]).map(entry => [entry.side, entry.grade])).toEqual([['p1', 'inaccuracy']]);
+    expect(lostGround(analysis, 'p1')).toBe(false);
   });
 });

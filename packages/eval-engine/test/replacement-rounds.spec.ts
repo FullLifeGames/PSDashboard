@@ -1,10 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { replacementRounds } from '../src/replacement-rounds';
+import { createRootPosition, legalChoices } from '../src/forward-model';
+import { reconstructWithPoints } from './replacement-points';
 
-/**
- * Round 79 (T290): the protocol's request rounds on scripted logs: singles, doubles with one and two slots, both sides at once,
- * a replacement that falls to an entry hazard, and the lines that are no replacement (a pivot, the last body of a side).
- */
 
 const log = (...lines: string[]) => lines.join('\n');
 
@@ -56,12 +54,67 @@ describe('replacementRounds', () => {
       '|turn|4', '|switch|p1a: B|Rotom|100/100', '|move|p2a: C|U-turn|p1a: B', '|switch|p2a: D|Zapdos|100/100|[from] U-turn', '|turn|5',
     ))).toEqual([]);
     expect(replacementRounds(log('|turn|9', '|faint|p2a: X', '|win|P1'))).toEqual([]);
-    // A faint left over from the block before does not answer the next block's plain switch.
     expect(replacementRounds(log('|turn|9', '|faint|p2a: X', '|turn|10', '|switch|p2a: Y|Zapdos|100/100'))).toEqual([]);
   });
 
   test('carriage returns do not change the reading', () => {
     const lines = ['|turn|3', '|faint|p2a: B', '|upkeep', '|switch|p2a: C|Toxapex, F|100/100', '|turn|4'];
     expect(replacementRounds(lines.join('\r\n'))).toEqual(replacementRounds(lines.join('\n')));
+  });
+});
+
+describe('onReplacement: the hook at the open request', () => {
+  test('doubles: every point is an open request, read twice with the same bytes', { timeout: 240000 }, async () => {
+    const run = await reconstructWithPoints('gen9doublesou-2694811367');
+    const rounds = replacementRounds(run.replay.log);
+    expect(rounds.length).toBeGreaterThan(0);
+    expect(run.points.length).toBeGreaterThan(0);
+    for (const { point, serialized, serializedAgain } of run.points) {
+      expect(serializedAgain).toBe(serialized);
+      const root = createRootPosition(serialized);
+      for (const side of ['p1', 'p2'] as const) {
+        const choices = legalChoices(root, side).map(option => option.choice);
+        if (point.forced[side].length === 0) expect(choices).toEqual(['wait']);
+        else expect(choices.every(choice => choice.split(', ').some(part => part.startsWith('switch') || part === 'pass'))).toBe(true);
+      }
+    }
+  });
+
+  test('singles: the point names the knockout turn, the slot and the species the replay sent in', { timeout: 240000 }, async () => {
+    const run = await reconstructWithPoints('gen9ou-2658662321');
+    const rounds = replacementRounds(run.replay.log);
+    expect(rounds.length).toBeGreaterThan(0);
+    const first = run.points[0].point;
+    expect(first.turn).toBe(rounds[0].turn);
+    expect(first.ordinal).toBe(0);
+    const side = first.forced.p1.length > 0 ? 'p1' : 'p2';
+    expect(first.forced[side]).toEqual([0]);
+    expect(first.played[side]).toEqual(rounds[0].species[side]);
+  });
+
+  test('the e2e scenes: Toxapex on turn 6 of the OU game, Flamigo and Sylveon together on turn 2 of the doubles game', { timeout: 480000 }, async () => {
+    const singles = await reconstructWithPoints('gen9ou-2658662321');
+    const species = singles.points.map(({ point }) => [point.turn, point.ordinal, ...point.played.p1, ...point.played.p2]);
+    expect(species).toEqual([[6, 0, 'Toxapex'], [11, 0, 'Walking Wake']]);
+    const doubles = await reconstructWithPoints('gen9doublesou-2694811367');
+    const first = doubles.points[0].point;
+    expect([first.turn, first.forced.p2, first.played.p2]).toEqual([2, [0, 1], ['Flamigo', 'Sylveon']]);
+  });
+
+  test('a knockout the simulator does not reproduce is a gap with its cause in the alignment: the default e2e replay', { timeout: 240000 }, async () => {
+    const run = await reconstructWithPoints('replay');
+    expect(run.points).toEqual([]);
+    expect(run.runtime.haxAlignment.find(entry => entry.turn === 3)?.actual.faintMismatches).toBeGreaterThan(0);
+  });
+
+  test.each(['gen9doublesou-2694811367', 'gen9ou-2658662321'])('%s: the hook changes no position', { timeout: 480000 }, async fixture => {
+    const withHook = await reconstructWithPoints(fixture);
+    const without = await reconstructWithPoints(fixture, { hook: false });
+    expect(withHook.points.length).toBeGreaterThan(0);
+    expect(without.points.length).toBe(0);
+    expect([...withHook.positions.keys()]).toEqual([...without.positions.keys()]);
+    for (const [turn, serialized] of without.positions) expect(withHook.positions.get(turn)).toBe(serialized);
+    expect(withHook.final).toBe(without.final);
+    expect(withHook.runtime.log).toEqual(without.runtime.log);
   });
 });

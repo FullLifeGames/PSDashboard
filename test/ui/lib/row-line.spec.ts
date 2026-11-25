@@ -3,10 +3,6 @@ import { formatLine, type EvalLine, type LineChoice, type LineStep } from '@full
 import { rowLineTail } from '../../../src/lib/row-line';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 
-/**
- * Round 89 (LN-4, F1 of LN-3): one card shows one line per row. The ranked row's "then ..." reads the later steps of the line the Lines
- * section shows for the row, not the engine's principal variation, which is read from another tree by another rule.
- */
 const pick = (label: string, slots = 1): LineChoice => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
 const waiting = (slots = 1): LineChoice => ({ choice: 'wait', label: '(waiting)', slots: Array.from({ length: slots }, () => null) });
 const step = (p1: string, p2: string, extra: Partial<LineStep> = {}): LineStep => ({ p1: pick(p1), p2: pick(p2), dice: [], ...extra });
@@ -14,7 +10,6 @@ const lineOf = (side: 'p1' | 'p2', label: string, steps: LineStep[], extra: Part
   ({ side, label, choice: label.toLowerCase(), for: ['engine'], steps, end: 0.1, endFainted: 0.1, visits: 100, ...extra });
 
 describe('rowLineTail', () => {
-  // the 655336 turn 24 shape: the engine's PV reads Roost / High Jump Kick at the third turn, the line (by value) Roost / Encore
   const pv = [{ p1: 'Roost', p2: 'Encore' }, { p1: 'Roost', p2: 'High Jump Kick' }];
   const row = rankedChoice('move dragondance', 'Dragon Dance', 0.234, { line: pv });
   const usual = lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'High Jump Kick'), step('Roost', 'Encore'), step('Roost', 'Encore')]);
@@ -62,7 +57,6 @@ describe('rowLineTail', () => {
     const other = lineOf('p1', 'Roost', [step('Roost', 'Encore'), step('Roost', 'Encore')]);
     expect(rowLineTail(evalResult('singles', { lines: [other] }), 'p1', row, false)).toEqual([]);
     expect(rowLineTail(evalResult('singles', { lines: [lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'Encore')])] }), 'p1', row, false)).toEqual([]);
-    // the other side's line of the same label is not this row's
     expect(rowLineTail(evalResult('singles', { lines: [{ ...usual, side: 'p2' }] }), 'p1', row, false)).toEqual([]);
   });
 

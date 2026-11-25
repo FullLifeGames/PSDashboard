@@ -8,15 +8,8 @@ import { TurnDock } from '../../../../src/components/dock/TurnDock';
 import { pickerFromSerialized, type PickerSource } from '../../../../src/lib/picker-state';
 import { diceBattle, setOf } from '../../fixtures/dice-battle';
 
-/**
- * Round 82 (forced dice), step A7b, moved to the dock in round 84 (A3b): the chips at a viewed replay position. A stored position
- * has its own revived battle (no branch yet), the chips read the log's dice from the replay's lines (`loggedDiceAt`), and the
- * picks go to the draft like any other pick. A position that is only approximated has no battle: once the tray opens "Dice ·
- * What if" the strip says the dice wait for the exact one.
- */
 vi.mock('../../../../src/lib/pokemon-options', () => ({ getMovePool: async () => [] }));
 
-/** What each reader of the log's dice was asked, and what they answer. */
 const read = vi.hoisted(() => ({ logged: [] as unknown[], at: [] as unknown[][], turn: [] as unknown[][] }));
 vi.mock('../../../../src/lib/lazy/branch-engine', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../../src/lib/lazy/branch-engine')>()),
@@ -49,7 +42,6 @@ interface Shown {
   battle: Battle | null; source: PickerSource; replayLog?: string; acquiringExact?: boolean; kind?: keyof typeof BOARDS;
 }
 
-/** The dock over a viewed position: the stored position's state with the draft picks mirrored in, as the app keeps them. */
 async function renderViewed({ battle, source, replayLog, acquiringExact, kind = 'singles' }: Shown) {
   const { state } = await storedPosition(kind);
   const pick: BranchSlotChoice = kind === 'doubles' ? { ...AIR_SLASH, targetLoc: 1 } : AIR_SLASH;
@@ -77,7 +69,6 @@ async function renderViewed({ battle, source, replayLog, acquiringExact, kind = 
 }
 
 const chipLabel = { singles: 'P1', doubles: 'P1A' };
-/** Opens the tray of the slot that holds the pick, then its "Dice · What if" section. */
 async function openDice(kind: keyof typeof BOARDS = 'singles') {
   await userEvent.click(screen.getByRole('button', { name: new RegExp(`^${chipLabel[kind]} `) }));
   await userEvent.click(within(document.querySelector('.ps-tray') as HTMLElement).getByRole('button', { name: /Dice · What if/ }));
@@ -100,11 +91,10 @@ describe('the dock dice chips at a viewed position', () => {
     await openDice();
     const crit = await screen.findByRole('group', { name: 'Crit' });
     expect(within(crit).getAllByRole('button').map(chip => chip.textContent)).toEqual(['Crit · log', 'No crit']);
-    // the log's dice come from the replay's lines, not from a branch's first-turn PRNG
     expect(read.at.some(args => args[1] === 'the replay log')).toBe(true);
     expect(read.turn).toEqual([]);
     await user.click(within(crit).getByRole('button', { name: 'No crit' }));
-    // the crit needs the hit: the panel sets it with the crit (decision 5a)
+    // the crit needs the hit: the panel sets it with the crit
     await waitFor(() => expect(latest.picks.p1[0]?.dice?.map(die => [die.name.kind, die.result])).toEqual([['crit', { happens: false }], ['accuracy', { happens: true }]]));
   });
 

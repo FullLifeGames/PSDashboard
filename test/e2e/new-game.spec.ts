@@ -3,11 +3,6 @@ import { installReplayEmbedCache, routeOfflineFixtures, pickMove, pickSwitch, fi
 import { lightEngine } from './dock-helpers';
 import { copiedGameLink, copiedLink, openInFreshContext, timelineState } from './new-game-helpers';
 
-/**
- * Round 89 (lane H, #105), stage H4: the New game dialog in the browser. A draft-league player pastes two Showdown exports on the
- * start page, picks the format, starts, picks leads (four of six in VGC), plays a turn by hand, opens the game
- * again from the start page's saved list, on its tip. Gen 9 OU and Scarlet/Violet VGC; the engine's turns and the grading are the later stages'.
- */
 test.beforeAll(installReplayEmbedCache);
 
 test.beforeEach(async ({ page }) => {
@@ -46,7 +41,6 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await expect(bar.getByText('New game', { exact: true })).toBeVisible();
   await expect(bar.getByText('[Gen 9] OU')).toBeVisible();
   await expect(bar.getByText('Tidepool')).toBeVisible();
-  // team preview: the lead picker offers both teams in full
   const lead = page.locator('.ps-lead');
   await expect(lead).toBeVisible({ timeout: 60_000 });
   await expect(lead.locator('.ps-lead-side')).toHaveCount(2);
@@ -55,19 +49,15 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await lead.locator('.ps-lead-side').nth(1).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
-  // turn 1 by hand
   await pickMove(page, 'p1a', 'Earthquake');
   await pickMove(page, 'p2a', 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
-  // the turn joined the main line: the tip is no variation, so the bar names none and offers no Discard
   await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
   await expect(page.getByText('Variation moves')).toHaveCount(0);
-  // the game is saved after the finished turn
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
 
-  // the address names the game, so a reload brings it back on its tip (H12a)
   await expect(page).toHaveURL(/[?&]game=newgame-/);
   const gameUrl = page.url();
   await page.reload();
@@ -77,7 +67,6 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
 
-  // the Game menu lists it (third part) and says it is open now; the dialog holds no list
   await page.locator('.ps-loader-toggle').click();
   const menu = page.locator('.ps-loader-panel');
   await expect(menu.getByText('Load replay')).toBeVisible();
@@ -85,7 +74,6 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await expect(menu.locator('.ps-newgame-saved-row')).toHaveCount(1);
   await expect(menu.locator('.ps-newgame-saved-row')).toContainText('open now');
 
-  // a fresh visit without a parameter: the start page lists the saved game under the loader, and Open plays it on its tip
   await page.goto('/');
   const landing = page.locator('.ps-entry-landing');
   await expect(landing.getByText('Saved games')).toBeVisible();
@@ -123,7 +111,6 @@ test('Scarlet/Violet VGC: the picker asks for four of six, the first two lead, t
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9] VGC 2025 Reg I');
 });
 
-/** Picks the leads (and the brought bodies) of a game that asks for them; a format without a team preview starts at turn 1. */
 async function playLeads(page: Page, brings: number | null): Promise<void> {
   const lead = page.locator('.ps-lead');
   await expect(lead.or(page.locator('.ps-dock-chip').first()).first()).toBeVisible({ timeout: 90_000 });
@@ -163,7 +150,6 @@ test('a replay loaded by id names itself in the address and a reload opens it ag
   expect(page.url()).toBe(replayUrl);
   await expect(page.locator('.ps-topbar')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.ps-topbar').getByText(fixtureReplay.players[0], { exact: true })).toBeVisible();
-  // a file load leaves no address behind
   const panel = await openLoader(page);
   await panel.locator('input[aria-label="Load exported replay file"]').setInputFiles(fixturePath('gpl-replay.html'));
   await expect.poll(() => new URL(page.url()).searchParams.has('replay')).toBe(false);
@@ -183,7 +169,6 @@ test('390 px: the top bar keeps its lines with Game, the menu fits the screen, t
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await startGame(page, null, ['Tidepool', 'Marrowkid']);
-  // saved at once (D-E1) and named in the address, with no lead played
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
   await expect(page).toHaveURL(/[?&]game=newgame-/);
   await page.reload();
@@ -201,28 +186,20 @@ test('390 px: the top bar keeps its lines with Game, the menu fits the screen, t
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   await expect(panel.locator('.ps-newgame-saved-row')).toContainText('open now');
   await page.keyboard.press('Escape');
-  // a fresh visit: the saved game stands on the start page
   await page.goto('/');
   const landing = page.locator('.ps-entry-landing');
   await expect(landing.locator('.ps-newgame-saved-row')).toHaveCount(1);
   expect(await noSideways()).toBe(true);
 });
 
-/**
- * Round 89 (H4h), the layout findings of the wave-tester: the open format list brings its footnote into the dialog's view, Start
- * stays in view while two long problem lists scroll the dialog, the menu of 20 saved games scrolls inside the window, and the
- * title's "New game" tag keeps its words at 390 px while the format tag gives way.
- */
-test('the Game menu copies a game\'s link at Team Preview and on the main line; a knockout turn waiting for its replacement is no variation (H7)', async ({ page, browser }) => {
+test('the Game menu copies a game\'s link at Team Preview and on the main line; a knockout turn waiting for its replacement is no variation', async ({ page, browser }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1366, height: 768 });
-  // P2's bodies are level 1: P1's first move knocks out its lead, and the replacement is asked for before the turn is finished
   const level1 = SIX.map(name => `${name}\nLevel: 1\nEVs: 4 HP\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
   await startGame(page, null, ['Tidepool', 'Marrowkid'], [team(SIX), level1]);
   const lead = page.locator('.ps-lead');
   await expect(lead).toBeVisible({ timeout: 60_000 });
 
-  // Team Preview: the link names the game, no entry, no branch; a fresh browser opens it at Team Preview
   const preview = await copiedGameLink(page);
   expect(preview.payload).toMatchObject({ kind: 'game', entries: [], view: { t0: true } });
   expect(preview.payload.variation).toBeUndefined();
@@ -231,17 +208,15 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   await expect(fresh.page).toHaveURL(/[?&]game=newgame-/);
   await fresh.close();
 
-  // leads, then a first turn that knocks out P2's lead
   await lead.locator('.ps-lead-side').nth(0).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-lead-side').nth(1).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
   await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
   await pickMove(page, 'p1a', 'Earthquake');
-  // not Protect: it would stop the Earthquake, and no one would faint (CI run 43440698616 read that turn: both Garchomps at 100 %)
+  // not Protect: it would stop the Earthquake, and no one would faint (both Garchomps would stay at 100 %)
   await pickMove(page, 'p2a', 'Return');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText(/fainted! Choose who to send in/)).toBeVisible({ timeout: 90_000 });
-  // the turn waits for its replacement: no variation chrome, and a link copied now holds the main line without the pending turn
   const noChrome = async () => {
     await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
     await expect(page.getByRole('group', { name: 'Line selector' })).toHaveCount(0);
@@ -255,7 +230,6 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   expect(pending.payload.entries).toHaveLength(1);
   expect(pending.payload.view).toMatchObject({ line: 'main' });
 
-  // a reload while the replacement is pending keeps the played turn (H8): the game stands where it stood, the replacement still to pick
   const position = async () => (await page.locator('body').innerText()).match(/T\d+\/\d+/)?.[0];
   const before = await position();
   expect(before).toBeTruthy();
@@ -267,7 +241,6 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   expect(reloaded.payload.variation).toBeUndefined();
   expect(reloaded.payload.entries).toHaveLength(1);
 
-  // the replacement joins the turn to the main line; the link now holds the turn and its replacement
   await pickSwitch(page, 'p2a', 'Gengar');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
@@ -295,7 +268,6 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   await expect.poll(within).toBe(true);
   await page.keyboard.press('Escape');
 
-  // two teams of banned bodies: each box lists many problems, and the window is short
   await page.setViewportSize({ width: 1400, height: 560 });
   const banned = ['Mewtwo', 'Koraidon', 'Miraidon', 'Zacian', 'Eternatus', 'Arceus'].map(name => `${name}\n- Protect\n- Earthquake\n- Return\n- Substitute`).join('\n\n');
   await dialog.getByRole('textbox', { name: 'Player 1 team' }).fill(banned);
@@ -304,7 +276,6 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   await expect(dialog.getByRole('button', { name: 'Start' })).toBeInViewport();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
 
-  // the menu of 20 saved games
   await page.setViewportSize({ width: 1400, height: 900 });
   await startGame(page, null, ['Tidepool', 'Marrowkid']);
   await page.evaluate(() => {
@@ -322,7 +293,6 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   const panelBox = await panel.boundingBox();
   expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(900);
   expect(await panel.evaluate(element => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY === 'auto')).toBe(true);
-  // the last row's Open is under the pointer once the panel is scrolled to its end: the workspace column does not clip it (tester, H7)
   await panel.evaluate(element => { element.scrollTop = element.scrollHeight; });
   const lastOpen = panel.locator('.ps-newgame-saved-row').last().getByRole('button', { name: 'Open' });
   await expect(lastOpen).toBeVisible();
@@ -333,7 +303,6 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   })).toBe(true);
   await page.keyboard.press('Escape');
 
-  // 390 px: the tag keeps its words beside a long format name (VGC's)
   await page.setViewportSize({ width: 390, height: 844 });
   await startGame(page, { search: 'VGC 2025 Reg I', name: '[Gen 9] VGC 2025 Reg I' }, ['Tidepool', 'Marrowkid']);
   const tag = page.locator('.ps-topbar .ps-newgame-tag');
@@ -341,12 +310,6 @@ test('layout: the format list, Start under long problem lists, the 20-game menu 
   expect(await tag.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
-/**
- * H6: one whole game per family, the way a draft-league player plays it: paste both teams, Start, pick the leads (four of six in VGC),
- * a turn by hand, a turn the engine fills (the dock's own fill, light engine settings), the slider's end growing by one per turn, a
- * variation at turn 1 whose link a fresh browser opens, the way back to the main line with the replace confirm, Analyze game on the
- * result, the save, and the reload and the saved list that bring the game back on the same turn.
- */
 interface GameKind {
   name: string;
   format: { search: string; name: string } | null;
@@ -381,14 +344,12 @@ for (const kind of GAME_KINDS) {
     const atStart = await sliderOf(page);
     expect(atStart.value).toBe(atStart.max);
 
-    // turn 1 by hand: every slot protects, so the turn cannot end the game
     for (const slot of kind.slots) await pickMove(page, slot, 'Protect');
     await page.locator('.ps-dock .ps-execute-btn').click();
     await expect(page.getByText('T2/')).toBeVisible({ timeout: 120_000 });
     await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
     expect(await sliderOf(page)).toEqual({ value: atStart.max + 1, max: atStart.max + 1 });
 
-    // turn 2 by the engine: the dock fills the untouched chips, Execute plays them
     for (const slot of kind.slots) await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 300_000 });
     await page.locator('.ps-dock .ps-execute-btn').click();
     await expect(page.getByText('T3/')).toBeVisible({ timeout: 300_000 });
@@ -397,7 +358,6 @@ for (const kind of GAME_KINDS) {
     const mainTip = atStart.max + 2;
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.turns)).toBe(2);
 
-    // a variation at turn 1: the main line keeps its length
     await moveTimeline(page, 1);
     await startVariationAt(page, 1);
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
@@ -405,7 +365,6 @@ for (const kind of GAME_KINDS) {
     await expect(page.getByRole('button', { name: 'Discard variation' })).toBeVisible();
     expect((await sliderOf(page)).max).toBe(mainTip);
 
-    // its link opens the same main line and branch in a fresh browser
     const sharer = await timelineState(page);
     const link = await copiedLink(page);
     const fresh = await openInFreshContext(browser, link);
@@ -418,7 +377,6 @@ for (const kind of GAME_KINDS) {
       await fresh.close();
     }
 
-    // back to the main line and its tip; a turn played there replaces the variation after the confirm and joins the main line
     await page.locator('.ps-line-chip button', { hasText: 'Main line' }).click();
     await moveTimeline(page, mainTip);
     await expect(page.getByText(`T${mainTip}/`)).toBeVisible();
@@ -432,7 +390,6 @@ for (const kind of GAME_KINDS) {
     await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
     expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
 
-    // Analyze game grades the played turns
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     await expect(panel.locator('button', { hasText: 'Re-analyze' })).toBeVisible({ timeout: 600_000 });
@@ -445,7 +402,6 @@ for (const kind of GAME_KINDS) {
     await panel.locator('.ps-eval-graph rect[data-turn="1"]').click();
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
 
-    // saved after every finished turn, three of them; the address names the game and a reload brings it back on its tip
     await expect.poll(() => page.evaluate(() => {
       const row = JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0];
       return row ? `${row.turns} ${row.formatName}` : null;
@@ -456,7 +412,6 @@ for (const kind of GAME_KINDS) {
     await expect(page.getByText(`T${mainTip + 1}/`)).toBeVisible({ timeout: 120_000 });
     expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
 
-    // and the start page's saved list opens it on the same turn
     await page.goto('/');
     const row = page.locator('.ps-entry-landing .ps-newgame-saved-row');
     await expect(row).toHaveCount(1);

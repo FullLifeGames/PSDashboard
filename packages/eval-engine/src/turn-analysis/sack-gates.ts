@@ -7,24 +7,13 @@ import {
 } from './types.ts';
 import { rulesOfActives } from './rules.ts';
 
-/**
- * The sack gates of one side's grading (round 63, T17 and T135; round 79 moved them out of grading.ts): whether a fallen body
- * was fed on purpose, through the stayed-feed floor gate, the hazard gate or the shape gates, and the windowed payoff behind
- * them. grading.ts turns the gates into the verdict band. Pure.
- */
-
-/** The best own-perspective outcome over a floor inside a chain, and the chain index where it peaked. */
 export interface WindowPayoff {
   payoff: number | null;
   /** Index of the first peak (0 = the turn itself). */
   payoffTurn: number;
 }
 
-/**
- * The payoff loop both the stayed-feed gate and the risk booking run: the
- * BEST expected outcome within the window over a guarantee (null entries
- * skipped) — a setup turn's value arrives on the turns after it.
- */
+/** The best expected outcome in the window over a guarantee (null entries skipped); a setup turn pays later. */
 export function bestWindowPayoff(chain: (number | null | undefined)[], key: Side, floor: number): WindowPayoff {
   let payoff: number | null = null;
   let payoffTurn = 0;
@@ -40,13 +29,7 @@ export function bestWindowPayoff(chain: (number | null | undefined)[], key: Side
   return { payoff, payoffTurn };
 }
 
-/**
- * A stayed feed's windowed payoff over the safe guarantee — only when the
- * realized outcome landed on the played line's priced floor (the player
- * accepted the known worst case and got it — the turn's own rolls
- * contributed nothing positive; 573756 t68). Null when the floor gate
- * fails or no safe line exists.
- */
+// Only when the realized outcome landed on the played line's priced floor (the worst case was accepted and came).
 function stayedFeedPayoff(
   params: AnalyzeTurnParams,
   key: Side,
@@ -63,39 +46,19 @@ function stayedFeedPayoff(
   return bestWindowPayoff(chain, key, safe.worstCase).payoff;
 }
 
-/**
- * The body's own action failed by dice while its move carried a knock-out:
- * a hit would have kept it alive, so nobody fed it (573756 t73, round 40).
- * Without knock-out odds on the played line the feed reading stands. A
- * doubles option's odds (round 56) carry a label and may be the partner
- * slot's: they count as none until the odds name their attacker.
- */
+// The body's action failed by dice while its move carried a knock-out: a hit would have kept it alive.
+// A doubles option's odds may be the partner slot's: they count as none until the odds name their attacker.
 function deniedByDice(sack: SackInfo, played: RankedChoice | null): boolean {
   const odds = played?.koOdds;
   return sack.rolled !== undefined && !!odds && !odds.label && odds.killFraction > 0;
 }
 
-/** What the sack gates decided: whether the leniency applies and, for a stayed feed, its windowed payoff. */
 export interface SackGate {
   sackApplies: boolean;
   feedPayoff: number | null;
 }
 
-/**
- * Shape gates: low-HP applies unconditionally; healthy only while
- * decisively ahead on both sides of the sack (trading surplus material
- * for certainty, GPL T35 Salazzle — expectation-based, not results-based:
- * both gates read engine scores, and no after-score means no excuse, so
- * game ends and gap turns fail closed); a stayed feed only when the
- * realized outcome landed on the played line's priced floor AND the
- * windowed payoff over the safe guarantee clears the read margin (573756
- * t68). Fails closed. Before any shape: a body whose own action the dice
- * failed while its move carried a knock-out was not fed — a hit would have
- * kept it alive (573756 t73, round 40) — so no shape applies. Round 67
- * (T135, rule A): every own faint of the turn passes its own gate, so a
- * plain loss (no shape) or a body behind a stricter gate that fails blocks
- * the leniency (a low-HP feed is cheap, a partner lost next to it is not).
- */
+/** The sack gate of a side: every own faint of the turn must pass its own gate; no after-score fails closed. */
 export function sackGate(
   params: AnalyzeTurnParams,
   key: Side,
@@ -109,10 +72,9 @@ export function sackGate(
   return { sackApplies: true, feedPayoff: gates.find(gate => gate!.feedPayoff !== null)?.feedPayoff ?? null };
 }
 
-/** Round 67 (T135, rule A): every own faint of the turn, the side's sack first; null = a plain loss with no sack shape. */
+// null = a plain loss with no sack shape.
 const turnFaints = (sack: SackInfo): (SackInfo | null)[] => [sack, ...(sack.others ?? [])];
 
-/** One fallen body's shape gate (sackGate above), with a stayed feed's windowed payoff. */
 function shapeGate(
   params: AnalyzeTurnParams,
   key: Side,
@@ -133,19 +95,8 @@ function shapeGate(
   return { sackApplies: true, feedPayoff: null };
 }
 
-/**
- * Round 63 (T17): a hazard sack's windowed payoff over the safe guarantee —
- * only when the rolls after the pair added nothing: no roll of the turn went the
- * side's way (653785 t19: −0.05). The switch-in's death already sits in the
- * pair's cell (the attack aimed at it hits nothing), so the floor gate of a
- * stayed feed cannot apply. Round 79: the luck is read from the dice
- * (`rolledFor`, turn-analysis/luck.ts), not from the after score over the pair's
- * value. Since T287 the pair is priced by the root's own cell, and the gap to
- * the next root is the difference of two searches, no die (t19: +0.138 with
- * nothing random on the turn). Without the turn's rolls the score test stays:
- * own after-score at most FEED_FLOOR_EPSILON over the pair's value. Null when
- * the gate fails.
- */
+// Only when no roll went the side's way (`rolledFor`, luck.ts): the switch-in's death already sits in the pair's cell,
+// so the gap to the next root is two searches, no die. Without the rolls the score test stays (FEED_FLOOR_EPSILON).
 function hazardSackPayoff(
   params: AnalyzeTurnParams,
   key: Side,
@@ -163,13 +114,7 @@ function hazardSackPayoff(
   return bestWindowPayoff(chain, key, safe.worstCase).payoff;
 }
 
-/**
- * Round 63 fix: the fed body is the one the opponent's near-decided click
- * removes — the opponent's way into its sweep, so letting it fall is no
- * win-condition sacrifice (649664 t20: Medicham-Mega one sure KO from
- * clearing the rest by removing Lopunny-Mega, the body BKC fed). Formes of
- * one species are one body (Lopunny and Lopunny-Mega), read from the Dex.
- */
+// The opponent's near-decided click removes the fed body: its way into the sweep, so letting it fall is no sacrifice.
 function feedsOpposingSweep(params: AnalyzeTurnParams, key: Side, sack: SackInfo): boolean {
   const near = params.result.unanswered?.nearDecided;
   if (!near || near.side === key || !sack.species) return false;
@@ -188,16 +133,7 @@ export interface SackGrade {
   rolledFor: { p1: boolean; p2: boolean } | undefined;
 }
 
-/**
- * Round 63 (T17): praise without a band. An UNTIERED side earns the
- * sacrifice stamp only in the two verified forms — a stayed feed through
- * the priced-floor gate (573756 t68) or a hazard sack through the
- * luck-after-the-pair gate (653785 t19) — and only when the window repaid
- * the regret with the read margin on top. Low-HP and healthy faints stay
- * leniencies for tiered turns; a phantom stay-in has no choice to praise,
- * and an already-lost position earns no praise (the gamble credit's bound).
- * Round 67 (T135, rule A): every own faint of the turn must earn it.
- */
+/** Praise for an untiered side: a stayed feed past the floor gate or a hazard sack repaying the regret plus margin. */
 export function praisedSack(
   params: AnalyzeTurnParams,
   key: Side,
@@ -208,7 +144,6 @@ export function praisedSack(
   return turnFaints(g.sack).every(shape => praisedFaint(params, key, shape, g, g.regret!));
 }
 
-/** One fallen body's praise form: a stayed feed through the floor gate or a hazard sack, repaying the regret with the margin. */
 function praisedFaint(
   params: AnalyzeTurnParams,
   key: Side,

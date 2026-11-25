@@ -10,12 +10,6 @@ import { END_IDS, END_ROWS, endBoard, present } from './dice-ability-support';
 import { playClicks, sweepSelection } from './dice-fixtures';
 import { critsOf, dexOfRules, forcedOn, missesOf, monOf, newTally, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, turnLines } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A4: the dice of the end of the turn. The simulator runs the Residual event of every body after
-// the moves: Shed Skin sheds a status, Harvest brings a berry back, Healer cures an ally (one draw for each statused ally, the
-// die is named by the holder and the ally), and Gen 2 thaws a frozen body. A future move (Future Sight, Doom Desire) lands in
-// the end-of-turn handling two turns after its use and draws its accuracy, crit and damage roll there; those dice carry the
-// move's own name, like the dice of any hit. Every die, in every rule set the Dex gives it, singles and doubles, forced to
-// happen and not to, on three seeds; the witness is the protocol line the effect writes.
 await loadSimMods('gen9championsou');
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -52,8 +46,6 @@ describe.each(SWEEP_CASES)('the end of the turn: $name', ({ rules, mode, name })
 
     test('a holder with nothing to do draws no die', () => {
       const idle = endBoard(rules, mode, row);
-      // the position the handler waits for is taken away: no status to shed or cure, and sunshine for Harvest (it draws every turn
-      // but a sunny one, whether or not a berry waits)
       if (row.id === 'shedskin' || row.id === 'frz') monOf(idle, 'p1a').clearStatus();
       if (row.id === 'healer') monOf(idle, 'p1b').clearStatus();
       if (row.id === 'harvest') idle.field.setWeather('sunnyday', monOf(idle, 'p1a'));
@@ -69,7 +61,6 @@ describe.each(SWEEP_CASES)('the end of the turn: $name', ({ rules, mode, name })
   });
 });
 
-/** Plays `turns` turns of the same clicks on a copy of the board. */
 function after(board: Battle, clicks: { p1: string; p2: string }, turns: number): Battle {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -86,7 +77,6 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
     const clicks = sweepClicks(mode, move.target);
     const label = dex.moves.get(move.id).name;
 
-    /** The turns it takes the move to land: the first turn whose lines end the move's condition on the target. */
     function landing(): number {
       const copy = after(sweepBoard(rules, move.id, mode), clicks, 0);
       for (let turn = 1; turn <= 4; turn++) {
@@ -109,13 +99,11 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
           const { report, battle, start } = forcedOn(ready, clicks, [accuracy]);
           tally.cases++;
           const shown = report.forced[0];
-          // Gens 2 to 4 and the moves that cannot miss draw no accuracy: the report says so, and the protocol shows no miss
           if (shown.took === 'no-draw') {
             tally.noDraw++;
             expect(missesOf(battle, start, 'p2a'), `${rules.name} ${move.id}: ${why(shown)}`).toBe(0);
             continue;
           }
-          // a move of 100 percent cannot be made to miss: the draw runs and the report says no-chance, the protocol shows the hit
           if (shown.took === 'no-chance' && !happens) {
             expect(shown.chance, why(shown)).toBe(1);
             expect(missesOf(battle, start, 'p2a')).toBe(0);
@@ -148,7 +136,7 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
       }
       const withCrit = lost([hit, crit(true)]);
       const withoutCrit = lost([hit, crit(false)]);
-      // Gens 2 to 4 land a future move as typeless damage with no crit: the die is never drawn and the protocol shows none
+      // Gens 2 to 4 land a future move as typeless damage with no crit: its die is never drawn
       const critDrawn = withCrit.took[1] !== 'no-draw';
       const low = lost(critDrawn ? [hit, crit(false), roll(0)] : [hit, roll(0)]);
       const high = lost(critDrawn ? [hit, crit(false), roll(genShape(rules.generation).roll.steps - 1)] : [hit, roll(genShape(rules.generation).roll.steps - 1)]);
@@ -160,7 +148,6 @@ describe.each(SWEEP_CASES)('the future moves: $name', ({ rules, mode, name }) =>
       } else {
         expect(rules.generation, `${move.id} draws no crit before Gen 5`).toBeLessThan(5);
         expect(withCrit.crits, 'no crit shows').toBe(0);
-        // the same landing draws no damage roll either: the damage is fixed
         expect(low.took.slice(1), 'no roll is drawn').toEqual(['no-draw']);
         expect(high.hp, 'the damage does not move with the roll').toBe(low.hp);
         tally.noDraw++;

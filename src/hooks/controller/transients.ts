@@ -8,7 +8,6 @@ export interface PlayOutState {
   turns: number;
   startTurn: number;
   prevAuto: boolean;
-  /** Round 88 (T347, #83): Stop was pressed with a turn in flight; the run ends when that turn landed. */
   stopping?: { text: string; navigated: boolean } | null;
 }
 
@@ -17,54 +16,23 @@ export interface PendingConfirm {
   proceed: () => void;
 }
 
-/**
- * Per-position interaction state that dies with the previous replay:
- * the play-out run, its notice, draft choices, and the inline confirm.
- *
- * Mirrors for the play-out state and its stop: user navigation while the
- * engine plays must STOP the run — the loop only advances while the
- * pointer sits on the live tip, so a silent stall with "Engine is
- * playing…" frozen was the alternative. Internal navigations (tip-follow,
- * the finish's move to the frame's turn) keep the run alive.
- */
+/** User navigation while the engine plays stops the run; internal navigations (tip-follow, finish) keep it alive. */
 export function useTransients(replayId: string | undefined) {
   const playOutRef = useRef<{ active: boolean; stopping?: { navigated: boolean } | null } | null>(null);
   const stopPlayOutRef = useRef<((opts?: { navigated?: boolean }) => void) | null>(null);
 
-  // ── "Let it play out": the engine plays BOTH sides' top choice from the
-  // current position until the game ends, the user stops, or the safety cap
-  // trips. Each executed turn is a normal history entry — navigable,
-  // evaluable, truncatable like anything else; Stop keeps what was played.
   const [playOut, setPlayOut] = useState<PlayOutState | null>(null);
-  /** Why the last play-out ended + where watching it starts (panel notice). */
   const [playOutNotice, setPlayOutNotice] = useState<{ text: string; watchTurn: number } | null>(null);
   const playOutProcessedRef = useRef<EvalResult | null>(null);
-  /**
-   * The lead picker's complete selection while the turn 0 view shows it (null otherwise): "Let it play out" starts
-   * from the leads on screen (round 77, C2).
-   */
   const leadPicksRef = useRef<LeadSelection | null>(null);
   const setLeadPicks = useCallback((picks: LeadSelection | null) => { leadPicksRef.current = picks; }, []);
-  /**
-   * "Fast play-out": every evaluation of a run uses the depth-1 matrix
-   * instead of the Auto line. A session option the user ticks on purpose —
-   * never stored, and it survives a replay change like any other choice
-   * the user made for this session.
-   */
+  /** Session option, never stored; it survives a replay change. */
   const [fastPlayOut, setFastPlayOut] = useState(false);
 
-  /**
-   * Draft choices for positions WITHOUT the live sim (variant B pickers):
-   * collected here, executed via requestDeviation → rebuild → executeTurn.
-   * Cleared on every navigation — a draft belongs to one position.
-   */
+  /** Draft choices for positions without the live sim; cleared on every navigation. */
   const [draftChoices, setDraftChoices] = useState<{ p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] }>({ p1: [], p2: [] });
-  /** Inline confirm for main-line deviations that would replace the variation. */
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
-  // The transient interaction state dies with the previous replay —
-  // render-phase adjustment on the replay id (the react-hooks gate forbids
-  // plain setState resets inside the load-sync effect).
   const [transientsReplayId, setTransientsReplayId] = useState(replayId);
   if (transientsReplayId !== replayId) {
     setTransientsReplayId(replayId);

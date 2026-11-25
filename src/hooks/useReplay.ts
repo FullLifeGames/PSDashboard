@@ -12,24 +12,17 @@ export interface ReplayState {
   error: string | null;
   replayData: ReplayData | null;
   snapshots: TurnSnapshot[];
-  /** Clean damaging hits observed in the protocol — spread inference input. */
   observations: DamageObservation[];
-  /** Proven same-turn move order — hard speed constraints for the solver. */
   speedOrders: SpeedOrderObservation[];
-  /** Effectiveness readings of typeless Hidden Power hits — type evidence. */
   hpEvidence: HiddenPowerEvidence[];
   p1Info: OpponentTeamInfo | null;
   opponentInfo: OpponentTeamInfo | null;
-  /**
-   * The damage judge (round 67, T130), loaded with the inference: the enrichment
-   * reads the infos' logged hits with it, so both arrive in one render.
-   */
+  /** Loaded with the inference, so the enrichment reads the logged hits with it in the same render. */
   itemJudge: ItemDamageJudge | null;
-  /** Round 89 (#105): the replay came by link or id, so the address can name it (`?replay=`); a file or a game has no such address. */
+  /** The replay came by link or id, so the address can name it (`?replay=`); a file or a game has no such address. */
   byLink: boolean;
 }
 
-/** Load outcome for callers that need to react (embed host responses). */
 export interface LoadReplayResult {
   data: ReplayData | null;
   error: string | null;
@@ -54,7 +47,6 @@ export function useReplay() {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
       const data = await task();
-      // The Champions mod registers before the inference reads the Champions Dex (round 75, T160).
       await loadReplayMods(data);
       const [{ parseReplayLogWithObservations }, { inferOpponentTeam, judgeItemsByDamage }] = await Promise.all([
         import('../lib/lazy/protocol-parser'),

@@ -4,13 +4,8 @@ import type { IssueReport } from '../lib/support-state';
 const STEP_STYLE = { fontSize: 12, color: '#cdd', margin: '0 0 8px' } as const;
 const ACTION_STYLE = { display: 'inline-block', textDecoration: 'none', marginBottom: 14 } as const;
 
-/**
- * Round 77 (user request 28.10.2026): "Report issue" opens this dialog instead of a tab and a download
- * of its own. The user downloads the state file and opens the filled issue form, each with one click.
- */
 export function ReportIssueDialog({ report, game = false, onDownload, onClose }: {
   report: IssueReport;
-  /** Round 89 (#105, H7): a new game has no Showdown replay; the file holds the game. */
   game?: boolean;
   onDownload: () => void;
   onClose: () => void;

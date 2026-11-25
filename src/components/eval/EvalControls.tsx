@@ -50,14 +50,8 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
   );
 }
 
-/**
- * The panel header: title, the engine link, Tera, and the Evaluate/Cancel entry. Round 89 (ruling 49): "Always on" shares the row with the title,
- * the engine link and Tera at the right column's desktop width (380 px, see `.ps-eval-controls` in eval-panel.css); a narrower column wraps it.
- * Depth and Samples left the header for the Setup menu (`SearchSelects`); the header imports nothing of them.
- */
 export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
-  /** Round 77: the engines on offer; another engine than the own search decides its own depth. */
   engines?: EngineChoice;
   showTera: boolean;
   onEvaluate?: () => void;
@@ -69,7 +63,6 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
   const engineNote = external ? `Estimate from ${engines.selected.name}.` : 'Built-in engine: it plays the turns in the simulator.';
   return (
     <div className="ps-eval-controls">
-      {/* Round 89 (FB-1): the engine's description left the layout; it is the title of the heading and of the Engine select. */}
       <span className="ps-eval-controls-title" title={engineNote}>Evaluation</span>
       {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
       {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}

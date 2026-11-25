@@ -1,16 +1,9 @@
-/* Eval panel: win bar, ranked choices, game graph, turn analysis, game report, progress, and the play-out spinner (EvalPanel, EvalGraph, EvalTurnAnalysis, EvalGameReport, PlayOutBar, components/eval/). */
-
-/* ----- Evaluation panel ----- */
 .ps-eval-panel {
-  /* Round 77 (user request 28.10.2026): the panel's top edge lines up with the top bar's. */
   margin-top: 0;
-  /* Combined doubles labels and PV lines must wrap inside the column —
-     never widen the panel past its grid track. */
+  /* Combined doubles labels and PV lines must wrap inside the column, never widen the panel past its grid track. */
   overflow-wrap: anywhere;
   min-width: 0;
 }
-/* Round 89 (ruling 49): the header of the panel (EvalControls) in one row at the column's desktop width; the title keeps the left edge and the controls
-   stand to its right. A narrower column wraps the controls under the title. */
 .ps-eval-controls {
   display: flex;
   align-items: center;
@@ -18,9 +11,8 @@
   gap: 4px;
   margin-bottom: 6px;
 }
-/* The checkbox's own margin (about 7 px) would push "Always on" under the title at 380 px: the label's gap already spaces it. */
+/* The checkbox's own margin (about 7 px) would push "Always on" under the title at 380 px. */
 .ps-eval-controls input[type='checkbox'] { margin: 0; }
-/* A select as wide as its chosen option, not its longest one (Tera: "Auto" against "Revealed"); a browser without the property keeps the longest. */
 .ps-eval-controls select { field-sizing: content; }
 .ps-eval-controls-title {
   margin-right: auto;
@@ -84,8 +76,6 @@
   font-size: 11px;
   padding: 3px 6px;
 }
-/* Engine lines speak in the panel's muted dark-theme palette — the standard
-   blue button gradient drowns it. Dark chip styling keeps it readable. */
 button.ps-eval-choice,
 .ps-eval-report-moment,
 .ps-eval-inline-btn {
@@ -103,8 +93,6 @@ button.ps-eval-choice:hover,
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  /* Doubles labels are long — the numbers block drops below rather than
-     forcing the panel wide. */
   flex-wrap: wrap;
 }
 .ps-eval-line {
@@ -144,7 +132,6 @@ button.ps-eval-choice:hover,
   line-height: 1.45;
   color: #bcd;
 }
-/* Round 80 (T294): the turn card's summary opens from this line. */
 .ps-eval-analysis-toggle {
   align-self: flex-start;
   background: none;
@@ -162,14 +149,11 @@ button.ps-eval-choice:hover,
   cursor: default;
   opacity: 0.6;
 }
-/* Round 89: the Lines section's body under its toggle (the title moved to the toggle). */
 .ps-eval-lines-body { display: flex; flex-direction: column; gap: 4px; }
-/* Round 84 (A7f): the history panel's toggle carries the panel's heading size. */
 .ps-history-toggle {
   font-size: 13px;
   font-weight: bold;
 }
-/* Round 84 (A7i): the toggle and the Save / Share buttons share one line; at a phone width the buttons wrap below the toggle. */
 .ps-history-line {
   align-items: center;
   display: flex;
@@ -226,7 +210,6 @@ button.ps-eval-choice:hover,
   transition: width 0.2s;
 }
 
-/* "Let it play out": one steady progress line instead of per-turn churn. */
 .ps-playout-progress {
   display: flex;
   align-items: center;
@@ -253,7 +236,6 @@ button.ps-eval-choice:hover,
   .ps-spinner { animation: none; }
 }
 
-/* Round 89 (#104): the Lines section under a turn's rows. */
 .ps-eval-lines { display: flex; flex-direction: column; gap: 4px; margin-top: 3px; padding-top: 4px; border-top: 1px solid rgba(190, 222, 255, 0.12); }
 .ps-eval-lines-title { font-size: 11px; font-weight: bold; color: #cde; }
 .ps-eval-line-block { display: flex; flex-direction: column; gap: 1px; }
@@ -261,12 +243,11 @@ button.ps-eval-choice:hover,
 .ps-eval-line-turn { display: grid; grid-template-columns: 30px 1fr; column-gap: 6px; font-size: 10px; color: #bcd; }
 .ps-eval-line-turn .t { color: #778; }
 .ps-eval-line-turn .side { color: #9fb2cc; }
-/* Round 89 (#104), G4b: the buttons stand inline in 10 px text, as ExplorableLabel's do; the full-size .ps-btn doubled every row. */
+/* Inline in 10 px text, as ExplorableLabel's buttons; the full-size .ps-btn doubled every row. */
 .ps-eval-lines .ps-eval-inline-btn, .ps-eval-review .ps-eval-inline-btn { padding: 0 5px; font-size: 10px; line-height: 1.5; }
-/* Round 89 (FT-1): the dice chips of a line. The timeline bar owns .ps-line-chip (timeline.css); this rule once reused its name and gave the Main line | Variation pill a padding. */
+/* .ps-line-chip belongs to the timeline bar: reusing its name gave the Main line | Variation pill a padding. */
 .ps-lines-chip { border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(0, 0, 0, 0.2); color: #9fb2cc; font-size: 9px; padding: 0 6px; margin-left: 4px; white-space: nowrap; }
 
-/* Round 89 (#104), G4: the Game review under the game report. */
 .ps-eval-review { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding: 4px 0 2px; border-top: 1px solid rgba(190, 222, 255, 0.12); }
 .ps-eval-review-side { display: flex; flex-direction: column; gap: 3px; }
 .ps-eval-review-side .name { font-size: 11px; font-weight: bold; color: #cde; margin-top: 2px; }
@@ -276,7 +257,6 @@ button.ps-eval-choice:hover,
 .ps-eval-review-line .role { color: #778; }
 .ps-eval-review-line .text { min-width: 0; overflow-wrap: anywhere; }
 
-/* Round 89 (#130): the win-path panel under the Game review's Endgame row and under an endgame turn's card. */
 .ps-winpaths { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 2px 8px; padding: 4px 0 2px 8px; border-left: 2px solid rgba(190, 222, 255, 0.25); }
 .ps-winpaths-turns { display: flex; flex-wrap: wrap; gap: 4px; }
 .ps-winpaths-turns .ps-btn[aria-pressed="true"] { border-color: #8db2e0; color: #fff; }

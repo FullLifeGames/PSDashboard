@@ -10,12 +10,6 @@ import { dieKey } from '../src/dice/types';
 import { branchOf, mon } from './branch-dice-support';
 import { reconstruct } from './arrival-turn';
 
-/**
- * Round 82 (forced dice), step A7b: the chips at a viewed replay position. The picker there has a stored exact position, a
- * battle that serialization gave back without the first turn's `LoggedRollPRNG`; the log's dice come from the replay's own
- * lines (`loggedDiceAt`, no seed search). They must name the same dice the arrival reads after a branch started at that turn
- * (`loggedTurnDice`), so a chip reads the same before and after the first click.
- */
 await loadSimMods('gen9championsou');
 
 const feedback = (name: string): ReplayData =>
@@ -59,7 +53,6 @@ describe('loggedDiceAt: the log\'s dice at a stored position', () => {
   test('a position the replay has no turn for shows none', { timeout: 300000 }, async () => {
     const plain = await branchOf('gen9customgame', [mon('Pikachu', ['tackle'])], [mon('Snorlax', ['tackle'])], '1,2,3,4');
     expect(loggedDiceAt(plain.battleStream.battle!, '')).toEqual([]);
-    // the same battle one turn on has no block in a log that stops before it
     const source = feedback(SCENES[0].fixture);
     const battle = plain.battleStream.battle!;
     battle.choose('p1', 'move 1');

@@ -11,16 +11,10 @@ import {
   clicksAccepted, dexOfRules, forcedOn, isCharge, newTally, outfitBoard, picksOne, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A3a: the dice the panel offers. For every move of every rule set, singles and doubles: the offer
-// of the choice holds no die the simulator never draws (every offered die, forced, reads drawn: no phantom chip), and every die
-// the natural turn draws for the move is offered. Then the state rows: an item that adds an entry, an ability that fixes the
-// hit count or strips the entries, a target that removes them, the stalling die that exists only on the second use, a charge
-// move that offers its dice on the second turn, a switch that offers none.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
-/** The kinds of die the offer covers. */
 const OFFERED_KINDS = new Set(['accuracy', 'crit', 'damage-roll', 'secondary', 'self-effect', 'hit-count', 'stalling', 'power']);
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -33,10 +27,8 @@ const choiceOf = (move: DexMove, mode: Mode) => ({
   kind: 'move' as const, moveId: move.id, moveName: move.name, ...(mode === 'doubles' && NEEDS_AIM.has(move.target) ? { targetLoc: 1 } : {}),
 });
 
-/** The first result of an offer: a chance happens, the lowest roll, the lowest count. */
 const firstOf = (offer: DieOffer): DieResult => offer.results[0];
 
-/** The dice the natural turn draws for the move of the slot, by key. */
 function drawnKeys(board: ReturnType<typeof sweepBoard>, clicks: { p1: string; p2: string }, moveId: string): string[] {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -55,7 +47,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', false, FAST);
   let clicks = sweepClicks(mode, move.target);
   if (isCharge(move)) {
-    // the first turn charges: nothing is offered, the second turn offers the move's dice
     expect(offeredDice(board, 'p1a', choiceOf(move, mode)), `${move.id} charging`).toEqual([]);
     playClicks(board, clicks);
     clicks = sweepClicks(mode, move.target, true);
@@ -66,25 +57,21 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally): string
   expect(standing(board), `${move.id} offer leaves the battle as it was`).toBe(before);
   tally.cases++;
   const problems: string[] = [];
-  // every die the natural turn draws is offered
   const offered = new Set(offers.map(offer => dieKey(offer.name)));
-  // round 89 (#114): a multi-accuracy move draws the die of a later hit only when the earlier hits land, so it plays a few more seeds
   const dexMove = move as unknown as { multiaccuracy?: boolean };
   const extra = dexMove.multiaccuracy ? ['5,6,7,8', '9,10,11,12', '13,14,15,16', '17,18,19,20'].flatMap(seed => drawnKeys(sweepBoard(rules, move.id, mode, seed, false, FAST), clicks, move.id)) : [];
   for (const key of new Set([...drawnKeys(board, clicks, move.id), ...extra])) {
     const [, , target, kind] = key.split(':');
-    // a die the state cannot name before the hit stays unoffered: a move that sets its self effect in its own hit handler
-    // (`onTryHit`), and an accuracy aimed at the user (a move that works through its own condition: Bide, Nature Power)
+    // A die the state cannot name before the hit stays unoffered: a self effect set in the move's own `onTryHit`,
+    // and an accuracy aimed at the user (a move that works through its own condition: Bide, Nature Power).
     const lateSelf = kind === 'self-effect' && typeof (dexOfRules(rules).moves.get(move.id) as unknown as { onTryHit?: unknown }).onTryHit === 'function';
     if (OFFERED_KINDS.has(kind) && !offered.has(key) && !lateSelf && target !== 'p1a') problems.push(`drawn but not offered: ${key}`);
   }
   if (offers.length === 0) return problems;
-  // every offered die, forced, is drawn (the accuracy forced to hit so the dice behind it run)
   const forced: ForcedDie[] = offers.map(offer => ({ name: offer.name, result: offer.name.kind === 'accuracy' ? { happens: true } : firstOf(offer) }));
   const { report } = forcedOn(board, clicks, forced);
   const phantoms = report.forced.filter(shown => shown.took === 'no-draw' && /^the simulator drew no/.test(shown.reason ?? ''));
   tally.applied += report.forced.length;
-  // a move that picks one foe at random draws for that one only: the chip of the other foe stands for the pick it did not make
   const sameDie = (a: ForcedDie, b: ForcedDie): boolean => a.name.kind === b.name.kind && a.name.effectId === b.name.effectId;
   for (const shown of phantoms) {
     const pickedElsewhere = picksOne(move.target) && report.forced.some(other => sameDie(other.die, shown.die) && !phantoms.includes(other));
@@ -144,7 +131,7 @@ describe.each(SWEEP_CASES)('the offer follows the state: $name', ({ rules, mode 
     expect(kindsOf(offerOn('thunderbolt', { ability: 'Sheer Force' }))).not.toContain('secondary:par');
   });
 
-  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability (round 89, F4a)', () => {
+  test('Skill Link fixes the hit count: no hit count die to choose, one row without a choice that names the count and the ability', () => {
     if (!has(rules, 'abilities', 'skilllink')) return;
     play('skilllink');
     expect(kindsOf(offerOn('furyattack'))).toContain('hit-count');

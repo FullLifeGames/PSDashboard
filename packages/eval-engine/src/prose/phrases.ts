@@ -3,20 +3,6 @@ import type { KoOddsInfo } from '../types.ts';
 import { splitCombinedLabel } from '../turn-analysis/played-match.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 
-/**
- * The phrase helpers the turn summary and the game report share: choice
- * labels as prose, the recommendation to display (the null-move swap), the
- * true-odds parentheticals, and the conditional-equilibrium note. Pure
- * template composition; sim-free, main-bundle safe.
- */
-
-/**
- * Choice labels read as prose: "→ Dragapult" becomes "switching to Dragapult". Round 67 (T135): a doubles
- * pair with a switch read as one switch ("switching to Ting-Lu + Scale Shot→Incineroar", 2663093831 t7) or
- * kept a raw arrow ("Parting Shot→Orthworm + → Volcanion"); it now reads per slot in the gerund, the shape of
- * playedVerb below. A pair of moves keeps its label like a single move, and a single label keeps its form (the
- * singles pins "switching to Heatran", "switching to Lopunny-Mega came instead").
- */
 export const phrase = (label: string): string => {
   const slots = splitCombinedLabel(label);
   if (slots.length < 2 || !slots.some(part => part.startsWith('→ '))) {
@@ -24,23 +10,14 @@ export const phrase = (label: string): string => {
   }
   return slots
     .map(part => (part.startsWith('→ ') ? { verb: 'switching to', object: part.slice(2) } : { verb: 'playing', object: part }))
-    // Two slots of one kind share the verb: "playing Tailwind and Solar Beam→Groudon".
     .map((slot, index, all) => (index > 0 && all[index - 1].verb === slot.verb ? slot.object : `${slot.verb} ${slot.object}`))
     .join(' and ');
 };
 
-/**
- * Round 69 (T179): an opponent reply label as prose. A doubles pair reads per slot like phrase() ("playing
- * Weather Ball→Incineroar and switching to Basculegion", 2695803506 t6); a singles reply keeps its string, since
- * phrase() would turn "→ Heatran" into "switching to Heatran" and the singles pins read the raw label.
- */
+/** An opponent reply label as prose; a singles reply keeps its raw label, which the singles pins read. */
 export const phraseReplies = (label: string): string => (splitCombinedLabel(label).length > 1 ? phrase(label) : label);
 
-/**
- * Round 69 (T64): the side row's hindsight sentence, "Against Iron Head, switching to Heatran was worth +28% more."
- * A doubles pair of clicks reads per slot in brackets ("Against what was clicked (playing Protect and Drain Punch
- * ...)"), since a bare "Against playing ..." does not parse.
- */
+/** The hindsight sentence; a doubles pair reads in brackets, since a bare "Against playing ..." does not parse. */
 export const hindsightLine = (read: { response: string; against: string; gain: number }): string => {
   const lead = splitCombinedLabel(read.against).length > 1
     ? `Against what was clicked (${phrase(read.against)})`
@@ -48,38 +25,19 @@ export const hindsightLine = (read: { response: string; against: string; gain: n
   return `${lead}, ${phrase(read.response)} was worth ${winDeltaText(read.gain)} more.`;
 };
 
-/**
- * Round 64 (T123): the gerund fits a subject ("switching to Heatran was
- * worth"), not an object. What a side did reads as a verb per slot
- * ("switched to Keldeo", "switched to Calyrex-Shadow and played Protect"),
- * a line after "the safe" as a noun per slot ("switch to Volcanion",
- * "switch to Chi-Yu and Collision Course→Chien-Pao"). A doubles pair splits
- * into its slots, a Tera or Mega marker staying with its move.
- */
 export const playedVerb = (label: string): string =>
   splitCombinedLabel(label)
     .map(part => (part.startsWith('→ ') ? { verb: 'switched to', object: part.slice(2) } : { verb: 'played', object: part }))
-    // Two slots of one kind share the verb: "played Tailwind and Solar Beam→Groudon".
     .map((slot, index, slots) => (index > 0 && slots[index - 1].verb === slot.verb ? slot.object : `${slot.verb} ${slot.object}`))
     .join(' and ');
 
-/**
- * Round 64 (T123): a probability under 1 as a whole percent that never
- * reads as certain (99.5% is 99, not 100); exactly 1 stays 100.
- */
 export const percentBelowSure = (odds: number): number => (odds >= 1 ? 100 : Math.min(99, Math.round(odds * 100)));
 
 type ForcedCaveat = 'none' | 'barring-crit' | 'sampled-rolls';
 
-/** The caveat of a forced-win proof in words. */
 export const caveatWords = (caveat: ForcedCaveat): string =>
   caveat === 'barring-crit' ? ', barring a crit' : caveat === 'sampled-rolls' ? ' on the sampled rolls' : '';
 
-/**
- * The words a forced-win proof adds to its sentence, in one place for the turn card and the game report (round 89, ruling
- * 30.2): empty for a full proof, the crit caveat for a full proof that carries it, and below mass 1 the share of the rolls
- * the proof covers ("in 98% of the sampled rolls", "in 98% of the rolls, barring a crit"). The share stops at 99%.
- */
 export function forcedQualifier(forced: { mass: number; caveat: ForcedCaveat }): string {
   const tail = caveatWords(forced.caveat);
   if (forced.mass >= 1) return tail;
@@ -87,28 +45,19 @@ export function forcedQualifier(forced: { mass: number; caveat: ForcedCaveat }):
   return forced.caveat === 'sampled-rolls' ? ` in ${share}% of the sampled rolls` : ` in ${share}% of the rolls${tail}`;
 }
 
-/** What a forced-win proof says besides its mass: the stall it delays and the choice it wins through (round 89, lane P; `ForcedWin.delayName`, `ForcedWin.choiceNames`). */
 interface ForcedLean {
   delay?: string;
   delayName?: string;
   choiceNames?: { first: string; partner?: string };
 }
 
-/**
- * Round 89 (P4, ruling 39 B4a): the clause a delayed win carries, in one place for the turn card and the game report. "; a repeated
- * Protect only delays it" (the report: "only delayed it"), the stall by the battle's own Dex name; a result cached without the name
- * says "a repeated stalling move". Empty without a delay.
- */
+/** A result cached without the stall's name says "a repeated stalling move". */
 export function delayClause(forced: ForcedLean, past = false): string {
   if (!forced.delay) return '';
   return `; a repeated ${forced.delayName ?? 'stalling move'} only ${past ? 'delayed' : 'delays'} it`;
 }
 
-/**
- * Round 89 (P4, ruling 39 B4a): the sentence that names the winning choice when the proof wins through one the search's own list never
- * held (a sure strike from the legal combinations, doubles only): the move that strikes first, with its partner. "The winning line is
- * Aqua Jet, which strikes first, with Heat Wave beside it." (the report: "was", "struck"). Empty without a choice.
- */
+/** Names the winning choice when the proof wins through one the search never listed (a sure strike, doubles only). */
 export function choiceSentence(forced: ForcedLean, past = false): string {
   const names = forced.choiceNames;
   if (!names) return '';
@@ -116,81 +65,53 @@ export function choiceSentence(forced: ForcedLean, past = false): string {
   return ` The winning line ${past ? 'was' : 'is'} ${names.first}, which ${past ? 'struck' : 'strikes'} first${beside}.`;
 }
 
-/** The near-decided click: a "sure KO" only at odds 1, else an "N% roll" (T123: 99.5% is no sure KO). */
+/** The near-decided click: "sure KO" only at odds 1, else an "N% roll" (99.5% is no sure KO). */
 export const rollText = (odds: number): string => (odds >= 1 ? 'sure KO' : `${percentBelowSure(odds)}% roll`);
 
-/** The noun form of a line, for "the safe …" (see playedVerb). */
 export const choiceNoun = (label: string): string =>
   splitCombinedLabel(label)
     .map(part => (part.startsWith('→ ') ? `switch to ${part.slice(2)}` : part))
     .join(' and ');
 
-/**
- * Round 89 (FT-1): the words for a body knocked out before it moved, whose log shows no choice. The engine's stand-in label
- * ("stayed in (KO’d before acting)") names what it graded, not what happened; a sentence says this instead. The app's row
- * (`neverActedText`) builds on the same words.
- */
+/** The engine's stand-in label names what it graded, not what happened, so a sentence says this instead. */
 export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
 
-/** "... ; <this> came instead": what the other side did, or that it was knocked out before it moved. */
 export const cameInstead = (name: string, side: SideAnalysis): string =>
   side.neverActed ? `${name} was ${NEVER_ACTED_WORDS}` : `${phrase(side.played!.label)} came instead`;
 
 export const playedBest = (side: SideAnalysis) =>
   side.played !== null && side.best !== null && side.played.choice === side.best.choice;
 
-/**
- * What the clause RECOMMENDS: the true best, unless it is mechanically null
- * against the opposing active and a co-optimal alternative exists — then the
- * alternative's label/EV display in its place (the grading upstream stays
- * priced against the true argmax; the swap lives within the rank-tie
- * epsilon). `swapped` tells callers to drop best-specific extras (the PV
- * line) that would misattach to the substitute.
- */
+/** The true best, unless it is mechanically null and a co-optimal one exists; `swapped` says to drop the PV line. */
 export const displayBest = (side: SideAnalysis): { label: string; ev: number; swapped: boolean } =>
   side.bestNull?.alternative
     ? { ...side.bestNull.alternative, swapped: true }
     : { label: side.best!.label, ev: side.best!.ev, swapped: false };
 
-/**
- * Round 64 (T123, decision 22): regret is best ev minus played ev on the
- * score scale [−1, 1], so it reaches 2. Above 1 the played choice turned a
- * board the engine's line held into one it loses, and the linear points
- * ("−84%") claim more than the two win chances the card shows. Such a
- * regret reads as those two chances, from the engine's line to the played
- * choice ("85% to 19%", 2630685175 t8); at or under 1 the points stay.
- */
+/** Regret is best minus played ev on the [−1, 1] score scale, so it reaches 2; above this the card shows chances. */
 export const REGRET_SPAN_MIN = 1;
 
+/** A regret as text: points up to `REGRET_SPAN_MIN`, above it the two win chances the regret spans. */
 export const regretText = (regret: number, from: number, to: number, faintedFraction?: number | null): string =>
   regret > REGRET_SPAN_MIN ? `${winPctText(from, faintedFraction)} to ${winPctText(to, faintedFraction)}` : winDeltaText(-regret);
 
-/** The two values a regret over 1 spans (the displayed best, the played choice), for the report's misplay. */
 export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: number; faintedFraction?: number } } =>
   side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
     ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
 
-/** The report's misplay of a body that fell before it moved: the stand-in's chance, for the sentence of `neverActedText` (round 89, FT-1). */
 export const neverActedFor = (side: SideAnalysis): { neverActed?: { ev: number; faintedFraction?: number } } =>
   side.neverActed && side.played
     ? { neverActed: { ev: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
 
-/** What a report misplay carries beyond its sentence: the span of a regret over 1 and the stand-in of a body that never acted. */
 export const misplayExtrasFor = (side: SideAnalysis) => ({ ...regretSpanFor(side), ...neverActedFor(side) });
 
-/** The null recommendation kept its place (no alternative): name the caveat. */
 export const nullNote = (side: SideAnalysis): string =>
   side.bestNull && !side.bestNull.alternative && side.best
     ? ` (A caveat: ${side.best.label} does nothing here because ${side.bestNull.reason}; it only pays against the rest of the team.)`
     : '';
 
-/**
- * The three analytic odds shapes (round 6 expectation grounding): "a 90%
- * roll into a ~43% kill range" / "kills ~43% of the time" / "an 80% roll
- * to connect". Exported for the report's seeds sentence.
- */
 export function koPhrase(odds: { accuracy: number; killFraction: number }): string {
   const acc = Math.round(odds.accuracy * 100);
   const kill = Math.round(odds.killFraction * 100);
@@ -200,17 +121,9 @@ export function koPhrase(odds: { accuracy: number; killFraction: number }): stri
   return `${art(acc)} ${acc}% roll to connect`;
 }
 
-/** One named claim: a doubles label (round 56) names the slot, singles the option. */
 export const oddsPart =(name: string, odds: KoOddsInfo, copula: 'was' | 'is') =>
   `${phrase(odds.label ?? name)} ${odds.killFraction < 1 && odds.accuracy === 1 ? koPhrase(odds) : `${copula} ${koPhrase(odds)}`}`;
 
-/**
- * One parenthetical naming the true odds behind the clause's claims — the
- * played move's and/or the recommendation's. The "kills ~43% of the time"
- * shape already reads as a verb phrase; the roll shapes take a copula.
- * Round 70 (gate of 13.10. 20:26, 4a): a claim whose hit the opponent's actual click
- * stopped (`hitStopped`, the cell of the line against the click) is not quoted.
- */
 export const oddsNote = (side: SideAnalysis): string => {
   const shown = displayBest(side);
   const shownOdds = side.bestNull?.alternative ? side.bestNull.alternative.koOdds : side.best?.koOdds;
@@ -220,11 +133,6 @@ export const oddsNote = (side: SideAnalysis): string => {
   return parts.length > 0 ? ` (True odds: ${parts.join('; ')}.)` : '';
 };
 
-/**
- * The engine's own equilibrium leans a different choice than the rendered
- * recommendation: say so, and name the opponent replies that split them —
- * the recommendation becomes conditional instead of absolute (653785 t19).
- */
 export function conditionalNote(side: SideAnalysis): string {
   const conditional = side.conditional;
   if (!conditional || !side.best) return '';
@@ -238,10 +146,7 @@ export function conditionalNote(side: SideAnalysis): string {
     `(${Math.round(conditional.mixWeight * 100)}%)${segments.length > 0 ? `: ${segments.join('; ')}` : ''}.`;
 }
 
-/**
- * One-line rendering of an exploitative read recommendation (the Read row):
- * the payoff SPREAD stays visible — a read is a priced gamble, not a mean.
- */
+/** One-line exploitative read: the payoff spread stays visible, since a read is a priced gamble, not a mean. */
 export function formatRead(read: {
   choice: { label: string };
   net: number;

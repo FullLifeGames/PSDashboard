@@ -21,11 +21,7 @@ function storeSelectedId(id: string): void {
   }
 }
 
-/**
- * Round 77 (user gate 28.10.2026, 4a and 5a): the engines on offer and the one chosen. The worker
- * client reads the choice at every evaluation; a switch drops the evaluation and the game graph of
- * the engine before, whose results stay apart in the cache.
- */
+/** The engines on offer and the one chosen; a switch drops the evaluation and game graph of the engine before. */
 export function useEngineChoice(onSwitch: () => void) {
   const [added, setAdded] = useState(loadAddedEngines);
   const [selectedId, setSelectedId] = useState(readSelectedId);
@@ -41,7 +37,6 @@ export function useEngineChoice(onSwitch: () => void) {
     onSwitch();
   }, [onSwitch]);
   const select = useCallback((id: string) => choose(engines.find(engine => engine.id === id) ?? BUILTIN_ENGINE), [engines, choose]);
-  /** An engine added by address is the one its author wants to try: it is chosen at once. */
   const add = useCallback((name: string, url: string) => {
     const entry: EngineEntry = { id: engineIdForUrl(url), name, url, source: 'added' };
     const next = [...added.filter(engine => engine.id !== entry.id), entry];

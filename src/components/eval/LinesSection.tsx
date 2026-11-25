@@ -12,7 +12,6 @@ interface LinesSectionProps {
   playerNames: [string, string];
   doubles: boolean;
   host: LinesHost;
-  /** The turn card's analysis: the engine's line is the line of the engine choice the card names. */
   analysis?: Pick<TurnAnalysis, 'p1' | 'p2'> | null;
 }
 
@@ -25,7 +24,6 @@ function SideText({ view }: { view: LineSideView }) {
   );
 }
 
-/** The numbered rows of a line with their chips (the Lines section's and the win-path panel's). */
 export function LineRows({ block }: { block: LineBlockView }) {
   return (
     <>
@@ -67,10 +65,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
   );
 }
 
-/**
- * Why a turn holds no line. A matrix turn (a result with a matrix and no tree cells) ran no tree, so it cannot have kept lines;
- * a tree search that kept none says so of the search.
- */
+// A matrix turn ran no tree, so it cannot have kept lines.
 function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<LinesHost['lineComing']>> = null): string {
   if (result.engine) return `No line: ${result.engine.name} sends none.`;
   if (coming === 'stage') return `No line yet: the app searches this turn after the game report${gameReviewEnabled() ? ' (the review shows the progress)' : ''}.`;
@@ -79,11 +74,6 @@ function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<Lines
   return 'No line on this turn: the search kept none for these choices.';
 }
 
-/**
- * Round 89 (#104), step G3: the Lines section under a turn's rows (the card puts it under its closed `Lines` toggle). Per player the engine's line and the played line (one line for a
- * player who played the engine's move), each with ▶ Play, the end value and the dice that could have gone the other way. A turn
- * that holds no line says why in one muted sentence; a turn without a result shows nothing.
- */
 export function LinesSection({ turn, result, playerNames, doubles, host, analysis }: LinesSectionProps) {
   if (!result) return null;
   const lines = linesForMode(cardLines(result.lines ?? [], analysis), !!host.hardMode);

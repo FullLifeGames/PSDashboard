@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { EvalResult } from '@fulllifegames/eval-engine';
 import { clearWorldPositions, registerWorldPositions, worldPositionsOf } from '../../../src/lib/eval/world-positions';
 
-/**
- * Round 89 (#124): the item-sensitivity probe edits one guessed item of the opposing side and values the edited position. In a
- * short-side game the edit goes into every world's position, so the client blends the probe like the evaluation it softens. A world
- * whose party lacks the edited body (its guess is another body) leaves the probe's blend. The position strings are real
- * serialized shapes (`patchSerializedItem` reads them); the pool is a stand-in that records what it was asked to value.
- */
+// The position strings are real serialized shapes: `patchSerializedItem` reads them.
 vi.mock('../../../src/hooks/evaluation/sweep-types', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../src/hooks/evaluation/sweep-types')>()),
   matchOrPhantom: (result: EvalResult, side: 'p1' | 'p2') => result.perSide[side][1],
@@ -15,7 +10,6 @@ vi.mock('../../../src/hooks/evaluation/sweep-types', async importOriginal => ({
 const { probeSensitivity } = await import('../../../src/hooks/evaluation/sweep-verify');
 
 const mon = (species: string, item: string) => ({ set: { species, item }, item: item.toLowerCase(), isActive: true });
-/** A position of the opposing side P2 holding `species`; P1 is irrelevant to the probe. */
 const position = (...species: string[]) => JSON.stringify({ formatid: 'gen9customgame', sides: [{ pokemon: [] }, { pokemon: species.map(name => mon(name, 'Leftovers')) }] });
 const itemOf = (serialized: string, species: string) =>
   (JSON.parse(serialized) as { sides: { pokemon: { set: { species: string; item: string } }[] }[] }).sides[1].pokemon.find(entry => entry.set.species === species)?.set.item;
@@ -36,7 +30,6 @@ beforeEach(() => { asked.length = 0; clearWorldPositions(); });
 afterEach(() => clearWorldPositions());
 
 describe('the item-sensitivity probe over the worlds', () => {
-  // Doubles and singles share the probe: the patched side is the opposing one and the choice strings are opaque here.
   test.each([['singles', 'Heatran'], ['doubles', 'Heatran']])('%s: the edited item is registered in every world that holds the body', async () => {
     const heaviest = position('Heatran', 'Kingambit');
     const lighter = position('Heatran', 'Ceruledge');

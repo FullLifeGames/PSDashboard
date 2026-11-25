@@ -7,16 +7,10 @@ import { turnEntryCount } from '../../lib/variation-turns';
 import { rebuildGame } from './game-rebuild';
 import type { BranchEngineModule } from './shared';
 
-/**
- * Round 89 (lane H, #105), stage H5: the reader of a game's share link (version 2). The link holds the format, the teams, the seed
- * and the entries; the reader starts the format's battle on the seed (the header comes from it, the team preview with it) and plays
- * the entries onto it, the road a saved game's rebuild takes (`rebuildGame`). The record it returns is the sharer's, with a new
- * id: the reader's browser keeps its own copy, and a link opened twice makes two games only where it is opened twice.
- */
+/** The returned record carries a new id: a link opened twice makes two games. */
 
 export interface OpenedShare { id?: string; now?: Date }
 
-/** The record of a shared game, or the words that say why it cannot start. */
 export async function recordOfShare(
   branchEngine: BranchEngineModule, payload: GameSharePayload, { id, now }: OpenedShare = {},
 ): Promise<NewGameRecord | { error: string }> {

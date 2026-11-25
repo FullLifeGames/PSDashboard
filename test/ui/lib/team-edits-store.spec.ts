@@ -14,7 +14,7 @@ const inferred = { p1: team('Garchomp', 'Gholdengo'), p2: team('Dragapult', 'Hea
 
 afterEach(() => { vi.restoreAllMocks(); });
 
-describe('team edits store (round 89, T9c: an edit made in the editor survives a reload)', () => {
+describe('team edits store (an edit made in the editor survives a reload)', () => {
   test('a saved edit reads back whole, one record per replay, with a version', () => {
     const edit = { p1: null, p2: team('Dragapult', 'Heatran', 'Kingambit') };
     saveTeamEdits('game-1', edit);

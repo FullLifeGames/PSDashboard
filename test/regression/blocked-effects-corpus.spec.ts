@@ -5,18 +5,7 @@ import { bankTeamsFor } from './bank-build';
 import { CORPUS } from './rebuild-through';
 import { diskCachedSmogonFetcher } from './smogon-fetch-cache';
 
-/**
- * Round 89 (#110): an effect the log shows landing rules out the abilities of the body that would have refused it. Each row is a
- * corpus game of round 88's X1 count where the built ability (the top of the usage stats) blocks an effect the log shows: a
- * Dragonite, Bisharp or Mienshao that flinches, a body that takes an Intimidate drop. (The Champions VGC flinch rows of the count do not read: the
- * flinching Oranguru stood next to a Mold Breaker Tinkaton, the Dragonite of 2651374599 had Mega evolved; Doubles OU 2661677291's Dragonite flinched
- * from a Mold Breaker Excadrill, singles smogtours-gen9ou-677299's Gholdengo took Thunder Wave from a Mold Breaker Tinkaton, and a Ditto that took
- * a burn while transformed holds no proof about its Imposter: the reader rules nothing out for them, as it should.) The row reads the game through the
- * bank's and the app's build with the disk-cached Smogon data (local: the rows skip without `.fit-corpus`): the inference holds
- * the ability in `ruledOut`, and the built set does not carry it. The unit rows and the sweep that holds the reader to the
- * simulator are `packages/replay-core/test/blocked-effects.spec.ts` and `blocked-effects-sweep.spec.ts`; the corpus recount of the
- * events the built sets still block is lane D's `d-x1` probe.
- */
+// No row where the reader rightly rules nothing out (a flinch beside a Mold Breaker, a Mega body, a transformed Ditto).
 
 interface Row { id: string; family: string; body: string; ability: string; what: string }
 
@@ -24,7 +13,6 @@ const ROWS: Row[] = [
   { id: 'smogtours-gen9ru-878668', family: 'singles', body: 'Mienshao', ability: 'Inner Focus', what: 'a flinch' },
   { id: 'smogtours-gen9ru-883312', family: 'singles', body: 'Mienshao', ability: 'Inner Focus', what: 'an Intimidate drop' },
   { id: 'gen9doublesou-2661750338', family: 'Doubles OU', body: 'Bisharp', ability: 'Inner Focus', what: 'a flinch' },
-  // Turn 5: Mew transformed into Incineroar and its copied Intimidate (named by the log) lowers Dragonite; the first reader skipped a transformed source.
   { id: 'gen9doublesou-2543203909-euqqjb3y09m4xb8fjvanwx01h3kkjjxpw', family: 'Doubles OU', body: 'Dragonite', ability: 'Inner Focus', what: 'a copied Intimidate drop' },
   { id: 'gen9doublesou-2661737737', family: 'Doubles OU', body: 'Mamoswine', ability: 'Oblivious', what: 'an Intimidate drop' },
   { id: 'gen9vgc2025regh-2441205662', family: 'VGC SV', body: 'Dragonite', ability: 'Inner Focus', what: 'a flinch' },
@@ -36,7 +24,7 @@ const ROWS: Row[] = [
 
 type Replay = ReplayData & { formatid?: string };
 
-describe('a landed flinch or drop rules out the ability that refuses it, in the corpus (#110)', () => {
+describe('a landed flinch or drop rules out the ability that refuses it, in the corpus', () => {
   for (const row of ROWS) {
     test.skipIf(!existsSync(CORPUS(row.id)))(`${row.family} ${row.id}: ${row.what} on ${row.body} rules out ${row.ability}`, async () => {
       const replay = JSON.parse(readFileSync(CORPUS(row.id), 'utf-8')) as Replay;

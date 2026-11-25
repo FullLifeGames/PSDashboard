@@ -11,24 +11,15 @@ import { normalizeLineEndings } from './line-endings.ts';
 
 type ReplayFormatSource = Partial<Pick<ReplayData, 'id' | 'format' | 'formatid' | 'log'>>;
 
-/** Optional-input wrapper: an absent field normalizes to the empty id. */
 const optionalId = (value: string | undefined): string => toId(value ?? '');
 
-/** The log as LF lines: the readers below match line by line, whatever endings the file came with (round 70, T206). */
 const lfLog = (log: string | undefined): string | undefined => (log === undefined ? undefined : normalizeLineEndings(log));
 
-/**
- * Splits Showdown's `-{password}pw` suffix off a private replay id
- * (`gen9natdexdraft-2632003305-e10u50b7xrkmn0w7j5q2bac68relhlwpw`), mirroring
- * the replay server's own splitPasswordSuffix. The suffix belongs in the
- * FETCHED id — the replay API parses it there — but never in anything derived
- * from the id: a 31-character password read as part of the format produced
- * `gen9natdexdraft2632003305e10u...pw`, which no Dex knows, so every private
- * replay silently fell back to a rule-less custom game.
- */
+/** Splits Showdown's `-{password}pw` suffix off a private replay id; derived ids never carry it. */
 export function splitReplayPassword(fullid: string): [id: string, password: string | null] {
   if (fullid.endsWith('pw')) {
     const dash = fullid.lastIndexOf('-');
+    // A password read as part of the format gives a format no Dex knows: a rule-less custom game.
     if (dash > 0) return [fullid.slice(0, dash), fullid.slice(dash + 1, -2)];
   }
   return [fullid, null];
@@ -38,17 +29,11 @@ function stripReplayNumber(id: string | undefined): string {
   return splitReplayPassword(id || '')[0].replace(/-\d+$/, '');
 }
 
-/**
- * Round 72 (T241): the header facts of a log (game type, generation, tier, the number brought at team preview) are what
- * @pkmn/client's Battle holds after it has read the header lines, so the library's handlers decide what a line means
- * (the last `|gametype|` wins, `|teampreview|` without a number is six). The header is the text before `|start`; a log
- * without a `|start` line is read whole. Only the four lines the facts come from go to the client. A header reads once
- * per distinct text, because the hooks ask for these facts on every render.
- */
+// @pkmn/client's own handlers read the facts (the last `|gametype|` wins, a bare `|teampreview|` is six): only the four
+// lines they come from go to the client, and a header reads once per distinct text (the hooks ask on every render).
 interface ReplayHeader {
-  /** The raw `|gametype|` argument, or null when the log has no such line (the client's default "singles" says nothing). */
+  /** The raw `|gametype|` argument, or null when the log has no such line (the client's default says nothing). */
   gameType: string | null;
-  /** The `|gen|` line's generation, or null without one. */
   gen: number | null;
   tier: string;
   /** The client's `teamPreviewCount` after the header, or null without a `|teampreview|` line. */
@@ -75,7 +60,6 @@ function readHeaderText(text: string): ReplayHeader {
     try {
       battle.add(args, kwArgs);
     } catch {
-      // A generation the client does not know: the line says nothing.
       if (key === '|gen|') gen = false;
     }
   }
@@ -111,11 +95,7 @@ function extractGen(source: ReplayFormatSource & { formatid?: string }): string 
   return '9';
 }
 
-/**
- * Round 88 (F, #101): how many bodies each side really has, as the simulator's `|teamsize|` line prints them at the start action
- * (the brought count after a team preview, the whole team without one). The last line of a side wins; null for a side the log
- * does not size. A log or its lines: the near sentence's phase reads a snapshot's lines, the builder and the inference a text.
- */
+/** How many bodies each side has, from its last `|teamsize|` line; null for a side the log does not size. */
 export function teamSizes(log: string | readonly string[]): { p1: number | null; p2: number | null } {
   const sizes: { p1: number | null; p2: number | null } = { p1: null, p2: null };
   const lines = typeof log === 'string' ? (lfLog(log) ?? '').split('\n') : log;
@@ -126,17 +106,13 @@ export function teamSizes(log: string | readonly string[]): { p1: number | null;
   return sizes;
 }
 
+/** The id of the log's `|gametype|` line (singles, doubles), null without one. */
 export function getReplayGameType(log: string | undefined): string | null {
   const raw = lfLog(log)?.match(/^\|gametype\|([^|\n]+)/m)?.[1];
   return raw ? optionalId(raw) : null;
 }
 
-/**
- * Smogtours replay ids prefix the real format (`smogtours-gen3ou-56583`) and
- * sometimes drop the gen entirely (`smogtours-ubers`) — stripping the prefix
- * and re-adding the generation yields the format usage stats and the branch
- * simulator actually understand (B13).
- */
+// Smogtours ids prefix the real format (`smogtours-gen3ou-56583`) and sometimes drop the gen (`smogtours-ubers`).
 function normalizeInferredFormatId(id: string, source: ReplayFormatSource): string {
   let normalized = id.replace(/^smogtours/, '');
   if (normalized && !/^gen\d/.test(normalized)) {
@@ -145,6 +121,7 @@ function normalizeInferredFormatId(id: string, source: ReplayFormatSource): stri
   return normalized || id;
 }
 
+/** The format id of a replay: the explicit one, else its id's, log tier's or format name's, else the generation OU. */
 export function inferReplayFormatId(source: ReplayFormatSource): string {
   const explicit = optionalId(source.formatid);
   if (explicit) return normalizeInferredFormatId(explicit, source);
@@ -161,7 +138,7 @@ export function inferReplayFormatId(source: ReplayFormatSource): string {
   return `gen${extractGen(source)}ou`;
 }
 
-/** Prefixes the generation when the display format omits it ("Ubers" → "[Gen 6] Ubers", G5). */
+/** Prefixes the generation when the display format omits it ("Ubers" → "[Gen 6] Ubers"). */
 export function getReplayDisplayFormat(source: ReplayFormatSource, formatid: string): string {
   const format = (source.format || '').trim();
   if (!format) return formatid;
@@ -170,17 +147,18 @@ export function getReplayDisplayFormat(source: ReplayFormatSource, formatid: str
   return `[Gen ${gen}] ${format}`;
 }
 
+/** The generation of a replay, 9 when nothing names one. */
 export function getReplayGeneration(source: ReplayFormatSource): number {
   const formatid = inferReplayFormatId(source);
   return parseInt(extractGen({ ...source, formatid }), 10) || 9;
 }
 
-/** The generation and mod a replay plays by: the Dex of the game is `dexOf` of these (round 75, T160). */
+/** The generation and mod a replay plays by: the Dex of the game is `dexOf` of these. */
 export function replayRules(source: ReplayFormatSource): GameRules {
   return { gen: getReplayGeneration(source), mod: replayRuleset(source) === 'champions' ? CHAMPIONS_MOD : undefined };
 }
 
-/** Sides' currently-sleeping (non-Rest) victims — detects logs the clause cannot describe. */
+// Two non-Rest sleepers at once: a log the Sleep Clause cannot describe.
 function logShowsSecondSleep(log: string): boolean {
   const sleepers: Record<'p1' | 'p2', Set<string>> = { p1: new Set(), p2: new Set() };
   let lastMoveWasRest = false;
@@ -205,49 +183,24 @@ function logShowsSecondSleep(log: string): boolean {
   return false;
 }
 
-/**
- * Sleep Clause for the singles branch sim — CUSTOM-GAME bases only: a real
- * ladder format is its own rule authority (gen3ou carries the clause; gen9ou
- * bans sleep moves outright instead). The replay's |rule| lines decide; a
- * log with NO rule lines at all (video-reconstructed pipelines) gets the
- * singles-standard default unless the log itself shows a second
- * simultaneous sleep.
- */
+// Custom-game bases only: a real ladder format is its own rule authority (gen3ou has it, gen9ou bans sleep moves).
+// The |rule| lines decide; a log with none (video-reconstructed) gets the singles default unless a second sleep shows.
 function sleepClauseSuffix(rawLog: string | undefined, base: string): string {
   const log = lfLog(rawLog);
   if (!log || !base.endsWith('customgame')) return '';
   if (/^\|rule\|Sleep Clause/m.test(log)) return '@@@Sleep Clause Mod';
-  // Only REAL rule declarations ("Name: description") count as a declared
-  // ruleset — video pipelines watermark their logs with colon-less |rule|
-  // lines ("Reconstructed from video by gpl-pipeline - best effort"), and
-  // treating those as "rules declared, clause absent" silenced the singles
-  // default exactly where it was needed (GPL T11).
+  // Only "Name: description" rules count: video pipelines watermark logs with colon-less |rule| lines.
   if (/^\|rule\|[^|\n]*: /m.test(log)) return '';
   if (logShowsSecondSleep(log)) return '';
   return '@@@Sleep Clause Mod';
 }
 
-/**
- * Round 89 (FB-1): Terastal Clause for the branch sim. It nulls every canTerastallize at battle start, so a draft game that declared
- * it must not offer Tera in the branch. Read like Sleep Clause: the `|rule|` line decides, a real format is its own authority.
- */
+// The Terastal Clause nulls every `canTerastallize` at battle start: a draft game that declared it must not offer Tera.
 const teraClause = (rawLog: string | undefined): string => (/^\|rule\|Terastal Clause/m.test(lfLog(rawLog) ?? '') ? 'Terastal Clause' : '');
 
-/** The custom rules of the branch format in the simulator's "@@@A,B" form; empty for none. */
 const joinRules = (...rules: string[]): string => (rules.some(Boolean) ? `@@@${rules.filter(Boolean).join(',')}` : '');
 
-/**
- * How many Pokémon each side BRINGS at team preview (VGC: 4 of 6, Battle
- * Stadium Singles: 3 of 6), or null for formats that bring the full team.
- * The Dex's own rule table answers for formats it knows. For the rest the
- * log answers: its `|teampreview|N` line is the client's `teamPreviewCount`,
- * and 1 to 5 is a bring limit (a bare `|teampreview` is six and says nothing;
- * T241: over 5,648 replays of fixtures and fit
- * corpus the log and the rule table agree wherever the Dex knows the format,
- * and the log covers the 2,326 VGC replays whose regulation postdates the
- * bundled sim). Last comes the format-id heuristic for a log with no such
- * line (every VGC ruleset to date brings 4).
- */
+/** How many Pokémon each side brings at team preview (VGC: 4 of 6), null for formats that bring the full team. */
 export function getReplayBringCount(source: ReplayFormatSource): number | null {
   const formatid = inferReplayFormatId(source);
   if (!formatid) return null;
@@ -258,35 +211,25 @@ export function getReplayBringCount(source: ReplayFormatSource): number | null {
       if (typeof size === 'number' && size > 0) return size;
       return null;
     } catch {
-      // Rule table refused (mod gaps) — fall through to the log.
+      // Rule table refused (mod gaps): fall through to the log.
     }
   }
+  // `|teampreview|N` is a bring limit when 1 to 5 (a bare one is six); it covers VGC regulations newer than the sim.
   const previewed = readHeader(source.log).teamPreviewCount;
   if (previewed !== null && previewed >= 1 && previewed <= 5) return previewed;
+  // No such line: every VGC ruleset to date brings 4.
   if (formatid.includes('vgc') || formatid.includes('battlestadiumdoubles')) return 4;
   if (formatid.includes('battlestadiumsingles')) return 3;
   return null;
 }
 
-/**
- * Base-species identity for bring matching: the protocol reveals ACTIVE
- * formes (Zamazenta-Crowned, Terapagos-Stellar) while team preview and the
- * built sets may carry the base name or the "-*" unknown-forme marker.
- * Species clause keeps one base per side in bring-limited formats, so the
- * base id is a safe secondary key there.
- */
+/** The base-species id for bring matching: the protocol shows active formes, preview and sets the base or "-*". */
 export function speciesBaseId(name: string, rules: GameRules): string {
   const species = dexOf(rules).species.get(name);
   return optionalId(species.exists ? species.baseSpecies || species.name : name);
 }
 
-/**
- * The species each side actually fielded, in first-appearance order — the
- * protocol's ground truth for a bring-limited format's selection. One entry
- * per BODY: an in-battle forme change (Terapagos-Terastal → -Stellar) keeps
- * its first-seen name instead of counting twice (the VGC-tranche sighting
- * caught exactly that).
- */
+/** The species each side fielded in first-appearance order, one per body: a forme change keeps its first-seen name. */
 export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', rules: GameRules): string[] {
   const seenBases = new Set<string>();
   const ordered: string[] = [];
@@ -299,23 +242,17 @@ export function broughtSpeciesFor(snapshots: TurnSnapshot[], side: 'p1' | 'p2', 
   for (const turn of snapshots) {
     for (const pokemon of turn[side].pokemon) {
       if (!pokemon.isActive) continue;
-      // Round 89 (#116): a body that wears a Transform copy (Imposter, the move) lists the species it entered with, never the copy.
+      // A body that wears a Transform copy (Imposter, the move) lists the species it entered with, never the copy.
       add(pokemon.baseSpeciesForme ?? pokemon.speciesForme);
     }
-    // Round 89 (#124): a snapshot shows the bodies on the field at the turn's end, so a body that entered and fainted or left
-    // within the turn is in the turn's log lines only.
+    // A snapshot shows the bodies on the field at the turn's end: one that entered and left in the turn is in the log.
     for (const name of enteredInLog(turn.log, side)) add(name);
   }
   return ordered;
 }
 
-/**
- * Round 89 (#124): the species each protocol line of one turn brings onto the field for a side, in line order: `switch` (a
- * player's switch, a U-turn or Volt Switch with `[from]`, the forced replacement after a faint) and `drag` (Roar, Whirlwind,
- * Dragon Tail, Red Card). `replace` (an Illusion that breaks) names the real body, and the `switch` line it replaces named only
- * the disguise, a party member that may never have fielded, so the replace drops that entry. The species is the first word of
- * the details field, the species the body entered with.
- */
+// `switch` (a switch, U-turn, a forced replacement) and `drag` (Roar, Red Card) bring a species on; a `replace`
+// (an Illusion that breaks) names the real body, so it drops the disguise's entry from the `switch` line.
 function enteredInLog(lines: readonly string[] | undefined, side: 'p1' | 'p2'): string[] {
   const entries: { slot: string; species: string }[] = [];
   for (const line of lines ?? []) {
@@ -330,14 +267,7 @@ function enteredInLog(lines: readonly string[] | undefined, side: 'p1' | 'p2'): 
   return entries.map(entry => entry.species);
 }
 
-/**
- * The bring lists for a bring-limited replay, or null for bring-all
- * formats AND whenever either side's full selection cannot be pinned from
- * the protocol (short games). BOTH sides or neither: evaluating a pinned
- * four against an unpinned six overrates the open side — the A.3c A/B
- * gate flipped a won game (452654) to the loser on exactly that
- * asymmetry, so symmetric-wrong beats asymmetric-wrong.
- */
+/** The bring lists of a bring-limited replay, both sides or neither; null for bring-all formats or an unpinned side. */
 export function replayBringOnly(
   source: ReplayFormatSource,
   snapshots: TurnSnapshot[],
@@ -347,31 +277,27 @@ export function replayBringOnly(
   const rules = replayRules(source);
   const p1 = broughtSpeciesFor(snapshots, 'p1', rules);
   const p2 = broughtSpeciesFor(snapshots, 'p2', rules);
+  // A pinned four against an unpinned six overrates the open side: symmetric-wrong beats asymmetric-wrong.
   return p1.length === bringCount && p2.length === bringCount ? { p1, p2 } : null;
 }
 
-/**
- * Round 89 (#124): one side of a bring list. `fielded`: the bodies the protocol shows on the field, in first-appearance order.
- * `open`: how many of the side's brought bodies never entered (the count minus `fielded`). `candidates`: the preview bodies the
- * side never fielded, in preview order, each with its share of the side's open choice (the shares sum to 1; empty when `open` is 0).
- */
+/** One side of a bring list. */
 export interface BringSide {
   fielded: string[];
+  /** The preview bodies never fielded, in preview order, with shares of the open choice (sum 1; empty at `open` 0). */
   candidates: { species: string; weight: number }[];
+  /** How many of the side's brought bodies never entered (the count minus `fielded`). */
   open: number;
 }
 
-/** Round 89 (#124): the bring lists of a bring-limited game with the unknown bodies a short side still holds. */
+/** The bring lists of a bring-limited game with the unknown bodies a short side still holds. */
 export interface BringList {
   count: number;
   p1: BringSide;
   p2: BringSide;
 }
 
-/**
- * Round 89 (#124): the usage count of each base species, the sum of `rawCount` over the stats entries that share the base
- * (Urshifu-Rapid-Strike and Urshifu-Single-Strike are one Urshifu).
- */
+// Sum of `rawCount` over the stats entries that share a base (Urshifu-Rapid-Strike and Urshifu-Single-Strike are one).
 function usageCountsByBase(stats: SmogonUsageStats | null | undefined, rules: GameRules): Map<string, number> {
   const counts = new Map<string, number>();
   for (const entry of Object.values(stats?.pokemon ?? {})) {
@@ -382,14 +308,7 @@ function usageCountsByBase(stats: SmogonUsageStats | null | undefined, rules: Ga
   return counts;
 }
 
-/**
- * Round 89 (#124): the bring list of a bring-limited replay with the bodies a side brought but never fielded, or null for
- * bring-all formats and for a game whose preview cannot name enough candidates. A side that fielded its whole selection has
- * `open` 0 and no candidates; a short side's candidates are its preview bodies it never fielded. A candidate weighs by the usage
- * count of its base species in the format's stats; one the stats lack takes the smallest count present (the stats list every
- * species above their cutoff, so a missing one is rarer); without any count the weights are equal. `replayBringOnly` keeps its
- * meaning (both sides full, or null) for the readers that need a pinned list.
- */
+/** The bring list of a bring-limited replay with its unfielded bodies; null for bring-all or too few candidates. */
 export function replayBringList(
   source: ReplayFormatSource,
   snapshots: TurnSnapshot[],
@@ -415,6 +334,7 @@ export function replayBringList(
       previewed.push(pokemon.baseSpeciesForme ?? pokemon.speciesForme);
     }
     if (previewed.length < open) return null;
+    // A candidate weighs by the usage count of its base species; a missing one takes the smallest present count.
     const raw = previewed.map(species => byBase.get(speciesBaseId(species, rules)) ?? smallest);
     const total = raw.reduce((sum, value) => sum + value, 0);
     const candidates = previewed.map((species, index) => ({ species, weight: total > 0 ? raw[index] / total : 1 / previewed.length }));
@@ -425,23 +345,17 @@ export function replayBringList(
   return p1 && p2 ? { count, p1, p2 } : null;
 }
 
-/** Round 65: the rule set a replay's static weighs by (the engine's StaticRuleset). */
+/** The rule set a replay's static weighs by (the engine's StaticRuleset). */
 export type ReplayRuleset = 'standard' | 'vgc' | 'champions';
 
-/**
- * Round 65: the rule set of a replay, read from its own format id. Pokémon
- * Champions (Champions OU, Champions VGC) is its own game, reconstructed on
- * the Champions mod since round 67 (getBranchSimulatorFormat); VGC outside
- * Champions (bring six, pick four, level 50) parts from Doubles OU. The
- * hosts name the rule set from here and the engine weighs its statics by it.
- */
+/** The rule set of a replay: Champions is its own game on its mod; VGC (bring six, pick four) parts from Doubles OU. */
 export function replayRuleset(source: ReplayFormatSource): ReplayRuleset {
   const format = inferReplayFormatId(source);
   if (isChampionsFormat(format)) return 'champions';
   return /vgc/.test(format) ? 'vgc' : 'standard';
 }
 
-/** The branch format carries the clause as a custom-rule suffix — is it there? */
+/** Whether the branch format enforces Sleep Clause, by a custom-rule suffix or by its own rule table. */
 export function formatEnforcesSleepClause(format: string): boolean {
   if (/@@@.*sleep ?clause/i.test(format)) return true;
   const base = simFormats().get(format.split('@@@')[0]);
@@ -452,17 +366,12 @@ export function formatEnforcesSleepClause(format: string): boolean {
   }
 }
 
-/**
- * Round 67 (T145): the Champions mod's formats (@pkmn/mods champions) a
- * Champions replay branches on. Singles play the mod's OU; doubles play its
- * Doubles Custom Game, which brings the whole team as Doubles OU does (the
- * reconstruction trims to the brought Pokémon itself, where a VGC format's
- * team preview would keep the first four). The regulation changes only
- * legality, and the base Dex resolves no custom-rule suffix on a mod format.
- */
+// Singles play the mod's OU; doubles its Doubles Custom Game, which brings the whole team as OU does (the
+// reconstruction trims to the brought ones). The regulation changes only legality; the base Dex takes no rule suffix.
 const CHAMPIONS_SINGLES_FORMAT = 'gen9championsou';
 const CHAMPIONS_DOUBLES_FORMAT = 'gen9championsdoublescustomgame';
 
+/** The simulator format a replay's branch plays on; a custom game carries the Sleep and Terastal clauses as suffix. */
 export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   const formatid = inferReplayFormatId(source);
   const gameType = getReplayGameType(source.log);
@@ -472,9 +381,7 @@ export function getBranchSimulatorFormat(source: ReplayFormatSource): string {
   if (replayRuleset(source) === 'champions') return doubles ? CHAMPIONS_DOUBLES_FORMAT : CHAMPIONS_SINGLES_FORMAT;
   if (doubles) return `gen${gen}doublesou${joinRules(teraClause(source.log))}`;
 
-  // A formatid the sim doesn't know (draft leagues, video pipelines) runs as
-  // a rule-less custom game anyway — name that explicitly so clause suffixes
-  // have a real base to attach to.
+  // An unknown formatid (draft leagues, video pipelines) runs as a rule-less custom game: clause suffixes need a base.
   const known = formatid && simFormats().get(formatid).exists ? formatid : '';
   const base = known || (formatid ? `gen${gen}customgame` : `gen${gen}ou`);
   return `${base}${joinRules(sleepClauseSuffix(source.log, base).slice(3), base.endsWith('customgame') ? teraClause(source.log) : '')}`;

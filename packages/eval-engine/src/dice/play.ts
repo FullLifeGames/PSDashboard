@@ -11,40 +11,18 @@ import { probeCheck } from './status-probe.ts';
 import { dieKey, type DiceReport, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
-/**
- * Round 82 (forced dice), decisions D5, D7 and D8: one forced turn. The caller's `play` writes both sides' choices to a
- * battle and lets the turn run; the module plays it twice.
- *
- * 1. The natural turn on a copy of the battle, with a stream at the live PRNG's place (`LoggedRollPRNG.fork()` on a
- *    branch's first turn, the plain clone otherwise), under watch: every die it draws is written down under its name.
- * 2. The real turn on the live battle, under watch, with `ForcedDicePRNG` over the live PRNG: a forced die answers as forced,
- *    every other recognized die answers what the natural turn drew for it, and the rest follows the stream.
- *
- * Afterwards the live PRNG is the battle's own again and its seed is the natural turn's end seed: a forced die that changes
- * the number of draws (a forced hit after a natural miss adds a crit and a roll) moves no later die of the branch.
- *
- * A turn with nothing forced is today's turn: `play` runs on the live battle and nothing else happens.
- */
+/** One forced turn: the natural turn on a copy, then the real turn on the live battle with the forced dice. */
 
 export interface ForcedTurnInput {
   live: Battle;
   forced: readonly ForcedDie[];
-  /** Writes the choices of both sides to the battle it gets and plays the turn out; runs twice, on a copy and on the live battle. */
+  /** Writes both sides' choices and plays the turn out; it runs twice, on a copy and on the live battle. */
   play: (battle: Battle) => void;
-  /**
-   * Round 86 (the log's dice, T306): told every draw of the real turn with the answer the turn took (a forced die's answer, not the
-   * stream's value). The arrival records the draws of the turn the log's dice force, so an action the user leaves as logged rolls the same.
-   */
+  /** Every draw of the real turn with the answer the turn took (a forced die's answer, not the stream's value). */
   observe?: (from: number | undefined, to: number | undefined, value: number) => void;
-  /**
-   * Round 86 (T306): told every recognized die of the real turn with the raw value the turn took. The faint step reads the damage rolls
-   * the forced turn really draws (the log's dice can add a hit the natural turn lacks) and the step each one took. Round 89 (#104): also the draw's shape (its call, range and items), so a caller can read the chance or the
-   * results the simulator drew from.
-   */
   onDraw?: (name: DieName, value: number, draw: Draw) => void;
 }
 
-/** The real turn's PRNG that reports each answer it gives, and each die it names. */
 class ObservedForcedPRNG extends ForcedDicePRNG {
   private readonly hooks: Pick<ForcedTurnInput, 'observe' | 'onDraw'>;
 
@@ -66,30 +44,26 @@ class ObservedForcedPRNG extends ForcedDicePRNG {
   }
 }
 
-/** A stream at the PRNG's place, attached to the battle it will play on. */
 function forkPrng(prng: PRNG, battle: Battle): PRNG {
   const fork = prng instanceof LoggedRollPRNG ? prng.fork() : prng.clone();
   if (fork instanceof LoggedRollPRNG) fork.attach(battle);
   return fork;
 }
 
-/** The die of Gens 2 and 3 that lets a Quick Claw holder act first, kept on the battle (the simulator reads it in the action speed). */
+// Gens 2 and 3: the Quick Claw roll kept on the battle, which the simulator reads in the action speed.
 type StartRoll = { quickClawRoll?: boolean };
 
-/** What the natural turn on a copy showed: the dice it drew (names, chances, answers), the speed ties, who acted, where the stream ended. */
 export interface NaturalTurn {
   record: NaturalRecord;
   endSeed: string;
   startRoll: boolean | undefined;
   names: ReadonlyMap<string, DieName>;
   chances: ReadonlyMap<string, number>;
-  /** The slots of the move actions of every shuffle that held two or more of them. */
   ties: readonly (readonly string[])[];
-  /** The slots of the bodies that acted, in order. */
   acted: readonly string[];
 }
 
-/** The natural turn: `play` runs on a copy of the battle with a stream at the live PRNG's place, under watch. The live battle is read and never written. */
+/** The natural turn: `play` on a copy with a stream at the live PRNG's place; the live battle is only read. */
 export function naturalTurn(live: Battle, play: (battle: Battle) => void): NaturalTurn {
   const copy = copyOf(live);
   (copy as unknown as { debugMode: boolean }).debugMode = false;
@@ -108,11 +82,6 @@ export function naturalTurn(live: Battle, play: (battle: Battle) => void): Natur
   };
 }
 
-/**
- * The raw answers of the dice that learn theirs on copies (decision D6): a hit count whose draws the module cannot name by
- * the draw alone (Loaded Dice adds a second draw, Population Bomb draws `random(7)`), and a status word (Effect Spore compares
- * one number with thresholds). `null` marks a result no draws reach.
- */
 function learnedScripts(input: Omit<LearnInput, 'fork' | 'die'>): Map<string, readonly number[] | null> {
   const scripts = new Map<string, readonly number[] | null>();
   for (const die of input.forced) {
@@ -126,12 +95,7 @@ function learnedScripts(input: Omit<LearnInput, 'fork' | 'die'>): Map<string, re
   return scripts;
 }
 
-/**
- * Gens 2 and 3 draw the die that lets a holder act first at the start of the turn, outside any action, and keep it on the
- * battle: the real turn reads the forced answer from there (one roll for every holder on the field: any forced yes wins). The
- * natural turn on the copy keeps the value the battle drew. A body whose action speed does not read the roll has no die. Returns
- * the keys of the dice written this way.
- */
+// Gens 2 and 3 draw the die at the turn's start, outside any action; one roll serves every holder: any forced yes wins.
 function writeStartRoll(live: Battle, forced: readonly ForcedDie[]): Set<string> {
   const written = new Set<string>();
   if (!rollsAtTurnStart(live.gen)) return written;
@@ -145,7 +109,6 @@ function writeStartRoll(live: Battle, forced: readonly ForcedDie[]): Set<string>
   return written;
 }
 
-/** Which way each forced status check goes: whether the body acts when the draw comes true, read from the condition's own handler. */
 function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string, boolean> {
   const polarities = new Map<string, boolean>();
   for (const die of forced) {
@@ -156,6 +119,7 @@ function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string
   return polarities;
 }
 
+/** Plays `play` twice: the natural turn on a copy, then the real turn on the live battle with the forced dice. */
 export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTurnInput): DiceReport {
   if (forced.length === 0 && !observe && !onDraw) {
     play(live);
@@ -178,7 +142,7 @@ export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTu
     live.prng = inner;
   }
   inner.setSeed(natural.endSeed as Parameters<PRNG['setSeed']>[0]);
-  // the roll of the next turn was drawn at the end of the real turn from a stream the forced die may have moved: the natural one stands
+  // The next turn's roll came from a stream the forced die may have moved: the natural one stands.
   if (natural.startRoll !== undefined) (live as unknown as StartRoll).quickClawRoll = natural.startRoll;
   return {
     forced: forced.map(die => reportOf({

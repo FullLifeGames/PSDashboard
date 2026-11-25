@@ -9,9 +9,7 @@ import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import type { WinPathsHost } from '../../../src/lib/win-paths-host';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
-/** Round 89 (#104), step G4: the Game review panel, singles and doubles. */
 const host = (onPlay = vi.fn()): LinesHost => ({ rules: { gen: 9, mod: undefined }, onPlay });
-/** The ranking that holds the fixtures' answers: Tzon's Draining Kiss and pixelfrost's opponent pair are each side's top choice. */
 const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
 const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({
   ...evalResult(kind), lines,
@@ -45,7 +43,6 @@ describe('GameReviewPanel, singles', () => {
     const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
     expect(within(tzon).getAllByRole('button', { name: /^T\d+$/ }).map(button => button.textContent)).toEqual(['T9']);
     expect(within(pepito).getAllByRole('button', { name: /^T\d+$/ }).map(button => button.textContent)).toEqual(['T20', 'T21']);
-    // the quiet turns are not listed
     expect(screen.queryByRole('button', { name: 'T1' })).toBeNull();
     expect(within(pepito).getByText(/inaccuracy/)).toBeInTheDocument();
     expect(within(pepito).getByText(/blunder/)).toBeInTheDocument();
@@ -123,7 +120,6 @@ describe('GameReviewPanel, doubles', () => {
   });
 });
 
-/** Round 89 (#130), step G8b: the Endgame row of the player who lost. */
 const endgameHost = (extra: Partial<WinPathsHost> = {}): LinesHost & { winPaths: WinPathsHost } => ({
   rules: { gen: 9, mod: undefined },
   winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
@@ -138,7 +134,6 @@ describe('GameReviewPanel, the Endgame row', () => {
     const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
     await userEvent.click(button);
     expect(lined.winPaths.show).toHaveBeenCalledWith(23, 'review');
-    // only for the loser: the winner has no such row
     expect(screen.queryByRole('button', { name: /How could Tzon have won/ })).toBeNull();
   });
 
@@ -185,7 +180,6 @@ describe('GameReviewPanel, the Endgame row', () => {
   });
 });
 
-/** Round 89 (#104), step G10 (ruling G5a): each review line ends with its own number, and one sentence stands under the review when a line differs. */
 describe('GameReviewPanel, both numbers', () => {
   const SENTENCE = "A row's value averages every answer and die the search tried; a line follows one answer with each die at its likeliest result.";
 
@@ -221,10 +215,7 @@ describe('GameReviewPanel, both numbers', () => {
   });
 });
 
-/**
- * Round 89 (#104), step G13: while the early-lines stage searches the graded matrix turns, the review's header says how far it is
- * and offers a Stop. Singles only in practice; the panel draws what the host hands it for either game type.
- */
+// Singles only in practice; the panel draws what the host hands it for either game type.
 describe('GameReviewPanel, the early-lines progress line', () => {
   const PROGRESS = 'Finding lines for graded turns: 2 of 6';
 

@@ -43,7 +43,6 @@ describe('secondary fishing', () => {
 
 describe('crit vs boost wall', () => {
   test('attacks into a boosted special wall accumulate crit odds', () => {
-    // Different moves are fine — the crit streak keys on attacker+defender.
     const e = (moveId: string) => entry({ moveId, defenderBoosts: { def: 0, spd: 2 }, defenderAbility: 'shielddust' });
     const result = detectStreakOdds(6, [e('icebeam'), e('earthpower'), e('icebeam')]);
     expect(result).not.toBeNull();
@@ -56,7 +55,6 @@ describe('crit vs boost wall', () => {
     expect(detectStreakOdds(8, [e(), e(), e()])!.perTurn).toBeCloseTo(1 / 24, 9);
   });
   test('no boost, no crit story', () => {
-    // Earth Power's only secondary is a stat drop (not fished), no boosts → null.
     const e = () => entry({ defenderAbility: 'shielddust', moveId: 'earthpower' });
     expect(detectStreakOdds(6, [e(), e(), e()])).toBeNull();
   });

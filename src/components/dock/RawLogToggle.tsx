@@ -1,6 +1,5 @@
 import { useState } from 'react';
 
-/** Round 84 (turn dock): the Raw Protocol Log toggle, the old panel's toggle. It stays above the dock at every position. */
 export function RawLogToggle({ log }: { log: string[] }) {
   const [showLog, setShowLog] = useState(false);
   return (

@@ -11,8 +11,7 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
-// Positions rebuild for real on the test thread; the search itself answers
-// from a script, so the sweep fills the graph in one go.
+// Positions rebuild for real; the search answers from a script, so the sweep fills the graph at once.
 const searches = vi.hoisted(() => ({ settings: [] as EvalSettings[] }));
 vi.mock('../../../src/lib/eval/worker-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/eval/worker-client')>();
@@ -31,7 +30,6 @@ vi.mock('../../../src/lib/eval/worker-client', async (importOriginal) => {
 const { useAppController } = await import('../../../src/hooks/useAppController');
 const { WorkspaceEvalColumn } = await import('../../../src/components/WorkspaceEvalColumn');
 
-/** The evaluation column over the real controller; the ref always holds the newest render's controller. */
 function Column({ latestRef }: { latestRef: { current: AppController | null } }) {
   const app = useAppController();
   useEffect(() => { latestRef.current = app; });
@@ -72,8 +70,7 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByRole('img', { name: /Evaluation over/ })).toBeNull();
   }, 60_000);
 
-  test('at turn 0 the play-out hint names the picked leads, not a turn (round 77, C2)', async () => {
-    // Lane C of the branching swarm: at T0 the hint read "from turn 3" while the run starts from the lead decision.
+  test('at turn 0 the play-out hint names the picked leads, not a turn', async () => {
     const app = await mountLoaded();
     act(() => app().board.timeline.handleGraphSelectLine(0));
     await waitFor(() => expect(app().board.timeline.viewT0).toBe(true));
@@ -91,9 +88,6 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.getByText('Game report', { selector: 'span' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeInTheDocument();
 
-    // The slider moves the analysis turn: that turn's view opens with its provenance. Round 63 (T110): auto runs an
-    // early singles turn on the matrix with three draws. Round 67 (T109, gate answer 5b): an analyzed turn offers no
-    // deeper stage.
     act(() => app().board.timeline.navigateTo({ turn: 3, line: 'main' }));
     await waitFor(() => expect(app().analysis.turnAnalysis?.turn).toBe(3));
     expect(screen.getByText('Turn 3')).toBeInTheDocument();
@@ -101,30 +95,24 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Evaluate/ })).toBeNull();
 
-    // The graph's T0 point opens the team-preview analysis: the replay has a preview, so the sweep graded the leads.
     act(() => app().board.timeline.handleGraphSelectLine(0));
     await waitFor(() => expect(app().board.timeline.analysisTurn).toBe(0));
     expect(app().analysis.leadAnalysisData).not.toBeNull();
     expect(screen.getByText('Team preview')).toBeInTheDocument();
     expect(screen.queryByText('Turn 3')).toBeNull();
-    // Round 89 (FB-1): the rows at T0 rank the leads, and no code applies a lead to the picker, so a click on one opened an empty
-    // variation at turn 1 ("Variation tip: Turn 1"). They read as rows, not buttons, until a feature applies them to the picker.
     expect(document.querySelectorAll('.ps-eval-choice').length).toBeGreaterThan(0);
     expect(document.querySelectorAll('button.ps-eval-choice')).toHaveLength(0);
     expect(app().ctx.branch.simState).toBeNull();
 
-    // Entering a variation: the live evaluation view owns the panel, the analysis block and report step back.
     act(() => app().board.timeline.navigateTo({ turn: 2, line: 'main' }));
     act(() => app().board.deviation.requestDeviation(null));
     await waitFor(() => expect(app().board.timeline.liveEvalView).toBe(true), { timeout: 60_000 });
-    // Round 84 (A5): the dock's fill runs the engine at the tip by itself, so the entry reads Cancel while it runs and Re-evaluate after.
+    // The dock's fill runs the engine at the tip by itself: Cancel while it runs, Re-evaluate after.
     expect(screen.getByRole('button', { name: /evaluate|cancel/i })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(screen.queryByText(/^Turn \d$/)).toBeNull();
-    // Round 89 (#104, G4d): a deviation that has played no turn is no variation to leave: no way back to offer (the e2e specs of the
-    // Lines section and the review click the button on a played line's variation).
     expect(screen.queryByRole('button', { name: 'Back to the main line' })).toBeNull();
   }, 240_000);
 });

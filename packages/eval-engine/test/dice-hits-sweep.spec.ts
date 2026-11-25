@@ -8,12 +8,6 @@ import {
   type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A3a: the hit count sweep. Every move that hits more than once, singles and doubles. A move with
-// a range of hits (Fury Attack, Double Slap, Triple Kick in Gen 2) takes every count of its range forced, the accuracy forced
-// to hit, and the report is held against the protocol's `|-hitcount|` line. A move with a fixed count (Double Kick) and Skill
-// Link draw no count: the report says no-draw with the fixed number. A move whose every hit rolls its own accuracy (Triple
-// Axel, Population Bomb) takes the accuracy die for every hit: yes gives every hit, no a miss before the first. Loaded Dice
-// makes a count of two or three unreachable (no-chance) and a count from four reachable, by a second draw the learner finds.
 await loadSimMods('gen9championsou');
 
 const FAST = 'Pikachu';
@@ -34,11 +28,9 @@ afterAll(() => {
 const hit = (move: string, slot = 'p2a'): ForcedDie => ({ name: dieOf(move, slot, 'accuracy'), result: { happens: true } });
 const countDie = (move: string, hits: number): ForcedDie => ({ name: { slot: 'p1a', moveId: move, kind: 'hit-count' }, result: { hits } });
 
-/** The numbers of the `|-hitcount|` lines of the forced turn. */
 const hitcounts = (lines: string[]): number[] => lines.filter(line => line.startsWith('|-hitcount|')).map(line => Number(line.split('|')[3]));
 const countsOf = (battle: Parameters<typeof missesOf>[0], start: number): number[] => hitcounts(battle.log.slice(start));
 
-/** The first click the move needs: a charge move plays its first turn plain. */
 function readyBoard(rules: Rules, mode: Mode, move: DexMove, species = FAST) {
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', false, species);
   let clicks = sweepClicks(mode, move.target);
@@ -75,7 +67,6 @@ describe.each(SWEEP_CASES)('the hit count sweep: $name', ({ rules, mode, name })
         expect(countsOf(battle, start), `${move.id} ${hits}`).toEqual([hits]);
         tally.applied++;
       }
-      // a count outside the range cannot be given
       const { report } = forcedOn(board, clicks, [hit(move.id), countDie(move.id, high + 1)]);
       expect(report.forced[1].took, `${move.id} ${high + 1}`).toBe('no-chance');
       tally.cases++;
@@ -123,7 +114,6 @@ describe.each(SWEEP_CASES)('the hit count sweep: $name', ({ rules, mode, name })
   test('the sweep exercised the moves', () => conclude(name, moves, tally));
 });
 
-/** Whether the rule set has the ability or item (the Dex of the game decides). */
 const has = (rules: Rules, kind: 'items' | 'abilities', id: string): boolean => {
   const dex = dexOfRules(rules);
   const entry = dex[kind].get(id);
@@ -134,7 +124,6 @@ const played = new Map<string, number>();
 const play = (row: string): void => void played.set(row, (played.get(row) ?? 0) + 1);
 
 describe.each(SWEEP_CASES)('the hit count rules: $name', ({ rules, mode }) => {
-  /** A forced turn of one move on an outfitted board. */
   function turn(move: string, outfit: { item?: string; ability?: string }, forced: ForcedDie[]) {
     const board = outfitBoard(rules, mode, { species: FAST, moves: [move], ...outfit }, { species: 'Vaporeon' });
     return forcedOn(board, sweepClicks(mode, 'normal'), forced);

@@ -5,11 +5,6 @@ import { parsePlayedActions, parsePlayedActionsDoubles } from '@fulllifegames/ev
 import { usePlayedAtView } from '../../../src/hooks/usePositionPicker';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
 
-/**
- * Round 77 (branching swarm, B3): in doubles the "played" hint showed on slot A only, and on the main line not at all.
- * parsePlayedActionsDoubles reads one action per slot (`p1Slots`, `p2Slots`) and leaves `p1`/`p2` empty, so the hook
- * returned nothing for every doubles turn of the replay; behind the tip of a variation it kept the first slot's pick.
- */
 type Args = Parameters<typeof usePlayedAtView>[0];
 
 const RULES = logRules('|gen|9\n|tier|[Gen 9] OU');
@@ -36,7 +31,7 @@ describe('usePlayedAtView', () => {
       '|move|p1b: Flutter Mane|Moonblast|p2b: Urshifu',
     ];
     const { result } = renderHook(() => usePlayedAtView(args({ doubles: true, snapshots: snapshotsWith(3, log) })));
-    // Round 84 (turn dock): each move pick carries the target the log names (1 and 2 are the foe slots of the mover, negative its own side).
+    // Target locs: 1 and 2 are the foe slots of the mover, negative its own side.
     expect(result.current?.p1Slots).toEqual([
       { kind: 'move', name: 'Fake Out', targetLoc: 1 },
       { kind: 'move', name: 'Moonblast', targetLoc: 2 },
@@ -60,7 +55,6 @@ describe('usePlayedAtView', () => {
     const { result } = renderHook(() => usePlayedAtView(args({
       doubles: true, viewingVariation: true, variationSpan: { startTurn: 3 } as Args['variationSpan'], viewTurn: 3, history,
     })));
-    // Round 84: the recorded choice rides along whole (target, gimmick and dice), for the dock's seed.
     expect(result.current?.p1Slots).toEqual([
       { kind: 'move', name: 'Fake Out', recorded: history[0].p1SlotChoices![0] },
       { kind: 'switch', name: 'Grimmsnarl', species: 'grimmsnarl', recorded: history[0].p1SlotChoices![1] },
@@ -75,8 +69,7 @@ describe('usePlayedAtView', () => {
     expect(result.current).toEqual({ p1: { kind: 'move', name: 'Ice Beam' }, p2: { kind: 'move', name: 'Earthquake' } });
   });
 
-  test('doubles: the target, a spread move without one, and the gimmick of each slot reach the pick (round 84, turn dock)', () => {
-    // The dock seeds each chip with what the log played; fromAction used to drop the target and the Tera, Mega and Ultra flags.
+  test('doubles: the target, a spread move without one, and the gimmick of each slot reach the pick (turn dock)', () => {
     const log = [
       '|move|p1a: Greninja|Rock Slide|p2a: Regigigas|[spread] p2a,p2b',
       '|-terastallize|p1b: Conkeldurr|Fighting',

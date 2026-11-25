@@ -6,12 +6,6 @@ import { replayFixture } from '../fixtures/replay';
 import { rolledCopyParams } from '../../../src/lib/rolled-copy-stage';
 import type { RolledCopyJob, RolledCopyOutcome } from '../../../src/lib/replay-jobs/types';
 
-/**
- * Round 86 (T304): the app's half of the sweep's biggest-roll stage. The replay worker plays the copy of the roll's turn (one worker, spawned
- * for the one call and ended after it), the job carries the roll in the report's words, and the cache key of the copy's evaluation sits
- * beside the turn keys of the replay. The roll itself is the report's (`namedRollOf`, tested with the walk).
- */
-
 const { replayData, snapshots } = replayFixture('singles');
 const FORMAT = getBranchSimulatorFormat(replayData);
 

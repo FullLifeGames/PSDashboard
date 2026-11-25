@@ -7,7 +7,7 @@ function replayLogPrefixThroughTurn(replayLog: string, targetTurn: number): stri
   const prefix: string[] = [];
   let foundTargetTurn = false;
 
-  // The log reaches here through a door that settled its line endings (reconstructBranchRuntime, adoptSerializedRuntime).
+  // The log arrives with LF endings already settled (reconstructBranchRuntime, adoptSerializedRuntime).
   for (const line of replayLog.split('\n')) {
     if (!line.trim()) continue;
     prefix.push(line);
@@ -25,12 +25,7 @@ export function replaceLogWithReplayPrefix(log: string[], replayLog: string, tar
   log.splice(0, log.length, ...replayLogPrefixThroughTurn(replayLog, targetTurn));
 }
 
-/**
- * The protocol log a reconstruction arriving at `targetTurn` hands to the
- * branch: the replay's own lines through `|turn|N`, plus switch lines for
- * actives the corrections repointed (the tail of finishReconstruction).
- * An adopted position (round 38) rebuilds it from the same two steps.
- */
+/** The log a branch at `targetTurn` starts from: the replay through `|turn|N` plus switches for repointed actives. */
 export function branchLogForPosition(replayLog: string, targetTurn: number, battle: SimBattle): string[] {
   const log = replayLogPrefixThroughTurn(replayLog, targetTurn);
   syncLogActivesFromBattle(log, battle, targetTurn);
@@ -58,7 +53,6 @@ export function parseLoggedActive(line: string): LoggedActive | null {
 
 export function activeMatchesLog(pokemon: SimPokemon, logged: LoggedActive | undefined): boolean {
   if (!logged) return false;
-  // Round 88 (#103): the species counts by the Dex of the battle, one body in another forme included.
   return sameBodyName(logged.name, pokemon.name) || sameBodyForme(pokemon.battle.dex, pokemon.species?.name, logged.speciesId);
 }
 

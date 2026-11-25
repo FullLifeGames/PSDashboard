@@ -32,10 +32,8 @@ function EmbedLoadStatus({ app }: { app: AppController }) {
   );
 }
 
-/** Round 89 (#105, H4c): the address names a game this browser does not hold. */
 function MissingGameNotice({ app }: { app: AppController }) {
   const id = app.ctx.address.missingGame;
-  // it stands on the start page only: nothing is open, no shared branch owns the view, no host owns the page
   if (!id || app.ctx.replay.replayData || app.ctx.shared.sharedBranch || app.ctx.replay.embed) return null;
   return (
     <div className="ps-entry-notice" role="alert">
@@ -44,7 +42,6 @@ function MissingGameNotice({ app }: { app: AppController }) {
   );
 }
 
-/** Round 89 (#105, H5): a game's share link on its way, or the reason it did not open. */
 function SharedGameNotice({ app }: { app: AppController }) {
   const { opening, error } = app.sharedGame;
   if (error) return <div className="ps-panel" role="alert" style={{ marginTop: 8, color: '#f3a6a6', fontSize: 11 }}>Unable to open the shared game: {error}</div>;
@@ -79,21 +76,18 @@ function AppModals({ app }: { app: AppController }) {
     editorSide, setEditorSide, saveTeam,
   } = app.ctx.knowledge;
   const { replayGen } = app.ctx.meta;
-  // Round 89 (#105): the editor of a new game changes the game's record, not the replay's overlay.
   const { record, editTeams, planTeams } = app.ctx.newGame;
   const gameEdit = useGameTeamEdit({ record, planTeams, editTeams, variationOpen: variationOpen(app), stopBranch: app.board.discardVariation, close: () => setEditorSide(null) });
   const onSave = (side: 'p1' | 'p2', info: Parameters<typeof saveTeam>[1]) => { if (!gameEdit.edit(side, info)) saveTeam(side, info); };
   return (
     <>
       <GameEditNotices edit={gameEdit} />
-      {/* H14a follow-up: while the cut question stands, the editor stays mounted under it (hidden), so Cancel returns to the text as typed. */}
+      {/* Hidden, not unmounted, while the cut question stands: Cancel returns to the text as typed. */}
       <div hidden={gameEdit.hold}>
       {setsPanelOpen && replayData && (
         <SetsImportExportPanel
           game={record !== null}
-          // Round 70 (T205): the export reads what the stats panel shows (the solved spreads, the posted sheet), not the
-          // enriched infos: those hold the usage guesses and the published IVs, and an import takes every value it reads
-          // as the user's own input over the solver.
+          // The export reads the solved spreads and posted sheet, not the enriched infos: those hold usage guesses.
           exportText={buildSetsExport({
             p1Name: replayData.players[0] ?? 'p1',
             p2Name: replayData.players[1] ?? 'p2',
@@ -101,8 +95,6 @@ function AppModals({ app }: { app: AppController }) {
             p2Info: statsP2Info,
           })}
           onImport={text => {
-            // a game's sets belong to its record: the import plays it again on them (editTeams), as the editor does; the panel closes
-            // when the edit applies (after the cut question, if one is asked), not at the click
             const importError = applySetsText(text, record ? next => { gameEdit.editSides(next, () => setSetsPanelOpen(false)); } : undefined);
             if (!importError && !record) setSetsPanelOpen(false);
             return importError;
@@ -142,14 +134,11 @@ function App() {
   const app = useAppController();
   const { embed, replayData } = app.ctx.replay;
   const { sharedBranch, sharedBranchError, clearSharedBranch, handleLoadSharedOriginal } = app.ctx.shared;
-  // Round 89 (#105): the New game dialog opens from the Game menu and from the start page's New game panel.
   const [newGameOpen, setNewGameOpen] = useState(false);
   const openNewGame = () => setNewGameOpen(true);
 
   return (
     <div className="ps-app-root">
-      {/* Header (hidden when framed by a host site, and once a replay is
-          loaded — on a 1080p screen every row above the pickers counts). */}
       {!embed && !replayData && (
         <div className="ps-app-header" style={{ borderRadius: '0 0 5px 5px' }}>
           <h1>PS Dashboard</h1>
@@ -180,7 +169,6 @@ function App() {
       <EvictedGameNotice />
 
       {!replayData && !sharedBranch && (embed ? (
-        // The host page provides the replay — no loader chrome in embed mode.
         <EmbedLoadStatus app={app} />
       ) : (
         <LoaderScreen app={app} onNewGame={openNewGame} />

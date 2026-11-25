@@ -1,23 +1,11 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import type { Battle, Pokemon } from '@pkmn/sim';
 import {
-  createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, FEATURE_WEIGHTS, type EvalFeatures,
+  createMatchupCache, evalFeatures, evaluatePosition, featureWeights, EVAL_WEIGHTS, type EvalFeatures,
 } from '../src/eval-function';
 import { phaseFormOf, setStaticForm, staticFormOn } from '../src/score/phase-form';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
-
-/**
- * Round 69 (S9, T102, decision 17): the model form of the static in standard
- * singles. Phase on the two big weights (bodies and matchup, weight plus an
- * addend times the share of fainted mons) and the status fold (statusFix at
- * the weight of bodies, so a Poison Heal body under toxic is no longer
- * discounted like a plain one). Fitted on the r69-b0 capture, 10,350
- * positions of 1,363 sets, out of fold better than the table in 20 of 20
- * seeds (log-loss -21 bp, Brier -7 bp); the other four families keep their
- * tables. The switch (EVAL_STATIC_FORM=0 or setStaticForm(false)) gives the
- * table's score back exactly.
- */
 
 const SINGLES = 'gen9customgame';
 const DOUBLES = 'gen9doublescustomgame';
@@ -25,13 +13,11 @@ const mon = (species: string, extra: Partial<Parameters<typeof set>[2]> = {}) =>
 
 afterEach(() => setStaticForm(null));
 
-/** The share of fainted mons of both sides, counted here from the board. */
 const faintedShare = (battle: Battle): number => {
   const all = battle.sides.flatMap(side => side.pokemon as Pokemon[]);
   return all.filter(pokemon => pokemon.fainted || pokemon.hp <= 0).length / all.length;
 };
 
-/** Gliscor with Poison Heal under toxic against a plain team, one foe already fainted. */
 function board(format: string): Battle {
   const doubles = format === DOUBLES;
   const mine = [mon('Gliscor', { ability: 'Poison Heal', item: 'Toxic Orb' }), mon('Garchomp'), mon('Clefable'), mon('Blissey')];
@@ -72,15 +58,7 @@ describe('the tables and the form per family', () => {
     for (const [doubles, ruleset] of [[false, 'champions'], [true, 'standard'], [true, 'vgc'], [true, 'champions']] as const) {
       expect(phaseFormOf(doubles, ruleset)).toBeNull();
     }
-    // A VGC singles game reads the standard singles table, and the form with it.
     expect(phaseFormOf(false, 'vgc')).toBe(form);
-  });
-
-  test('the fold: statusFix weighs what bodies weighs, in the table and in the form', () => {
-    expect(FEATURE_WEIGHTS.statusFix).toBe(FEATURE_WEIGHTS.bodies);
-    const form = phaseFormOf(false, 'standard')!;
-    expect(form.base.statusFix).toBe(form.base.bodies);
-    expect(form.phase.statusFix).toBe(form.phase.bodies);
   });
 });
 

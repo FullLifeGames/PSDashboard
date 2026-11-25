@@ -1,50 +1,31 @@
 import type { EvalMatrix, ReadRecommendation } from './types.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 
-/**
- * The exploitative "Read" lens: a boundedly-rational opponent model and a
- * best response over the ALREADY-SOLVED matrix — no new sim work. Pure,
- * main-bundle safe, deterministic.
- *
- * Model = λ·equilibriumMix + (1−λ)·softmax(τ·opponentOwnEVs), optionally
- * sharpened by the player's observed tendencies from this replay. λ is the
- * Restricted-Nash-Response honesty knob: reads stay anchored to balanced
- * play so a wrong model cannot fully faceplant. Verdict GRADING never uses
- * this — equilibrium stays the grade; the read is advice.
- */
+// The Read lens is advice only: grading stays equilibrium.
 
 /** RNR anchor: this share of the model is always the equilibrium mix. */
 export const READ_LAMBDA = 0.3;
-/** Softmax temperature over the opponent's own EVs (wp-units). */
+// Softmax temperature over the opponent's own EVs (wp-units).
 const READ_TAU = 4;
 /** Reads only surface when the model's top probability reaches this. */
 export const READ_CONFIDENCE = 0.55;
-/**
- * Round 47: the summary's predictive sentence ("If you expect X, Y is the
- * move") needs a surer favourite than the turn card's Read row. Measured on
- * the six feedback dumps: 4 of 279 turns speak at 0.6 with a mistake-sized gain.
- */
 export const PREDICTIVE_READ_CONFIDENCE = 0.6;
-/** Round 47: the hindsight read calls the actual click the likeliest one only when the model's favourite holds this share. */
+/** The hindsight read calls the actual click the likeliest one only when the model's favourite holds this share. */
 export const LIKELIEST_CLICK_MIN = 0.3;
 
 export interface OpponentModel {
-  /** Aligned with the opponent's label array in the matrix. */
   probs: number[];
-  /** Top probability — the model's confidence in its favourite. */
   confidence: number;
 }
 
+/** A side's share of main-choice turns spent on moves and on switches, and how often a move repeated the last move. */
 export interface PlayerTendencies {
-  /** Share of main-choice turns spent clicking a move. */
   attackRate: number;
-  /** Share spent switching. */
   switchRate: number;
   /** How often a move turn repeated the previous move (0..1). */
   repeatBias: number;
 }
 
-/** The running counts of one side's tendency scan. */
 interface TendencyScan {
   moves: number;
   switches: number;
@@ -59,7 +40,6 @@ interface TendencyScan {
   pendingFaints: number;
 }
 
-/** Books one protocol line into the scan: turn markers, forced replacements, then the first move or non-pivot switch. */
 function noteTendencyLine(scan: TendencyScan, line: string, side: 'p1' | 'p2'): void {
   if (line.startsWith('|turn|')) {
     scan.started = true;
@@ -93,10 +73,7 @@ function noteTendencyLine(scan: TendencyScan, line: string, side: 'p1' | 'p2'): 
   }
 }
 
-/**
- * Per-side action tendencies from the replay protocol: the first |move| or
- * non-pivot |switch| after each |turn| marker is that side's main choice.
- */
+/** The first |move| or non-pivot |switch| after each |turn| marker is that side's main choice. */
 export function parseTendencies(rawLog: string, side: 'p1' | 'p2'): PlayerTendencies {
   const scan: TendencyScan = {
     moves: 0, switches: 0, repeats: 0, repeatChances: 0, lastMove: null,
@@ -113,21 +90,12 @@ export function parseTendencies(rawLog: string, side: 'p1' | 'p2'): PlayerTenden
   };
 }
 
-/**
- * Switch-kind classification on the machine choice id ('switch 3',
- * 'team 12'); the display-label heuristic remains only as the fallback for
- * cached matrices written before choice ids existed.
- */
+// By the machine choice id ('switch 3', 'team 12'); the label heuristic is the fallback for matrices without ids.
 const isSwitchChoice = (choiceId: string | undefined, label: string): boolean =>
   choiceId !== undefined ? /^(?:switch |team )/.test(choiceId) : (label.startsWith('→') || label.startsWith('Lead '));
 
-/**
- * Status-quo-biased reference for MY play: humans click what is best
- * against the field AS IT STANDS, discounting switch-outs — softmaxing
- * against my full equilibrium mix would find only indifference (that is
- * what equilibrium support means). My mix restricted to move options,
- * renormalized; uniform over moves as fallback; full mix if I can only switch.
- */
+// Humans click what is best against the field AS IT STANDS, discounting switch-outs: softmaxing against my full
+// equilibrium mix would find only indifference. My mix restricted to move options; uniform over moves as fallback.
 function statusQuoMix(rawMyMix: number[], myLabels: string[], myChoices: string[] | undefined): number[] {
   const moveIndices = myLabels.map((label, index) => ({ label, index }))
     .filter(entry => !isSwitchChoice(myChoices?.[entry.index], entry.label))
@@ -145,10 +113,6 @@ function statusQuoMix(rawMyMix: number[], myLabels: string[], myChoices: string[
   return myMix;
 }
 
-/**
- * Tendency prior: reallocate mass between move-kind and switch-kind option
- * groups toward the player's observed rates; within-group shape stands.
- */
 function applyTendencies(
   probs: number[],
   tendencies: PlayerTendencies,
@@ -165,10 +129,7 @@ function applyTendencies(
   return scaled.map(p => p / total);
 }
 
-/**
- * The opponent model for `side`'s Read: probabilities over the OTHER side's
- * matrix options.
- */
+/** Probabilities over the OTHER side's options: λ·equilibriumMix + (1−λ)·softmax(τ·own EVs), tendency-sharpened. */
 export function modelOpponent(
   matrix: EvalMatrix,
   side: 'p1' | 'p2',
@@ -183,12 +144,11 @@ export function modelOpponent(
 
   const myMix = statusQuoMix(matrix.mixes[side], myLabels, myChoices);
 
-  // The opponent's own EV per option against the status-quo reference.
   const ownEv = labels.map((_, index) => {
     let value = 0;
     if (opponent === 'p2') {
       for (let i = 0; i < myMix.length; i++) value += matrix.values[i][index] * myMix[i];
-      return -value; // p2's own perspective
+      return -value;
     }
     for (let j = 0; j < myMix.length; j++) value += matrix.values[index][j] * myMix[j];
     return value;
@@ -205,7 +165,6 @@ export function modelOpponent(
   return { probs, confidence: Math.max(...probs) };
 }
 
-/** The argmax rows against the model and against the equilibrium (first encounter wins ties). */
 function bestResponses(
   myLabels: string[],
   oppLabels: string[],
@@ -236,11 +195,7 @@ function bestResponses(
   return { bestRead, bestReadEv, bestEquilibrium };
 }
 
-/**
- * Best response to the opponent model, own perspective. Returns null when
- * the model is not confident or the read agrees with the equilibrium best —
- * a read that recommends the equilibrium line is not a read.
- */
+/** Best response to the opponent model; null when the model is not confident or agrees with the equilibrium best. */
 export function computeRead(
   matrix: EvalMatrix,
   side: 'p1' | 'p2',

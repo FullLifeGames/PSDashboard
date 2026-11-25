@@ -2,17 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { Battle as LiveBattle, Teams, type Battle, type PokemonSet } from '@pkmn/sim';
 import { correctActivesFromProtocol } from '../src/branch/corrections';
 
-/**
- * Round 78 (@pkmn 0.10.12): Gens 1 to 4 play their entry inside BattleActions#switchIn now; the gen 4 mod's runSwitch,
- * which ran EntryHazard and SwitchIn, is gone. EntryHazard brings the hazards, Healing Wish and Lunar Dance,
- * AfterSwitchInSelf the gen 1 and 2 status conditions, AfterEntryHazard the gen 3 weather abilities after turn 0, and a
- * Knocked-Off Pokémon drops a regained item. A body the boundary correction puts in (playEntry in entry-effects.ts) ran
- * only runSwitch, so in Gens 3 and 4 it took no Spikes or Stealth Rock. The sweep plays every Dex entry these events
- * reach, in each generation, two ways: the simulator's own entry (a replacement after a faint, or a switch at the
- * boundary), and the correction of a protocol that shows the same entry. The entering body and its side must match.
- * Gen 9 rows hold the path of Gens 5 on, where runSwitch plays the entry. (Gen 1 and 2 `residualdmg` is a volatile that a
- * switch-out clears, so no entering body carries it.)
- */
+// Gens 1 to 4 play their entry inside BattleActions#switchIn, so a body the correction puts in must play it too.
 
 type Body = Battle['sides'][number]['pokemon'][number];
 
@@ -20,7 +10,6 @@ interface Row {
   gen: number;
   label: string;
   entering?: Partial<PokemonSet>;
-  /** Run on both battles right before the entry: the side conditions, the weather, the entering body's state. */
   setup?: (battle: Battle, entering: Body) => void;
 }
 
@@ -32,7 +21,6 @@ const set = (gen: number, species: string, moves: string[], extra: Partial<Pokem
 const enteringName = (row: Row) => row.entering?.species ?? 'Snorlax';
 const enteringBody = (row: Row, battle: Battle) => battle.sides[0].pokemon.find(body => body.species.name === enteringName(row))!;
 
-/** Turn 1 played (Growl on both sides): the board stands at a boundary. */
 function make(row: Row): Battle {
   const p1 = [set(row.gen, 'Tauros', ['Growl']), set(row.gen, enteringName(row), ['Growl', 'Rest'], row.entering)];
   const p2 = [set(row.gen, 'Starmie', ['Swift', 'Growl'])];
@@ -49,7 +37,6 @@ function make(row: Row): Battle {
   return battle;
 }
 
-/** Turn 2 with Tauros at 1 HP: Starmie's Swift K.O.s it, or Growl leaves it standing. */
 function playTurnTwo(battle: Battle, knockOut: boolean) {
   battle.sides[0].active[0]!.hp = 1;
   battle.choose('p1', 'move 1');
@@ -60,7 +47,6 @@ const drain = (battle: Battle) => {
   while (battle.queue.list.length > 0) battle.runAction(battle.queue.shift()!);
 };
 
-/** The simulator's own entry: the replacement after Tauros's faint, or a switch at the boundary. */
 function simulatorEntry(row: Row, afterFaint: boolean): Battle {
   const battle = make(row);
   if (afterFaint) {
@@ -76,7 +62,6 @@ function simulatorEntry(row: Row, afterFaint: boolean): Battle {
   return battle;
 }
 
-/** The correction: the simulator kept Tauros on the field, the protocol shows the entry (after Tauros's faint). */
 function correctedEntry(row: Row, afterFaint: boolean): Battle {
   const battle = make(row);
   if (afterFaint) playTurnTwo(battle, false);
@@ -86,7 +71,6 @@ function correctedEntry(row: Row, afterFaint: boolean): Battle {
   return battle;
 }
 
-/** What an entry can change: the entering body and the side it entered. */
 function entryState(battle: Battle) {
   const body = battle.sides[0].active[0]!;
   const side = battle.sides[0];
@@ -95,8 +79,7 @@ function entryState(battle: Battle) {
     item: body.item, pp: body.moveSlots.map(slot => slot.pp), boosts: { ...body.boosts },
     sideConditions: Object.fromEntries(Object.entries(side.sideConditions).map(([id, state]) => [id, (state as { layers?: number }).layers ?? 1])),
     weather: battle.field.weather,
-    // Gens 1 and 2 forget every active Pokémon's last move at an entry; later the foe's last move is the harness's own
-    // (Swift for the faint, Growl where the correction keeps Tauros alive).
+    // Gens 1 and 2 forget every active Pokémon's last move at an entry; later the foe's last move is the harness's own.
     foeLastMove: battle.gen <= 2 ? battle.sides[1].active[0]?.lastMove?.id ?? null : 'not an entry effect',
   };
 }
@@ -128,8 +111,7 @@ const ROWS: Row[] = [
   { gen: 2, label: 'gen 2 spikes', setup: hazard('spikes') },
   { gen: 3, label: 'gen 3 spikes', setup: hazard('spikes') },
   ...['Drizzle', 'Drought'].map(ability => ({ gen: 3, label: `gen 3 ${ability}`, entering: { ability } })),
-  // A Gen 3 replacement after a faint enters before the turn's residuals, so the sand would hit a body it can hurt in the
-  // simulator's turn and not at the correction's boundary: Tyranitar, the Sand Stream holder, is immune to it.
+  // A Gen 3 replacement enters before the turn's residuals; Tyranitar, the Sand Stream holder, is immune to the sand.
   { gen: 3, label: 'gen 3 Sand Stream: Tyranitar', entering: { species: 'Tyranitar', ability: 'Sand Stream' } },
   ...['Air Lock', 'Cloud Nine'].map(ability => ({ gen: 3, label: `gen 3 ${ability} in rain`, entering: { ability }, setup: rain })),
   { gen: 3, label: 'gen 3 Forecast: Castform in rain', entering: { species: 'Castform', ability: 'Forecast' }, setup: rain },
@@ -140,15 +122,14 @@ const ROWS: Row[] = [
   { gen: 9, label: 'gen 9 Drizzle', entering: { ability: 'Drizzle' } },
 ];
 
-describe('a body the correction puts in plays the entry the simulator plays (round 78, @pkmn 0.10.12)', () => {
+describe('a body the correction puts in plays the entry the simulator plays (@pkmn 0.10.12)', () => {
   for (const afterFaint of [true, false]) {
     test.each(ROWS.map(row => [row.label, row] as const))(`${afterFaint ? 'after a faint' : 'a switch at the boundary'}: %s`, (_label, row) => {
       expect(entryState(correctedEntry(row, afterFaint))).toEqual(entryState(simulatorEntry(row, afterFaint)));
     });
   }
 
-  // Air Lock and Cloud Nine only announce themselves on a Gen 3 entry (their weather suppression is read later), so
-  // their rows hold the entry to the simulator without changing a field of the board.
+  // Air Lock and Cloud Nine only announce themselves on a Gen 3 entry; their weather suppression is read later.
   const ANNOUNCING = ['gen 3 Air Lock in rain', 'gen 3 Cloud Nine in rain'];
 
   test('the rows are not empty: in every other row of Gens 1 to 4 the simulator\'s entry changes the body, its side or the field', () => {

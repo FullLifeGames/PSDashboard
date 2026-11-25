@@ -10,18 +10,12 @@ import {
   sweepTargets, VGC_RULES, type DexMove, type Tally,
 } from './dice-sweep-support';
 
-// Round 82 (forced dice), lane A2b: the crit sweep. Every damaging move that can crit (no fixed damage, no OHKO, no damage
-// callback, no sure crit), singles and doubles with every target on its own, with the accuracy forced to hit so the crit is
-// drawn, forced to crit and forced not to. The report is held against the protocol's `|-crit|` line. The rows that have no
-// chance: a move that always crits, a move that deals fixed damage, a target that blocks the crit, a sure crit by the
-// crit stage.
 await loadSimMods('gen9championsou');
 
 const damageCallback = (move: DexMove): boolean => !!(move as unknown as { damageCallback?: unknown }).damageCallback;
 const fixedDamage = (move: DexMove): boolean => !!move.damage || !!move.ohko || damageCallback(move);
 const canCrit = (move: DexMove): boolean => move.category !== 'Status' && !move.willCrit && !fixedDamage(move) && move.basePower !== 0;
 
-/** The reason of a report, or the word that it has none (a report that must have one fails with this). */
 const why = (report: DieReport): string => report.reason ?? 'no reason';
 
 const logPath = process.env.DICE_SWEEP_LOG;
@@ -32,7 +26,6 @@ afterAll(() => {
 
 const hit = (name: string, slot: string) => ({ name: dieOf(name, slot, 'accuracy'), result: { happens: true } });
 
-/** The problem with a report of a forced crit, or null when the report and the protocol agree. */
 function problemOf(report: DieReport, happens: boolean, crits: number, misses: number): string | null {
   switch (report.took) {
     case 'applied': return (happens ? crits >= 1 : crits === 0) ? null : `applied but the protocol shows ${crits} crits`;
@@ -42,7 +35,6 @@ function problemOf(report: DieReport, happens: boolean, crits: number, misses: n
   }
 }
 
-/** Forces the crit of one move to happen and not to, with the accuracy forced to hit, on every slot it can draw for; the problems found. */
 function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = false): string[] {
   const board = sweepBoard(rules, move.id, mode, '1,2,3,4', vgc);
   let clicks = sweepClicks(mode, move.target);
@@ -66,7 +58,6 @@ function exercise(rules: Rules, mode: Mode, move: DexMove, tally: Tally, vgc = f
         : problemOf(shown, happens, critsOf(battle, start, slot), missesOf(battle, start, slot));
       verdicts.push({ slot, report: shown, problem });
     }
-    // a move that picks one target draws for that one only
     const settled = picksOne(move.target) && verdicts.some(verdict => verdict.report.took !== 'no-draw' && !verdict.problem);
     for (const verdict of verdicts) {
       if (settled && verdict.report.took === 'no-draw') continue;
@@ -96,7 +87,6 @@ describe.each(SWEEP_CASES)('the crit sweep: $name', ({ rules, mode, name }) => {
 });
 
 describe.each(VGC_RULES.map(rules => ({ rules, name: `${rules.name} VGC` })))('the crit sweep, a team of six: $name', ({ rules, name }) => {
-  // every tenth move keeps the row short; the dice behave as in doubles, the row exists because VGC counts on its own
   const { moves, skipped } = sweepMoves(rules, canCrit);
   const some = moves.filter((_, index) => index % 10 === 0);
   const tally: Tally = newTally();
@@ -147,7 +137,6 @@ describe.each(SWEEP_CASES)('the crit rows with no chance: $name', ({ rules, mode
 describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the crit rows of a target and an attacker: $name', ({ rules, mode }) => {
   const outfit = (rules: Rules) => ({ level: rules.level, ...(rules.evs ? { evs: rules.evs } : {}) });
 
-  /** A board where side p2's lead has the given species and ability (Gens 3 and up). */
   function board(moveId: string, species: string, ability: string, mode: Mode, item = '') {
     const attacker = set('Snorlax', [moveId], { ...outfit(rules), gender: 'M', item });
     const foe = set(species, ['splash'], { ...outfit(rules), ability, gender: 'F' });
@@ -178,7 +167,6 @@ describe.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 3))('the cri
     const forcedNo = forcedOn(live, clicks, [hit('slash', slot), { name: dieOf('slash', slot, 'crit'), result: { happens: false } }]);
     const sure = critsOf(forcedNo.battle, forcedNo.start, slot) > 0;
     expect(forcedNo.report.forced[1].took === 'no-chance').toBe(sure);
-    // a forced crit shows in every case
     const forcedYes = forcedOn(live, clicks, [hit('slash', slot), { name: dieOf('slash', slot, 'crit'), result: { happens: true } }]);
     expect(critsOf(forcedYes.battle, forcedYes.start, slot)).toBeGreaterThan(0);
     expect(forcedYes.report.forced[1].took).toBe('applied');

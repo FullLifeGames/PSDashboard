@@ -1,9 +1,3 @@
-/**
- * Generates a standalone PS replay HTML page from a battle log string.
- * The generated HTML loads replay-embed.js from play.pokemonshowdown.com
- * which handles all rendering, animations, and playback controls.
- */
-
 import { EMBED_SCRIPT_ORDER_SCRIPT, fontAwesomeOverrideStyle, POINTER_SOURCE_SHIM_SCRIPT } from './replay-compat';
 import { tableSwapScript } from './teambuilder-table';
 import { PHONE_FIT_SCRIPT, PHONE_STYLES } from './replay-phone';
@@ -27,19 +21,11 @@ body{padding:0 0 12px;background:#344b6c;}
 .wrapper.replay-wrapper{margin-top:-9px;}
 </style>`;
 
-/**
- * Showdown's route table (play.pokemonshowdown.com/config/config.js). The
- * embed loader appends its dependencies as dynamic scripts, which run in
- * any order, and battledata.js reads `window.Config ? Config.routes.client
- * : default` at load time: a predefined Config WITHOUT routes crashes it
- * before Dex exists. Our mute stub therefore carries the routes; config.js
- * keeps its own when it has already run.
- */
+// Scripts load in any order and battledata.js reads `Config.routes.client` at load: the mute stub carries the routes.
 const PS_CONFIG_DEFAULTS = "{routes: {root: 'pokemonshowdown.com', client: 'play.pokemonshowdown.com', "
   + "dex: 'dex.pokemonshowdown.com', replays: 'replay.pokemonshowdown.com', users: 'pokemonshowdown.com/users', "
   + "teams: 'teams.pokemonshowdown.com'}}";
 
-/** Mutes the embed before it loads: every media handle it can reach becomes a silent stub. */
 const SILENT_AUDIO_SCRIPT = `<script>
 window.Config = Object.assign({}, ${PS_CONFIG_DEFAULTS}, window.Config || {}, {sound: false, mute: true});
 window.__psMakeSilentMedia = function makeSilentMediaHandle() {
@@ -92,7 +78,6 @@ let daily = Math.floor(Date.now()/1000/60/60/24);
 document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js?version'+daily+'"></'+'script>');
 </script>`;
 
-/** The parent bridge: seek and append messages in, ready and turn reports out. */
 const REPLAY_BRIDGE_BODY = `
   function silenceAudio() {
     window.Config = Object.assign({}, ${PS_CONFIG_DEFAULTS}, window.Config || {}, {sound: false, mute: true});
@@ -123,7 +108,7 @@ const REPLAY_BRIDGE_BODY = `
     setTimeout(function() { waitSeekEnd(battle); }, 100);
   }
 
-  // Ids of the play seeks already run: the app sends one request with retries, all under one id (round 88, T347).
+  // Ids of the play seeks already run: the app sends one request with retries, all under one id.
   var lastPlaySeekId = null;
 
   function applySeek() {
@@ -230,7 +215,7 @@ function replayBridgeScript(seekTurn: number | undefined, autoPlay: boolean, vie
 ${REPLAY_BRIDGE_BODY}`;
 }
 
-/** Reports landed turns to the parent (never mid-seek scrub positions). */
+// Reports landed turns, never mid-seek scrub positions.
 const TURN_TRACKER_SCRIPT = `
 <script>
 (function trackTurn() {
@@ -254,12 +239,7 @@ const TURN_TRACKER_SCRIPT = `
 })();
 </script>`;
 
-/**
- * The replay frame's height: the embed's battle, its two control rows and the body's bottom padding (445 px)
- * with a few pixels to spare for font rendering, so the document never scrolls (round 77, user request 28.10.2026:
- * the title under the controls went, and the frame shrank to its content). layout.css repeats it as the frame's
- * min-height; test/regression/replay-html.spec.ts holds the two equal.
- */
+/** 445 px of battle, controls and padding plus font slack, so the document never scrolls; layout.css repeats it. */
 export const REPLAY_FRAME_HEIGHT = 456;
 
 export function generateReplayHtml(opts: {
@@ -271,15 +251,10 @@ export function generateReplayHtml(opts: {
   seekTurn?: number;
   autoPlay?: boolean;
   reportTurn?: boolean;
-  /** Round 88 (T316): reports the side the frame shows near (`ps-side`), for the dock's row order. */
   reportSide?: boolean;
-  /** Round 88 (T316): hides Color scheme and Music (replay-controls.ts). */
   hideChoosers?: boolean;
-  /** Viewer perspective — 'p2' renders the battle from player 2's side (the ?p2 replay-URL flag). */
   viewpoint?: 'p1' | 'p2';
-  /** Replaces the embed's FontAwesome face (see replay-compat.ts). */
   fontAwesomeWoff2Url?: string;
-  /** Round 85 (T318): the script of the teambuilder table's part a replay reads, loaded in place of Showdown's file (teambuilder-table.ts). */
   teambuilderTableUrl?: string;
 }): string {
   const {
@@ -287,13 +262,10 @@ export function generateReplayHtml(opts: {
     reportTurn = false, reportSide = false, hideChoosers = false, viewpoint = 'p1', fontAwesomeWoff2Url, teambuilderTableUrl,
   } = opts;
   const displayTitle = title || `${format ? `[${format}] ` : ''}${p1} vs. ${p2}`;
-  // Escape forward slashes for the script tag content (PS format)
   const escapedLog = log.replace(/<\//g, '<\\/');
 
-  // Round 77 (user report 28.10.2026): graphics.js prefixes the effect sprites (Stealth Rock, Spikes, the move
-  // animations) with Dex.fxPrefix only when Dex already exists, and the embed runs its scripts in any order.
-  // A sprite left as "rock1.png" has no base in a blob document: the base names the folder the prefix names.
-  // The title lives in <title> only (user request 28.10.2026): shown under the controls it scrolled the frame.
+  // The <base> covers effect sprites left as "rock1.png": graphics.js prefixes Dex.fxPrefix only once Dex exists.
+  // The title lives in <title> only: shown under the controls it scrolled the frame.
   return `<!DOCTYPE html>
 <meta charset="utf-8" />
 <base href="https://play.pokemonshowdown.com/fx/">
@@ -315,17 +287,11 @@ ${teambuilderTableUrl ? `${tableSwapScript(teambuilderTableUrl)}\n` : ''}${EMBED
 ${fontAwesomeWoff2Url ? `${fontAwesomeOverrideStyle(fontAwesomeWoff2Url)}\n` : ''}${replayBridgeScript(seekTurn, autoPlay, viewpoint)}${reportTurn ? TURN_TRACKER_SCRIPT : ''}${sideTrackerScript(reportSide, viewpoint)}`;
 }
 
-/**
- * Creates a blob URL from HTML content for use in iframes.
- */
 export function createBlobUrl(html: string): string {
   const blob = new Blob([html], { type: 'text/html' });
   return URL.createObjectURL(blob);
 }
 
-/**
- * Revokes a previously created blob URL.
- */
 export function revokeBlobUrl(url: string): void {
   if (url.startsWith('blob:')) {
     URL.revokeObjectURL(url);

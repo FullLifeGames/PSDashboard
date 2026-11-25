@@ -1,22 +1,11 @@
 import type { Dex } from '@pkmn/sim';
 
-/**
- * Round 69 (T154): a move that doubles its strength on a chance (Fickle Beam:
- * the Dex's onBasePower asks `this.randomChance(3, 10)` and chains a factor of
- * 2) is priced as the mix of its two strengths. The calc knows nothing of the
- * draw, so the chance and the factor are read from the handler itself: it runs
- * on a stand-in battle whose randomChance records its arguments and answers
- * yes and whose chainModify returns the factor. A handler that never asks for
- * a chance (Venoshock's) or needs the battle itself (Expanding Force's field)
- * is no mix. Last Respects (T76) reads a fixed strength instead.
- */
+/** The chance and factor of a move's strength draw (Fickle Beam: 3 in 10, factor 2), read on a stand-in battle. */
 
 export interface StrengthMix {
   numerator: number;
   denominator: number;
-  /** The chance of the stronger draw. */
   chance: number;
-  /** What the stronger draw multiplies the base power by. */
   factor: number;
 }
 
@@ -53,7 +42,6 @@ function readMix(dexMove: ReturnType<DexLike['moves']['get']>): StrengthMix | nu
   return { numerator: chance[0], denominator: chance[1], chance: chance[0] / chance[1], factor };
 }
 
-/** The move's strength draw from the Dex handler, or null for a move that fixes its strength. */
 export function strengthMix(dex: DexLike, moveName: string): StrengthMix | null {
   const dexMove = dex.moves.get(moveName);
   if (!dexMove.exists) return null;
@@ -65,7 +53,6 @@ export function strengthMix(dex: DexLike, moveName: string): StrengthMix | null 
   return mix;
 }
 
-/** The calc move's override at the stronger draw: the base power the factor makes (`basePower` is the move's power at the weaker one). */
 export function strongerPower(basePower: number, factor: number): { basePower: number } {
   return { basePower: Math.round(basePower * factor) };
 }

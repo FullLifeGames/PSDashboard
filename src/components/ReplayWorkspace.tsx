@@ -23,7 +23,6 @@ import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
 interface WorkspaceProps {
   app: AppController;
   replayData: ReplayData;
-  /** Round 89 (#105): opens the New game dialog (a part of the Game menu). */
   onNewGame?: () => void;
 }
 
@@ -45,18 +44,15 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       branchDivergence={branchDivergence}
       onCancelPreparation={cancelPreparation}
       onAnimateChange={app.ctx.setAnimateBranchTurns}
-      // Round 89 (#153, HM-2): the stored `hardMode` preference, called "Opponent reads my move" where the user sees it.
       opponentReads={!!prefs.hardMode}
       onOpponentReadsChange={value => setPrefs({ ...prefs, hardMode: value })}
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
-      // Round 89 (ruling 49): Depth and Samples left the Evaluation header; another engine decides its own depth.
       search={{
         prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin',
         running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
       }}
       embed={embed}
-      // Round 84 (Q20 a): with a replay loaded the loader is the top bar's Load button; the embedded view keeps none.
       loader={embed ? undefined : {
         onLoad: loadReplay,
         onLoadFile: loadReplayFile,
@@ -78,21 +74,13 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   );
 }
 
-/**
- * Round 88 (T316): names the frame the workspace shows: the main line's frame, or the branch's for one session of the variation.
- * The replay's id and viewpoint are part of it, so a new document of the same replay (a link with ?p2) starts a new report.
- */
+// A new document of the same replay (a link with ?p2) starts a new report.
 function frameIdentity(app: AppController, replayData: ReplayData): string {
   const base = `${replayData.id}:${replayData.viewpoint ?? 'p1'}`;
   return app.analysis.showBranch && app.board.timeline.viewingVariation ? `${base}:branch:${app.analysis.branchReloadKey}` : `${base}:replay`;
 }
 
-/**
- * Round 88 (T316): the side the frame shows near, for the dock. The frame's document reports it (Switch sides, the ?p2 flag); until
- * its first report, and for a frame that mounted after the last report (the swap between the main and the branch frame, a new
- * branch session, a new replay), it is the replay's viewpoint. A report belongs to the frame that sent it; the identity changing
- * drops it during render, as state that follows a prop is reconciled.
- */
+// A report belongs to the frame that sent it; until its first report the replay's viewpoint stands.
 function useNearSide(identity: string, viewpoint: FrameSide | undefined) {
   const [report, setReport] = useState<{ frame: string; side: FrameSide | null }>({ frame: identity, side: null });
   if (report.frame !== identity) setReport({ frame: identity, side: null });
@@ -105,7 +93,6 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   const { viewingVariation, viewTurn, viewT0, navSeek, handleReplayTurn, followedPlay, tipTurn } = app.board.timeline;
   const { playOut } = app.transients;
   const appendMode = playOut?.active ? 'hold' : app.ctx.animateBranchTurns ? 'play' : 'follow-end';
-  // The pointer followed a turn that just ran: a branch frame that opens now plays that turn in.
   const openAtTurn = appendMode === 'play' && followedPlay && tipTurn !== null && viewTurn === tipTurn ? tipTurn - 1 : null;
   return (
     <div className="ps-iframe-wrap">
@@ -152,7 +139,6 @@ function BattleFrame({ app, replayData, onSideChange }: WorkspaceProps & { onSid
   );
 }
 
-/** The main frame's document key. A new game's log grows with every promoted turn, so its frame opens again on the longer log (round 89, #105); a replay's log never changes. */
 const mainFrameKey = (replayData: { id: string; log: string }) =>
   isGameId(replayData.id) ? `${replayData.id}:original:${replayData.log.length}` : `${replayData.id}:original`;
 
@@ -162,7 +148,6 @@ function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: 
   const { branchPreparing, leadOptions, startLeadVariation } = app.board.deviation;
   const { replayGameType, bringCount } = app.ctx.meta;
   const { setLeadPicks } = app.transients;
-  // One reading of the picks for both buttons: a bring-limited format carries its back line along.
   const withBring = (leads: { p1: string[]; p2: string[] }) => (bringCount !== null ? { ...leads, bring: true } : leads);
   return (
     <LeadPanel
@@ -182,7 +167,6 @@ function LeadRegion({ app, replayData, nearSide }: WorkspaceProps & { nearSide: 
   );
 }
 
-/** The lead picker of turn 0 and the confirm banner above it (the dock's place at turn 0); the dock region takes over everywhere else. */
 function LeadSlot({ app, replayData, nearSide }: WorkspaceProps & { nearSide: FrameSide }) {
   const { pendingConfirm, setPendingConfirm, playOut } = app.transients;
   if (!app.board.timeline.viewT0 || playOut?.active) return null;
@@ -205,7 +189,6 @@ function BranchSidePanels({ app, replayData }: WorkspaceProps) {
   const { history } = app.ctx.branch;
   const { snapshots } = app.ctx.replay;
   const branchStartTurn = variationSpan?.startTurn ?? viewTurn;
-  // Round 89 (#105, H5): a game shares as a game, with the turn the user stands on.
   const record = app.ctx.newGame.record;
   const game = record ? { record, view: { turn: viewTurn, line: viewingVariation ? 'variation' as const : 'main' as const, ...(viewT0 ? { t0: true } : {}) } } : null;
   const slots = useBranchSaveShare({ replayData, branchTurn: branchStartTurn, history, finalLog: app.analysis.simLog, game });
@@ -239,11 +222,8 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
   const discard = useDiscardAsk(turnEntryCount(app.ctx.branch.history), app.board.discardVariation);
   return (
     <div className="ps-main-left">
-      {/* Match info, the Load and Setup menus in one bar */}
       <WorkspaceTopBar app={app} replayData={replayData} onNewGame={onNewGame} />
-      {/* Single iframe */}
       <BattleFrame app={app} replayData={replayData} onSideChange={onSideChange} />
-      {/* Timeline bar: always visible — one slider over main line and variation */}
       <TimelineBar
         viewT0={app.board.timeline.viewT0}
         viewTurn={app.board.timeline.viewTurn}
@@ -264,30 +244,23 @@ function WorkspaceLeft({ app, replayData, onNewGame }: WorkspaceProps) {
       {branchDivergence && !app.analysis.showBranch && <WorkspaceAlert text={`⚠ ${branchDivergence}`} />}
       {variationNotice && <WorkspaceAlert text={variationNotice} />}
       {(branching || variationSpan !== null) && !idleTip(app) && <BranchSidePanels app={app} replayData={replayData} />}
-      {/* Round 84 (A7b): at turn 0 the lead picker stands where the dock stands, as the column's last child. */}
       <LeadSlot app={app} replayData={replayData} nearSide={nearSide} />
       <DockRegion app={app} replayId={replayData.id} nearSide={nearSide} />
     </div>
   );
 }
 
-/** The loaded-replay layout: battle iframe and panels beside the evaluation column. */
 export function ReplayWorkspace({ app, replayData, onNewGame }: WorkspaceProps) {
   const rules = useMemo(() => logRules(replayData.log), [replayData]);
-  // Round 88 (F, #101): the bodies the log never showed wear the stats panel's marker wherever the What-if offers them.
   const { statsP1Info, statsP2Info } = app.ctx.knowledge;
-  // Round 89 (#124): a short-side game's heaviest world guesses the bodies its side never fielded; they wear a mark of their own.
   const { bringWorlds } = app.ctx.meta;
   const isGuessed = useMemo(() => guessedBodies(statsP1Info, statsP2Info, rules, bringWorlds), [statsP1Info, statsP2Info, rules, bringWorlds]);
-  // Round 84 (A7b, ruling 9a): the layout's height caps the left column; the right column follows the dock's foot.
   const layoutRef = useLayoutHeight();
   return (
     <ReplayRulesContext.Provider value={rules}>
       <GuessedBodiesContext.Provider value={isGuessed}>
         <div className="ps-main-layout" ref={layoutRef}>
-          {/* Left column: iframe */}
           <WorkspaceLeft app={app} replayData={replayData} onNewGame={onNewGame} />
-          {/* Right column: evaluation beside the battle (chess-style), then stats */}
           <WorkspaceEvalColumn app={app} replayData={replayData} />
         </div>
       </GuessedBodiesContext.Provider>

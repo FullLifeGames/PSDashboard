@@ -3,12 +3,6 @@ import type { Battle } from '@pkmn/sim';
 import { chipShown, likeliestOf } from '../src/dice/likeliest';
 import type { DieName, Draw, ForcedDie } from '../src/dice/types';
 
-/**
- * Round 89 (#104), step G2: the rule of the likeliest result, die by die, on the draws the simulator makes. The sweep
- * (likeliest-dice-sweep.spec.ts) plays whole turns; these rows hold the boundaries: one half takes the event, a tie of results takes the
- * lower middle one, a draw with no range names none, and the chip rule of question 3a.
- */
-
 const nobody = undefined as unknown as Battle;
 const die = (kind: DieName['kind']): DieName => ({ slot: 'p1a', moveId: 'tackle', targetSlot: 'p2a', kind });
 const chance = (numerator: number, from: number): Draw => ({ call: 'chance', numerator, from });
@@ -59,7 +53,7 @@ describe('the damage roll and the hit count', () => {
   });
 });
 
-describe('which dice earn a chip (ruling 33, question 3a)', () => {
+describe('which dice earn a chip', () => {
   const forced = (kind: DieName['kind'], result: ForcedDie['result']): ForcedDie => ({ name: die(kind), result });
 
   test('an event that happens below one in one, a status check, a speed tie and a hit count show', () => {
@@ -78,13 +72,11 @@ describe('which dice earn a chip (ruling 33, question 3a)', () => {
     expect(chipShown(forced('damage-roll', { step: 8 }), undefined, false)).toBe(false);
   });
 
-  // Round 89 (X1a part 3, 2630685175 T7): a Protect that fails at 67 percent decided the turn and could have worked; the line showed no chip.
   test('a stalling move shows whenever its chance is below one, both when it fails and when it works again', () => {
     expect(chipShown(forced('stalling', { happens: false }), 2 / 3, false)).toBe(true);
     expect(chipShown(forced('stalling', { happens: true }), 1 / 3, false)).toBe(true);
     expect(chipShown(forced('stalling', { happens: false }), 80 / 81, false)).toBe(true);
     expect(chipShown(forced('stalling', { happens: true }), 1, false)).toBe(false);
-    // a draw that names no chance keeps the rule of any event: shown when it happens
     expect(chipShown(forced('stalling', { happens: true }), undefined, false)).toBe(true);
     expect(chipShown(forced('stalling', { happens: false }), undefined, false)).toBe(false);
   });

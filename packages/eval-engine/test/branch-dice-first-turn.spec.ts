@@ -9,11 +9,6 @@ import { branchOf, clickWith, mon } from './branch-dice-support';
 import { executeBranchChoices } from '../src/branch-engine';
 import { playTurn, reconstruct } from './arrival-turn';
 
-/**
- * Round 82 (forced dice), step A6, item 2 (gate answer 19a): on the first turn of a branch the dice the log shows for the actions
- * the user leaves as logged join the user's dice, once the user forces a die in that turn. The slots whose action the user
- * changed (another move, another aim, a switch) leave the join, as do the dice aimed at a body the user switched out.
- */
 await loadSimMods('gen9championsou');
 
 const feedback = (name: string): ReplayData =>
@@ -27,7 +22,6 @@ describe('turnChanges: the slots the user acts differently in than the log', () 
     expect(turnChanges(logged, [cmd('p1', 'move 2'), cmd('p2', 'move 1')])).toEqual({ changed: new Set(), switched: new Set() });
     expect(turnChanges(logged, [cmd('p1', 'move 3'), cmd('p2', 'move 1')])).toEqual({ changed: new Set(['p1a']), switched: new Set() });
     expect(turnChanges(logged, [cmd('p1', 'move 2'), cmd('p2', 'switch 3')])).toEqual({ changed: new Set(['p2a']), switched: new Set(['p2a']) });
-    // a modifier (Terastallize) leaves the action as it was: the dice are named by slot, move and target
     expect(turnChanges(logged, [cmd('p1', 'move 2 terastallize'), cmd('p2', 'move 1')]).changed.size).toBe(0);
   });
 
@@ -36,9 +30,7 @@ describe('turnChanges: the slots the user acts differently in than the log', () 
     expect(turnChanges(logged, [cmd('p1', 'move 1 1, move 2 -2'), cmd('p2', 'move 3 2, switch 4')]).changed.size).toBe(0);
     expect(turnChanges(logged, [cmd('p1', 'move 1 2, move 2 -2'), cmd('p2', 'move 3 2, switch 4')])).toEqual({ changed: new Set(['p1a']), switched: new Set() });
     expect(turnChanges(logged, [cmd('p1', 'move 1 1, move 2 -2'), cmd('p2', 'move 3 2, switch 3')])).toEqual({ changed: new Set(['p2b']), switched: new Set(['p2b']) });
-    // a spread move writes no aim on one side: no change
     expect(turnChanges({ p1: 'move 1, move 2', p2: 'move 1 1, move 1' }, [cmd('p1', 'move 1 1, move 2'), cmd('p2', 'move 1 1, move 1')]).changed.size).toBe(0);
-    // only the sides that send a command are compared (a forced replacement of one side)
     expect(turnChanges(logged, [cmd('p2', 'switch 3, pass')]).changed).toEqual(new Set(['p2a', 'p2b']));
   });
 
@@ -85,7 +77,6 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     const { replay, runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
     const played = await playTurn(runtime, replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress', [crit])], p2: [] });
     expect(tookOf(played.report, 'p1a', 'crit')).toBe('applied');
-    // the report holds the user's die only: the log's dice joined it and stay out of the user's view
     expect(played.report?.forced.length).toBe(1);
     expect(has(played.lines, '|move|p2a: Penal Battalion|Fire Fang|p1a: Corviknight|[miss]')).toBe(true);
     expect(has(played.lines, '|-crit|p2a: Penal Battalion')).toBe(true);
@@ -94,7 +85,6 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
   test('singles: a die of another action does not join the log when the user changed that action', { timeout: 300000 }, async () => {
     const crit = { name: { slot: 'p1a', moveId: 'bodypress', targetSlot: 'p2a', kind: 'crit' as const }, result: { happens: true } };
     const { replay, runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
-    // p2 clicks another move than the log's Fire Fang: the log's miss of Fire Fang must not carry over to it
     const battle = runtime.battleStream.battle!;
     const other = battle.sides[1].active[0]!.getMoveRequestData().moves.findIndex(move => move.id !== 'firefang') + 1;
     const played = await playTurn(runtime, replay.log, FIRE_FANG.turn, { p2: `move ${other}` }, { p1: [clickWith('bodypress', [crit])], p2: [] });
@@ -111,7 +101,6 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     expect(has(played.lines, '|-status|p2b: tea pot|brn')).toBe(false);
   });
 
-  // Round 82 (A7d, gate answer 2a): the first turn joins the log with or without a die of the user's.
   test('singles (t73): a first turn with no forced die shows the Fire Fang miss and lists no die', { timeout: 300000 }, async () => {
     const { replay, runtime } = await reconstruct(FIRE_FANG.fixture, FIRE_FANG.turn, FIRE_FANG.source);
     const played = await playTurn(runtime, replay.log, FIRE_FANG.turn, undefined, { p1: [clickWith('bodypress')], p2: [] });
@@ -123,7 +112,6 @@ describe('the first turn through executeBranchChoices joins the log\'s dice to t
     const { replay, runtime } = await reconstruct(DOUBLES.fixture, DOUBLES.turn, DOUBLES.source);
     const played = await playTurn(runtime, replay.log, DOUBLES.turn, undefined, { p1: [clickWith('matchagotcha'), null], p2: [] });
     expect(played.report).toBeUndefined();
-    // the turn plays the logged crits and hit counts (the damage rolls stay with the seed, so the faint can still differ): the unjoined turn crits Kanye
     expect(has(played.lines, '|-crit|p2')).toBe(false);
     expect(played.score.softMismatches).toBeLessThan(4);
   });

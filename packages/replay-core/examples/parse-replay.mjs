@@ -1,14 +1,4 @@
-/**
- * Turn a Pokémon Showdown replay into snapshots, revealed teams, and sim sets.
- *
- *   node parse-replay.mjs https://replay.pokemonshowdown.com/smogtours-gen8ou-573756
- *   node parse-replay.mjs ./replay.json
- *
- * Loads the replay JSON (a local file, or the replay page's .json), walks the
- * protocol log into one snapshot per turn, lists what the log revealed about
- * the second player's team, and builds the simulator sets both sides would
- * get in the app.
- */
+// Turns a Pokémon Showdown replay into turn snapshots, the revealed opponent team and the simulator sets of both sides.
 import { readFile } from 'node:fs/promises';
 import { buildTeamsFromReplay, inferOpponentTeam, parseReplayLog } from '@fulllifegames/replay-core';
 

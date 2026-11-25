@@ -4,21 +4,6 @@ import * as championsMod from '@pkmn/mods/champions';
 import { CHAMPIONS_MOD, broughtSpeciesFor, dexOf, getReplayBringCount, logRules, parseReplayLog, replayBringOnly, speciesBaseId } from '../src/index';
 import type { GameRules } from '../src/index';
 
-/**
- * Round 89 (#116): the bring list names the species a body entered with, never the copy it wears. A Ditto that transforms
- * (Imposter on entry, the move Transform) reads as the foe's species in the client's snapshot, and the list used to name the
- * copy: the trimmed team then dropped the Ditto's set and kept the unbrought body of the copied species (VGC 2382086291),
- * or counted a side's four as five names. The sweep reads the Dex and plays a real battle of every generation the corpus
- * plays (1 to 9) and of the Champions mod, singles and, from Generation 3, doubles; no species name stands in the code.
- *
- *  - Transformers: every species whose learnset holds Transform, and every species with the ability Imposter, as of the
- *    generation (the move is the way in every generation, Imposter the way in from Generation 5). The body copies a foe on
- *    its first turn; the list must equal the simulator's own species of the bodies that stood active.
- *  - Illusion: every species with the ability, from the generation that has it. The disguise copies a party member of its
- *    own side, so the list never names a species outside the side's party, whether the disguise held or broke.
- *  - Bring limits (Scarlet/Violet VGC, Champions VGC, Battle Stadium Singles): `replayBringOnly` gives the transformer's own
- *    species and the full count for a side that fielded its whole selection.
- */
 Dex.mod(CHAMPIONS_MOD, championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 Dex.formats.extend(championsMod.Formats);
 
@@ -40,7 +25,6 @@ const set = (species: string, ability: string, moves: string[]): PokemonSet => (
 
 type Dexish = ReturnType<typeof dexOf>;
 
-/** The species of the generation a plain body can be: no transformer, no disguise, its own base species, listed in this Dex's generation. */
 function fillersOf(dex: Dexish, scene: Scene, count: number): string[] {
   return dex.species.all()
     .filter(species => species.exists && species.gen <= scene.gen && !species.isNonstandard && species.num > 0 && species.baseSpecies === species.name &&
@@ -55,7 +39,6 @@ function learnsTransform(dex: Dexish, id: string, gen: number): boolean {
 
 const inGeneration = (dex: Dexish, scene: Scene, ability: string) => dex.abilities.get(ability).gen <= scene.gen;
 
-/** The species of the generation that can carry the ability or the move. */
 function bearersOf(dex: Dexish, scene: Scene) {
   const transformers: { name: string; imposter: boolean }[] = [];
   const illusionists: string[] = [];
@@ -73,10 +56,6 @@ function bearersOf(dex: Dexish, scene: Scene) {
 
 const publicLog = (battle: Battle) => battle.log.filter((line, index) => !line.startsWith('|split|') && !battle.log[index - 1]?.startsWith('|split|')).join('\n');
 
-/**
- * Plays `turns` (one choice pair each) from teams of the scene's format and returns the spectators' log. Choices must be legal:
- * a refused choice stops the sweep, so the row cannot pass on a battle that never played.
- */
 function play(scene: Scene, kind: Kind, p1: PokemonSet[], p2: PokemonSet[], turns: [string, string][]): { log: string; battle: Battle } {
   const battle = new Battle({
     formatid: toID(formatOf(scene, kind)) as never, seed: [3, 1, 4, 1],
@@ -93,7 +72,6 @@ function play(scene: Scene, kind: Kind, p1: PokemonSet[], p2: PokemonSet[], turn
   return { log: publicLog(battle), battle };
 }
 
-/** The base species of the bodies the simulator's side has switched in (`previouslySwitchedIn` counts every entry): the oracle of the bring list. */
 const fieldedBy = (battle: Battle, side: 0 | 1) => battle.sides[side].pokemon.filter(body => body.previouslySwitchedIn > 0).map(body => body.baseSpecies.name);
 const partyOf = (battle: Battle, side: 0 | 1) => battle.sides[side].pokemon.map(body => body.baseSpecies.name);
 const bases = (names: string[], rules: GameRules) => names.map(name => speciesBaseId(name, rules)).sort();
@@ -118,7 +96,6 @@ describe.each(SCENES)('$label', scene => {
 
   for (const kind of kindsOf(scene)) {
     const doubles = kind === 'doubles';
-    // Singles bring one body to the field and switch; doubles lead two and switch slot a.
     const bodyFor = (species: string, ability: string, moves: string[]) => set(species, ability, moves);
 
     for (const transformer of transformers) {
@@ -134,7 +111,6 @@ describe.each(SCENES)('$label', scene => {
             ? [[`${first}, move 1`, 'move 1, move 1'], ['switch 3, move 1', 'move 1, move 1']]
             : [[first, 'move 1'], ['switch 2', 'move 1']];
           const { log, battle } = play(scene, kind, p1, p2, turns);
-          // The row proves something only if the copy happened.
           expect(log, 'the body transformed').toMatch(/^\|-transform\|p1a: /m);
           const rules = logRules(log);
           expect(rules).toEqual(scene.rules);
@@ -152,8 +128,7 @@ describe.each(SCENES)('$label', scene => {
           const own = set(illusionist, 'Illusion', ['splash']);
           // The disguise copies the last member of the party (the tail of the team).
           const p1 = doubles ? [own, set(fillers[0], '', ['splash']), set(fillers[1], '', ['splash'])] : [own, set(fillers[0], '', ['splash'])];
-          // Peck is Flying in every generation: no Normal or Ghost body is immune to it. A broken disguise is pecked in slot a; a held one
-          // is left alone (the foe splashes).
+          // Peck is Flying in every generation: no Normal or Ghost body is immune to it.
           const attacker = [set(fillers[2], '', ['peck', 'splash']), set(fillers[3], '', ['peck', 'splash'])];
           const p2 = doubles ? attacker : [attacker[0]];
           const strike = held ? 'move 2' : doubles ? 'move 1 1' : 'move 1';
@@ -171,7 +146,6 @@ describe.each(SCENES)('$label', scene => {
   }
 });
 
-/** The bring-limited formats the corpus plays: the format id gives the count, the sweep plays the body into the selection. */
 const LIMITED = [
   { label: 'Scarlet/Violet VGC', formatid: 'gen9vgc2026regi', scene: SCENES[8], kind: 'doubles', count: 4 },
   { label: 'Champions VGC', formatid: 'gen9championsvgc2026regmbbo3', scene: SCENES[9], kind: 'doubles', count: 4 },
@@ -192,7 +166,6 @@ describe.each(LIMITED)('bring limit: $label', ({ formatid, scene, kind, count })
         const own = set(transformer.name, ability, way === 'Imposter' ? ['splash'] : ['transform']);
         const first = way === 'Imposter' ? 'move 1' : doubles ? 'move 1 1' : 'move 1';
         const plain = (index: number) => set(fillers[index], '', ['splash']);
-        // Each side takes six into the game and fields `count` of them; the Ditto's side shows its transformer in front.
         const p1 = [own, plain(0), plain(1), plain(2), plain(3), plain(4)];
         const p2 = [plain(5), plain(6), plain(7), plain(8), plain(9), plain(10)];
         const turns: [string, string][] = doubles

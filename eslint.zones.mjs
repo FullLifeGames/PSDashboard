@@ -1,14 +1,4 @@
-// Import zones: the package layering as lint errors.
-//
-//   app (src: components, hooks, App, workers, the lazy facades)
-//     -> @fulllifegames/eval-engine (packages/eval-engine)
-//       -> @fulllifegames/replay-core (packages/replay-core)
-//
-// The ratchet next to this file is generated; this file is maintained by
-// hand. Packages import each other by name; nothing in a package reaches
-// src/; the app imports the packages by name, never their files. A package's
-// tests (packages/<name>/test/) import their own sources relatively and the
-// sibling package by name; two directories up leaves the package.
+// Maintained by hand; the ratchet next to this file is generated.
 
 const UI_LAYER = '(^|/)(hooks|components|workers|App|main)(/|$)';
 const OUT_OF_PACKAGE = '^(\\.\\./)+(src|packages)/';
@@ -24,17 +14,24 @@ export const importZones = [
     'Packages import each other by name and never reach src/ or the UI layer.'),
   zone(['packages/replay-core/src/**/*.ts'], '^@fulllifegames/eval-engine',
     'replay-core sits below the engine.'),
+  // Replaces the package zone for this file, so it repeats the zone's pattern: typescript-eslint knows `import type`.
+  {
+    files: ['packages/eval-engine/src/branch/execute.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [
+        { regex: `${UI_LAYER}|${OUT_OF_PACKAGE}`, message: 'Packages import each other by name and never reach src/ or the UI layer.' },
+        { regex: '^@pkmn/|(^|/)dice/', allowTypeImports: true,
+          message: 'execute.ts loads the simulator and the dice module as types or with a dynamic import, so a turn without a forced die never pays for them.' },
+      ] }],
+    },
+  },
   zone(['packages/*/test/**/*.ts'], OUT_OF_TEST_DIR,
     'Package tests import their own sources relatively (../src/...) and the sibling package by name; nothing outside the package.'),
   zone(['packages/replay-core/test/**/*.ts'], '^@fulllifegames/eval-engine',
     'replay-core sits below the engine.'),
   zone(['src/**/*.{ts,tsx}'], '^(\\.\\./)+packages/',
     'The app imports the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine), never their files.'),
-  // The root suite consumes the packages the way the app does: by name over
-  // the curated barrel. The three measurement chains read engine internals
-  // (feature weights, leaf values, sweep setters) and stay white-box, and the
-  // speed-layer setting spec reads each lever of the worker's switch (simFastOn). The spec that compares a deliberate copy of
-  // the app with the engine's own function (branch-required-choices-copy.spec.ts) reads that function's file: the barrel does not export it.
   {
     ...zone(['test/regression/**/*.ts'], '^(\\.\\./)+packages/',
       'Root specs import the packages by name (@fulllifegames/replay-core, @fulllifegames/eval-engine); only the measurement chains read package internals.'),

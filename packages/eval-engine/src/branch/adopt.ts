@@ -8,48 +8,26 @@ import { branchLogForPosition } from './log-sync.ts';
 import { openStreams } from './runtime-session.ts';
 import type { BranchRuntime } from './types.ts';
 
+/** The input of `adoptSerializedRuntime`: a serialized position, the replay log and the target turn. */
 export interface AdoptParams {
-  /** The position in the engine's stable serialization (a reconstruction's arrival or a captured boundary). */
   serialized: string;
   replayLog: string;
   targetTurn: number;
-  /** The turn's snapshot for the arrival corrections; null for a position without one (a lead game). */
   snapshot?: TurnSnapshot | null;
   /** The runtime's protocol log when the reconstruction already built it; else derived from the replay. */
   log?: string[];
   haxAlignment?: TurnAlignmentRecord[];
-  /** The reconstruction hit its deadline before the target — validateBranchRuntime reports it. */
   timedOut?: boolean;
 }
 
-/**
- * A live branch runtime from a serialized position (round 38): the
- * reconstruction may run elsewhere (a worker) or have run earlier (the
- * exact-position store), and the interactive branch still needs a battle
- * that accepts choices and streams its lines. The sim supports exactly
- * this: a deserialized battle is restarted with a new `send`.
- *
- * The arrival corrections are the tail of reconstructBranchRuntime
- * (snapshot correction, request refresh) — identities on an already
- * corrected position, so a sweep-captured boundary adopts as well as a
- * single-turn arrival. The stable serialization drops the sim's `|t:|`
- * lines, so the sent-log cursor is realigned to the log it actually has;
- * the branch's protocol log is the replay prefix plus active corrections,
- * never battle.log.
- *
- * Round 70: a position of a replay turn (one with a snapshot) is put on the
- * seed that turn plays under in the log, whatever dice the stored position
- * carried (a sweep boundary keeps the state the previous block left), so the
- * first turn the user plays shows the rolls of the log for every action left
- * as it was. The search never reads the position's dice: its forks reseed.
- */
+/** A live branch runtime from a serialized position: restarted with a new `send`, accepting choices. */
 export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
-  // The log's line endings are settled here once; every reader below sees LF (T206 for the engine).
   const replayLog = normalizeLineEndings(params.replayLog);
   const battle = deserializeBattleExact(params.serialized);
   if (params.snapshot) correctBattleFromSnapshot(battle, params.snapshot);
   refreshRequestsFromLiveState(battle);
   if (params.snapshot) alignArrivalDice(battle, replayLog, params.targetTurn);
+  // The stable serialization drops the sim's `|t:|` lines, so the sent-log cursor is realigned.
   battle.sentLogPos = battle.log.length;
 
   const session = openStreams();
@@ -60,6 +38,7 @@ export function adoptSerializedRuntime(params: AdoptParams): BranchRuntime {
   });
   battleStream.battle = battle;
 
+  // The branch's protocol log is the replay prefix plus active corrections, never battle.log.
   const log = params.log ? [...params.log] : branchLogForPosition(replayLog, params.targetTurn, battle);
   session.collectedLog.push(...log);
   return {

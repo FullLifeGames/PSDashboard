@@ -98,6 +98,7 @@ value fillUsageMoves
 value finalPlayedTurn
 value formatEnforcesSleepClause
 value formatRules
+value generatesTeam
 value generationsFor
 value getBranchSimulatorFormat
 value getReplayBringCount

@@ -7,39 +7,22 @@ import { calcMove } from './calc/move.ts';
 import { stellarFirstUse } from './calc/stellar.ts';
 import { bodyAsClicked } from './calc/tera-click.ts';
 
-/**
- * Analytic one-turn boundary-event odds (round 6 expectation grounding).
- * The sim keeps answering WHAT happens after a roll; this module answers
- * only HOW LIKELY each roll outcome is — kill share of the 16 damage rolls
- * (crit-weighted) times the accuracy after stage modifiers. Everything it
- * cannot price confidently returns null and the caller keeps the plain
- * seed average (fail closed). The value/narrative contract: the search
- * prices what the next roll is worth; the report narrates what many rolls
- * mean.
- */
+// Analytic one-turn odds: the sim says what a roll does, this module how likely each outcome is; what it cannot price
+// returns null and the caller keeps the plain seed average (fail closed).
 
 export interface BoundaryEvent {
-  /** 0..1 chance the move connects (accuracy × stage modifiers; 1 for true-accuracy/No Guard). */
   accuracy: number;
-  /** 0..1 share of connect branches that KO (16 rolls, crit-weighted). */
   killFraction: number;
-  /** accuracy × killFraction. */
   pKill: number;
-  /** Round 43: of the 16 damage rolls, how many knock out without a crit (0 for status moves; 0 or 16 for fixed damage). */
+  /** Of the 16 damage rolls, how many knock out without a crit (0 for status moves; 0 or 16 for fixed damage). */
   normalKillRolls: number;
-  /** Round 43: of the 16 damage rolls, how many knock out with a crit. */
   critKillRolls: number;
 }
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
-/**
- * Moves that call another move, so the seed or the turn decides what actually happens (Round 72, W1: the Dex's `callsMove`,
- * seven moves over every generation; the hand list held four). test/random-call-oracle.spec.ts plays each of them.
- */
 export const randomCallMoves = (dex: RulesDex): ReadonlySet<string> => callingMoves(dex);
 
-/** Moves whose immediate damage the one-turn model cannot price. */
 // oracle: packages/eval-engine/test/unpriceable-oracle.spec.ts
 export const UNPRICEABLE_MOVE_IDS = new Set([
   // depends on incoming damage
@@ -58,16 +41,8 @@ export const UNPRICEABLE_MOVE_IDS = new Set([
   'beatup',
 ]);
 
-/**
- * Round 70 (N1): the crit and accuracy modifiers the stage table does not cover → fail closed, read from the simulator's Dex.
- * An item or an ability with a handler on the ModifyAccuracy or ModifyCritRatio event (its own, a foe's, an ally's, the
- * source's or any: Wide Lens, Sand Veil, Victory Star, Scope Lens, Super Luck, Merciless) changes the number the model
- * prices. The first version named eleven of the eighteen such effects of Gen 9 and its comment said the rest "fail closed".
- * A handler on the Accuracy or CriticalHit event stays out: No Guard is priced in moveAccuracy, and the calc gives a
- * crit-proof defender the normal roll for a crit. test/ko-odds-guard-census.spec.ts walks every item and ability of every
- * generation and the Champions mod and lists the reason of each exclusion. @pkmn/dex strips handlers, so a body asks the
- * simulator's own Dex objects (getItem, getAbility).
- */
+// Items and abilities with a Modify(Accuracy|CritRatio) handler (Wide Lens, Sand Veil, Super Luck) shift the odds;
+// test/ko-odds-guard-census.spec.ts walks them all. @pkmn/dex strips handlers: ask the simulator's own Dex.
 const ODDS_HANDLER = /^on(?:Any|Foe|Ally|Source)?Modify(?:Accuracy|CritRatio)$/;
 const changesOdds = new WeakMap<object, boolean>();
 
@@ -80,7 +55,6 @@ function modifiesOdds(effect: object): boolean {
   return known;
 }
 
-/** Modern accuracy stage multiplier: stage s ≥ 0 → (3+s)/3, s < 0 → 3/(3−s). */
 function accuracyStageMultiplier(stages: number): number {
   const s = Math.max(-6, Math.min(6, stages));
   return s >= 0 ? (3 + s) / 3 : 3 / (3 - s);
@@ -109,17 +83,15 @@ function calcField(battle: Battle, defender: Pokemon): Field {
   });
 }
 
-/** Share of `rolls` that reaches the defender's remaining HP. */
 function killShare(damage: unknown, hp: number): number | null {
   if (typeof damage === 'number') return damage >= hp ? 1 : 0;
   if (!Array.isArray(damage)) return null;
-  if (damage.some(entry => Array.isArray(entry))) return null; // multi-hit shape
+  if (damage.some(entry => Array.isArray(entry))) return null;
   const rolls = (damage as number[]).map(Number);
   if (rolls.length === 0) return null;
   return rolls.filter(roll => roll >= hp).length / rolls.length;
 }
 
-/** The guards that make the one-turn model refuse a pair: unknown or unpriceable moves, crit and accuracy modifiers it cannot fold. */
 export function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove): boolean {
   if (!move.exists) return true;
   if (randomCallMoves(attacker.battle.dex).has(move.id) || UNPRICEABLE_MOVE_IDS.has(move.id)) return true;
@@ -134,7 +106,6 @@ export function unpriceable(attacker: Pokemon, defender: Pokemon, move: DexMove)
   return false;
 }
 
-/** The weather overrides on a move's base accuracy (Thunder/Hurricane in rain and sun, Blizzard in hail). */
 function weatherAccuracy(move: DexMove, base: number, weather: string): number {
   let value = base;
   const rainish = weather === 'raindance' || weather === 'primordialsea';
@@ -146,10 +117,7 @@ function weatherAccuracy(move: DexMove, base: number, weather: string): number {
   return value;
 }
 
-/**
- * Accuracy after weather and stage modifiers; No Guard on either side makes the move sure. `weather` is the weather the
- * move meets when it is not the battle's own: '' after a Tera click that clears it (T152).
- */
+/** `weather` is the weather the move meets when not the battle's own: '' after a Tera click that clears it. */
 export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, defender: Pokemon, weather = battle.field.weather ?? ''): number {
   let accuracy: number;
   if (move.accuracy === true) {
@@ -165,7 +133,6 @@ export function moveAccuracy(battle: Battle, move: DexMove, attacker: Pokemon, d
 
 interface KillRolls { killFraction: number; normalKillRolls: number; critKillRolls: number }
 
-/** The crit-weighted kill share of the 16 damage rolls with its roll counts, or null when the calc cannot price the pair. */
 function damageKillFraction(
   genNum: number,
   battle: Battle,
@@ -179,7 +146,7 @@ function damageKillFraction(
     const defPoke = calcPokemon(gen, bodies.defender);
     const field = calcField(battle, defender);
     const hp = bodies.defender.hp;
-    // A Stellar body's first use of a type hits harder (T152); the type at use is the calc's own.
+    // A Stellar body's first use of a type hits harder; the type at use is the calc's own.
     const first = stellarFirstUse(bodies.attacker, () => calculate(gen, atkPoke, defPoke, calcMove(gen, move.name, bodies.attacker), field).move.type);
     const stellar = first ? { isStellarFirstUse: true } : {};
     const sharesAt = (power: { basePower: number } | null) => {
@@ -191,7 +158,7 @@ function damageKillFraction(
     const weak = sharesAt(null);
     const c = critRate(genNum, move.critRatio ?? 1);
     if (weak === null || c === null) return null;
-    // A move that doubles on a chance (Fickle Beam, T154) is the mix of its two strengths; the roll counts stay the weaker one's, which the scripts aim by.
+    // A chance-doubling move (Fickle Beam) mixes its two strengths; the roll counts stay the weaker one's.
     const mix = strengthMix(dexOfCalc(gen), move.name);
     const strong = mix ? sharesAt(strongerPower(calcMove(gen, move.name, bodies.attacker, stellar).bp, mix.factor)) : null;
     if (mix && strong === null) return null;
@@ -206,26 +173,18 @@ function damageKillFraction(
   }
 }
 
-/** Which of the two bodies an option clicks Tera for: its own attacker, or (a cell's other side) the defender. */
 export interface TeraClicks { attacker?: boolean; defender?: boolean }
 
-/**
- * The analytic odds of one attacking move against one defender, or null
- * when the model cannot price it (the caller keeps the seed average). `tera`:
- * a body whose side clicks Tera this turn is read as the click makes it,
- * before any move lands (round 67, T84); left out, the bodies as they stand.
- */
 export function boundaryEvent(
   battle: Battle, attacker: Pokemon, defender: Pokemon, moveId: string, tera: TeraClicks = {},
 ): BoundaryEvent | null {
+  // `tera`: a body whose side clicks Tera this turn is read as the click makes it, before any move lands.
   const genNum = battle.gen;
   if (genNum <= 2 || genNum > 9) return null;
   const move = battle.dex.moves.get(moveId);
   if (unpriceable(attacker, defender, move)) return null;
 
   if (move.category === 'Status') {
-    // Accuracy-only event: the hit/miss split is pure table arithmetic;
-    // the status effect's consequences live inside the outcome classes.
     const accuracy = moveAccuracy(battle, move, attacker, defender);
     if (accuracy >= 1) return null;
     return { accuracy, killFraction: 0, pKill: 0, normalKillRolls: 0, critKillRolls: 0 };

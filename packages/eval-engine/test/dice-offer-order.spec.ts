@@ -12,12 +12,6 @@ import { dexOfRules, forcedOn, SWEEP_CASES, sweepBoard, sweepClicks } from './di
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-// Round 82 (forced dice), lane A3b: the dice the panel offers for the checks and the order of a turn, held to the simulator. A
-// status check is offered for the slot's choice when the body carries the condition and the condition's own handler draws a
-// chance for that move; the offer names exactly the status dice the natural turn draws, and every offered die, forced to either
-// answer, is drawn. The order dice read the turn on a copy: a speed tie is offered for every pair of bodies whose move actions
-// the simulator shuffles together, a first mover for every holder whose die the simulator draws (Quick Claw for a move of any
-// priority, Quick Draw for a damaging move), and neither for a board where nothing ties.
 await loadSimMods('gen9championsou');
 
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
@@ -25,7 +19,6 @@ const choiceOf = (moveId: string, target: string, mode: Mode) => ({
   kind: 'move' as const, moveId, moveName: moveId, ...(mode === 'doubles' && NEEDS_AIM.has(target) ? { targetLoc: 1 } : {}),
 });
 
-/** The dice of the natural turn for slot p1a, by key. */
 function drawnKeys(board: ReturnType<typeof sweepBoard>, clicks: { p1: string; p2: string }, kind: string): string[] {
   const copy = copyOf(board);
   copy.prng ??= board.prng.clone();
@@ -63,7 +56,6 @@ describe.each(SWEEP_CASES)('the offered status checks: $name', ({ rules, mode })
         const no = forcedOn(board, clicks, [{ name: offer.name, result: { happens: false } }]).report.forced[0];
         expect(yes.took, yes.reason).not.toBe('no-draw');
         expect(no.took, no.reason).not.toBe('no-draw');
-        // the offer names the chance of "the body goes on", as the report of the forced yes does
         expect(offer.chance).toBeCloseTo(yes.chance!, 9);
         expect(offer.results).toEqual([{ happens: true }, { happens: false }]);
       }
@@ -121,7 +113,6 @@ describe.each(SWEEP_CASES)('the offered order dice: $name', ({ rules, mode }) =>
   });
 
   describe.each(moversOf(rules).map(mover => [mover.label, mover] as const))('%s', (_label, mover) => {
-    // the chance of the die is the simulator's: Quick Claw 1 in 5, Quick Draw 3 in 10 where a draw of the turn carries it
     const chance = mover.id === 'quickclaw' ? 1 / 5 : 3 / 10;
 
     test('the holder is offered the die, a body without it is not, and each answer is drawn', () => {

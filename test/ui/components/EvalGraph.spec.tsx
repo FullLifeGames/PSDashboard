@@ -9,7 +9,6 @@ import { leadAnalysis } from '../fixtures/analysis';
 const names: [string, string] = ['Alice', 'Bob'];
 const pctPair = (score: number) => `Alice ${winPercent(score)}% · Bob ${100 - winPercent(score)}%`;
 
-/** The invisible hit column of a turn on the main line, or on the variation. */
 const hit = (turn: number, line?: 'variation') =>
   document.querySelector(`rect[data-turn="${turn}"]${line ? '[data-line="variation"]' : ':not([data-line])'}`) as SVGRectElement;
 
@@ -35,8 +34,6 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(5, 'main');
   });
 
-  // Round 89 (#105, H7, tester finding 15): React logged `Received NaN for the y2 attribute` while a game's graph filled (Champions VGC).
-  // A score the sweep has not written yet reads undefined, and only `null` meant "no point" in the line from the lead and in the edge's highlight.
   test('a lead score before any turn score, and a turn whose next score is not there yet, draw no line with a NaN end', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const unfilled = (turns: number, filled: Record<number, number>) => {
@@ -96,14 +93,10 @@ describe('EvalGraph', () => {
     expect(onSelectTurn).toHaveBeenLastCalledWith(3, 'main');
     expect(svg.querySelector('circle[r="4.5"]')).not.toBeNull();
 
-    // The pointer on the main line at turn 4 has no main point to ring.
     rerender(<EvalGraph {...shared} currentLine="main" />);
     expect(svg.querySelector('circle[r="4.5"]')).toBeNull();
   });
 
-  // Round 77 (C8): on a turn where both lines have a point, the two hit areas share the whole column and split it at
-  // the middle between the two points, so the nearer point wins at any width. Before, the gold area took the middle half
-  // of a column about 5 px wide and the blue point under it could not be hit.
   describe('a turn where the variation and the main line both have a point', () => {
     const rect = (turn: number, line?: 'variation') => {
       const element = hit(turn, line);
@@ -119,13 +112,11 @@ describe('EvalGraph', () => {
       const yellow = rect(3, 'variation');
       expect(yellow.x).toBe(blue.x);
       expect(yellow.width).toBe(blue.width);
-      // The higher score draws higher on the graph and owns the upper area.
       const top = main > gold ? blue : yellow;
       const bottom = main > gold ? yellow : blue;
       expect(top.y).toBe(0);
       expect(top.y + top.height).toBeCloseTo(bottom.y, 5);
       expect(bottom.y + bottom.height).toBeCloseTo(GRAPH_HEIGHT, 5);
-      // Each point lies inside its own area.
       const graphY = (score: number) => GRAPH_HEIGHT / 2 - score * (GRAPH_HEIGHT / 2 - 7);
       expect(graphY(Math.max(main, gold))).toBeLessThan(top.y + top.height);
       expect(graphY(Math.min(main, gold))).toBeGreaterThan(top.y + top.height);
@@ -156,5 +147,46 @@ describe('EvalGraph', () => {
   test('nothing renders without a turn to show', () => {
     const { container } = render(<EvalGraph scores={[]} playerNames={names} currentTurn={1} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+const NAMES: [string, string] = ['Alice', 'Bob'];
+const SCORES = [0.1, 0.3, -0.2, 0.0, 0.4];
+
+const draw = (marks?: { turn: number; side: 'p1' | 'p2' }[]) => {
+  const { container } = render(<EvalGraph scores={SCORES} playerNames={NAMES} currentTurn={2} reviewMarks={marks} />);
+  return container.querySelector('svg')!;
+};
+
+describe('EvalGraph review marks', () => {
+  test('a circle for player 1 and a square for player 2, each at the turn\'s point and in the player\'s colour', () => {
+    const svg = draw([{ turn: 3, side: 'p1' }, { turn: 5, side: 'p2' }]);
+    const circle = svg.querySelector('circle[data-review-mark="p1"]')!;
+    const square = svg.querySelector('rect[data-review-mark="p2"]')!;
+    expect(circle).not.toBeNull();
+    expect(square).not.toBeNull();
+    expect(circle.getAttribute('data-turn-mark')).toBe('3');
+    expect(square.getAttribute('data-turn-mark')).toBe('5');
+    expect(circle.getAttribute('stroke')).toBe('#8ac');
+    expect(square.getAttribute('stroke')).toBe('#c8a');
+    expect(circle.getAttribute('fill')).toBe('none');
+    expect(svg.querySelectorAll('[data-review-mark]')).toHaveLength(2);
+    const points = [...svg.querySelectorAll('circle')].filter(node => !node.hasAttribute('data-review-mark'));
+    expect(circle.getAttribute('cx')).toBe(points[2].getAttribute('cx'));
+    expect(circle.getAttribute('cy')).toBe(points[2].getAttribute('cy'));
+    const side = Number(square.getAttribute('width'));
+    expect(Number(square.getAttribute('x')) + side / 2).toBeCloseTo(Number(points[4].getAttribute('cx')), 5);
+    expect(Number(square.getAttribute('y')) + side / 2).toBeCloseTo(Number(points[4].getAttribute('cy')), 5);
+  });
+
+  test('a turn graded on both sides carries both marks; marks never block the turn\'s hit area', () => {
+    const svg = draw([{ turn: 4, side: 'p1' }, { turn: 4, side: 'p2' }]);
+    expect(svg.querySelectorAll('[data-review-mark]')).toHaveLength(2);
+    for (const mark of svg.querySelectorAll<SVGElement>('[data-review-mark]')) expect(mark.style.pointerEvents).toBe('none');
+  });
+
+  test('no marks, none drawn; a mark on a turn without a point is skipped', () => {
+    expect(draw().querySelectorAll('[data-review-mark]')).toHaveLength(0);
+    expect(draw([{ turn: 9, side: 'p1' }]).querySelectorAll('[data-review-mark]')).toHaveLength(0);
   });
 });

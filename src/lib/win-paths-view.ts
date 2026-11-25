@@ -1,40 +1,26 @@
 import type { WinStep } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, rankWords, type LineBlockView, type LinesHost } from './line-view';
 
-/**
- * Round 89 (#130, G8b): what the win-path panel shows, as plain data, in the words the user ruled on 14.11.2026 (W1a to W5a): a
- * stronger play with its chance whatever the opponent answers, the likeliest lucky dice with their chance, the smallest mistake by
- * the opponent, and one sentence for a step without a find. The lines are the engine's `EvalLine`s of the job, drawn by `lineBlocks`
- * (the rows, the dice chips and the tooltip of ▶ Play, one rule in one module).
- */
 
 type Side = 'p1' | 'p2';
 
-/** The turns a path may take: the request's default, which the panel's sentences name. */
 const TURNS = 3;
 
 export type WinStepKind = WinStep['kind'];
 export interface WinStepView {
   kind: WinStepKind;
-  /** "1 · A stronger play". */
   title: string;
-  /** What the step found, in one sentence; null for a step without a find. */
   headline: string | null;
-  /** The sentence of a step without a find: none, stopped or failed. */
   empty: string | null;
-  /** The line, drawn as the Lines section draws one; null without a find. */
   block: LineBlockView | null;
 }
 
 export interface WinPathsViewContext {
-  /** The turn the search started from: the line's first step plays it. */
   turn: number;
   playerNames: [string, string];
   doubles: boolean;
   host: LinesHost;
-  /** The loser: the side the search is for. */
   side: Side;
-  /** The label of the choice the loser played at the turn, when the log shows it. */
   playedLabel: string | null;
   /** The loser was knocked out before it moved: `playedLabel` stands in for a choice the log does not show. */
   playedNeverActed?: boolean;
@@ -42,7 +28,6 @@ export interface WinPathsViewContext {
 
 export { rankWords };
 
-/** A chance as the panel prints it: one decimal under 20 %, whole percent above ("52 %", "10.8 %"). */
 export function chanceText(chance: number): string {
   const percent = chance * 100;
   return `${percent < 20 ? (Math.round(percent * 10) / 10).toString() : Math.round(percent).toString()} %`;
@@ -62,7 +47,6 @@ function emptySentence(step: WinStep): string | null {
 
 const sequenceOf = (step: WinStep): string => (step.chance === undefined ? '' : `This sequence: ${chanceText(step.chance)}.`);
 
-/** One sentence (X1a part 4): the slip, who wins by it, and the chance of the dice of that sequence. */
 function mistakeHeadline(step: WinStep, opponent: string, player: string): string | null {
   const { deviation } = step;
   if (!deviation) return sequenceOf(step) || null;
@@ -72,7 +56,6 @@ function mistakeHeadline(step: WinStep, opponent: string, player: string): strin
 
 const PREFIXES: Record<string, string> = { Tera: 'Terastallize', Mega: 'Mega Evolve', Ultra: 'Ultra Burst' };
 
-/** An engine label ("Tera + Heat Wave→Ursaluna", "→ Corviknight") in the words of the game's own buttons and log. */
 export function showdownWords(label: string): string {
   const words = (part: string): string => {
     const switched = /^→ (.+)$/.exec(part);
@@ -90,7 +73,6 @@ export function showdownWords(label: string): string {
   return out.join(' + ');
 }
 
-/** The sentence beside step 1's number: what the loser's own choice wins in, or that the log shows none. */
 function playedSentence(step: WinStep, ctx: WinPathsViewContext): string {
   if (step.played === undefined) return '';
   const loser = ctx.playerNames[ctx.side === 'p1' ? 0 : 1];
@@ -122,17 +104,11 @@ const TITLES: Record<WinStepKind, (opponent: string) => string> = {
   mistake: opponent => `3 · A mistake by ${opponent}`,
 };
 
-/**
- * What the number of a luck or a mistake step counts (round 89, G13b, the tester's questions 8 and 9): the exact chance of the dice it
- * needs, which are the dice whose other result would change who faints. A chip also shows a die that changes nothing (a 95 percent hit
- * whose miss leaves the same bodies standing), and the stronger play's share adds every sequence that wins, so the two never read as
- * one sum. Null when no luck or mistake step found a path.
- */
+// Counts only the dice whose other result would change who faints; a chip may also show a die that changes nothing.
 export const SEQUENCE_NOTE = 'A sequence\'s chance multiplies the dice whose other result would change who faints; a die that changes nothing counts as certain, and other sequences that also win are not added.';
 export const sequenceNote = (views: readonly WinStepView[]): string | null =>
   views.some(view => view.kind !== 'stronger' && view.headline !== null) ? SEQUENCE_NOTE : null;
 
-/** The views of the steps that arrived, in the order of the job. */
 export function winStepViews(steps: readonly WinStep[], ctx: WinPathsViewContext): WinStepView[] {
   const opponent = ctx.playerNames[ctx.side === 'p1' ? 1 : 0];
   return steps.map((step): WinStepView => {

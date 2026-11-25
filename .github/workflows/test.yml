@@ -14,11 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Job limits (round 89, step M4). Measured on 13.11.2026 on a 4-vCPU runner (the repository is public): healthy
-  # Node suites 22 to 28 min (34 on a slow runner), Browser flows 21 to 24 min, engine suite 14 to 35 min (the same job ran 1.8 times
-  # slower on a slower runner), dice sweeps 12 to 24 min, build smoke 1 min; setup (checkout, Node, npm ci,
-  # Chromium) takes under one minute in every job. A runner that is 1.6 times slower cancelled Node suites and
-  # Browser flows at 30 min and hid their red rows, so the limits stand at about twice the healthy time.
+  # Limits stand at about twice the healthy time: a slower runner cancelled jobs at 30 minutes and hid red rows.
   node:
     name: Node suites
     runs-on: ubuntu-24.04
@@ -39,15 +35,10 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # The four Vitest projects: the root specs, each package's suite, and the app suite under test/ui/.
       - name: Run the Node suites
-        run: npm run test:regression
+        run: npx vitest run --project app --project replay-core --project ui
 
-  # Round 59: the Node suites cover the adopted speed layer; one more run forces it off (the kill
-  # switch) and one forces it on (a break throws instead of falling back). Release 1.0.0: both ran
-  # after the Node suites in one job, which outgrew its 20 minutes, so each runs as its own job.
-  # Round 78: on simulator 0.10.12 the forced-off pass ran past 20 minutes (12 on 0.10.11), the
-  # forced-on pass still takes 12.
+  # The engine suite runs twice: speed layer forced off (the kill switch) and forced on (a break throws).
   engine-speed-layer:
     name: Engine suite, speed layer ${{ matrix.speed-layer }}
     runs-on: ubuntu-24.04
@@ -78,8 +69,7 @@ jobs:
         env:
           EVAL_SIM_FAST: ${{ matrix.sim-fast }}
 
-  # Round 82 (forced dice): the dice sweeps play every move of the Dex only with DICE_SWEEPS=full; the jobs above play a
-  # fixed sample of them. One full run per push, beside the other jobs (user gate 31.10.2026, "1b").
+  # Plays every move of the Dex (DICE_SWEEPS=full); the other jobs play a fixed sample.
   dice-sweeps:
     name: Dice sweeps, every move
     runs-on: ubuntu-24.04
@@ -102,13 +92,6 @@ jobs:
         env:
           DICE_SWEEPS: full
 
-  # Round 89 (final gate, D6b): the dice job above reaches the `dice-*` files only, and 36 other spec files read the same switch. The three
-  # parts below run them with DICE_SWEEPS=full. Their size comes from the run of 17.11.2026 (CI-1, the first run of the job): parts 1 and 2 hold
-  # about 3,448 summed seconds of file time each (runner measure, 2.6 summed seconds per wall second, so about 22 min), part 3 holds
-  # `board-key-census.spec.ts` alone, which played every move against every entry (a few million hits, over an hour) and now plays a bounded set (see its header). The longest
-  # single files are landed-hit-sweep (675 s) and stratified-root-sweep (650 s). Not a required check until the user makes it one (branch protection names
-  # the six jobs above). `full-sweep-job.spec.ts` fails when a spec reads the switch and sits in neither job, or when a listed file is gone: add a new
-  # sweep spec to the part with the least time, and keep every part under 25 minutes of wall time.
   full-sweeps:
     name: Full sweeps, the other specs, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
@@ -183,9 +166,64 @@ jobs:
           SPECS: ${{ matrix.files }}
 
   browser:
-    name: Browser flows
+    name: Browser flows, part ${{ matrix.part }} of 3
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: 1
+            files: >-
+              test/e2e/bench-bring.spec.ts
+              test/e2e/branch-dice-flinch.spec.ts
+              test/e2e/branch-dice-hits.spec.ts
+              test/e2e/branch-dice-lines.spec.ts
+              test/e2e/embed.spec.ts
+              test/e2e/game-review.spec.ts
+              test/e2e/matrix-dialog.spec.ts
+              test/e2e/new-game-share.spec.ts
+              test/e2e/play-out-finish.spec.ts
+              test/e2e/replay-end.spec.ts
+              test/e2e/repro-state.spec.ts
+              test/e2e/stand-ins.spec.ts
+              test/e2e/sweet-spot.spec.ts
+              test/e2e/timeline-bar.spec.ts
+              test/e2e/timeline.spec.ts
+              test/e2e/turn-dock-vgc.spec.ts
+          - part: 2
+            files: >-
+              test/e2e/branch-dice-pivot.spec.ts
+              test/e2e/dock-narrow.spec.ts
+              test/e2e/eval-graph.spec.ts
+              test/e2e/eval.spec.ts
+              test/e2e/frame-controls.spec.ts
+              test/e2e/lead-dock.spec.ts
+              test/e2e/loader.spec.ts
+              test/e2e/new-game.spec.ts
+              test/e2e/phone.spec.ts
+              test/e2e/replacement-note.spec.ts
+              test/e2e/scale.spec.ts
+              test/e2e/topbar.spec.ts
+              test/e2e/turn-dock-fill.spec.ts
+              test/e2e/win-paths.spec.ts
+          - part: 3
+            files: >-
+              test/e2e/branch.spec.ts
+              test/e2e/dock-column.spec.ts
+              test/e2e/engines.spec.ts
+              test/e2e/eval-header.spec.ts
+              test/e2e/hard-mode.spec.ts
+              test/e2e/lines-play.spec.ts
+              test/e2e/pickers.spec.ts
+              test/e2e/replay-sprites.spec.ts
+              test/e2e/right-column.spec.ts
+              test/e2e/support.spec.ts
+              test/e2e/teambuilder-table.spec.ts
+              test/e2e/turn-dock-forced.spec.ts
+              test/e2e/turn-dock.spec.ts
+              test/e2e/turn-link.spec.ts
+              test/e2e/variation-interlude.spec.ts
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -205,41 +243,80 @@ jobs:
       - name: Show the runner
         run: nproc && free -m
 
-      # Playwright runs 2 workers here (half of the 4 vCPUs). Tried on 13.11.2026: 3 workers took 28 min instead
-      # of 21 to 24 and turned play-out-finish.spec.ts:65 red (its 10 s predicate); Vitest with --maxWorkers=100%
-      # (4 workers instead of 3) took 34 min instead of 28 on Node suites. More workers did not
-      # make a run faster. The JSON report feeds the next step.
-      - name: Run the browser flows
-        run: npm run test:e2e -- --reporter=dot,json
+      # Two workers, half of the 4 vCPUs: three ran slower and turned a live-search row red.
+      - name: Run the browser flows of part ${{ matrix.part }}
+        run: npm run test:e2e -- --reporter=dot,json $SPECS
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: ${{ github.workspace }}/playwright-report.json
+          SPECS: ${{ matrix.files }}
 
-      # The 15 slowest spec files, summed over their tests, so the next limit review reads numbers from the log.
-      - name: List the slowest browser specs
+      - name: List the slowest browser specs and tests
         if: always()
-        run: |
-          node - <<'EOF'
-          const fs = require('node:fs');
-          if (!fs.existsSync('playwright-report.json')) process.exit(0);
-          const report = JSON.parse(fs.readFileSync('playwright-report.json', 'utf8'));
-          const per = new Map();
-          const walk = suite => {
-            for (const spec of suite.specs ?? []) for (const t of spec.tests) for (const r of t.results) per.set(spec.file, (per.get(spec.file) ?? 0) + r.duration);
-            for (const child of suite.suites ?? []) walk(child);
-          };
-          for (const suite of report.suites) walk(suite);
-          const rows = [...per].sort((a, b) => b[1] - a[1]);
-          console.log(`${rows.length} spec files, ${(rows.reduce((n, r) => n + r[1], 0) / 1000).toFixed(0)} s summed over ${report.config.workers} workers`);
-          for (const [file, ms] of rows.slice(0, 15)) console.log(`${(ms / 1000).toFixed(1).padStart(7)} s  ${file}`);
-          EOF
+        run: test -f playwright-report.json && node scripts/merge-playwright-reports.mjs playwright-report.json || true
+
+      - name: Keep the JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-part-${{ matrix.part }}
+          path: playwright-report.json
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Keep the failure traces
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-results
+          name: playwright-results-part-${{ matrix.part }}
           path: test-results
           retention-days: 7
+
+  # The required check: passes only when the matrix result is "success"; prints the wall time of each part.
+  browser-flows:
+    name: Browser flows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: browser
+    if: always()
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Fetch the reports of the three parts
+        uses: actions/download-artifact@v4
+        if: always()
+        with:
+          pattern: playwright-report-part-*
+          path: part-reports
+
+      - name: Merge the reports and list the wall time of each part and the slowest specs and tests
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=(part-reports/playwright-report-part-*/playwright-report.json)
+          echo "${#reports[@]} of 3 part reports found"
+          if [ "${#reports[@]}" -gt 0 ]; then node scripts/merge-playwright-reports.mjs --out playwright-report.json "${reports[@]}"; fi
+
+      - name: Keep the merged JSON report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Fail unless all three parts passed
+        env:
+          PARTS: ${{ needs.browser.result }}
+        run: |
+          echo "The parts' result: $PARTS"
+          test "$PARTS" = success
 
   build:
     name: Production build smoke
@@ -258,11 +335,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check for unused code
+        run: npm run knip
+
+      - name: Lint
+        run: npm run lint
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      # Round 89 (step M4): the packed packages install and run in a throwaway consumer project; a pack that
-      # breaks (an import without its extension, a missing export) fails this job. It takes under a minute.
+      # A pack that breaks (an import without its extension, a missing export) fails this job.
       - name: Pack the packages and run the consumer smoke
         run: npm run pack:smoke
 

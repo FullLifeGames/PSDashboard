@@ -1,15 +1,8 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { bodyStateKey, boardStateKey, readsFactory, type ReadSet } from './board-key.ts';
 
-/**
- * Round 89 (#149, step A8): the memo keys of the two memos that play a board, built from the board key of score/board-key.ts.
- * A body's key runs to several hundred characters (every field the play reads), so a memo key holds numbers: a key string is
- * interned to a small integer, and the interner starts over together with the memo it serves. A reader caches the numbers it
- * handed out, with the interner's generation, and drops them when the memo started over: a number from before a clear is
- * never reused.
- */
+/** Maps a key string to a small integer; a reader drops its cached numbers when `generation` moves. */
 export class Interner {
-  /** Raised when the interner starts over. */
   generation = 0;
   private readonly ids = new Map<string, number>();
 
@@ -19,7 +12,6 @@ export class Interner {
     return id;
   }
 
-  /** For probes: the texts held (a worker keeps them until the memo starts over) and their length in characters. */
   held(): { entries: number; chars: number } {
     let chars = 0;
     for (const text of this.ids.keys()) chars += text.length;
@@ -32,10 +24,8 @@ export class Interner {
   }
 }
 
-/** Where a body stands. */
 export const placeKey = (pokemon: Pokemon): string => `${pokemon.side.id}${pokemon.position}:`;
 
-/** The id of a body's key under a set of reads, found once per reader and generation. */
 function bodyIds(consumer: 'hit' | 'residual', interner: Interner): (pokemon: Pokemon, reads: ReadSet, withHp?: boolean) => number {
   let generation = interner.generation;
   let cache = [new Map<ReadSet, Map<Pokemon, number>>(), new Map<ReadSet, Map<Pokemon, number>>()];
@@ -53,14 +43,9 @@ function bodyIds(consumer: 'hit' | 'residual', interner: Interner): (pokemon: Po
   };
 }
 
-/** The reading of the key of a hit for one board: the key of `attacker`'s hit of `moveId` on `defender`. */
 export type HitKey = (attacker: Pokemon, defender: Pokemon, moveId: string) => string;
 
-/**
- * The key under which the hit of a pair is memoized: the board key (field, sides, battle) and the key of the move, the pair
- * with its places, every other active with its place, and, where a handler on the board names a side's `pokemon`, the benched
- * bodies of both sides with their HP. What the hit reads of each body follows the reads of everything on the board and of the move.
- */
+/** The memo key of a hit: board key, the pair, other actives and, where a handler names `pokemon`, the bench. */
 export function hitKeyReader(battle: Battle, interner: Interner): HitKey {
   const reads = readsFactory(battle, 'hit');
   const bodyId = bodyIds('hit', interner);
@@ -85,7 +70,6 @@ export function hitKeyReader(battle: Battle, interner: Interner): HitKey {
   };
 }
 
-/** The key under which the end of a board's turn is memoized: the board key and the key of every active, in the order of the slots. */
 export function residualKey(battle: Battle, slots: readonly (Pokemon | null)[], interner: Interner): string {
   const set = readsFactory(battle, 'residual')([]);
   const bodyId = bodyIds('residual', interner);

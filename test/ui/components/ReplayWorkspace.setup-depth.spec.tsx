@@ -9,13 +9,11 @@ import { realReplayWorkerClient } from '../fixtures/worker';
 
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
-// The legal move pool is heavy dex data the what-if row loads lazily; a fixed pool keeps the workspace render cheap.
 vi.mock('../../../src/lib/pokemon-options', () => ({ getMovePool: async () => ['Dragon Claw'] }));
 
 const { useAppController } = await import('../../../src/hooks/useAppController');
 const { ReplayWorkspace } = await import('../../../src/components/ReplayWorkspace');
 
-/** The workspace over the real controller; the ref always holds the newest render's controller. */
 function Workspace({ latestRef }: { latestRef: { current: AppController | null } }) {
   const app = useAppController();
   useEffect(() => { latestRef.current = app; });
@@ -47,10 +45,6 @@ async function mountLoaded(kind: ReplayKind, link?: (id: string) => string) {
   return { app: () => latest.current!, replay };
 }
 
-/**
- * Round 89 (ruling 49): Depth and Samples live in the Setup menu of the workspace and write the stored preferences; another engine than
- * the built-in search hides them. Singles and doubles read the same menu.
- */
 describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
   test.each([['singles'], ['doubles']] as const)('%s: Depth 2 brings Samples and updates the preferences; Auto takes the matrix depth back', async kind => {
     const { app } = await mountLoaded(kind);

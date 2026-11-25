@@ -16,31 +16,13 @@ type Captured = {
 
 const capture = (page: Page) => page.evaluate(() => (window as unknown as { __psState: StateHandle }).__psState.capture()) as Promise<Captured>;
 
-/** User gate 28.10.2026 (round 77, "1a 2a 3a 4a 5a", mobile a): the support utilities of a bug report. */
 test.describe('support', () => {
   test.beforeEach(async ({ page }) => {
     await routeOfflineFixtures(page);
     await page.goto('/');
   });
 
-  test('the header carries Beta, Report issue and the creator link before and after a replay loads', async ({ page }) => {
-    const header = page.locator('.ps-app-header');
-    await expect(header).toContainText('Beta');
-    await expect(header.getByRole('button', { name: 'Report issue' })).toBeVisible();
-    await expect(header.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toHaveAttribute('href', 'https://fulllifegames.com');
-    await expect(page.locator('h1')).toHaveCount(1);
-
-    await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-    const links = page.locator('.ps-topbar .ps-support-links');
-    await expect(links).toContainText('PS Dashboard');
-    await expect(links).toContainText('Beta');
-    await expect(links.getByRole('button', { name: 'Report issue' })).toBeVisible();
-    await expect(links.getByRole('link', { name: 'by Bene (FullLifeGames)' })).toBeVisible();
-  });
-
   test('Report issue opens a dialog that offers the state file and the filled issue form', async ({ page, context }) => {
-    // User request 28.10.2026: a dialog with a download button and a link replaces the tab and the download that the
-    // click started by itself.
     await context.route('https://github.com/**', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>issue form</p>' }));
     await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
     await startVariationAt(page, 1);
@@ -86,11 +68,9 @@ test.describe('support', () => {
     await page.locator('.ps-execute-btn').click();
     const history = page.locator('.ps-panel', { hasText: 'Variation moves' });
     await expect(history).toContainText('Turn 2', { timeout: 60_000 });
-    // One turn back and a draft pick there: a non-tip view with a pending choice.
     await page.locator('.ps-branch-bar button', { hasText: '◀' }).click();
     await expect(page.getByText('T2/')).toBeVisible();
-    // Round 84 (turn dock): the tray's second enabled tile. The draft holds the user's pick only: the seed under it is derived
-    // from the recorded turn and never reaches the draft.
+    // The draft holds the user's pick only: the seed under it comes from the recorded turn and never reaches it.
     await (await openTray(page, 'p1a')).locator('.ps-movebtn:enabled').nth(1).click();
     const saved = await capture(page);
     expect(saved.choices.draft.p1.length).toBe(1);

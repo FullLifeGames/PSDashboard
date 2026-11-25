@@ -8,8 +8,6 @@ import { stubReplayFetch } from '../../fixtures/network';
 import { realReplayWorkerClient } from '../../fixtures/worker';
 import { startedRecord } from '../../fixtures/new-game';
 
-// The context runs its real hooks; the replay worker is the real job handler
-// on this thread, and the network serves the fixture replays only.
 const worker = vi.hoisted(() => ({ current: null as null | ReturnType<typeof import('../../fixtures/worker').realReplayWorkerClient> }));
 vi.mock('../../../../src/hooks/useReplayWorker', () => ({ useReplayWorker: () => worker.current!.client }));
 
@@ -25,7 +23,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** Round 88 (T314, #55): Champions VGC 2625939941, where P1 fielded three bodies and P2's four are known. */
 const championsOpenGame = () => JSON.parse(readFileSync('test/e2e/fixtures/dock-championsvgc-2625939941.json', 'utf-8')) as ReplayData;
 
 describe('useReplayContext', () => {
@@ -47,7 +44,6 @@ describe('useReplayContext', () => {
     expect(ctx.positions.getExact(1)).toBeNull();
   });
 
-  // Round 89 (#105, stage H4): the Load menu offers both a replay and a new game, in either order.
   test('a game opens as the context\'s game; a replay loaded after it is a replay again: no record, its own link, its own positions', async () => {
     const { result } = renderHook(() => useReplayContext());
     const record = await startedRecord('gen9ou');
@@ -63,7 +59,6 @@ describe('useReplayContext', () => {
     expect(result.current.replay.loadedReplayUrl).toBe(`https://replay.pokemonshowdown.com/${replay.id}`);
     expect(result.current.positions.exactKeyFor(2)).toBe(`${replay.id}:2:${result.current.knowledge.setsFingerprint}`);
 
-    // a game opened once more after the replay works the same way (a failed load leaves the game as it was)
     await act(async () => { await result.current.newGame.openRecord(record); });
     await waitFor(() => expect(result.current.replay.replayData?.id).toBe(record.id));
     await act(async () => { await result.current.replay.loadReplay('no-such-replay-at-all'); });
@@ -90,7 +85,6 @@ describe('useReplayContext', () => {
     await waitFor(() => expect(result.current.smogon.setAssumptions.loading).toBe(false));
   });
 
-  // Round 89 (#124): a short side is no longer left whole: the rebuild plays the heaviest world (the worlds are in replay-context-worlds.spec.tsx).
   test('an open bring-limited game rebuilds its heaviest world and hands the bench of both sides to the branch', async () => {
     await loadSimMods('gen9championsvgc2026regma');
     const replay = championsOpenGame();

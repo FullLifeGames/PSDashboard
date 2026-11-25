@@ -8,18 +8,9 @@ import { FIRST_MOVERS } from './dice-order-support';
 import { CHECKS } from './dice-status-support';
 import { dexOfRules } from './dice-sweep-support';
 
-
-/**
- * Round 82 (forced dice), step A4: the census of the draws that abilities, items and conditions make. The scan reads the
- * simulator's own data tables (the base data, every generation mod the corpus plays, and the Champions bundle), finds every
- * handler (a function under an entry, at any depth) that calls `random`, `randomChance`, `sample` or `shuffle`, and keys each by
- * table, entry and handler. A handler no one has classed fails the census; so does a class whose handler is gone or whose calls
- * changed. The class says whether the dice module owns the draw (a die of an action, of the turn order or of the end of the
- * turn: the user can force it) or leaves it out (a random pick or a duration die, GLOSSARY.md).
- */
 await loadSimMods('gen9championsou');
 
-describe('the draws of abilities, items and conditions, scanned (round 82, A4)', () => {
+describe('the draws of abilities, items and conditions, scanned', () => {
   const found = scan();
 
   test('the scan', () => {
@@ -46,8 +37,6 @@ describe('the draws of abilities, items and conditions, scanned (round 82, A4)',
     }
   });
 
-  // The status checks: the handlers of conditions that draw in BeforeMove are exactly the checks the status sweep plays, and the
-  // rule set a check first draws in is the Dex's own (a Dex entry whose BeforeMove text calls the PRNG).
   const BEFORE_MOVE = Object.keys(CLASSES).filter(key => key.endsWith('onBeforeMove') && CLASSES[key].kind === 'status-check');
 
   test('the BeforeMove draws of conditions are the checks of the status sweep', () => {
@@ -63,7 +52,6 @@ describe('the draws of abilities, items and conditions, scanned (round 82, A4)',
   describe.each(RULES)('the status checks in $name', rules => {
     test.each(CHECKS.map(entry => [entry.id, entry] as const))('%s draws in BeforeMove exactly from its generation on', (_id, entry) => {
       const dex = dexOfRules(rules);
-      // a condition a move carries (infatuation) exists in the rule set when the move does
       const move = dex.moves.get(entry.id);
       const present = !move.exists || move.gen <= dex.gen;
       const handler = (dex.conditions.get(entry.id) as unknown as { onBeforeMove?: () => void }).onBeforeMove;

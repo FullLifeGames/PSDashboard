@@ -9,11 +9,6 @@ import { forcedOn, outfitBoard, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves
 import { battleOf } from './power-oracle';
 import { copyOf } from '../src/sim-ask/copy';
 
-// Round 82 (forced dice), lane A4: the dice the panel offers for the procs of abilities and items and for the end of the turn,
-// held to the simulator. A proc die is offered for the move's choice when the holder's handler draws a chance for that hit: the
-// offer runs the hit's events on a copy and names what the module recognizes (no ability or item is named). The end-of-turn dice
-// belong to the turn, so the offer plays the turn on a copy and reads what the simulator drew at the Residual event, plus the
-// accuracy, crit and roll of a future move that lands. Every offered die, forced to either answer, is drawn.
 await loadSimMods('gen9championsou');
 
 const SEED = '1,2,3,4';
@@ -36,18 +31,15 @@ describe.each(SWEEP_CASES)('the offered procs: $name', ({ rules, mode }) => {
     for (const offer of own) {
       expect(offer.name.slot).toBe('p1a');
       expect(offer.name.targetSlot).toBe('p2a');
-      // the chance is one the simulator asked for while the handler ran
       const asked = chanceOfEffect(procBoard(rules, mode, proc), clicks, proc.id, playClicks);
       if (offer.chance !== undefined && asked.length > 0) expect(asked).toContain(offer.chance);
       for (const result of offer.results) {
-        // the pick that follows a proc is drawn only when the proc's chance came true: force it with the pick
         const chanceDie: ForcedDie[] = offer.name.effectId?.endsWith(':option') ? [{ name: { ...offer.name, effectId: proc.id }, result: { happens: true } }] : [];
         const forced: ForcedDie[] = [hitDie(proc.move), ...chanceDie, { name: offer.name, result }];
         const shown = forcedOn(procBoard(rules, mode, proc), clicks, forced).report.forced[forced.length - 1];
         expect(shown.took, `${dieKey(offer.name)} ${JSON.stringify(result)}: ${shown.reason}`).not.toBe('no-draw');
       }
     }
-    // Effect Spore offers its three statuses and the no; Gens 3 and 4 offer the chance and the pick as two dice
     if (proc.id === 'effectspore') {
       const results = own.flatMap(offer => offer.results.map(result => JSON.stringify(result)));
       expect(results.some(result => result.includes('"option":"par"'))).toBe(true);
@@ -114,16 +106,13 @@ describe.each(SWEEP_CASES.filter(({ rules }) => rules.generation >= 2))('the off
     const later = copyOf(next);
     later.prng ??= next.prng.clone();
     playClicks(later, clicks);
-    // exactly one of the next two turns holds the landing, and its die is offered both ways
     const offered = [landing, accuracy(later)].filter(keys => keys.length > 0);
     expect(offered.length, 'the landing turn offers the accuracy').toBe(1);
   });
 });
 
-// A condition that starts in the middle of the turn (a faster foe's Thunder Wave or Confuse Ray lands before the body's own check)
-// is no state of the board when the choice is made: the offer lists no status check for it. A die forced for it anyway is held to
-// the check the simulator then draws: the status probe adds the condition on a copy and reads its polarity, and the report
-// says applied for both answers.
+// A condition that starts in the middle of the turn (a faster foe's Thunder Wave) is no state of the board
+// at the choice: the offer lists no status check for it.
 describe.each(SWEEP_CASES.filter(({ rules }) => rules.generation >= 3))('a status check that starts in the turn: $name', ({ rules, mode }) => {
   const foe = (moveId: string) => mon(rules, PIKACHU([moveId]));
   const board = (moveId: string) => mode === 'singles'
@@ -138,7 +127,6 @@ describe.each(SWEEP_CASES.filter(({ rules }) => rules.generation >= 3))('a statu
       const die: ForcedDie = { name: { slot: 'p1a', moveId: 'tackle', kind: 'status-check', effectId: id }, result: { happens } };
       const { report, battle, start: from } = forcedOn(board(moveId), clicks(moveId), [die]);
       expect(report.forced[0].took, `${rules.name} ${mode} ${id} ${happens}: ${report.forced[0].reason}`).toBe('applied');
-      // the answer shows: the body goes on with its own move, or it is stopped (a full-paralysis line, the confusion self-hit)
       const moved = battle.log.slice(from).some(line => line.startsWith('|move|p1a: ') && line.includes('Tackle'));
       expect(moved).toBe(happens);
     }

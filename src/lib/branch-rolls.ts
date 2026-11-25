@@ -2,11 +2,7 @@ import type { BranchMoveOption, DamageResult, DieName } from '@fulllifegames/eva
 import { toId } from '@fulllifegames/replay-core';
 import type { SpreadTargetDamage } from './branch-damage';
 
-/**
- * Round 82 (forced dice), step A7a: the damage of each step of the roll for one die of the panel. The preview computes it for the
- * move a slot has chosen (`DamageResult.rolls`); this reads the entry the die's target belongs to: the target's own result when the
- * move aims at one (doubles), the spread entry of that target for a move that hits both foes, the move's default result otherwise.
- */
+/** The damage of each roll step for one die of the panel: the target's own result, the spread entry, or the default. */
 
 export type StepDamage = NonNullable<DamageResult['rolls']>;
 

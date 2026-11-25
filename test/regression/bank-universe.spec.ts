@@ -5,7 +5,6 @@ import {
 } from './bank-universe';
 import { FAMILY_NAMES, familyOf, familyOfFormat, rulesetOfId } from './fit-families';
 
-/** Round 65: the universe of a bank run (bank, fit corpus, holdout) and its sampled turns. */
 
 const bank = { ids: ['a', 'b'], trancheOf: new Map([['a', 'x'], ['b', 'y']]) };
 const saved = {
@@ -35,8 +34,7 @@ describe('bank universe', () => {
     expect(holdoutTurns(4)).toEqual([2, 3]);
   });
 
-  test('round 66: each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
-    // Round 65's rule clamped the early point to turn 2, which a game of five or six snapshots reads as mid.
+  test('each holdout turn lies in the third it stands for, a short game drops the thirds it cannot reach', () => {
     const round65 = (maxTurn: number) => [...new Set([1 / 6, 1 / 2, 5 / 6]
       .map(at => Math.min(maxTurn - 1, Math.max(2, Math.round(at * maxTurn)))))].filter(turn => turn < maxTurn);
     for (let maxTurn = 3; maxTurn <= 400; maxTurn++) {
@@ -66,19 +64,16 @@ describe('bank universe', () => {
     expect(universe.sampleTurns(30)).toEqual([5, 15, 25]);
   });
 
-  // Round 66 review: scripts/expand-fit-corpus.mjs keeps bank and feedback replays out, scripts/build-fit-corpus.mjs does not.
   test('the fit corpus and its holdout share no replay with the bank or the feedback corpus', () => {
     const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
     const barred = new Set([...quoted('test/regression/eval-calibration.spec.ts'), ...quoted('test/e2e-feedback/corpus.ts')]);
     const corpus = new Set((JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: { id: string }[] }).replays.map(entry => entry.id));
     expect(barred.size).toBeGreaterThanOrEqual(134);
     expect([...corpus].filter(id => barred.has(id))).toEqual([]);
-    // Round 86: the sets of the four families come from the corpus; a family that scripts/fresh-holdout.mjs drew does not.
     const own = new Set(['championsou', 'championsvgc', 'doublesou', 'vgc']);
     expect(holdoutSets().filter(set => own.has(set.family)).flatMap(set => set.ids).filter(id => !corpus.has(id))).toEqual([]);
   });
 
-  // Round 86 (the fresh VGC holdout): a drawn family holds replays that no fit, bank or feedback run has read.
   test('a drawn holdout family shares no replay with the fit corpus, the bank or the feedback corpus', () => {
     const quoted = (path: string) => [...readFileSync(path, 'utf-8').matchAll(/'((?:[a-z0-9]+-)+\d+)'/g)].map(match => match[1]);
     const barred = new Set([...quoted('test/regression/eval-calibration.spec.ts'), ...quoted('test/e2e-feedback/corpus.ts')]);
@@ -98,10 +93,6 @@ describe('bank universe', () => {
   });
 });
 
-/**
- * Round 69 (T163): a search capture of one family at up to three positions per game, so a night holds
- * the four families the leaf K is fitted on. The default paths do not move.
- */
 describe('fit universe of one family', () => {
   type Entry = { id: string; format: string; source: 'tournament' | 'ladder' };
   const corpus = () => (JSON.parse(readFileSync(FIT_MANIFEST, 'utf-8')) as { replays: Entry[] }).replays;
@@ -113,11 +104,9 @@ describe('fit universe of one family', () => {
     return bankUniverse(bank);
   };
   const held = () => new Set(holdoutSets().flatMap(set => set.ids));
-  /** What a fit does not read: the holdout and the ladder games without a rating (withoutHoldout, withoutUnratedLadder). */
   const leavesTheFit = (entry: Entry, holdout: ReadonlySet<string>) =>
     holdout.has(entry.id) || (entry.source === 'ladder' && (cachedRating(entry.id) ?? 0) <= 0 && cachedRating(entry.id) !== undefined);
-  // Release 1.0.0: the Tests workflow on master runs without the bank's data (.fit-corpus reaches only the bank jobs),
-  // so the tests that read the corpus's replay files skip there, like every spec of local data.
+  // The Tests workflow has no `.fit-corpus` (only the bank jobs do): the rows that read replay files skip there.
   const corpusHere = existsSync('.fit-corpus');
 
   test('without a family or a turn rule the fit universe is the whole corpus at the bank turns', () => {
@@ -156,7 +145,6 @@ describe('fit universe of one family', () => {
       const first = expected[0];
       expect(universe.trancheOf.get(first.id)).toBe(`fit-${first.source}`);
     }
-    // The five families split the games a fit reads between them: no game twice, none lost.
     const all = lists.flatMap(({ universe }) => universe.ids);
     expect(new Set(all).size).toBe(all.length);
     expect(all.length).toBe(fitted.length);
@@ -188,17 +176,11 @@ describe('fit universe of one family', () => {
   });
 });
 
-/**
- * Round 70 (bank tooling): EVAL_CALIBRATION_FRACTION keeps a deterministic, stratified share of the
- * universe, so a quick run screens a change in a fraction of the machine time and pairs against a
- * full base on the rows both hold. Unset, empty and 1 leave the universe whole.
- */
 describe('quick tier', () => {
   type Entry = readonly [id: string, tranche: string];
   type Universe = { ids: string[]; trancheOf: Map<string, string> };
   const numbered = (format: string, count: number, tranche: string): Entry[] =>
     Array.from({ length: count }, (_, index) => [`${format}-${index + 1}`, tranche] as const);
-  /** Four strata: gen9ou in ladder (8), Doubles OU (6) and VGC (4) in cup, one Champions OU game alone in solo. */
   const mixed: Entry[] = [
     ...numbered('gen9ou', 8, 'ladder'), ...numbered('gen9doublesou', 6, 'cup'),
     ...numbered('gen9vgc2026regi', 4, 'cup'), ...numbered('gen9championsou', 1, 'solo'),
@@ -254,7 +236,6 @@ describe('quick tier', () => {
   test('each tranche and family keeps its rounded share, and no stratum drops out', () => {
     expect(mixedStrata(at('0.5').ids)).toEqual({ 'ladder|gen9ou': 4, 'cup|gen9doublesou': 3, 'cup|gen9vgc2026regi': 2, 'solo|gen9championsou': 1 });
     expect(mixedStrata(at('0.25').ids)).toEqual({ 'ladder|gen9ou': 2, 'cup|gen9doublesou': 2, 'cup|gen9vgc2026regi': 1, 'solo|gen9championsou': 1 });
-    // Below half a replay a stratum still keeps one.
     expect(mixedStrata(at('0.05').ids)).toEqual({ 'ladder|gen9ou': 1, 'cup|gen9doublesou': 1, 'cup|gen9vgc2026regi': 1, 'solo|gen9championsou': 1 });
   });
 
@@ -273,7 +254,6 @@ describe('quick tier', () => {
     const alone = ladder(mixed.filter(([, tranche]) => tranche === 'ladder'));
     expect(alone).toEqual(['gen9ou-1', 'gen9ou-5']);
     expect(ladder(mixed)).toEqual(alone);
-    // A new tranche and a new family inside the tranche each form a stratum of their own.
     expect(ladder([...mixed, ...numbered('gen9uu', 7, 'newcomer'), ...numbered('gen9vgc2026regj', 5, 'ladder')])).toEqual(alone);
   });
 
@@ -281,13 +261,11 @@ describe('quick tier', () => {
     const ids = mixed.map(([id]) => id);
     expect(quickSubset(ids, new Map(mixed), 1)).toEqual(ids);
     expect(quickSubset([], new Map(), 0.25)).toEqual([]);
-    // Without tranche labels the strata are the four families: 8 standard singles, 6 Doubles OU, 4 VGC, 1 Champions singles.
     const bare = quickSubset(ids, new Map(), 0.5);
     expect(bare.filter(id => id.startsWith('gen9ou-'))).toHaveLength(4);
     expect(bare.filter(id => id.startsWith('gen9doublesou-'))).toHaveLength(3);
     expect(bare.filter(id => id.startsWith('gen9vgc2026regi-'))).toHaveLength(2);
     expect(bare).toContain('gen9championsou-1');
-    // Every family of `mixed` sits in one tranche, so the labels leave the picks where they were.
     expect(bare).toEqual(at('0.5').ids);
   });
 
@@ -315,7 +293,6 @@ describe('quick tier', () => {
     const whole = bankUniverse(bank);
     expect(new Set(whole.ids).size).toBe(whole.ids.length);
     const wholeCounts = counted(whole, (_id, tranche) => tranche);
-    // Round 86: the four families of the fit corpus plus vgc2, the fresh VGC holdout drawn on 06.11.2026.
     expect(wholeCounts.size).toBe(5);
     for (const fraction of [0.1, 0.25, 0.5]) {
       process.env.EVAL_CALIBRATION_FRACTION = String(fraction);
@@ -345,7 +322,6 @@ describe('quick tier', () => {
     for (const [key, count] of wholeStrata) {
       expect(Math.abs((quickStrata.get(key) ?? 0) - count * 0.25), key).toBeLessThanOrEqual(0.5 + 1e-9);
     }
-    // A tranche or a family sums its strata, so its share is off by half a replay per stratum at most.
     for (const part of [0, 1] as const) {
       const sums = (strata: Map<string, number>) => {
         const sum = new Map<string, number>();

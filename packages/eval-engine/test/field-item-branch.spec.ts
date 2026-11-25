@@ -7,16 +7,8 @@ import { SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 import { playTurn, reconstruct } from './arrival-turn';
 
-/**
- * Round 88 (T329, GitHub issue #65): a branch that starts in the middle of a weather or a terrain keeps it to its logged end. The
- * log shows the field's start and end but never the setter's item (Heat Rock, Terrain Extender), so the rebuild guessed the item
- * from usage; without the rock the simulator's sun lasts five turns and a branch from turn 3 dropped it at turn 5 where the game
- * kept it until turn 8. The inference now reads the item from the field's turns (`field-evidence.ts`); `syncWeather` and
- * `syncTerrain` already leave the simulator's own count in place where the snapshot's id matches, so the rebuilt holder's item
- * decides and the field code needs no change. Each row plays a simulator log of 9 turns (Generation 9, singles and doubles),
- * rebuilds it at turn 3 the way the app does and plays the logged turns through the branch's execution path: the field must
- * stand after every turn the log shows it standing and be gone after the turn the log ends it.
- */
+// The log hides the setter's item (Heat Rock): without it the simulator's sun lasts five turns, the game's eight.
+// `syncWeather` and `syncTerrain` keep the simulator's own count where the snapshot's id matches: the item decides.
 await loadSimMods('gen9championsou');
 
 interface Row { label: string; species: string; item: string; ability?: string; moves: string[]; first?: string }
@@ -27,7 +19,6 @@ const ROWS: Row[] = [
 ];
 const TURNS = 9;
 
-/** The turns after which the log's weather or terrain stands: a start before the turn's end, no end line up to it. */
 function standingAfter(log: string): number[] {
   const turns: number[] = [];
   let turn = 0;

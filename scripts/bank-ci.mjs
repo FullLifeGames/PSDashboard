@@ -1,25 +1,4 @@
-// Runs a bank measurement in GitHub Actions (round 71, bank in GitHub Actions).
-//
-//   node scripts/bank-ci.mjs --name <name> [--commit <ref>] [--jobs 16] [--slices-per-job 4] [--env KEY=VALUE ...]
-//                            [--tranche NAME] [--reuse] [--dry-run]
-//   node scripts/bank-ci.mjs --resume <name|run id>
-//
-// The script builds a run commit on top of the measured commit that adds exactly one file, .bank-run.json (git
-// commit-tree over a throwaway index, so the working tree, the index and every local branch stay as they are), pushes
-// it as the one branch bank/<name> with an explicit refspec (never a tag, never --force, refused when the branch
-// exists), waits for the workflow .github/workflows/bank.yml, downloads the merged run into .calibration/<name>/ and
-// deletes the branch with --force-with-lease, so a branch that moved is never deleted. Before the push it reads the
-// diff of the measured commit against origin/master and refuses files and lines that look like secrets. The user's
-// standing okay of 13.10. ("6a") covers these pushes and deletes of bank/<name> branches and nothing else.
-//
-// --resume takes up a run whose watcher ended (the session closed, the machine slept): it finds the run by its name or run
-// id, waits for it by the same rule, downloads it into .calibration/<name>/, records it and deletes its branch. A run whose
-// jobs have all completed and whose merged artifact exists counts as over after a grace period, also while GitHub still
-// calls it in_progress (round 76, T266).
-//
-// --reuse prints the folder of a downloaded CI run of the same measured commit and the same run settings and starts
-// nothing. --dry-run builds and checks the run commit and stops before the push. CI measures only commits that carry
-// this tooling (user 17.10., 1a). Data uploads are a separate command (scripts/bank-data-pack.mjs --upload).
+// Runs a bank measurement in GitHub Actions.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,21 +7,15 @@ import { fileURLToPath } from 'node:url';
 import { BANK_TRANCHES, CONFIG_FILE, FIT_TRANCHES, holdoutTranches, validateRunConfig } from './bank-run-config.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
-/** The workflow's display name (`name:` of .github/workflows/bank.yml). GitHub resolves a workflow file name only on
- * the default branch, where bank.yml need not exist, so the run is found by branch, commit and this name. */
+// The `name:` of bank.yml: a workflow file name resolves only on the default branch, so the run is found by it.
 const WORKFLOW_NAME = 'Bank';
 const PUBLIC_BASE = 'origin/master';
 const CI_RECORD = 'ci.json';
 
-/** Added files whose names look like keys or credentials. */
 const SECRET_FILE = /(^|\/)(\.env(\.[^/]*)?|id_(rsa|dsa|ecdsa|ed25519)[^/]*|[^/]*\.(pem|p12|pfx|key))$/;
-/** Added lines that look like a token or a private key. */
 const SECRET_LINE = /ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|npm_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/;
 
-/**
- * What in a diff looks like a secret: `nameStatus` is `git diff --name-status` output, `patch` the `git diff` text.
- * Returns one finding per file or line, empty when nothing looks like a secret.
- */
+/** What in a diff looks like a secret: `nameStatus` is `git diff --name-status` output, `patch` the `git diff` text. */
 export function secretFindings(nameStatus, patch) {
   const findings = [];
   for (const line of nameStatus.split(/\r?\n/)) {
@@ -58,28 +31,20 @@ export function secretFindings(nameStatus, patch) {
   return findings;
 }
 
-/** The refspec of the push: exactly the run commit onto the one branch bank/<name>. */
 export const pushRefspec = (sha, name) => `${sha}:refs/heads/bank/${name}`;
 
-/** The git arguments that delete bank/<name> only while it still points at the run commit. */
 export const deleteArgs = (sha, name) => ['push', `--force-with-lease=refs/heads/bank/${name}:${sha}`, 'origin', `:refs/heads/bank/${name}`];
 
 /** The run settings that decide a CI run's rows: everything of the validated run but its name. */
 export const runSettings = config => ({ jobs: config.jobs, slicesPerJob: config.slicesPerJob, env: config.env });
 
-/**
- * A git command's output. The secret check reads the whole diff against master, which outgrew Node's default output
- * limit of 1 MB in round 77 ("spawnSync git ENOBUFS"), so the limit is 256 MB.
- */
+/** A git command's output; the limit is 256 MB because the whole diff against master outgrows Node's 1 MB (ENOBUFS). */
 export const gitText = (root, args, options = {}) => execFileSync('git', args, {
   cwd: root, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024, ...options,
 });
 const git = gitText;
 
-/**
- * The run commit: the measured commit's tree plus .bank-run.json, its parent the measured commit. Built in a
- * throwaway index (GIT_INDEX_FILE), so the repository's own index and working tree stay untouched.
- */
+/** The measured commit's tree plus .bank-run.json, built in a throwaway index (GIT_INDEX_FILE). */
 export function buildRunCommit(root, measured, config) {
   const text = `${JSON.stringify({ name: config.name, jobs: config.jobs, slicesPerJob: config.slicesPerJob, env: config.env }, null, 2)}\n`;
   const blob = git(root, ['hash-object', '-w', '--stdin'], { input: text }).trim();
@@ -146,23 +111,18 @@ function parseArgs(argv) {
 const gh = args => execFileSync('gh', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const pause = ms => new Promise(done => setTimeout(done, ms));
 
-/** The workflow run of the pushed commit, once GitHub has created it. */
-/** The bank workflow's run of `sha` among the runs `gh run list --json databaseId,headSha,url,workflowName` lists, or null. */
+/** The bank workflow's run of `sha` among `gh run list --json databaseId,headSha,url,workflowName`, or null. */
 export function pickRun(runs, sha) {
   return runs.find(entry => entry.headSha === sha && entry.workflowName === WORKFLOW_NAME) ?? null;
 }
 
 /** The merge job of bank.yml (`name:` of the job `merge`); a run is over only when it has completed too. */
 export const MERGE_JOB = 'Merge the jobs';
-/** How long a run whose jobs are all completed and whose merged artifact exists may stay open before it counts as over. */
+// GitHub can hold a finished run "in_progress" for about an hour: after this grace the jobs and the artifact decide.
 export const GRACE_MS = 5 * 60 * 1000;
-/** The longest `gh run watch` blocks before the loop looks at the jobs again (a run GitHub holds open never ends it). */
 const WATCH_MS = 3 * 60 * 1000;
 
-/**
- * Round 76 (T266): whether the run's own jobs say it is over, whatever GitHub's status of the run says: every job of the run
- * (the config job, the slice jobs, the merge job) has completed and the merged artifact exists.
- */
+/** Whether all jobs of the run completed and the merged artifact exists, whatever GitHub's status of the run says. */
 export function runFinished(state, artifactNames, { expectedJobs, artifactName, mergeJob = MERGE_JOB }) {
   const jobs = state?.jobs ?? [];
   return jobs.length >= expectedJobs
@@ -171,19 +131,9 @@ export function runFinished(state, artifactNames, { expectedJobs, artifactName, 
     && artifactNames.includes(artifactName);
 }
 
-/** The conclusion the jobs of a finished run add up to: skipped and neutral jobs do not count against it. */
 const jobsConclusion = jobs => (jobs.every(job => ['success', 'skipped', 'neutral'].includes(job.conclusion)) ? 'success' : 'failure');
 
-/**
- * The conclusion of a CI run once GitHub calls it completed. `gh run watch` ends with an error on a failed run and on an
- * API error alike (HTTP 504 on 19.10.2026: the script read run 39262005491 as over while it ran, found no artifact and
- * deleted its branch), so the run's own status decides, asked again until the run is completed.
- *
- * Round 76 (T266): GitHub also kept the run of r74-k open for about an hour after its 16 jobs and its merge had completed. With
- * `artifacts` (the names of the run's artifacts) a run whose jobs are all completed and whose merged artifact is there counts
- * as over once that has held for `graceMs`; a job that runs again starts the period anew, and the run's own conclusion wins
- * when GitHub gives it first. The conclusion then is the jobs': success only when none failed.
- */
+/** The conclusion of a CI run once completed, from its own status: `gh run watch` also fails on an API error. */
 export async function waitForRun(id, {
   watch, view, artifacts, wait = pause, now = Date.now, attempts = 240, graceMs = GRACE_MS, expectedJobs = 0, artifactName = '',
 }) {
@@ -206,7 +156,7 @@ export async function waitForRun(id, {
       try {
         names = artifacts(id);
       } catch {
-        // The artifact list could not be read: the period keeps running as it was.
+        // The artifact list could not be read: the period keeps running.
       }
       if (names) {
         if (!runFinished(state, names, { expectedJobs, artifactName })) finishedSince = null;
@@ -221,10 +171,7 @@ export async function waitForRun(id, {
   return 'unknown';
 }
 
-/**
- * Round 76 (T266): the Bank run a name or a run id stands for, through `gh` (`ghText(args)` returns its output). A name is the
- * run's `bank/<name>` branch (the newest Bank run on it), a number is the run itself; its branch gives the name back.
- */
+/** The Bank run a name (newest on bank/<name>) or a run id stands for, through `gh` (`ghText(args)`). */
 export function findRunByTarget(target, ghText) {
   const fields = 'databaseId,headSha,url,workflowName,headBranch';
   const byId = /^\d+$/.test(target);
@@ -237,10 +184,7 @@ export function findRunByTarget(target, ghText) {
   return { databaseId: found.databaseId, headSha: found.headSha, url: found.url, name: found.headBranch.slice('bank/'.length) };
 }
 
-/**
- * The tail of every collection (a run just pushed and a run taken up again): wait for the run, download it, record it,
- * and delete the branch, also when the wait or the download fails. Returns the conclusion.
- */
+/** Waits, downloads, records and deletes the branch, also when a step fails; returns the conclusion. */
 export async function collectRun({ wait, download, record, cleanup }) {
   try {
     const conclusion = await wait();
@@ -262,7 +206,6 @@ async function runOf(sha, name) {
   throw new Error(`no run of the ${WORKFLOW_NAME} workflow for ${sha} after five minutes`);
 }
 
-/** What waitForRun asks of GitHub: a watch that never blocks for long, the run's jobs, the run's artifact names. */
 const waitDeps = (id, config) => ({
   watch: runId => execFileSync('gh', ['run', 'watch', String(runId), '--exit-status', '--interval', '30'], { cwd: ROOT, stdio: 'inherit', timeout: WATCH_MS }),
   view: runId => JSON.parse(gh(['run', 'view', String(runId), '--json', 'status,conclusion,jobs'])),
@@ -273,7 +216,6 @@ const waitDeps = (id, config) => ({
 
 const downloadRun = (runId, name) => execFileSync('gh', ['run', 'download', String(runId), '--name', `run-${name}`, '--dir', join(ROOT, '.calibration', name)], { cwd: ROOT, stdio: 'inherit' });
 
-/** ci.json of a downloaded run (what --reuse reads), and the run's summary on the console. */
 function recordRun(run, config, measured, sha, conclusion) {
   const out = join(ROOT, '.calibration', config.name);
   writeFileSync(join(out, CI_RECORD), `${JSON.stringify({
@@ -286,11 +228,7 @@ function recordRun(run, config, measured, sha, conclusion) {
   console.log(out);
 }
 
-/**
- * Round 76 (T266): takes up a run whose watcher ended. The run commit still exists on origin as bank/<name> (the watcher
- * deletes the branch last), and its .bank-run.json gives the run's settings back; a branch that is gone leaves the run
- * commit to fetch by its sha, and a commit that cannot be fetched stops the resume with the reason.
- */
+// The run commit stays on origin as bank/<name> until the watcher ends; a gone branch means fetching it by its sha.
 async function resume(target) {
   let run;
   try {

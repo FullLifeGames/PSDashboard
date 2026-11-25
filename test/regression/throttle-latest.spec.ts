@@ -1,7 +1,10 @@
-import { test, expect, describe } from 'vitest';
+import { test, expect, describe, beforeEach, afterEach, vi } from 'vitest';
 import { throttleLatest } from '../../src/lib/eval/throttle-latest';
 
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => vi.useRealTimers());
+
+const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
 
 describe('throttleLatest', () => {
   test('delivers the first value at once and only the LATEST held value after the interval', async () => {
@@ -58,8 +61,7 @@ describe('throttleLatest', () => {
     }
     await wait(50);
     for (let index = 1; index < stamps.length; index++) {
-      // Timer granularity on a loaded machine: allow a few milliseconds of slack.
-      expect(stamps[index] - stamps[index - 1]).toBeGreaterThanOrEqual(25);
+      expect(stamps[index] - stamps[index - 1]).toBeGreaterThanOrEqual(30);
     }
     expect(stamps.length).toBeLessThan(20);
   });

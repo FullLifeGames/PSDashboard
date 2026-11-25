@@ -8,12 +8,6 @@ import {
   COMPARE_JOB, REPO_URL, WORKFLOW_NAME, buildRunCommit, compareVerdict, deleteArgs, findReuse, jobTimes, pickRun, pushRefspec, runFolder,
 } from '../../scripts/feedback-ci.mjs';
 
-/**
- * Round 89 (feedback runs in GitHub Actions): scripts/feedback-ci.mjs pushes one feedback/<name> branch per run by the
- * repository's URL (the user's okay of 20.11.2026 covers these pushes and deletes and nothing else). The specs pin what it
- * pushes and deletes, that the run commit adds exactly .feedback-run.json without touching the repository's index, working tree
- * or branches, which run it takes for its own, and how it reads the compare job.
- */
 
 const made: string[] = [];
 afterAll(() => {

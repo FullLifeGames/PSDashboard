@@ -1,13 +1,4 @@
-/**
- * Evaluate one turn of a Pokémon Showdown replay in Node.
- *
- *   node evaluate-turn.mjs https://replay.pokemonshowdown.com/smogtours-gen8ou-573756 12
- *   node evaluate-turn.mjs ./replay.json 12
- *
- * Loads the replay JSON (a local file, or the replay page's .json), rebuilds
- * the battle at that turn from the sets the log reveals, runs the fixed-depth
- * search, and prints the win chance plus the top lines for each side.
- */
+// Evaluates one turn of a Pokémon Showdown replay and prints the win chance and the top lines of each side.
 import { readFile } from 'node:fs/promises';
 import { buildTeamsFromReplay, getBranchSimulatorFormat, parseReplayLog } from '@fulllifegames/replay-core';
 import {

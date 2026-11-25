@@ -10,46 +10,23 @@ import { resolveAutoTurnSettings, serializedAutoRouting, type EngineMode, type T
 
 export type EvalStatus = 'idle' | 'reconstructing' | 'searching' | 'done' | 'stale' | 'error';
 
-/** Panel repaint cadence for streamed search progress and partial results. */
 const PROGRESS_INTERVAL_MS = 100;
 const PARTIAL_INTERVAL_MS = 250;
 
 export interface EvaluateParams {
-  /** Cache key for replay-view positions; null disables caching (branch mode). */
   cacheKey: string | null;
-  /** Resolved Tera allowance (the panel pref resolved against the replay). */
   tera: TeraAllowance;
-  /** Sleep Clause enforced for this replay (resolved from the branch format). */
   sleepClause?: boolean;
-  /** Round 65: the rule set the replay runs under (Pokémon Champions or standard), resolved from its format. */
   ruleset: StaticRuleset;
-  /**
-   * Produces the serialized position. A reconstruction-based acquire calls
-   * reportReconstruct(turn, target) as it replays turns; the hook surfaces
-   * that as reconstructProgress state.
-   */
   acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
-  /**
-   * Identity of the position this run evaluates (unified timeline). Exposed
-   * back as resultTag so consumers can tell whether the shown result still
-   * belongs to the position on screen — a run finishing AFTER the user
-   * navigated away must not display (or be recorded) as the new position's.
-   */
+  /** Identity of the position, exposed as resultTag: a run finishing after navigation must not show as the new's. */
   tag?: string;
-  /**
-   * The actions played on this replay turn, as the sweep passes them (round
-   * 63): both store under one cache key, so both search with the played row
-   * and column in the verify step. Absent for live and variation positions.
-   */
+  /** The actions played on this replay turn, as the sweep passes them; absent for live and variation positions. */
   keepPlayed?: EvalSettings['keepPlayed'];
-  /**
-   * Round 84 (turn dock): called once where this run's result lands: after the search, from the stored hit or from the memory
-   * hit. Never for a partial result, and not for a run that was superseded, cancelled or failed. The dock's engine fill acts here.
-   */
+  /** Called once where the result lands; never for a partial, superseded, cancelled or failed run. */
   onResult?: (result: EvalResult) => void;
 }
 
-/** The caller's hook on a landed result. A failure in it never turns the finished run into an error. */
 function deliverResult(params: EvaluateParams, result: EvalResult): void {
   try {
     params.onResult?.(result);
@@ -60,15 +37,12 @@ function deliverResult(params: EvaluateParams, result: EvalResult): void {
 
 export interface CachedEval {
   result: EvalResult;
-  /** Round 35: false marks a sketch result (no forced-win prover); a full pass never reuses it. */
+  /** False marks a sketch result (no forced-win prover); a full pass never reuses it. */
   prove?: boolean;
-  // Engine-typed: the UI only offers depth 1/2, but sweeps cache whatever
-  // EvalSettings the engine ran with.
   depth: EvalSettings['depth'];
   samples: EvalSettings['samples'];
   mode: EngineMode;
   tera: TeraAllowance;
-  /** Engine expectation of the actually played pair (set by graph sweeps). */
   playedOutcome?: number | null;
   /** Depth+1 re-search of flagged misplays (null = checked, nothing flagged). */
   verified?: TurnVerification | null;
@@ -76,13 +50,9 @@ export interface CachedEval {
   sensitivity?: TurnSensitivity | null;
 }
 
-/**
- * Round 89 (SB-7): the run the user stopped while it held a partial result. `tag` names its position (`EvaluateParams.tag`). The
- * partial stays the shown result, read as the answer of that position: the dock fills from it, the panel says it is a stopped run.
- */
-export interface StoppedRun { tag: string | null; /** Round 89 (SB-9): the stop came before any partial result; the panel says so and nothing is kept. */ empty?: true }
+/** The run the user stopped on a partial result; `tag` names its position (`EvaluateParams.tag`). */
+export interface StoppedRun { tag: string | null; /** The stop came before any partial result. */ empty?: true }
 
-/** The state setters and shared refs a single-evaluation run writes through. */
 interface SingleEvalIO {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
@@ -92,15 +62,9 @@ interface SingleEvalIO {
   setError: (value: string | null) => void;
   setProgress: (value: SearchProgress | null) => void;
   setReconstructProgress: (value: { turn: number; target: number } | null) => void;
-  /** Stops the sweep's painting; `superseded` keeps where it stopped for its status line (round 77, C1). */
   stopGraphPaint: (superseded?: boolean) => void;
 }
 
-/**
- * Engine resolution and the stored-eval fast path. 'auto' needs the position
- * before the engine is known — acquire first and resolve; concrete modes
- * keep the stored-eval fast path that skips reconstruction entirely.
- */
 async function resolveEngineAndStored(
   io: SingleEvalIO, params: EvaluateParams, runId: number,
   prefs: { depth: EvalSettings['depth']; samples: EvalSettings['samples']; mode: EvalPreferences['mode'] },
@@ -113,14 +77,11 @@ async function resolveEngineAndStored(
       if (io.runRef.current === runId) io.setReconstructProgress({ turn, target });
     });
     if (io.runRef.current !== runId) return 'aborted';
-    // Round 63 (T110): the position carries both routing signals, its fainted fraction and its game type.
     const { faintedFraction, doubles } = serializedAutoRouting(serialized);
     resolved = resolveAutoTurnSettings(faintedFraction, doubles);
   } else {
     resolved = { depth, samples, mode };
   }
-  // Persistent cache: a result from a previous session for the same
-  // position + settings skips reconstruction and search entirely.
   if (params.cacheKey) {
     const stored = await loadStoredEval(evalStoreKey(params.cacheKey, resolved.depth, resolved.samples, resolved.mode, params.tera));
     if (io.runRef.current !== runId) return 'aborted';
@@ -138,7 +99,6 @@ async function resolveEngineAndStored(
   return { serialized, resolved };
 }
 
-/** The search itself: acquire (if the fast paths left no position), run the workers, install and persist. */
 async function searchAndInstall(
   io: SingleEvalIO, params: EvaluateParams, runId: number,
   resolved: TurnEvalSettings, acquired: string | null,
@@ -154,10 +114,7 @@ async function searchAndInstall(
   io.setReconstructProgress(null);
 
   io.clientRef.current ??= new EvalWorkerClient();
-  // The workers stream progress and partials far faster than a panel can
-  // show them; each delivery is a render. Only the latest matters, so a
-  // burst collapses to one repaint per interval (round 38). The final
-  // result supersedes anything still held — cancel, never flush.
+  // The final result supersedes anything still held: cancel the throttle, never flush.
   const progress = throttleLatest<SearchProgress>(update => {
     if (io.runRef.current === runId) io.setProgress(update);
   }, PROGRESS_INTERVAL_MS);
@@ -210,7 +167,6 @@ async function runSingleEvaluation(
   }
 }
 
-/** The evaluate entry: the in-memory cache fast path, then the staged async run. */
 function useEvaluateAction(
   io: SingleEvalIO,
   prefsRef: React.RefObject<EvalPreferences>,
@@ -220,14 +176,12 @@ function useEvaluateAction(
 ) {
   const { runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint } = io;
   return useCallback((params: EvaluateParams) => {
-    // A pinned engine (the fast play-out) beats the panel preferences for
-    // single evaluations; the sweep never reads it.
     const { depth, samples, mode } = engineOverrideRef.current ?? prefsRef.current;
     if (params.cacheKey) {
       const hit = cacheRef.current.get(params.cacheKey);
       if (hit && hit.depth === depth && hit.samples === samples && hit.mode === mode && teraKey(hit.tera) === teraKey(params.tera)) {
         runRef.current += 1;
-        // Bumping the run counter kills a running sweep: its status must say so (round 77, C1).
+        // Bumping the run counter kills a running sweep: its status must say so.
         stopGraphPaint(true);
         setResult(hit.result);
         setResultTag(params.tag ?? null);
@@ -255,19 +209,13 @@ function useEvaluateAction(
   }, [io, prefsRef, engineOverrideRef, setResultTag, setStopped, runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint]);
 }
 
-/**
- * The user's Cancel (round 89, SB-7). Like `cancel`, and a run that streamed a partial result keeps it as its answer (`stopped`): the
- * engine's own stop leaves the quick estimate, and the app reads it the same way. Every other cancel (the game analysis taking over,
- * a changed engine) leaves the partial as a stale result and no answer. A stop before any partial result (a tree before its first
- * interim result) keeps nothing and says so (`empty`, SB-9).
- */
 function useStop(
   cancel: () => void, resultRef: React.RefObject<EvalResult | null>, resultTagRef: React.RefObject<string | null>,
   statusRef: React.RefObject<EvalStatus>, setStopped: (value: StoppedRun | null) => void,
 ) {
   return useCallback(() => {
     const partial = resultRef.current !== null;
-    // Round 89 (SB-9): the game analysis's Cancel calls this too; only a single search that was under way leaves the empty mark.
+    // The game analysis's Cancel calls this too; only a single search that was under way leaves the empty mark.
     const searching = statusRef.current === 'searching' || statusRef.current === 'reconstructing';
     cancel();
     if (partial) setStopped({ tag: resultTagRef.current });
@@ -275,31 +223,23 @@ function useStop(
   }, [cancel, resultRef, resultTagRef, statusRef, setStopped]);
 }
 
-/**
- * The single-position evaluation surface: status/result state, the
- * evaluate entry with its two cache layers, cancel, and staleness.
- */
 export function useSingleEval(env: {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
   cacheRef: React.RefObject<Map<string, CachedEval>>;
   prefsRef: React.RefObject<EvalPreferences>;
-  /** A concrete engine pinned for the single path (null = the prefs decide). */
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>;
-  /** cancel also stops the sweep's painting (the run counter kills its work). */
   stopGraphPaint: (superseded?: boolean) => void;
 }) {
   const { runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint } = env;
   const [status, setStatusState] = useState<EvalStatus>('idle');
-  // Round 89 (SB-10): the run's own status, written with every change. A click on Cancel can land between a change and the commit's
-  // effects (a long task right after the paint), so the stop must not read a ref that an effect writes after the render.
+  // Written with every change, not in an effect: a Cancel click can land between a change and the commit's effects.
   const statusRef = useRef<EvalStatus>('idle');
   const setStatus = useCallback((value: EvalStatus) => {
     statusRef.current = value;
     setStatusState(value);
   }, []);
   const [result, setResultState] = useState<EvalResult | null>(null);
-  /** Position tag of the run that produced `result` (see EvaluateParams.tag). */
   const [resultTag, setResultTagState] = useState<string | null>(null);
   const resultTagRef = useRef<string | null>(null);
   const setResultTag = useCallback((value: string | null) => {

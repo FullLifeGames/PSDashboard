@@ -3,12 +3,6 @@ import type { BranchSimState, BranchSwitchOption, SimPokemonInfo } from '@fullli
 import { limitBench, type Bench } from '../../../src/lib/bench';
 import { pokemon } from '../fixtures/sim-state';
 
-/**
- * Round 88 (M3, T314 #55): a battle that already holds only the bodies a side selected needs no filter from the replay's bring
- * list. A turn-0 pick that swaps a never-brought body into the four builds a battle of four (the pinned bring); the replay's own
- * list does not name that body, and filtering by it would drop a body the user picked from the bench.
- */
-
 const option = (species: string, slot: number): BranchSwitchOption => ({ name: species, species, activeSlot: 0, slot, hp: '100/100', hpPercent: 100, fainted: false });
 const party = (...names: string[]): SimPokemonInfo[] => names.map(name => pokemon(name));
 

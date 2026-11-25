@@ -25,13 +25,6 @@ vi.mock('../src/branch/entry-effects.ts', async importOriginal => {
   };
 });
 
-/**
- * Round 73 (T230, the door of T206 for the correction): correctActivesFromProtocol takes the lines of a block, and a caller that
- * cut a CRLF log at '\n' hands it lines that end in '\r'. The readers behind the door see LF only. Today every reader happens
- * to trim or to match through toId, so the board comes out the same; the door keeps that true for the next reader that anchors
- * a pattern at the line end.
- */
-
 const mon = (species: string, item: string, ability: string, moves: string[], spe = 0): PokemonSet => ({
   name: species, species, item, ability, moves, nature: 'Serious', gender: '', level: 100,
   evs: { hp: 252, atk: 0, def: 4, spa: 0, spd: 0, spe }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
@@ -81,7 +74,7 @@ const scenes: { name: string; board: () => Battle; events: string[] }[] = [
 
 const withCrlf = (lines: string[]) => lines.map(line => `${line}\r`);
 
-describe('correctActivesFromProtocol reads a block with Windows line endings like the same block with LF (T230, T206)', () => {
+describe('correctActivesFromProtocol reads a block with Windows line endings like the same block with LF', () => {
   for (const scene of scenes) {
     test(`${scene.name}: the board after a CRLF block equals the board after the LF block`, () => {
       const lf = scene.board();

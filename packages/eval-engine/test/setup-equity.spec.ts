@@ -7,21 +7,12 @@ import { boostedFraction, pairThreat } from '../src/score/threat';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 64 (T125, point 2): a doubles status part is hinted by the damage its
- * stages buy the user over two attacks (setupEquity). It read `move.boosts`
- * whoever the move lands on, so Swagger, Decorate and Coaching priced as the
- * user's own setup, and it skipped Speed, accuracy and evasion, which Stored
- * Power reads. Singles price a status move at its damage, 0, and never ask.
- */
 
 const splash = (species: string, extra: Partial<PokemonSet> = {}) => set(species, ['splash'], extra);
 const rootOf = (battle: Battle) => createRootPosition(JSON.stringify(State.serializeBattle(battle)));
 const option = (choice: string) => ({ choice, label: choice });
-/** The support floor of a status part, and the hint of the partner's Splash. */
 const FLOOR = 0.25;
 
-/** The hint of slot 0's part, the partner Splashing (its part adds the floor). */
 function partHint(battle: Battle, part: string): number {
   return combinedOptionHints(rootOf(battle), 'p1', [option(`${part}, move splash`)])[0] - FLOOR;
 }
@@ -32,20 +23,8 @@ const nonzero = (stages: Partial<BoostsTable>) => Object.fromEntries(Object.entr
 const sameStages = (a: Partial<BoostsTable>, b: Partial<BoostsTable>) =>
   Object.keys({ ...a, ...b }).every(stat => a[stat as keyof BoostsTable] === b[stat as keyof BoostsTable]);
 
-/**
- * Moves whose stages a handler sets and the Dex does not carry: Belly Drum
- * with its HP cost, Acupressure on a random stat, a Stockpile layer, Curse by
- * the user's type, Take Heart and Tidy Up beside the cure or the clearing.
- * ownStages and the setup hint leave them out, as before round 64.
- */
 const HANDLER_STAGES = ['acupressure', 'bellydrum', 'curse', 'stockpile', 'takeheart', 'tidyup'];
 
-/**
- * The stages the simulator leaves on a user after it plays the move once in
- * doubles (Mew, no ability, next to a Splashing ally, two Splashing foes),
- * aimed as the first legal choice aims it; a charging move plays its second
- * turn too.
- */
 function playedStages(format: string, id: string): Partial<BoostsTable> {
   const battle = battleOf(format, [set('Mew', [id, 'splash']), splash('Pikachu')], [splash('Snorlax'), splash('Blissey')]);
   const user = battle.sides[0].active[0];
@@ -60,9 +39,8 @@ function playedStages(format: string, id: string): Partial<BoostsTable> {
   return { ...user.boosts };
 }
 
-describe('setup equity counts the stages the move gives its user (round 64, T125)', () => {
+describe('setup equity counts the stages the move gives its user', () => {
   test('a stage the move gives another body buys the user no setup', () => {
-    // Swagger and Decorate raise the target, Coaching the ally; each user carries an attack the stages would feed.
     const swagger = battleOf('gen9doublescustomgame', [set('Garchomp', ['swagger', 'earthquake']), splash('Pikachu')], foes());
     expect(partHint(swagger, 'move swagger 1')).toBe(FLOOR);
     const decorate = battleOf('gen9doublescustomgame', [set('Garchomp', ['decorate', 'dracometeor']), splash('Pikachu')], foes());
@@ -75,7 +53,6 @@ describe('setup equity counts the stages the move gives its user (round 64, T125
     const team = () => [set('Espeon', ['agility', 'storedpower']), splash('Pikachu')];
     const before = battleOf('gen9doublescustomgame', team(), foes());
     const hint = partHint(before, 'move agility');
-    // The simulator plays Agility; the equity is twice the best gain the staged body reads against a foe.
     const after = battleOf('gen9doublescustomgame', team(), foes());
     after.choose('p1', 'move 1, move 1');
     after.choose('p2', 'move 1, move 1');

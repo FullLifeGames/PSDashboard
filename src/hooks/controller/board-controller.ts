@@ -9,14 +9,6 @@ import type { ReplayContext } from './replay-context';
 import type { Transients } from './transients';
 import { prefsAfterRun } from '../../lib/play-out';
 
-/**
- * Honest divergence notice: guessed sets can make the branch replay
- * DIVERGE from the real game — in the worst case the simulated game ends
- * before the requested turn (GPL T39: three rejected choices, sim winner
- * declared early). Playing recommendations into that dead sim produced
- * baffling errors ("more choices than unfainted Pokémon"); instead the
- * divergence is surfaced and play-outs are refused.
- */
 function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline: Timeline) {
   const { replayData, snapshots, observations } = ctx.replay;
   const { startBranch, getBattle, executeTurn, setChoice, history, branching, variationStartTurn, stopBranch } = ctx.branch;
@@ -29,8 +21,6 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
     setViewTurn, setViewLine, liveTip, viewTurn, restorePointer, followNextTip,
   } = timeline;
 
-  // Deviation machinery: the rebuild road, the chess-rule requests, the
-  // shared preparation session, and the picker draft plumbing.
   const deviationTimeline = useMemo(() => ({
     viewTurnRef, viewTurn, viewLine, endSnapshotTurn, variationSpan, setVariationScores,
     setViewTurn, setViewLine, liveTip, restorePointer, followNextTip,
@@ -60,23 +50,17 @@ function useDeviationLayer(ctx: ReplayContext, transients: Transients, timeline:
   return { ...deviation, restoreVariation };
 }
 
-/** The requested turn of the page's link, read from the replay layer's context (a helper so the controller stays in its complexity budget). */
 function useRequestedTurnOf(ctx: ReplayContext, maxTurn: number, landOnTurn: (turn: number) => void) {
   const { requestedReplay, requestedTurn, replayData } = ctx.replay;
   useRequestedTurn({ requestedReplay, requestedTurn, replayId: replayData?.id ?? null, maxTurn, landOnTurn });
 }
 
-/**
- * Board layer: the unified-timeline pointer, the deviation/rebuild road,
- * the branch refresh, and the line lifecycle (discard, replay-load reset).
- */
 export function useTimelineController(ctx: ReplayContext, transients: Transients) {
   const { replayData, snapshots } = ctx.replay;
   const { branching, variationStartTurn, history, stopBranch } = ctx.branch;
   const { evaluation, branchWindowOpenRef } = ctx;
   const { interruptPlayOut, clearDraftChoices, setPendingConfirm, playOut, setPlayOut, setPlayOutNotice, setDraftChoices } = transients;
 
-  // ── Unified timeline: one pointer over main line + at most one variation ──
   const timeline = useTimeline({
     replayId: replayData?.id, snapshots, branching, variationStartTurn, history,
     interruptPlayOut, onNavigate: clearDraftChoices, variationEnded: branching && (ctx.branch.simState?.ended ?? false),
@@ -86,14 +70,12 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   const liveEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && !evalResultMatchesView ? 'stale' : evaluation.status;
 
-  // Round 89 (#112): the same reading against the live tip's position, for the play-out and the Auto evaluation of a run: the
-  // pointer may stand elsewhere (the frame reported another turn) while the run plays on at the tip.
+  // Against the live tip, not the pointer: a run plays on at the tip while the pointer may stand elsewhere.
   const tipEvalStatus: typeof evaluation.status =
     evaluation.status === 'done' && evaluation.resultTag !== null && evaluation.resultTag !== (timeline.tip?.key ?? null) ? 'stale' : evaluation.status;
 
   const deviation = useDeviationLayer(ctx, transients, timeline);
   const { setBranchDivergence } = deviation;
-  // Round 89 (#105): a turn that joined a new game's main line leaves the pointer on the new tip.
   const { restorePointer } = timeline;
   const { landRef } = ctx;
   useEffect(() => {
@@ -106,7 +88,6 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     stopBranch();
     setBranchDivergence(null);
     setPendingConfirm(null);
-    // A run that ends with its variation gives the user's Auto setting back (round 77, C4).
     const restored = playOut ? prefsAfterRun(evaluation.prefs, playOut) : null;
     if (restored) evaluation.setPrefs(restored);
     setPlayOut(null);
@@ -118,10 +99,6 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
   }, [stopBranch, maxTurn, setViewTurn, setViewLine, setVariationScores, setBranchDivergence, evaluation, playOut,
     branchWindowOpenRef, setPendingConfirm, setPlayOut, setPlayOutNotice, setDraftChoices]);
 
-  // A freshly loaded replay must start clean: slider at turn 1 (B11), no live
-  // branch, and no team edits carried over from the previous replay. Host
-  // pages can inject replays repeatedly via ps-load-replay, so the previous
-  // game's state must never leak into the next one.
   const { takeLanding } = ctx.newGame;
   const landOnTurn = timeline.landOnTurn;
   useEffect(() => {
@@ -129,14 +106,10 @@ export function useTimelineController(ctx: ReplayContext, transients: Transients
     setBranchDivergence(null);
     branchWindowOpenRef.current = false;
     stopBranch();
-    // Round 89 (#105): a game opens on its tip, where the next turn is played from: turn 0 (the lead picker) before the lead is picked.
     const tip = takeLanding(replayData?.id);
-    // The landing is the game's own id's: the run before its document arrives (a reload mounts the board first) takes none (H4g).
-    // A selection, not a restore: the frame of a game that opens at start (a reload) is not there yet and reports turn 1 while it
-    // loads; the guard of the landing drops that report until the frame confirms the tip, however long it loads (round 89, H4e, H4f).
+    // A selection, not a restore: a reloaded frame reports turn 1 until it loads; the landing guard drops that report.
     if (tip !== null) landOnTurn(tip);
   }, [replayData?.id, stopBranch, resetPointer, setBranchDivergence, branchWindowOpenRef, takeLanding, landOnTurn]);
-  // Round 89 (lane L): `?replay=<id>&turn=<n>` lands on its turn after the reset above, in the same selection a graph click makes.
   useRequestedTurnOf(ctx, maxTurn, landOnTurn);
 
   return { timeline, deviation, evalResultMatchesView, liveEvalStatus, tipEvalStatus, discardVariation };

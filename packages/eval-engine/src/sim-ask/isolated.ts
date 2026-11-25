@@ -1,20 +1,8 @@
 import type { Battle, Pokemon } from '@pkmn/sim';
 import { AskLeak, askCheckOn, fingerprint } from './guard.ts';
 
-/**
- * Round 72 (T239): a copy-on-write view of a live object, for a stand-in that must hand a Dex handler a live body
- * without letting the handler write it. Reads fall through to the live object; every write (a property, an index, a
- * length, a delete, a nested object, an array) lands in an overlay of the view, so the handler sees its own writes and
- * the live object never changes. A Map, a Set, a Date or anything else with internal slots cannot be copied on write:
- * the view refuses it, and the first touch throws `NeedsMore`, which `callHandler` turns into the typed answer.
- * The battle's Dex is the exception: game data every copy shares, whose caches are Maps. It passes through, and the
- * development check fingerprints the Dex entries a question reads. So does every entry the Dex hands out (a species,
- * a move, an ability, an item, a condition, a nature) and a format: the speed layer (forward/sim-fast/dispatch.ts) keeps a
- * table from an effect object to its handlers for as long as the Dex lives, and a view is a new object on every question,
- * so a view of a body's species or of the format would enter that table for good, with the graph behind it (round 72,
- * T256: the renderer of the feedback run ran out of memory). Objects the handler creates are its own and pass back
- * unwrapped. The development check (guard.ts) fingerprints the live battle around every `callHandler` on a view.
- */
+// A copy-on-write view of a live object: writes land in an overlay, so a handler never changes it. An object with
+// internal slots (Map, Set, Date) cannot be copied on write: the first touch throws `NeedsMore`.
 
 export class NeedsMore extends Error {
   constructor(what: string) {
@@ -23,21 +11,17 @@ export class NeedsMore extends Error {
   }
 }
 
-/** The live battle behind a view, for the development check. */
 const rootOf = new WeakMap<object, Battle>();
 
 const REFUSED = new Set(['[object Map]', '[object Set]', '[object WeakMap]', '[object WeakSet]', '[object Date]', '[object RegExp]', '[object Promise]']);
 const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
 
-/** The Dex lookup that hands out each kind of game data, by the `effectType` of its entries. */
 const DEX_KINDS: Readonly<Record<string, string>> = {
   Pokemon: 'species', Move: 'moves', Ability: 'abilities', Item: 'items', Condition: 'conditions', Weather: 'conditions', Status: 'conditions', Nature: 'natures',
 };
 
-/**
- * Game data a view hands out as itself: a format, or an entry the Dex returns for its own id (the active move of a
- * battle is a copy of its Dex entry, so it is not one).
- */
+// Game data passes through unwrapped: the speed layer's table from effect objects to handlers lives as long as the Dex,
+// and a view is a new object per question: a wrapped species or format would enter it for good.
 function isGameData(value: object, dex: object | undefined): boolean {
   const { effectType, id } = value as { effectType?: unknown; id?: unknown };
   if (typeof effectType !== 'string') return false;
@@ -50,17 +34,14 @@ function isGameData(value: object, dex: object | undefined): boolean {
 const DELETED = Symbol('deleted');
 type Key = string | symbol;
 
-/** The refusal in place of a value that cannot be copied on write. */
 function refusal(what: string): object {
   const fail = (): never => { throw new NeedsMore(what); };
   return new Proxy({}, { get: fail, set: fail, has: fail, deleteProperty: fail, ownKeys: fail, defineProperty: fail, getOwnPropertyDescriptor: fail });
 }
 
-/** What one view changed on one live object, and what of the live object still shows. */
 class Overlay {
   readonly writes = new Map<Key, unknown>();
   readonly isArray: boolean;
-  /** An array's length as the view sees it, and the length below which the live elements still show. */
   length: number;
   floor: number;
 
@@ -77,7 +58,6 @@ class Overlay {
     return this.isArray && typeof key === 'string' && /^(0|[1-9]\d*)$/.test(key) ? Number(key) : -1;
   }
 
-  /** An array index the view has cut off or truncated away. */
   hidden(key: Key): boolean {
     const at = this.indexOf(key);
     return at >= 0 && (at >= this.length || (at >= this.floor && !this.writes.has(key)));
@@ -104,7 +84,6 @@ class Overlay {
     return true;
   }
 
-  /** The live keys in their order, then the keys the view added. */
   keys(): Key[] {
     const keys = new Set<Key>();
     for (const key of Reflect.ownKeys(this.target)) if (!this.hidden(key) && this.writes.get(key) !== DELETED) keys.add(key);
@@ -114,7 +93,6 @@ class Overlay {
   }
 }
 
-/** The proxy of one live object over its overlay; `wrap` hands nested objects the same treatment. */
 function proxyOf(state: Overlay, wrap: (value: unknown) => unknown): object {
   const { target } = state;
   const view: object = new Proxy(state.isArray ? [] : {}, {
@@ -175,10 +153,8 @@ export function isolated<T extends object>(live: T): T {
   return root;
 }
 
-/** The body of a view of a battle that stands for `live`'s body `mon`, found by its place on its side. */
 export const bodyInView = (view: Battle, mon: Pokemon): Pokemon => view.sides[mon.side.n].pokemon[mon.side.pokemon.indexOf(mon)];
 
-/** With the check on, runs the call and throws `AskLeak` when the live battle behind the view moved. */
 export function viewGuarded<T>(facade: object, call: () => T): T {
   const root = askCheckOn() ? rootOf.get(facade) : undefined;
   if (!root) return call();

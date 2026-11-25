@@ -6,16 +6,8 @@ import { actionsTie, fingerprint, setAskCheck } from '../src/sim-ask';
 import { boardBattle, boardChoices, boards, cheapOracle, playedTie, SLOT_A } from './speed-tie-oracle';
 import { SUITE_RULE_SETS, tieSweep } from './speed-tie-sweep';
 
-/**
- * Round 72 (T196, step 4): `speedTie` against the simulator's own queue. A tie is the condition under which
- * `speedSort` flips a coin between two move actions: `battle.comparePriority(a, b) === 0` on the actions that
- * `queue.resolveAction` builds (priority after ModifyPriority events, fractional priority, speed with Trick Room).
- *   1. The eight boards of the round-70 probe, in Gen 9 and Champions, singles and doubles: the played turn (a shuffle
- *      of the two move actions on a copy) and the cheap queue answer agree, and `speedTie` equals them.
- *   2. The sweep: every Dex entry that can move a priority or a speed, as the holder on either side, in every
- *      generation and the Champions mod, against the Dex's moves, at equal and unequal speed, Trick Room, Tailwind and
- *      paralysis; the live battle's fingerprint is unchanged by every ask.
- */
+// A tie is the condition under which `speedSort` flips a coin: `battle.comparePriority(a, b) === 0` on the actions
+// `queue.resolveAction` builds (priority after ModifyPriority events, fractional priority, speed with Trick Room).
 
 await loadSimMods('gen9championsou');
 
@@ -39,7 +31,6 @@ describe('the eight boards: played turn, queue answer and speedTie', () => {
           if (cheap) ties++;
         }
       }
-      // The oracle is not vacuous: boards tie and boards do not.
       expect(ties).toBeGreaterThan(0);
       expect(ties).toBeLessThan(rows.length);
     });

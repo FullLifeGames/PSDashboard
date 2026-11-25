@@ -3,7 +3,6 @@ import type { EditorPools } from '../../lib/team-editor';
 import type { TeamDraft } from '../../hooks/useTeamDraft';
 import { AbilityField, EvGrid, ItemField, MovesField, NatureField, TeraField } from './fields';
 
-/** One Pokémon's editable set: identity line, the set fields, EVs, and moves. */
 export function PokemonRow({ entry, index, gen, pools, draft }: {
   entry: RevealedPokemonInfo;
   index: number;

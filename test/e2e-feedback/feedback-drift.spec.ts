@@ -19,28 +19,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const REPORT_DIR = join(__dirname, '..', '..', 'docs', 'reports');
 const DUMP = process.env.FEEDBACK_DUMP === '1';
-/** Round 59: '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace. */
+// '0' | '1' | a lever list for the speed layer; unset keeps the app's default and no perf trace.
 const SIM_FAST = process.env.FEEDBACK_SIM_FAST;
-/**
- * Round 61: a search-budget form (search/budget.ts syntax); unset keeps the app's default. Round 67 (T111):
- * parsed here before any page opens, so a typo stops the run instead of measuring the default (the browser
- * reads a bad form as the default).
- */
+// Parsed before any page opens, so a typo stops the run (the browser reads a bad form as the default).
 const SEARCH_BUDGET = process.env.FEEDBACK_SEARCH_BUDGET;
 parseSearchBudget(SEARCH_BUDGET);
 const perfByReplay: Record<string, unknown> = {};
-/** Round 88 (T328): how long one single read of the debug handle may take before the page counts as dead. */
 const READ_TIMEOUT_MS = 120_000;
 
-/**
- * The expert-feedback drift run: analyzes each pinned replay through the
- * REAL app (fresh context = default d2s3 auto line) and grades the corpus.
- * WARN-ONLY: claim statuses are report content. The only reds are harness
- * breakage — hermetic violations, unfinished sweeps, empty extraction, a
- * malformed corpus. Run: npm run test:feedback
- * (FEEDBACK_RECORD=1 records data.pkmn.cc pins; FEEDBACK_DUMP=1 writes
- * full graph dumps for dossier work.)
- */
 
 interface ExtractedDebug {
   scores: (number | null)[];
@@ -59,11 +45,9 @@ const evalErrorsByReplay: Record<string, { turn: number; error: string }[]> = {}
 const alignmentByReplay: Record<string, AlignmentSummary | null> = {};
 const koMismatchByReplay: Record<string, number> = {};
 
-/** A replay that cannot be graded still shows up — as ERROR rows, never silence. */
 function pushErrorResults(replayId: string, details: string[]) {
   const items = FEEDBACK_CORPUS.filter(entry => entry.replay === replayId);
   for (const item of items) results.push({ item, status: 'error', details });
-  // A census-only replay has no rows to carry the failure: the notice line does.
   if (items.length === 0) noticeByReplay[replayId] = `harness failure: ${details.join(' · ')}`;
 }
 
@@ -75,7 +59,6 @@ test('corpus is well-formed against the real fixtures', () => {
   expect(validateCorpus(FEEDBACK_CORPUS, turnsByReplay)).toEqual([]);
 });
 
-// The census replays (doubles, no corpus items) run last: the pinned six keep their place in every report.
 for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
   test(`drift: ${replayId}`, async ({ page }) => {
     const log = await installHermeticRoutes(page, replayId);
@@ -97,7 +80,6 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
     const panel = page.locator('.ps-main-right .ps-eval-panel');
     await panel.locator('button', { hasText: 'Analyze game' }).click();
     const wait = await waitForSweepEnd(page);
-    // Round 88 (T328): the single reads race a timeout as well; the generous bound covers the serialising of a full dump.
     const read = async <R>(fn: () => R | Promise<R>): Promise<R> => {
       try {
         return await guardedEvaluate(page, fn, { evalTimeoutMs: READ_TIMEOUT_MS });
@@ -145,8 +127,6 @@ for (const replayId of [...FEEDBACK_REPLAYS, ...FEEDBACK_CENSUS_REPLAYS]) {
       writeFileSync(join(REPORT_DIR, `feedback-full-${replayId}.json`), JSON.stringify(full, null, 2));
     }
 
-    // Harness reds — the ONLY reds on this path. A failed replay still
-    // reaches the report as ERROR rows before the test goes red.
     const problems: string[] = [];
     if (log.violations.length > 0) problems.push(`unexpected external requests: ${log.violations.join(' ')}`);
     if (log.smogonMisses.length > 0) problems.push(`unpinned data.pkmn.cc requests (record once with FEEDBACK_RECORD=1): ${log.smogonMisses.join(' ')}`);

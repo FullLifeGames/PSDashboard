@@ -10,14 +10,7 @@ import { sharedBranchPayload } from '../e2e/fixtures/shared-branch';
 import type { BranchHistoryEntry } from '../../src/lib/branch-history';
 import { FAMILIES, bareEntry, playRecord } from './new-game-play';
 
-/**
- * Round 89 (lane H, #105), stage H5: the share link of a game, version 2. The link holds what the game is made of (the format,
- * both teams, the seed, the leads and every choice) and nothing the reader can play again: the log, the positions and the names a
- * Dex knows stay out. The reader plays the entries on the format's own simulator and gets the record the sharer had. Version 1
- * links (a replay's branch) read as they did; a version this app does not know reads as a newer link.
- */
 
-/** What a rebuild replays of an entry: the rest is what the rebuild writes again. */
 const core = (entry: BranchHistoryEntry) => JSON.parse(JSON.stringify({
   kind: entry.kind ?? 'turn', forcedSide: entry.forcedSide, leadChoices: entry.leadChoices, p1SlotChoices: entry.p1SlotChoices, p2SlotChoices: entry.p2SlotChoices,
 }));
@@ -40,7 +33,7 @@ describe('a game link (version 2)', () => {
         id: 'newgame-opened0001', format: record.format, formatName: record.formatName, players: record.players, seed: record.seed,
         teamPreview: record.teamPreview, bringCount: record.bringCount, header: record.header, body: record.body, turns: record.turns,
       });
-      // `Teams.unpack` leaves out an empty gender: the teams are the sharer's by their packed text (what the battle reads)
+      // `Teams.unpack` leaves out an empty gender: compare the teams by their packed text.
       expect({ p1: Teams.pack(opened.teams.p1), p2: Teams.pack(opened.teams.p2) }).toEqual(payload.teams);
       expect(opened.entries.map(core)).toEqual(record.entries.map(core));
       expect(opened.entries).toEqual(record.entries.map(withoutPosition).map((entry, index) => ({ ...entry, ...opened.entries[index] })));
@@ -84,7 +77,6 @@ describe('a game link (version 2)', () => {
     const entry = bareEntry(4, { kind: 'turn', p1SlotChoices: slots, p2SlotChoices: [slots[2]] });
     const shared = shareEntry(entry);
     expect(historyOfShare([shared])[0]).toMatchObject({ p1SlotChoices: slots, p2SlotChoices: [slots[2]] });
-    // the plain forms are short: a move with its target and modifier is one string, a plain switch another
     expect(JSON.stringify(shared)).toContain('"Close Combat@1#terastallize"');
     expect(JSON.stringify(shared)).toContain('">Rotom-Wash"');
   });
@@ -96,15 +88,13 @@ describe('a game link (version 2)', () => {
   });
 });
 
-describe('a link that holds a game this browser has (H7, finding 4)', () => {
+describe('a link that holds a game this browser has', () => {
   for (const family of [FAMILIES[0], FAMILIES[1]]) {
     test(`${family.name}: only a link of the very same game equals the saved one`, async () => {
       const record = await playRecord(family, 2);
       const payload = makeGameSharePayload({ record });
       expect(sameGameAsShare(record, payload)).toBe(true);
-      // the sharer's open branch and the pointer do not make another game
       expect(sameGameAsShare(record, makeGameSharePayload({ record, view: { turn: 1, line: 'main' } }))).toBe(true);
-      // another seed, format, player, team, or main line is another game
       expect(sameGameAsShare(record, { ...payload, seed: '1,2,3,4' })).toBe(false);
       expect(sameGameAsShare(record, { ...payload, format: 'gen9customgame' })).toBe(false);
       expect(sameGameAsShare(record, { ...payload, players: ['Alice', 'Carol'] })).toBe(false);

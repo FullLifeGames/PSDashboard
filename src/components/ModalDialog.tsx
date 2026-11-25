@@ -1,11 +1,9 @@
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
-/** The overlay, the dialog box with its focus handling, and the title row with the close button. */
 export function ModalDialog({ title, closeLabel, onClose, maxWidth = 640, children }: {
   title: string;
   closeLabel: string;
   onClose: () => void;
-  /** The box's widest size in pixels (the New game dialog holds two team fields side by side). */
   maxWidth?: number;
   children: React.ReactNode;
 }) {

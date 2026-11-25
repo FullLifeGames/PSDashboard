@@ -1,42 +1,28 @@
 import type { DieKind, DieName, DieResult, ForcedDie } from './types.ts';
 
-/**
- * Round 82 (forced dice), step A5: one text per forced die, for the history rows, the shares and the frame lines of a branch
- * (A6) and for the chips (A7). It says what the die decided, with the names a reader gives it: the caller hands in the Dex of
- * the game's rule set (`rulesDex`), so this file holds no move, ability or item name. Free of simulator imports like
- * `logged-results.ts`.
- */
+/** The reader of names for dieLabel; this module imports nothing from the simulator. */
 
-/** The reader of names: the game's own Dex for moves and effects, the battle's names for the bodies. */
 export interface DieWords {
   move(id: string): string;
-  /** A status, a volatile, an ability or an item by its id (a secondary's `boosts:spd` and `self:atk` pass through as given). */
+  /** A status, volatile, ability or item by id; a secondary's `boosts:spd` and `self:atk` pass through as given. */
   effect(id: string): string;
-  /**
-   * The same effect as a common noun inside a result ("no burn", like "no crit"): a status or a volatile in lower case, a stat change
-   * and the names of abilities and items as `effect` writes them. Absent: `effect`.
-   */
+  /** The effect as a common noun inside a result ("no burn", like "no crit"); absent: `effect`. */
   plain?(id: string): string;
   slot(slot: string): string;
 }
 
-/** Without a reader the ids stand in for the names. */
 const IDS: DieWords = { move: id => id, effect: id => id, slot: slot => slot };
 
-/** Kinds whose subject is the effect that holds the die, not a move. */
 const EFFECT_SUBJECT = new Set<DieKind>(['ability-proc', 'item-proc', 'end-of-turn', 'move-first']);
 
-/** The effect id without the suffix the module gives a die with several results (`effectspore:option`). */
 const idOf = (name: DieName): string => (name.effectId ?? '').split(':option')[0];
 
 function subjectOf(name: DieName, words: DieWords): string {
   if (name.kind === 'speed-tie') return 'Speed tie';
   if (EFFECT_SUBJECT.has(name.kind) && name.effectId) return words.effect(idOf(name));
-  // the accuracy die of a later hit of a multi-hit move names its hit (round 89, #114); the first hit's die keeps the plain subject
   return name.moveId ? `${words.move(name.moveId)}${name.hit ? ` hit ${name.hit}` : ''}` : words.slot(name.slot);
 }
 
-/** The two words of a chance, by what the die decides: yes and no. */
 function chanceText(name: DieName, words: DieWords): [string, string] {
   const effect = words.effect(idOf(name));
   const noun = (words.plain ?? words.effect)(idOf(name));

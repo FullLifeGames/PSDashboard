@@ -15,14 +15,6 @@ vi.mock('../src/search/outcome-children', async importOriginal => {
 });
 import { drawChild } from '../src/search/outcome-children';
 
-/**
- * Round 89 (A5f-5, ruling 20): the plain path of the endgame children (the prover and the endgame solver) reads a damaging pair
- * through several draws of the cell's own seeds and takes their median; a proof books it only when every draw agrees. The count
- * is one table, `PLAIN_DRAWS` in `endgame/children.ts`, and both game types read it. Doubles take five, singles three: A5f-3
- * measured the five on the doubles holdouts (+0.1 to +0.2 % forks per family, 20 of 89 sampled proofs gone, 1 added, 1 of the 3
- * proofs for the side that lost gone), and nobody measured singles. The scenes below are A5f-3's lost proofs: three seeds agree
- * and book mass 1, five do not.
- */
 interface Scene {
   id: string;
   turn: number;
@@ -56,14 +48,13 @@ function makeBattle(p1Sets: PokemonSet[], p2Sets: PokemonSet[], formatid: string
   return JSON.stringify(State.serializeBattle(battle));
 }
 
-/** The draws one plain cell takes: drawChild calls per child (a doubles speed tie draws each order apart). */
 function drawsOf(serialized: string, p1Choice: string, p2Choice: string): { draws: number; plain: boolean } {
   vi.mocked(drawChild).mockClear();
   const result = endgameChildren(createRootPosition(serialized), p1Choice, p2Choice);
   return { draws: vi.mocked(drawChild).mock.calls.length / result.children.length, plain: result.plain };
 }
 
-describe('plain draws of the endgame children (round 89, A5f-5)', () => {
+describe('plain draws of the endgame children', () => {
   test('singles: a damaging pair the class plan refuses (Protect) takes three draws, a quiet pair one', () => {
     const serialized = makeBattle([makeSet('Champ', 'Machamp', ['Seismic Toss', 'Splash'])], [makeSet('Egg', 'Chansey', ['Protect', 'Splash'])], 'gen9customgame');
     expect(drawsOf(serialized, 'move seismictoss', 'move protect')).toEqual({ draws: 3, plain: true });
@@ -80,13 +71,6 @@ describe('plain draws of the endgame children (round 89, A5f-5)', () => {
     expect(drawsOf(serialized, 'move splash, move splash', 'move splash, move splash').draws).toBe(1);
   });
 
-  // A5f-3 (a5f3-draws.jsonl): the proof below reads mass 1 with three draws and mass 0 with five. The root order is empty, so the
-  // prover tries the root candidates in its own odds order; the scenes are the bank's positions as the holdout run builds them.
-  // gen9vgc2025regi-2391814405 turn 9: Player 2 proves a win on three draws and loses the game (one of the three proofs for a losing
-  // side that A5f-3 found); five draws prove nothing, and that still holds.
-  // gen9doublesou-2694460841 turn 16: Player 2 proved a win in 1 turn on three draws, and five draws read 0 until round 89 (P3): the
-  // sure strike now proves it on the sampled rolls, mass 0.995 in 2 turns (49 cells; the rest is a Protect reply the proof does not
-  // close). That is a proof for the side that won the game (probe p3-draws.vt.ts of lane P), no lost-side proof, and the row reads it.
   test('doubles, gen9vgc2025regi-2391814405-t9: three agreeing draws prove nothing once five must agree', async () => {
     const board = scene('gen9vgc2025regi-2391814405-t9');
     await loadSimMods('gen9doublescustomgame');

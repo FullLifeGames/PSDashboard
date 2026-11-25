@@ -2,12 +2,6 @@ import { describe, expect, test, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { parseRequestedTurn, useRequestedTurn } from '../../../src/hooks/useRequestedTurn';
 
-/**
- * `?replay=<id>&turn=<n>` (round 89, lane L): the address names a turn, and the app lands on it once, after the replay it named has
- * opened, through the selection the evaluation column's graph makes (`landOnTurn`). Singles and doubles read the same address and
- * the same selection: the turn count comes from the loaded snapshots, whichever game type they hold.
- */
-
 describe('parseRequestedTurn', () => {
   test('reads a whole number and ignores everything else', () => {
     expect(parseRequestedTurn('7')).toBe(7);

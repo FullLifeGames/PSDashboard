@@ -3,34 +3,22 @@ import type { SimBattle, SimPokemon } from './types.ts';
 import { takeBodyOut } from './team-order.ts';
 import { sameBodyForme } from './body-forme.ts';
 
-/**
- * Round 67 (T133): a body the boundary correction puts on the field, where the
- * sim kept another one, plays the switch-in the game showed. Before, it never
- * did: 749828 t17, Roaring Moon held no Booster Energy (as in the game) but
- * lacked the Protosynthesis the protocol shows, because the sim's Gholdengo
- * had not fainted and the repoint skipped the entry. The entry is the
- * simulator's own (no list of effects), and a body the sim already brought in
- * during the block keeps the entry it played there.
- */
 
 interface FreshEntry {
   body: SimPokemon;
   sideIdx: number;
   slot: number;
-  /** Index of the protocol line that brought the body in. */
   line: number;
-  /** The protocol dragged it in (Roar, Whirlwind, Dragon Tail): the simulator's entry of a drag. */
   drag: boolean;
 }
 
 const SWITCH_IN = /^\|(switch|drag|replace)\|(p[12])([a-d]):[^|]*\|([^,|]+)/;
 
-/** The sim's own lines of the block that just ended (it opened with |turn| one before the board's turn). */
+// The sim's own lines of the block that just ended (it opened with |turn| one before the board's turn).
 function simBlockLines(battle: SimBattle): string[] {
   return battle.log.slice(battle.log.lastIndexOf(`|turn|${battle.turn - 1}`) + 1);
 }
 
-/** Whether the sim's block wrote a switch-in on the slot (any body), or of the body (any slot). */
 function simSwitchedIn(lines: string[], sideId: string, test: (slotLetter: string, name: string) => boolean): boolean {
   return lines.some(line => {
     const match = line.match(/^\|(?:switch|drag|replace)\|(p[12])([a-d]): ([^|]*)/);
@@ -38,14 +26,8 @@ function simSwitchedIn(lines: string[], sideId: string, test: (slotLetter: strin
   });
 }
 
-/** Round 88 (#103): the body holds the species or another forme of it, by the Dex of its battle. */
 export const sameSpecies = (body: SimPokemon, species: string) => sameBodyForme(body.battle.dex, body.species.name, species);
 
-/**
- * Bodies active after the repoints that were not active in the sim before them,
- * alive, and that the sim's own block did not switch in, in the order the
- * protocol brought them.
- */
 function freshEntries(battle: SimBattle, before: (SimPokemon | null)[][], events: string[], simLines: string[]): FreshEntry[] {
   const entries: FreshEntry[] = [];
   events.forEach((line, index) => {
@@ -64,14 +46,7 @@ function freshEntries(battle: SimBattle, before: (SimPokemon | null)[][], events
   return entries;
 }
 
-/**
- * The faint the protocol shows on the slot before the body came in, when the
- * sim's body there still stands: the sim's own faint bookkeeping, so the side
- * counts it before the entry reads it (Supreme Overlord). The body is the one
- * the protocol lost when the protocol switched that species in earlier in the
- * block, or when neither side switched the slot during the block. True when the protocol shows the slot's faint before
- * the entry: the body then replaces a fainted one, as the simulator's replacement after a faint does.
- */
+// Faints the predecessor the log shows, so the side counts it before the entry reads it (Supreme Overlord).
 function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimPokemon | null)[][], events: string[], simLines: string[]): boolean {
   const sideId = battle.sides[entry.sideIdx].id;
   const ident = `${sideId}${String.fromCharCode('a'.charCodeAt(0) + entry.slot)}:`;
@@ -92,12 +67,8 @@ function faintThePredecessor(battle: SimBattle, entry: FreshEntry, before: (SimP
   return true;
 }
 
-/**
- * Round 86 (B10, ruling C3): the predecessor leaves through `takeBodyOut`, so its ability ends the way the simulator's faint ends it (Weezing's
- * Neutralizing Gas in 2159578969 turn 2: Slow Start starts on Regigigas). The simulator's End events run before the replacement comes in, but the
- * repoint has already put the replacement in the slot: the predecessor stands in its slot again while its End events run, then the replacement
- * goes back (without it, the gas's end would start the replacement's ability once here and once more in its entry).
- */
+// `takeBodyOut` ends its ability as the simulator's faint does (Neutralizing Gas: Slow Start starts on Regigigas).
+// The predecessor re-takes its slot while its End events run, then the replacement goes back (else twice).
 function takeThePredecessorOut(predecessor: SimPokemon, entry: FreshEntry) {
   const { side } = predecessor;
   const replacement = side.active[entry.slot];
@@ -114,22 +85,16 @@ function takeThePredecessorOut(predecessor: SimPokemon, entry: FreshEntry) {
 
 interface EntryWay { afterFaint: boolean; drag: boolean }
 
-/**
- * Gens 1 to 4, before the ability and the item start: a body Knock Off robbed drops a regained item, Gens 1 and 2 forget
- * the active Pokémon's last moves, Gen 1 resets the side's last move slot. switchIn's Gen 1 branch that re-records a
- * partial trap's Metronome for the trapping foe is left out: it names a move, and no entry the sweep plays reaches it.
- */
+// Gens 1 to 4, before ability and item start: a robbed body drops a regained item; Gens 1 and 2 forget the last moves;
+// Gen 1 resets the side's last move slot. Left out: switchIn's Gen 1 partial-trap Metronome (no sweep reaches it).
 function enterOlderGeneration(battle: SimBattle, body: SimPokemon) {
   if (body.itemKnockedOff && body.item) body.item = '';
   if (battle.gen <= 2) for (const active of battle.getAllActive()) active.lastMove = null;
   if (battle.gen === 1) body.side.lastSelectedMoveSlot = 0;
 }
 
-/**
- * Gens 1 to 4, after BeforeSwitchIn: EntryHazard (hazards, Healing Wish, Lunar Dance), in Gens 1 and 2 AfterSwitchInSelf
- * unless the body replaces a fainted one or is dragged in, in Gen 3 after turn 0 AfterEntryHazard (the weather
- * abilities). False when the hazards K.O. the body: it then runs no runSwitch.
- */
+// Gens 1 to 4, after BeforeSwitchIn: EntryHazard, in Gens 1 and 2 AfterSwitchInSelf (not after a faint or a drag),
+// in Gen 3 AfterEntryHazard after turn 0. False when the hazards K.O. the body: it then runs no runSwitch.
 function settleOlderGeneration(battle: SimBattle, body: SimPokemon, way: EntryWay): boolean {
   battle.runEvent('EntryHazard', body);
   if (battle.gen <= 2 && !way.afterFaint && !way.drag) battle.runEvent('AfterSwitchInSelf', body);
@@ -138,11 +103,8 @@ function settleOlderGeneration(battle: SimBattle, body: SimPokemon, way: EntryWa
   return true;
 }
 
-/**
- * BattleActions#switchIn's steps for the incoming body, then its runSwitch: the entry as the sim plays it. Round 78
- * (@pkmn 0.10.12): Gens 1 to 4 play their entry inside switchIn, where the gen 4 mod's runSwitch used to.
- * test/entry-sweep.spec.ts holds every entry these steps reach to switchIn.
- */
+// BattleActions#switchIn's steps for the incoming body, then its runSwitch (Gens 1 to 4 play theirs inside switchIn);
+// `test/entry-sweep.spec.ts` holds every entry these steps reach to switchIn.
 function playEntry(battle: SimBattle, body: SimPokemon, way: EntryWay) {
   body.activeTurns = 0;
   body.activeMoveActions = 0;
@@ -156,11 +118,7 @@ function playEntry(battle: SimBattle, body: SimPokemon, way: EntryWay) {
   battle.actions.runSwitch(body);
 }
 
-/**
- * The game's body entered before its turn ended, so Battle#endTurn ran over it
- * once: the per-active steps of endTurn for the entered body, which made no
- * move in that turn (the move disable pass follows in the request refresh).
- */
+// The body entered before its turn ended, so Battle#endTurn ran over it: its per-active steps, no move made.
 function closeTheTurn(body: SimPokemon) {
   body.moveThisTurn = '';
   body.newlySwitched = false;
@@ -173,7 +131,6 @@ function closeTheTurn(body: SimPokemon) {
   body.activeTurns++;
 }
 
-/** The fields a turn's events set that the sim's endTurn already cleared for this turn, per body. */
 function turnFlags(battle: SimBattle) {
   return battle.sides.flatMap(side => side.pokemon.map(pokemon => ({
     pokemon,
@@ -184,15 +141,8 @@ function turnFlags(battle: SimBattle) {
   })));
 }
 
-/**
- * Plays the switch-in of every body the correction put on the field. Silent:
- * the lines the entries write leave the sim's log again, like every other
- * correction (the block's alignment record reads that log afterwards). The
- * board stands at the start of a turn, so what an entry sets for its own turn
- * goes back to how the sim's endTurn left it, a switch an entry effect asks
- * for (an Eject Pack after Intimidate) among it: the protocol already placed
- * every body. True when an entry played.
- */
+/** Plays the switch-in of every body the correction put on the field, silently; true when an entry played. */
+// The entries' lines leave the sim log again (the alignment record reads it); own-turn state resets as endTurn left it.
 export function playProtocolEntries(battle: SimBattle, before: (SimPokemon | null)[][], events: string[]): boolean {
   if (battle.ended || battle.queue.list.length > 0) return false;
   const simLines = simBlockLines(battle);
@@ -208,14 +158,8 @@ export function playProtocolEntries(battle: SimBattle, before: (SimPokemon | nul
   return true;
 }
 
-/**
- * Round 73 (T212): a `|-start|` the block shows and the board lacks. The simulator's own block misses a start when it diverges
- * (752733 turn 14: the game's Garganacl lives and starts Salt Cure, the simulator K.O.s it first), and its Protosynthesis or
- * Quark Drive may boost another stat than the one the protocol names. The line's effect is read as a Dex condition (the text
- * after `move:`, `ability:` or `item:`; the stat suffix of `protosynthesisatk` split off when the rest is a condition) and the
- * volatile starts through the simulator's own `addVolatile`, without a list of effects. A token no condition names (a
- * count such as perish3, a type change) starts nothing.
- */
+// A `|-start|` line read as a Dex condition: the text after `move:`, `ability:` or `item:`;
+// the stat suffix of `protosynthesisatk` is split off when the rest is a condition.
 interface ProtocolStart {
   sideIdx: number;
   slot: number;
@@ -240,7 +184,6 @@ function conditionOf(battle: SimBattle, effect: string): { id: string; stat?: st
   return stripped && stat ? { id: stripped, stat } : null;
 }
 
-/** The starts that still stand at the block's end: not ended by an `-end`, and the body still on its slot (no switch, drag or faint after). */
 function liveStarts(battle: SimBattle, events: readonly string[]): ProtocolStart[] {
   const live = new Map<string, ProtocolStart>();
   events.forEach((line, index) => {
@@ -261,12 +204,8 @@ function liveStarts(battle: SimBattle, events: readonly string[]): ProtocolStart
   return [...live.values()];
 }
 
-/**
- * Round 76 (T261): whether the body still had its move to make when the start landed, which is what the simulator's
- * `queue.willMove` answers to a duration handler (Taunt and Encore lengthen by a turn when it does not). The block's own
- * order shows it: a move or a failed move of the body (`|cant|`) after the start line. A move the body makes inside another
- * action (`[from]` an ability, Instruct, a called move) takes no place in the queue; a locked move does.
- */
+// `queue.willMove` for duration handlers (Taunt, Encore: +1 turn if the body already moved): a move or `|cant|`
+// of the body after the start line; a `[from]` move takes no queue place, a locked move does.
 function moveStillToCome(events: readonly string[], start: ProtocolStart): boolean {
   const prefix = `p${start.sideIdx + 1}${String.fromCharCode(97 + start.slot)}:`;
   return events.slice(start.index + 1).some(line => {
@@ -277,13 +216,13 @@ function moveStillToCome(events: readonly string[], start: ProtocolStart): boole
   });
 }
 
-/** Starts one volatile on the body as the simulator does, then takes back what a start must not change here: the body's hp, the log, the dice and the turn flags. */
+// Starts one volatile as the simulator does, then takes back what a start must not change here:
+// the body's hp, the log, the dice and the turn flags.
 function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart, ticked: boolean, pending: boolean): boolean {
   const source = start.source ? battle.sides[Number(start.source[1]) - 1].active[start.source.charCodeAt(2) - 97] : null;
   const [hp, maxhp, logLength, seed, activeMove] = [body.hp, body.maxhp, battle.log.length, battle.prng.getSeed(), battle.activeMove];
   const flags = turnFlags(battle);
   battle.activeMove = null;
-  // The queue is empty at the block's end; a body whose move came after the line answers as it did in the game.
   const queue = battle.queue as { willMove: (pokemon: SimPokemon) => unknown };
   const realWillMove = queue.willMove;
   const asked = realWillMove.bind(queue);
@@ -311,12 +250,8 @@ function startVolatile(battle: SimBattle, body: SimPokemon, start: ProtocolStart
   return added;
 }
 
-/**
- * Plays the `-start` lines of the block that the board lacks, on the body standing on the line's slot at the block's end.
- * `residualAt`: the index in `events` where the block's residual round came (the lines before it count one tick on a
- * duration). A volatile the board has keeps its state, but a protosynthesis-style stat takes the protocol's. True when the
- * board changed.
- */
+/** Plays the `|-start|` lines the board lacks through the sim's own `addVolatile`; true when the board changed. */
+// `residualAt`: the index in `events` of the block's residual round (lines before it count one duration tick).
 export function playProtocolStarts(battle: SimBattle, events: readonly string[], residualAt = 0): boolean {
   if (battle.ended || battle.queue.list.length > 0 || !events.some(line => line.startsWith('|-start|'))) return false;
   let changed = false;

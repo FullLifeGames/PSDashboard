@@ -6,12 +6,6 @@ import { Dex, TeamValidator } from '@pkmn/sim';
 import { parseReplayLogWithObservations } from '@fulllifegames/replay-core';
 import { bankTeamsFor } from './bank-build';
 
-/**
- * Round 60 prover (T93, T79): every set the bank build makes for the feedback
- * games passes the simulator's own team validator in the classes ability,
- * item and Tera type (gen<N>ou, custom games skipped). A new class of build
- * error (a new forme in a later gen) shows here without anyone naming it.
- */
 const FIXTURES = new URL('../e2e-feedback/fixtures/', import.meta.url);
 const CHECKED = /is an invalid ability|can't have [A-Z]|needs to have an ability|please fix its ability|please fix its item|needs to hold |Terastal type/;
 
@@ -23,7 +17,7 @@ const fixtureFetcher = (async (input: string | URL | Request) => {
   return { ok: true, status: 200, json: async () => JSON.parse(readFileSync(file, 'utf-8')) } as unknown as Response;
 }) as typeof fetch;
 
-describe('built sets pass the simulator validator (round 60 prover)', () => {
+describe('built sets pass the simulator validator', () => {
   const files = readdirSync(FIXTURES).filter(name => name.endsWith('.json'));
   for (const file of files) {
     test(file, async () => {

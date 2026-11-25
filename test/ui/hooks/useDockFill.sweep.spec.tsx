@@ -4,16 +4,7 @@ import { logRules } from '@fulllifegames/replay-core';
 import type { EvalResult } from '@fulllifegames/eval-engine';
 import { simState } from '../fixtures/sim-state';
 
-/**
- * Round 84 (turn dock), step A6d: the engine fill and the game analysis, on the real hooks (`useEvaluation`, `useEvalView`,
- * `useDockFill`) with a worker that never answers. A single evaluation stops the analysis sweep, so the fill must never start
- * while the sweep runs. Two facts hold the e2e case "while Analyze game runs no fill starts":
- *  - Opening the variation (Execute at a replay turn) leaves branch mode's `resetEval`, which ends a running sweep. A sweep
- *    started at the replay turn is over when the tip stands, so the fill starts there and stops nothing.
- *  - A sweep started at the tip, while the fill's run is out, supersedes that run: the chips read busy, no second run starts,
- *    and the fill starts again once the sweep has ended.
- * Singles and doubles share the code (the game type only picks the engine); the state fixture carries both slot counts.
- */
+// A single evaluation stops the analysis sweep, so the fill must never start while the sweep runs.
 vi.mock('../../../src/lib/eval/worker-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/eval/worker-client')>();
   class FakeEvalWorkerClient {
@@ -47,7 +38,6 @@ const miniSweep = () => ({
 
 interface Where { branching: boolean }
 
-/** The wiring of the app: one evaluation, the view over it, the fill over both. Calls of the fill's Evaluate are counted. */
 function useWired(where: Where, calls: string[]) {
   const evaluation = useEvaluation();
   const tip = where.branching;
@@ -79,7 +69,6 @@ describe('the engine fill and the game analysis', () => {
     expect(calls).toEqual([]);
 
     rerender({ branching: true });
-    // Branch mode resets the evaluation: the sweep ended without a "stopped" note, and nothing held the fill back.
     await waitFor(() => expect(result.current.evaluation.graph.running).toBe(false));
     expect(result.current.evaluation.graph.stopped ?? null).toBeNull();
     await waitFor(() => expect(result.current.evaluation.status).toBe('searching'));
@@ -99,7 +88,6 @@ describe('the engine fill and the game analysis', () => {
     await waitFor(() => expect(result.current.evaluation.graph.running).toBe(true));
     expect(result.current.fill.busy).toBe(true);
     expect(result.current.fill.pending).toBe(false);
-    // The sweep keeps running: no single evaluation took it over, however long the fill is asked.
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
     expect(result.current.evaluation.graph.running).toBe(true);
     expect(result.current.evaluation.graph.stopped ?? null).toBeNull();

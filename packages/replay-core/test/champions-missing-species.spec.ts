@@ -8,14 +8,8 @@ import { inferSpreads } from '../src/spread-inference';
 import { buildSolveContext, hpBasisOf, observationError, speedStat } from '../src/spreads/fit';
 import type { DamageObservation } from '../src/types';
 
-/**
- * Round 68 (T186, decision 3 with D8): the spread solver builds every species the Champions mod allows. The calculator's
- * Champions generation 0 lacks 35 of them (Aegislash, the Vivillon patterns, the Alcremie flavors, Minior-Meteor, the Ogerpon
- * Tera formes, ...); each used to throw inside the solver (an observation that never judged, a Speed of 0, no max-HP pin).
- * The solver builds through the shared builder now. It also holds the other half of decision 7: Pound, the one damaging
- * move generation 0 lacks, builds as a 0-damage Status move in the calculator and must read as unreadable, never as a miss.
- * The species come from the mod, the numbers from the simulator's Dex: stat = base + SP + 20, HP = base + SP + 75 at level 50.
- */
+// The calculator's Champions generation 0 lacks 35 species of the mod and the damaging move Pound (a Status there).
+// Stat = base + SP + 20, HP = base + SP + 75 at level 50.
 Dex.mod('champions', championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>);
 const dex = Dex.dexes.champions;
 const FORMATS = { singles: 'gen9championsou', doubles: 'gen9championsvgc2026regmcbo3' } as const;
@@ -45,7 +39,6 @@ describe('the solver builds every species the Champions mod allows', () => {
         const basis = hpBasisOf(ctx, 'p1', species.name);
         if (speed !== species.baseStats.spe + 20) wrong.push(`${species.name} speed ${speed}`);
         if (basis?.baseHp !== species.baseStats.hp) wrong.push(`${species.name} max-HP pin ${basis?.baseHp}`);
-        // An impossible hit (150% of the HP, not a knock-out) is a miss whenever the observation judges at all.
         const hit: DamageObservation = { ...observation('dragonclaw', 1.5), attackerSide: 'p2', attackerSpecies: 'Garchomp', defenderSpecies: species.name };
         const error = observationError(buildSolveContext([hit], sets, format, []), hit, `p1:${species.id}`, { evs: { ...ZERO }, nature: 'Hardy' });
         if (!(error > 0)) wrong.push(`${species.name} unjudged`);
@@ -72,7 +65,6 @@ describe('the solver builds every species the Champions mod allows', () => {
       const attacker = { ...mon('Garchomp', ['Dragon Claw', 'Pound']), nature: 'Adamant' };
       const defender = { ...mon('Corviknight', ['Roost']), nature: 'Impish' };
       const sets = { p1: [attacker], p2: [defender] };
-      // Two readable hits meet the solver's observation minimum with or without the Pound line (an unreadable line still counts as a line).
       const claws = [observation('dragonclaw', 0.3), observation('dragonclaw', 0.31)];
       const pound = observation('pound', 0.5);
       const ctx = buildSolveContext([pound], sets, format, []);

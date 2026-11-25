@@ -3,25 +3,13 @@ import { inferOpponentTeam } from '@fulllifegames/replay-core';
 import { expectNameBlind, replays } from './identity-blind-support';
 import { loadSimMods } from '../src/forward/sim-mods';
 
-// Round 75 (T160): a Champions game reads the registered Champions Dex, so the mod loads first, as the hosts do.
 await loadSimMods('gen9championsou');
 
-/**
- * Round 72, T238: a nickname or a shiny flag never reaches the engine's words or its numbers. The turn analysis of a
- * position (the search, the played actions, the tiers, the sentence) must read the same when every name is the species
- * and no body is shiny (the reading and its failure message are in `identity-blind-support.ts`).
- *
- * This spec reads one replay each of singles with nicknames, Doubles OU, VGC and Champions VGC, a shiny body among
- * them, so it stays in the regular suite. The full run over all 20 fixture replays with a nicknamed or shiny body is
- * the lane probe `identity-blind-full.vt.ts`, run before a merge that touches how the build names a body.
- */
-
-// The shares of each replay's snapshots that are read: the cheap singles replay reads three positions, the others one or two (the VGC position costs most).
 const KEPT: ReadonlyArray<readonly [tag: string, shares: readonly number[]]> = [
-  ['gen9ou-2658662321', [0.2, 0.5, 0.8]], // singles, five nicknamed bodies
-  ['smogtours-gen9doublesou-938276', [0.3, 0.7]], // Doubles OU, a shiny body
-  ['gen9vgc2026regi-2630181744', [0.3]], // VGC (Scarlet/Violet), two shiny bodies
-  ['champions-vgc-2679899667', [0.3, 0.7]], // Champions VGC, eight nicknamed and three shiny bodies
+  ['gen9ou-2658662321', [0.2, 0.5, 0.8]],
+  ['smogtours-gen9doublesou-938276', [0.3, 0.7]],
+  ['gen9vgc2026regi-2630181744', [0.3]],
+  ['champions-vgc-2679899667', [0.3, 0.7]],
 ];
 const TAGS = KEPT.map(([tag]) => tag);
 const SWEEP = replays().filter(entry => TAGS.includes(entry.tag));

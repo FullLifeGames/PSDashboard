@@ -8,7 +8,6 @@ const sample = (name: string) => {
 };
 const positions = [sample('singles-gen9ou'), sample('doubles-gen9doublesou'), sample('vgc-gen9vgc2026regi')];
 
-/** A valid engine: every option valued 0, CORS for every origin. */
 function engine(overrides: { status?: number; body?: (request: EngineRequest) => unknown; cors?: string | null } = {}) {
   return vi.fn(async (_url: string, init?: RequestInit) => {
     const headers = new Headers();
@@ -24,13 +23,12 @@ function engine(overrides: { status?: number; body?: (request: EngineRequest) =>
   });
 }
 
-describe('check-engine, the conformance tool (round 77, user gate 28.10.2026, 6a)', () => {
+describe('check-engine, the conformance tool (6a)', () => {
   test('the samples ship singles, doubles and VGC; a request lists the options of the dashboard\'s own matrix', () => {
     const requests = positions.map(position => engineRequestFor(position.serialized, 5000, true, position.format));
     expect(requests.map(request => request.gameType)).toEqual(['singles', 'doubles', 'doubles']);
     expect(requests.every(request => request.options.p1.length > 0 && request.options.p2.length > 0)).toBe(true);
     expect(requests[2].format).toBe('gen9vgc2026regi');
-    // VGC rebuilds on the doubles format; the request names both.
     expect(requests[2].simFormat).toBe('gen9doublesou');
   });
 

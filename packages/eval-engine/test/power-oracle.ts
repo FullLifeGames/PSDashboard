@@ -1,16 +1,8 @@
 import { Battle, Teams, toID } from '@pkmn/sim';
 import type { ActiveMove, Pokemon, PokemonSet } from '@pkmn/sim';
 
-/**
- * Round 63 (T81) test helpers: what the simulator itself uses for a move in a
- * real turn. The BasePower event carries the power after the move's own
- * basePowerCallback and before the modifier is applied; a handler on the
- * format with the lowest priority runs last and reads both. Fixed damage
- * (damageCallback) never reaches that event, so its oracle is the HP the
- * target loses.
- */
+// BasePower carries the power after basePowerCallback, before the modifier; damageCallback never reaches it.
 
-/** A battle of any custom format past team preview, every set in team order. */
 export function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[], seed = '1,2,3,4'): Battle {
   const battle = new Battle({
     formatid: toID(format),
@@ -27,10 +19,6 @@ export function battleOf(format: string, p1: PokemonSet[], p2: PokemonSet[], see
 
 export interface PowerSeen { basePower: number; modifier: number; target: string }
 
-/**
- * Plays one turn with the given choices and returns every BasePower event of
- * `moveId` in it (one per hit and target).
- */
 export function powerInTurn(battle: Battle, choices: { p1: string; p2: string }, moveId: string): PowerSeen[] {
   const seen: PowerSeen[] = [];
   battle.onEvent('BasePower', battle.format, -100, function (this: Battle, basePower: number, _source: Pokemon, target: Pokemon, move: ActiveMove) {
@@ -41,7 +29,6 @@ export function powerInTurn(battle: Battle, choices: { p1: string; p2: string },
   return seen;
 }
 
-/** Everything one call into the static could leave behind: the log, the dice, the bodies' state, the Dex move. */
 export function fingerprint(battle: Battle, bodies: Pokemon[], moveId: string): string {
   const move = battle.dex.moves.get(moveId);
   return JSON.stringify({

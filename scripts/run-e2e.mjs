@@ -5,13 +5,8 @@ import { connect } from 'node:net';
 const host = '127.0.0.1';
 const DEFAULT_PORT = '5174';
 
-/**
- * `--dev-port <n>` (or `--dev-port=<n>`, or PS_DEV_PORT) is the runner's own
- * flag: it is TAKEN out of the argument list before the rest goes to the
- * Playwright command line. Playwright has no --port (only --ui-port) and
- * aborts on an unknown option, and it would read a bare number as a test
- * filter. The e2e suite stays on 5174, the feedback suite runs on 5176.
- */
+// Taken out of the argument list: Playwright has no --port (only --ui-port), aborts on an unknown option
+// and reads a bare number as a test filter.
 function takeDevPort(argv) {
   const rest = [];
   let port = process.env.PS_DEV_PORT ?? DEFAULT_PORT;
@@ -45,18 +40,12 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** The packages vite.config.ts pre-bundles (optimizeDeps.include) — the ones the app reaches through lazy imports. */
+// The packages vite.config.ts pre-bundles (optimizeDeps.include).
 const PREBUNDLED_DEPS = ['@pkmn/client', '@pkmn/data', '@pkmn/dex', '@pkmn/sim', '@pkmn/smogon', '@smogon/calc'];
 const METADATA_PATH = './node_modules/.vite/deps/_metadata.json';
 
-/**
- * Wait for the dependency optimizer to settle before the first test opens
- * a page. With a cold or outdated cache Vite bundles at startup and sends
- * every open page a reload when it finishes, which aborted the dynamic
- * imports of whichever test was running at that moment. The optimizer
- * writes the metadata file last, so a complete and unchanging file means
- * the reload (if any) already went out to nobody.
- */
+// A cold cache makes Vite bundle at startup and reload every open page, aborting a running test's dynamic imports;
+// the optimizer writes the metadata file last, so a complete, unchanging file means the reload is over.
 async function waitForDependencyCache() {
   await fetch(`${baseUrl}/src/main.tsx`).catch(() => {});
   const deadline = Date.now() + 60_000;
@@ -83,7 +72,6 @@ async function waitForDependencyCache() {
   console.warn('The dependency cache did not settle in time; starting the tests anyway.');
 }
 
-/** True when something already accepts connections on the port at this loopback address. */
 function answers(address) {
   return new Promise(resolve => {
     const socket = connect({ host: address, port: Number(port) });
@@ -97,15 +85,8 @@ function answers(address) {
   });
 }
 
-/**
- * Refuse to start against a port somebody else holds: a dev server left by
- * an aborted run, or a second session's live run. Vite's --strictPort only
- * guards 127.0.0.1, and a plain `vite` listens on localhost, which can be
- * ::1; the configs therefore open the page as http://127.0.0.1:<port>, the
- * socket this runner owns, and the check covers both loopback addresses so
- * a neighbour's run is noticed either way. The runner never clears the port:
- * the owner may be a live measurement.
- */
+// --strictPort guards only 127.0.0.1 and plain `vite` may listen on ::1, so both loopback addresses are checked;
+// the runner never clears the port: the owner may be a live measurement.
 async function assertPortFree() {
   for (const address of ['127.0.0.1', '::1']) {
     if (await answers(address)) {
@@ -117,11 +98,7 @@ async function assertPortFree() {
   }
 }
 
-/**
- * Round 89 (ruling 49): the two features behind a flag (src/lib/feature-flags.ts) are off in every build. The e2e specs of both run on a
- * dev server with the flags on; the feedback run (`-c playwright.feedback.config.ts`) reads neither and keeps the default build, which
- * is what ships. A flag the caller already set in the environment wins, so `VITE_FEATURE_GAME_REVIEW=0` runs the suite with one off.
- */
+// The e2e specs run with both on; a flag already in the environment wins, the feedback run keeps the shipped build.
 const FEATURE_FLAGS = ['VITE_FEATURE_GAME_REVIEW', 'VITE_FEATURE_OPPONENT_READS'];
 function serverEnv() {
   const feedback = playwrightArgs.some(arg => arg.includes('playwright.feedback.config'));
@@ -163,7 +140,6 @@ async function waitForServer() {
   throw new Error(`Timed out waiting for ${baseUrl}`);
 }
 
-/** Kill a child with everything it started (Windows has no process groups to signal). */
 function killTree(child) {
   if (process.platform !== 'win32') {
     child.kill('SIGTERM');
@@ -187,13 +163,6 @@ async function stopServer() {
   if (!serverExited && process.platform !== 'win32') server.kill('SIGKILL');
 }
 
-/**
- * An interrupted run (Ctrl+C, a closed console, a polite kill) takes the
- * browser run and the dev server down with it; before this, such a run left
- * Vite listening and the next run died on the port. A forced kill of the
- * runner itself runs no handler: the port check above then names the orphan.
- * A second signal ends the runner the hard way.
- */
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.once(signal, () => {
     const children = tests && tests.exitCode === null && tests.pid ? [killTree(tests)] : [];
@@ -211,7 +180,6 @@ async function run() {
   tests = spawn(process.execPath, testArgs, {
     stdio: 'inherit',
     windowsHide: true,
-    // The whole environment passes through (FEEDBACK_DUMP, FEEDBACK_RECORD);
     // PS_DEV_PORT lets the Playwright config build the same base URL.
     env: { ...process.env, PS_DEV_PORT: port },
   });

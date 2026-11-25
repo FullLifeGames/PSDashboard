@@ -5,14 +5,8 @@ import {
   PHONE_BATTLE, PHONE_BREAKPOINT, PHONE_CLASS, PHONE_FIT_SCRIPT, PHONE_SCALE_PROPERTY, PHONE_STYLES,
 } from '../../../src/lib/replay-phone';
 
-/**
- * Round 84 (T315, A7c, ruling 10a): on a phone the replay's battle scene shrinks to the frame's width, and the controls and the
- * log stand under it at their own size. The document decides by its own width: below the battle's 642 px it takes the class
- * `ps-phone` and the scale `--ps-k`; the stylesheet turns the embed's absolute layout into one column.
- */
 const log = '|player|p1|A|1\n|player|p2|B|2\n|turn|1';
 
-/** The fit script in a minimal document: a root element with a class list, a style map and a width. */
 function runFit(width: number) {
   const classes = new Set<string>();
   const props = new Map<string, string>();
@@ -90,8 +84,8 @@ describe('the phone stylesheet', () => {
   });
 
   test('the scene\'s transform and margin win over the inline ones of Showdown\'s onResize (scale(width / 640) below 640 px)', () => {
-    // battle.js `onResize` sets `transform: scale(width / 640)` and `margin-bottom` inline on the battle frame whenever the window is
-    // narrower than 640 px; an inline style beats a plain rule, so only !important keeps the scale on the border box (642 px).
+    // battle.js `onResize` sets `transform: scale(width / 640)` inline below 640 px of width; an inline
+    // style beats a plain rule, so only !important keeps the scale on the border box (642 px).
     expect(rules).toContain(`transform:scale(var(${PHONE_SCALE_PROPERTY},1)) !important`);
     expect(rules).toMatch(/margin-bottom:calc\(\(var\(--ps-k,1\) - 1\) \* 362px\) !important/);
   });

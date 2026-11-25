@@ -3,15 +3,8 @@ import { describe, expect, test } from 'vitest';
 import { replacementRounds } from '../src/replacement-rounds';
 import { reconstructWithPoints } from './replacement-points';
 
-/**
- * Round 79 (T290), the sweep of the capture: over the fixture replays (singles of generations 3, 7 and 9, Doubles OU, Scarlet/
- * Violet VGC, Pokémon Champions singles and VGC), every request round the protocol shows meets the capture hook's point of the
- * same turn and ordinal with the same slots and the same species, and the hook fires nowhere else. A round the capture skips is
- * a counted gap whose cause is the simulator's own divergence (the block's alignment missed the faint); the skip rate over the set is bounded.
- */
 
 const FIXTURES: { name: string; kind: 'singles' | 'doubles' | 'vgc' }[] = [
-  // The app's e2e replay (test/e2e/replacement-note.spec.ts reads its turn 4 card).
   { name: 'replay', kind: 'singles' },
   { name: 'gen9ou-2658662321', kind: 'singles' },
   { name: 'gen3customgame-2115579570', kind: 'singles' },
@@ -26,7 +19,6 @@ const FIXTURES: { name: string; kind: 'singles' | 'doubles' | 'vgc' }[] = [
   { name: 'champions/gen9championsvgc2026regmbbo3-2679053861', kind: 'vgc' },
 ];
 
-/** The highest share of protocol rounds the capture may leave as a gap (measured over this set: 5 of 47 rounds, singles 3 of 31, doubles 1 of 5, VGC 1 of 11). */
 const SKIP_BOUND = 0.25;
 
 const tally = { rounds: 0, skipped: 0 };
@@ -40,15 +32,12 @@ describe('the capture hook meets every request round of the protocol', () => {
     const points = new Map(run.points.map(({ point }) => [`${point.turn}.${point.ordinal}`, point]));
     expect(points.size).toBe(run.points.length);
     const roundKeys = new Set(rounds.map(round => `${round.turn}.${round.ordinal}`));
-    // The hook fires nowhere the protocol shows no round.
     const extras = [...points.entries()].filter(([key]) => !roundKeys.has(key)).map(([key, point]) => `${key} ${JSON.stringify(point)}`);
     expect(extras, JSON.stringify(rounds.map(round => `${round.turn}.${round.ordinal}`))).toEqual([]);
     let skipped = 0;
     for (const round of rounds) {
       const point = points.get(`${round.turn}.${round.ordinal}`);
       if (!point) {
-        // A gap has one cause: the simulator did not play the knockout the protocol shows (the block's hax alignment counts the
-        // faint it missed), so no request opens for the player's pick. Never a guess.
         const record = run.runtime.haxAlignment.find(entry => entry.turn === round.turn);
         expect(record?.actual.faintMismatches ?? 0, `${name} turn ${round.turn}: a gap without a missed faint`).toBeGreaterThan(0);
         skipped++;
@@ -56,8 +45,6 @@ describe('the capture hook meets every request round of the protocol', () => {
       }
       const same = isDeepStrictEqual({ forced: point.forced, played: point.played }, { forced: round.slots, played: round.species });
       if (!same) {
-        // Round 86 (T306): a request that opens for one side where the protocol shows two has the same cause as a missing one: the simulator kept a body
-        // alive that the log knocked out (the forced turn plays the hidden damage rolls of seed index 0; the faint step of B4 repairs the turns it can).
         const record = run.runtime.haxAlignment.find(entry => entry.turn === round.turn);
         expect(record?.actual.faintMismatches ?? 0, `${name} turn ${round.turn}: the point differs from the round without a missed faint`).toBeGreaterThan(0);
         skipped++;
@@ -69,8 +56,6 @@ describe('the capture hook meets every request round of the protocol', () => {
     byKind[kind] = { rounds: (byKind[kind]?.rounds ?? 0) + rounds.length, skipped: (byKind[kind]?.skipped ?? 0) + skipped };
   });
 
-  // Round 86 (T306): the faint step repairs the VGC turns where the forced turn kept a body alive that the log knocked out (2630181744 turn 4,
-  // 2687970740 turn 4, 2679053861 turn 1: VGC 3 of 11 skipped before it, bound 0.25).
   test('the skip rate over the set stays under the measured bound, singles and doubles apart', () => {
     expect(tally.rounds).toBeGreaterThan(0);
     for (const [kind, counts] of Object.entries(byKind)) {

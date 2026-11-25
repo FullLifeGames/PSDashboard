@@ -1,15 +1,8 @@
 import { toID } from '@pkmn/dex';
 import { dexOf, type GameRules } from '@fulllifegames/replay-core';
 
-/**
- * Builds play.pokemonshowdown.com sprite URLs. PS names sprite files after
- * the species ID of the base species plus the forme ID: every hyphen of the
- * base name goes ("Ting-Lu" → tinglu.png), the one before the forme stays,
- * and the forme loses its own ("Rotom-Wash" → rotom-wash.png,
- * "Urshifu-Rapid-Strike" → urshifu-rapidstrike.png). The Dex of the replay's
- * generation and mod (round 75, T160) says where the base name ends; cosmetic
- * formes keep their forme (gastrodon-east.png).
- */
+// PS names sprite files after the base species ID plus the forme ID: "Ting-Lu" → tinglu.png, "Urshifu-Rapid-Strike" →
+// urshifu-rapidstrike.png. The Dex says where the base ends; cosmetic formes keep their forme (gastrodon-east.png).
 function speciesSpriteId(name: string, rules: GameRules): string | null {
   const species = dexOf(rules).species.get(name);
   if (!species.exists) return null;
@@ -18,7 +11,7 @@ function speciesSpriteId(name: string, rules: GameRules): string | null {
 }
 
 export function spriteUrl(species: string, rules: GameRules): string {
-  // "Greninja-*" (unrevealed forme) falls back to the base sprite (B19).
+  // "Greninja-*" (unrevealed forme) falls back to the base sprite.
   const name = species.replace(/-*$/, '');
   const id = speciesSpriteId(name, rules) ?? name
     .toLowerCase()
@@ -28,10 +21,7 @@ export function spriteUrl(species: string, rules: GameRules): string {
   return `https://play.pokemonshowdown.com/sprites/gen5/${id}.png`;
 }
 
-/**
- * Round 89 (FB-1): the sprite of the base species for a forme whose own file the folder lacks (Dragalge-Mega has none), read from the
- * Dex's `baseSpecies`; null for a base species, an unknown name or a base whose file name is the forme's own.
- */
+/** The base species' sprite for a forme whose own file the folder lacks (Dragalge-Mega); null otherwise. */
 export function baseSpriteUrl(species: string, rules: GameRules): string | null {
   const known = dexOf(rules).species.get(species.replace(/-*$/, ''));
   if (!known.exists || known.baseSpecies === known.name) return null;

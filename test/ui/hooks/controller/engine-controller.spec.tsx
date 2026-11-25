@@ -13,7 +13,6 @@ const { useTransients } = await import('../../../../src/hooks/controller/transie
 const { useTimelineController } = await import('../../../../src/hooks/controller/board-controller');
 const { useEngineController } = await import('../../../../src/hooks/controller/engine-controller');
 
-/** The engine layer over the real context, transients, and board. */
 function useEngineHarness() {
   const ctx = useReplayContext();
   const transients = useTransients(ctx.replay.replayData?.id);
@@ -40,7 +39,6 @@ async function loaded() {
 }
 
 describe('useEngineController', () => {
-  // Round 77 (swarm D2): a pending pick that the position no longer offers is dropped once the picker lands.
   test('a draft pick the viewed position does not offer is dropped, a pick it offers stays', async () => {
     const { result } = await loaded();
     act(() => result.current.board.timeline.navigateTo({ turn: 2, line: 'main' }));
@@ -77,7 +75,6 @@ describe('useEngineController', () => {
     expect(approximate.p2ActiveSlots[0]?.species).toBeTruthy();
     expect(result.current.engine.playedAtView?.p1?.kind).toMatch(/move|switch/);
 
-    // The dwell rebuild lands the exact position and the pickers upgrade in place.
     await waitFor(() => expect(result.current.engine.positionPicker?.source).toBe('stored'), { timeout: 60_000 });
     expect(result.current.ctx.positions.getExact(2)).not.toBeNull();
     expect(result.current.engine.acquire.exactAcquiringTurn).toBeNull();

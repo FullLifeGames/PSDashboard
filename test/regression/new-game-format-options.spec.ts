@@ -1,10 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { formatGroups, loadFormatGroups, playableFormats } from '../../src/lib/new-game/format-options';
 
-/**
- * Round 89 (lane H, #105), stage H2: the formats the new-game panel lists. Its own file: the Champions mod registers once per
- * process, and the first test reads the registry before it does.
- */
+// Its own file: the Champions mod registers once per process, and the first test reads the registry before it does.
 
 describe('the format list', () => {
   const FEATURED = ['gen9ou', 'gen9doublesou', 'gen9vgc2025regi', 'gen9championsou', 'gen9championsvgc2026regmc', 'gen9customgame'];

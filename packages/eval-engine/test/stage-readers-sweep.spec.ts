@@ -5,22 +5,12 @@ import { mon, standing } from './dice-fixtures';
 import { dexOfRules, SWEEP_CASES } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
-/**
- * Round 88 (T336, #72, E2b): the census of the moves that read or move stat stages (`endgame/stage-readers.ts`), played on a twin
- * battle per move, against every Dex move of every rule set the corpus plays (Gens 1 to 9 and the Champions mod; the twin is a
- * singles battle of the generation, and the rule it serves fires only in singles: a doubles cell draws no class). The census must
- * name exactly the moves that read the target's stages (Foul Play, Punishment), copy or steal them (Psych Up, Spectral Thief,
- * Transform) or turn or hand them over (Topsy-Turvy, the three Swap moves), where the rule set has them: the Dex fields of the two
- * that carry one (`overrideOffensivePokemon`, `stealsBoosts`) say it independently. Every move the Dex plays at all is asked, no
- * sample: the census costs about 3 ms a move. A board of either game type with such a move on a foe's bench or lead reads as a reader,
- * and every question leaves the battle it reads standing.
- */
 await loadSimMods('gen9championsou');
 
-/** What the simulator shows, by name: the oracle of the census (the code reads no name). */
+// Oracle by name: moves that read the target's stages (Foul Play), copy or steal them, or invert or swap them.
 const READERS = ['foulplay', 'punishment', 'psychup', 'spectralthief', 'topsyturvy', 'powerswap', 'heartswap', 'guardswap', 'transform'];
 
-describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: every move against the census (round 88, T336)', ({ rules }) => {
+describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: every move against the census', ({ rules }) => {
   const dex = dexOfRules(rules);
   const moves = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
     && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past'));
@@ -41,7 +31,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: ever
   });
 });
 
-describe.each(SWEEP_CASES)('$name: a foe board with a reader reads as one (round 88, T336)', ({ rules, mode }) => {
+describe.each(SWEEP_CASES)('$name: a foe board with a reader reads as one', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const readers = READERS.filter(id => dex.moves.get(id).exists && dex.moves.get(id).gen <= dex.gen);
   const board = (leadMoves: string[], benchMoves: string[]) => {

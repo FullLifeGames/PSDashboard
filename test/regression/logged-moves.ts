@@ -1,32 +1,13 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOf, logRules, toId, type RulesDex } from '@fulllifegames/replay-core';
 
-/**
- * Round 89 (#146): the oracle of `logged-move-corpus.spec.ts`, its own reading of a log. For each body it lists the moves the log
- * shows as the body's own and where each came from, and it says which of them a built set lacks. It does not call the inference's
- * `ownMove`: the sweep holds that reader to the log.
- *
- * What the log shows as a body's own move:
- * - every `|move|` line without `[from]`, and the move a `|cant|` line names (Taunt, Disable, Imprison; not a blocker's line with an
- *   `ability:` reason, whose move is the foe's), but not Struggle;
- * - a Z-move or Max move books nothing named (the inference maps it to its base move or an open slot, `inference/power-moves.ts`; the
- *   mapping is not under test here);
- * - a typed `[from] move:` line books the caller when the Dex marks the from-move `callsMove`, else the shown move (a Pledge combination
- *   and Round show the partner's move as `[from]`); Sleep Talk books the shown move, typed or not; Pursuit's switch hit is its own move;
- * - a type-less `[from]` of a `callsMove` move books that caller; every other type-less `[from]` (Magic Coat, Snatch, lockedmove, an
- *   ability's echo) books nothing: the move was booked where its user chose it;
- * - an ability or an item as `[from]` books nothing;
- * - while a body is transformed (from its `|-transform|` line to its next entry), its lines book to the body it copied.
- */
+/** The oracle of `logged-move-corpus.spec.ts`: its own reading of a log, never the inference's `ownMove`. */
 
 export type Via = 'own' | 'transform' | 'from-move';
 export interface LoggedBody {
   side: 'p1' | 'p2';
-  /** Every species name the log shows for this nickname (switch details, forme changes). */
   species: Set<string>;
-  /** The booked moves, each with the kinds of line that book it. */
   moves: Map<string, Set<Via>>;
-  /** The nickname is shared by several species of the side: the inference reads a body by nickname and cannot tell them apart. */
   sharedNick: boolean;
 }
 
@@ -36,7 +17,6 @@ const identOf = (text: string): { side: 'p1' | 'p2'; slot: string; nick: string;
 };
 const detailsSpecies = (details: string | undefined): string => (details ?? '').split(',')[0].trim();
 
-/** The `[from]` text of a move line ('' when it has none); `typed` is the effect type of "move: Sleep Talk", '' for "lockedmove". */
 function fromOf(parts: string[]): { name: string; typed: string } | null {
   const raw = parts.slice(4).find(part => part.startsWith('[from]'));
   if (raw === undefined) return null;
@@ -45,33 +25,30 @@ function fromOf(parts: string[]): { name: string; typed: string } | null {
   return typed ? { typed: typed[1], name: typed[2] } : { typed: '', name: text };
 }
 
-/** A Z-move or Max move: the Dex marks it, and a status Z-move prints "Z-" before its base move. */
+// A status Z-move prints "Z-" before its base move, a name the Dex does not list.
 const poweredMove = (dex: RulesDex, name: string): boolean => {
   const move = dex.moves.get(name);
   return move.exists ? !!(move.isZ || move.isMax) : /^Z-/.test(name);
 };
 
-/** The moves one `move` or `cant` line books on its user, as the oracle reads them (an empty list for none). */
 function bookedBy(dex: RulesDex, parts: string[]): { moves: string[]; via: Via } {
   const cmd = parts[1];
   const shown = cmd === 'cant' ? (parts[4] ?? '') : (parts[3] ?? '');
   if (!shown || toId(shown) === 'struggle') return { moves: [], via: 'own' };
-  // A blocker's line (Dazzling, Queenly Majesty, Armor Tail, Damp) is `|cant|HOLDER|ability: X|ATTACKER'S MOVE|[of] ATTACKER`: the move is the foe's.
+  // A blocker's line (Dazzling, Damp) is `|cant|HOLDER|ability: X|ATTACKER'S MOVE|[of] ATTACKER`: the foe's move.
   if (cmd === 'cant' && /^ability:/.test(parts[3] ?? '')) return { moves: [], via: 'own' };
   const from = cmd === 'cant' ? null : fromOf(parts);
   if (!from) return { moves: poweredMove(dex, shown) ? [] : [shown], via: 'own' };
   const fromId = toId(from.name);
   const calls = !!dex.moves.get(from.name).callsMove;
+  // Sleep Talk books the shown move, typed or not; Pursuit's switch hit is the body's own move.
   if (fromId === 'sleeptalk' || fromId === 'pursuit') return { moves: [shown], via: 'own' };
   if (from.typed === 'move') return calls ? { moves: [from.name], via: 'own' } : { moves: [shown], via: 'from-move' };
+  // A type-less [from] books the caller only for a callsMove move; Magic Coat, Snatch, lockedmove, echoes book none.
   return { moves: !from.typed && calls ? [from.name] : [], via: 'own' };
 }
 
-/**
- * Every body of the log with the moves it must hold, by side and nickname. A nickname that several species of one side share ("???"
- * in the oldest logs) is several bodies: its lines book to the body switched into the slot (Ally Switch moves a body between slots
- * without a switch line, so the slot is read only for these nicknames).
- */
+// Ally Switch moves a body between slots without a switch line, so the slot is read only for shared nicknames.
 export function loggedBodies(log: string): Map<string, LoggedBody> {
   const dex = dexOf(logRules(log));
   const bodies = new Map<string, LoggedBody>();
@@ -125,30 +102,27 @@ export interface Gap {
   side: 'p1' | 'p2';
   species: string;
   move: string;
-  /** The kinds of line that book the move: the owner of the gap follows from them. */
   via: Via[];
-  /** The body also holds a move a `[from] move:` line shows: the build's booking of the caller takes a slot a fifth move then lacks (#140). */
+  /** A move a `[from] move:` line shows is also held: the caller's booking takes a slot a fifth move then lacks. */
   fromMoveBody: boolean;
-  /** The body may be a Zoroark behind its Illusion (the Dex gives a team member the ability), whose moves the log shows under another name (#141). */
+  /** The body may be a Zoroark behind its Illusion: its moves show in the log under another name. */
   illusion: boolean;
-  /** The body's nickname is shared by several species of its side (the gen 2 log "???"): the inference cannot tell them apart. */
+  /** Several species of the side share the nickname (the gen 2 log "???"): the inference cannot tell them apart. */
   sharedNick: boolean;
 }
 
 export interface SetsCheck { bodies: number; moves: number; held: number; unmatched: string[]; gaps: Gap[] }
 
-/** A move the set holds: the same slot key (a typed Hidden Power answers a typeless one), the form the build's own slot rule reads. */
+// The same slot key: a typed Hidden Power answers a typeless one.
 const slotKey = (dex: RulesDex, name: string): string => {
   const id = toId(name);
   return id.startsWith('hiddenpower') ? 'hiddenpower' : dex.moves.get(name).exists ? String(dex.moves.get(name).id) : id;
 };
 
-/** What the built sets lack of the log's moves, per body; a body no set answers by species is listed as unmatched. */
 export function checkBuiltSets(log: string, teams: { p1Team: PokemonSet[]; p2Team: PokemonSet[] }): SetsCheck {
   const dex = dexOf(logRules(log));
   const baseId = (name: string) => toId(dex.species.get(name).baseSpecies || name);
   const result: SetsCheck = { bodies: 0, moves: 0, held: 0, unmatched: [], gaps: [] };
-  // One entry per side and base species: a team with two bodies of one species (a Custom Game) pools them.
   const groups = new Map<string, { side: 'p1' | 'p2'; species: string; moves: Map<string, Set<Via>>; sharedNick: boolean }>();
   for (const [key, body] of loggedBodies(log)) {
     if (body.moves.size === 0) continue;
@@ -175,7 +149,6 @@ export function checkBuiltSets(log: string, teams: { p1Team: PokemonSet[]; p2Tea
   return result;
 }
 
-/** The issue that owns a gap, a finding no issue owns yet ('shared-nickname', one gen 2 log), or null for a gap nobody owns: the sweep's red rows. */
 export function ownerOf(gap: Gap): '#141' | '#139' | '#140' | 'shared-nickname' | null {
   if (gap.illusion) return '#141';
   if (gap.via.includes('transform')) return '#139';

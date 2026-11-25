@@ -7,15 +7,10 @@ interface Props {
   /** Returns an error message to display, or null when the import applied. */
   onImport: (text: string) => string | null;
   onClose: () => void;
-  /** Round 89 (#105): the sets belong to a new game, not to a replay. */
   game?: boolean;
 }
 
-/**
- * Text import/export for both players' sets. The textarea starts as the
- * current export (revealed + guessed + manual, exactly what the stats panel
- * shows); imported text overlays both sides as manual knowledge.
- */
+/** Imported text overlays both sides as manual knowledge. */
 export function SetsImportExportPanel({ exportText, onImport, onClose, game = false }: Props) {
   const [text, setText] = useState(exportText);
   const [error, setError] = useState<string | null>(null);

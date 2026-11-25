@@ -4,7 +4,6 @@ import { SpriteImg } from './SpriteImg';
 import type { LeadOption } from '../lib/lead-options';
 import { useIsGuessed, type GuessedSide } from '../lib/stand-in-mark';
 
-/** The slot letter of a lead: a, b, c (selection order is the slot order). */
 const slotLetter = (slot: number): string => String.fromCharCode(97 + slot);
 
 function columnPrompt(maxPicks: number, leadsPerSide: number): string {
@@ -15,11 +14,7 @@ function columnPrompt(maxPicks: number, leadsPerSide: number): string {
       : 'Who leads?';
 }
 
-/**
- * Round 84 (turn dock), A7b: one body of the lead picker as the bench's tile (`.ps-switchbtn` of the dock: sprite, name, the
- * selection blue). The order of a pick and the "played" badge stand in the tile's flag row on its top edge, after the name in the
- * DOM, so a pick never changes the tile's box and the tile's accessible name still begins with the body's name.
- */
+// The flag row follows the name in the DOM: the tile's accessible name still starts with the body's name.
 function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   side: GuessedSide;
   option: LeadOption;
@@ -29,9 +24,7 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   onToggle: (species: string) => void;
 }) {
   const rules = useReplayRules();
-  // Round 88 (F, #101): a body the log never showed (a stand-in) wears the stats panel's marker, as on the dock's switch tiles.
   const guessed = useIsGuessed()(side, option.species);
-  // The switch tiles of the turn dock read this same label (round 77, C10).
   const label = displayName(option.name, option.species);
   const picked = slot >= 0;
   const order = picked && showOrder ? (slot < leadsPerSide ? slotLetter(slot) : String(slot + 1)) : null;
@@ -64,7 +57,6 @@ function LeadTile({ side, option, slot, leadsPerSide, showOrder, onToggle }: {
   );
 }
 
-/** One side of the lead picker in the dock's rows: the side's prompt, then its bodies in the bench's wrapping row. */
 export function LeadSide({ side, label, options, selected, leadsPerSide, maxPicks, onToggle }: {
   side: GuessedSide;
   label: string;

@@ -6,8 +6,6 @@ import { teamInfo } from './team-info';
 import { leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from './analysis';
 import { fakeReplayWorkerClient, installFakeWorker } from './worker';
 
-// The factories behind the app suite: every call returns a fresh object, both
-// formats are covered, and the two worker fakes answer through the real clients.
 describe('fixture factories', () => {
   test('replays parse into snapshots for every format', () => {
     expect(replayFixture('singles').snapshots.length).toBeGreaterThan(1);

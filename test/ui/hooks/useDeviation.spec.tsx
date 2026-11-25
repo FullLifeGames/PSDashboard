@@ -4,7 +4,10 @@ import { getBranchSimulatorFormat } from '@fulllifegames/replay-core';
 import { useDeviation, type DeviationInputs } from '../../../src/hooks/useDeviation';
 import type { BranchHistoryEntry } from '../../../src/hooks/useBranch';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
-import { replayFixture } from '../fixtures/replay';
+import { replayFixture, type ReplayKind } from '../fixtures/replay';
+import { useState } from 'react';
+import type { BranchSlotChoice, ForcedDie } from '@fulllifegames/eval-engine';
+import { useBranch } from '../../../src/hooks/useBranch';
 
 const { replayData, snapshots, observations } = replayFixture('singles');
 
@@ -85,7 +88,6 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6]).toMatchObject({ p1Choices: prefill.p1Choices });
   }, 60_000);
 
-  // Round 77 (swarm A-2): the executor refuses the picked turn after the rebuild replaced the variation.
   describe('a refused execute after the rebuild', () => {
     const prefill = { p1Choices: [{ kind: 'move' as const, moveId: 'toxicspikes', moveName: 'Toxic Spikes' }], p2Choices: [] };
 
@@ -101,7 +103,6 @@ describe('useDeviation', () => {
       act(() => confirm.proceed());
       await waitFor(() => expect(startCalls(wired)).toHaveLength(2), { timeout: 30_000 });
 
-      // The first start replaced the variation at the viewed turn; the second brings the old one back whole.
       expect(startCalls(wired)[0][4]).toBe(3);
       expect(startCalls(wired)[0][6].replayHistory).toEqual([]);
       expect(startCalls(wired)[1][4]).toBe(2);
@@ -137,7 +138,6 @@ describe('useDeviation', () => {
     }, 60_000);
   });
 
-  // Round 77 (swarm D1): a rebuild that keeps no turn leaves no variation and no phantom message.
   test('a rebuild that keeps no turn ends the variation: the notice names it and the pointer stays on the main line', async () => {
     const notice = 'The variation from turn 2 (2 turns) ended: Swampert no longer knows Earthquake.';
     const history = [entry(2), entry(3)];
@@ -178,7 +178,6 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][4]).toBe(3);
   }, 60_000);
 
-  // Round 77 (C4): a caller that arms a run (the play-out) learns when the deviation really starts.
   test('onStart fires when the deviation runs: at once without a variation, after the yes next to one, never on cancel', async () => {
     const wired = inputs();
     const free = renderHook(() => useDeviation(wired));
@@ -193,14 +192,12 @@ describe('useDeviation', () => {
     act(() => asks.result.current.requestDeviation(null, { onStart: armed }));
     expect(armed).not.toHaveBeenCalled();
     const confirm = (standing.setPendingConfirm as ReturnType<typeof vi.fn>).mock.calls[0][0] as { proceed: () => void };
-    // Cancel is the banner dropping the confirm: the proceed callback never runs.
     expect(armed).not.toHaveBeenCalled();
     act(() => confirm.proceed());
     expect(armed).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(standing)).toHaveLength(1), { timeout: 30_000 });
   }, 60_000);
 
-  // Round 77 (C7): the notice of a finished run belongs to the line it ran on; a deviation ends it.
   test('onDeviate fires when a deviation or a lead variation really starts, and not while the replace confirm waits', async () => {
     const onDeviate = vi.fn();
     const standing = inputs({ timeline: timelineAt(3, { variationSpan: { startTurn: 2, length: 2 } }), onDeviate });
@@ -240,7 +237,6 @@ describe('useDeviation', () => {
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
     expect(turn).toBe(2);
-    // One executed turn kept, and the forced interlude that belongs to it.
     expect(options.replayHistory).toEqual([history[0], history[1]]);
     expect(wired.timeline.setViewTurn).not.toHaveBeenCalled();
   }, 60_000);
@@ -257,7 +253,7 @@ describe('useDeviation', () => {
     expect(startCalls(wired)[0][6].replayHistory).toEqual(history);
   }, 60_000);
 
-  test('a variation that ended the game by itself raises no divergence notice (FT-1)', async () => {
+  test('a variation that ended the game by itself raises no divergence notice', async () => {
     const history = [entry(2), entry(3)];
     const wired = inputs({
       timeline: timelineAt(4, { viewLine: 'variation', variationSpan: { startTurn: 2, length: 2 } }),
@@ -293,7 +289,6 @@ describe('useDeviation', () => {
     act(() => result.current.startLeadVariation({ p1: ['Garchomp'], p2: ['Great Tusk'] }, { onStart }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(wired.timeline.setVariationScores).toHaveBeenCalledWith([]);
-    // Round 80: the new game's tip is followed even when its span matches the one it replaces.
     expect(wired.timeline.followNextTip).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(startCalls(wired)).toHaveLength(1), { timeout: 30_000 });
     const [, , , , turn, , options] = startCalls(wired)[0];
@@ -328,4 +323,71 @@ describe('useDeviation', () => {
     act(() => result.current.requestDeviation(null));
     await waitFor(() => expect(result.current.branchDivergence).toMatch(/already ended \(Alice won the simulated line\)/), { timeout: 30_000 });
   }, 60_000);
+});
+
+const CASES: { kind: ReplayKind; turn: number }[] = [{ kind: 'singles', turn: 2 }, { kind: 'doubles', turn: 1 }, { kind: 'vgc', turn: 1 }];
+
+type Picks = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
+
+describe.each(CASES)('Execute from a viewed position, $kind', ({ kind, turn }) => {
+  const fixture = replayFixture(kind);
+
+  async function viewedPosition() {
+    const { result } = renderHook(() => {
+      const branch = useBranch();
+      const [draft, setDraft] = useState<Picks>({ p1: [], p2: [] });
+      const inputs: DeviationInputs = {
+        replayData: fixture.replayData, snapshots: fixture.snapshots, observations: fixture.observations, sources,
+        bringOnlyLists: null, bringCount: null, replayGameType: kind === 'singles' ? 'singles' : 'doubles',
+        timeline: {
+          viewTurnRef: { current: turn }, viewTurn: turn, viewLine: 'main', endSnapshotTurn: null, variationSpan: null,
+          setVariationScores: vi.fn(), setViewTurn: vi.fn(), setViewLine: vi.fn(), liveTip: false, restorePointer: vi.fn(), followNextTip: vi.fn(),
+        },
+        branch, acquireRuntime: undefined as never, branchWindowOpenRef: { current: false }, setPendingConfirm: vi.fn(),
+        draftChoices: draft, setDraftChoices: setDraft,
+      };
+      return { branch, deviation: useDeviation(inputs), draft, setDraft };
+    });
+
+    await act(async () => { await result.current.deviation.rebuildAt({ turn, line: 'main' }, null); });
+    await waitFor(() => expect(result.current.branch.simState).not.toBeNull(), { timeout: 120_000 });
+    const before = result.current.branch.simState!;
+    const click = (side: 'p1' | 'p2', slot: number): BranchSlotChoice => {
+      const move = (side === 'p1' ? before.p1MovesBySlot : before.p2MovesBySlot)[slot].find(option => !option.disabled)!;
+      return { kind: 'move', moveId: move.name.toLowerCase().replace(/[^a-z0-9]/g, ''), moveName: move.name };
+    };
+    const slots = before.p1MovesBySlot.length;
+    const p1 = Array.from({ length: slots }, (_, slot) => click('p1', slot));
+    const p2 = Array.from({ length: slots }, (_, slot) => click('p2', slot));
+    const die: ForcedDie = { name: { slot: 'p1a', moveId: p1[0].moveId, targetSlot: 'p2a', kind: 'accuracy' }, result: { happens: false } };
+    act(() => result.current.branch.stopBranch());
+    return { result, p1, p2, die };
+  }
+
+  test('the draft\'s forced die reaches the first turn of the branch', async () => {
+    const { result, p1, p2, die } = await viewedPosition();
+
+    act(() => result.current.setDraft({ p1: p1.map((choice, slot) => (slot === 0 ? { ...choice, dice: [die] } : choice)), p2 }));
+    act(() => result.current.deviation.handleExecuteDraft());
+    await waitFor(() => expect(result.current.branch.history).toHaveLength(1), { timeout: 120_000 });
+
+    expect(result.current.branch.executeError).toBeNull();
+    const entry = result.current.branch.history[0];
+    expect(entry.p1SlotChoices![0]).toMatchObject({ dice: [die] });
+    expect(entry.diceReport?.forced.map(report => report.die)).toEqual([die]);
+    expect(['applied', 'no-draw', 'no-chance', 'blocked']).toContain(entry.diceReport!.forced[0].took);
+  }, 300_000);
+
+  test('Execute sends the effective choices it is given, seed included, and not the bare draft (turn dock)', async () => {
+    // The dock's seed is derived, not stored in the draft: the caller hands the merge of seed and draft to Execute.
+    const { result, p1, p2 } = await viewedPosition();
+    expect(result.current.draft).toEqual({ p1: [], p2: [] });
+    act(() => result.current.deviation.handleExecuteDraft({ p1, p2 }));
+    await waitFor(() => expect(result.current.branch.history).toHaveLength(1), { timeout: 120_000 });
+
+    expect(result.current.branch.executeError).toBeNull();
+    const entry = result.current.branch.history[0];
+    expect(entry.p1SlotChoices).toEqual(p1);
+    expect(entry.p2SlotChoices).toEqual(p2);
+  }, 300_000);
 });

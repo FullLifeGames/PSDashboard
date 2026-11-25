@@ -2,29 +2,14 @@ import { useRef, useState } from 'react';
 import { deleteGame, listGames, loadGame, type SavedGameRow } from '../lib/new-game/store';
 import type { NewGameRecord } from '../lib/new-game/record';
 
-/**
- * Round 89 (lane H, #105), stage H4b (user ruling 13.11.2026, H11a): the saved games, in the Game menu's third part and on the start
- * page under the loader; the New game dialog holds none. One row per game as the saved branches show theirs: the format, the two
- * names, the turns played, the last save, Open and Delete, the dice seed under it. The three newest show; "Show all N saved games"
- * unfolds the rest (the store keeps 20). Delete asks once in the row (the app's own inline confirm, red button as the replace
- * confirm). The game that is open now cannot be deleted from under itself: its row says so. The list reads the store when it
- * mounts: the menu mounts it with its panel, the start page with the page.
- */
-
 const SHOWN = 3;
 
-/**
- * After a delete the rows below move up and the next row's Open lands under the pointer; the second click of a double click on the
- * confirm's red Delete would open that game (round 89, H4h). An Open within this time of a delete is not a deliberate click.
- */
+// After a delete the next row's Open lands under the pointer: a click within this time is not deliberate.
 const AFTER_DELETE_MS = 600;
 
 interface Props {
-  /** Opens a saved game in the workspace; a failure shows in the list. */
   onOpen: (record: NewGameRecord) => Promise<unknown> | void;
-  /** The id of the game that is open in the workspace, if any. */
   currentId: string | null;
-  /** A divider above the list, drawn only when the list shows (the Game menu's parts). */
   divider?: boolean;
 }
 

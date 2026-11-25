@@ -7,12 +7,6 @@ import { actionsTie, AskLeak, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { boardBattle, boards, cheapOracle, SLOT_A, type Board } from './speed-tie-oracle';
 
-/**
- * Round 72 (T196b): the prefilters of the speed tie answer from the simulator's own numbers and skip the queue's copy.
- * Forks are counted as `State.deserializeBattle` calls, which only the standard path makes (the speed layer's clone
- * copies a template), so the layer stays off here; speed-tie-sim.spec.ts holds every answer to the plain queue, and the
- * eight-mode matrix of lanes/B/tie-matrix.vt.ts holds them in every speed-layer mode.
- */
 
 await loadSimMods('gen9championsou');
 
@@ -32,13 +26,10 @@ function forksOf(run: () => void): number {
   return forks;
 }
 
-/** The board with its second body without speed training: the speeds differ, the handlers stay. */
 const slower = (board: Board): Board => ({ ...board, p2: { ...board.p2, evs: { ...board.p2.evs, spe: 0 } } });
 
-/** The same board with the sides swapped, so the holder of the entry stands on either side. */
 const mirrored = (board: Board): Board => ({ ...board, p1: board.p2, p2: board.p1, m1: board.m2, m2: board.m1 });
 
-/** Which of the eight boards need the queue: the others hold no handler for the priority and answer from the Dex. */
 const NEEDS_QUEUE = [false, true, true, true, true, true, true, false];
 
 describe.each(FORMATS)('$name', ({ singles, doubles }) => {

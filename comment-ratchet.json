@@ -1,0 +1,20 @@
+{
+  "history": {},
+  "lines": {
+    "source:eval-engine": 2366,
+    "source:replay-core": 865,
+    "source:app": 891,
+    "source:app-css": 33,
+    "workflows": 26,
+    "scripts": 225,
+    "config": 26,
+    "test:app": 213,
+    "test:replay-core": 190,
+    "test:eval-engine": 654,
+    "test:ui": 147,
+    "test:e2e": 140,
+    "test:e2e-feedback": 34,
+    "test:e2e-build": 2,
+    "test:e2e-capture": 4
+  }
+}

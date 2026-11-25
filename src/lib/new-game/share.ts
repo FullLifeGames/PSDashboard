@@ -4,18 +4,8 @@ import type { BranchMoveModifier, BranchSlotChoice } from '@fulllifegames/eval-e
 import type { BranchHistoryEntry } from '../branch-history';
 import type { NewGameRecord } from './record';
 
-/**
- * Round 89 (lane H, #105), stage H5: the share link of a game, format version 2 (version 1 is a replay's branch: its id, its choices
- * and the log it ends on). A game's link holds what the game is made of and nothing a reader can play again: the format, both teams
- * as `Teams.pack` text, the seed, the leads and every choice, a name beside its id only where the Dex cannot spell it. The log, the
- * positions and the header stay out; the reader starts the format's battle on the seed and plays the entries onto it
- * (`recordOfShare`), so its game is the sharer's to the byte. A game of 30 doubles turns measures under 8,000 characters.
- *
- * A slot choice is one string where it can be: a move is its name, `@<target>` when it has one and `#<modifier>` when it carries
- * one ("Close Combat@1#terastallize"); a switch is `>` and the Pokémon's name ("Rotom-Wash"). A choice that carries forced dice, a
- * move whose name does not spell its id and a switch whose name is a nickname stay as the object the app holds. An entry is a pair
- * of sides' slots (a turn), a side and its slots (a forced replacement) or `L` with the leads (the lead entry of turn 0).
- */
+/** The share link of a game, format version 2 (version 1 is a replay's branch); the reader replays them on the seed. */
+// A slot choice is one string if it can ("Close Combat@1#terastallize", ">Rotom-Wash"); dice or a nickname: object.
 
 export const GAME_SHARE_VERSION = 2;
 
@@ -28,27 +18,21 @@ export type ShareEntry =
 export interface GameSharePayload {
   version: typeof GAME_SHARE_VERSION;
   kind: 'game';
-  /** The sharer's game id: a saved row of a game is keyed by it, and a link of the game that is open opens its branch in it. */
   gameId: string;
   format: string;
   formatName: string;
   players: [string, string];
   teams: { p1: string; p2: string };
   seed: string;
-  /** The main line's entries in play order, the lead entry first. */
   entries: ShareEntry[];
-  /** The open variation: the turn it starts from and its entries. */
   variation?: { startTurn: number; entries: ShareEntry[] };
-  /** Where the sharer stood: the pointer's turn and line, and whether it was the team preview. */
   view?: { turn: number; line: 'main' | 'variation'; t0?: boolean };
-  /** The turn the shared branch starts from (the variation's start, else the game's tip): the saved row's words. */
   branchTurn: number;
   createdAt: string;
 }
 
 const MODIFIERS: readonly BranchMoveModifier[] = ['terastallize', 'mega', 'zmove', 'ultra'];
 
-/** A slot as one string, or as the object itself where the string cannot hold it. */
 function shareSlot(choice: BranchSlotChoice | null | undefined): ShareSlot {
   if (!choice) return null;
   if (choice.dice && choice.dice.length > 0) return choice;
@@ -75,7 +59,6 @@ function slotOfShare(slot: ShareSlot): BranchSlotChoice | null {
 
 const slotsOf = (choices: (BranchSlotChoice | null)[] | undefined): ShareSlot[] => (choices ?? []).map(shareSlot);
 
-/** One history entry as the link keeps it. */
 export function shareEntry(entry: BranchHistoryEntry): ShareEntry {
   if (entry.leadChoices) {
     const { p1, p2, bring } = entry.leadChoices;
@@ -87,7 +70,6 @@ export function shareEntry(entry: BranchHistoryEntry): ShareEntry {
   return [slotsOf(entry.p1SlotChoices), slotsOf(entry.p2SlotChoices)];
 }
 
-/** The history entries a list of shared entries stands for: what a rebuild replays; `firstTurn` numbers the first turn (the rebuild writes the rest again). */
 export function historyOfShare(entries: ShareEntry[], firstTurn = 1): BranchHistoryEntry[] {
   let turn = firstTurn;
   const bare = (turnNumber: number): BranchHistoryEntry => ({
@@ -109,7 +91,6 @@ export function historyOfShare(entries: ShareEntry[], firstTurn = 1): BranchHist
 
 export interface GameShareInputs {
   record: NewGameRecord;
-  /** The open variation (its history may be empty: no variation then). */
   variation?: { startTurn: number; history: BranchHistoryEntry[] };
   view?: GameSharePayload['view'];
   now?: Date;
@@ -134,11 +115,7 @@ export function makeGameSharePayload({ record, variation, view, now = new Date()
   };
 }
 
-/**
- * Whether a saved game is the game a link holds: the same format, seed, players, teams (by their packed text), leads and entries,
- * entry for entry. A link whose main line goes past the game, or differs anywhere, is another game (H7: opening a link twice made
- * a copy each time, and the cap of saved games then dropped real games for them).
- */
+/** Whether a saved game is the game a link holds, entry for entry; opening a link twice must not copy it. */
 export function sameGameAsShare(record: NewGameRecord, payload: GameSharePayload): boolean {
   return record.format === payload.format && record.seed === payload.seed
     && record.players[0] === payload.players[0] && record.players[1] === payload.players[1]
@@ -161,7 +138,7 @@ const isShareVariation = (value: unknown): boolean => {
   return !!variation && typeof variation.startTurn === 'number' && isEntryList(variation.entries);
 };
 
-/** Whether a decoded version 2 value holds every field the reader needs; the entries' inner shape is read when they are played. */
+/** Whether a decoded version 2 value holds every field the reader needs; the entries' inner shape is read on play. */
 export function isGameSharePayload(value: unknown): value is GameSharePayload {
   if (!value || typeof value !== 'object') return false;
   const v = value as Partial<GameSharePayload>;

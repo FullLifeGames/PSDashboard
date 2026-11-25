@@ -4,19 +4,7 @@ import { restoreSideInvariants } from './serialize.ts';
 import { assertSimMods } from './sim-mods.ts';
 import { prepareBattle, prepareFormat } from './sim-fast/index.ts';
 
-/**
- * The search's parsed position: JSON.parse once per position, the moveSlots
- * padding the sim's deserializer needs (see deserializeBattleExact), and the
- * history stripped. The sim reads `log` only to send updates (sentLogPos),
- * to attribute the move line it just wrote (lastMoveLine, which every
- * addMove sets fresh), and for debug output; `inputLog` and `messageLog` it
- * only writes. The search reads the log DELTA of one advance
- * (battle.log.slice(logStart)), which is the same from an empty start.
- * Forks share one parsed object because State.deserializeBattle rebuilds
- * every object it walks; the two shared pieces are the `set` objects, which
- * the Pokemon constructor normalizes idempotently, and the log array, which
- * deserializeFromParsed replaces per battle.
- */
+/** The search's parsed position: one JSON.parse per position, shared by every fork of it. */
 export interface ParsedSearchState {
   state: Record<string, unknown>;
   /** moveSlots the padding lengthened, trimmed back on every battle. */
@@ -35,6 +23,8 @@ export function parseSearchState(serialized: string): ParsedSearchState {
     trims.push({ side: sideIndex, index, length: slots.length });
     while (slots.length < base.length) slots.push(base[slots.length]);
   }));
+  // The `set` objects (the Pokemon constructor normalizes them idempotently) are shared by every battle of this state;
+  // the log array is shared too, and deserializeFromParsed replaces it per battle.
   state.log = [];
   state.inputLog = [];
   state.messageLog = [];
@@ -43,7 +33,6 @@ export function parseSearchState(serialized: string): ParsedSearchState {
   return { state, trims };
 }
 
-/** A fresh battle from the parsed state, with the search's side invariants restored. */
 export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
   assertSimMods(String(parsed.state.formatid));
   prepareFormat(String(parsed.state.formatid));
@@ -51,9 +40,7 @@ export function deserializeFromParsed(parsed: ParsedSearchState): Battle {
   for (const trim of parsed.trims) {
     battle.sides[trim.side].pokemon[trim.index].moveSlots.length = trim.length;
   }
-  // The deserializer hands the battle the parsed log array itself; a fork
-  // must never append into the object its siblings start from. The sim
-  // types the field read-only; its own deserializer assigns it the same way.
+  // The deserializer hands out the parsed log array itself: a fork appending to it would corrupt its siblings.
   (battle as unknown as { log: string[] }).log = [];
   restoreSideInvariants(battle);
   prepareBattle(battle);

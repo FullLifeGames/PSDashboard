@@ -3,12 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { calcGenerationFor, calcModOf, simGenNum } from '@fulllifegames/replay-core';
 
-/**
- * Round 68 (T186, decisions 1 and 6): one function decides the calculator's generation from the game generation and
- * the battle's mod (replay-core calc-gen.ts), and every caller takes it. The calculator's generation number is not the
- * simulator's: the Champions mod is the calculator's generation 0, which plays on Gen 9's rules, so a reader that wants
- * the simulator's generation asks simGenNum.
- */
+// Champions is the calculator's generation 0 but plays Gen 9's rules: ask simGenNum for the simulator's generation.
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 function sources(dir: string): string[] {
@@ -21,7 +16,7 @@ function sources(dir: string): string[] {
 const sourceFiles = () => ['packages/eval-engine/src', 'packages/replay-core/src', 'src'].flatMap(dir => sources(`${ROOT}${dir}`));
 const rel = (path: string) => path.slice(ROOT.length);
 
-describe('the calculator generation of a battle (decision 1)', () => {
+describe('the calculator generation of a battle', () => {
   test('a game generation without a mod, or under a mod other than Champions, is its own generation, clamped to 1..9', () => {
     for (const gen of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
       for (const mod of [undefined, 'base', 'gen7letsgo']) {
@@ -59,19 +54,11 @@ describe('the calculator generation of a battle (decision 1)', () => {
   });
 
   test('no source file reads the calculator generation\'s number as the simulator\'s generation', () => {
-    // calc/body.ts keys its memos by the calculator generation itself (calcAddsStages, calcSpecies) and tells generation 0 apart.
+    // calc/body.ts keys memos by the calculator generation (calcAddsStages, calcSpecies) and tells generation 0 apart.
     const allowedInBody = /calcAddsStages\(gen\.num|calcSpecies\(gen\.num|\(gen\.num as number\)/;
     const reads = sourceFiles().filter(path => !path.endsWith('replay-core/src/calc-gen.ts')).flatMap(path => readFileSync(path, 'utf-8').split(/\r?\n/)
       .filter(line => /\b(?:gen|calcGen|ctx\.gen)\.num\b/.test(line) && !(path.endsWith('eval-engine/src/calc/body.ts') && allowedInBody.test(line)))
       .map(line => `${rel(path)}: ${line.trim()}`));
     expect(reads).toEqual([]);
-  });
-});
-
-describe('the small consequences of the 0.12 diff (decision 6)', () => {
-  test('the damage preview passes no species option to the calculator\'s move (0.12 dropped it)', () => {
-    const source = readFileSync(`${ROOT}packages/eval-engine/src/damage-calc.ts`, 'utf-8');
-    expect(source).not.toMatch(/\bCalcSpecies\b/);
-    expect(source).not.toMatch(/^\s*species: attacker\.species/m);
   });
 });

@@ -5,11 +5,6 @@ import { getBranchSimulatorFormat, parseReplayLog, replayBringList, speciesBaseI
 import { makePreviewAcquire, type TeamBuildSources } from '../../../src/lib/eval-acquire';
 import { clearWorldPositions, worldPositionsOf } from '../../../src/lib/eval/world-positions';
 
-/**
- * Round 89 (#124): the lead analysis of turn 0 evaluates the team preview. A short-side game previews every world of its unknown
- * bodies and registers them under the heaviest world's position, so the worker client searches each and blends. Doubles (Champions
- * VGC, four of six) and singles (Battle Stadium Singles, three of six) take the same path; a game with no short side registers nothing.
- */
 const sources = {
   teamText: '', effectiveP1Info: null, effectiveP2Info: null, usageStats: { stats: null }, setAssumptions: { assumptions: null },
   hpEvidence: [], getInferredSpreads: async () => undefined,
