@@ -6,8 +6,6 @@ import { switchInSlots } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 import { isLockedEntry, nextChoosingSlot, requestMoveKey, type RequestMove } from './request-moves.ts';
 
-// Every consumer enumerates through legalChoices, so all engines see the same lists.
-
 const TARGET_FOE = new Set(['normal', 'any', 'adjacentFoe']);
 
 /** The played actions of a side's slots; a move aimed at the own partner names its location (negative). */
@@ -16,7 +14,6 @@ export type PlayedSlots = readonly ({ kind: string; name: string; targetLoc?: nu
 interface SlotChoice {
   choice: string;
   label: string;
-  /** Uses a once-per-battle gimmick (Tera / Mega / Ultra) this turn. */
   once: boolean;
   bench: number | null;
 }
@@ -27,6 +24,8 @@ interface ActiveRequestSlot {
   canTerastallize?: unknown;
   canMegaEvo?: unknown;
   canUltraBurst?: unknown;
+  canDynamax?: unknown;
+  canZMove?: unknown;
 }
 
 function benchSwitches(sideState: Side): SlotChoice[] {
@@ -197,8 +196,13 @@ function assignmentLabel(sideState: Side, choice: string): string {
   }).join(' + ');
 }
 
+interface ChoiceList {
+  options: ChoiceOption[];
+  slots: number[];
+}
+
 // Slots the sim auto-passes (fainted or empty) are skipped: an explicit `pass` trips "more choices than unfainted"
-function doublesChoices(
+function doublesList(
   sideState: Side,
   actives: (ActiveRequestSlot | null | undefined)[],
   forceSwitch: boolean[],
@@ -206,23 +210,28 @@ function doublesChoices(
   side: 'p1' | 'p2',
   tera: TeraAllowance | undefined,
   partner?: PlayedSlots,
-): ChoiceOption[] {
+): ChoiceList {
   // More forced slots than living replacements: the per-slot product drops each shared-target pair and leaves nothing;
   // leaves nothing; the sim wants a pass for each slot no body can fill.
   const forcedCount = forceSwitch.filter(Boolean).length;
   const bench = benchSwitches(sideState).map(entry => entry.bench!);
   if (forcedCount > 1 && bench.length < forcedCount) {
-    return switchAssignments(forcedCount, bench).map(choice => ({ choice, label: assignmentLabel(sideState, choice) }));
+    const options = switchAssignments(forcedCount, bench).map(choice => ({ choice, label: assignmentLabel(sideState, choice) }));
+    return { options, slots: forceSwitch.flatMap((forced, slot) => (forced && slot < slotCount ? [slot] : [])) };
   }
   const perSlot: SlotChoice[][] = [];
+  const slots: number[] = [];
   for (let slot = 0; slot < slotCount; slot++) {
     const slotTera = teraAllowed(tera, side, sideState.active[slot] ?? null);
     const slotChoices = slotChoicesFor(sideState, actives[slot], !!forceSwitch[slot], slot, slotTera, partner?.[slot]);
-    if (slotChoices.length > 0) perSlot.push(slotChoices);
+    if (slotChoices.length > 0) {
+      perSlot.push(slotChoices);
+      slots.push(slot);
+    }
   }
-  if (perSlot.length === 0) return [];
-  if (perSlot.length === 1) return perSlot[0].map(({ choice, label }) => ({ choice, label }));
-  return combineSlots(perSlot);
+  if (perSlot.length === 0) return { options: [], slots };
+  if (perSlot.length === 1) return { options: perSlot[0].map(({ choice, label }) => ({ choice, label })), slots };
+  return { options: combineSlots(perSlot), slots };
 }
 
 function pushSinglesGimmicks(
@@ -285,25 +294,34 @@ function singlesChoices(
   return options;
 }
 
+/** `legalChoices` with the slot behind each part of a choice string. */
+export function choiceList(
+  position: SimPosition,
+  side: 'p1' | 'p2',
+  opts?: { tera?: TeraAllowance; partner?: PlayedSlots },
+): ChoiceList {
+  const battle = positionBattle(position);
+  const sideState = battle.sides[sideIndex(side)];
+  const request = sideState.activeRequest;
+  if (!request || battle.ended) return { options: [], slots: [] };
+  // Mid forced switch: the other side replaces and this side cannot act; invented switches are rejected.
+  // The sentinel never reaches the sim (applyChoice skips it).
+  if ('wait' in request && request.wait) {
+    return { options: [{ choice: 'wait', label: '(waiting)' }], slots: [] };
+  }
+  if ('teamPreview' in request && request.teamPreview) return { options: teamPreviewChoices(battle, sideState), slots: [] };
+
+  const actives = 'active' in request ? request.active ?? [] : [];
+  const forceSwitch = 'forceSwitch' in request ? request.forceSwitch ?? [] : [];
+  const slotCount = Math.max(actives.length, forceSwitch.length);
+  if (slotCount > 1) return doublesList(sideState, actives, forceSwitch, slotCount, side, opts?.tera, opts?.partner);
+  return { options: singlesChoices(request, sideState, side, opts?.tera), slots: [0] };
+}
+
 export function legalChoices(
   position: SimPosition,
   side: 'p1' | 'p2',
   opts?: { tera?: TeraAllowance; partner?: PlayedSlots },
 ): ChoiceOption[] {
-  const battle = positionBattle(position);
-  const sideState = battle.sides[sideIndex(side)];
-  const request = sideState.activeRequest;
-  if (!request || battle.ended) return [];
-  // Mid forced switch: the other side replaces and this side cannot act; invented switches are rejected.
-  // The sentinel never reaches the sim (applyChoice skips it).
-  if ('wait' in request && request.wait) {
-    return [{ choice: 'wait', label: '(waiting)' }];
-  }
-  if ('teamPreview' in request && request.teamPreview) return teamPreviewChoices(battle, sideState);
-
-  const actives = 'active' in request ? request.active ?? [] : [];
-  const forceSwitch = 'forceSwitch' in request ? request.forceSwitch ?? [] : [];
-  const slotCount = Math.max(actives.length, forceSwitch.length);
-  if (slotCount > 1) return doublesChoices(sideState, actives, forceSwitch, slotCount, side, opts?.tera, opts?.partner);
-  return singlesChoices(request, sideState, side, opts?.tera);
+  return choiceList(position, side, opts).options;
 }
