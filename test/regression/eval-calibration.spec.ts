@@ -947,8 +947,8 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * of the three source trees and the app's stylesheets 21,164 to 12,408, of
  * the test projects 14,882 to 10,794 (the capture suite's 13 lines included
  * after), history lines of source 2,661 to 0; the designs of the cut comments
- * moved into EVALUATION.md and ARCHITECTURE.md, the fit and cache-version
- * histories into docs/completed/source-comment-history.md; the rule
+ * moved into EVALUATION-DETAILS.md and ARCHITECTURE-DETAILS.md, the fit and
+ * cache-version histories into docs/completed/source-comment-history.md; the rule
  * comments/no-history, comment-ratchet.json and scripts/comment-only-diff.mjs
  * hold it. Test names: 884 titles in 343 spec files and 12 file names lost
  * their round, T-number, issue number or plan code; tests/no-history holds
@@ -1016,11 +1016,12 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * replay-core 1,250 to 190, test:ui 1,247 to 147, test:e2e 1,036 to 140,
  * test:e2e-feedback 139 to 34, test:e2e-build 30 to 2, test:e2e-capture 13 to
  * 4 (the workflows had fallen from 109 to 39 before the ruling, 64764339).
- * 91 design blocks of the cut comments went into EVALUATION.md,
- * ARCHITECTURE.md, six ADRs and GLOSSARY.md, each read against the code
- * first; that check corrected two sentences on the replay frame's phone
- * layout, which shrinks the scene under 642 px and keeps no scroll
- * container. The new scripts/README.md says how to call each of the 42
+ * 91 design blocks of the cut comments went into EVALUATION-DETAILS.md,
+ * ARCHITECTURE-DETAILS.md (two documents of their own, which EVALUATION.md
+ * and ARCHITECTURE.md point to section by section), six ADRs and GLOSSARY.md,
+ * each read against the code first; that check corrected two sentences on
+ * the replay frame's phone layout in the main documents, which shrinks the
+ * scene under 642 px and keeps no scroll container. The new scripts/README.md says how to call each of the 42
  * scripts and corrected twelve statements of the old script headers. The
  * "Comments:" bullet of AGENTS.md has the stricter rule.
  *
