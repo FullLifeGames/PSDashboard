@@ -60,8 +60,10 @@ describe.each(CASES)('$name: the turns a body has stood are keyed as zero or not
       for (const id of ids) for (const holder of holders) if (holderOf(base, holder)) check(`${kind} ${id} on ${holder}`, recoil, lineupOf(kind, id, holder));
     }
     for (const move of moves) check(`move ${move}`, move, {});
+    // Gens 1 and 2 have no abilities and no other entry that reads the field.
     if (rules.generation >= 3) expect(rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
+    // The teeth: Stakeout, from Gen 7, doubles the attack against a body that has stood no turn.
     if (rules.generation >= 7 || rules.name === 'Champions') expect(teeth).toBeGreaterThan(0);
   });
 

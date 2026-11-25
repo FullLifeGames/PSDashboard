@@ -189,6 +189,7 @@ describe('the spread solver reads Champions Stat Points', () => {
     });
 
     test(`a settled order steps one Stat Point (${kind})`, () => {
+      // Charizard at 14 SP is 134; Garchomp is 122 at 0 SP and +1 per SP: 13 SP (135) is the smallest Speed that wins.
       const sets = { p1: [mon('Garchomp', 'Hardy', sp(32, 32, 0, 0, 2, 0))], p2: [mon('Charizard', 'Hardy', sp(0, 0, 0, 32, 2, 14))] };
       const solved = inferSpreads([], sets, format, [race('p1', 'Garchomp', 'p2', 'Charizard')], knowledge({ 'p2:charizard': { spreadKnown: true } }));
       expect(solved.get('p1:garchomp')?.evs.spe).toBe(13);
@@ -219,6 +220,7 @@ describe('the spread solver reads Champions Stat Points', () => {
     expect(hpEvsForMaxHp(108, 50, 215, 0, 31, evBudget('gen9championsou'))).toBe(32);
     expect(hpEvsForMaxHp(108, 50, 183, 32, 31, evBudget('gen9championsou'))).toBe(0);
     expect(hpEvsForMaxHp(108, 50, 200, 0, 31, evBudget('gen9championsou'))).toBe(17);
+    // Level 100: 2 x 108 + 31 + 110 + EVs / 4 = 409 gives 208 EVs.
     expect(hpEvsForMaxHp(108, 100, 409, 0)).toBe(208);
   });
 });

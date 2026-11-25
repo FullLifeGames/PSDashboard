@@ -25,6 +25,7 @@ describe('SENDERS is held to the simulator', () => {
       const candidates = realItems(view)
         .filter(item => HANDLERS.some(handler => (item as unknown as Record<string, unknown>)[handler]))
         .map(item => item.id);
+      // Eject Button and Red Card exist from Gen 5, Eject Pack from Gen 8; Gens 1 to 4 have no such item.
       if (view.dex.gen >= 5) expect(candidates.length).toBeGreaterThan(0);
       const filler = view.dex.moves.get('splash').exists ? 'splash' : 'harden';
       const senders = candidates.filter(id => ['tackle', 'growl'].some(move => sends(view, id, move, filler))).sort();

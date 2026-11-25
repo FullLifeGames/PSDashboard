@@ -92,8 +92,6 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test('648453 t13: AcrOne carries no tier (matrix 0.0550; MC 0.0732 and 0.0779 on two seed blocks)', { timeout: 300_000 }, async () => {
-    // Reference on the tree: regret 0.0732 and 0.0779, tier none on both blocks, the tree itself 0.0758.
-    // Pin 0.065 ± 0.03: the matrix, tree and blocks lie inside 0.055 to 0.078, 0.005 under the inaccuracy line.
     const position = board('smogtours-gen6ou-648453-t13');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Hidden Power Ice');
@@ -102,8 +100,6 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test('573756 t73: Body Press carries no tier (0.0100; MC 0.0078 and 0.0077 on two seed blocks)', { timeout: 300_000 }, async () => {
-    // Reference 0.0078 and 0.0077, best -> Toxapex, tier none; the score lies past DECIDED_SCORE (0.7).
-    // Pin 0.009 ± 0.02 (the engine and the blocks' mean).
     const position = board('smogtours-gen8ou-573756-t73');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Body Press');
@@ -112,8 +108,6 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
   });
 
   test("912045 t8 (doubles): p1's Blood Moon line carries no tier (0.0088; MC 0.0205 and 0.0435 on two seed blocks)", { timeout: 300_000 }, async () => {
-    // Reference re-prices the verified cells: 0.0205 and 0.0435 (same best row), tier none; the engine 0.0088.
-    // Pin 0.025 ± 0.04 (the engine and the blocks' mean; the band stops 0.035 under the 0.1 line of an inaccuracy).
     const position = board('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Blood Moon→Okidogi + Matcha Gotcha');
@@ -340,8 +334,7 @@ describe('verify-spread-scenes', () => {
 
   describe('verify scenes: hidden lengths', () => {
     test("2629703929 t8 (VGC): the Sleep Powder cell reads every sleep counter (MC 0.585 ± 0.079)", { timeout: 300_000 }, async () => {
-      // Reference (24 draws, blocks 1001 and 5001, answers off): 0.5847 under the class weights, SE 0.078 and 0.079.
-      // Band: 2.5 standard errors (0.079) around the weighted value, 0.39 to 0.78; the engine reads 0.4871.
+      // Reference 0.5847 (24 draws, answers off); band 2.5 SE (0.079): 0.39 to 0.78.
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const local = createLocalTreeExecutor(position.serialized);
       const rounds: EvalCellJob[][] = [];
@@ -353,8 +346,6 @@ describe('verify-spread-scenes', () => {
       expect(Math.abs(blendedValue(old) - 0.5847)).toBeLessThan(2.5 * 0.079);
     });
 
-    // The fresh reference (24 draws, blocks 1001 and 5001) grades p1 a mistake (0.255, 0.298), p2 a mistake (0.267).
-    // test.fails until the engine's distance closes. Engine regrets: 0.0514 (p1), 0.0004 (p2).
     test.fails("2629703929 t8 (VGC): the tiers the fresh reference grades, p1 a mistake and p2 at least an inaccuracy", { timeout: 300_000 }, async () => {
       const position = scene('gen9vgc2026regi-2629703929-t8');
       const analysis = flat(position, await search(position));

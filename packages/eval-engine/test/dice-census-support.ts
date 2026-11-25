@@ -98,6 +98,7 @@ export function scan(): Map<string, Set<string>> {
 }
 
 export type Scope = 'action' | 'turn-order' | 'end-of-turn' | 'out';
+// `open`: a draw in scope that no kind names yet; the text says why and what the user sees (nothing is offered).
 export interface Class { scope: Scope; kind: DieKind | 'pick' | 'duration'; calls: string[]; open?: string }
 
 const proc = (...calls: string[]): Class => ({ scope: 'action', kind: 'ability-proc', calls });

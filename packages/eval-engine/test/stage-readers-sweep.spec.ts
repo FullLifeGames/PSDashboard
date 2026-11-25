@@ -7,6 +7,7 @@ import { battleOf } from './power-oracle';
 
 await loadSimMods('gen9championsou');
 
+// Oracle by name: moves that read the target's stages (Foul Play), copy or steal them, or invert or swap them.
 const READERS = ['foulplay', 'punishment', 'psychup', 'spectralthief', 'topsyturvy', 'powerswap', 'heartswap', 'guardswap', 'transform'];
 
 describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: every move against the census', ({ rules }) => {

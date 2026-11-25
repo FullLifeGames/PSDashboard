@@ -31,6 +31,7 @@ const observationsOf = (log: string) => parseReplayLogWithObservations(log).obse
 const teams = { p1Team: [garchomp('Choice Band')], p2Team: [slowking()] };
 
 describe('a doubles observation does not move the Choice verdict', () => {
+  // Reflect in doubles takes 2732/4096 of the damage: a Band hit through it (1.5 x 2732/4096) reads like a bare hit.
   test('doubles: a Choice Band hit through Reflect is not contradicted', () => {
     const observations = observationsOf(sceneLog(true, 'Choice Band'));
     expect(observations).toHaveLength(1);

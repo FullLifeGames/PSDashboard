@@ -11,9 +11,12 @@ export interface Scene {
   reader: Reader;
   playedCell: number;
   safeCell: number;
+  /** The payoff comes three turns later (a window read) instead of at once. */
   window?: boolean;
   noMatrix?: boolean;
+  /** Doubles only: one slot of the opponent's click never surfaced. */
   hiddenClick?: boolean;
+  /** The reader's score fell across the turn by this much (own perspective); default: it kept ground. */
   lostGround?: number;
 }
 

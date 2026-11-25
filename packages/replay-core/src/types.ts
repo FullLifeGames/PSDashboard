@@ -118,6 +118,7 @@ export interface DamageObservation {
   defenderParadox?: ParadoxReading;
   /** The move's name as the `|move|` line prints it: Weather Ball, Terrain Pulse, Techno Blast key on it. */
   moveName?: string;
+  /** The terrain id the client shows at the hit ('' none). */
   terrain?: string;
   attackerTera?: string;
   defenderTera?: string;
@@ -132,13 +133,14 @@ export interface DamageObservation {
   /** The fallen Supreme Overlord counted when the attacker came in (the `fallenN` start line); absent at none. */
   attackerFallen?: number;
   /**
-   * The ability id the client shows each side with at the hit (revealed or changed: Trace, Skill Swap); absent when
-   * never shown. `Suppressed` is set when Gastro Acid, Neutralizing Gas or an ended ability took it away.
+   * The ability the client shows each side with at the hit (revealed or changed: Trace, Skill Swap); absent if unseen.
+   * `attackerSuppressed`, `defenderSuppressed`: Gastro Acid, Neutralizing Gas or an ended ability took it away.
    */
   attackerAbility?: string;
   defenderAbility?: string;
   attackerSuppressed?: boolean;
   defenderSuppressed?: boolean;
+  /** The attacker's ability is on, as its own volatile shows (Flash Fire, Slow Start, Unburden). */
   attackerAbilityOn?: boolean;
   /**
    * What the calculator reads off the field besides the two Pokémon (ids, sorted): Helping Hand, Charge, an ally with
@@ -154,6 +156,7 @@ export interface DamageObservation {
   /** A move power's history, only when above zero: the side's fainted (Last Respects), hits taken (Rage Fist). */
   attackerFainted?: number;
   attackerTimesAttacked?: number;
+  /** The defender's status before the hit (Hex and Venoshock double against it, Marvel Scale lifts Defense). */
   defenderStatus?: string;
   /** Only when true: the defender switched in this turn (Stakeout); `lastToMove`: all others had moved (Analytic). */
   defenderNewlyIn?: boolean;
@@ -233,6 +236,7 @@ export interface PokemonEvsInfo {
 
 /** One side of a logged hit, as it stood when the move landed. */
 export interface HitParty {
+  /** The forme that took part (a Mega, Terapagos-Terastal). */
   species: string;
   level: number;
   tera?: string;
@@ -268,6 +272,7 @@ export interface LoggedHit {
   lowerBound: boolean;
   weather: string;
   terrain: string;
+  /** Reflect, Light Screen and Aurora Veil on the defender's side. */
   screens: string[];
   helpingHand: boolean;
   defenderNew: boolean;
@@ -283,7 +288,7 @@ export interface LoggedHit {
   format: string;
 }
 
-/** A set move the log proves without naming it (a Z or Max move shows its base's type). */
+/** A set move the log proves without naming it: an attack of `type` (Z or Max move) or a status move (Max Guard). */
 export type OpenMove = { kind: 'attack'; type: string } | { kind: 'status' };
 
 /** What the app knows of one Pokemon of a side, each field with its knowledge source. */

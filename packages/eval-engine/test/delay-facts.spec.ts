@@ -103,6 +103,7 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
     return count;
   }
 
+  // The simulator's own core reads of each dropped field, counted per file by hand: a changed count needs a new review.
   const PINNED_CORE: Record<string, Record<string, number>> = {
     pp: { 'champions/index.js': 3, 'd/mods/gen1/scripts.js': 9, 'd/mods/gen2/scripts.js': 1, 'd/mods/gen3/scripts.js': 2, 'sim/battle-actions.js': 5, 'sim/battle.js': 4, 'sim/pokemon.js': 13 },
     used: { 'd/mods/gen1/scripts.js': 1, 'sim/battle-actions.js': 1, 'sim/pokemon.js': 1 },

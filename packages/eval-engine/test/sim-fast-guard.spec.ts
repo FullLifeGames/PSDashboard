@@ -197,6 +197,7 @@ describe('the pins the layer relies on', () => {
     const esmDir = join(SIM_BUILD, 'esm');
     const sources = [...readdirSync(join(esmDir, 'sim')).filter(name => name.endsWith('.mjs')).map(name => join(esmDir, 'sim', name)),
       ...walk(join(esmDir, 'data'))];
+    // The scan sees literal writes only (`lastMoveTargetLoc = targetLoc` can be undefined); the census plays the rest.
     const emptied = new Set<string>();
     for (const file of sources) {
       const where = relative(esmDir, file).replaceAll('\\', '/');

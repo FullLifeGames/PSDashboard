@@ -28,6 +28,7 @@ export const seedOf = (index: number): string => [1, 2, 3, 4].map(offset => inde
 
 export interface Scene {
   id: string;
+  /** The attacker (side p1) and the target (side p2); in doubles the partners splash beside them. */
   a: Mon;
   t: Mon;
   /** The foe's click when it does not splash; the attacker always uses its first move. */
@@ -84,6 +85,7 @@ export const GRID_SCENES: Scene[] = [
   { id: 'both sides attack', a: SNORLAX(['tackle']), t: PIKACHU(['tackle']), tMove: true },
 ];
 
+// DICE_SWEEPS=full plays every list whole; any other run plays a fixed even sample, unless the call names no sweep.
 export const SWEEPS_FULL = process.env.DICE_SWEEPS === 'full';
 
 const SAMPLE_SIZE: Record<string, number> = { moves: 6, rows: 4, seeds: 2, pool: 40 };

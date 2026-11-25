@@ -59,6 +59,7 @@ describe('a pasted set without an ability', () => {
       probed += 1;
       if (plain.bodies.p1.some(body => body.ability !== '')) failures.push(`${id}: the simulator plays an ability for a blank set (${plain.bodies.p1.map(body => body.ability)})`);
       for (const [index, species] of names(base.p1).entries()) {
+        // Exact while no legal species has its slot 0 banned: new-game-ability-fill.spec.ts holds that case.
         const expected = dex.gen >= 3 ? dex.species.get(species).abilities['0'] : '';
         if (filled.teams.p1[index].ability !== expected) failures.push(`${id} ${species}: the saved team holds "${filled.teams.p1[index].ability}", not "${expected}"`);
         if (filled.bodies.p1[index].ability !== toId(expected)) failures.push(`${id} ${species}: the battle plays "${filled.bodies.p1[index].ability}", not "${toId(expected)}"`);

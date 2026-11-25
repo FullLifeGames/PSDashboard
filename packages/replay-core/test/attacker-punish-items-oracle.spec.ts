@@ -34,6 +34,7 @@ describe('ATTACKER_PUNISH_ITEMS is held to the simulator', () => {
       const candidates = realItems(view)
         .filter(item => (item as unknown as { onDamagingHit?: unknown }).onDamagingHit)
         .map(item => item.id);
+      // Rocky Helmet exists from Gen 5, Jaboca and Rowap Berry from Gen 4; Gens 1 to 3 have no such item.
       if (view.dex.gen >= 4) expect(candidates.length).toBeGreaterThan(0);
       const expected = [...ATTACKER_PUNISH_ITEMS].filter(id => realItems(view).some(item => item.id === id)).sort();
       expect(punishing(view, candidates)).toEqual(expected);

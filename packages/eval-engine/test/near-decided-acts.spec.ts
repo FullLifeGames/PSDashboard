@@ -99,6 +99,7 @@ describe.each(RULES)('$name: who acts first, the reading against the simulator',
 
   test('the sweep covers the priority moves of the rule set', () => {
     expect(priorityMoves.length).toBeGreaterThan(15);
+    // A move with its own priority handler is not read from the Dex priority: the list stays named so a new one shows.
     const handlers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && typeof (move as { onModifyPriority?: unknown }).onModifyPriority === 'function')
       .map(move => move.id).sort();
     expect(handlers).toEqual(dex.gen >= 8 ? ['grassyglide'] : []);

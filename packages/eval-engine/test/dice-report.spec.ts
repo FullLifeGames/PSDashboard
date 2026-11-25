@@ -47,6 +47,7 @@ describe.each(cases)('the report of a forced accuracy: $rules.name $mode', ({ ru
     for (const seed of SEEDS) {
       const { report, battle } = forcedReport(boardOf(rules, TACKLE, mode, seed)!, TACKLE, mode, [{ name: name('tackle', 'accuracy'), result: { happens: false } }]);
       const hit = lines(battle, '|-miss|').length === 0;
+      // Gen 2 draws no accuracy for a 100 percent move (accuracy 255): the die never ran, whatever the answer.
       const sure = rules.generation === 2 ? 'no-draw' : 'no-chance';
       expect(report.took === sure, `${rules.name} ${seed} ${report.took}`).toBe(hit);
       if (hit) expect(report.reason).toBeTruthy();

@@ -297,9 +297,9 @@ const t25 = (numbers: { score: number; protect: [number, number, number]; lopunn
 };
 
 describe('655336 t25: the gate at both sets of numbers', () => {
-  /** The feedback dump at a2e7c2b: score 0.6958, Protect -0.6779, the switch -0.7343, regret 0.0563. */
+  /** The newer engine's feedback dump: score 0.6958, Protect -0.6779, the switch -0.7343, regret 0.0563. */
   const head = { score: 0.6958, protect: [-0.7263, -0.6224, -0.6779] as [number, number, number], lopunny: [-0.775, -0.7201, -0.7343] as [number, number, number] };
-  // An earlier feedback dump (0da5ec7 to 8683fa9): score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156.
+  // The older engine's feedback dump: score 0.3337, Protect -0.2773, the switch -0.6929, regret 0.4156.
   const r70 = { score: 0.3337, protect: [-0.45, -0.3, -0.2773] as [number, number, number], lopunny: [-0.9, -0.7, -0.6929] as [number, number, number] };
 
   test('at the dump of the a2e7c2b engine the turn has no tier and no blame', () => {

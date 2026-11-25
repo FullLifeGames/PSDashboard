@@ -70,7 +70,7 @@ describe('nullMoveReason', () => {
   });
 
   test('an immunity-breaking attacker ability suppresses the verdict', () => {
-    // Pangoro may carry Scrappy — Normal vs Ghost is not a definite null.
+    // Pangoro may carry Scrappy: Normal vs Ghost is not a definite null.
     expect(reason('move bodyslam', 'Gengar', 6, 'Pangoro')).toBeNull();
     expect(reason('move bodyslam', 'Gengar', 6, 'Snorlax')).toContain('immune to Normal-type moves');
   });

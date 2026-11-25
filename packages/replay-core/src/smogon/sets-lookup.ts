@@ -33,6 +33,7 @@ export interface SmogonSetAssumptions {
   format: string;
   source: string;
   pokemon: Record<string, PokemonSetAssumption>;
+  /** Fetch failures, one "<species or random sets>: <message>" per entry; absent when none failed. */
   errors?: string[];
   /** Every set file that contributed, the format's own first, then the generation Ubers fallback. */
   formats?: string[];

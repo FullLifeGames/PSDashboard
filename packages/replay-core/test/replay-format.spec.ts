@@ -99,6 +99,7 @@ describe('replay format inference', () => {
     }
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-2628340185', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU' }))
       .toBe('gen9championsou');
+    // The mod's OU holds Sleep Moves Clause (Standard ruleset); only custom-game bases take a Sleep Clause suffix.
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-1', log: '|gametype|singles\n|gen|9\n|tier|[Gen 9 Champions] OU\n|rule|Sleep Clause Mod: Limit one foe put to sleep' }))
       .toBe('gen9championsou');
     expect(getBranchSimulatorFormat({ id: 'gen9championsou-2', log: '|gametype|singles\n|gen|9' })).toBe('gen9championsou');

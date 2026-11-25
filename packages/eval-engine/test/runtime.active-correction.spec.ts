@@ -506,6 +506,7 @@ describe('generic protocol Hidden Power against a typed set', () => {
   });
 
   test('the sim keeps the generic id for a typed set, so the played match holds', () => {
+    // This row assumes @pkmn/sim keeps the request id 'hiddenpower' for "Hidden Power Ice" (the type lives in hpType).
     const option = {
       choice: 'move hiddenpower', label: 'Hidden Power Ice',
       worstCase: 0, expected: 0, ev: 0,

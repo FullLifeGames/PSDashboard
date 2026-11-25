@@ -154,7 +154,7 @@ function carryOrdersOnly(
   carryPreSolve(solved, inferredSpreadsFor(log, { ...options, observations: [] }, build, formatHint, infos, knownTeams));
 }
 
-/** Solves the damage-consistent spreads of a replay once (thousands of calc calls); memoize and pass them on. */
+/** Solves a replay's damage-consistent spreads once (thousands of calc calls); memoize, pass as `inferredSpreads`. */
 export function solveReplaySpreads(
   rawLog: string,
   observations: DamageObservation[],

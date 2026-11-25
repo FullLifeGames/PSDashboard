@@ -308,7 +308,7 @@ function usageCountsByBase(stats: SmogonUsageStats | null | undefined, rules: Ga
   return counts;
 }
 
-/** The bring list of a bring-limited replay with the bodies a side brought but never fielded; null for bring-all. */
+/** The bring list of a bring-limited replay with its unfielded bodies; null for bring-all or too few candidates. */
 export function replayBringList(
   source: ReplayFormatSource,
   snapshots: TurnSnapshot[],

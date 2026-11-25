@@ -416,7 +416,7 @@ describe('damage-gen', () => {
       const gen3 = calcSingleDamageRange(registeel, swampert, move('Explosion', 'Normal'), { gen: 3 });
 
       expect(gen9.maxPercent).toBeGreaterThan(0);
-      // Gen 3 Explosion halves the target's defense — roughly double damage.
+      // Gen 3 Explosion halves the target's defense: roughly double damage.
       expect(gen3.maxPercent).toBeGreaterThan(gen9.maxPercent * 1.7);
     });
 

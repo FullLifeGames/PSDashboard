@@ -17,6 +17,7 @@ export function writeSummaries(part?: string): void {
 // A move aimed at a random foe in doubles picks its target from the stream; the alignment reads bodies by
 // side and species, so two foes of one species hide the difference and the sweep leaves these moves out.
 const randomAim = (mode: Mode, move: DexMove): boolean => mode === 'doubles' && picksOne(move.target);
+// The main rows leave these moves out; one known row per group plays them and stays red until a die covers the cause.
 export const GAPS: { cause: string; moves: string[]; modes: Mode[] }[] = [
   { cause: 'the power Present picks (damage or a heal) is a draw no kind of die names, so the other seed can pick another power than the log shows', moves: ['present'], modes: ['singles', 'doubles'] },
   { cause: 'a secondary that picks its status (the die names the chance, the pick follows the stream)', moves: ['triattack', 'direclaw'], modes: ['singles', 'doubles'] },

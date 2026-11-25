@@ -8,6 +8,7 @@ import { protectorStops } from '../src/search/hints';
 import { loadPositions, withSimFast } from './sim-fast-helpers';
 
 
+// The speed layer's table of handlers, keyed by effect object, lives as long as the Dex: a fresh view leaks.
 v8.setFlagsFromString('--expose-gc');
 const collect = vm.runInNewContext('gc') as () => void;
 const heapMb = () => { collect(); collect(); return process.memoryUsage().heapUsed / 1048576; };

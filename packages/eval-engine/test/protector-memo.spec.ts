@@ -8,6 +8,7 @@ import { battleOf } from './power-oracle';
 
 await loadSimMods('gen9championsou');
 
+// The memo is exact only if a protector's handler reads only the attack and the HitProtect handlers on the field.
 beforeAll(() => setAskCheck(false));
 afterAll(() => setAskCheck(null));
 

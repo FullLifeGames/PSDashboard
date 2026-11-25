@@ -136,6 +136,7 @@ describe.each(RULES_WITH_DOUBLES)('Rock Slide in doubles: $name', (rules: Rules)
       for (const target of targets) {
         if (rules.generation === 3) expected.push(name('p1a', 'rockslide', target, 'accuracy'));
         if (hit.includes(target)) expected.push(name('p1a', 'rockslide', target, 'crit'), name('p1a', 'rockslide', target, 'damage-roll'));
+        // Gen 3 draws a target's flinch right after its roll, Gens 4 and up after the rolls of every target.
         if (rules.generation === 3 && hit.includes(target)) expected.push(flinch(target));
       }
       if (rules.generation !== 3) expected.push(...hit.map(flinch));

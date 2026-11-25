@@ -19,6 +19,7 @@ export const SWEEP_CASES: { rules: Rules; mode: Mode; name: string }[] = RULES.f
 const FOE_REACHING = new Set(['normal', 'any', 'adjacentFoe', 'allAdjacentFoes', 'allAdjacent', 'randomNormal', 'scripted']);
 const NEEDS_AIM = new Set(['normal', 'any', 'adjacentFoe']);
 
+// A plain run plays a fixed sample of the moves (`sweepSelection`); `whole` or DICE_SWEEPS=full plays every one.
 export function sweepMoves(rules: Rules, keep: (move: DexMove) => boolean, foesOnly = true, whole = false): { moves: DexMove[]; skipped: number } {
   const dex = dexOfRules(rules);
   const all = dex.moves.all().filter(move => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
