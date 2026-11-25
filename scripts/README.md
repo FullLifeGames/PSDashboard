@@ -298,6 +298,35 @@ node scripts/k-stamp.mjs [out-file]
 
 Prints the K table a capture runs under (the leaf's K per rule set and game type), or writes it to `out-file`. `EVAL_FIT_ROOT_K=<stamp file>` names the stamp that a capture with search ran under (`parseKTable` and `rootScaleReports` in `test/regression/fit-families.ts`), and the root-scale report stops when the stamp is not the current table. The stamp comes from `winprobK` in `packages/eval-engine/src/winprob.ts`, so make it at the capture's commit and never type it; `fit-families.spec.ts` holds the two together.
 
+### eval-fit.spec.ts (the fit levers)
+
+```sh
+EVAL_FIT=1 [EVAL_FIT_...=...] npx vitest run test/regression/eval-fit.spec.ts
+```
+
+The spec fits feature weights on the fit corpus (or on the dumps of a bank run) and writes reports. It never changes a weight: adopting one is a hand edit of the weight tables (`FEATURE_WEIGHTS` and its doubles, VGC and Champions twins) behind the calibration gate. Without `EVAL_FIT` it skips. Every other lever is an environment variable:
+
+| Lever | What it switches |
+| --- | --- |
+| `EVAL_FIT` | `1` runs the spec. |
+| `EVAL_FIT_SAMPLES` | A folder for the captured samples (`samples-<k>of<n>.json`) and the reports. Unset, the samples cache is `.fit-corpus/samples-cache.json` and the reports land in `.fit-corpus/`. A folder with every slice is read instead of captured again; missing or stale slices stop the run. Setting it also writes the refit report. |
+| `EVAL_FIT_SLICE` | `k/n`: with `EVAL_FIT_SAMPLES`, captures only the k-th of n slices of the corpus manifest, writes `samples-<k>of<n>.json` and stops. |
+| `EVAL_FIT_DUMP` | Comma list of bank dumps (rows that carry a feature vector) to fit from instead of capturing; a list with no such row stops the run. Skips the legacy reports. |
+| `EVAL_FIT_UNRATED` | `1` keeps the unrated ladder games of a dump; otherwise they leave the fit. |
+| `EVAL_FIT_FAMILIES` | Comma list of the families to fit (`standard-singles`, `standard-doubles`, `vgc-doubles`, `champions-singles`, `champions-doubles`); default all. |
+| `EVAL_FIT_DRAWS` | Bootstrap draws per report; default 200. |
+| `EVAL_FIT_OUT` | Path of the refit report; default `fit-report.json` in the samples folder. Setting it also writes the refit report. |
+| `EVAL_FIT_K_OUT` | Path of the phase-K or root-scale report; default `phase-k-report.json` or `root-scale-report.json` there. |
+| `EVAL_FIT_PHASE_K` | `1` writes the phase-K report (K as `k0 + k1 * fainted fraction` per family) in place of the refit. |
+| `EVAL_FIT_ROOT_SCALE` | `1` writes the root-scale report in place of the refit; it wins over `EVAL_FIT_PHASE_K`. |
+| `EVAL_FIT_ROOT_K` | The stamp file of the K table a capture with search ran under (`k-stamp.mjs`), for the root-scale report; default the current table. |
+| `EVAL_FIT_FORMS` | Comma list of `phase:<feature>` or `root:<feature>`: adds a column per entry to the refit (the feature times the fainted fraction, or its signed square root). |
+| `EVAL_FIT_LIFT` | Comma list of weights to take off the held lists (shared: `trickRoom`, `choiceMismatch`, `boosts`; doubles: `boosts`), so the refit may move them. |
+| `EVAL_FIT_ONLY` | Comma list of the only weights the refit frees (`*@phase` names every phase column); every other weight stays at its start value. |
+| `EVAL_FIT_SET` | `name=weight` list: start weights for the refit, in both tables. |
+| `EVAL_FIT_CAPTURED` | `name=weight` list: the weights a capture ran under where they differ from the current tables; only the identity check starts from them. |
+| `EVAL_FIT_LEGACY` | `0` skips the legacy logistic and bootstrap printouts (a dump skips them anyway). |
+
 ## Lint ratchets and counts
 
 `npm run lint` runs ESLint, then `twin-lists.mjs`, `spec-counts.mjs` and `comment-counts.mjs --shape`. Every ratchet only falls; `update-lint-ratchet.mjs` lowers the baselines after a cut.
