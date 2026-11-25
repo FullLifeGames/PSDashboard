@@ -3,7 +3,7 @@ import type { Battle, PRNGSeed } from '@pkmn/sim';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
 import { restoreSideInvariants, serializeBattleStable } from './serialize.ts';
 import { adoptTemplate, copyBattle, prepareBattle, simFastOn } from './sim-fast/index.ts';
-import { repairFaintedActives } from './switches.ts';
+import { repairFaintedActives, type StaticPick } from './switches.ts';
 import { DiceSink, ScriptedPRNG, type RollScripts } from './scripted-prng.ts';
 import { battleRuleset, tagRuleset } from './ruleset.ts';
 import type { StaticRuleset } from '../score/weights.ts';
@@ -21,7 +21,7 @@ export interface SimPosition {
   /** The rule set the position is searched under (a root takes its search's, children inherit). */
   readonly ruleset?: StaticRuleset;
   /** The static pick's replacements in the advance that made this position, one entry per round; absent on a root. */
-  readonly staticPicks?: readonly { p1?: string; p2?: string }[];
+  readonly staticPicks?: readonly StaticPick[];
 }
 
 class Position implements SimPosition {
@@ -31,9 +31,9 @@ class Position implements SimPosition {
   private templateCache: Battle | null = null;
   private readonly live: boolean;
   readonly ruleset: StaticRuleset;
-  readonly staticPicks?: readonly { p1?: string; p2?: string }[];
+  readonly staticPicks?: readonly StaticPick[];
 
-  constructor(serialized: string | null, battle: Battle | null, ruleset: StaticRuleset, staticPicks?: readonly { p1?: string; p2?: string }[]) {
+  constructor(serialized: string | null, battle: Battle | null, ruleset: StaticRuleset, staticPicks?: readonly StaticPick[]) {
     this.serializedCache = serialized;
     this.battleCache = battle;
     this.live = battle !== null;
@@ -133,7 +133,7 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
   return battle;
 }
 
-export function toPosition(battle: Battle, staticPicks?: readonly { p1?: string; p2?: string }[]): SimPosition {
+export function toPosition(battle: Battle, staticPicks?: readonly StaticPick[]): SimPosition {
   if (battle.prng instanceof ScriptedPRNG) battle.prng.release();
   return new Position(null, battle, battleRuleset(battle), staticPicks);
 }

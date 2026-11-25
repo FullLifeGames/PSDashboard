@@ -4,7 +4,7 @@ import { createMatchupCache, evaluatePosition } from '../eval-function.ts';
 import type { StaticRuleset } from '../score/weights.ts';
 import { battleRuleset } from './ruleset.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
-import { switchAssignments } from './assignments.ts';
+import { assignmentLabel, switchAssignments } from './assignments.ts';
 import { submittableChoice } from './request-moves.ts';
 import { isReviving } from './request-reviving.ts';
 import { deserializeFromParsed, parseSearchState, type ParsedSearchState } from './parsed-state.ts';
@@ -135,25 +135,41 @@ function midTurnSource(battle: Battle): () => Battle {
   return () => deserializeFromParsed(parsedMid ??= parseSearchState(midTurn));
 }
 
+/** The labels each side's static pick sent in during one round of replacements. */
+export interface StaticPick { p1?: string; p2?: string }
+
+/** Answers every open switch request by static value and returns the picks, one entry per round of the guard loop. */
 export function resolveForcedSwitches(
   battle: Battle,
   seed: PRNGSeed,
   followUps: { p1?: string; p2?: string } = {},
-): void {
+): StaticPick[] {
+  const picks: StaticPick[] = [];
   for (let guard = 0; guard < 6; guard++) {
-    if (battle.ended) return;
+    if (battle.ended) return picks;
     const pending = pendingSwitchSides(battle);
-    if (pending.length === 0) return;
+    if (pending.length === 0) return picks;
 
     const mid = midTurnSource(battle);
+    const round: StaticPick = {};
+    const answered: StaticPick = {};
     for (const side of pending) {
+      const id = side.id as 'p1' | 'p2';
       const forcedCount = forcedSlotCount(side);
-      if (answerFollowUp(battle, side, forcedCount, followUps)) continue;
+      const followUp = followUps[id];
+      const followUpLabel = followUp && forcedCount === 1 ? assignmentLabel(side, followUp) : undefined;
+      if (answerFollowUp(battle, side, forcedCount, followUps)) {
+        answered[id] = followUpLabel;
+        continue;
+      }
       const benchSlots = switchInSlots(side);
       if (benchSlots.length === 0) continue;
 
       const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots), battleRuleset(battle));
-      applyChoice(battle, side.id as 'p1' | 'p2', best);
+      round[id] = assignmentLabel(side, best);
+      applyChoice(battle, id, best);
     }
+    if (round.p1 !== undefined || round.p2 !== undefined) picks.push({ ...answered, ...round });
   }
+  return picks;
 }

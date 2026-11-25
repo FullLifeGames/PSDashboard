@@ -1,7 +1,7 @@
 import type { Battle, PRNGSeed, Side } from '@pkmn/sim';
 import { forkBattle, toPosition, type SimPosition } from './position.ts';
 import type { RollScripts } from './scripted-prng.ts';
-import { answerFollowUps, applyChoice, resolveForcedSwitches } from './switches.ts';
+import { answerFollowUps, applyChoice, resolveForcedSwitches, type StaticPick } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 
 
@@ -36,14 +36,15 @@ export function advancePositionWithLog(
   applyChoice(battle, 'p2', p2Choice);
   const followUps = { p1: p1Choice.split(' > ')[1], p2: p2Choice.split(' > ')[1] };
   let pendingSwitch = false;
+  let picks: StaticPick[] = [];
   if (opts?.stopAtForcedSwitch) {
     const stand = answerFollowUps(battle, followUps);
     if (stand === 'pending') pendingSwitch = true;
-    else if (stand === 'mixed') resolveForcedSwitches(battle, seed, followUps);
+    else if (stand === 'mixed') picks = resolveForcedSwitches(battle, seed, followUps);
   } else {
-    resolveForcedSwitches(battle, seed, followUps);
+    picks = resolveForcedSwitches(battle, seed, followUps);
   }
-  return { child: toPosition(battle), log: battle.log.slice(logStart), pendingSwitch };
+  return { child: toPosition(battle, picks), log: battle.log.slice(logStart), pendingSwitch };
 }
 
 export interface TrialAdvanceResult {

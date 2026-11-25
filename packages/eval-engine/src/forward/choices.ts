@@ -1,7 +1,7 @@
 import type { Battle, Pokemon, Side } from '@pkmn/sim';
 import type { TeraAllowance } from '../types.ts';
 import { positionBattle, type ChoiceOption, type SimPosition } from './position.ts';
-import { switchAssignments } from './assignments.ts';
+import { assignmentLabel, switchAssignments, WAITING_LABEL } from './assignments.ts';
 import { switchInSlots } from './switches.ts';
 import { sideIndex, toId } from '@fulllifegames/replay-core';
 import { isLockedEntry, nextChoosingSlot, requestMoveKey, type RequestMove } from './request-moves.ts';
@@ -188,14 +188,6 @@ function combineSlots(perSlot: SlotChoice[][]): ChoiceOption[] {
   return combined;
 }
 
-function assignmentLabel(sideState: Side, choice: string): string {
-  return choice.split(',').map(part => {
-    const tokens = part.trim().split(' ');
-    if (tokens[0] !== 'switch') return 'pass';
-    return `→ ${sideState.pokemon[parseInt(tokens[1], 10) - 1].species.name}`;
-  }).join(' + ');
-}
-
 interface ChoiceList {
   options: ChoiceOption[];
   slots: number[];
@@ -307,7 +299,7 @@ export function choiceList(
   // Mid forced switch: the other side replaces and this side cannot act; invented switches are rejected.
   // The sentinel never reaches the sim (applyChoice skips it).
   if ('wait' in request && request.wait) {
-    return { options: [{ choice: 'wait', label: '(waiting)' }], slots: [] };
+    return { options: [{ choice: 'wait', label: WAITING_LABEL }], slots: [] };
   }
   if ('teamPreview' in request && request.teamPreview) return { options: teamPreviewChoices(battle, sideState), slots: [] };
 

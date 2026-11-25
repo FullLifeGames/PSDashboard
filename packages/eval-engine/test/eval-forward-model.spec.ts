@@ -527,3 +527,55 @@ describe('concealed trapping (Magnet Pull family)', () => {
     expect(result.perSide.p2.some(option => option.choice.startsWith('switch'))).toBe(false);
   });
 });
+
+describe('the child names the replacements the static pick made', () => {
+  const rockedBench = (names: string[]): Battle => {
+    const battle = makeBattle(
+      [makeSet('Electrode', 'Electrode', ['Explosion']), ...names.map(name => makeSet(name, name, ['Protect']))],
+      [makeSet('Snorlax', 'Snorlax', ['Protect', 'Substitute'])],
+    );
+    battle.sides[0].addSideCondition('stealthrock', battle.sides[1].active[0]!);
+    return battle;
+  };
+
+  test('a knock-out answered by the static pick names the body that came in', () => {
+    const battle = rockedBench(['Pichu', 'Blissey']);
+    battle.sides[0].pokemon[1].hp = 1;
+    const child = advancePosition(createRootPosition(serialize(battle)), 'move explosion', 'move substitute', '1,2,3,4');
+    expect(child.staticPicks).toEqual([{ p1: '→ Blissey' }]);
+  });
+
+  test('a replacement that dies on entry names it and the one after it', () => {
+    const battle = rockedBench(['Pichu', 'Magikarp']);
+    for (const bench of battle.sides[0].pokemon.slice(1)) bench.hp = 1;
+    const child = advancePosition(createRootPosition(serialize(battle)), 'move explosion', 'move substitute', '1,2,3,4');
+    expect(child.staticPicks).toHaveLength(2);
+    expect(child.staticPicks!.map(round => round.p1).sort()).toEqual(['→ Magikarp', '→ Pichu']);
+  });
+
+  test('a double knock-out in singles is one entry with both sides', () => {
+    const battle = makeBattle(
+      [makeSet('Electrode', 'Electrode', ['Explosion']), makeSet('Blissey', 'Blissey', ['Protect'])],
+      [makeSet('Pichu', 'Pichu', ['Splash'], 1), makeSet('Chansey', 'Chansey', ['Protect'])],
+    );
+    const child = advancePosition(createRootPosition(serialize(battle)), 'move explosion', 'move splash', '1,2,3,4');
+    expect(child.staticPicks).toEqual([{ p1: '→ Blissey', p2: '→ Chansey' }]);
+  });
+
+  test('a pivot names its replacement unless the row chose it', () => {
+    const battle = makeBattle(
+      [makeSet('Scizor', 'Scizor', ['U-turn']), makeSet('Pichu', 'Pichu', ['Protect']), makeSet('Blissey', 'Blissey', ['Protect'])],
+      [makeSet('Snorlax', 'Snorlax', ['Splash'])],
+    );
+    const root = createRootPosition(serialize(battle));
+    expect(advancePosition(root, 'move uturn', 'move splash', '1,2,3,4').staticPicks).toHaveLength(1);
+    expect(advancePosition(root, 'move uturn > switch 3', 'move splash', '1,2,3,4').staticPicks).toBeUndefined();
+  });
+
+  test('a turn without a replacement carries none', () => {
+    const root = createRootPosition(serialize(rockedBench(['Pichu'])));
+    expect(advancePosition(root, 'move explosion', 'move substitute', '1,2,3,4').staticPicks).toBeDefined();
+    const quiet = makeBattle([makeSet('Snorlax', 'Snorlax', ['Protect'])], [makeSet('Pikachu', 'Pikachu', ['Protect'])]);
+    expect(advancePosition(createRootPosition(serialize(quiet)), 'move protect', 'move protect', '1,2,3,4').staticPicks).toBeUndefined();
+  });
+});
