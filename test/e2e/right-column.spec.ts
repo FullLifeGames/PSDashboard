@@ -65,6 +65,7 @@ for (const scene of SCENES) {
       await expect(page.locator('.ps-branch-bar input[type="range"]')).toBeVisible({ timeout: 30_000 });
       await page.locator('.ps-branch-bar input[type="range"]').fill(String(scene.turn));
       await expect(page.getByText(`T${scene.turn}/`)).toBeVisible();
+      await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 30_000 });
     }
     await expect(page.locator('.ps-main-right > .ps-stats-panel .ps-stats-pokemon').first()).toBeVisible({ timeout: 30_000 });
     await page.addStyleTag({ content: `.ps-main-right > .ps-eval-panel { min-height: ${TALL_EVALUATION}px; }` });
