@@ -437,3 +437,32 @@ describe('a Protective Pads the log tells is built', () => {
     expect(buildTeamsFromReplay(draft).p1Team.find(set => set.species === 'Quaquaval')?.item).toBe('Protective Pads');
   });
 });
+
+describe('the default ability is one the format allows', () => {
+  const log = (kind: 'singles' | 'doubles', tier: string) => [
+    `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', `|tier|${tier}`, '|poke|p1|Blissey, F|', '|poke|p1|Chansey, F|', '|poke|p2|Garchomp, F|', '|start',
+    '|switch|p1a: Blissey|Blissey, F|100/100', ...(kind === 'doubles' ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+    '|switch|p2a: Garchomp|Garchomp, F|100/100', ...(kind === 'doubles' ? ['|switch|p2b: Blissey|Blissey, F|100/100'] : []),
+    '|turn|1', '|move|p2a: Garchomp|Earthquake|p1a: Blissey', '|-damage|p1a: Blissey|60/100', '|turn|2',
+  ].join('\n');
+  const garchomp = (text: string) => buildTeamsFromReplay(text).p2Team.find(set => set.species === 'Garchomp')?.ability;
+
+  test('singles: a silent Garchomp of a Gen 9 OU game plays Rough Skin, the format bans Sand Veil', () => {
+    expect(garchomp(log('singles', '[Gen 9] OU'))).toBe('Rough Skin');
+  });
+
+  test('doubles: a silent Garchomp of a Doubles OU game plays Rough Skin', () => {
+    expect(garchomp(log('doubles', '[Gen 9] Doubles OU'))).toBe('Rough Skin');
+  });
+
+  test('the draft game: a silent Garchomp plays Rough Skin through the Evasion Abilities Clause of its rule lines', () => {
+    const draft = readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.txt', import.meta.url), 'utf8');
+    expect(draft).toMatch(/^\|rule\|Evasion Abilities Clause/m);
+    const text = draft.replace('|start', '|poke|p2|Garchomp, F|\n|start');
+    expect(garchomp(text)).toBe('Rough Skin');
+  });
+
+  test('a Custom Game without rule lines keeps Sand Veil', () => {
+    expect(garchomp(log('singles', '[Gen 9] Custom Game'))).toBe('Sand Veil');
+  });
+});

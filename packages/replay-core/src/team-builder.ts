@@ -14,8 +14,8 @@ import {
   selectCuratedFor, USAGE_MOVE_POOL, usageMoveTail,
 } from './team/set-resolvers.ts';
 import { itemClauseLimit, resolveInferredItems, speedKnowledgeFor } from './team/inferred-items.ts';
-import { abilitiesAreFree, dexLegalSet, type LegalityContext } from './team/dex-legal.ts';
-import { dexOf, formatRules, logRules, type GameRules } from './rules-dex.ts';
+import { abilitiesAreFree, dexLegalSet, formatAbilityBans, type LegalityContext } from './team/dex-legal.ts';
+import { dexOf, formatRules, logRules } from './rules-dex.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
 import type { DamageObservation, HiddenPowerEvidence, OpponentTeamInfo, RevealedPokemonInfo, SpeedOrderObservation } from './types.ts';
 import { toId } from './ids.ts';
@@ -90,7 +90,7 @@ function buildTeams(log: string, options: BuildOptions): { teams: BuiltTeams; in
   // Champions counts Stat Points (32 per stat, 66 total) with every IV at 31: legalizeEvs converts EV-scale guesses.
   const budget = evBudget(formatHint);
   const champions = budget.statPoints;
-  const legality = { ...logRules(log), freeAbilities: abilitiesAreFree(log) };
+  const legality = { ...logRules(log), freeAbilities: abilitiesAreFree(log), bannedAbilities: formatAbilityBans(log) };
   const legalize = (team: PokemonSet[]): PokemonSet[] =>
     (champions ? team.map(set => ({ ...set, evs: legalizeEvs(set.evs, formatHint), ivs: { ...ALL_31_IVS } })) : team)
       .map(set => dexLegalSet(withHappinessAssumption(set), legality));
@@ -211,7 +211,7 @@ type HiddenPowerTyping = (set: PokemonSet) => PokemonSet;
 interface SetContext {
   hpTyped: HiddenPowerTyping;
   tellItem: string;
-  rules: GameRules;
+  rules: LegalityContext;
   budget: EvBudget;
 }
 
@@ -221,7 +221,7 @@ function buildSet(
   usageStats?: SmogonUsageStats | null,
   setAssumptions?: SmogonSetAssumptions | null,
   inferred?: SpreadCandidate,
-  { hpTyped, tellItem, rules, budget }: SetContext = { hpTyped: set => set, tellItem: '', rules: { gen: 9, mod: undefined }, budget: evBudget('') },
+  { hpTyped, tellItem, rules, budget }: SetContext = { hpTyped: set => set, tellItem: '', rules: { gen: 9, mod: undefined, freeAbilities: false }, budget: evBudget('') },
 ): PokemonSet {
   const edited = editedFields(info);
   const userMatch = findUserMatch(userTeam, info.species);
@@ -243,7 +243,7 @@ function buildSet(
     name: info.species,
     species: info.species,
     item,
-    ability: resolveAbility(dexOf(rules), info, curated, usageSet, smogonSet),
+    ability: resolveAbility(dexOf(rules), info, curated, usageSet, smogonSet, rules.bannedAbilities),
     moves: moves.length > 0 ? moves : ['Tackle'],
     nature: spread.nature,
     evs: spread.evs,
