@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
@@ -69,6 +70,30 @@ describe('Life Orb shows its recoil on every hit', () => {
     const log = boom('Expert Belt');
     expect(log).toMatch(/\|faint\|p2a: Electrode/);
     expect(ruledOut(log, 'Electrode')).not.toContain('lifeorb');
+  });
+});
+
+describe('Throat Spray shows its boost after a damaging sound move', () => {
+  const exploud = (item: string) => [set('Exploud', item, 'Scrappy', ['Hyper Voice', 'Protect'], 50)];
+
+  test('singles: a hit with a sound move and no spray line rules Throat Spray out', () => {
+    expect(shown(play([wall()], exploud('Throat Spray'), [['move recover', 'move hypervoice']]), 'Throat Spray')).toBe(true);
+    const log = play([wall()], exploud('Expert Belt'), [['move recover', 'move hypervoice']]);
+    expect(ruledOut(log, 'Exploud')).toContain('throatspray');
+  });
+
+  test('doubles: a spread sound move and no spray line rules Throat Spray out', () => {
+    const p1 = [wall(), set('Blissey', '', 'Natural Cure', ['Soft-Boiled'])];
+    const p2 = (item: string) => [exploud(item)[0], set('Talonflame', '', 'Gale Wings', ['Roost'])];
+    const turn: [string, string] = ['move recover, move softboiled', 'move hypervoice, move roost'];
+    expect(shown(play(p1, p2('Throat Spray'), [turn], true), 'Throat Spray')).toBe(true);
+    expect(ruledOut(play(p1, p2('Expert Belt'), [turn], true), 'Exploud')).toContain('throatspray');
+  });
+
+  test('doubles, a Doubles OU game where a spread Hyper Voice printed no spray line: Ursaluna is not holding it', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../../../test/e2e-feedback/fixtures/smogtours-gen9doublesou-912045.json', import.meta.url), 'utf8')) as { log: string };
+    const ursaluna = inferOpponentTeam(fixture.log, 'p1').pokemon.find(mon => mon.species.startsWith('Ursaluna'));
+    expect(ursaluna?.ruledOut?.items).toContain('throatspray');
   });
 });
 

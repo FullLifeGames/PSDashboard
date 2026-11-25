@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildTeamsFromReplay, inferOpponentTeam } from '../src/index';
 import type { RevealedPokemonInfo, DamageObservation } from '../src/types';
@@ -377,5 +378,34 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect([find(built.p1Team, 'Garchomp').evs.hp, find(built.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
     expect([find(oneStage.p1Team, 'Garchomp').evs.hp, find(oneStage.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThan(speedOf(find(built.p1Team, 'Garchomp')));
+  });
+});
+
+describe('a Throat Spray the log never showed is not built', () => {
+  const stats = (id: string, species: string): SmogonUsageStats => ({
+    format: 'gen9test', month: '2026-06', source: 'test',
+    pokemon: {
+      [id]: {
+        species, rawCount: 100, abilities: [], moves: [], spreads: [],
+        items: [{ value: 'Throat Spray', probability: 0.6, sourceDetail: 'test' }, { value: 'Assault Vest', probability: 0.3, sourceDetail: 'test' }],
+      },
+    },
+  });
+
+  test('singles: Exploud used Hyper Voice into Blissey and no spray line followed', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Blissey, F|', '|poke|p2|Exploud, M|', '|start',
+      '|switch|p1a: Blissey|Blissey, F|100/100', '|switch|p2a: Exploud|Exploud, M|100/100', '|turn|1',
+      '|move|p2a: Exploud|Hyper Voice|p1a: Blissey', '|-damage|p1a: Blissey|70/100',
+      '|move|p1a: Blissey|Soft-Boiled|p1a: Blissey', '|-heal|p1a: Blissey|100/100|[from] move: Soft-Boiled', '|turn|2',
+    ].join('\n');
+    const exploud = buildTeamsFromReplay(log, { usageStats: stats('exploud', 'Exploud') }).p2Team.find(set => set.species === 'Exploud');
+    expect(exploud?.item).toBe('Assault Vest');
+  });
+
+  test('doubles: Ursaluna-Bloodmoon used a spread Hyper Voice and no spray line followed', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../../../test/e2e-feedback/fixtures/smogtours-gen9doublesou-912045.json', import.meta.url), 'utf8')) as { log: string };
+    const ursaluna = buildTeamsFromReplay(fixture.log, { usageStats: stats('ursalunabloodmoon', 'Ursaluna-Bloodmoon') }).p1Team.find(set => set.species.startsWith('Ursaluna'));
+    expect(ursaluna?.item).toBe('Assault Vest');
   });
 });

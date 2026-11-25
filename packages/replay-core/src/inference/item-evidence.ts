@@ -5,6 +5,7 @@ import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line.ts';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
+import { spendsAfterOwnMove, spentAfterOwnMove, type SelfItem } from './spent-items.ts';
 
 // Design: EVALUATION.md "Rule-outs".
 
@@ -108,12 +109,10 @@ export function ruleOutUnknown(state: InferrerState, key: string, itemId: string
   ruleOut(state, nickname, 'items', itemId);
 }
 
-type ItemHandler = (this: never, ...args: never[]) => unknown;
-
 // Gen 4 arms Life Orb in `onBasePower`, which fixed-damage and one-hit KO moves never run; from Gen 5
 // `onAfterMoveSecondarySelf` decides, on stubs (Gens 5 and 6 skip one-hit KO moves). A failing handler proves nothing.
 function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']>): boolean {
-  const lifeOrb = dex.items.get('lifeorb') as { onBasePower?: unknown; onAfterMoveSecondarySelf?: ItemHandler };
+  const lifeOrb = dex.items.get('lifeorb') as SelfItem & { onBasePower?: unknown };
   if (lifeOrb.onBasePower) return !move.damage && !move.damageCallback && !move.ohko;
   let recoil = false;
   try {
@@ -125,14 +124,19 @@ function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']
   return recoil;
 }
 
+// The gates the simulator reads before a move's own item acts: Klutz, Magic Room, Embargo, and Sheer Force on a move
+// with secondaries (`suppressingSecondaries`).
+function ownItemActs(state: InferrerState, watch: ItemWatch, action: ActionWatch, move: ReturnType<RulesDex['moves']['get']>): boolean {
+  const abilities = possibleAbilities(state, action.ident);
+  if (!abilities || abilities.has('klutz') || (abilities.has('sheerforce') && move.secondaries)) return false;
+  return !watch.magicRoom && !watch.embargoed.has(action.attacker);
+}
+
 function lifeOrbWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = dexOf(state);
   const move = dex.moves.get(action.move);
   if (!move.exists || move.category === 'Status' || move.flags.futuremove || !lifeOrbRecoils(dex, move)) return false;
-  const abilities = possibleAbilities(state, action.ident);
-  if (!abilities || abilities.has('magicguard') || abilities.has('klutz')) return false;
-  if (abilities.has('sheerforce') && move.secondaries) return false;
-  return !watch.magicRoom && !watch.embargoed.has(action.attacker);
+  return possibleAbilities(state, action.ident)?.has('magicguard') === false && ownItemActs(state, watch, action, move);
 }
 
 // The simulator heals an eighth of the damage after the move (`onAfterMoveSecondarySelf`, Gens 3 to 9).
@@ -142,9 +146,7 @@ function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: Acti
   const move = dex.moves.get(action.move);
   if (!bell.exists || bell.gen > state.gen || !move.exists || move.category === 'Status') return false;
   if (!belowFull(watch.hp.get(action.attacker))) return false;
-  const abilities = possibleAbilities(state, action.ident);
-  if (!abilities || abilities.has('klutz') || (abilities.has('sheerforce') && move.secondaries)) return false;
-  return !watch.magicRoom && !watch.embargoed.has(action.attacker) && !watch.healBlocked.has(action.attacker);
+  return ownItemActs(state, watch, action, move) && !watch.healBlocked.has(action.attacker);
 }
 
 /** Whether a move makes contact with `heldItem`: Punching Glove, then `checkMoveMakesContact`; doubt reads as no. */
@@ -174,7 +176,17 @@ function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionW
   return !!abilities && !abilities.has('magicguard') && !abilities.has('longreach') && !watch.magicRoom;
 }
 
+function judgeSpentItems(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
+  const dex = dexOf(state);
+  const move = dex.moves.get(action.move);
+  if (!move.exists || move.category === 'Status' || move.flags.futuremove || !ownItemActs(state, watch, action, move)) return;
+  for (const id of spentAfterOwnMove(dex)) {
+    if (!action.shown.has(`${action.attacker}|${id}`) && spendsAfterOwnMove(dex, id, move.name)) ruleOutUnknown(state, action.attacker, id);
+  }
+}
+
 function judgeAttacker(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
+  judgeSpentItems(state, watch, action);
   if (!action.shown.has(`${action.attacker}|lifeorb`) && lifeOrbWouldShow(state, watch, action)) {
     ruleOutUnknown(state, action.attacker, 'lifeorb');
   }
