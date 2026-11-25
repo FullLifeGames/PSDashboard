@@ -13,6 +13,8 @@ await loadSimMods('gen9championscustomgame');
 
 const CASES = SWEEPS_FULL ? SWEEP_CASES : SWEEP_CASES.filter(({ name }) => ['Gen 9 singles', 'Gen 9 doubles', 'Champions singles', 'Champions doubles'].includes(name));
 
+const drainsAtEndOfTurn = (generation: number): boolean => generation >= 3;
+
 const ALWAYS = ['substitute', 'futuremove', 'tox', 'leechseed', 'slp', 'confusion'];
 
 type Kind = 'volatile' | 'side' | 'slot' | 'field' | 'weather' | 'terrain' | 'status';
@@ -149,8 +151,7 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     }
     expect(counts.rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    // Gens 1 and 2 drain poison, burn and Leech Seed in `onAfterMoveSelf`, not at the end of turn (mods gen1/gen2).
-    if (rules.generation >= 3) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
+    if (drainsAtEndOfTurn(rules.generation)) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
   });
 
   test('the state of every ability and item a body holds, at two values', () => {

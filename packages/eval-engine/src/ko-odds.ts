@@ -61,8 +61,7 @@ function accuracyStageMultiplier(stages: number): number {
 }
 
 export function critRate(gen: number, critRatio: number): number | null {
-  // Stage 0 or 1 only (the move's own ratio); higher effective stages
-  // (Super Luck, Scope Lens, focus energy) fail closed at the call site.
+  // Stage 0 or 1 only; higher stages (Super Luck, Scope Lens, focus energy) fail closed at the call site.
   const stage = Math.max(0, Math.min(1, (critRatio || 1) - 1));
   if (stage === 1) return 1 / 8;
   return gen >= 7 ? 1 / 24 : 1 / 16;

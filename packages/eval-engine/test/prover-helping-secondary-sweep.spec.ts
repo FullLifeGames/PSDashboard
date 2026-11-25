@@ -66,7 +66,6 @@ function sameButStages(unfired: Battle, fired: Battle): boolean {
   return strip(unfired) === strip(fired);
 }
 
-// `boundaryEvent` prices 16 damage rolls and leaves Gens 1 and 2 (rolls 217 to 255) plain: every cell stays one class.
 const pricesBoundary = (generation: number): boolean => generation >= 3;
 
 const VGC_WITNESSES = ['focusblast', 'shadowball', 'psychic', 'crunch', 'ancientpower', 'chargebeam', 'fierydance', 'flamethrower'];
