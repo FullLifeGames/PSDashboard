@@ -97,13 +97,17 @@ function effectOf(line: LogLine): SceneEffect | null {
   return null;
 }
 
-// Not asked: a move with an `onModifyType` handler, a Z or Max move, any move under Electrify or Ion Deluge.
-function hitCauseOf(state: InferrerState, watch: BlockedWatch, target: string, effect: SceneEffect): { target: string; causes: Cause[]; unsure?: boolean } | null {
+export function moveTypeMayShift(state: InferrerState, moveName: string): boolean {
+  const move = dexOf(state).moves.get(moveName);
+  // A name whose id is another move's (typed Hidden Powers of older gens) is an alias the twin cannot select by name.
+  return !!state.blockedWatch?.typeShift || !!move.isZ || !!move.isMax || toId(moveName) !== move.id || Object.keys(move).some(key => /^on\w*ModifyType/.test(key));
+}
+
+function hitCauseOf(state: InferrerState, target: string, effect: SceneEffect): { target: string; causes: Cause[]; unsure?: boolean } | null {
   const pending = state.pendingMove;
   const move = pending ? dexOf(state).moves.get(pending.moveName) : null;
   if (!pending || !move?.exists || move.category === 'Status') return null;
-  // A name whose id is another move's (typed Hidden Powers of older gens) is an alias the twin cannot select by name.
-  const open = watch.typeShift || !!move.isZ || !!move.isMax || toId(pending.moveName) !== move.id || Object.keys(move).some(key => /^on\w*ModifyType/.test(key));
+  const open = moveTypeMayShift(state, pending.moveName);
   return { target, causes: open ? [] : [{ source: pending.attacker, effect, route: 'primary', move: move.id }], unsure: open };
 }
 
@@ -113,7 +117,7 @@ function causesOf(state: InferrerState, watch: BlockedWatch, line: LogLine): { t
   const from = fromEffect(line);
   const effect = effectOf(line);
   if (!target || !effect || (hasKw(line, 'from') && from.type !== 'move')) return null;
-  if (effect.kind === 'hit') return hitCauseOf(state, watch, target, effect);
+  if (effect.kind === 'hit') return hitCauseOf(state, target, effect);
   if (effect.id === 'flinch') {
     const hits = watch.hitBy.get(keyOf(target)) ?? [];
     return { target, causes: hits.map(hit => ({ source: hit.attacker, effect, route: 'secondary' as const, move: hit.move })) };

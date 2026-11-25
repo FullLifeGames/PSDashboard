@@ -172,6 +172,31 @@ describe('Sitrus Berry is eaten at half HP', () => {
   });
 });
 
+describe('Weakness Policy is spent by a super-effective hit', () => {
+  const fighter = { moves: ['Close Combat', 'Dragon Claw', 'Splash'] };
+
+  test.each(FORMATS)('%s: a super-effective hit without the item\'s line rules it out', format => {
+    expect(read({ attacker: fighter, turns: [hit('closecombat')] }, format, 'Weakness Policy')).toEqual({ shown: true, out: true });
+  });
+
+  test.each(FORMATS)('%s: a neutral hit judges nothing', format => {
+    expect(read({ attacker: fighter, turns: [hit('dragonclaw')] }, format, 'Weakness Policy')).toEqual({ shown: false, out: false });
+  });
+
+  test('doubles: a spread move super-effective on one of two holders rules out the item of that one only', () => {
+    const scene: Scene = {
+      attacker: { moves: ['Rock Slide', 'Splash'], level: 30 }, holder: set('Charizard', 'Leftovers', 'Blaze', ['Splash']),
+      mate: set('Chansey', 'Weakness Policy', 'Natural Cure', ['Splash']), turns: [[mv('rockslide'), mv('splash')]],
+    };
+    const real = play(scene, 'doubles', 'Weakness Policy');
+    expect(real).toMatch(/\|-enditem\|p2a: Charizard\|Weakness Policy/);
+    expect(real).not.toMatch(/\|-enditem\|p2b: Chansey\|Weakness Policy/);
+    const mixed = play({ ...scene, mate: set('Chansey', 'Weakness Policy', 'Natural Cure', ['Splash']) }, 'doubles', NEUTRAL);
+    expect(ruledOut(mixed, 'Charizard')).toContain('weaknesspolicy');
+    expect(ruledOut(mixed, 'Chansey')).not.toContain('weaknesspolicy');
+  });
+});
+
 describe('the shown HP bounds the real HP, so Sitrus Berry is judged only where rounding cannot hide it', () => {
   const mod = championsMod as unknown as NonNullable<Parameters<typeof Dex.mod>[1]>;
   Dex.mod('champions', mod);
