@@ -116,7 +116,7 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     }
     expect(counts.rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    if (rules.generation >= 4) expect(counts.hitSplit).toBeGreaterThan(0);
+    expect(counts.hitSplit).toBeGreaterThan(0);
     expect([...fired].filter(event => !RESIDUAL_EVENTS.has(event)).sort().join(' ')).toBe('');
   });
 
@@ -149,7 +149,8 @@ describe.each(CASES)('the effect states are keyed on $name', ({ rules, mode, nam
     }
     expect(counts.rows).toBeGreaterThan(0);
     expect(wrong).toEqual([]);
-    if (rules.generation >= 4) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
+    // Gens 1 and 2 drain poison, burn and Leech Seed in `onAfterMoveSelf`, not at the end of turn (mods gen1/gen2).
+    if (rules.generation >= 3) expect(counts.hitSplit + counts.residualSplit).toBeGreaterThan(0);
   });
 
   test('the state of every ability and item a body holds, at two values', () => {
