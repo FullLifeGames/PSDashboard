@@ -280,6 +280,7 @@ value regretText
 value releaseBrokenClaims
 value replacementRounds
 value replacementSpeciesOf
+value replacementWords
 value requiredChoicesForActiveSlots
 value resolveSideChoices
 value resolveTeraPreference

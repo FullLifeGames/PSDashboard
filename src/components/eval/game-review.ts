@@ -1,6 +1,6 @@
-import { lostGround, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
+import { lostGround, replacementWords, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
-import { activeNamesAt, lineBlocks, ranksOf, replacementWords, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
+import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
 import { cardLines, engineChoice, neverActedOf, neverActedText, regretView, rowValueTexts } from './turn-copy';
 
 

@@ -1,4 +1,4 @@
-import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type EvalResult, type LineChoice, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
+import { dieKey, dieLabel, replacementWords, winPctText, type DieKind, type DieWords, type EvalLine, type EvalResult, type LineChoice, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
@@ -186,8 +186,6 @@ function endNote(line: EvalLine, playerNames: [string, string]): string | null {
   const who = line.awaits === 'both' ? `${playerNames[0]} and ${playerNames[1]} send in their replacements` : `${playerNames[SIDE_INDEX[line.awaits]]} sends in a replacement`;
   return `The line stops before ${who}. Its end is the board before the switch-in.`;
 }
-
-export const replacementWords = (label: string): string => label.replace(/ \+ pass$/, '').replace(/^pass \+ /, '');
 
 const roleText = (line: EvalLine, neverActed = false): string => {
   if (neverActed) return line.for.includes('engine') ? `engine: ${line.label}` : `staying in: ${line.label}`;

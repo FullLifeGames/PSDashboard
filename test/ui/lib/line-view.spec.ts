@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { DIE_KINDS, winPctText, type EvalLine, type ForcedDie, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
-import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, replacementWords, type LineViewContext } from '../../../src/lib/line-view';
+import { LINE_DIFFERS_SENTENCE, LINE_PROVEN_SENTENCE, differsSentences, lineBlocks, type LineViewContext } from '../../../src/lib/line-view';
 import { bothRolesLine, doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 const singles: LineViewContext = { turn: 20, playerNames: SINGLES_NAMES, doubles: false, rules: { gen: 9, mod: undefined } };
@@ -387,10 +387,5 @@ describe('a replacement names the bodies that come in, not the slot that passes'
   test('the row of the Lines section', () => {
     const [block] = lineBlocks([withPass], doubles);
     expect(block.rows[2].sides[0].text).toBe('replaces: → Zamazenta-Crowned');
-  });
-
-  test('both orders, and a label with no pass is unchanged', () => {
-    expect(replacementWords('pass + → Zamazenta-Crowned')).toBe('→ Zamazenta-Crowned');
-    expect(replacementWords('→ A + → B')).toBe('→ A + → B');
   });
 });

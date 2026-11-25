@@ -1,14 +1,12 @@
 import type { EvalResult, LineStep, RankedChoice } from '@fulllifegames/eval-engine';
 import { linesForMode, pivotMove } from './worst-reply';
-import { replacementWords } from './line-view';
 
 
 type Side = 'p1' | 'p2';
-type Step = { p1: string; p2: string };
+type Step = { p1: string; p2: string; replacement?: 'p1' | 'p2' | 'both' };
 
-const labelsOf = (step: LineStep): Step => step.replacement
-  ? { p1: replacementWords(step.p1.label), p2: replacementWords(step.p2.label) }
-  : { p1: step.p1.label, p2: step.p2.label };
+const labelsOf = (step: LineStep): Step =>
+  ({ p1: step.p1.label, p2: step.p2.label, ...(step.replacement ? { replacement: step.replacement } : {}) });
 
 // Reads the engine's line the Lines section shows for the row (the same `linesForMode`, so Hard mode swaps both); a
 // result without lines keeps the row's own line. A row that waits shows none.

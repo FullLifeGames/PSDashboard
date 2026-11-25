@@ -4,7 +4,7 @@ import type { PokemonSet } from '@pkmn/sim';
 import { createRootPosition, legalChoices } from '../src/forward-model';
 import { analyzeTurn } from '../src/analysis';
 import { summarizeTurn } from '../src/summary';
-import { formatLine } from '../src/prose/line';
+import { formatLine, replacementWords } from '../src/prose/line';
 import type { EvalResult, RankedChoice } from '../src/types';
 
 describe('main lines without the waiting placeholder', () => {
@@ -65,5 +65,35 @@ describe('main lines without the waiting placeholder', () => {
     expect(summary).toContain('switching to Tyranitar');
     expect(summary).toContain(', then → Keldeo.');
     expect(summary).not.toContain('(waiting)');
+  });
+});
+
+describe('a replacement step', () => {
+  test('singles: it reads "replaces:" and joins the next step with a comma', () => {
+    expect(formatLine([
+      { p1: '(waiting)', p2: '→ Dragonite', replacement: 'p2' },
+      { p1: 'Power Gem', p2: 'Dragon Dance' },
+    ])).toBe('replaces: → Dragonite, Power Gem · Dragon Dance');
+  });
+
+  test('a step before it joins with the arrow, a step without the flag keeps the arrow form', () => {
+    expect(formatLine([
+      { p1: 'Earthquake', p2: 'Protect' },
+      { p1: '→ Keldeo', p2: '(waiting)', replacement: 'p1' },
+      { p1: 'Hydro Pump', p2: 'Scald' },
+      { p1: '(waiting)', p2: '→ Muk-Alola' },
+    ])).toBe('Earthquake · Protect → replaces: → Keldeo, Hydro Pump · Scald → → Muk-Alola');
+  });
+
+  test('doubles: the slot that passes drops, and both sides read side by side', () => {
+    expect(formatLine([{ p1: '(waiting)', p2: 'pass + → Zamazenta-Crowned', replacement: 'p2' }, { p1: 'Protect + Protect', p2: 'Tailwind + Protect' }]))
+      .toBe('replaces: → Zamazenta-Crowned, Protect + Protect · Tailwind + Protect');
+    expect(formatLine([{ p1: '→ Rillaboom + pass', p2: '→ Amoonguss + → Incineroar', replacement: 'both' }]))
+      .toBe('replaces: → Rillaboom · → Amoonguss + → Incineroar');
+  });
+
+  test('both orders of a passing slot, and a label with no pass is unchanged', () => {
+    expect(replacementWords('pass + → Zamazenta-Crowned')).toBe('→ Zamazenta-Crowned');
+    expect(replacementWords('→ A + → B')).toBe('→ A + → B');
   });
 });

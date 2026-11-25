@@ -29,7 +29,7 @@ describe('rowLineTail', () => {
       step('Flare Blitz → Rillaboom + Rage Powder', 'Taunt → Amoonguss + Wood Hammer → Incineroar'),
     ]);
     const tail = rowLineTail(evalResult('doubles', { lines: [line] }), 'p1', best, false);
-    expect(tail && formatLine(tail)).toBe('→ Zamazenta → Flare Blitz → Rillaboom + Rage Powder · Taunt → Amoonguss + Wood Hammer → Incineroar');
+    expect(tail && formatLine(tail)).toBe('replaces: → Zamazenta, Flare Blitz → Rillaboom + Rage Powder · Taunt → Amoonguss + Wood Hammer → Incineroar');
   });
 
   test('a pivot row (the move and the body it brings in) skips the line\'s replacement step: the label shows it already', () => {
@@ -90,6 +90,14 @@ describe('rowLineTail', () => {
     const result = evalResult('doubles', { lines });
     expect(rowLineTail(result, 'p1', wait, false)).toEqual([]);
     expect(formatLine(rowLineTail(result, 'p2', choosing, false)!)).toBe('Protect + Protect · Tailwind + Protect');
+  });
+
+  test('a result without lines whose row line crosses a replacement: the matrix line reads it as the Lines section does', () => {
+    const crossing = rankedChoice('switch 4', '→ Iron Valiant', 0.3, {
+      line: [{ p1: '(waiting)', p2: '→ Dragonite', replacement: 'p2' }, { p1: 'Power Gem', p2: 'Dragon Dance' }],
+    });
+    const tail = rowLineTail(evalResult('singles'), 'p2', crossing, false);
+    expect(tail && formatLine(tail)).toBe('replaces: → Dragonite, Power Gem · Dragon Dance');
   });
 
   test('a result without lines (singles at depth 2): the waiting row shows no tail, a normal row keeps its line', () => {
