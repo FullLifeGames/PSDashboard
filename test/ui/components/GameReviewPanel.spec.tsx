@@ -113,10 +113,10 @@ describe('GameReviewPanel, doubles', () => {
     expect(screen.getByText('engine line:')).toBeInTheDocument();
   });
 
-  test('a line that ends on a switch nobody chose says why under its row', () => {
+  test('a line that stops before a replacement says why under its row', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
     render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [{ ...doublesLine, awaits: 'p1' }])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
-    expect(screen.getByText(`The line ends where ${DOUBLES_NAMES[0]} must choose who to send in; the search made no choice there.`)).toBeInTheDocument();
+    expect(screen.getByText(`The line stops before ${DOUBLES_NAMES[0]} sends in a replacement. Its end is the board before the switch-in.`)).toBeInTheDocument();
   });
 });
 

@@ -129,10 +129,10 @@ describe('LinesSection', () => {
   });
 });
 
-describe('a line that ends on a switch nobody chose', () => {
+describe('a line that stops before a replacement', () => {
   test.each([['singles', singlesLine, SINGLES_NAMES, false], ['doubles', doublesLine, DOUBLES_NAMES, true]] as const)('%s: the block says why it stops', (kind, line, names, doubles) => {
     render(<LinesSection turn={5} result={{ ...withLines([{ ...line, awaits: 'p1' }]), ...(doubles ? { kind: 'doubles' } : {}) } as EvalResult} playerNames={names} doubles={doubles} host={host()} />);
-    expect(screen.getByText(`The line ends where ${names[0]} must choose who to send in; the search made no choice there.`)).toBeInTheDocument();
+    expect(screen.getByText(`The line stops before ${names[0]} sends in a replacement. Its end is the board before the switch-in.`)).toBeInTheDocument();
   });
 });
 

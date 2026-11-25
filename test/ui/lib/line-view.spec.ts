@@ -185,12 +185,12 @@ describe('the note under a line names what the click cannot force', () => {
 });
 
 describe('why a line ends', () => {
-  test('a line whose last position asks a player who to send in says so, with the player\'s name (singles and doubles)', () => {
+  test('a line that stops at an open replacement says so and names its end, with the player\'s name (singles and doubles)', () => {
     const [single] = lineBlocks([{ ...singlesLine, awaits: 'p1' }], singles);
-    expect(single.endNote).toBe(`The line ends where ${SINGLES_NAMES[0]} must choose who to send in; the search made no choice there.`);
+    expect(single.endNote).toBe(`The line stops before ${SINGLES_NAMES[0]} sends in a replacement. Its end is the board before the switch-in.`);
     const [pair] = lineBlocks([{ ...doublesLine, awaits: 'p2' }], doubles);
-    expect(pair.endNote).toBe(`The line ends where ${DOUBLES_NAMES[1]} must choose who to send in; the search made no choice there.`);
-    expect(lineBlocks([{ ...singlesLine, awaits: 'both' }], singles)[0].endNote).toBe(`The line ends where ${SINGLES_NAMES[0]} and ${SINGLES_NAMES[1]} must choose who to send in; the search made no choice there.`);
+    expect(pair.endNote).toBe(`The line stops before ${DOUBLES_NAMES[1]} sends in a replacement. Its end is the board before the switch-in.`);
+    expect(lineBlocks([{ ...singlesLine, awaits: 'both' }], singles)[0].endNote).toBe(`The line stops before ${SINGLES_NAMES[0]} and ${SINGLES_NAMES[1]} send in their replacements. Its end is the board before the switch-in.`);
   });
 
   test('a line that ends for another reason has no such note', () => {

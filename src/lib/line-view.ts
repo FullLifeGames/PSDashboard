@@ -183,8 +183,8 @@ function unforcedNote(line: EvalLine): string | null {
 
 function endNote(line: EvalLine, playerNames: [string, string]): string | null {
   if (!line.awaits) return null;
-  const who = line.awaits === 'both' ? `${playerNames[0]} and ${playerNames[1]}` : playerNames[SIDE_INDEX[line.awaits]];
-  return `The line ends where ${who} must choose who to send in; the search made no choice there.`;
+  const who = line.awaits === 'both' ? `${playerNames[0]} and ${playerNames[1]} send in their replacements` : `${playerNames[SIDE_INDEX[line.awaits]]} sends in a replacement`;
+  return `The line stops before ${who}. Its end is the board before the switch-in.`;
 }
 
 export const replacementWords = (label: string): string => label.replace(/ \+ pass$/, '').replace(/^pass \+ /, '');
