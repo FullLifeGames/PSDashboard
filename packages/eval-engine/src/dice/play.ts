@@ -21,6 +21,8 @@ export interface ForcedTurnInput {
   /** Every draw of the real turn with the answer the turn took (a forced die's answer, not the stream's value). */
   observe?: (from: number | undefined, to: number | undefined, value: number) => void;
   onDraw?: (name: DieName, value: number, draw: Draw) => void;
+  /** Filled with `BattleWatch.aimed` once the real turn is played. */
+  aimed?: Map<string, string>;
 }
 
 class ObservedForcedPRNG extends ForcedDicePRNG {
@@ -120,8 +122,8 @@ function checkPolarities(live: Battle, forced: readonly ForcedDie[]): Map<string
 }
 
 /** Plays `play` twice: the natural turn on a copy, then the real turn on the live battle with the forced dice. */
-export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTurnInput): DiceReport {
-  if (forced.length === 0 && !observe && !onDraw) {
+export function playForcedTurn({ live, forced, play, observe, onDraw, aimed }: ForcedTurnInput): DiceReport {
+  if (forced.length === 0 && !observe && !onDraw && !aimed) {
     play(live);
     return { forced: [], naturalEndSeed: String(live.prng.getSeed()) };
   }
@@ -141,6 +143,7 @@ export function playForcedTurn({ live, forced, play, observe, onDraw }: ForcedTu
     watch.uninstall();
     live.prng = inner;
   }
+  if (aimed) for (const [key, target] of watch.aimed) aimed.set(key, target);
   inner.setSeed(natural.endSeed as Parameters<PRNG['setSeed']>[0]);
   // The next turn's roll came from a stream the forced die may have moved: the natural one stands.
   if (natural.startRoll !== undefined) (live as unknown as StartRoll).quickClawRoll = natural.startRoll;

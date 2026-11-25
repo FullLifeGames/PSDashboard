@@ -162,3 +162,92 @@ describe('the scene rows: which line carries the note', () => {
     expect(turn.unforced).toContain('random-target');
   });
 });
+
+const WRITES_TARGET = /\bmove\.target\s*=[^=]/;
+
+function writersOf(rules: Rules): string[] {
+  const dex = dexOfRules(rules);
+  const entries: [string, object][] = [
+    ...dex.moves.all().filter(entry => entry.exists).map(entry => [`move ${entry.id}`, entry] as [string, object]),
+    ...dex.abilities.all().filter(entry => entry.exists).map(entry => [`ability ${entry.id}`, entry] as [string, object]),
+    ...dex.items.all().filter(entry => entry.exists).map(entry => [`item ${entry.id}`, entry] as [string, object]),
+    ...Object.entries(dex.data.Conditions ?? {}).map(([id, entry]) => [`condition ${id}`, entry as object] as [string, object]),
+  ];
+  const found = new Set<string>();
+  for (const [name, entry] of entries) {
+    const holders = [entry, (entry as { condition?: object }).condition ?? {}];
+    if (holders.some(holder => Object.values(holder).some(value => typeof value === 'function' && WRITES_TARGET.test(String(value))))) found.add(name);
+  }
+  return [...found].sort();
+}
+
+const VARIANTS = [
+  { name: 'a plain user', species: 'Snorlax', terrain: false },
+  { name: 'a Ghost user', species: 'Gengar', terrain: false },
+  { name: 'Terapagos-Stellar', species: 'Terapagos-Stellar', terrain: false },
+  { name: 'a grounded user on Psychic Terrain', species: 'Snorlax', terrain: true },
+];
+
+function variantScene(input: { rules: Rules; mode: Mode; vgc: boolean }, moveId: string, variant: typeof VARIANTS[number]): Scene[] {
+  const { rules, mode, vgc } = input;
+  const dex = dexOfRules(rules);
+  if (!dex.species.get(variant.species).exists || dex.species.get(variant.species).gen > dex.gen) return [];
+  const scenes: Scene[] = [];
+  for (const aim of ['move 1', 'move 1 1']) {
+    const board = pickBoard({ rules, mode, vgc, attacker: variant.terrain ? [moveId, 'psychicterrain'] : [moveId], attackerSpecies: variant.species });
+    if (variant.terrain) {
+      const opening = pickClicks(mode, 'move 2');
+      if (!clicksAccepted(board, opening)) return [];
+      playClicks(board, opening);
+    }
+    const clicks = pickClicks(mode, aim);
+    if (clicksAccepted(board, clicks)) { scenes.push({ board, clicks }); break; }
+  }
+  if (!variant.terrain) {
+    for (const aim of ['move 1', 'move 1 1']) {
+      const bent = bentScene({ rules, mode, vgc, attackerSpecies: variant.species }, moveId, aim);
+      if (bent) { scenes.push(bent); break; }
+    }
+  }
+  return scenes;
+}
+
+describe('a move whose handlers change its own target: the note shows exactly when the sample changes the turn', () => {
+  const TRIGGERS = new Set(['move curse', 'move expandingforce', 'move terastarstorm']);
+
+  test.each(CASES)('the writers and their scenes in $name', ({ rules, mode, vgc }) => {
+    const dex = dexOfRules(rules);
+    const writers = writersOf(rules).filter(name => !name.startsWith('move ') || dex.moves.get(name.slice(5)).gen <= dex.gen);
+    expect(writers.filter(name => !TRIGGERS.has(name)), 'a handler that writes a target needs a user in VARIANTS').toEqual([]);
+    const problems: string[] = [];
+    let played = 0;
+    let shown = 0;
+    for (const name of writers) {
+      const moveId = name.slice(5);
+      for (const variant of VARIANTS) {
+        for (const scene of variantScene({ rules, mode, vgc }, moveId, variant)) {
+          const changes = sampleChanges(scene.board, scene.clicks, moveId);
+          if (changes === undefined) continue;
+          played++;
+          const turn = playLikeliestTurn(scene.board, battle => playClicks(battle, scene.clicks));
+          if (turn.unforced.includes('random-target')) shown++;
+          if (turn.unforced.includes('random-target') !== changes) problems.push(`${moveId} by ${variant.name}: the sample ${changes ? 'changes' : 'cannot change'} the turn, the note ${changes ? 'is missing' : 'shows'}`);
+        }
+      }
+    }
+    expect(problems).toEqual([]);
+    expect(played, 'the scenes of a writer are drawn').toBeGreaterThan(0);
+    expect(shown, 'a writer that aims at one body keeps the note').toBeGreaterThan(0);
+  });
+
+  test.each(SWEEP_CASES.filter(entry => entry.mode === 'singles'))('a singles click draws no random target for any of them: $name', ({ rules }) => {
+    for (const name of writersOf(rules).filter(entry => entry.startsWith('move '))) {
+      for (const variant of VARIANTS) {
+        for (const scene of variantScene({ rules, mode: 'singles', vgc: false }, name.slice(5), variant)) {
+          const turn = playLikeliestTurn(scene.board, battle => playClicks(battle, scene.clicks));
+          expect(turn.unforced, `${name} by ${variant.name}`).not.toContain('random-target');
+        }
+      }
+    }
+  });
+});

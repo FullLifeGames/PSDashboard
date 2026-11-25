@@ -1,5 +1,5 @@
 import type { Battle } from '@pkmn/sim';
-import type { SecondaryEntry } from './types.ts';
+import { dieKey, type SecondaryEntry } from './types.ts';
 
 // The watch wraps hooks and script calls as own properties and changes nothing (docs/adr/0002); uninstall() undoes it.
 // No `battle.onEvent` listeners: they join the speed sort and can draw a tie shuffle.
@@ -35,6 +35,8 @@ export interface AllyList {
 export interface BattleWatch {
   readonly battle: Battle;
   aim: { slot: string; moveId: string } | null;
+  /** The target the last `getRandomTarget` call of each random-target die key read from its move, drawn or not. */
+  readonly aimed: Map<string, string>;
   dragged: { slot: string } | null;
   allies: AllyList | null;
   readonly moves: Map<string, MoveSight>;
@@ -96,6 +98,7 @@ export function watchBattle(battle: Battle): BattleWatch {
   const watch: BattleWatch = {
     battle,
     aim: null,
+    aimed: new Map<string, string>(),
     dragged: null,
     moves: new Map<string, MoveSight>(),
     secondaries: null,
@@ -160,6 +163,7 @@ function watchPicks(
     const before = watch.aim;
     const slot = slotOf(args[0]);
     watch.aim = slot === undefined ? null : { slot, moveId: moveIdOf(args[1]) };
+    if (watch.aim) watch.aimed.set(dieKey({ ...watch.aim, kind: 'random-target' }), String((args[1] as { target?: string } | null)?.target));
     return () => { watch.aim = before; };
   }));
   wrap(watch.battle, 'getRandomSwitchable', scoped('getRandomSwitchable'));

@@ -122,6 +122,7 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
   const forced = new Map<string, LikeliestDie>();
   const skipped = new Map<string, DieName>();
   const draws = new Map<string, Draw>();
+  const aimed = new Map<string, string>();
   for (const die of orderDice(live, play)) forced.set(dieKey(die.die.name), die);
   for (const die of pinned) forced.set(dieKey(die.die.name), die);
   for (let round = 0; ; round++) {
@@ -131,6 +132,7 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
     const report = playForcedTurn({
       live: trial, forced: [...forced.values()].map(entry => entry.die), play,
       onDraw: (name, _value, draw) => { if (!seen.has(dieKey(name))) seen.set(dieKey(name), { name, draw: { ...draw } }); },
+      aimed,
     });
     let added = 0;
     for (const [key, { name, draw }] of seen) {
@@ -150,7 +152,7 @@ export function playTurnWith(live: Battle, play: (battle: Battle) => void, pinne
         battle: trial,
         dice: [...forced.values()].filter(entry => drawn.has(dieKey(entry.die.name))),
         drawOrder: [...seen.keys()],
-        unforced: [...new Set([...skipped].filter(([key, name]) => name.kind !== 'random-target' || sampleDecides(trial.dex.moves.get(name.moveId).target, draws.get(key))).map(([, name]) => name.kind))],
+        unforced: [...new Set([...skipped].filter(([key, name]) => name.kind !== 'random-target' || sampleDecides(aimed.get(key) ?? '', draws.get(key))).map(([, name]) => name.kind))],
         unnamed: report.unnamed ?? 0,
         draws,
       };

@@ -14,6 +14,7 @@ export interface PickBoard {
   mode: Mode;
   vgc: boolean;
   attacker: string[];
+  attackerSpecies?: string;
   attackerItem?: string;
   foe?: string[];
   foeItem?: string;
@@ -26,7 +27,7 @@ export function pickBoard(input: PickBoard): Battle {
   const bench = BENCH.slice(0, vgc ? 4 : 2).map(species => mon(rules, { species, moves: ['splash'] }));
   if (input.benchAbility) bench[0] = { ...mon(rules, { species: 'Porygon2', moves: ['splash'] }), ability: input.benchAbility };
   const copyable = input.benchAbility ? { ability: 'Thick Fat' } : {};
-  const attacker = { ...mon(rules, { species: 'Snorlax', moves: input.attacker, gender: 'M' }), item: input.attackerItem ?? '', ...copyable };
+  const attacker = { ...mon(rules, { species: input.attackerSpecies ?? 'Snorlax', moves: input.attacker, gender: 'M' }), item: input.attackerItem ?? '', ...copyable };
   const foe = { ...mon(rules, { species: input.foe ? 'Persian' : 'Vaporeon', moves: input.foe ?? ['splash'] }), item: input.foeItem ?? '' };
   const doubles = mode === 'doubles';
   const p1 = [attacker, ...(doubles ? [{ ...mon(rules, { species: 'Blissey', moves: ['splash'] }), ...(input.benchAbility ? { ability: 'Natural Cure' } : {}) }] : []), ...bench];
@@ -90,9 +91,9 @@ export function sweepItems(rules: Rules) {
   return sweepSelection(legal, SWEEPS_FULL ? undefined : 'pool');
 }
 
-export function bentScene(input: { rules: Rules; mode: Mode; vgc: boolean }, moveId: string, first: string): { board: Battle; clicks: { p1: string; p2: string } } | null {
-  const { rules, mode, vgc } = input;
-  const board = pickBoard({ rules, mode, vgc, attacker: [moveId, 'splash'], foe: ['encore', 'splash'] });
+export function bentScene(input: { rules: Rules; mode: Mode; vgc: boolean; attackerSpecies?: string }, moveId: string, first: string): { board: Battle; clicks: { p1: string; p2: string } } | null {
+  const { rules, mode, vgc, attackerSpecies } = input;
+  const board = pickBoard({ rules, mode, vgc, attacker: [moveId, 'splash'], attackerSpecies, foe: ['encore', 'splash'] });
   const opening = pickClicks(mode, first, 'move 2');
   if (!clicksAccepted(board, opening)) return null;
   playClicks(board, opening);
