@@ -16,7 +16,8 @@ describe('the checks the upgrade script prints', () => {
 
   test('they keep the checks they had', () => {
     expect(text).toContain('The @pkmn train stands at 0.10.9');
-    expect(text).toContain('T103');
+    expect(text).toContain('harden the speed layer for it (hash gate, census over Gen 1 to 9)');
+    expect(text).not.toMatch(/\bT\d+\b|#\d+/);
     expect(text).toContain('EVAL_SIM_FAST=0 and EVAL_SIM_FAST=1');
     expect(text).toContain('batch check');
   });

@@ -15,7 +15,7 @@ export function upgradeChecks(version) {
   return [
     '',
     `The @pkmn train stands at ${version}. Before a new simulator ships:`,
-    '- T103 (issue #6): harden the speed layer for it (hash gate, census over Gen 1 to 9).',
+    '- harden the speed layer for it (hash gate, census over Gen 1 to 9).',
     '- npx vitest run --project eval-engine, also with EVAL_SIM_FAST=0 and EVAL_SIM_FAST=1 (the CI modes).',
     '- the full dice sweeps (a plain run plays a sample of them): DICE_SWEEPS=full npx vitest run --project eval-engine packages/eval-engine/test/dice-',
     '- the other sweep specs, also full: the job "Full sweeps, the other specs" of .github/workflows/test.yml lists them in three parts; run each part as DICE_SWEEPS=full npx vitest run <the part\'s files>.',

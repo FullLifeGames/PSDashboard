@@ -201,7 +201,7 @@ async function main() {
   };
   const drawn = await takeChecked(lists, check);
   const games = drawn.flatMap(entry => entry.games);
-  const description = `Round 86: ${games.length} rated games of the searched ladders that no measurement read, drawn ${date} by scripts/fresh-holdout.mjs `
+  const description = `${games.length} rated games of the searched ladders that no measurement read, drawn ${date} by scripts/fresh-holdout.mjs `
     + '(rating floor 1500, highest rated first per format, one game per player pair).';
   writeFileSync(manifestPath, JSON.stringify(appendFamily(manifest, family, games, description), null, 1) + '\n');
   for (const entry of drawn) {

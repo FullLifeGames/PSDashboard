@@ -50,7 +50,7 @@ const families = [...new Set(all.map(set => set.family))].sort();
 const previous = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { sets: [] };
 const kept = previous.sets.filter(set => !OWN_FAMILIES.includes(set.family));
 writeFileSync(OUT, JSON.stringify({
-  note: "Round 65: one third of the fit corpus's sets in every doubles and Champions family, held out of every fit and read as a test bank (scripts/build-fit-holdout.mjs).",
+  note: "One third of the fit corpus's sets in every doubles and Champions family, held out of every fit and read as a test bank (scripts/build-fit-holdout.mjs).",
   sets: [...holdout, ...kept],
   ...(previous.drawn ? { drawn: previous.drawn } : {}),
 }, null, 1) + '\n');
