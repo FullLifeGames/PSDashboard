@@ -11,8 +11,6 @@ import { probeCheck } from './status-probe.ts';
 import { dieKey, type DiceReport, type DieName, type Draw, type ForcedDie, type NaturalRecord } from './types.ts';
 import { watchBattle } from './watch.ts';
 
-/** One forced turn: the natural turn on a copy, then the real turn on the live battle with the forced dice. */
-
 export interface ForcedTurnInput {
   live: Battle;
   forced: readonly ForcedDie[];
@@ -21,7 +19,6 @@ export interface ForcedTurnInput {
   /** Every draw of the real turn with the answer the turn took (a forced die's answer, not the stream's value). */
   observe?: (from: number | undefined, to: number | undefined, value: number) => void;
   onDraw?: (name: DieName, value: number, draw: Draw) => void;
-  /** Filled with `BattleWatch.aimed` once the real turn is played. */
   aimed?: Map<string, string>;
 }
 

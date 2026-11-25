@@ -1,7 +1,6 @@
 import type { Draw } from './types.ts';
 
-// A doubles click without a target samples a foe; these targets ignore it, read after ModifyMove (Curse becomes self).
-// Counter and Mirror Coat answer the body that hit them (onRedirectTarget); dice-random-target-note.spec.ts holds it.
+// A sample cannot change these turns, read after ModifyMove; Counter and Mirror Coat answer the body that hit them.
 export const AIM_FREE_TARGETS: ReadonlySet<string> = new Set(['all', 'foeSide', 'allySide', 'allyTeam', 'allAdjacent', 'allAdjacentFoes', 'allies', 'scripted', 'self']);
 
 /** A sample over one body (the other foe fell) has one result; a draw that is no sample can matter. */
