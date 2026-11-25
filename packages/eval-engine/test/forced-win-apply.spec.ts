@@ -187,6 +187,12 @@ const scene = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${na
 const asProof = (serialized: string, ruleset: StaticRuleset | undefined, rootOrder: string[], side: 'p1' | 'p2' = 'p1'): ForcedWinProof =>
   proveForcedWin(createRootPosition(serialized, ruleset), { side, rootOrder, tera: false, ruleset });
 const sceneProof = (board: Scene): ForcedWinProof => asProof(board.serialized, board.ruleset, board.rootOrder, board.side);
+type BodyState = { hp: number; fainted: boolean; item: string };
+const withBody = (board: Scene, side: number, index: number, edit: (body: BodyState) => void): Scene => {
+  const state = JSON.parse(board.serialized) as { sides: { pokemon: BodyState[] }[] };
+  edit(state.sides[side].pokemon[index]);
+  return { ...board, serialized: JSON.stringify(state) };
+};
 
 function boardOf(format: string, p1: ReturnType<typeof set>[], p2: ReturnType<typeof set>[], prepare: (battle: Battle) => void): string {
   const battle = battleOf(format, p1, p2);
@@ -337,16 +343,24 @@ describe('a failed repeat that missed is a delay too (the stall is reset)', () =
 });
 
 describe('the four Champions scenes the user reported', () => {
-  test('Champions VGC 2694505370 turn 10: the held Protect lets the partner hit, no proof for the side that lost', () => {
-    const proof = sceneProof(scene('forced-win-delay/champions-vgc-2694505370-t10'));
+  test('Champions VGC 2694505370 turn 10: the held Protect lets the partner hit, no proof for the side that lost; with the partner down it is a delay and proves', () => {
+    const board = scene('forced-win-delay/champions-vgc-2694505370-t10');
+    const proof = sceneProof(board);
     expect(proof.delay).toBeUndefined();
     expect(proof.mass).toBe(0);
+    const alone = sceneProof(withBody(board, 0, 0, body => { body.hp = 0; body.fainted = true; }));
+    expect(alone.delay).toBe('protect');
+    expect(alone.mass).toBeCloseTo(1, 9);
   });
 
-  test('Champions VGC 2628166702 turn 7: Umbreon\'s Leftovers heal each held Protect, no forced win (the game gives P1 about 0.64)', () => {
-    const proof = sceneProof(scene('forced-win-delay/champions-vgc-2628166702-t7'));
+  test('Champions VGC 2628166702 turn 7: Umbreon\'s Leftovers heal each held Protect, no forced win (the game gives P1 about 0.64); without the item it is a delay and proves', () => {
+    const board = scene('forced-win-delay/champions-vgc-2628166702-t7');
+    const proof = sceneProof(board);
     expect(proof.delay).toBeUndefined();
     expect(proof.mass).toBe(0);
+    const bare = sceneProof(withBody(board, 1, 0, body => { body.item = ''; }));
+    expect(bare.delay).toBe('protect');
+    expect(bare.mass).toBeCloseTo(1, 9);
   });
 
   // Without the strike these two boards read 0.765625, 7/8 of 7/8 (Volcarona's paralysis die at each of two levels).

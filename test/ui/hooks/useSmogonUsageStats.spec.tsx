@@ -85,6 +85,13 @@ describe('useSmogonUsageStats', () => {
     expect(result.current.error).toBe('No Smogon usage stats found for this format');
   });
 
+  test('an abort the hook did not ask for ends in a generic error, and loading stops', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new DOMException('The operation timed out.', 'AbortError'); }));
+    const { result } = renderHook(() => useSmogonUsageStats('gen4uu'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current).toMatchObject({ formatid: 'gen4uu', stats: null, error: 'Unable to load Smogon usage stats' });
+  });
+
   test('a load cut short by a format change is not remembered: back on the format, the stats load', async () => {
     let firstAsk = true;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
