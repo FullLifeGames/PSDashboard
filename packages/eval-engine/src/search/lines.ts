@@ -8,6 +8,7 @@ import type { ForcedDie } from '../dice/types.ts';
 import { createMatchupCache, type MatchupCache } from '../eval-function.ts';
 import { createRootPosition, positionBattle, type ChoiceOption, type SimPosition } from '../forward-model.ts';
 import { forkBattle, toPosition } from '../forward/position.ts';
+import { slotChoiceCounts } from '../forward/choice-counts.ts';
 import { applyChoice } from '../forward/switches.ts';
 import { perfCount } from '../perf-trace.ts';
 import { copyOf } from '../sim-ask/copy.ts';
@@ -15,9 +16,6 @@ import type { StaticRuleset } from '../score/weights.ts';
 import type { EvalLine, LineDie, LineRequest, LinesInput, LineStep, TreeLineStep } from '../types.ts';
 import { battleFaintedFraction, leafValue } from './leaf.ts';
 import { searchOptions } from './options.ts';
-
-// A step is resolved by label against the replay's own options (tree choice strings below the root do not translate);
-// a line stops (`cut`) before a step that is no longer legal after the likeliest dice.
 
 const REPLAY_SEED = '1,2,3,4';
 
@@ -49,7 +47,10 @@ interface Replay { steps: LineStep[]; unforced: Set<string>; cut?: string; battl
 
 const labelOf = (line: TreeLineStep, side: 'p1' | 'p2'): string => (side === 'p1' ? line.p1 : line.p2);
 
-interface Resolved { o1: ChoiceOption; o2: ChoiceOption; s1: (BranchSlotChoice | null)[]; s2: (BranchSlotChoice | null)[] }
+interface Resolved { o1: ChoiceOption; o2: ChoiceOption; s1: (BranchSlotChoice | null)[]; s2: (BranchSlotChoice | null)[]; only: { p1: number[]; p2: number[] } }
+
+const onlyChoiceSlots = (position: SimPosition, side: 'p1' | 'p2', chosen: ChoiceOption): number[] =>
+  chosen.choice === 'wait' ? [] : slotChoiceCounts(position, side).flatMap((count, slot) => (count === 1 ? [slot] : []));
 
 function resolveStep(root: SimPosition, battle: Battle, index: number, wanted: TreeLineStep, input: LinesInput): Resolved | string {
   const position = index === 0 ? root : toPosition(copyOf(battle));
@@ -61,7 +62,8 @@ function resolveStep(root: SimPosition, battle: Battle, index: number, wanted: T
   if (!o1 || !o2) return `step ${index + 1}: ${!o1 ? `p1 ${wanted.p1}` : `p2 ${wanted.p2}`} is not legal after the likeliest dice`;
   const s1 = slotChoicesOf(battle, 'p1', o1.choice, o1.label);
   const s2 = slotChoicesOf(battle, 'p2', o2.choice, o2.label);
-  return s1 && s2 ? { o1, o2, s1, s2 } : `step ${index + 1}: the choices do not map onto the slots`;
+  const only = { p1: onlyChoiceSlots(position, 'p1', o1), p2: onlyChoiceSlots(position, 'p2', o2) };
+  return s1 && s2 ? { o1, o2, s1, s2, only } : `step ${index + 1}: the choices do not map onto the slots`;
 }
 
 function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: LinesInput): Replay {
@@ -74,7 +76,7 @@ function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: L
       out.cut = resolved;
       break;
     }
-    const { o1, o2, s1, s2 } = resolved;
+    const { o1, o2, s1, s2, only } = resolved;
     const replacement = battle.requestState === 'switch' ? (o1.choice === 'wait' ? 'p2' : o2.choice === 'wait' ? 'p1' : 'both') : undefined;
     const play = (b: Battle): void => {
       perfCount('lines-sim-turns');
@@ -93,8 +95,8 @@ function replayDonor(root: SimPosition, donor: readonly TreeLineStep[], input: L
     const dice = kept.map((entry, at) => lineDie(battle, play, forced, entry, at));
     withDice(s1, s2, forced);
     out.steps.push({
-      p1: { choice: o1.choice, label: o1.label, slots: s1 },
-      p2: { choice: o2.choice, label: o2.label, slots: s2 },
+      p1: { choice: o1.choice, label: o1.label, slots: s1, ...(only.p1.length > 0 ? { onlyChoice: only.p1 } : {}) },
+      p2: { choice: o2.choice, label: o2.label, slots: s2, ...(only.p2.length > 0 ? { onlyChoice: only.p2 } : {}) },
       ...(replacement ? { replacement } : {}),
       dice,
     });

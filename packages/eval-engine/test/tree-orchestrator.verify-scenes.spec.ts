@@ -197,14 +197,14 @@ describe('GPL t27: setting up behind the sleeping Rhydon', () => {
 
 const mon = (species: string, moves: string[]) => set(species, moves, { level: 50 });
 
-async function lineOf(format: string, p1: ReturnType<typeof mon>[], p2: ReturnType<typeof mon>[], pick: (labels: string[]) => { p1: string; p2: string }): Promise<EvalLine> {
+async function lineOf(format: string, p1: ReturnType<typeof mon>[], p2: ReturnType<typeof mon>[], pick: (labels: string[]) => { p1: string; p2: string } | { p1: string; p2: string }[]): Promise<EvalLine> {
   const runtime = await branchOf(format, p1, p2, '1,2,3,4');
   const serialized = JSON.stringify(State.serializeBattle(runtime.battleStream.battle!));
   const root = createRootPosition(serialized, 'standard');
   const labels = (side: 'p1' | 'p2') => searchOptions(root, side, { tera: false }).map(option => option.label);
-  const step = pick([...labels('p1'), '|', ...labels('p2')]);
+  const steps = [pick([...labels('p1'), '|', ...labels('p2')])].flat();
   const [line] = await createLocalTreeExecutor(serialized).lines!({
-    requests: [{ side: 'p1', label: step.p1, for: ['engine'], donors: [[{ ...step, visits: 20 }]], visits: 20 }],
+    requests: [{ side: 'p1', label: steps[0].p1, for: ['engine'], donors: [steps.map(step => ({ ...step, visits: 20 }))], visits: 20 }],
     tera: false,
   });
   return line;
@@ -234,6 +234,36 @@ describe('a line that ends on a switch nobody chose', () => {
       return { p1: own.find(l => !l.includes('U-turn') && !/→ /.test(l))!, p2: other.find(l => l.startsWith('Close Combat'))! };
     });
     expect(quiet.awaits).toBeUndefined();
+  });
+});
+
+describe('a line step where the request leaves a side one choice', () => {
+  test('singles: an Encored last body is marked on the step the lock holds, its free foe and the step before are not', async () => {
+    const line = await lineOf('gen6customgame', [mon('Dragonite', ['Tackle', 'Splash'])], [mon('Snorlax', ['Encore', 'Tackle'])],
+      () => [{ p1: 'Tackle', p2: 'Encore' }, { p1: 'Tackle', p2: 'Tackle' }]);
+    expect(line.steps).toHaveLength(2);
+    expect(line.steps.map(step => step.p1.onlyChoice)).toEqual([undefined, [0]]);
+    expect(line.steps.map(step => step.p2.onlyChoice)).toEqual([undefined, undefined]);
+  });
+
+  test('doubles: the charging slot is marked and its free partner is not', async () => {
+    const line = await lineOf('gen6doublescustomgame',
+      [mon('Dragonite', ['Solar Beam', 'Splash']), mon('Rillaboom', ['Splash', 'Tackle'])], [mon('Snorlax', ['Splash', 'Tackle']), mon('Blissey', ['Splash', 'Tackle'])],
+      labels => [{ p1: labels.find(label => label.startsWith('Solar Beam') && label.endsWith('+ Splash'))!, p2: 'Splash + Splash' }, { p1: 'Solar Beam + Splash', p2: 'Splash + Splash' }]);
+    expect(line.steps.map(step => step.p1.onlyChoice)).toEqual([undefined, [0]]);
+  });
+
+  test.each([
+    { type: 'singles', format: 'gen9customgame', p1: [mon('Rillaboom', ['U-turn', 'Grassy Glide']), mon('Mew', ['Psychic'])], p2: [mon('Snorlax', ['Body Slam', 'Rest']), mon('Eevee', ['Tackle'])], replaces: '→ Mew', foe: 'Body Slam', marked: [0] },
+    { type: 'doubles', format: 'gen9doublescustomgame', p1: [mon('Incineroar', ['U-turn', 'Fake Out']), mon('Rillaboom', ['Grassy Glide']), mon('Amoonguss', ['Spore']), mon('Urshifu', ['Close Combat'])], p2: [mon('Urshifu', ['Close Combat']), mon('Amoonguss', ['Spore']), mon('Rillaboom', ['Grassy Glide']), mon('Incineroar', ['Fake Out'])], replaces: '→ Amoonguss', foe: 'Close Combat', marked: undefined },
+  ])('$type: the side that waits while the other sends a body in carries none', async ({ format, p1, p2, replaces, foe, marked }) => {
+    const line = await lineOf(format, p1, p2, labels => {
+      const { own, other } = split(labels);
+      return [{ p1: own.find(label => label.includes('U-turn'))!, p2: other.find(label => label.startsWith(foe))! }, { p1: replaces, p2: '(waiting)' }];
+    });
+    expect(line.steps[1].replacement).toBe('p1');
+    expect(line.steps[1].p2.onlyChoice).toBeUndefined();
+    expect(line.steps[1].p1.onlyChoice).toEqual(marked);
   });
 });
 

@@ -189,7 +189,13 @@ export interface EvalResult {
 export interface LineDie { die: ForcedDie; chance?: number; shown: boolean; ko?: { rolls: number; of: number } }
 
 /** One side's click of a step: the engine's choice string and label, and the slot choices the branch layer replays. */
-export interface LineChoice { choice: string; label: string; slots: (BranchSlotChoice | null)[] }
+export interface LineChoice {
+  choice: string;
+  label: string;
+  slots: (BranchSlotChoice | null)[];
+  /** The slots (simulator order, from 0) where the request left this side one legal choice; absent when none. */
+  onlyChoice?: number[];
+}
 
 /** One step of a line: a turn, or a replacement after a faint or a pivot (`replacement` names who picks). */
 export interface LineStep { p1: LineChoice; p2: LineChoice; replacement?: 'p1' | 'p2' | 'both'; dice: LineDie[] }
