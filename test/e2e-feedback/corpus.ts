@@ -3,10 +3,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { TurnAttribution, VerdictTier } from '../../packages/eval-engine/src/analysis';
 
-/**
- * Ground truth distilled from expert feedback (English essence, no verbatim quotes; FeedbackEval.xlsx stays local): truth items
- * are asserted by the drift run, gap items are tracked (open/moved), never asserted.
- */
+// Expert feedback as English essence, no quotes (FeedbackEval.xlsx stays local): truth is asserted, gaps are tracked.
 
 /** Claim against one turn's TurnAnalysis. Only present fields are checked. */
 export interface TurnClaim {
@@ -20,12 +17,7 @@ export interface TurnClaim {
   playedLabelIncludes?: string;
   /** Whether the turn must appear among the report's key moments. */
   keyMoment?: boolean;
-  /**
-   * Narrative pins: every fragment must appear in the turn's
-   * rendered summary (`summarizeTurn` with the replay's player names). Keep
-   * fragments short and structural ("open turn", "cannot be burned") — the
-   * summary wording may be refined without moving verdicts.
-   */
+  /** Fragments the turn's rendered summary (`summarizeTurn`) must hold; keep them short and structural. */
   summaryIncludes?: string[];
 }
 
@@ -42,7 +34,7 @@ export interface FeedbackItem {
   /** 1-based played turn; absent = whole-game item (ReportClaim territory). */
   turn?: number;
   kind: 'truth' | 'gap';
-  /** expert-…: distilled expert claims. round…-gate-…: engine deliverables pinned at a round's user gate. user-…: the user's own expert observations. */
+  /** expert-…: distilled expert claims; round…: engine deliverables the user approved; user-…: the user's own notes. */
   source: 'expert-2026-08' | 'round6-gate-2026-08' | 'user-2026-08' | 'user-2026-10';
   essence: string;
   /** truth only — pinned from the user-approved baseline. */
@@ -56,7 +48,7 @@ export interface FeedbackItem {
 /** Flipped true in the commit that lands the approved baseline pins. */
 export const BASELINE_PINNED = true;
 
-/** The approved 655336 report freeze (baseline ef342fa). */
+// The approved 655336 report freeze (baseline ef342fa).
 const GOLDEN_655336 = JSON.parse(readFileSync(
   join(dirname(fileURLToPath(import.meta.url)), 'golden', 'smogtours-gen6ou-655336.report.json'),
   'utf-8',
@@ -73,27 +65,13 @@ export const FEEDBACK_REPLAYS = [
   'gen9vgc2026regi-2630685175',
 ] as const;
 
-/**
- * Census-only replays: doubles games that run through the same
- * drift run so their dumps exist for the tier census (scripts/tier-census.mjs). They carry NO corpus items: nothing about them is an
- * expert claim, and the drift report grades nothing on them. All come from
- * the calibration bank, with the Smogon inputs the bank measures them with.
- * The drift run appends them after FEEDBACK_REPLAYS, so the pinned replays
- * keep their place in every report.
- * - 2629703929: VGC, both sides bring a visible four, Tailwind, long endgame.
- * - 912045: Doubles OU, tournament, Tailwind and Trick Room, long endgame.
- * - 2663093831: Doubles OU, ladder, no speed control.
- * The tier census counts Pokémon Champions too, one
- * game of each Champions ladder, neither in the fit corpus, its holdout or the bank:
- * - 2695803506: Champions VGC Reg M-C, rated 1710, 13 turns, no team sheet.
- * - 2628340185: Champions OU (singles), rated 1688, 25 turns.
- */
+/** Census-only replays, appended after FEEDBACK_REPLAYS for the tier census; the drift run grades none of them. */
 export const FEEDBACK_CENSUS_REPLAYS = [
-  'gen9vgc2026regi-2629703929',
-  'smogtours-gen9doublesou-912045',
-  'gen9doublesou-2663093831',
-  'gen9championsvgc2026regmc-2695803506',
-  'gen9championsou-2628340185',
+  'gen9vgc2026regi-2629703929', // VGC, both sides bring a visible four, Tailwind, long endgame
+  'smogtours-gen9doublesou-912045', // Doubles OU, tournament, Tailwind and Trick Room, long endgame
+  'gen9doublesou-2663093831', // Doubles OU, ladder, no speed control
+  'gen9championsvgc2026regmc-2695803506', // Champions VGC Reg M-C, rated 1710, 13 turns, no team sheet
+  'gen9championsou-2628340185', // Champions OU (singles), rated 1688, 25 turns
 ] as const;
 
 export const FEEDBACK_CORPUS: FeedbackItem[] = [
