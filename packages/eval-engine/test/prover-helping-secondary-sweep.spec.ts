@@ -66,6 +66,9 @@ function sameButStages(unfired: Battle, fired: Battle): boolean {
   return strip(unfired) === strip(fired);
 }
 
+// `boundaryEvent` prices 16 damage rolls and leaves Gens 1 and 2 (rolls 217 to 255) plain: every cell stays one class.
+const pricesBoundary = (generation: number): boolean => generation >= 3;
+
 const VGC_WITNESSES = ['focusblast', 'shadowball', 'psychic', 'crunch', 'ancientpower', 'chargebeam', 'fierydance', 'flamethrower'];
 
 describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', ({ rules, mode }) => {
@@ -118,7 +121,7 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
       }
       expect(bodies(battle).length).toBe(before);
     }
-    expect(witnessed > 0).toBe(rules.generation >= 3);
+    expect(witnessed > 0).toBe(pricesBoundary(rules.generation));
   });
 
   if (mode === 'singles') test('every move, the crit forced both ways in each class: the reading follows the Dex', () => {
@@ -156,8 +159,8 @@ describe.each(SWEEP_CASES)('$name: the fired class against the unfired class', (
       }
     }
     expect(skipped.filter(name => name.endsWith('(no effect)'))).toEqual([]);
-    expect(witnessed > 0).toBe(rules.generation >= 3);
-    expect(crits > 0).toBe(rules.generation >= 3);
+    expect(witnessed > 0).toBe(pricesBoundary(rules.generation));
+    expect(crits > 0).toBe(pricesBoundary(rules.generation));
   });
 });
 
@@ -200,7 +203,7 @@ describe.each(SWEEP_CASES.filter(({ mode }) => mode === 'singles'))('$name: the 
     const battle = battleOf(rules.singles, [user], [foe, bench]);
     const { cell } = drawCell(battle, 'singles', move!);
     const { plain, fired } = classesOf(cell);
-    if (rules.generation < 3) { expect(cell.plain).toBe(true); return; }
+    if (!pricesBoundary(rules.generation)) { expect(cell.plain).toBe(true); return; }
     expect(`${reactor.name} ${move!.id} fired ${fired.length > 0 && plain >= 0}`).toBe(`${reactor.name} ${move!.id} fired true`);
     const sources = helpedSources(cell, 'p1');
     for (const { child, index } of fired) {

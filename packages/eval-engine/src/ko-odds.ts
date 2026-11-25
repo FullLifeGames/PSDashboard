@@ -180,6 +180,7 @@ export function boundaryEvent(
 ): BoundaryEvent | null {
   // `tera`: a body whose side clicks Tera this turn is read as the click makes it, before any move lands.
   const genNum = battle.gen;
+  // Gens 1 and 2 roll damage over 217 to 255 (mods gen1/gen2 `getDamage`), Gen 1 crits by Speed: no 16 rolls to count.
   if (genNum <= 2 || genNum > 9) return null;
   const move = battle.dex.moves.get(moveId);
   if (unpriceable(attacker, defender, move)) return null;
