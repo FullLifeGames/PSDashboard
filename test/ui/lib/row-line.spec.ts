@@ -60,8 +60,50 @@ describe('rowLineTail', () => {
     expect(rowLineTail(evalResult('singles', { lines: [{ ...usual, side: 'p2' }] }), 'p1', row, false)).toEqual([]);
   });
 
-  test('a row that shows no tail today shows none now', () => {
+  test('a row whose only line is the played one shows no tail', () => {
     const quiet = rankedChoice('move roost', 'Roost', 0.2);
-    expect(rowLineTail(evalResult('singles', { lines: [lineOf('p1', 'Roost', [step('Roost', 'Encore'), step('Roost', 'Encore')])] }), 'p1', quiet, false)).toBeUndefined();
+    const played = lineOf('p1', 'Roost', [step('Roost', 'Encore'), step('Roost', 'Encore')], { for: ['played'] });
+    expect(rowLineTail(evalResult('singles', { lines: [played] }), 'p1', quiet, false)).toEqual([]);
+    const both = { ...played, for: ['engine', 'played'] as EvalLine['for'] };
+    expect(formatLine(rowLineTail(evalResult('singles', { lines: [both] }), 'p1', quiet, false)!)).toBe('Roost · Encore');
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: both sides\' best rows carry a tail on a tree result, though only P1\'s row holds the line', game => {
+    const p1 = rankedChoice('move dragondance', 'Dragon Dance', 0.3, { line: [{ p1: 'Roost', p2: 'Encore' }] });
+    const p2 = rankedChoice('move encore', 'Encore', 0.2);
+    const lines = [
+      lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'Encore'), step('Roost', 'Encore')]),
+      lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Dragon Claw', 'Protect')]),
+    ];
+    const result = evalResult(game, { lines });
+    expect(formatLine(rowLineTail(result, 'p1', p1, false)!)).toBe('Roost · Encore');
+    expect(formatLine(rowLineTail(result, 'p2', p2, false)!)).toBe('Dragon Claw · Protect');
+  });
+
+  test('doubles replacement card: the waiting row carries no tail, the choosing row the steps after its replacement', () => {
+    const wait = rankedChoice('wait', '(waiting)', 0.3, { line: [{ p1: 'Protect + Protect', p2: 'Tailwind + Protect' }] });
+    const choosing = rankedChoice('switch 3', '→ Zamazenta', 0.3);
+    const lines = [
+      lineOf('p1', '(waiting)', [{ p1: waiting(2), p2: pick('pass + → Zamazenta', 2), replacement: 'p2', dice: [] }, step('Protect + Protect', 'Tailwind + Protect')], { choice: 'wait' }),
+      lineOf('p2', '→ Zamazenta', [{ p1: waiting(2), p2: pick('pass + → Zamazenta', 2), replacement: 'p2', dice: [] }, step('Protect + Protect', 'Tailwind + Protect')], { choice: 'switch 3' }),
+    ];
+    const result = evalResult('doubles', { lines });
+    expect(rowLineTail(result, 'p1', wait, false)).toEqual([]);
+    expect(formatLine(rowLineTail(result, 'p2', choosing, false)!)).toBe('Protect + Protect · Tailwind + Protect');
+  });
+
+  test('a result without lines (singles at depth 2): the waiting row shows no tail, a normal row keeps its line', () => {
+    const wait = rankedChoice('wait', '(waiting)', 0.3, { line: pv });
+    expect(rowLineTail(evalResult('singles'), 'p1', wait, false)).toEqual([]);
+    expect(rowLineTail(evalResult('singles'), 'p2', row, false)).toEqual(pv);
+  });
+
+  test('Hard mode: the worst line reaches the second player\'s best row as it reaches the first player\'s', () => {
+    const best = rankedChoice('move encore', 'Encore', 0.2);
+    const usual2 = lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Roost', 'Encore')]);
+    const worst2 = lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Dragon Claw', 'Protect')], { versus: 'worst' });
+    const result = evalResult('singles', { lines: [usual2, worst2] });
+    expect(formatLine(rowLineTail(result, 'p2', best, true)!)).toBe('Dragon Claw · Protect');
+    expect(formatLine(rowLineTail(result, 'p2', best, false)!)).toBe('Roost · Encore');
   });
 });

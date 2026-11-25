@@ -10,14 +10,14 @@ const labelsOf = (step: LineStep): Step => step.replacement
   ? { p1: replacementWords(step.p1.label), p2: replacementWords(step.p2.label) }
   : { p1: step.p1.label, p2: step.p2.label };
 
-// Reads the line the Lines section shows for the row (the same `linesForMode`, so Hard mode swaps both); a result
-// without lines keeps the row's principal variation (`row.line`).
+// Reads the engine's line the Lines section shows for the row (the same `linesForMode`, so Hard mode swaps both); a
+// result without lines keeps the row's own line. A row that waits shows none.
 export function rowLineTail(
   result: Pick<EvalResult, 'lines'> | null | undefined, side: Side, row: Pick<RankedChoice, 'choice' | 'label' | 'line'>, hardMode: boolean,
 ): Step[] | undefined {
-  if (!row.line || row.line.length === 0) return undefined;
+  if (row.choice === 'wait') return [];
   if (!result?.lines) return row.line;
-  const line = linesForMode(result.lines, hardMode).find(entry => entry.side === side && (entry.choice === row.choice || entry.label === row.label || entry.label === pivotMove(row.label)));
+  const line = linesForMode(result.lines, hardMode).find(entry => entry.for.includes('engine') && entry.side === side && (entry.choice === row.choice || entry.label === row.label || entry.label === pivotMove(row.label)));
   if (!line) return [];
   const tail = line.steps.slice(1);
   // a pivot's row names the move and the body it brings in; the line's replacement step after the move says it again
