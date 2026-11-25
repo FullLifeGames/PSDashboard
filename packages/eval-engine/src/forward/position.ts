@@ -20,6 +20,8 @@ export interface SimPosition {
   readonly serialized: string;
   /** The rule set the position is searched under (a root takes its search's, children inherit). */
   readonly ruleset?: StaticRuleset;
+  /** The static pick's replacements in the advance that made this position, one entry per round; absent on a root. */
+  readonly staticPicks?: readonly { p1?: string; p2?: string }[];
 }
 
 class Position implements SimPosition {
@@ -29,12 +31,14 @@ class Position implements SimPosition {
   private templateCache: Battle | null = null;
   private readonly live: boolean;
   readonly ruleset: StaticRuleset;
+  readonly staticPicks?: readonly { p1?: string; p2?: string }[];
 
-  constructor(serialized: string | null, battle: Battle | null, ruleset: StaticRuleset) {
+  constructor(serialized: string | null, battle: Battle | null, ruleset: StaticRuleset, staticPicks?: readonly { p1?: string; p2?: string }[]) {
     this.serializedCache = serialized;
     this.battleCache = battle;
     this.live = battle !== null;
     this.ruleset = ruleset;
+    if (staticPicks && staticPicks.length > 0) this.staticPicks = staticPicks;
   }
 
   get serialized(): string {
@@ -129,7 +133,7 @@ export function forkBattleWithPrng(position: SimPosition, prng: PRNG & { attach(
   return battle;
 }
 
-export function toPosition(battle: Battle): SimPosition {
+export function toPosition(battle: Battle, staticPicks?: readonly { p1?: string; p2?: string }[]): SimPosition {
   if (battle.prng instanceof ScriptedPRNG) battle.prng.release();
-  return new Position(null, battle, battleRuleset(battle));
+  return new Position(null, battle, battleRuleset(battle), staticPicks);
 }
