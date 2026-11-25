@@ -1,11 +1,11 @@
 import { dexOf, type RulesDex } from '../rules-dex.ts';
-import { Battle } from '@pkmn/sim';
 import { Protocol } from '@pkmn/protocol';
 import { findPokemon, ruleOut, type InferrerState } from './inferrer-state.ts';
 import { arg, fromEffect, hasKw, keyOf, ofIdent, type LogLine } from './log-line.ts';
 import type { RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 import { spendsAfterOwnMove, spentAfterOwnMove, type SelfItem } from './spent-items.ts';
+import { contactLands, noteContactTell } from './contact-tell.ts';
 
 // Design: EVALUATION.md "Rule-outs".
 
@@ -100,13 +100,15 @@ export function partyMayHideIllusion(state: InferrerState): boolean {
   hiddenParty.set(state, hidden);
   return hidden;
 }
+export function unknownItemHolder(state: InferrerState, key: string): RevealedPokemonInfo | undefined {
+  if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return undefined;
+  const pokemon = findPokemon(state, key.slice(4));
+  if (!pokemon || (pokemon.item.value && pokemon.item.value !== '(has item)')) return undefined;
+  return [...state.swappedIdents.keys()].some(ident => keyOf(ident) === key) ? undefined : pokemon;
+}
+
 export function ruleOutUnknown(state: InferrerState, key: string, itemId: string) {
-  if (!key.startsWith(state.opponentSide) || illusionPossible(state)) return;
-  const nickname = key.slice(4);
-  const pokemon = findPokemon(state, nickname);
-  if (!pokemon || (pokemon.item.value && pokemon.item.value !== '(has item)')) return;
-  if ([...state.swappedIdents.keys()].some(ident => keyOf(ident) === key)) return;
-  ruleOut(state, nickname, 'items', itemId);
+  if (unknownItemHolder(state, key)) ruleOut(state, key.slice(4), 'items', itemId);
 }
 
 // Gen 4 arms Life Orb in `onBasePower`, which fixed-damage and one-hit KO moves never run; from Gen 5
@@ -149,19 +151,6 @@ function shellBellWouldShow(state: InferrerState, watch: ItemWatch, action: Acti
   return ownItemActs(state, watch, action, move) && !watch.healBlocked.has(action.attacker);
 }
 
-/** Whether a move makes contact with `heldItem`: Punching Glove, then `checkMoveMakesContact`; doubt reads as no. */
-export function contactLands(dex: RulesDex, moveName: string, heldItem: string): boolean {
-  const holder = { hasItem: (item: string | string[]) => [item].flat().map(toId).includes(heldItem), addVolatile: () => false };
-  try {
-    const move = dex.getActiveMove(moveName);
-    const item = dex.items.get(heldItem) as { onModifyMove?: (this: never, ...args: never[]) => void };
-    item.onModifyMove?.call({} as never, move as never, holder as never, null as never);
-    return Battle.prototype.checkMoveMakesContact.call({} as never, move, holder as never, holder as never);
-  } catch {
-    return false;
-  }
-}
-
 // From the generation of Protective Pads on, only an attacker whose item the log showed is judged.
 function helmetWouldShow(state: InferrerState, watch: ItemWatch, action: ActionWatch): boolean {
   const dex = dexOf(state);
@@ -185,7 +174,19 @@ function judgeSpentItems(state: InferrerState, watch: ItemWatch, action: ActionW
   }
 }
 
-function judgeAttacker(state: InferrerState, watch: ItemWatch, action: ActionWatch) {
+const identOfKey = (state: InferrerState, key: string) => [...state.identSpecies.keys()].find(ident => keyOf(ident) === key) ?? key;
+
+function judgeSilentHelmet(state: InferrerState, watch: ItemWatch, action: ActionWatch, hitOthers: string[]) {
+  const abilities = possibleAbilities(state, action.ident);
+  const info = unknownItemHolder(state, action.attacker);
+  if (!info || !abilities || abilities.has('magicguard') || abilities.has('longreach') || watch.magicRoom) return;
+  const silent = hitOthers.some(holder => watch.items.get(holder) === 'rockyhelmet' && !action.shown.has(`${holder}|rockyhelmet`) &&
+    !action.fainted.has(holder) && !watch.embargoed.has(holder) && possibleAbilities(state, identOfKey(state, holder))?.has('klutz') === false);
+  if (silent) noteContactTell(state, info, action.move);
+}
+
+function judgeAttacker(state: InferrerState, watch: ItemWatch, action: ActionWatch, hitOthers: string[]) {
+  judgeSilentHelmet(state, watch, action, hitOthers);
   judgeSpentItems(state, watch, action);
   if (!action.shown.has(`${action.attacker}|lifeorb`) && lifeOrbWouldShow(state, watch, action)) {
     ruleOutUnknown(state, action.attacker, 'lifeorb');
@@ -200,7 +201,7 @@ function judgeAction(state: InferrerState, watch: ItemWatch, action: ActionWatch
   const hitOthers = [...action.hits].filter(key => key !== action.attacker);
   if (hitOthers.length === 0) return;
   if (action.attacker.startsWith(state.opponentSide)) {
-    judgeAttacker(state, watch, action);
+    judgeAttacker(state, watch, action, hitOthers);
     return;
   }
   if (!helmetWouldShow(state, watch, action)) return;

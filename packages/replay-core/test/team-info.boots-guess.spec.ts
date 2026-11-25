@@ -178,6 +178,24 @@ describe('a custom game keeps each species to its own abilities', () => {
   });
 });
 
+describe('the Item Clause lets one Pokémon of a side take the Boots guess', () => {
+  const ITEM_CLAUSE = '|rule|Item Clause: Limit one of each item\n|start';
+  const two = (log: string) => ['Corviknight', 'Noivern'].map(species => rawItem(log, species).source);
+  const corviknight = () => mon('Corviknight', 'Heavy-Duty Boots', 'Pressure', ['Brave Bird', 'Roost']);
+  const noivern = () => mon('Noivern', 'Heavy-Duty Boots', 'Infiltrator', ['Draco Meteor', 'Hurricane']);
+  const singles = () => play([rocks()], [mon('Chansey', '', 'Natural Cure', ['Soft-Boiled']), corviknight(), noivern()],
+    [['move stealthrock', 'move softboiled'], ['move roost', 'switch 2'], ['move roost', 'switch 3']]);
+  const doubles = () => play([rocks(), mon('Blissey', '', 'Natural Cure', ['Soft-Boiled'])],
+    [mon('Chansey', '', 'Natural Cure', ['Soft-Boiled']), mon('Talonflame', '', 'Gale Wings', ['Roost']), corviknight(), noivern()],
+    [['move stealthrock, move softboiled', 'move softboiled, move roost'], ['move roost, move softboiled', 'switch 3, move roost'], ['move roost, move softboiled', 'switch 4, move roost']], true);
+
+  test.each([['singles', singles], ['doubles', doubles]] as const)('%s: two entrants without rock damage share one Boots under the clause', (_kind, made) => {
+    const log = made();
+    expect(two(log.replace('|start', '|rule|Item Clause: Limit 2 of each item\n|start'))).toEqual(['guessed', 'guessed']);
+    expect(two(log.replace('|start', ITEM_CLAUSE))).toEqual(['guessed', 'unknown']);
+  });
+});
+
 const evs = (hp: number, atk: number, def: number, spa: number, spd: number, spe: number): PokemonEvs => ({ hp, atk, def, spa, spd, spe });
 const SET_DETAIL = 'Smogon sets gen9ou';
 const guess = evs(0, 252, 0, 0, 4, 252);

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { Battle, Dex, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
-import { contactLands } from '../src/inference/item-evidence';
+import { contactLands } from '../src/inference/contact-tell';
 import { rulesDex } from '../src/rules-dex';
 
 function set(species: string, item: string, ability: string, moves: string[], level = 100): PokemonSet {

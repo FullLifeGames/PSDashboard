@@ -409,3 +409,31 @@ describe('a Throat Spray the log never showed is not built', () => {
     expect(ursaluna?.item).toBe('Assault Vest');
   });
 });
+
+describe('a Protective Pads the log tells is built', () => {
+  const helmetLines = (kind: 'singles' | 'doubles') => {
+    const doubles = kind === 'doubles';
+    return [
+      `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Snorlax, M|', '|poke|p2|Rattata, M|', '|poke|p2|Raticate, M|', '|start',
+      '|switch|p1a: Snorlax|Snorlax, M|100/100', ...(doubles ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+      '|switch|p2a: Rattata|Rattata, M|100/100', ...(doubles ? ['|switch|p2b: Chansey|Chansey, F|100/100'] : []), '|turn|1',
+      '|move|p2a: Rattata|Tackle|p1a: Snorlax', '|-damage|p1a: Snorlax|80/100', '|-damage|p2a: Rattata|90/100|[from] item: Rocky Helmet|[of] p1a: Snorlax',
+      '|turn|2', '|switch|p2a: Raticate|Raticate, M|100/100', '|move|p2a: Raticate|Tackle|p1a: Snorlax', '|-damage|p1a: Snorlax|60/100', '|turn|3',
+    ].join('\n');
+  };
+  const raticate = (log: string) => buildTeamsFromReplay(log).p2Team.find(set => set.species === 'Raticate');
+
+  test('singles: a Tackle into a shown Rocky Helmet that leaves no chip builds Protective Pads', () => {
+    expect(raticate(helmetLines('singles'))?.item).toBe('Protective Pads');
+  });
+
+  test('doubles: a Tackle into a shown Rocky Helmet that leaves no chip builds Protective Pads', () => {
+    expect(raticate(helmetLines('doubles'))?.item).toBe('Protective Pads');
+  });
+
+  test('the draft game: Quaquaval hit a shown Rocky Helmet without a chip and plays Protective Pads', () => {
+    const draft = readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.txt', import.meta.url), 'utf8');
+    expect(inferOpponentTeam(draft, 'p1').pokemon.find(mon => mon.species === 'Quaquaval')?.item).toMatchObject({ value: 'Protective Pads', source: 'guessed' });
+    expect(buildTeamsFromReplay(draft).p1Team.find(set => set.species === 'Quaquaval')?.item).toBe('Protective Pads');
+  });
+});
