@@ -14,7 +14,6 @@ export interface DeepeningState {
   pvByCell: Map<number, PvStep[]>;
 }
 
-/** The sub-search's result with its cell child's replacements as steps; a child without any leaves it as it is. */
 export function withStaticPicks(result: EvalResult, child: Pick<SimPosition, 'staticPicks'>): EvalResult {
   if (!child.staticPicks) return result;
   const staticPicks = child.staticPicks.map(pick => ({

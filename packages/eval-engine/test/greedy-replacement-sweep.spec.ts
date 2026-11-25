@@ -14,8 +14,6 @@ import type { StaticRuleset } from '../src/eval-function';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
-// Each cause that opens a switch request is found in the Dex by handler key, never by name.
-
 await loadSimMods('gen9customgame');
 await loadSimMods('gen9championsou');
 
@@ -58,7 +56,6 @@ const body = (moves: string[], extra: Partial<PokemonSet> = {}, fast = false): P
 
 interface Scene { battle: Battle; tries: [string, string][] }
 
-// p1 is faster and plays the entry's move; p2 plays Tackle; the replacement comes from the move, the hazard or the item
 function sceneOf(format: string, entry: Entry, doubles: boolean, lethal: boolean): Scene {
   const filler = body(['Tackle', 'Splash']);
   const leadMoves = entry.kind === 'pivot' ? [entry.id, 'Splash'] : ['Tackle', 'Splash'];

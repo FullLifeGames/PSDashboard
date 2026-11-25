@@ -135,10 +135,8 @@ function midTurnSource(battle: Battle): () => Battle {
   return () => deserializeFromParsed(parsedMid ??= parseSearchState(midTurn));
 }
 
-/** The labels each side's static pick sent in during one round of replacements. */
 export interface StaticPick { p1?: string; p2?: string }
 
-/** Answers every open switch request by static value and returns the picks, one entry per round of the guard loop. */
 export function resolveForcedSwitches(
   battle: Battle,
   seed: PRNGSeed,

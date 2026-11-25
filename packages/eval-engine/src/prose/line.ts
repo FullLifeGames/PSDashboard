@@ -2,7 +2,6 @@ import { WAITING_LABEL } from '../forward/assignments.ts';
 
 type Step = { p1: string; p2: string; replacement?: 'p1' | 'p2' | 'both' };
 
-/** A replacement's label without the slot that passes: `→ A + pass` and `pass + → A` read `→ A`. */
 export const replacementWords = (label: string): string => label.replace(/ \+ pass$/, '').replace(/^pass \+ /, '');
 
 const stepText = (step: Step): string => {

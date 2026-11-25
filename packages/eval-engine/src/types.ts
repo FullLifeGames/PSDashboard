@@ -176,7 +176,6 @@ export interface EvalResult {
   engine?: { id: string; name: string; version?: string };
   /** The answer of a trend probe (EvalSubSearchJob.draw): this result's score minus the draw's child leaf. */
   trend?: number;
-  /** The static pick's replacements in a deepened cell's turn, as steps that open its line (sub-searches only). */
   staticPicks?: { p1: string; p2: string; replacement: 'p1' | 'p2' | 'both' }[];
   /**
    * The lines over the next turns, from the tree search: per side its best row's and played row's line, each with

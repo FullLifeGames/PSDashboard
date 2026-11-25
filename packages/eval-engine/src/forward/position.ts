@@ -20,7 +20,6 @@ export interface SimPosition {
   readonly serialized: string;
   /** The rule set the position is searched under (a root takes its search's, children inherit). */
   readonly ruleset?: StaticRuleset;
-  /** The static pick's replacements in the advance that made this position, one entry per round; absent on a root. */
   readonly staticPicks?: readonly StaticPick[];
 }
 
