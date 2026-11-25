@@ -912,7 +912,7 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * static basis for this mass; the next lever, if any, is search/
  * planning-side.
  *
- * ROUND 90 2026-11-22 to 2026-11-24 (improvement round 90, the clean-up
+ * ROUND 90 2026-11-22 to 2026-11-25 (improvement round 90, the clean-up
  * before 1.2.1: milestone "Clean-up before 1.2.1", no release and no version
  * bump; branch r90 from master c87b617d (release 1.2.0) with the lane
  * branches r90-e, r90-ci, r90-fb and r90-c, 278 commits at the head 3ec89b67
@@ -992,6 +992,72 @@ import { takeSimFastReport } from '../../packages/eval-engine/src/forward/sim-fa
  * (#228) and the two lint exceptions of useTeamSources (#229), two stale
  * skipped rows deleted, one sentence on <module>.<topic>.spec.ts in rule 5,
  * two stale worktrees removed.
+ *
+ * SECOND COMMENT PASS (round 90, lane C2, 24.11. to 25.11.2026; ruling 5 of
+ * the user, 24.11. evening: the comments were still too many after the first
+ * pass, 24,429 lines by the ratchet, and the comments of test.yml had grown).
+ * Measure: no JSDoc on a declaration that is not exported, no line that cites
+ * a replay id in a spec, no near-obvious game-rule line;
+ * a design that lived only in a comment moves into a document, and a spec
+ * keeps one line with the calculation of an expected number. The figures of
+ * #157 above (21,164 to 12,408 in source, 14,882 to 10,794 in tests) are the
+ * state after the first pass; this pass replaces them.
+ *
+ * DELIVERED: the rule comments/shape (120 columns, two lines, one JSDoc line
+ * on an export and none on a declaration that is not exported; c1f95a11 as a
+ * warning) and comments/no-history, both as errors in every code file except
+ * this ledger (167d02f3); comment-counts.mjs --shape in npm run lint for the
+ * workflows and stylesheets (2c53041e); 33 slices over
+ * 1,543 files, each commit proven comment-only with comment-only-diff; comment
+ * lines per project 24,429 to 5,816 (comment-ratchet.json holds these): eval-
+ * engine src 7,266 to 2,366, replay-core src 2,120 to 865, app src 2,925 to
+ * 891, app css 97 to 33, workflows 39 to 26, scripts 1,037 to 225, configs
+ * 151 to 26, test:eval-engine 5,308 to 654, test:app 1,771 to 213, test:
+ * replay-core 1,250 to 190, test:ui 1,247 to 147, test:e2e 1,036 to 140,
+ * test:e2e-feedback 139 to 34, test:e2e-build 30 to 2, test:e2e-capture 13 to
+ * 4 (the workflows had fallen from 109 to 39 before the ruling, 64764339).
+ * 91 design blocks of the cut comments went into EVALUATION.md,
+ * ARCHITECTURE.md, six ADRs and GLOSSARY.md, each read against the code
+ * first; that check corrected two sentences on the replay frame's phone
+ * layout, which shrinks the scene under 642 px and keeps no scroll
+ * container. The new scripts/README.md says how to call each of the 42
+ * scripts and corrected twelve statements of the old script headers. The
+ * "Comments:" bullet of AGENTS.md has the stricter rule.
+ *
+ * REVIEW: three reviewers judged the 413 deletions that the builders doubted
+ * or that a sample found: 65 facts came back (game rules, traps, invariants
+ * the code does not check, the DICE_SWEEPS switch in the shared sweep helpers,
+ * the calculation of an expected number). The builders had also cut the hover
+ * line of 124 of the engine's 327 barrel exports; a barrel probe found it and
+ * the lines are back (486 of 486 exports of both packages carry one line).
+ * The legal notice of sim-fast/index.ts stands alone, its dead pointer is
+ * gone.
+ *
+ * MEASUREMENT: lossless, no bank and no feedback run. comment-only-diff
+ * c1f95a11 against 46e7fb8e: 1,543 files, five expected exceptions
+ * (eslint.config.js, eslint.ratchet.mjs, sim-fast/index.ts,
+ * update-lint-ratchet.mjs and lint-rules.spec.ts, the rule and its pins);
+ * the parsed YAML of the five workflows is equal (release.yml differs in the
+ * shell comment lines of one run step). tsc -b, npm run lint and knip exit 0;
+ * the 14 specs that read text (322 tests) and setup-moves-oracle (27 tests)
+ * pass. Every code token and string is proven the same, so the bank, the
+ * feedback corpus and the pins stand; the bank fingerprint hashes the tree,
+ * so run-calibration.mjs --reuse finds no base from before the pass.
+ *
+ * LESSONS: a builder told to keep what holds a fact kept half; a default of
+ * no comment with one test question cut specs to a tenth and source to a
+ * third. Workflows, scripts and configs stood under no rule. Builders deleted
+ * export hover lines that the rule keeps. A share target per slice kind made
+ * the slices comparable. A comment moved into a document needs a check
+ * against the code (the phone layout, twelve script usages).
+ *
+ * RESTS (TODO proposals for the gate, no issues yet): the generation >= 4
+ * threshold of the board-key-effects sweep has no stated reason (a probe
+ * lists the rows with a hit split in Generations 3 and 4); the witnessed > 0
+ * condition from Generation 3 in prover-helping-secondary-sweep has no stated
+ * reason; three scripts write history into their output (fresh-holdout.mjs
+ * "Round 86", build-fit-holdout.mjs "Round 65", upgrade-pkmn.mjs "T103 (issue
+ * #6)"); the EVAL_FIT_* levers of eval-fit.spec.ts are in no document.
  *
  * ROUND 89 2026-11-09 to 2026-11-20 (improvement round 89, the wave of 1.2.0:
  * the 38 open issues of milestone 1.2.0, built in lanes A to H, N, P, Q, S, L
