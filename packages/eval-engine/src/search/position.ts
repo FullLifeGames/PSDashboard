@@ -18,7 +18,7 @@ import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VE
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, searchOptions } from './options.ts';
 import { attachRootPayload, type RootPayload } from './root-payload.ts';
-import { FORCED_ROOT_LEVEL, recordDeepenedCell, type DeepeningState } from './deepening.ts';
+import { FORCED_ROOT_LEVEL, recordDeepenedCell, withStaticPicks, type DeepeningState } from './deepening.ts';
 import { deepenForcedRoot, isForcedRoot } from './forced-root.ts';
 import { forcedWinFor } from './forced-win.ts';
 import { rootOptions, rootPayload } from './root-setup.ts';
@@ -89,7 +89,7 @@ interface Deepening extends DeepeningState {
 // keepPlayed is a root-position hint: child positions have their own choice space.
 function deepenCell(state: Deepening, i: number, j: number, depth: number, expandedThisLevel: Set<number>): void {
   const child = state.matrix.children[i][j];
-  const sub = subSearch(child.serialized, { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, state.matchupCache);
+  const sub = withStaticPicks(subSearch(child.serialized, { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, state.matchupCache), child);
   recordDeepenedCell(state, i, j, sub, depth, expandedThisLevel);
 }
 
@@ -311,7 +311,7 @@ function localExecutorOn(serializedBattle: string, ruleset: StaticRuleset): Sear
       if (job.draw) return probeDraw(root, job.p1Choice, job.p2Choice, job.draw, serialized => subSearch(serialized, job.settings, matchupCache), matchupCache);
       const child = advancePosition(root, job.p1Choice, job.p2Choice, cellSeeds(root, job.p1Choice, job.p2Choice)[0]);
       if (job.turn) return searchPosition(child.serialized, job.settings, undefined, matchupCache);
-      return subSearch(child.serialized, job.settings, matchupCache);
+      return withStaticPicks(subSearch(child.serialized, job.settings, matchupCache), child);
     },
     async prove(input) {
       return forcedWinFor(root, input);

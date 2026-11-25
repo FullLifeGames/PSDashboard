@@ -1,4 +1,6 @@
 import { cellKey, reblendValue, type PvStep, type ValueMatrix } from '../rank.ts';
+import { WAITING_LABEL } from '../forward/assignments.ts';
+import type { SimPosition } from '../forward/position.ts';
 import type { CellBlend, EvalResult, EvalSettings } from '../types.ts';
 
 /** The deepening bookkeeping the sync search and the orchestrator share; pure, no sim imports. */
@@ -10,6 +12,17 @@ export interface DeepeningState {
   staticValues: number[][];
   trendMap: Map<number, number>;
   pvByCell: Map<number, PvStep[]>;
+}
+
+/** The sub-search's result with its cell child's replacements as steps; a child without any leaves it as it is. */
+export function withStaticPicks(result: EvalResult, child: Pick<SimPosition, 'staticPicks'>): EvalResult {
+  if (!child.staticPicks) return result;
+  const staticPicks = child.staticPicks.map(pick => ({
+    p1: pick.p1 ?? WAITING_LABEL,
+    p2: pick.p2 ?? WAITING_LABEL,
+    replacement: pick.p1 !== undefined && pick.p2 !== undefined ? 'both' as const : pick.p1 !== undefined ? 'p1' as const : 'p2' as const,
+  }));
+  return { ...result, staticPicks };
 }
 
 /** Books one deepened cell; a blended cell re-blends through the first-seed child's class, never overwritten. */
@@ -29,6 +42,7 @@ export function recordDeepenedCell(
   const subTopP2 = sub.perSide.p2[0];
   if (subTopP1 || subTopP2) {
     state.pvByCell.set(cellKey(i, j), [
+      ...(sub.staticPicks ?? []),
       { p1: subTopP1?.label ?? '—', p2: subTopP2?.label ?? '—' },
       ...(subTopP1?.line ?? []),
     ]);

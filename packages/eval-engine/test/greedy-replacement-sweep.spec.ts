@@ -198,11 +198,10 @@ describe('a matrix line names the replacement its cell made', () => {
     const bench = body(['Splash'], { level: 50 });
     const team = [lead, ...(doubles ? [lead] : []), bench, bench];
     const battle = battleOf(format, team, team);
-    for (const side of battle.sides) {
-      for (const active of side.active) {
-        active.hp = 1;
-        active.setStatus('psn');
-      }
+    for (const pokemon of battle.sides.flatMap(side => side.pokemon)) {
+      pokemon.hp = 1;
+      pokemon.status = 'psn' as typeof pokemon.status;
+      pokemon.statusState = { id: 'psn', target: pokemon };
     }
     return serializeBattleStable(battle);
   };
@@ -212,13 +211,12 @@ describe('a matrix line names the replacement its cell made', () => {
     { name: 'Champions VGC doubles', format: 'gen9championsdoublescustomgame', doubles: true },
   ];
 
-  test.each(BOARDS)('$name: both sides lose their active to the poison and the line names both replacements', ({ format, doubles }) => {
+  test.each(BOARDS)('$name: every body is poisoned at 1 HP, so a line opens with both replacements', ({ format, doubles }) => {
     const result = searchPosition(residual(format, doubles), { depth: 2, samples: 1, mode: 'matrix', tera: false, prove: false });
     const lines = SIDES.flatMap(side => result.perSide[side].flatMap(row => (row.line ? [row.line] : [])));
     expect(lines.length).toBeGreaterThan(0);
-    const both = lines.filter(line => line[0].replacement === 'both');
-    expect(both.length).toBeGreaterThan(0);
-    for (const line of both) {
+    for (const line of lines) {
+      expect(line[0].replacement).toBe('both');
       expect(line[0].p1).toMatch(/^→ /);
       expect(line[0].p2).toMatch(/^→ /);
     }

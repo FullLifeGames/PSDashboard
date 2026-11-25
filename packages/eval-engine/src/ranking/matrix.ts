@@ -25,7 +25,7 @@ export interface Ranked {
   matrixOut?: EvalMatrix;
 }
 
-export type PvStep = { p1: string; p2: string };
+export type PvStep = { p1: string; p2: string; replacement?: 'p1' | 'p2' | 'both' };
 
 /** The key of matrix cell (i, j) in the maps of captured lines; assumes fewer than 10,000 columns. */
 export const cellKey = (i: number, j: number) => i * 10_000 + j;

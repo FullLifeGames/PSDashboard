@@ -219,7 +219,8 @@ describe('iterative deepening', () => {
     expect(depth2.perSide.p1[0].line).toHaveLength(1);
 
     const depth3 = searchPosition(threeTurnWin(), { depth: 3, samples: 1, tera: false });
-    expect(depth3.perSide.p1[0].line).toHaveLength(2);
+    expect(depth3.perSide.p1[0].line).toHaveLength(3);
+    expect(depth3.perSide.p1[0].line![0]).toMatchObject({ p1: '(waiting)', replacement: 'p2' });
 
     const again = searchPosition(threeTurnWin(), { depth: 3, samples: 1, tera: false });
     expect(again.perSide.p1[0].line).toEqual(depth3.perSide.p1[0].line);

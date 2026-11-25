@@ -144,7 +144,7 @@ export interface RankedChoice {
   /** Label of the opponent reply that achieves worstCase; null when the opponent has no choices. */
   punishedBy: string | null;
   /** Principal variation after the punishing reply, one best pair of labels per turn; only where depth ≥ 2 expanded. */
-  line?: { p1: string; p2: string }[];
+  line?: { p1: string; p2: string; replacement?: 'p1' | 'p2' | 'both' }[];
   /** Analytic kill odds of this option's move vs the pre-turn opposing active; only if 0 < killFraction < 1. */
   koOdds?: KoOddsInfo;
 }
@@ -176,6 +176,8 @@ export interface EvalResult {
   engine?: { id: string; name: string; version?: string };
   /** The answer of a trend probe (EvalSubSearchJob.draw): this result's score minus the draw's child leaf. */
   trend?: number;
+  /** The static pick's replacements in a deepened cell's turn, as steps that open its line (sub-searches only). */
+  staticPicks?: { p1: string; p2: string; replacement: 'p1' | 'p2' | 'both' }[];
   /**
    * The lines over the next turns, from the tree search: per side its best row's and played row's line, each with
    * every die at its likeliest result. Absent on a matrix search or an engine that sends none. No grade reads it.
