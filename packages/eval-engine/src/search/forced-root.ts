@@ -27,6 +27,7 @@ export function deepenForcedRoot(state: ForcedRootState, search: (serialized: st
   matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!matrix.ended[i][j]) cells.push([i, j]); }));
   const settings = turnSettings(state.settings);
   const subs: EvalResult[] = [];
+  state.callbacks?.onProgress?.({ done: 0, total: cells.length, depth: FORCED_ROOT_LEVEL });
   for (const [i, j] of cells) {
     if (state.callbacks?.shouldStop?.()) return true;
     subs.push(search(matrix.children[i][j].serialized, settings));

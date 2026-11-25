@@ -22,7 +22,8 @@ describe('EvalStatus', () => {
     expect(screen.getByText('Searching… depth 2')).toBeInTheDocument();
     expect(container.querySelector('.ps-eval-progress > div')).toHaveStyle({ width: '25%' });
     rerender(<EvalStatus {...base} status="searching" />);
-    expect(screen.getByText('Searching… depth 1')).toBeInTheDocument();
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+    expect(screen.queryByText(/depth/)).toBeNull();
     expect(container.querySelector('.ps-eval-progress > div')).toHaveStyle({ width: '0%' });
   });
 

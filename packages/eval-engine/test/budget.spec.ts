@@ -23,7 +23,7 @@ import {
 import { serializeLiveBattle } from '../src/serialize';
 import { loadSimModsFor } from '../src/forward/sim-mods';
 import type { StaticRuleset } from '../src/eval-function';
-import type { EvalResult, EvalSettings } from '../src/types';
+import type { EvalResult, EvalSettings, SearchProgress } from '../src/types';
 import { evaluatePosition } from '../src/eval-function';
 import { createMatchupCache } from '../src/score/threat';
 import { resetHitMemo } from '../src/score/contact';
@@ -205,6 +205,20 @@ describe('guards', () => {
     expect(autoTurnSettings(0.12, true).mode).toBe('mcts');
     expect(autoTurnSettings(0.08, false)).toEqual({ depth: 1, samples: 3, mode: 'matrix' });
   });
+
+  test('the forced-root pass opens with an empty bar at depth 2, matrix and sync', async () => {
+    const settings = settingsOf(small, 3);
+    const orchestrated: SearchProgress[] = [];
+    await searchOrchestrated(createLocalExecutor(small.serialized, small.settings.ruleset), settings, { onProgress: progress => orchestrated.push(progress) });
+    const sync: SearchProgress[] = [];
+    searchPosition(small.serialized, settings, { onProgress: progress => sync.push(progress) });
+    for (const seen of [orchestrated, sync]) {
+      const turns = seen.filter(progress => progress.depth === 2);
+      expect(turns[0]).toMatchObject({ done: 0 });
+      expect(turns[0].total).toBeGreaterThan(0);
+      expect(turns.at(-1)!.done).toBe(turns[0].total);
+    }
+  }, 240_000);
 
   test('a stop before the turn searches leaves the depth-1 result, sync and orchestrated', async () => {
     const settings = settingsOf(small, 3);

@@ -68,7 +68,7 @@ export function EvalStatus({ playOutProgress, status, reconstructProgress, progr
       {!playOutProgress && status === 'searching' && (
         <>
           <div style={{ fontSize: 11, color: '#fd6' }}>
-            Searching… depth {progress?.depth ?? 1}
+            Searching…{progress ? ` depth ${progress.depth}` : ''}
           </div>
           <div className="ps-eval-progress">
             <div style={{ width: `${progress && progress.total > 0 ? Math.round((100 * progress.done) / progress.total) : 0}%` }} />

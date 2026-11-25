@@ -118,6 +118,26 @@ describe('tree orchestration through the executor', () => {
     expect(record.proofs[0].input.rootOrder).toEqual(forcedWinInput(result, settings).rootOrder);
   });
 
+  test.each([
+    ['singles', CASES[0], [4, 5, 4, 5]],
+    ['doubles', CASES[2], [4, 5, 3, 5]],
+    ['doubles with three trees of unequal depth', CASES[2], [2, 5, 3]],
+  ])('the depth the trees report never falls: %s', { timeout: 120_000 }, async (_name, name, depths) => {
+    configureSearchBudget({ ...searchBudget(), trees: depths.length, iterations: 30 });
+    onTestFinished(() => configureSearchBudget(null));
+    const local = createLocalTreeExecutor(position(name), rulesetOf(name));
+    const executor: TreeExecutor = {
+      ...local,
+      tree: (settings, offset, onProgress, onPartial) => {
+        onProgress?.({ done: 1, total: 30, depth: depths[offset] });
+        return local.tree(settings, offset, undefined, onPartial);
+      },
+    };
+    const seen: number[] = [];
+    await searchTreesOrchestrated(executor, settingsOf(name), { onProgress: progress => seen.push(progress.depth) });
+    expect(seen).toEqual(depths.map((_, at) => Math.max(...depths.slice(0, at + 1))));
+  });
+
   // Count the trees the budget in force runs: a constant beside it makes the late run wait for trees never started.
   test('a budget of three trees runs three offsets, whatever order they finish in', { timeout: 120_000 }, async () => {
     configureSearchBudget(parseSearchBudget('trees=3'));

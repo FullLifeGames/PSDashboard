@@ -45,17 +45,19 @@ function runTrees(executor: TreeExecutor, settings: EvalSettings, callbacks?: Or
   // A FIXED number of trees (seed offsets 0..N-1 from the search budget, never the pool size).
   const treeCount = searchBudget().trees;
   const doneByTree = new Array<number>(treeCount).fill(0);
+  const depthByTree = new Array<number>(treeCount).fill(0);
   let totalPerTree = 1;
   const completed: MctsTreeStats[] = [];
   return Promise.all(Array.from({ length: treeCount }, async (_, offset) => {
     const started = Date.now();
     const tree = await executor.tree(settings, offset, progress => {
       doneByTree[offset] = progress.done;
+      depthByTree[offset] = progress.depth;
       totalPerTree = progress.total;
       callbacks?.onProgress?.({
         done: doneByTree.reduce((sum, done) => sum + done, 0),
         total: treeCount * totalPerTree,
-        depth: progress.depth,
+        depth: Math.max(...depthByTree),
       });
     }, interim(offset, completed, callbacks));
     perfAdd('tree-wall', Date.now() - started);

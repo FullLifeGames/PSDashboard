@@ -115,6 +115,7 @@ async function deepenForcedRootAsync(state: Orchestration): Promise<boolean> {
   if (state.callbacks?.shouldStop?.()) return true;
   let done = 0;
   const settings = turnSettings(state.settings);
+  state.callbacks?.onProgress?.({ done, total: cells.length, depth: FORCED_ROOT_LEVEL });
   const subs = await Promise.all(cells.map(async ([i, j]) => {
     const sub = await state.executor.subSearch({ i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice, settings, turn: true });
     done += 1;
