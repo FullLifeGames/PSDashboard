@@ -8,6 +8,7 @@ import { AIM_KEY, BOOKKEEPING_FIELDS, BOOKKEEPING_KEYS, boardFacts, ROLL_FIELDS,
 import { CHAMPIONS, mon, playClicks, RULES, type Mode } from './dice-fixtures';
 import { dexOfRules, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
+import { copyOf } from '../src/sim-ask/copy';
 
 await loadSimMods('gen9championsou');
 
@@ -20,6 +21,24 @@ function turnOf(rules: (typeof RULES)[number], moveId: string, mode: Mode, seed:
   playClicks(board, sweepClicks(mode, target));
   return board;
 }
+
+describe('the memo key reads a pending future attack by the turns it has left', () => {
+  const holds = (battle: Battle): boolean => JSON.stringify(State.serializeBattle(battle)).includes('"endingTurn"');
+  const copyAhead = (battle: Battle, turns: number): Battle => {
+    const copy = copyOf(battle);
+    copy.prng ??= battle.prng.clone();
+    copy.turn += turns;
+    return copy;
+  };
+
+  test.each(SWEEP_CASES.filter(entry => entry.rules.generation >= 2))('one turn later is another board only where an absolute landing turn is stored: $name', ({ rules, mode }) => {
+    const pending = turnOf(rules, 'futuresight', mode, '1,2,3,4');
+    expect(endgameKey(copyAhead(pending, 1)) !== endgameKey(copyAhead(pending, 0))).toBe(holds(pending));
+    const plain = turnOf(rules, 'tackle', mode, '1,2,3,4');
+    expect(endgameKey(copyAhead(plain, 1))).toBe(endgameKey(copyAhead(plain, 0)));
+    if (rules.generation >= 5) expect(holds(pending), 'the landing turn is in the state').toBe(true);
+  });
+});
 
 const unchosen = (battle: Battle, moveId: string): boolean => !battle.actions.targetTypeChoices(battle.dex.moves.get(moveId).target);
 

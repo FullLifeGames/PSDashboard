@@ -2,7 +2,7 @@ import { State, type Battle, type Pokemon } from '@pkmn/sim';
 import { sideIndex } from '@fulllifegames/replay-core';
 import { rollsStall } from '../dex-facts/protect.ts';
 import { parsePairChoice } from '../pair/guards.ts';
-import { BOOKKEEPING_FIELDS, BOOKKEEPING_KEYS, STRIPPED_FIELDS } from './board-facts.ts';
+import { BOOKKEEPING_FIELDS, BOOKKEEPING_KEYS, rebaseClocks, STRIPPED_FIELDS } from './board-facts.ts';
 
 // What an entry on the board reads comes from the source of its handlers in the battle's own Dex (`readsOfEntry`).
 // test/delay-facts.spec.ts holds each drop against the installed @pkmn/sim and @pkmn/mods.
@@ -120,6 +120,7 @@ const sortedKeys = (_key: string, value: unknown): unknown =>
 function serialized(battle: Battle): Json & { sides: { pokemon: Json[] }[] } {
   const state = State.serializeBattle(battle) as unknown as Json & { sides: { pokemon: Json[] }[] };
   for (const field of STRIPPED_FIELDS) delete state[field];
+  rebaseClocks(state, battle);
   return state;
 }
 

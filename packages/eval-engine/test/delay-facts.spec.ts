@@ -138,6 +138,23 @@ describe('the simulator reads a dropped field only where the facts keep it (sour
     ]);
   });
 
+  test('the data and the mods read the turn count in three places: the future attack (rebased), Wish (resolves in the turn after) and Gen 3 Truant (a boolean)', () => {
+    const reads = sources.filter(source => !source.file.startsWith('@pkmn/sim:sim/')).flatMap(source => source.lines.map(line => line.trim())
+      .filter(line => /\bthis\.turn\b|\bgetOverflowedTurnCount\b|\b(?:ending|starting)Turn\b/.test(line) && !/^(\/\/|\/\*|\*)/.test(line)).map(line => `${source.file}: ${line}`));
+    expect(reads).toEqual([
+      '@pkmn/sim:data/conditions.js: this.effectState.endingTurn = (this.turn - 1) + 2;',
+      '@pkmn/sim:data/conditions.js: if (this.gen >= 8 && this.effectState.endingTurn >= 256) {',
+      '@pkmn/sim:data/conditions.js: if (this.gen >= 8 && this.effectState.endingTurn >= 256) {',
+      '@pkmn/sim:data/conditions.js: if (this.getOverflowedTurnCount() < this.effectState.endingTurn)',
+      '@pkmn/sim:data/mods/gen3/abilities.js: pokemon.truantTurn = this.turn !== 0;',
+      '@pkmn/sim:data/moves.js: this.effectState.startingTurn = this.getOverflowedTurnCount();',
+      '@pkmn/sim:data/moves.js: if (this.gen >= 8 && this.effectState.startingTurn === 255) {',
+      '@pkmn/sim:data/moves.js: this.hint(`In Gen 8+, Wish will never resolve when used on the ${this.turn}th turn.`);',
+      '@pkmn/sim:data/moves.js: if (this.gen >= 8 && this.effectState.startingTurn === 255) {',
+      '@pkmn/sim:data/moves.js: if (this.getOverflowedTurnCount() <= this.effectState.startingTurn)',
+    ]);
+  });
+
   test.each(['pp', 'last', 'activeTurns', 'activeMoveActions'])('%s: no format rule reads it (the rule sets are no entry of the board)', name => {
     const rules = roots.flatMap(({ name: pkg, root }) => files(root.replace(/\/$/, '')).filter(path => /rulesets\.js$/.test(path) && PLAYED.test(`${pkg}:${path.slice(root.length)}`))
       .flatMap(path => readFileSync(path, 'utf8').split('\n')));

@@ -18,6 +18,16 @@ const FLAGS_OF_TURN_ONE = new Set(['statsRaisedThisTurn', 'statsLoweredThisTurn'
 export const AIM_KEY = 'lastMoveTargetLoc';
 
 type Json = Record<string, unknown>;
+
+/** Replaces each absolute landing turn a condition stores (`endingTurn`) by the turns left. */
+export function rebaseClocks(node: unknown, battle: Battle): void {
+  if (!node || typeof node !== 'object') return;
+  const turns = battle.getOverflowedTurnCount();
+  for (const [key, child] of Object.entries(node)) {
+    if (key === 'endingTurn' && typeof child === 'number') (node as Json)[key] = child - turns;
+    else rebaseClocks(child, battle);
+  }
+}
 interface Bodies { pokemon: Json[] }
 
 function state(battle: Battle): Json & { sides: Bodies[] } {

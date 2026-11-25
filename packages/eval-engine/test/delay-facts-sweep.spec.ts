@@ -174,7 +174,7 @@ describe.each(WITH_STALL)('equal facts, the same next turn, $name', ({ rules, mo
   const dex = dexOfRules(rules);
   const moves = sweepMoves(rules, () => true, false).moves;
   const readers = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && Object.entries(readsOfEntry(dex, 'move', move.id)).some(([name, read]) => read && name !== 'last'));
-  const sample = [...new Map([...sweepSelection(moves, 'moves'), ...readers, dex.moves.get('tackle')].filter(move => !isFutureAttack(move)).map(move => [move.id, move])).values()];
+  const sample = [...new Map([...sweepSelection(moves, 'moves'), ...readers, dex.moves.get('tackle')].map(move => [move.id, move])).values()];
 
   test('the sample holds moves that read PP, the last move and the entry counters', () => expect(readers.length).toBeGreaterThan(0));
 
@@ -185,14 +185,12 @@ describe.each(WITH_STALL)('equal facts, the same next turn, $name', ({ rules, mo
   });
 });
 
-// From Generation 5 a future attack notes the absolute turn it lands on (`endingTurn`), which the facts drop: the later
-// generations' rows are `test.fails` until the facts carry the turn relative to the count.
+// A future attack stores the absolute turn it lands on (`endingTurn`); the facts carry the turns left.
 describe.each(WITH_STALL)('a pending future attack, equal facts, the same next turn, $name', ({ rules, mode }) => {
   const dex = dexOfRules(rules);
   const attacks = dex.moves.all().filter(move => move.exists && move.gen <= dex.gen && isFutureAttack(move));
-  const keepsTurn = rules.generation >= 5;
   test('the Dex holds a future attack', () => expect(attacks.length).toBeGreaterThan(0));
-  (keepsTurn ? test.fails : test)('the turn after a held repeat is the same where the facts are equal', () => {
+  test('the turn after a held repeat is the same where the facts are equal', () => {
     const { bad } = nextTurnReads(rules, mode, attacks);
     expect(bad).toEqual([]);
   });
