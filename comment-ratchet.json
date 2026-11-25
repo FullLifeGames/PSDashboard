@@ -1,20 +1,20 @@
 {
   "history": {},
   "lines": {
-    "source:eval-engine": 7266,
-    "source:replay-core": 2120,
-    "source:app": 2925,
-    "source:app-css": 97,
-    "workflows": 39,
-    "scripts": 1037,
-    "config": 151,
-    "test:app": 1771,
-    "test:replay-core": 1250,
-    "test:eval-engine": 5308,
-    "test:ui": 1247,
-    "test:e2e": 1036,
-    "test:e2e-feedback": 139,
-    "test:e2e-build": 30,
-    "test:e2e-capture": 13
+    "source:eval-engine": 2366,
+    "source:replay-core": 865,
+    "source:app": 891,
+    "source:app-css": 33,
+    "workflows": 26,
+    "scripts": 225,
+    "config": 26,
+    "test:app": 213,
+    "test:replay-core": 190,
+    "test:eval-engine": 654,
+    "test:ui": 147,
+    "test:e2e": 140,
+    "test:e2e-feedback": 34,
+    "test:e2e-build": 2,
+    "test:e2e-capture": 4
   }
 }
