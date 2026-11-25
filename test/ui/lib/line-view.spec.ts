@@ -37,6 +37,33 @@ describe('lineBlocks', () => {
     expect(chips[2]).toEqual([['Brave Bird: KO (10 of 16 rolls)'], []]);
   });
 
+  describe('a step where the game leaves a side one choice', () => {
+    const marked = (line: EvalLine, at: number, side: 'p1' | 'p2', onlyChoice: number[]): EvalLine =>
+      ({ ...line, steps: line.steps.map((step, index) => (index === at ? { ...step, [side]: { ...step[side], onlyChoice } } : step)) });
+    const texts = (line: EvalLine, ctx: LineViewContext) => lineBlocks([line], ctx)[0].rows.flatMap(row => row.sides.map(side => `${side.side} ${side.text}`));
+
+    test('singles: the label stands beside the choice and no other step carries it', () => {
+      expect(texts(marked(singlesLine, 2, 'p1', [0]), singles)).toEqual([
+        'p1 Draining Kiss', 'p2 Hydro Pump', 'p1 → Corviknight', 'p2 Moonblast', 'p1 Brave Bird (only choice)', 'p2 Moonblast',
+      ]);
+    });
+
+    test('doubles: the label names the held slot\'s choice, a switch with its arrow', () => {
+      const held = marked(marked(doublesLine, 0, 'p1', [1]), 0, 'p2', [0]);
+      expect(texts(held, doubles).slice(0, 2)).toEqual([
+        'p1 Fake Out → Rillaboom + Spore → Zamazenta (only choice: Spore)',
+        'p2 Sucker Punch → Terapagos + Protect (only choice: Sucker Punch)',
+      ]);
+      const bench = { ...doublesLine, steps: doublesLine.steps.map((step, index) => (index === 0 ? { ...step, p1: { ...step.p1, slots: [step.p1.slots[0], { kind: 'switch' as const, speciesId: 'garchomp', pokemonName: 'Garchomp' }], onlyChoice: [1] } } : step)) };
+      expect(texts(bench, doubles)[0]).toBe('p1 Fake Out → Rillaboom + Spore → Zamazenta (only choice: → Garchomp)');
+    });
+
+    test('doubles: both slots held, or a replacement of one body, read plainly', () => {
+      expect(texts(marked(doublesLine, 0, 'p1', [0, 1]), doubles)[0]).toBe('p1 Fake Out → Rillaboom + Spore → Zamazenta (only choice)');
+      expect(texts(marked(doublesLine, 1, 'p2', [0]), doubles)[2]).toBe('p2 replaces: → Zamazenta-Crowned (only choice)');
+    });
+  });
+
   test('the tooltip of the play button lists every forced die, the quiet ones too', () => {
     const [block] = lineBlocks([singlesLine], singles);
     expect(block.tooltip).toContain('Play this line as a variation');

@@ -1,4 +1,4 @@
-import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type EvalResult, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
+import { dieKey, dieLabel, winPctText, type DieKind, type DieWords, type EvalLine, type EvalResult, type LineChoice, type LineDie, type LineStep } from '@fulllifegames/eval-engine';
 import { rulesDex, type GameRules, type TurnSnapshot } from '@fulllifegames/replay-core';
 import { wordsOf } from './branch-dice';
 import type { WinPathsHost } from './win-paths-host';
@@ -195,6 +195,14 @@ const roleText = (line: EvalLine, neverActed = false): string => {
   return `${line.for.includes('engine') ? 'engine' : 'played'}: ${line.label}`;
 };
 
+function onlyChoiceNote(choice: LineChoice): string {
+  const held = choice.onlyChoice ?? [];
+  const slots = choice.slots.flatMap((slot, index) => (slot ? [{ slot, held: held.includes(index) }] : []));
+  if (held.length === 0) return '';
+  if (slots.length < 2 || slots.every(entry => entry.held)) return ' (only choice)';
+  return ` (only choice: ${slots.filter(entry => entry.held).map(({ slot }) => (slot.kind === 'switch' ? `→ ${slot.pokemonName}` : slot.moveName)).join(' and ')})`;
+}
+
 function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[]; every: string[] } {
   const rows: LineRowView[] = [];
   const every: string[] = [];
@@ -210,7 +218,7 @@ function stepViews(line: EvalLine, ctx: LineViewContext): { rows: LineRowView[];
         const entry = step.dice.find(candidate => dieKey(candidate.die.name) === dieKey(die.name));
         return entry?.shown ? [chipText(entry, wordsOfDie(entry, step, words))] : [];
       });
-      return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: step.replacement ? `replaces: ${replacementWords(choice.label)}` : choice.label, chips };
+      return { side, player: ctx.playerNames[SIDE_INDEX[side]], text: `${step.replacement ? `replaces: ${replacementWords(choice.label)}` : choice.label}${onlyChoiceNote(choice)}`, chips };
     });
     // A replacement inside a turn plays on in the turn before it: its dice belong to that turn's number.
     for (const entry of step.dice) every.push(`${label || `T${turn - 1}`}: ${tooltipText(entry, wordsOfDie(entry, step, words))}`);
