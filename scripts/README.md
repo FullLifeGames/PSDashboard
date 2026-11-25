@@ -300,7 +300,7 @@ Prints the K table a capture runs under (the leaf's K per rule set and game type
 
 ## Lint ratchets and counts
 
-`npm run lint` runs ESLint, then `twin-lists.mjs`, `spec-counts.mjs` and `comment-counts.mjs`. Every ratchet only falls; `update-lint-ratchet.mjs` lowers the baselines after a cut.
+`npm run lint` runs ESLint, then `twin-lists.mjs`, `spec-counts.mjs` and `comment-counts.mjs --shape`. Every ratchet only falls; `update-lint-ratchet.mjs` lowers the baselines after a cut.
 
 ### update-lint-ratchet.mjs
 
@@ -328,7 +328,7 @@ node scripts/comment-counts.mjs [--shape [files...]]
 
 Without a flag it checks the two comment ratchets of `comment-ratchet.json` and exits 1 when one is above its baseline: comment lines per project (`source:eval-engine`, `source:replay-core`, `source:app`, `source:app-css`, `workflows`, `scripts`, `config` and one `test:<project>` each; the calibration ledger spec stays out) and history lines per workflow file. The history lines of the source files are held by the lint rule `comments/no-history`.
 
-`--shape` also checks the shape of the workflow files and the app's stylesheets, which no lint rule reads. With file arguments (paths from the current folder) it checks only those files, skips the ratchets and exits 1 on a hit.
+`--shape` also checks the shape of the workflow files and the app's stylesheets, which no lint rule reads; `npm run lint` passes it. With file arguments (paths from the current folder) it checks only those files, skips the ratchets and exits 1 on a hit.
 
 ### twin-lists.mjs
 
