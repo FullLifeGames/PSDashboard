@@ -136,15 +136,17 @@ function listed(view: SimView, moveId: string, counter: number, asleep: boolean)
   return listsMove(searchOptions(rootOf(board(view, moveId, counter, asleep)), 'p1'), moveId);
 }
 
-interface Truth { fresh: Outcome; once: Outcome; twice: Outcome }
+interface Truth { fresh: Outcome; once: Outcome; twice: Outcome; asleep: Outcome }
 
 const truthOf = (view: SimView, moveId: string): Truth => ({
   fresh: outcome(view, moveId, 0, false),
   once: outcome(view, moveId, 1, false),
   twice: outcome(view, moveId, 2, false),
+  asleep: outcome(view, moveId, 0, true),
 });
 
 const turnsAway = (outcome: Outcome): boolean => outcome === 'refused' || outcome === 'unoffered';
+const asleepOnly = (truth: Truth): boolean => truth.fresh === 'refused' && truth.asleep === 'tried';
 const firstTurnOnly = (truth: Truth): boolean => truth.fresh === 'tried' && turnsAway(truth.once) && turnsAway(truth.twice);
 
 describe('a move its own handler refuses by the body is no option, in the simulator, singles and doubles', () => {
@@ -154,13 +156,14 @@ describe('a move its own handler refuses by the body is no option, in the simula
     const classOf = (pick: (truth: Truth) => boolean) => ids.filter(id => pick(truths.get(id)!));
 
     test.each([
-      { counter: 0 },
-      { counter: 1 },
-      { counter: 2 },
-    ])('the options drop exactly the moves the simulator refuses at action count $counter', ({ counter }) => {
-      const at = (truth: Truth) => [truth.fresh, truth.once, truth.twice][counter];
-      const expected = classOf(truth => at(truth) === 'unoffered' || (counter >= 1 && firstTurnOnly(truth)));
-      expect(ids.filter(id => !listed(view, id, counter, false))).toEqual(expected);
+      { counter: 0, asleep: false },
+      { counter: 1, asleep: false },
+      { counter: 2, asleep: false },
+      { counter: 0, asleep: true },
+    ])('the options drop exactly the moves the simulator refuses at action count $counter, asleep $asleep', ({ counter, asleep }) => {
+      const at = (truth: Truth) => (asleep ? truth.asleep : [truth.fresh, truth.once, truth.twice][counter]);
+      const expected = classOf(truth => at(truth) === 'unoffered' || (!asleep && (asleepOnly(truth) || (counter >= 1 && firstTurnOnly(truth)))));
+      expect(ids.filter(id => !listed(view, id, counter, asleep))).toEqual(expected);
     });
 
     test('the first-turn-only moves are the ones whose handler reads the action count', () => {
@@ -168,6 +171,9 @@ describe('a move its own handler refuses by the body is no option, in the simula
       expect(classOf(firstTurnOnly)).toEqual(reads);
     });
 
+    test('the sleep-only moves are the ones the Dex marks as usable asleep', () => {
+      expect(classOf(asleepOnly)).toEqual(ids.filter(id => (view.dex.moves.get(id) as { sleepUsable?: boolean }).sleepUsable));
+    });
   });
 });
 
@@ -179,6 +185,12 @@ describe('the reported scenes', () => {
       expect(listed(view, 'fakeout', 0, false)).toBe(true);
       expect(listed(view, 'fakeout', 1, false)).toBe(false);
       expect(listed(view, 'fakeout', 5, false)).toBe(false);
+    });
+
+    test.runIf(has('sleeptalk'))('Sleep Talk is no reply of an awake body and stays with a sleeping one', () => {
+      expect(listed(view, 'sleeptalk', 0, false)).toBe(false);
+      expect(listed(view, 'sleeptalk', 3, false)).toBe(false);
+      expect(listed(view, 'sleeptalk', 0, true)).toBe(true);
     });
 
     test.runIf(has('fakeout') && outcome(view, 'fakeout', 1, false) === 'refused')('a body whose only move is refused keeps it', () => {

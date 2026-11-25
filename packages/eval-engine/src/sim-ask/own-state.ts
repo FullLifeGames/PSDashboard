@@ -15,10 +15,10 @@ function bodyTry(dex: Dex, moveId: string): BodyTry {
   if (!byId) tries.set(dex, byId = new Map());
   let found = byId.get(moveId);
   if (!found) {
-    const move = dex.moves.get(moveId) as { onTry?: unknown };
+    const move = dex.moves.get(moveId) as { onTry?: unknown; sleepUsable?: boolean };
     const handler = typeof move.onTry === 'function' ? move.onTry as TryHandler : null;
     const firstTurn = handler !== null && READS_ACTIONS.test(String(handler));
-    byId.set(moveId, found = { handler: firstTurn ? handler : null, firstTurn });
+    byId.set(moveId, found = { handler: firstTurn || move.sleepUsable === true ? handler : null, firstTurn });
   }
   return found;
 }
@@ -28,7 +28,7 @@ export function firstTurnOnly(dex: Dex, moveId: string): boolean {
   return bodyTry(dex, moveId).firstTurn;
 }
 
-/** Whether the move's own Try handler refuses `source` now: a first-turn move after an action. */
+/** Whether the move's own Try handler refuses `source` now: a first-turn move after an action, a sleep move awake. */
 export function refusedByBody(battle: Battle, source: Pokemon, target: Pokemon, moveId: string): boolean {
   const { handler } = bodyTry(battle.dex, moveId);
   if (!handler) return false;
