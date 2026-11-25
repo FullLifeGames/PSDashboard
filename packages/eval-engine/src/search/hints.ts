@@ -6,7 +6,7 @@ import { bodyAsClicked } from '../calc/tera-click.ts';
 import { RULE_MOVES } from '../move-use.ts';
 import { shieldsFromHits, shieldsSide } from '../dex-facts/protect.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
-import { bodyInView, callHandler, guarded, isolated, protectorStops } from '../sim-ask/index.ts';
+import { bodyInView, callHandler, firstTurnOnly, guarded, isolated, protectorStops } from '../sim-ask/index.ts';
 
 
 export const isCombined = (options: ChoiceOption[]) => options.some(option => option.choice.includes(','));
@@ -90,7 +90,6 @@ function switchHint(board: HintBoard, tokens: string[]): number {
     boostedFraction(pairThreat(foe, candidate, battle), foe, candidate)));
 }
 
-// Sets the body terastallized for the call and restores it, as speed.ts effectiveSpeed does.
 function asClicked<T>(attacker: Pokemon, clicked: boolean, ask: () => T): T {
   if (!clicked || attacker.terastallized || !attacker.teraType) return ask();
   attacker.terastallized = attacker.teraType;
@@ -232,7 +231,8 @@ function aimedRead(board: HintBoard, tokens: string[], attacker: Pokemon, target
     damage = Math.max(...foes.map(each => singleMoveFraction(attacker, each, tokens[1], battle)));
     if (foes.length === 1) foe = foes[0];
   }
-  const hint = tokens[1] === 'fakeout' && attacker.activeMoveActions === 0 ? damage + FLINCH_BONUS : damage;
+  const opens = firstTurnOnly(battle.dex, tokens[1]) && battle.dex.moves.get(tokens[1]).secondary?.volatileStatus === 'flinch';
+  const hint = opens && attacker.activeMoveActions === 0 ? damage + FLINCH_BONUS : damage;
   const read: PartRead = { ...plainRead(hint), attack: hint };
   if (foe) {
     read.foeSlot = foeActives.indexOf(foe) + 1;

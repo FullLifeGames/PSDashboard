@@ -7,3 +7,4 @@ export { callHandler } from './handler.ts';
 export { bodyInView, isolated } from './isolated.ts';
 export { protectorStops } from './protector.ts';
 export { twinBattle, twinFormat } from './twin.ts';
+export { firstTurnOnly, refusedByBody } from './own-state.ts';

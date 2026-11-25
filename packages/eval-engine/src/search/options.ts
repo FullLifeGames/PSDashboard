@@ -6,11 +6,11 @@ import type { PlayedAction } from '../played.ts';
 import type { TeraAllowance } from '../types.ts';
 import { combinedOptionHints, isCombined, singlesOptionHints } from './hints.ts';
 import { sideIndex } from '@fulllifegames/replay-core';
+import { refusedByBody } from '../sim-ask/index.ts';
 
 
 const RESTRICT_K = 8;
 
-// Combined-option cap for doubles, mandatory everywhere (the root included).
 const RESTRICT_K_DOUBLES = 16;
 const BASE_CORE_BUDGET = 12;
 const GIMMICK_CORE_BUDGET = 4;
@@ -54,8 +54,7 @@ function restrictCombined(
   return restricted;
 }
 
-// The played combo stays rankable even when the hints would drop it, so played-vs-best regret has something to read.
-// A hidden slot (flinch) falls back to the best-hint consistent combo, the candidate the analysis grades.
+// The played combo stays rankable past the hints; a hidden slot (flinch) takes the best-hint consistent combo.
 function keepPlayedCore(
   options: ChoiceOption[],
   restricted: ChoiceOption[],
@@ -78,7 +77,7 @@ function keepPlayedCore(
 }
 
 /** Layers at which a layered hazard refuses another; only `onSideRestart` code says it, no Dex field. */
-// oracle: packages/eval-engine/test/noop-field-moves-oracle.spec.ts
+// oracle: packages/eval-engine/test/noop-moves-oracle.spec.ts
 export const LAYER_CAPS: Record<string, number> = { spikes: 3, toxicspikes: 2 };
 
 type Side = ReturnType<typeof positionBattle>['sides'][number];
@@ -109,15 +108,41 @@ function dropNoopMoves(
 ): ChoiceOption[] {
   const own = battle.sides[sideIndex(side)];
   const foe = battle.sides[side === 'p1' ? 1 : 0];
+  const foeBody = foe.active.find(body => body && !body.fainted);
   const foeSleeps = sleepClauseActive(battle, sleepClause) &&
     foe.pokemon.some(pokemon => !pokemon.fainted && pokemon.status === 'slp');
   const filtered = options.filter(option => {
     if (!option.choice.startsWith('move ')) return true;
     const moveId = option.choice.split(' ')[1];
     if (foeSleeps && battle.dex.moves.get(moveId).status === 'slp') return false;
-    return !failsAgainstStanding(battle.dex, moveId, own, foe);
+    const body = own.active[0];
+    return !failsAgainstStanding(battle.dex, moveId, own, foe) && !(body && foeBody && refusedByBody(battle, body, foeBody, moveId));
   });
   return filtered.length > 0 ? filtered : options;
+}
+
+function dropRefusedParts(battle: ReturnType<typeof positionBattle>, side: 'p1' | 'p2', options: ChoiceOption[]): ChoiceOption[] {
+  const own = battle.sides[sideIndex(side)];
+  const foeBody = battle.sides[side === 'p1' ? 1 : 0].active.find(body => body && !body.fainted);
+  if (!foeBody) return options;
+  const parts = options.map(option => option.choice.split(',').map(part => part.trim()));
+  const refused = new Map<string, boolean>();
+  const refusedAt = (slot: number, part: string): boolean => {
+    const key = `${slot}:${part}`;
+    let answer = refused.get(key);
+    if (answer === undefined) {
+      const body = own.active[slot];
+      const [verb, moveId] = part.split(' ');
+      refused.set(key, answer = verb === 'move' && !!body && !body.fainted && refusedByBody(battle, body, foeBody, moveId));
+    }
+    return answer;
+  };
+  const starved = new Set<number>();
+  for (let slot = 0; slot < Math.max(...parts.map(each => each.length)); slot++) {
+    if (parts.every(each => each[slot] === undefined || refusedAt(slot, each[slot]))) starved.add(slot);
+  }
+  const kept = options.filter((_option, index) => parts[index].every((part, slot) => starved.has(slot) || !refusedAt(slot, part)));
+  return kept.length > 0 ? kept : options;
 }
 
 export function searchOptions(
@@ -126,7 +151,7 @@ export function searchOptions(
   opts?: { tera?: TeraAllowance; keep?: (PlayedAction | null)[]; sleepClause?: boolean },
 ): ChoiceOption[] {
   const options = legalChoices(position, side, { tera: opts?.tera, partner: opts?.keep });
-  if (isCombined(options)) return restrictCombined(position, side, options, opts?.keep);
+  if (isCombined(options)) return restrictCombined(position, side, dropRefusedParts(positionBattle(position), side, options), opts?.keep);
   return dropNoopMoves(positionBattle(position), side, options, opts?.sleepClause);
 }
 

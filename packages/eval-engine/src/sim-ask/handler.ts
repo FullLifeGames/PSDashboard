@@ -10,7 +10,7 @@ const noop = (): undefined => undefined;
 export function callHandler<T = unknown>(
   handler: (this: never, ...args: never[]) => T, facade: object, args: readonly unknown[],
 ): HandlerResult<T> {
-  const self = Object.create(facade, { add: { value: noop }, debug: { value: noop } }) as never;
+  const self = Object.create(facade, { add: { value: noop }, debug: { value: noop }, hint: { value: noop } }) as never;
   return viewGuarded(facade, () => {
     try {
       return { ok: true, value: (handler as (this: never, ...a: unknown[]) => T).call(self, ...args) };
