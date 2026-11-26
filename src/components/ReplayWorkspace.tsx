@@ -49,7 +49,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
       search={{
-        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin',
+        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin', showTera: app.ctx.meta.replayGen === 9,
         running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
       }}
       embed={embed}

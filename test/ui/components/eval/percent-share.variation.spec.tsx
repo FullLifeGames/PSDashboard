@@ -46,7 +46,7 @@ const mainTooltip = () => document.querySelector(`rect[data-turn="${TURN}"]:not(
 describe('a variation point and the panel print one number', () => {
   const panelProps = (kind: FormatKind, mode: EvalPreferences['mode'], overrides: Partial<Parameters<typeof EvalPanel>[0]> = {}): Parameters<typeof EvalPanel>[0] => ({
     playerNames: names, status: 'done', progress: null, reconstructProgress: null, error: null, prefs: prefsFor(mode),
-    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: true, showTera: true, report: null,
+    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: true, report: null,
     graph: lateGraph(kind, mode), faintedShares: mainShares(), result: evalResult(kind, { score: SCORE }),
     positionLabel: `Turn ${TURN} · variation`, currentTurn: TURN, currentLine: 'variation', analysisTurn: TURN - 1, analysis: null, graphMaxTurn: 10,
     variation: { startTurn: TURN - 1, scores: variationScores(), shares: variationShares() },

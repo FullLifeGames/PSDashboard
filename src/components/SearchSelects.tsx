@@ -6,6 +6,8 @@ export interface SearchSelectsProps {
   prefs: EvalPreferences;
   onPrefsChange: (prefs: EvalPreferences) => void;
   running: boolean;
+  external: boolean;
+  showTera: boolean;
 }
 
 function autoLineText(split: SearchBudget['singles']): string {
@@ -20,7 +22,32 @@ function autoTitle(budget: SearchBudget): string {
     `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
 }
 
-export function SearchSelects({ prefs, onPrefsChange, running }: SearchSelectsProps) {
+function TeraRow({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, 'prefs' | 'onPrefsChange' | 'running'>) {
+  const teraId = useId();
+  return (
+    <label
+      className="ps-setup-row"
+      htmlFor={teraId}
+      title="Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format."
+    >
+      Tera
+      <select
+        id={teraId}
+        className="ps-setup-row-select"
+        value={prefs.tera}
+        onChange={event => onPrefsChange({ ...prefs, tera: event.target.value as EvalPreferences['tera'] })}
+        disabled={running}
+      >
+        <option value="auto">Auto</option>
+        <option value="on">On</option>
+        <option value="off">Off</option>
+        <option value="revealed">Revealed</option>
+      </select>
+    </label>
+  );
+}
+
+function DepthRows({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, 'prefs' | 'onPrefsChange' | 'running'>) {
   const depthId = useId();
   const samplesId = useId();
   return (
@@ -65,6 +92,15 @@ export function SearchSelects({ prefs, onPrefsChange, running }: SearchSelectsPr
           </select>
         </label>
       )}
+    </>
+  );
+}
+
+export function SearchSelects({ external, showTera, ...rows }: SearchSelectsProps) {
+  return (
+    <>
+      {!external && <DepthRows {...rows} />}
+      {showTera && <TeraRow {...rows} />}
     </>
   );
 }

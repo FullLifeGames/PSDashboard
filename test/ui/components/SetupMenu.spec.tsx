@@ -145,7 +145,7 @@ const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: fal
 type Search = NonNullable<Parameters<typeof SetupMenu>[0]['search']>;
 
 async function openMenu(overrides: Partial<Search> = {}) {
-  const search: Search = { prefs, onPrefsChange: vi.fn(), running: false, external: false, ...overrides };
+  const search: Search = { prefs, onPrefsChange: vi.fn(), running: false, external: false, showTera: true, ...overrides };
   const view = render(
     <SetupMenu
       animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()}
@@ -219,5 +219,39 @@ describe('Depth and Samples in the Setup menu', () => {
     render(<SetupMenu animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
     expect(screen.queryByText('Depth')).toBeNull();
+  });
+});
+
+describe('Tera in the Setup menu', () => {
+  const TERA_TITLE = 'Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. '
+    + 'Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format.';
+
+  test('the row stands below Depth and Samples with its title, and a pick writes the preference', async () => {
+    const { search } = await openMenu();
+    const rows = [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')].map(row => row.firstChild?.textContent?.trim());
+    expect(rows).toEqual(['Depth', 'Samples', 'Tera']);
+    expect(screen.getByText('Tera')).toHaveAttribute('title', TERA_TITLE);
+    expect([...select('Tera').querySelectorAll('option')].map(option => [option.value, option.textContent])).toEqual([['auto', 'Auto'], ['on', 'On'], ['off', 'Off'], ['revealed', 'Revealed']]);
+    expect(select('Tera')).toHaveValue('auto');
+    await userEvent.selectOptions(select('Tera'), 'revealed');
+    expect(search.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, tera: 'revealed' });
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('a format without Tera draws no row', async () => {
+    await openMenu({ showTera: false });
+    expect(screen.queryByText('Tera')).toBeNull();
+    expect(screen.getByText('Depth')).toBeInTheDocument();
+  });
+
+  test('another engine still gets the row, since the request carries the Tera setting, and no Depth', async () => {
+    await openMenu({ external: true });
+    expect(select('Tera')).toBeEnabled();
+    expect(screen.queryByText('Depth')).toBeNull();
+  });
+
+  test('the row locks while a search runs', async () => {
+    await openMenu({ running: true });
+    expect(select('Tera')).toBeDisabled();
   });
 });

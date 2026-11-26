@@ -15,8 +15,8 @@ interface SetupMenuProps {
   onOpponentReadsChange: (value: boolean) => void;
   onEditSide: (side: 'p1' | 'p2') => void;
   onOpenSets: () => void;
-  /** Left out, the menu draws neither Depth nor Samples; `external` is another engine, which decides its own depth. */
-  search?: SearchSelectsProps & { external: boolean };
+  /** Left out, the menu draws none of the search rows. */
+  search?: SearchSelectsProps;
 }
 
 /** The "Opponent reads my move" box is drawn only with the flag `opponentReadsEnabled` (`src/lib/feature-flags.ts`). */
@@ -66,7 +66,7 @@ export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, 
               Opponent reads my move
             </label>
           )}
-          {search && !search.external && <SearchSelects prefs={search.prefs} onPrefsChange={search.onPrefsChange} running={search.running} />}
+          {search && <SearchSelects {...search} />}
           <SizeSelect />
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p1'))}>Edit Player</button>
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p2'))}>Edit Opp</button>

@@ -61,6 +61,15 @@ describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
     expect(screen.queryByText('Depth', { selector: '.ps-eval-controls *' })).toBeNull();
   });
 
+  test.each([['singles'], ['doubles'], ['vgc']] as const)('%s (Generation 9): the menu holds Tera and a pick updates the preferences; the evaluation header holds no select', async kind => {
+    const { app } = await mountLoaded(kind);
+    expect(screen.queryByRole('combobox')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+    await userEvent.selectOptions(within(screen.getByText('Tera')).getByRole('combobox'), 'revealed');
+    await waitFor(() => expect(app().ctx.evaluation.prefs.tera).toBe('revealed'));
+    expect(screen.queryByText('Tera', { selector: '.ps-eval-controls *' })).toBeNull();
+  });
+
   test('another engine hides both selects in the menu', async () => {
     const { app } = await mountLoaded('singles');
     act(() => app().ctx.engines.add('My bot', 'http://localhost:8765/'));
@@ -69,5 +78,6 @@ describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
     expect(screen.getByRole('button', { name: 'Edit Player' })).toBeInTheDocument();
     expect(screen.queryByText('Depth')).toBeNull();
     expect(screen.queryByText('Samples')).toBeNull();
+    expect(within(screen.getByText('Tera')).getByRole('combobox')).toBeEnabled();
   });
 });
