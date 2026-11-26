@@ -3,7 +3,7 @@ import { Dex } from '@pkmn/sim';
 import * as championsMod from '@pkmn/mods/champions';
 import { createInferrerState } from '../src/inference/inferrer-state';
 import { readLine } from '../src/inference/log-line';
-import { contactLands } from '../src/inference/item-evidence';
+import { contactLands } from '../src/inference/contact-tell';
 import { dexOf, rulesDex, type RulesDex } from '../src/rules-dex';
 import { factsOf } from '../src/set-coherence';
 import { fillsOpenMove } from '../src/team/open-moves';

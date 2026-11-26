@@ -10,6 +10,7 @@ import type { ScreenWatch } from './screen-evidence.ts';
 import type { FieldWatch } from './field-evidence.ts';
 import type { HitWalk } from './hits.ts';
 import type { BlockedWatch } from './blocked-effects.ts';
+import type { ItemTell } from './contact-tell.ts';
 import { arg, type LogLine } from './log-line.ts';
 
 export interface InferrerState {
@@ -38,6 +39,7 @@ export interface InferrerState {
   fieldWatch?: FieldWatch;
   hitWalk?: HitWalk;
   blockedWatch?: BlockedWatch;
+  itemTells?: Map<RevealedPokemonInfo, ItemTell>;
 }
 
 export function createInferrerState(lines: readonly LogLine[], opponentSide: 'p1' | 'p2'): InferrerState {

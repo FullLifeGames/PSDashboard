@@ -1,6 +1,6 @@
-import type { PokemonSet } from '@pkmn/sim';
+import { TeamValidator, type PokemonSet } from '@pkmn/sim';
 import { toId } from '../ids.ts';
-import { dexOf, simFormats, type GameRules, type RulesDex } from '../rules-dex.ts';
+import { dexOf, logRules, simFormats, type GameRules, type RulesDex } from '../rules-dex.ts';
 
 /** The rules read only the Dex of the replay's generation, never a species or ability name. */
 
@@ -9,6 +9,7 @@ export type GenDex = RulesDex;
 export interface LegalityContext extends GameRules {
   /** A format with free abilities (abilitiesAreFree): players may give any species any ability or item. */
   freeAbilities: boolean;
+  bannedAbilities?: ReadonlySet<string>;
 }
 
 function ownAbilities(dex: GenDex, species: string): string[] {
@@ -48,6 +49,43 @@ export function abilitiesAreFree(log: string): boolean {
   // A custom game keeps each species to its own abilities (draft leagues); a format the sim does not know does too.
   if (!format.exists || format.id.endsWith('customgame')) return false;
   return !simFormats().getRuleTable(format).has('obtainableabilities');
+}
+
+const bansByFormat = new Map<string, ReadonlySet<string>>();
+
+function bansOfFormat(formatId: string): ReadonlySet<string> {
+  const known = bansByFormat.get(formatId);
+  if (known) return known;
+  const validator = new TeamValidator(formatId);
+  const probe = { name: '', species: '' } as unknown as PokemonSet;
+  const bans = new Set(validator.dex.abilities.all().filter(ability => ability.exists && validator.checkAbility(probe, ability, {})).map(ability => ability.id));
+  bansByFormat.set(formatId, bans);
+  return bans;
+}
+
+/** The ability ids the log's format bans: its validator, else one per `|rule|` line (a joined list loses rules). */
+export function formatAbilityBans(log: string): ReadonlySet<string> {
+  const format = simFormats().get(/^\|tier\|(.*)$/m.exec(log)?.[1] ?? '');
+  if (format.exists && !format.id.endsWith('customgame')) return bansOfFormat(format.id);
+  const rules = logRules(log);
+  const base = `gen${rules.gen}${rules.mod ?? ''}customgame`;
+  const bans = new Set<string>();
+  if (!simFormats().get(base).exists) return bans;
+  for (const [, name] of log.matchAll(/^\|rule\|([^|\n:]+): /gm)) {
+    if (simFormats().get(name).effectType !== 'ValidatorRule') continue;
+    for (const id of bansOfFormat(`${base}@@@${name}`)) bans.add(id);
+  }
+  return bans;
+}
+
+/** The first of the species' slots 0, 1, H that `skip` lets pass; slot 0 when every slot is skipped, '' without one. */
+export function firstAllowedAbility(dex: GenDex, species: string, skip: (abilityId: string) => boolean): string {
+  const slots = (dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
+  for (const slot of ['0', '1', 'H'] as const) {
+    const ability = slots[slot];
+    if (ability && !skip(toId(ability))) return ability;
+  }
+  return slots['0'] || '';
 }
 
 /** The ability the simulator plays: the species' own one the log's name maps to, else a battle-only forme's default. */

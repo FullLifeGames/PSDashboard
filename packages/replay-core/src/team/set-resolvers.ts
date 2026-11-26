@@ -9,6 +9,7 @@ import type { SpreadCandidate } from '../spread-inference.ts';
 import type { KnowledgeSource, PokemonEvs, RevealedPokemonInfo } from '../types.ts';
 import { toId } from '../ids.ts';
 import { evBudget, evsOfSet, type EvBudget } from '../spreads/ev-budget.ts';
+import { firstAllowedAbility } from './dex-legal.ts';
 import { slotMoveKey } from './move-slots.ts';
 import { settleOpenMoves, unfilledOpenMoves } from './open-moves.ts';
 
@@ -197,11 +198,14 @@ export function assembleMoves(
   return settleOpenMoves(dex, pool, info.openMoves, assemble).map(candidate => candidate.name);
 }
 
-export function resolveAbility(dex: RulesDex, info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet): string {
+export function resolveAbility(
+  dex: RulesDex, info: RevealedPokemonInfo, curated: CuratedSet | null, usageSet: SpeciesUsageSet | null, smogonSet: SmogonSet,
+  banned?: ReadonlySet<string>,
+): string {
   const curatedAbility = curated ? allowed(curated.ability?.value, info.ruledOut?.abilities) : '';
   return known(info.ability) || curatedAbility || info.ability.value ||
     usageSet?.ability?.value || allowed(smogonSet?.ability?.value, info.ruledOut?.abilities) ||
-    defaultAbility(dex, info.species, info.ruledOut?.abilities);
+    firstAllowedAbility(dex, info.species, id => !!info.ruledOut?.abilities?.includes(id) || !!banned?.has(id));
 }
 
 type UsageSpreadLike = { nature: string; evs: PokemonSet['evs'] } | undefined;
@@ -290,18 +294,6 @@ function sanitizeEvs(evs: PokemonEvs): PokemonEvs {
 
 function cleanItem(replayItem: string, fallback: string): string {
   return itemSetValue(replayItem) || fallback;
-}
-
-// A packed set with an empty ability gives the sim Pokemon NO ability at all (custom games skip team validation);
-// slot 0 is Showdown's own default. Protocol rule-outs walk to the next slot.
-function defaultAbility(dex: RulesDex, species: string, ruledOut?: string[]): string {
-  const abilities = (dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
-  for (const slot of ['0', '1', 'H'] as const) {
-    const ability = abilities[slot];
-    if (ability && !(ruledOut ?? []).includes(toId(ability))) return ability;
-  }
-  // Every slot ruled out (contradictory evidence): keep slot 0, a wrong ability beats none.
-  return abilities['0'] || '';
 }
 
 // `primary` defines the set; `fill` only tops it up to four moves.

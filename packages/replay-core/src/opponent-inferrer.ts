@@ -1,8 +1,8 @@
 import { Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from './types.ts';
-import { guessedField, revealedField, unknownEvs, unknownField } from './team-info.ts';
-import { createInferrerState } from './inference/inferrer-state.ts';
+import { revealedField, unknownEvs, unknownField } from './team-info.ts';
+import { createInferrerState, type InferrerState } from './inference/inferrer-state.ts';
 import { findPokemonByNickname } from './inference/lookup.ts';
 import {
   addFromPreview, addFromSwitch, noteEntry, noteMoveOrBoundary, recordAbilityAttribution, recordItem,
@@ -17,10 +17,10 @@ import { attachHits, collectHits } from './inference/hits.ts';
 import { syncClientFacts } from './inference/client-facts.ts';
 import { watchBlockedEffects } from './inference/blocked-effects.ts';
 import { rocksMayMiss } from './inference/rocks-tell.ts';
+import { applyItemTells, noteItemTell } from './inference/contact-tell.ts';
 import { arg, fromEffect, identOf, readLine, type LogLine } from './inference/log-line.ts';
 import { toId } from './ids.ts';
 import { dexOf, logRules, type RulesDex } from './rules-dex.ts';
-import type { LegalityContext } from './team/dex-legal.ts';
 import { normalizeLineEndings } from './line-endings.ts';
 import { dropAmbiguousNicknames, noteLogIdentities, noteSheetIdentities, sheetMatcher } from './team-identity.ts';
 
@@ -163,7 +163,8 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
   }
   attachHits(state);
 
-  inferBootsFromHazards(lines, opponentSide, state.pokemonMap, { gen: state.gen, mod: state.mod, freeAbilities: state.freeAbilities });
+  inferBootsFromHazards(lines, opponentSide, state);
+  applyItemTells(state, log);
 
   const dex = dexOf(state);
   const sheet = parseShowteamSheet(log, opponentSide);
@@ -179,10 +180,9 @@ export function inferOpponentTeam(rawLog: string, opponentSide: 'p1' | 'p2' = 'p
 function inferBootsFromHazards(
   lines: readonly LogLine[],
   side: 'p1' | 'p2',
-  pokemonMap: Map<string, RevealedPokemonInfo>,
-  legality: LegalityContext,
+  state: InferrerState,
 ) {
-  if (legality.gen < 8) return;
+  if (state.gen < 8) return;
 
   let rocksUp = false;
   for (let index = 0; index < lines.length; index++) {
@@ -190,9 +190,9 @@ function inferBootsFromHazards(
     const nickname = rocksUp ? entrantOf(lines[index], side) : null;
     if (!nickname || tookRockDamageOnEntry(lines, index, nickname)) continue;
 
-    const pokemon = findPokemonByNickname(dexOf(legality), pokemonMap, nickname, lines, side);
-    if (!pokemon || !canGuessBoots(pokemon, legality)) continue;
-    pokemon.item = guessedField('Heavy-Duty Boots', undefined, 'No Stealth Rock damage on switch-in');
+    const pokemon = findPokemonByNickname(dexOf(state), state.pokemonMap, nickname, lines, side);
+    if (!pokemon || !canGuessBoots(pokemon, state)) continue;
+    noteItemTell(state, pokemon, { id: 'heavydutyboots', name: 'Heavy-Duty Boots', detail: 'No Stealth Rock damage on switch-in' });
   }
 }
 
@@ -209,10 +209,10 @@ function entrantOf(line: LogLine, side: string): string | null {
 }
 
 // Asked of the simulator as the build asks it: the panel never shows a guess the build refuses.
-function canGuessBoots(pokemon: RevealedPokemonInfo, legality: LegalityContext): boolean {
+function canGuessBoots(pokemon: RevealedPokemonInfo, state: InferrerState): boolean {
   if (pokemon.item.value && pokemon.item.value !== '(has item)') return false;
   if (pokemon.ruledOut?.items.includes('heavydutyboots')) return false;
-  return !rocksMayMiss(pokemon, dexOf(legality), legality.freeAbilities);
+  return !rocksMayMiss(pokemon, dexOf(state), state.freeAbilities);
 }
 
 function tookRockDamageOnEntry(lines: readonly LogLine[], index: number, nickname: string): boolean {

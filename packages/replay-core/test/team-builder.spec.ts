@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { buildTeamsFromReplay, inferOpponentTeam } from '../src/index';
 import type { RevealedPokemonInfo, DamageObservation } from '../src/types';
@@ -377,5 +378,91 @@ describe('the two-stage solve keeps the move orders its pre-solve repaired', () 
     expect([find(built.p1Team, 'Garchomp').evs.hp, find(built.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
     expect([find(oneStage.p1Team, 'Garchomp').evs.hp, find(oneStage.p1Team, 'Garchomp').evs.spe]).toEqual([60, 192]);
     expect(speedOf(find(built.p2Team, 'Gliscor'))).toBeGreaterThan(speedOf(find(built.p1Team, 'Garchomp')));
+  });
+});
+
+describe('a Throat Spray the log never showed is not built', () => {
+  const stats = (id: string, species: string): SmogonUsageStats => ({
+    format: 'gen9test', month: '2026-06', source: 'test',
+    pokemon: {
+      [id]: {
+        species, rawCount: 100, abilities: [], moves: [], spreads: [],
+        items: [{ value: 'Throat Spray', probability: 0.6, sourceDetail: 'test' }, { value: 'Assault Vest', probability: 0.3, sourceDetail: 'test' }],
+      },
+    },
+  });
+
+  test('singles: Exploud used Hyper Voice into Blissey and no spray line followed', () => {
+    const log = [
+      '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Blissey, F|', '|poke|p2|Exploud, M|', '|start',
+      '|switch|p1a: Blissey|Blissey, F|100/100', '|switch|p2a: Exploud|Exploud, M|100/100', '|turn|1',
+      '|move|p2a: Exploud|Hyper Voice|p1a: Blissey', '|-damage|p1a: Blissey|70/100',
+      '|move|p1a: Blissey|Soft-Boiled|p1a: Blissey', '|-heal|p1a: Blissey|100/100|[from] move: Soft-Boiled', '|turn|2',
+    ].join('\n');
+    const exploud = buildTeamsFromReplay(log, { usageStats: stats('exploud', 'Exploud') }).p2Team.find(set => set.species === 'Exploud');
+    expect(exploud?.item).toBe('Assault Vest');
+  });
+
+  test('doubles: Ursaluna-Bloodmoon used a spread Hyper Voice and no spray line followed', () => {
+    const fixture = JSON.parse(readFileSync(new URL('../../../test/e2e-feedback/fixtures/smogtours-gen9doublesou-912045.json', import.meta.url), 'utf8')) as { log: string };
+    const ursaluna = buildTeamsFromReplay(fixture.log, { usageStats: stats('ursalunabloodmoon', 'Ursaluna-Bloodmoon') }).p1Team.find(set => set.species.startsWith('Ursaluna'));
+    expect(ursaluna?.item).toBe('Assault Vest');
+  });
+});
+
+describe('a Protective Pads the log tells is built', () => {
+  const helmetLines = (kind: 'singles' | 'doubles') => {
+    const doubles = kind === 'doubles';
+    return [
+      `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Snorlax, M|', '|poke|p2|Rattata, M|', '|poke|p2|Raticate, M|', '|start',
+      '|switch|p1a: Snorlax|Snorlax, M|100/100', ...(doubles ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+      '|switch|p2a: Rattata|Rattata, M|100/100', ...(doubles ? ['|switch|p2b: Chansey|Chansey, F|100/100'] : []), '|turn|1',
+      '|move|p2a: Rattata|Tackle|p1a: Snorlax', '|-damage|p1a: Snorlax|80/100', '|-damage|p2a: Rattata|90/100|[from] item: Rocky Helmet|[of] p1a: Snorlax',
+      '|turn|2', '|switch|p2a: Raticate|Raticate, M|100/100', '|move|p2a: Raticate|Tackle|p1a: Snorlax', '|-damage|p1a: Snorlax|60/100', '|turn|3',
+    ].join('\n');
+  };
+  const raticate = (log: string) => buildTeamsFromReplay(log).p2Team.find(set => set.species === 'Raticate');
+
+  test('singles: a Tackle into a shown Rocky Helmet that leaves no chip builds Protective Pads', () => {
+    expect(raticate(helmetLines('singles'))?.item).toBe('Protective Pads');
+  });
+
+  test('doubles: a Tackle into a shown Rocky Helmet that leaves no chip builds Protective Pads', () => {
+    expect(raticate(helmetLines('doubles'))?.item).toBe('Protective Pads');
+  });
+
+  test('the draft game: Quaquaval hit a shown Rocky Helmet without a chip and plays Protective Pads', () => {
+    const draft = readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.txt', import.meta.url), 'utf8');
+    expect(inferOpponentTeam(draft, 'p1').pokemon.find(mon => mon.species === 'Quaquaval')?.item).toMatchObject({ value: 'Protective Pads', source: 'guessed' });
+    expect(buildTeamsFromReplay(draft).p1Team.find(set => set.species === 'Quaquaval')?.item).toBe('Protective Pads');
+  });
+});
+
+describe('the default ability is one the format allows', () => {
+  const log = (kind: 'singles' | 'doubles', tier: string) => [
+    `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', `|tier|${tier}`, '|poke|p1|Blissey, F|', '|poke|p1|Chansey, F|', '|poke|p2|Garchomp, F|', '|start',
+    '|switch|p1a: Blissey|Blissey, F|100/100', ...(kind === 'doubles' ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+    '|switch|p2a: Garchomp|Garchomp, F|100/100', ...(kind === 'doubles' ? ['|switch|p2b: Blissey|Blissey, F|100/100'] : []),
+    '|turn|1', '|move|p2a: Garchomp|Earthquake|p1a: Blissey', '|-damage|p1a: Blissey|60/100', '|turn|2',
+  ].join('\n');
+  const garchomp = (text: string) => buildTeamsFromReplay(text).p2Team.find(set => set.species === 'Garchomp')?.ability;
+
+  test('singles: a silent Garchomp of a Gen 9 OU game plays Rough Skin, the format bans Sand Veil', () => {
+    expect(garchomp(log('singles', '[Gen 9] OU'))).toBe('Rough Skin');
+  });
+
+  test('doubles: a silent Garchomp of a Doubles OU game plays Rough Skin', () => {
+    expect(garchomp(log('doubles', '[Gen 9] Doubles OU'))).toBe('Rough Skin');
+  });
+
+  test('the draft game: a silent Garchomp plays Rough Skin through the Evasion Abilities Clause of its rule lines', () => {
+    const draft = readFileSync(new URL('./fixtures/gen9natdexdraft-2713067801.txt', import.meta.url), 'utf8');
+    expect(draft).toMatch(/^\|rule\|Evasion Abilities Clause/m);
+    const text = draft.replace('|start', '|poke|p2|Garchomp, F|\n|start');
+    expect(garchomp(text)).toBe('Rough Skin');
+  });
+
+  test('a Custom Game without rule lines keeps Sand Veil', () => {
+    expect(garchomp(log('singles', '[Gen 9] Custom Game'))).toBe('Sand Veil');
   });
 });

@@ -1,9 +1,9 @@
 import './champions-mod';
 import { test, expect, describe } from 'vitest';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
-import { enrichTeamInfo } from '../src/team-info';
+import { enrichTeamInfo, unknownEvs, unknownField } from '../src/team-info';
 import { buildTeamsFromReplay } from '../src/team-builder';
-import { editedFields, resolveSpread, buildSheetSet } from '../src/team/set-resolvers';
+import { editedFields, resolveAbility, resolveSpread, buildSheetSet } from '../src/team/set-resolvers';
 import type { PokemonSetAssumption, SmogonSetAssumptions } from '../src/smogon/sets-lookup';
 import type { PokemonUsageStats, SmogonUsageStats } from '../src/smogon/stats-types';
 import type { OpponentTeamInfo, RevealedPokemonInfo } from '../src/types';
@@ -101,6 +101,35 @@ test('singles gen 6: a typeless Hidden Power still takes its usage type under pu
   const set = build(singles(6, 'Volcarona', ['Quiver Dance', 'Hidden Power']), 'Volcarona', volcarona, published);
   expect(set.moves).toContain('Hidden Power Ground');
   expect(set.ivs?.atk).toBe(0);
+});
+
+describe('resolveAbility\'s default skips the ruled-out and the banned slots (the resolver reads no game type: singles and doubles alike)', () => {
+  const lucario = (ruledOut?: string[]) => ({
+    species: 'Lucario', moves: [], ability: unknownField(), item: unknownField(), teraType: unknownField(), evs: unknownEvs(), level: 100, gender: '',
+    ...(ruledOut ? { ruledOut: { abilities: ruledOut } } : {}),
+  }) as unknown as RevealedPokemonInfo;
+  const read = (info: RevealedPokemonInfo, banned?: string[]) => resolveAbility(rulesDex(9), info, null, null, undefined, banned && new Set(banned));
+
+  test('slot 0 without evidence or bans', () => {
+    expect(read(lucario())).toBe('Steadfast');
+  });
+
+  test('a banned slot gives way to the next one', () => {
+    expect(read(lucario(), ['steadfast'])).toBe('Inner Focus');
+  });
+
+  test('a ruled-out slot and a banned slot together leave the hidden ability', () => {
+    expect(read(lucario(['innerfocus']), ['steadfast'])).toBe('Justified');
+  });
+
+  test('every slot banned or ruled out keeps slot 0', () => {
+    expect(read(lucario(['innerfocus']), ['steadfast', 'justified'])).toBe('Steadfast');
+  });
+
+  test('a revealed ability stays, whatever the format bans', () => {
+    const shown = { ...lucario(), ability: { value: 'Steadfast', source: 'revealed' } } as unknown as RevealedPokemonInfo;
+    expect(read(shown, ['steadfast'])).toBe('Steadfast');
+  });
 });
 
 const replay = JSON.parse(readFileSync(new URL('./fixtures/gen9championsvgc2026regmbbo3-2634204248.json', import.meta.url), 'utf-8')) as { log: string };

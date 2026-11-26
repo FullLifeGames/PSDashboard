@@ -7,11 +7,13 @@ import { arg, hasKw, identOf, keyOf, namesEffect, type LogLine } from './log-lin
 import { toId } from '../ids.ts';
 import { teamSizes } from '../replay-format.ts';
 import { spentToMax } from './pp-trigger.ts';
+import { moveTypeMayShift } from './blocked-effects.ts';
+import { kindShifters, spendsOnHit, spentByHit, type HitFacts } from './spent-items.ts';
 
 // Design: EVALUATION.md "Rule-outs".
 
 type ItemHandler = (this: never, ...args: never[]) => unknown;
-type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard' | 'pp';
+type Rule = 'lumberry' | 'sitrusberry' | 'ejectbutton' | 'redcard' | 'pp' | 'spent';
 
 interface Trigger {
   rule: Rule;
@@ -30,6 +32,7 @@ export interface ItemTriggerWatch {
   healBlocked: Set<string>;
   /** The move resolving now; a spread move's immune target does not end it. */
   move: { attacker: string; move: string } | null;
+  effectiveness: Map<string, number>;
   pending: Trigger[];
   /** An Eject Button, Red Card or Eject Pack spent itself inside the window: no hit is judged. */
   doubt: boolean;
@@ -64,7 +67,7 @@ export function newItemTriggerWatch(state: InferrerState): ItemTriggerWatch {
   const { names } = stoppersOf(dexOf(state));
   const heads = names.map(name => name.replace(/ \(.*\)$/, ''));
   return {
-    slots: new Map(), fainted: new Set(), hp: new Map(), healBlocked: new Set(), move: null, pending: [], doubt: false, sizes: new Map(),
+    slots: new Map(), fainted: new Set(), hp: new Map(), healBlocked: new Set(), move: null, effectiveness: new Map(), pending: [], doubt: false, sizes: new Map(),
     unnerveNamed: state.lines.some(line => heads.some(head => line.raw.includes(head)) && names.some(name => namesEffect(line, name))),
   };
 }
@@ -227,6 +230,29 @@ function ppItemsOut(state: InferrerState, watch: ItemTriggerWatch, trigger: Trig
   return [...ppEaters(dexOf(state))];
 }
 
+function kindMayShift(state: InferrerState, hit: NonNullable<Trigger['hit']>): boolean {
+  const dex = dexOf(state);
+  if (moveTypeMayShift(state, hit.move) || 'onModifyMove' in dex.moves.get(hit.move)) return true;
+  const abilities = possibleAbilities(state, hit.attackerIdent);
+  return !abilities || [...abilities].some(ability => kindShifters(dex).has(ability));
+}
+
+function spentOut(state: InferrerState, watch: ItemTriggerWatch, trigger: Trigger): string[] {
+  const hit = trigger.hit;
+  if (!hit || watch.fainted.has(hit.attacker)) return [];
+  const dex = dexOf(state);
+  const may = (ident: string) => (ability: string) => possibleAbilities(state, ident)?.has(ability) !== false;
+  const facts: HitFacts = {
+    typeMod: watch.effectiveness.get(trigger.holder) ?? 0, healBlocked: watch.healBlocked.has(trigger.holder), berryStopped: foeStopsBerry(state, watch, trigger.holder),
+    secondariesOff: sheerForced(state, trigger), holderMay: may(trigger.ident), attackerMay: may(hit.attackerIdent),
+  };
+  const shifts = kindMayShift(state, hit);
+  return spentByHit(dex).filter(id => {
+    const { fires, readsKind } = spendsOnHit(dex, id, hit.move, facts);
+    return !SENDERS.has(id) && fires && !(readsKind && shifts);
+  });
+}
+
 function judge(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGates) {
   const pending = watch.pending;
   const doubt = watch.doubt;
@@ -236,6 +262,7 @@ function judge(state: InferrerState, watch: ItemTriggerWatch, gates: TriggerGate
   for (const trigger of pending) {
     if (!active.has(trigger.holder) || (doubt && trigger.hit) || ignoresItem(state, gates, trigger)) continue;
     if (trigger.rule === 'pp') for (const item of ppItemsOut(state, watch, trigger)) ruleOutUnknown(state, trigger.holder, item);
+    else if (trigger.rule === 'spent') for (const item of spentOut(state, watch, trigger)) ruleOutUnknown(state, trigger.holder, item);
     else if (wouldShow(state, watch, gates, trigger)) ruleOutUnknown(state, trigger.holder, trigger.rule);
   }
 }
@@ -262,7 +289,7 @@ function onHit(state: InferrerState, watch: ItemTriggerWatch, line: LogLine, key
   if (!pending || hasKw(line, 'from') || keyOf(pending.attacker) === key) return;
   if (!dexOf(state).moves.get(pending.move).exists) return;
   const hit = { attacker: keyOf(pending.attacker), attackerIdent: pending.attacker, move: pending.move };
-  for (const rule of ['ejectbutton', 'redcard'] as const) open(watch, { rule, holder: key, ident: arg(line, 1), hit });
+  for (const rule of ['ejectbutton', 'redcard', 'spent'] as const) open(watch, { rule, holder: key, ident: arg(line, 1), hit });
 }
 
 function onStatus(watch: ItemTriggerWatch, line: LogLine, key: string, kind: 'status' | 'confusion') {
@@ -276,7 +303,8 @@ function onOpponentLine(state: InferrerState, watch: ItemTriggerWatch, line: Log
   else if (tag === '-damage' || tag === '-heal' || tag === '-sethp') {
     noteHp(state, watch, arg(line, 1), key, arg(line, 2));
     if (tag === '-damage') onHit(state, watch, line, key);
-  } else if (tag === '-enditem') watch.pending = watch.pending.filter(trigger => trigger.holder !== key);
+  } else if (tag === '-supereffective' || tag === '-resisted') watch.effectiveness.set(key, tag === '-supereffective' ? 1 : -1);
+  else if (tag === '-enditem') watch.pending = watch.pending.filter(trigger => trigger.holder !== key);
   // A move another move called spends no PP of its own; only the holder's own move opens the PP window.
   else if (tag === 'move' && !hasKw(line, 'from')) open(watch, { rule: 'pp', holder: key, ident: arg(line, 1), move: arg(line, 2) });
 }
@@ -316,8 +344,10 @@ export function watchItemTriggers(state: InferrerState, watch: ItemTriggerWatch,
     }
     judge(state, watch, gates);
   }
-  if (tag === 'move') watch.move = { attacker: arg(line, 1), move: arg(line, 2) };
-  else if (BOUNDARIES.has(tag) || tag === 'done' || tag === 'upkeep') watch.move = null;
+  if (tag === 'move') {
+    watch.move = { attacker: arg(line, 1), move: arg(line, 2) };
+    watch.effectiveness.clear();
+  } else if (BOUNDARIES.has(tag) || tag === 'done' || tag === 'upkeep') watch.move = null;
   if (tag === 'switch' || tag === 'drag') onEntry(state, watch, line, key);
   else if (tag === 'faint') onFaint(watch, key);
   else if (tag === 'swap') onSwap(watch, line);
