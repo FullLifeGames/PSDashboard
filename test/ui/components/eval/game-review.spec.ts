@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildGameReport,
-  winDeltaText,
   winPctText,
   type EvalLine,
   type EvalResult,
@@ -96,7 +95,8 @@ describe('gameReview, singles', () => {
     expect(row.grade).toBe('inaccuracy');
     expect(row.played).toBe(`Hyper Voice ${winPctText(0.06)}`);
     expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
-    expect(row.loss).toBe(winDeltaText(-0.04));
+    expect(row.loss).toBe('−2%');
+    expect(row.lossTitle).toContain('regret of 0.04 on the score scale');
     expect(view[0].rows[0].grade).toBe('mistake');
     expect(view[1].rows[1].grade).toBe('blunder');
   });

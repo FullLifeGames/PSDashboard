@@ -4,7 +4,7 @@ import {
 import { gradedTier } from './game-review';
 import { rowLineTail } from '../../lib/row-line';
 import { ExplorableLabel, KoSuffix, MiniBar } from './analysis-bits';
-import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
+import { comparisonTarget, ENGINE_EQUIVALENT_EPSILON, engineChoice, evTitle, inaccuracyView, playedTextFor, regretView, RISK_DISPLAY_GAP } from './turn-copy';
 
 type Explore = ((choice: RankedChoice) => void) | undefined;
 
@@ -132,6 +132,11 @@ function ReadPaidOffCell({ side }: Pick<RowProps, 'side'>) {
   );
 }
 
+function InaccuracyCell({ side }: Pick<RowProps, 'side'>) {
+  const view = inaccuracyView(side);
+  return <span style={{ color: '#b6a46a' }} title={view.title}>· inaccuracy ({view.text})</span>;
+}
+
 function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowProps, 'name' | 'side' | 'lostGround'> & { regretful: boolean; setupMove: string | null }) {
   return (
     <>
@@ -154,14 +159,7 @@ function VerdictCell({ name, side, regretful, setupMove, lostGround }: Pick<RowP
       )}
       {side.riskPaidOff && !side.sacrifice && !lostGround && <ReadPaidOffCell side={side} />}
       {regretful && !side.sacrifice && !side.riskPaidOff && <RegretCell name={name} side={side} setupMove={setupMove} />}
-      {gradedTier(side, lostGround) === 'inaccuracy' && side.best && (
-        <span
-          style={{ color: '#b6a46a' }}
-          title={`${side.best.label} was a touch better: a minor imprecision, not a mistake.`}
-        >
-          · inaccuracy ({winDeltaText(-(side.regret ?? 0))})
-        </span>
-      )}
+      {gradedTier(side, lostGround) === 'inaccuracy' && side.best && <InaccuracyCell side={side} />}
       {side.sensitivity && (
         <span
           style={{ color: '#b6a46a' }}

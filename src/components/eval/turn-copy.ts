@@ -1,4 +1,4 @@
-import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 
@@ -132,3 +132,16 @@ export function regretView(name: string, side: SideAnalysis, regret: number): { 
 export const exploreTitle = (opponentReads = false): string => opponentReads && opponentReadsEnabled()
   ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
   : 'Play this turn in a variation; the opponent plays its top choice.';
+
+export function inaccuracyView(side: Pick<SideAnalysis, 'best' | 'played' | 'faintedFraction' | 'regret'>): { text: string; title: string } {
+  const regret = side.regret ?? 0;
+  const { best, played } = side;
+  const text = best && played
+    ? `−${Math.max(0, winPercent(best.ev, side.faintedFraction) - winPercent(played.ev, side.faintedFraction))}%`
+    : winDeltaText(-regret);
+  const lead = best ? `${best.label} was a touch better: a minor imprecision, not a mistake.` : 'A minor imprecision, not a mistake.';
+  return {
+    text,
+    title: `${lead} The size is the gap of the two win chances shown; the grade rests on a regret of ${regret.toFixed(2)} on the score scale (${TIER_THRESHOLDS.inaccuracy.toFixed(2)} or more).`,
+  };
+}

@@ -131,7 +131,7 @@ describe('SideRow', () => {
     expect(screen.getByText('· sacked Toxapex (12% HP)')).toBeInTheDocument();
     expect(screen.queryByText(/^mistake ·/)).toBeNull();
 
-    rerender(<SideRow name="Alice" side={sideAnalysis({ verifiedAtDepth: true, tier: 'inaccuracy', regret: 0.12 })} />);
+    rerender(<SideRow name="Alice" side={sideAnalysis({ verifiedAtDepth: true, tier: 'inaccuracy', regret: 0.12, played: rankedChoice('move stoneedge', 'Stone Edge', 0.23) })} />);
     expect(screen.getByText('· verified deeper')).toBeInTheDocument();
     expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.12)})`)).toBeInTheDocument();
   });
@@ -182,13 +182,28 @@ describe('SideRow', () => {
   });
 
   test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way', () => {
-    const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09 });
+    const paid = sideAnalysis({ tier: 'inaccuracy', regret: 0.09, riskPaidOff: true, riskPayoff: 0.09, played: rankedChoice('move stoneedge', 'Stone Edge', 0.26) });
     const { rerender } = render(<SideRow name="Alice" side={paid} />);
     expect(screen.getByText(`read paid off · ${winDeltaText(0.09)}`)).toBeInTheDocument();
     expect(screen.queryByText(/· inaccuracy/)).toBeNull();
     rerender(<SideRow name="Alice" side={paid} lostGround />);
     expect(screen.queryByText(/read paid off/)).toBeNull();
-    expect(screen.getByText(`· inaccuracy (${winDeltaText(-0.09)})`)).toBeInTheDocument();
+    expect(screen.getByText('· inaccuracy (−4%)')).toBeInTheDocument();
+  });
+
+  test.each([
+    ['singles, opening', 'Earthquake', 'Stone Edge', 0.35, 0.24, undefined, '66%', '61%', '−5%'],
+    ['doubles, three of eight down', 'Fake Out → Rillaboom + Spore → Tornadus', 'Protect → Rillaboom + Spore → Tornadus', 0.3, 0.18, 0.5, '72%', '64%', '−8%'],
+  ])('an inaccuracy chip (%s) is the gap of the two chances beside it, the title keeps the regret', (_scene, bestLabel, playedLabel, best, played, share, bestPct, playedPct, size) => {
+    const side = sideAnalysis({
+      tier: 'inaccuracy', regret: best - played, faintedFraction: share,
+      best: rankedChoice('move 1', bestLabel, best), played: rankedChoice('move 2', playedLabel, played),
+    });
+    render(<SideRow name="Alice" side={side} />);
+    expect(screen.getByText(/^played /)).toHaveTextContent(`played ${playedLabel} (${playedPct})`);
+    expect(screen.getByText(/^engine:/)).toHaveTextContent(`engine: ${bestLabel} (${bestPct})`);
+    const chip = screen.getByText(`· inaccuracy (${size})`);
+    expect(chip.getAttribute('title')).toContain(`regret of ${(best - played).toFixed(2)} on the score scale`);
   });
 
   test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {
