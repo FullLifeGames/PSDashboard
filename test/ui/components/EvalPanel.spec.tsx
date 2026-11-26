@@ -32,7 +32,7 @@ describe('EvalPanel', () => {
     expect(screen.queryByText('Game graph')).toBeNull();
     expect(screen.getByText('Turn 3 · variation')).toBeInTheDocument();
     expect(screen.getByText('depth 1 · 1 sample')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Follow' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Earthquake/ }));
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0], result);

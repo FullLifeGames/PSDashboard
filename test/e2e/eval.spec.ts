@@ -89,7 +89,7 @@ test.describe('PS Dashboard', () => {
     await expect(panel.locator('.ps-eval-bar')).toBeVisible({ timeout: 120_000 });
     await expect(panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first())
       .toBeVisible({ timeout: 120_000 });
-    await expect(panel.getByRole('checkbox', { name: 'Auto' })).toBeChecked();
+    await expect(panel.getByRole('checkbox', { name: 'Follow' })).toBeChecked();
   });
 
   test('clicking a matrix cell branches with exactly that pair', async ({ page }) => {

@@ -17,7 +17,7 @@ interface Box { text: string; top: number; bottom: number; left: number; right: 
 
 async function headerBoxes(page: Page): Promise<{ boxes: Box[]; panel: { left: number; right: number }; graphTop: number }> {
   await page.locator('.ps-eval-panel .ps-eval-controls').waitFor({ timeout: 30_000 });
-  await page.getByRole('checkbox', { name: 'Always on' }).waitFor({ timeout: 30_000 });
+  await page.getByRole('checkbox', { name: 'On load' }).waitFor({ timeout: 30_000 });
   return page.evaluate(() => {
     const head = document.querySelector('.ps-eval-panel .ps-eval-controls') as HTMLElement;
     const panel = (document.querySelector('.ps-eval-panel') as HTMLElement).getBoundingClientRect();
@@ -50,7 +50,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1707, height: 900
     const { boxes, panel, graphTop } = await headerBoxes(page);
     const names = boxes.map(box => box.text);
     expect(names.some(text => text.startsWith('Evaluation')), `header children ${names.join(' | ')}`).toBe(true);
-    expect(names.some(text => text.startsWith('Always on')), `header children ${names.join(' | ')}`).toBe(true);
+    expect(names.some(text => text.startsWith('On load')), `header children ${names.join(' | ')}`).toBe(true);
     expectOneLine(boxes, panel);
     expect(names.some(text => text.startsWith('Depth') || text.startsWith('Samples')), `no Depth or Samples in the header: ${names.join(' | ')}`).toBe(false);
     expect(graphTop).toBeGreaterThan(Math.max(...boxes.map(box => box.bottom)));
@@ -132,7 +132,7 @@ test.describe('with a stored matrix depth', () => {
   });
 
   for (const width of [1280, 390]) {
-    test(`inside a variation at ${width} px the header shows "Auto" and the button beside the rest${width === 1280 ? '; one row, or the wrap is measured' : ''}`, async ({ page }) => {
+    test(`inside a variation at ${width} px the header shows "Follow" and the button beside the rest${width === 1280 ? '; one row, or the wrap is measured' : ''}`, async ({ page }) => {
       test.setTimeout(180_000);
       await page.setViewportSize({ width, height: width === 1280 ? 800 : 844 });
       await page.goto('/');
@@ -141,7 +141,7 @@ test.describe('with a stored matrix depth', () => {
       await dockTray(page).locator('.ps-movebtn:enabled').first().click();
       await page.locator('.ps-execute-btn').click();
       await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toContainText('Turn 5', { timeout: 90_000 });
-      await page.getByRole('checkbox', { name: 'Auto', exact: true }).waitFor({ timeout: 30_000 });
+      await page.getByRole('checkbox', { name: 'Follow', exact: true }).waitFor({ timeout: 30_000 });
       const { boxes, panel } = await headerBoxes(page);
       console.log(`VARIATION ${width} ${JSON.stringify(boxes.map(box => [box.text, Math.round(box.left), Math.round(box.right), Math.round(box.top)]))} panel right ${panel.right}`);
       if (SHOTS) await page.locator('.ps-eval-panel').screenshot({ path: `${SHOTS}/eval-header-${width}-variation-panel.png` });

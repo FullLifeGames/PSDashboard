@@ -21,7 +21,7 @@ function props(overrides: Partial<Props> = {}): Props {
 const select = (label: string) => within(screen.getByText(label)).getByRole('combobox');
 
 describe('EvalControls', () => {
-  test('the header holds the title, Tera and "Always on", and no Depth or Samples in any mode', () => {
+  test('the header holds the title, Tera, "Follow" and "On load", and no Depth or Samples in any mode', () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
@@ -33,6 +33,19 @@ describe('EvalControls', () => {
       expect(screen.queryByText('Samples')).toBeNull();
       expect(screen.getAllByRole('combobox').map(box => box.closest('label')?.textContent?.trim().slice(0, 4))).toEqual(['Tera']);
     }
+  });
+
+  test('the two boxes say what each starts and read neither Auto nor Always on', () => {
+    render(<EvalControls {...props()} />);
+    expect(screen.getByRole('checkbox', { name: 'Follow' }).closest('label')).toHaveAttribute(
+      'title',
+      'After your first Evaluate in a variation, each position you play or step to evaluates by itself. The engine walk and Play line switch this on. Stays on across sessions.',
+    );
+    expect(screen.getByRole('checkbox', { name: 'On load' }).closest('label')).toHaveAttribute(
+      'title',
+      'Analyze game starts by itself when a replay loads, and the newest position of a variation evaluates without a click. Stays on across sessions.',
+    );
+    expect(screen.queryByRole('checkbox', { name: /^Auto$|Always on/ })).toBeNull();
   });
 
   test('the Tera select names the Auto rule of a new game, of a replay and of draft formats', () => {
@@ -48,15 +61,15 @@ describe('EvalControls', () => {
     const { rerender } = render(<EvalControls {...wired} />);
     await userEvent.selectOptions(select('Tera'), 'revealed');
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, tera: 'revealed' });
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Auto' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Follow' }));
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, auto: true });
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Always on' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'On load' }));
     expect(wired.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, autoAnalyze: true });
 
     rerender(<EvalControls {...wired} showAuto={false} showTera={false} prefs={{ ...prefs, autoAnalyze: true }} />);
     expect(screen.queryByText('Tera')).toBeNull();
-    expect(screen.queryByRole('checkbox', { name: 'Auto' })).toBeNull();
-    expect(screen.getByRole('checkbox', { name: 'Always on' })).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: 'Follow' })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'On load' })).toBeChecked();
   });
 
   test('the Evaluation row holds no checkbox for the opponent\'s reply, in any engine', () => {
@@ -65,7 +78,7 @@ describe('EvalControls', () => {
     expect(screen.queryByText(/Hard mode/)).toBeNull();
     rerender(<EvalControls {...props()} prefs={{ ...prefs, hardMode: true }} showAuto={false} />);
     expect(screen.queryByRole('checkbox', { name: /Hard mode|Opponent reads my move/ })).toBeNull();
-    expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Always on']);
+    expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['On load']);
   });
 
   test('Evaluate turns into Re-evaluate with a result or a stale state, into Cancel while running; running locks Tera', async () => {

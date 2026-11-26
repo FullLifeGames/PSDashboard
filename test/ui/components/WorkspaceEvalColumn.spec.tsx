@@ -62,8 +62,8 @@ describe('WorkspaceEvalColumn', () => {
     expect(screen.getByText('Evaluation')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Analyze game' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Evaluate/ })).toBeNull();
-    expect(screen.queryByRole('checkbox', { name: 'Auto' })).toBeNull();
-    expect(screen.getByRole('checkbox', { name: 'Always on' })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Follow' })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'On load' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Let it play out/ })).toBeInTheDocument();
     expect(screen.getByText('Battle Statistics')).toBeInTheDocument();
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
@@ -109,7 +109,7 @@ describe('WorkspaceEvalColumn', () => {
     await waitFor(() => expect(app().board.timeline.liveEvalView).toBe(true), { timeout: 60_000 });
     // The dock's fill runs the engine at the tip by itself: Cancel while it runs, Re-evaluate after.
     expect(screen.getByRole('button', { name: /evaluate|cancel/i })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Follow' })).toBeInTheDocument();
     expect(screen.queryByText('Game report', { selector: 'span' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Think deeper/ })).toBeNull();
     expect(screen.queryByText(/^Turn \d$/)).toBeNull();

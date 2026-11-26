@@ -67,17 +67,20 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
       {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
       {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
       {showAuto && (
-        <label style={LABEL_STYLE}>
+        <label
+          title="After your first Evaluate in a variation, each position you play or step to evaluates by itself. The engine walk and Play line switch this on. Stays on across sessions."
+          style={LABEL_STYLE}
+        >
           <input
             type="checkbox"
             checked={prefs.auto}
             onChange={event => onPrefsChange({ ...prefs, auto: event.target.checked })}
           />
-          Auto
+          Follow
         </label>
       )}
       <label
-        title="Evaluation as a companion: Analyze game starts by itself when a replay loads, and new variation positions evaluate without the Evaluate button. Stays on across sessions."
+        title="Analyze game starts by itself when a replay loads, and the newest position of a variation evaluates without a click. Stays on across sessions."
         style={LABEL_STYLE}
       >
         <input
@@ -85,7 +88,7 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
           checked={prefs.autoAnalyze}
           onChange={event => onPrefsChange({ ...prefs, autoAnalyze: event.target.checked })}
         />
-        Always on
+        On load
       </label>
       {onEvaluate && <EvaluateButton running={running} onEvaluate={onEvaluate} onCancel={onCancel} result={result} status={status} />}
     </div>
