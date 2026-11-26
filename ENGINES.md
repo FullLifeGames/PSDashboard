@@ -6,7 +6,7 @@ PS Dashboard evaluates positions with its own search on the simulator. Your engi
 
 1. Start the example engine, one Python file without dependencies: `python packages/eval-engine/examples/engine-python/engine.py`. It answers on `http://localhost:8765/`.
 2. Check it: `npx @fulllifegames/eval-engine check-engine http://localhost:8765/`. The check sends three shipped positions (singles, doubles, VGC) and reads every answer the way the dashboard reads it.
-3. Add it in the app: load a replay, click `+ engine` in the Evaluation panel, and enter a name and the address. The panel now shows an `Engine` dropdown with your engine selected, and `Evaluate`, `Analyze game` and `Let it play out` ask it instead of the built-in search.
+3. Add it in the app: load a replay, click `+ engine` in the Evaluation panel, and enter a name and the address. The `Setup` menu now shows an `Engine` select with your engine selected, and `Evaluate`, `Analyze game` and `Let it play out` ask it instead of the built-in search.
 
 The example has no judgment of its own: it rates every attack a little above every switch. Your engine replaces its `judge` function.
 
