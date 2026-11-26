@@ -1,5 +1,7 @@
-import type { LeadAnalysis, SideAnalysis, TurnAnalysis } from '@fulllifegames/eval-engine';
+import { winPercent, type LeadAnalysis, type SideAnalysis, type TurnAnalysis } from '@fulllifegames/eval-engine';
 import { rankedChoice } from './eval-result';
+
+export const chanceGap = (better: number, played: number, share?: number): string => `−${winPercent(better, share) - winPercent(played, share)}%`;
 
 const p1Line = () => rankedChoice('move earthquake', 'Earthquake', 0.35);
 const p2Line = () => rankedChoice('move leechseed', 'Leech Seed', -0.3);

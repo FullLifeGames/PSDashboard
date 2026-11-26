@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { formatRead, summarizeTurn, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../../../src/components/EvalTurnAnalysis';
-import { leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from '../fixtures/analysis';
+import { chanceGap, leadAnalysis, misplayedSide, sideAnalysis, turnAnalysis } from '../fixtures/analysis';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { doublesLine, playedLine } from '../fixtures/lines';
 import type { WinPathsRun } from '../../../src/lib/win-paths-host';
@@ -19,7 +19,7 @@ describe('EvalTurnAnalysis', () => {
     expect(screen.getByText('Alice misplayed')).toBeInTheDocument();
     expect(screen.getByText(summarizeTurn(analysis, names))).toBeInTheDocument();
     expect(screen.getByText(/expected from the choices/)).toHaveTextContent(`${winDeltaText(-0.15)} expected from the choices · ${winDeltaText(-0.05)} from how it rolled`);
-    expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeInTheDocument();
+    expect(screen.getByText(`mistake · ${chanceGap(0.35, 0.1)}`)).toBeInTheDocument();
   });
 
   test.each([['a tracked card', {}, false], ['an untracked card (doubles)', { playedTracking: false }, false], ['an open tip', {}, true]] as const)(
@@ -57,7 +57,7 @@ describe('EvalTurnAnalysis', () => {
     expect(summary).not.toBeVisible();
     expect(screen.getByText('Alice misplayed')).toBeVisible();
     expect(screen.getByText(/expected from the choices/)).toBeVisible();
-    expect(screen.getByText(`mistake · ${winDeltaText(-0.25)}`)).toBeVisible();
+    expect(screen.getByText(`mistake · ${chanceGap(0.35, 0.1)}`)).toBeVisible();
 
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
@@ -155,7 +155,15 @@ describe('EvalLeadAnalysis', () => {
     expect(screen.getByText('Team preview')).toBeInTheDocument();
     expect(screen.getByText(/^led Garchomp/)).toHaveTextContent(`led Garchomp (${winPctText(0.2)})`);
     expect(screen.getByText('✓ the engine\'s leads')).toBeInTheDocument();
-    expect(screen.getByText(/^mistake ·/)).toHaveTextContent(`mistake · ${winDeltaText(-0.3)} · better: Rotom-Wash (${winPctText(-0.1)})`);
+    expect(screen.getByText(/^mistake ·/)).toHaveTextContent(`mistake · ${chanceGap(-0.1, -0.4)} · better: Rotom-Wash (${winPctText(-0.1)})`);
+  });
+
+  test.each(['mistake', 'blunder'] as const)('a lead %s is the gap of the two chances on its card', tier => {
+    const played = rankedChoice('team 1', 'Lead Ferrothorn', tier === 'blunder' ? -0.6 : -0.35);
+    const best = rankedChoice('team 2', 'Lead Rotom-Wash', -0.1);
+    render(<EvalLeadAnalysis leads={leadAnalysis({ p2: { played, best, regret: best.ev - played.ev, tier } })} playerNames={names} />);
+    expect(screen.getByText(/^led Ferrothorn/)).toHaveTextContent(`led Ferrothorn (${winPctText(played.ev)})`);
+    expect(screen.getByText(new RegExp(`^${tier} ·`))).toHaveTextContent(`${tier} · ${chanceGap(best.ev, played.ev)} · better: Rotom-Wash (${winPctText(best.ev)})`);
   });
 
   test('doubles: a lead pair keeps the engine\'s pick as a neutral line, without a verdict', () => {
@@ -181,7 +189,7 @@ describe('EvalLeadAnalysis', () => {
     const leads = leadAnalysis({ p1: { played: null, best: rankedChoice('team 1', 'Lead Garchomp', 0.2), regret: null }, p2: { ...p2, tier: 'inaccuracy' } });
     const { rerender } = render(<EvalLeadAnalysis leads={leads} playerNames={names} />);
     expect(screen.getByText('led leads not matched')).toBeInTheDocument();
-    expect(screen.getByText(/inaccuracy/)).toHaveTextContent(`· inaccuracy (${winDeltaText(-0.05)}): Rotom-Wash was a touch better`);
+    expect(screen.getByText(/inaccuracy/)).toHaveTextContent(`· inaccuracy (${chanceGap(-0.1, -0.15)}): Rotom-Wash was a touch better`);
 
     rerender(<EvalLeadAnalysis leads={leadAnalysis({ p2 })} playerNames={names} />);
     expect(screen.getByText(/^engine:/)).toHaveTextContent(`engine: Rotom-Wash (${winPctText(-0.1)})`);
