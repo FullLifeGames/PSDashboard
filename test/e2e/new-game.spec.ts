@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installReplayEmbedCache, routeOfflineFixtures, pickMove, pickSwitch, fixtureReplay, fixturePath, openLoader, moveTimeline, startVariationAt, dockChip, type DockSlotKey } from './helpers';
+import { expectGameOnMainLine, installReplayEmbedCache, routeOfflineFixtures, pickMove, pickSwitch, fixtureReplay, fixturePath, openLoader, moveTimeline, startVariationAt, dockChip, type DockSlotKey } from './helpers';
 import { lightEngine } from './dock-helpers';
 import { copiedGameLink, copiedLink, openInFreshContext, timelineState } from './new-game-helpers';
 
@@ -48,13 +48,13 @@ test('Gen 9 OU: paste, Start at Team Preview, pick leads, play a turn by hand, r
   await lead.locator('.ps-lead-side').nth(0).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-lead-side').nth(1).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expectGameOnMainLine(page);
   await pickMove(page, 'p1a', 'Earthquake');
   await pickMove(page, 'p2a', 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
   await expect(page.getByText('Variation moves')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]').length)).toBe(1);
 
@@ -103,11 +103,11 @@ test('Scarlet/Violet VGC: the picker asks for four of six, the first two lead, t
     for (let pick = 0; pick < 4; pick += 1) await tiles.nth(pick).click();
   }
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expectGameOnMainLine(page);
   for (const slot of ['p1a', 'p1b', 'p2a', 'p2b'] as const) await pickMove(page, slot, 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9] VGC 2025 Reg I');
 });
 
@@ -121,7 +121,7 @@ async function playLeads(page: Page, brings: number | null): Promise<void> {
     }
     await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
   }
-  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expectGameOnMainLine(page);
 }
 
 test('Champions VGC: Start, the leads, a turn by hand joins the main line; the saved row names the format', async ({ page }) => {
@@ -133,7 +133,7 @@ test('Champions VGC: Start, the leads, a turn by hand joins the main line; the s
   for (const slot of ['p1a', 'p1b', 'p2a', 'p2b'] as const) await pickMove(page, slot, 'Protect');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText('T2/')).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.formatName)).toBe('[Gen 9 Champions] VGC 2026 Reg M-C');
 });
 
@@ -211,14 +211,14 @@ test('the Game menu copies a game\'s link at Team Preview and on the main line; 
   await lead.locator('.ps-lead-side').nth(0).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-lead-side').nth(1).locator('.ps-switchbtn').first().click();
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expectGameOnMainLine(page);
   await pickMove(page, 'p1a', 'Earthquake');
   // not Protect: it would stop the Earthquake, and no one would faint (both Garchomps would stay at 100 %)
   await pickMove(page, 'p2a', 'Return');
   await page.locator('.ps-dock .ps-execute-btn').click();
   await expect(page.getByText(/fainted! Choose who to send in/)).toBeVisible({ timeout: 90_000 });
   const noChrome = async () => {
-    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
     await expect(page.getByRole('group', { name: 'Line selector' })).toHaveCount(0);
     await expect(page.getByText('Variation moves')).toHaveCount(0);
     await expect(page.getByText(/Variation tip: Turn/)).toHaveCount(0);
@@ -347,13 +347,13 @@ for (const kind of GAME_KINDS) {
     for (const slot of kind.slots) await pickMove(page, slot, 'Protect');
     await page.locator('.ps-dock .ps-execute-btn').click();
     await expect(page.getByText('T2/')).toBeVisible({ timeout: 120_000 });
-    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
     expect(await sliderOf(page)).toEqual({ value: atStart.max + 1, max: atStart.max + 1 });
 
     for (const slot of kind.slots) await expect(dockChip(page, slot)).toHaveAttribute('data-origin', 'engine', { timeout: 300_000 });
     await page.locator('.ps-dock .ps-execute-btn').click();
     await expect(page.getByText('T3/')).toBeVisible({ timeout: 300_000 });
-    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
     expect(await sliderOf(page)).toEqual({ value: atStart.max + 2, max: atStart.max + 2 });
     const mainTip = atStart.max + 2;
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('ps-replay-interceptor:games') ?? '[]')[0]?.turns)).toBe(2);
@@ -387,7 +387,7 @@ for (const kind of GAME_KINDS) {
     await confirm.locator('button', { hasText: 'Replace' }).click();
     await expect(page.getByText(`T${mainTip + 1}/`)).toBeVisible({ timeout: 300_000 });
     await expect(page.locator('.ps-panel', { hasText: 'Variation moves' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 30_000 });
     expect(await sliderOf(page)).toEqual({ value: mainTip + 1, max: mainTip + 1 });
 
     const panel = page.locator('.ps-main-right .ps-eval-panel');

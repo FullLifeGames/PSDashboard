@@ -37,7 +37,6 @@ export async function expectReplayTurn(
   frame: Frame,
   turn: number,
 ) {
-  // The embed script loads from play.pokemonshowdown.com and can take a while: wait for `Replays.battle` first.
   await expect.poll(async () => frame.evaluate(() =>
     !!(window as ReplayWindow).Replays?.battle
   ), { timeout: 30_000 }).toBe(true);
@@ -83,6 +82,12 @@ async function openChip(page: Page, chip: Locator, { timeout }: TrayOptions = {}
   if ((await chip.getAttribute('aria-expanded', { timeout })) !== 'true') await chip.click({ timeout });
   await expect(chip).toHaveAttribute('aria-expanded', 'true', { timeout });
   return dockTray(page);
+}
+
+/** A new game's lead turn is a variation until it joins the main line; a tray opened meanwhile closes. */
+export async function expectGameOnMainLine(page: Page): Promise<void> {
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 60_000 });
 }
 
 export function openTray(page: Page, slot: DockSlotKey, options?: TrayOptions): Promise<Locator> {

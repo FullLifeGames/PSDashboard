@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { installReplayEmbedCache, pickMove, moveTimeline, startVariationAt } from './helpers';
+import { expectGameOnMainLine, installReplayEmbedCache, pickMove, moveTimeline, startVariationAt } from './helpers';
 import { copiedLink, openInFreshContext, prepare, timelineState } from './new-game-helpers';
 
 test.beforeAll(installReplayEmbedCache);
@@ -34,7 +34,7 @@ async function playLeads(page: Page, brings: number | null): Promise<void> {
     for (let pick = 0; pick < (brings ?? 1); pick += 1) await tiles.nth(pick).click();
   }
   await lead.locator('.ps-execute-btn', { hasText: 'Play from turn 0' }).click();
-  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expectGameOnMainLine(page);
 }
 
 async function playProtectTurn(page: Page, slots: ('p1a' | 'p1b' | 'p2a' | 'p2b')[], reaches: number): Promise<void> {
