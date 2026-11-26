@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { ActiveMove, Battle, Pokemon, PokemonSet } from '@pkmn/sim';
 import { shieldsFromHits, shieldsSide } from '../src/dex-facts/protect';
+import { deserializeBattleExact, serializeBattleStable } from '../src/forward/serialize';
+import { copyBattle } from '../src/forward/sim-fast';
 import { loadSimMods } from '../src/forward/sim-mods';
-import { copyOf, FixedDice, protectorStops, setAskCheck } from '../src/sim-ask';
+import { FixedDice, protectorStops, setAskCheck } from '../src/sim-ask';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
@@ -123,8 +125,21 @@ function probeAttacks(dex: Battle['dex']): string[] {
   ].filter((id): id is string => !!id);
 }
 
+const frozen = new WeakMap<Battle, string>();
+
+function copyOfUnchangedBoard(battle: Battle): Battle {
+  const fast = copyBattle(battle);
+  if (fast) return fast;
+  let text = frozen.get(battle);
+  if (text === undefined) {
+    text = serializeBattleStable(battle);
+    frozen.set(battle, text);
+  }
+  return deserializeBattleExact(text);
+}
+
 function stopsOnCopy(battle: Battle, handler: unknown, attack: ActiveMove, source: Pokemon, target: Pokemon): boolean {
-  const copy = copyOf(battle);
+  const copy = copyOfUnchangedBoard(battle);
   copy.prng = new FixedDice({});
   const at = (mon: Pokemon) => copy.sides[mon.side.n].pokemon[mon.side.pokemon.indexOf(mon)];
   try {
