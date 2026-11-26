@@ -40,6 +40,15 @@ async function pickFormat(search: string, name: string) {
   await user.click(screen.getAllByRole('option').find(option => option.firstChild?.textContent === name)!);
 }
 
+const FAMILIES: [string, string, string][] = [
+  ['singles', 'gen9 ou', '[Gen 9] OU'],
+  ['doubles', 'doubles ou', '[Gen 9] Doubles OU'],
+  ['VGC, Scarlet and Violet', 'vgc 2025', '[Gen 9] VGC 2025 Reg I'],
+  ['Champions singles', 'champions ou', '[Gen 9 Champions] OU'],
+  ['Champions VGC', 'champions vgc', '[Gen 9 Champions] VGC 2026 Reg M-C'],
+];
+const PROBLEMS = { timeout: 30_000 };
+
 beforeEach(() => localStorage.clear());
 
 describe('the dialog', () => {
@@ -197,7 +206,7 @@ describe('a team box', () => {
     paste(2, 'Garchomp\nAbility: Rough Skin\n\nGliscor\nAbility: Poison Heal');
     expect(await within(team(1)).findByText('This team has 1 problem for [Gen 9] OU:', undefined, { timeout: 30_000 })).toBeInTheDocument();
     expect(within(team(2)).getByText(/No moves read for/)).toBeInTheDocument();
-    expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
+    expect(within(team(2)).queryByText(/Paste a team/)).toBeNull();
     expect(start()).toBeDisabled();
     expect(screen.queryByText(NOTE)).toBeNull();
   }, 60_000);
@@ -285,8 +294,7 @@ describe('Start', () => {
     render(<NewGameDialog {...wired} />);
     paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
     paste(2, GOOD);
-    await waitFor(() => expect(screen.getByText(/does not exist/)).toBeInTheDocument(), { timeout: 30_000 });
-    expect(within(team(1)).getByText('zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.')).toBeInTheDocument();
+    expect(await within(team(1)).findByText('Zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, PROBLEMS)).toBeInTheDocument();
     expect(within(team(2)).queryByText(/is no Pokémon/)).toBeNull();
     expect(start()).toBeDisabled();
     expect(screen.queryByText(NOTE)).toBeNull();
@@ -301,7 +309,7 @@ describe('Start', () => {
     paste(1, `Zzqxvwk @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
     paste(2, GOOD);
     await userEvent.click(start());
-    expect(await screen.findByText('The game could not start: zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, { timeout: 30_000 })).toBeInTheDocument();
+    expect(await screen.findByText('The game could not start: Zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, { timeout: 30_000 })).toBeInTheDocument();
     expect(wired.onStart).not.toHaveBeenCalled();
   }, 60_000);
 
@@ -315,13 +323,6 @@ describe('Start', () => {
     expect(wired.onOpenChange).not.toHaveBeenCalled();
   }, 60_000);
 
-  const FAMILIES: [string, string, string][] = [
-    ['singles', 'gen9 ou', '[Gen 9] OU'],
-    ['doubles', 'doubles ou', '[Gen 9] Doubles OU'],
-    ['VGC, Scarlet and Violet', 'vgc 2025', '[Gen 9] VGC 2025 Reg I'],
-    ['Champions singles', 'champions ou', '[Gen 9 Champions] OU'],
-    ['Champions VGC', 'champions vgc', '[Gen 9 Champions] VGC 2026 Reg M-C'],
-  ];
   for (const [label, search, name] of FAMILIES) {
     test(`${label}: ${name} starts from two pasted teams at Team Preview`, async () => {
       const wired = props();
@@ -438,4 +439,63 @@ describe('a pasted set without an ability', () => {
       expect(record.teams.p2.map(set => set.ability)).toEqual(['Rough Skin', 'Poison Heal']);
     }, 90_000);
   }
+});
+
+describe('one message per cause', () => {
+  const SEVEN = [...FOUR.split('\n\n'), 'Dragonite\n- Protect'].join('\n\n');
+  const GAMES = FAMILIES.slice(0, 2);
+  const open = async (search: string, name: string) => {
+    render(<NewGameDialog {...props()} />);
+    if (name !== '[Gen 9] OU') await pickFormat(search, name);
+  };
+
+  for (const [label, search, name] of GAMES) {
+    test(`${label}: seven sets say the limit once, with no count above six and no simulator line`, async () => {
+      await open(search, name);
+      paste(1, LEVITATE);
+      paste(2, SEVEN);
+      expect(await within(team(1)).findByText(/This team has \d+ problems? for/, undefined, PROBLEMS)).toBeInTheDocument();
+      expect(within(team(2)).getAllByText('A team holds at most 6 Pokémon.')).toHaveLength(1);
+      expect(within(team(2)).queryByText(/sets read/)).toBeNull();
+      expect(within(team(2)).queryByText(/You may only bring/)).toBeNull();
+      paste(2, GOOD);
+      expect(await within(team(2)).findByText('2 of 6 sets read')).toBeInTheDocument();
+    }, 90_000);
+
+    test(`${label}: a team of six reads "6 of 6 sets read" and a set without move lines does not ask for a paste`, async () => {
+      await open(search, name);
+      paste(1, `${FOUR}`);
+      paste(2, 'Garchomp\nAbility: Rough Skin\n\nGliscor\nAbility: Poison Heal');
+      expect(within(team(1)).getByText('6 of 6 sets read')).toBeInTheDocument();
+      expect(within(team(2)).getByText(/No moves read for/)).toBeInTheDocument();
+      expect(within(team(2)).queryByText(/Paste a team/)).toBeNull();
+      expect(start()).toBeDisabled();
+    }, 60_000);
+
+    test(`${label}: one side filled leaves the empty box without a validator problem and keeps the filled side's verdict`, async () => {
+      await open(search, name);
+      paste(1, GOOD);
+      expect(await within(team(1)).findByText(/This team is valid for|This team has \d+ problem/, undefined, PROBLEMS)).toBeInTheDocument();
+      expect(within(team(2)).queryAllByText(/You must bring|This team has|This team is valid/)).toHaveLength(0);
+      expect(within(team(2)).getByText('Paste a team for Player 2 to start.')).toBeInTheDocument();
+    }, 60_000);
+  }
+
+  for (const [label, search, name] of FAMILIES) {
+    test(`${label}: an unknown species is refused once, in the spelling typed, and a known one in capitals is not`, async () => {
+      await open(search, name);
+      paste(1, `FOOOMON @ Leftovers\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
+      paste(2, GOOD.replace('Garchomp', 'GARCHOMP'));
+      const refusal = new RegExp(`^FOOOMON is no Pokémon of ${name.replace(/[[\]]/g, '\\$&')}\\. Fix the set to start\\.$`);
+      expect(await within(team(1)).findAllByText(refusal, undefined, PROBLEMS)).toHaveLength(1);
+      expect(within(team(1)).queryByText(/The Pokemon .* does not exist|This team is valid/)).toBeNull();
+      expect(within(team(2)).queryByText(/is no Pokémon/)).toBeNull();
+    }, 90_000);
+  }
+
+  test('a species typed in lower case is refused with a capital first letter', async () => {
+    await open('gen9 ou', '[Gen 9] OU');
+    paste(1, `fooomon\nAbility: Pressure\n- Tackle\n\n${GOOD}`);
+    expect(await within(team(1)).findByText('Fooomon is no Pokémon of [Gen 9] OU. Fix the set to start.', undefined, PROBLEMS)).toBeInTheDocument();
+  }, 60_000);
 });

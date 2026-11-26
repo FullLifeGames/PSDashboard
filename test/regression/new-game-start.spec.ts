@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { Dex, PRNG, TeamValidator, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { readTeamPaste, seedProblem, startNewGame, startBlocks, startProblem, stopsStart } from '../../src/lib/new-game/start';
+import { boxProblems, readTeamPaste, seedProblem, startNewGame, startBlocks, startProblem, stopsStart, teamTooBig } from '../../src/lib/new-game/start';
 import { newGameSeed } from '../../src/lib/new-game/record';
 
 const TEAM = `Garchomp @ Rocky Helmet
@@ -36,6 +36,15 @@ describe('the team paste', () => {
     expect(read.sets.map(set => set.species)).toEqual(['Garchomp', 'Gliscor', 'Clefable']);
     expect(read.skipped).toEqual(['asdfasdf']);
     expect(read.sets[0].moves).toEqual(['Earthquake', 'Dragon Tail', 'Stealth Rock', 'Spikes']);
+  });
+
+  test('a species the Dex lacks keeps the spelling the user typed as its name; a known species keeps its nickname or none', () => {
+    const typed = (text: string) => readTeamPaste(text).sets.map(set => [set.species, set.name]);
+    expect(typed('Fooomon @ Leftovers\n- Tackle')).toEqual([['fooomon', 'Fooomon']]);
+    expect(typed('Nick (Fooomon) (M) @ Leftovers\n- Tackle')).toEqual([['fooomon', 'Fooomon']]);
+    expect(typed('fooomon-alola (F)\n- Tackle')).toEqual([['fooomonalola', 'fooomon-alola']]);
+    expect(typed('GARCHOMP @ Leftovers\n- Tackle\n\nNick (Gliscor)\n- Tackle')).toEqual([['Garchomp', ''], ['Gliscor', 'Nick']]);
+    expect(readTeamPaste('Fooomon\nAbility: Pressure').skipped).toEqual(['fooomon']);
   });
 
   test('an empty box reads nothing, and Windows line endings and German stat names read as in the loader', () => {
@@ -81,6 +90,8 @@ describe('Start', () => {
     expect(startProblem({ texts: ['', ''] })).toBe('Paste a team for each player to start.');
     expect(startProblem({ texts: ['', TEAM] })).toBe('Paste a team for Player 1 to start.');
     expect(startProblem({ texts: [TEAM, 'Garchomp'] })).toBe('Paste a team for Player 2 to start.');
+    expect(startProblem({ texts: [TEAM, 'Garchomp\nAbility: Rough Skin'] })).toBe('Player 2 has no set with a move line.');
+    expect(startProblem({ texts: ['Garchomp\nAbility: Rough Skin', ' \n'] })).toBe('Player 1 has no set with a move line.');
     expect(startProblem({ texts: [TEAM, TEAM], seed: '1,2' })).toMatch(/four whole numbers/);
     expect(startProblem({ texts: [TEAM, TEAM], seed: '' })).toBeNull();
     expect(startProblem({ texts: [TEAM, TEAM], seed: '9,9,9,9' })).toBeNull();
@@ -90,14 +101,42 @@ describe('Start', () => {
 
   test('one rule names what stops Start by box: a side, the seed, and a species the check refused; the simulator\'s other problems never stop it', () => {
     const seven = Array.from({ length: 7 }, (_, index) => `Garchomp\n- Earthquake${' '.repeat(index)}`).join('\n\n');
-    expect(startBlocks({ texts: [TEAM, TEAM] })).toEqual({ teams: [null, null], seed: null });
-    expect(startBlocks({ texts: ['', seven] })).toEqual({ teams: ['Paste a team for Player 1 to start.', 'A team holds at most 6 Pokémon.'], seed: null });
+    expect(startBlocks({ texts: [TEAM, TEAM] })).toEqual({ teams: [null, null], seed: null, said: [false, false] });
+    expect(startBlocks({ texts: ['', seven] })).toEqual({ teams: ['Paste a team for Player 1 to start.', 'A team holds at most 6 Pokémon.'], seed: null, said: [false, false] });
     expect(startBlocks({ texts: [TEAM, TEAM], seed: '1,2' }).seed).toMatch(/four whole numbers/);
     const refusal = 'Zzqxvwk is no Pokémon of [Gen 9] OU. Fix the set to start.';
     expect(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }).teams).toEqual([null, refusal]);
     expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], refused: [null, refusal] }))).toBe(true);
     expect(stopsStart(startBlocks({ texts: [TEAM, TEAM], seed: '1,2,3,4' }))).toBe(false);
     expect(startProblem({ texts: [TEAM, seven] })).toBe('A team holds at most 6 Pokémon.');
+  });
+
+  test('a box whose sets all lack a move line blocks Start without a second sentence: the skipped line says it; a blank box keeps its hint', () => {
+    const blocks = startBlocks({ texts: ['Garchomp\nAbility: Rough Skin', TEAM] });
+    expect(blocks.teams[0]).toBe('Player 1 has no set with a move line.');
+    expect(blocks.said).toEqual([true, false]);
+    expect(stopsStart(blocks)).toBe(true);
+    expect(startBlocks({ texts: ['  \n', TEAM] })).toMatchObject({ teams: ['Paste a team for Player 1 to start.', null], said: [false, false] });
+    expect(startBlocks({ texts: ['Garchomp\n- Earthquake\n\nGliscor', TEAM] }).said).toEqual([false, false]);
+  });
+
+  test('the box shows the check\'s problems once: none for an empty box, none the refusal or the size reason already says', () => {
+    const read = (text: string) => readTeamPaste(text);
+    const missing = 'You must bring at least 1 Pokémon (your team has 0).';
+    const size = 'You may only bring up to 6 Pokémon (your team has 7).';
+    const absent = 'The Pokemon "fooomon" does not exist.';
+    const refusal = 'Fooomon is no Pokémon of [Gen 9] OU. Fix the set to start.';
+    const seven = Array.from({ length: 7 }, (_, index) => `Garchomp\n- Earthquake${' '.repeat(index)}`).join('\n\n');
+    expect(boxProblems(read(''), [missing], null)).toBeNull();
+    expect(boxProblems(read('Garchomp'), [missing], null)).toBeNull();
+    expect(boxProblems(read(TEAM), null, null)).toBeNull();
+    expect(boxProblems(read(TEAM), [], null)).toEqual([]);
+    expect(boxProblems(read(TEAM), ['Garchomp can\'t have Levitate.'], null)).toEqual(['Garchomp can\'t have Levitate.']);
+    expect(boxProblems(read('Fooomon\n- Tackle'), [absent], refusal)).toBeNull();
+    expect(boxProblems(read('Fooomon\n- Tackle'), [absent, 'Fooomon has no ability.'], refusal)).toEqual(['Fooomon has no ability.']);
+    expect(boxProblems(read(seven), [size], null)).toBeNull();
+    expect(teamTooBig(read(seven))).toBe(true);
+    expect(teamTooBig(read(TEAM))).toBe(false);
   });
 
   const FORMATS: { id: string; name: string; level: number; gameType: 'singles' | 'doubles'; bring: number | null }[] = [

@@ -92,8 +92,8 @@ function unknownSpeciesRefusal(format: ReturnType<ReturnType<typeof simFormats>[
   const dex = dexOfFormat(format);
   for (const set of team) {
     if (dex.species.get(set.species).exists) continue;
-    const name = (set.species || set.name || '').trim();
-    return name ? `${name} is no Pokémon of ${format.name}. Fix the set to start.` : `A set has no Pokémon. Fix the set to start.`;
+    const name = (set.name || set.species || '').trim();
+    return name ? `${name[0].toUpperCase()}${name.slice(1)} is no Pokémon of ${format.name}. Fix the set to start.` : `A set has no Pokémon. Fix the set to start.`;
   }
   return null;
 }
