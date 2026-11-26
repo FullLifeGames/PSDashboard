@@ -85,8 +85,9 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
   const { evaluation, liveTip, simState, requestDeviation, branching, branchPreparing, confirmOpen } = args;
   const playOutEvalChoice = usePlayTurnOut(args);
 
-  const pendingPickRef = useRef<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null } | null>(null);
+  const pendingPickRef = useRef<{ side: 'p1' | 'p2'; ranked: RankedChoice; reply: RankedChoice | null; version: number } | null>(null);
   const [pickVersion, setPickVersion] = useState(0);
+  const lastVersionRef = useRef(0);
 
   /** `from`: the result of an engine-move click, read for Hard mode's worst reply; a matrix pair has none. */
   const handleExploreChoice = useCallback((side: 'p1' | 'p2', ranked: RankedChoice, named?: RankedChoice | null, from?: EvalResult | null) => {
@@ -96,8 +97,9 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
       playOutEvalChoice(side, ranked, reply);
       return;
     }
-    pendingPickRef.current = { side, ranked, reply };
-    setPickVersion(version => version + 1);
+    lastVersionRef.current += 1;
+    pendingPickRef.current = { side, ranked, reply, version: lastVersionRef.current };
+    setPickVersion(lastVersionRef.current);
     requestDeviation(null);
   }, [liveTip, simState, playOutEvalChoice, requestDeviation, evaluation]);
 
@@ -109,7 +111,8 @@ function useChessWalk(args: EngineWalkInputs & WalkRefs & {
 
   useEffect(() => {
     const pendingEvalPick = pendingPickRef.current;
-    if (!pendingEvalPick) return;
+    const seenByThisRender = pendingEvalPick?.version === pickVersion;
+    if (!pendingEvalPick || !seenByThisRender) return;
     // Wait until the rebuild landed the pointer on the live sim: earlier, the pick would play into the old sim.
     if (liveTip && simState && !branchPreparing && !confirmOpen) {
       pendingPickRef.current = null;
