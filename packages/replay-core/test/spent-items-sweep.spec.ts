@@ -5,8 +5,6 @@ import { registerChampionsDex, type RulesDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { spentAfterOwnMove, spentByHit } from '../src/inference/spent-items';
 
-// A scene left unjudged on purpose carries its reason and must never rule the item out.
-
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
 interface RuleSet { name: string; prefix: string; gen: number; champions?: boolean }
@@ -27,7 +25,6 @@ interface Scene {
   ifFaints?: boolean;
 }
 
-// An item that prints no line, so the inference cannot learn it from the log.
 const INERT = 'Light Ball';
 const idOf = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 

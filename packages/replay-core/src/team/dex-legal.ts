@@ -9,7 +9,6 @@ export type GenDex = RulesDex;
 export interface LegalityContext extends GameRules {
   /** A format with free abilities (abilitiesAreFree): players may give any species any ability or item. */
   freeAbilities: boolean;
-  /** Ability ids the format bans; undefined reads as none. */
   bannedAbilities?: ReadonlySet<string>;
 }
 

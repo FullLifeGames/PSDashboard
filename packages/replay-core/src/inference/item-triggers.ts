@@ -32,7 +32,6 @@ export interface ItemTriggerWatch {
   healBlocked: Set<string>;
   /** The move resolving now; a spread move's immune target does not end it. */
   move: { attacker: string; move: string } | null;
-  /** The effectiveness the move in hand printed per holder key: 1 super effective, -1 resisted. */
   effectiveness: Map<string, number>;
   pending: Trigger[];
   /** An Eject Button, Red Card or Eject Pack spent itself inside the window: no hit is judged. */

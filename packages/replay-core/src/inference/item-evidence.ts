@@ -126,8 +126,6 @@ function lifeOrbRecoils(dex: RulesDex, move: ReturnType<RulesDex['moves']['get']
   return recoil;
 }
 
-// The gates the simulator reads before a move's own item acts: Klutz, Magic Room, Embargo, and Sheer Force on a move
-// with secondaries (`suppressingSecondaries`).
 function ownItemActs(state: InferrerState, watch: ItemWatch, action: ActionWatch, move: ReturnType<RulesDex['moves']['get']>): boolean {
   const abilities = possibleAbilities(state, action.ident);
   if (!abilities || abilities.has('klutz') || (abilities.has('sheerforce') && move.secondaries)) return false;
