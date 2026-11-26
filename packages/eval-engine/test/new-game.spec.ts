@@ -57,6 +57,15 @@ describe('new-game-refused', () => {
     await loadSimMods('gen9championsou');
   }, 60_000);
 
+  test('the refusal names the typed spelling when the set carries it, and starts with a capital letter either way', async () => {
+    const base = legalTeams('gen9ou');
+    if ('problems' in base) throw new Error('gen9ou has no legal team');
+    const refusal = async (changes: Partial<PokemonSet>) => (await checkGameTeams('gen9ou', { p1: [{ ...base.p1[0], ...changes }, ...base.p1.slice(1)], p2: base.p2 })).refused.p1;
+    const tail = ' is no Pokémon of [Gen 9] OU. Fix the set to start.';
+    expect(await refusal({ species: 'fooomon', name: 'FOOOMON' })).toBe(`FOOOMON${tail}`);
+    expect(await refusal({ species: 'fooomon', name: '' })).toBe(`Fooomon${tail}`);
+  }, 60_000);
+
   describe('the refusal of an unknown species, per side', () => {
     for (const id of FORMATS) {
       test(`${id}: the check names what Start refuses, and a known side has none`, async () => {

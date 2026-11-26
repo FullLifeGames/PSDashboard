@@ -425,6 +425,13 @@ describe('lead-css', () => {
       expect(block).toMatch(/\.ps-lead \.ps-dock-bar\s*\{[^}]*max-height:\s*calc\(60 \* var\(--ps-vh\)\)[^}]*overflow-y:\s*auto/);
     });
 
+    test('the picker stays compact: Start is a normal button beside the rows, and a tile lets six fit one row', () => {
+      expect(rule(lead, '.ps-lead .ps-execute-btn')).toMatch(/align-self:\s*center/);
+      expect(rule(lead, '.ps-lead .ps-execute-btn')).toMatch(/min-height:\s*36px/);
+      expect(rule(lead, '.ps-lead .ps-dock-bar')).toMatch(/align-items:\s*center/);
+      expect(Number(/min-width:\s*(\d+)px/.exec(rule(lead, '.ps-lead .ps-switch-text'))?.[1])).toBeLessThanOrEqual(56);
+    });
+
     test('the sides stand in rows and take the full width of their column', () => {
       expect(rule(lead, '.ps-lead-rows')).toMatch(/display:\s*grid/);
       expect(rule(lead, '.ps-lead-rows')).toMatch(/min-width:\s*0/);

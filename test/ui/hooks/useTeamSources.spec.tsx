@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { useEffect } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { SmogonUsageStats, SpreadCandidate } from '@fulllifegames/replay-core';
 import { useHpResolver, useSheetTeams, useSpreadSolve, useTeamPaste } from '../../../src/hooks/useTeamSources';
@@ -120,6 +121,21 @@ describe('useSpreadSolve', () => {
     rerender(inputs(client, { replayData: { ...replayData, id: 'other' } }));
     expect(result.current.solvedSpreads).toBeNull();
   });
+
+  test('the first committed render after a replay change shows no spreads of the old replay', async () => {
+    const { client } = worker();
+    const committed: Array<Map<string, SpreadCandidate> | null> = [];
+    const { result, rerender } = renderHook((props: Inputs) => {
+      const value = useSpreadSolve(props);
+      useEffect(() => { committed.push(value.solvedSpreads); });
+      return value;
+    }, { initialProps: inputs(client) });
+    await result.current.getInferredSpreads();
+    await waitFor(() => expect(result.current.solvedSpreads).not.toBeNull());
+    committed.length = 0;
+    rerender(inputs(client, { replayData: { ...replayData, id: 'other' } }));
+    expect(committed[0]).toBeNull();
+  });
 });
 
 describe('useSheetTeams', () => {
@@ -134,5 +150,19 @@ describe('useSheetTeams', () => {
     expect(result.current).toEqual({ p1: null, p2: null });
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(result.current).toEqual({ p1: null, p2: null });
+  });
+
+  test('the first committed render after a replay change shows no sheets of the old replay', async () => {
+    const doubles = replayFixture('doubles').replayData;
+    const committed: Array<{ p1: unknown; p2: unknown }> = [];
+    const { result, rerender } = renderHook((replay: typeof doubles | null) => {
+      const value = useSheetTeams(replay);
+      useEffect(() => { committed.push(value); });
+      return value;
+    }, { initialProps: doubles });
+    await waitFor(() => expect(result.current.p1).not.toBeNull());
+    committed.length = 0;
+    rerender(replayFixture('singles').replayData);
+    expect(committed[0]).toEqual({ p1: null, p2: null });
   });
 });

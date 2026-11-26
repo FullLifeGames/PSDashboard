@@ -139,7 +139,7 @@ export function NewGameDialog(props: Props) {
               format={format}
               formatName={selected?.name ?? format}
               check={check}
-              reason={blocks.teams[index]}
+              reason={blocks.said[index] ? null : blocks.teams[index]}
               startBlocked={blocked}
               onValidate={() => draft.setNonce(current => current + 1)}
             />

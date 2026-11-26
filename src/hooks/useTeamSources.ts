@@ -99,11 +99,10 @@ export function useSpreadSolve(inputs: {
 }) {
   const { replayData, observations, speedOrders, teamText, effectiveP1Info, effectiveP2Info, usageStats, setAssumptions, replayWorker } = inputs;
   const spreadSolveRef = useRef<SpreadSolveEntry | null>(null);
-  const [solvedSpreads, setSolvedSpreads] = useState<Map<string, SpreadCandidate> | null>(null);
+  const [solved, setSolved] = useState<{ replay: ReplayData | null; spreads: Map<string, SpreadCandidate> | null }>({ replay: replayData, spreads: null });
+  if (solved.replay !== replayData) setSolved({ replay: replayData, spreads: null });
   useEffect(() => {
     spreadSolveRef.current = null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the reset on a replay change; moving it to render time is a hook refactor for a UI round
-    setSolvedSpreads(null);
   }, [replayData]);
 
   const getInferredSpreads = useCallback(async (
@@ -134,8 +133,8 @@ export function useSpreadSolve(inputs: {
     const entry: SpreadSolveEntry = { refs, content, value };
     spreadSolveRef.current = entry;
     value
-      .then(solved => {
-        if (spreadSolveRef.current === entry) setSolvedSpreads(solved);
+      .then(spreads => {
+        if (spreadSolveRef.current === entry) setSolved({ replay: replayData, spreads });
       })
       .catch(() => {
         if (spreadSolveRef.current === entry) spreadSolveRef.current = null;
@@ -146,16 +145,19 @@ export function useSpreadSolve(inputs: {
     usageStats.stats, usageStats.loading, setAssumptions.assumptions, setAssumptions.loading, replayWorker,
   ]);
 
-  return { solvedSpreads, getInferredSpreads };
+  return { solvedSpreads: solved.spreads, getInferredSpreads };
 }
 
 /** Posted open team sheets, surfaced in the stats panel as 'sheet' knowledge. */
 export function useSheetTeams(replayData: ReplayData | null) {
   const [sheetTeams, setSheetTeams] = useState<{ p1: PokemonSet[] | null; p2: PokemonSet[] | null }>({ p1: null, p2: null });
+  const [sheetsFor, setSheetsFor] = useState(replayData);
+  if (sheetsFor !== replayData) {
+    setSheetsFor(replayData);
+    setSheetTeams({ p1: null, p2: null });
+  }
   useEffect(() => {
     let stale = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the reset on a replay change; moving it to render time is a hook refactor for a UI round
-    setSheetTeams({ p1: null, p2: null });
     if (!replayData) return;
     void import('../lib/lazy/team-builder').then(({ extractTeamSheets }) => {
       if (!stale) setSheetTeams(extractTeamSheets(replayData.log));

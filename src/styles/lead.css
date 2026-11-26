@@ -1,6 +1,11 @@
 /* The picker's root is a dock (`ps-dock ps-lead`): dock.css applies as it is, only what the picker adds stands here. */
 
 .ps-lead-rows { display: grid; gap: 10px; min-width: 0; }
+.ps-lead .ps-dock-bar { align-items: center; }
+.ps-lead .ps-execute-btn { align-self: center; min-height: 36px; }
+.ps-lead .ps-switch-row { gap: 6px 4px; }
+.ps-lead .ps-switchbtn { padding-right: 6px; }
+.ps-lead .ps-switch-text { min-width: 52px; }
 .ps-lead-side { display: grid; gap: 8px; min-width: 0; }
 .ps-lead-prompt {
   display: flex;

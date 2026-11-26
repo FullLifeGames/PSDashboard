@@ -2,7 +2,7 @@ import { useId } from 'react';
 import type { PokemonSet } from '@pkmn/sim';
 import { formatRules } from '@fulllifegames/replay-core';
 import { SpriteImg } from '../SpriteImg';
-import { TEAM_SIZE, type TeamRead } from '../../lib/new-game/start';
+import { boxProblems, TEAM_SIZE, teamTooBig, type TeamRead } from '../../lib/new-game/start';
 import type { TeamCheck } from './use-team-check';
 
 
@@ -42,7 +42,7 @@ function CheckNote({ read, check }: Pick<Props, 'read' | 'check'>) {
 export function TeamBox({ side, name, onName, text, onText, read, format, formatName, check, reason, startBlocked, onValidate }: Props) {
   const number = side === 'p1' ? 1 : 2;
   const pasteId = useId();
-  const problems = check.state === 'done' ? check.problems[side] : null;
+  const problems = check.state === 'done' ? boxProblems(read, check.problems[side], check.problems.refused[side]) : null;
   return (
     <section className="ps-newgame-team" aria-label={`Player ${number} team`}>
       <div className="ps-newgame-team-head">
@@ -70,7 +70,7 @@ export function TeamBox({ side, name, onName, text, onText, read, format, format
       {text.trim() !== '' && (
         <div className="ps-newgame-read">
           <Sprites sets={read.sets} format={format} />
-          <span className="ps-newgame-count">{read.sets.length} of {TEAM_SIZE} sets read</span>
+          {!teamTooBig(read) && <span className="ps-newgame-count">{read.sets.length} of {TEAM_SIZE} sets read</span>}
         </div>
       )}
       {read.skipped.length > 0 && (
