@@ -35,6 +35,14 @@ describe('EvalControls', () => {
     }
   });
 
+  test('the Tera select names the Auto rule of a new game, of a replay and of draft formats', () => {
+    render(<EvalControls {...props()} />);
+    const title = select('Tera').closest('label')?.getAttribute('title') ?? '';
+    expect(title).toContain('in a new game on wherever the format allows Tera');
+    expect(title).toContain('in a replay off until someone terastallizes');
+    expect(title).toContain('Draft and custom formats keep the option only for the Pokémon that terastallized');
+  });
+
   test('tera and auto follow their visibility flags; the checkboxes report their new state', async () => {
     const wired = props();
     const { rerender } = render(<EvalControls {...wired} />);

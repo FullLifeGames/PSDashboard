@@ -14,7 +14,7 @@ const LABEL_STYLE = { display: 'flex', alignItems: 'center', gap: 4, fontSize: 1
 function TeraSelect({ prefs, onPrefsChange, running }: PrefsProps) {
   return (
     <label
-      title="Auto: off when the game never terastallized; in draft/custom formats only the Pokémon that terastallized keep the option. Revealed: force that per-Pokémon restriction for any format."
+      title="Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format."
       style={LABEL_STYLE}
     >
       Tera

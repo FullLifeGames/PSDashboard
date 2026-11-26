@@ -400,3 +400,18 @@ describe('useEvalView replacement mark', () => {
     expect(spies.evaluate.mock.calls.at(-1)![0].replacement ?? false).toBe(false);
   });
 });
+
+describe('useEvalView Tera Auto', () => {
+  test.each([
+    ['singles', 'gen9ou', 'singles', true],
+    ['doubles', 'gen9doublesou', 'doubles', true],
+    ['vgc', 'gen9vgc2025regi', 'doubles', true],
+    ['a Custom Game', 'gen9customgame', 'singles', false],
+    ['a Terastal Clause format', 'gen9monotype', 'singles', false],
+  ] as const)('Tera Auto in a new game of %s follows the format; the replay of the same log stays off', (_kind, formatid, replayGameType, allowed) => {
+    const { evaluation } = evaluationOf();
+    const tera = (id: string) => renderHook(() => useEvalView(inputs(evaluation, { replayData: { ...replayData, id, formatid }, replayGameType }))).result.current.effectiveTera;
+    expect(tera('newgame-abcdefghij')).toBe(allowed);
+    expect(tera('gen9ou-1234567890')).toBe(false);
+  });
+});

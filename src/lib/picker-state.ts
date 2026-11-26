@@ -1,10 +1,9 @@
 import type { PokemonSet } from '@pkmn/sim';
 import { CHAMPIONS_MOD, type GameRules, type RulesDex, buildCalcPokemon, dexOf, calcGenerationFor, evBudget, speciesBaseId, toId, type PokemonSnapshot, type TurnSnapshot } from '@fulllifegames/replay-core';
 import {
-  moveAtUse, sightedHpAt, snapshotMoveTypes, snapshotSimFacts, speciesAfterTeraClick,
+  moveAtUse, sightedHpAt, snapshotMoveTypes, snapshotSimFacts, speciesAfterTeraClick, teraBanned,
   type BranchMoveOption, type BranchSimState, type BranchSlotModifiers, type BranchSwitchOption, type MoveUser, type SimPokemonInfo,
 } from '@fulllifegames/eval-engine';
-import { teraBanned } from './picker-tera';
 import { fieldRow } from './field-row';
 
 /** 'stored' is exact (incl. PP and disables); 'snapshot' is approximated from the replay snapshot and guessed teams. */

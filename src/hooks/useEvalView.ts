@@ -65,10 +65,10 @@ export interface EvalViewInputs {
 
 function useEvalFormat(inputs: EvalViewInputs) {
   const { replayData, evaluation, replayGameType } = inputs;
-  // Tera 'auto': off when the game never terastallized; in draft and custom formats only for species that did.
+  // Tera 'auto': a new game follows its format; a replay stays off until someone terastallized (draft: per species).
   const effectiveTera = useMemo(
     () => (replayData
-      ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log)
+      ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log, { newGame: isGameId(replayData.id) })
       : false),
     [replayData, evaluation.prefs.tera],
   );

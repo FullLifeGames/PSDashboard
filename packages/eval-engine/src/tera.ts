@@ -1,8 +1,7 @@
+import { Battle as SimBattle, type PokemonSet } from '@pkmn/sim';
 import type { TeraAllowance } from './types.ts';
-import { toId } from '@fulllifegames/replay-core';
+import { dexOfFormat, simFormats, toId } from '@fulllifegames/replay-core';
 import { normalizeLineEndings } from './line-endings.ts';
-
-// Draft leagues grant Terastallization to specific Pokémon: a global on/off would recommend illegal Teras.
 
 /** The panel's Tera setting. */
 export type TeraPreference = 'auto' | 'on' | 'off' | 'revealed';
@@ -48,15 +47,48 @@ export function parseRevealedTeraSpecies(rawLog: string): { p1: string[]; p2: st
   return revealed;
 }
 
-/** Resolves the panel setting; 'auto' limits draft and custom game formats to the revealed species. */
+/** Terastal Clause nulls canTerastallize; a mod (Champions) can switch Tera off without it. */
+export function teraBanned(format: string | undefined): boolean {
+  if (!format) return false;
+  if (/@@@.*terastal ?clause/i.test(format)) return true;
+  try {
+    const base = simFormats().get(format.split('@@@')[0]);
+    if (!base.exists) return false;
+    return simFormats().getRuleTable(base).has('terastalclause') || simOffersTera(base.id) === false;
+  } catch {
+    return false;
+  }
+}
+
+const teraOffers = new Map<string, boolean>();
+
+function simOffersTera(formatid: string): boolean | null {
+  const known = teraOffers.get(formatid);
+  if (known !== undefined) return known;
+  try {
+    const dex = dexOfFormat(formatid as never);
+    const probe = { species: dex.species.all().find(species => !species.isNonstandard)?.name, moves: [dex.moves.all()[0]?.name] } as PokemonSet;
+    const battle = new SimBattle({ formatid: formatid as never, seed: '1,2,3,4', p1: { name: 'A', team: [probe] }, p2: { name: 'B', team: [probe] } });
+    const offers = battle.sides[0].pokemon[0].canTerastallize !== null;
+    teraOffers.set(formatid, offers);
+    return offers;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolves the panel setting; 'auto' lets draft and custom formats (Tera per Pokémon) keep only revealed species. */
 export function resolveTeraPreference(
   pref: TeraPreference,
   formatid: string,
   log: string,
+  options?: { newGame?: boolean },
 ): TeraAllowance {
   if (pref === 'on') return true;
   if (pref === 'off') return false;
-  if (!log.includes('|-terastallize|')) return false;
+  if (!log.includes('|-terastallize|')) {
+    return pref === 'auto' && !!options?.newGame && !PER_POKEMON_TERA_FORMATS.test(formatid) && !teraBanned(formatid);
+  }
   if (pref === 'revealed' || PER_POKEMON_TERA_FORMATS.test(formatid)) {
     return parseRevealedTeraSpecies(log);
   }
