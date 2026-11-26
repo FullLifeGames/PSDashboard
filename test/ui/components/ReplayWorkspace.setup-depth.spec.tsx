@@ -70,14 +70,20 @@ describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
     expect(screen.queryByText('Tera', { selector: '.ps-eval-controls *' })).toBeNull();
   });
 
-  test('another engine hides both selects in the menu', async () => {
-    const { app } = await mountLoaded('singles');
+  test.each([['singles'], ['doubles']] as const)('%s: an added engine puts its Engine select in the menu, hides Depth and Samples, and the way back restores them', async kind => {
+    const { app } = await mountLoaded(kind);
+    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
     act(() => app().ctx.engines.add('My bot', 'http://localhost:8765/'));
     await waitFor(() => expect(app().ctx.engines.selected.name).toBe('My bot'));
-    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    expect(screen.getByRole('button', { name: 'Edit Player' })).toBeInTheDocument();
+    const engine = screen.getByRole('combobox', { name: 'Engine' });
+    expect(engine).toHaveValue('url:http://localhost:8765/');
     expect(screen.queryByText('Depth')).toBeNull();
     expect(screen.queryByText('Samples')).toBeNull();
     expect(within(screen.getByText('Tera')).getByRole('combobox')).toBeEnabled();
+    expect(engine.closest('.ps-eval-controls')).toBeNull();
+    await userEvent.selectOptions(engine, 'ps-dashboard');
+    await waitFor(() => expect(app().ctx.engines.selected.source).toBe('builtin'));
+    expect(screen.getByText('Depth')).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import type { EvalPreferences, EvalResult } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
 import type { EngineChoice } from '../../hooks/useEngineChoice';
+import { BUILTIN_ENGINE, engineNote } from '../../lib/engines/registry';
 import { EngineControls } from './EngineControls';
 
 interface PrefsProps {
@@ -37,12 +38,10 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, onEvalua
   result: EvalResult | null;
   status: EvalStatus;
 }) {
-  const external = !!engines && engines.selected.source !== 'builtin';
-  const engineNote = external ? `Estimate from ${engines.selected.name}.` : 'Built-in engine: it plays the turns in the simulator.';
   return (
     <div className="ps-eval-controls">
-      <span className="ps-eval-controls-title" title={engineNote}>Evaluation</span>
-      {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
+      <span className="ps-eval-controls-title" title={engineNote(engines?.selected ?? BUILTIN_ENGINE)}>Evaluation</span>
+      {engines && <EngineControls engines={engines.engines} onAdd={engines.add} onRemove={engines.remove} />}
       {showAuto && (
         <label
           title="After your first Evaluate in a variation, each position you play or step to evaluates by itself. The engine walk and Play line switch this on. Stays on across sessions."

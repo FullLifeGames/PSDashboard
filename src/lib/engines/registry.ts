@@ -11,6 +11,9 @@ export interface EngineEntry {
 
 export const BUILTIN_ENGINE: EngineEntry = { id: 'ps-dashboard', name: 'PS Dashboard', url: null, source: 'builtin' };
 
+export const engineNote = (engine: EngineEntry): string =>
+  engine.source === 'builtin' ? 'Built-in engine: it plays the turns in the simulator.' : `Estimate from ${engine.name}.`;
+
 export const CONTRIBUTED_ENGINES: EngineEntry[] = [];
 
 export const ADDED_ENGINES_KEY = 'ps-replay-interceptor:engines';

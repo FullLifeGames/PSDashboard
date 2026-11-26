@@ -5,6 +5,7 @@ import { SetupMenu } from '../../../src/components/SetupMenu';
 import { UI_SCALE_STORAGE_KEY } from '../../../src/lib/ui-scale-setting';
 import { getUiScaleState, startUiScale } from '../../../src/lib/ui-scale-store';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
+import { BUILTIN_ENGINE, type EngineEntry } from '../../../src/lib/engines/registry';
 
 describe('SetupMenu.size', () => {
   let stop: (() => void) | null = null;
@@ -253,5 +254,49 @@ describe('Tera in the Setup menu', () => {
   test('the row locks while a search runs', async () => {
     await openMenu({ running: true });
     expect(select('Tera')).toBeDisabled();
+  });
+});
+
+describe('the Engine select in the Setup menu', () => {
+  const bot: EngineEntry = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' };
+  const choice = (selected: EngineEntry, engines: EngineEntry[] = [BUILTIN_ENGINE, bot]) => ({ engines, selected, select: vi.fn() });
+  const engineSelect = () => screen.getByRole('combobox', { name: 'Engine' });
+  const rowNames = () => [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')].map(row => row.firstChild?.textContent?.trim());
+
+  test('the built-in engine alone leaves no row, so the menu has no dead select', async () => {
+    await openMenu({ engines: choice(BUILTIN_ENGINE, [BUILTIN_ENGINE]) });
+    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
+    expect(rowNames()).toEqual(['Depth', 'Samples', 'Tera']);
+  });
+
+  test('a second engine adds the row above Depth; a pick reaches the handler and keeps the menu open', async () => {
+    const engines = choice(BUILTIN_ENGINE);
+    await openMenu({ engines });
+    expect(rowNames()).toEqual(['Engine', 'Depth', 'Samples', 'Tera']);
+    expect(engineSelect()).toHaveValue('ps-dashboard');
+    expect([...engineSelect().querySelectorAll('option')].map(option => option.textContent)).toEqual(['PS Dashboard', 'My bot']);
+    await userEvent.selectOptions(engineSelect(), bot.id);
+    expect(engines.select).toHaveBeenCalledWith(bot.id);
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('an added engine keeps the row, so the user can return, and the title names the engine in use', async () => {
+    await openMenu({ external: true, engines: choice(bot) });
+    expect(engineSelect()).toHaveValue(bot.id);
+    expect(engineSelect().closest('label')).toHaveAttribute('title', expect.stringContaining('Estimate from My bot.'));
+    expect(rowNames()).toEqual(['Engine', 'Tera']);
+  });
+
+  test('the built-in engine in the title says it plays the turns in the simulator', async () => {
+    await openMenu({ engines: choice(BUILTIN_ENGINE) });
+    expect(engineSelect().closest('label')).toHaveAttribute(
+      'title',
+      expect.stringContaining("Which engine evaluates: the dashboard's own search or another one (ENGINES.md). Built-in engine: it plays the turns in the simulator."),
+    );
+  });
+
+  test('the row locks while a search runs', async () => {
+    await openMenu({ running: true, engines: choice(BUILTIN_ENGINE) });
+    expect(engineSelect()).toBeDisabled();
   });
 });

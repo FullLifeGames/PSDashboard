@@ -1,5 +1,7 @@
 import { useId } from 'react';
 import type { EvalPreferences, SearchBudget } from '@fulllifegames/eval-engine';
+import { engineNote } from '../lib/engines/registry';
+import type { EngineChoice } from '../hooks/useEngineChoice';
 import { readSearchBudget, treeThresholdText } from '../lib/eval/search-budget-setting';
 
 export interface SearchSelectsProps {
@@ -8,6 +10,7 @@ export interface SearchSelectsProps {
   running: boolean;
   external: boolean;
   showTera: boolean;
+  engines?: Pick<EngineChoice, 'engines' | 'selected' | 'select'>;
 }
 
 function autoLineText(split: SearchBudget['singles']): string {
@@ -96,9 +99,33 @@ function DepthRows({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, '
   );
 }
 
-export function SearchSelects({ external, showTera, ...rows }: SearchSelectsProps) {
+function EngineRow({ engines, running }: { engines: NonNullable<SearchSelectsProps['engines']>; running: boolean }) {
+  const engineId = useId();
+  return (
+    <label
+      className="ps-setup-row"
+      htmlFor={engineId}
+      title={`Which engine evaluates: the dashboard's own search or another one (ENGINES.md). ${engineNote(engines.selected)}`}
+    >
+      Engine
+      <select
+        id={engineId}
+        aria-label="Engine"
+        className="ps-setup-row-select"
+        value={engines.selected.id}
+        disabled={running}
+        onChange={event => engines.select(event.target.value)}
+      >
+        {engines.engines.map(engine => <option key={engine.id} value={engine.id}>{engine.name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+export function SearchSelects({ external, showTera, engines, ...rows }: SearchSelectsProps) {
   return (
     <>
+      {engines && engines.engines.length > 1 && <EngineRow engines={engines} running={rows.running} />}
       {!external && <DepthRows {...rows} />}
       {showTera && <TeraRow {...rows} />}
     </>

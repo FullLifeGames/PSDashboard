@@ -90,18 +90,14 @@ describe('EvalControls', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  test('another engine names itself in the heading title and the Engine select title, not in a line of text', () => {
+  test('another engine names itself in the heading title only; the header holds no Engine select, with the add link beside the title', () => {
     const bot = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' as const };
     const engines = { engines: [BUILTIN_ENGINE, bot], selected: bot, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
-    render(<EvalControls {...props({ engines })} />);
+    const { container } = render(<EvalControls {...props({ engines })} />);
     expect(screen.queryByText(/estimate from/i)).toBeNull();
     expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Estimate from My bot.');
-    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Estimate from My bot.'));
-  });
-
-  test('the built-in engine reaches the Engine select title too', () => {
-    const engines = { engines: [BUILTIN_ENGINE, { id: 'u', name: 'Other', url: 'http://x/', source: 'added' as const }], selected: BUILTIN_ENGINE, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
-    render(<EvalControls {...props({ engines })} />);
-    expect(screen.getByRole('combobox', { name: 'Engine' }).closest('label')).toHaveAttribute('title', expect.stringContaining('Built-in engine: it plays the turns in the simulator.'));
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect([...container.querySelector('.ps-eval-controls')!.children].map(child => child.textContent?.trim()))
+      .toEqual(['Evaluation', '+ engine', 'Follow', 'On load', 'Evaluate']);
   });
 });
