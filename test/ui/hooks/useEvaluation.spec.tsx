@@ -314,6 +314,25 @@ describe('useEvaluation whole-game sweep', () => {
     expect(script.calls).toHaveLength(3);
   });
 
+  test('only a sweep over the whole game marks the graph as swept; a later one-turn analysis keeps the mark, a new game length drops it', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    const run = async (extra: object) => {
+      act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), ...extra }));
+      await waitFor(() => expect(result.current.graph.running).toBe(true));
+      await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    };
+    await run({ from: 2, to: 3 });
+    expect(result.current.graph.scores).toEqual([null, 0.1, 0.2]);
+    expect(result.current.graph.gameSwept).toBeFalsy();
+    await run({});
+    expect(result.current.graph.gameSwept).toBe(true);
+    await run({ from: 2, to: 3 });
+    expect(result.current.graph.gameSwept).toBe(true);
+    await run({ turns: 4, from: 3, to: 4 });
+    expect(result.current.graph.gameSwept).toBeFalsy();
+  });
+
   test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
