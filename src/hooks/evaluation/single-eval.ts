@@ -21,6 +21,7 @@ export interface EvaluateParams {
   acquire: (reportReconstruct: (turn: number, target: number) => void) => Promise<string>;
   /** Identity of the position, exposed as resultTag: a run finishing after navigation must not show as the new's. */
   tag?: string;
+  replacement?: boolean;
   /** The actions played on this replay turn, as the sweep passes them; absent for live and variation positions. */
   keepPlayed?: EvalSettings['keepPlayed'];
   /** Called once where the result lands; never for a partial, superseded, cancelled or failed run. */
@@ -171,7 +172,7 @@ function useEvaluateAction(
   io: SingleEvalIO,
   prefsRef: React.RefObject<EvalPreferences>,
   engineOverrideRef: React.RefObject<TurnEvalSettings | null>,
-  setResultTag: (value: string | null) => void,
+  setResultTag: (value: string | null, replacement?: boolean) => void,
   setStopped: (value: StoppedRun | null) => void,
 ) {
   const { runRef, cacheRef, setResult, setStatus, setError, setProgress, setReconstructProgress, stopGraphPaint } = io;
@@ -184,7 +185,7 @@ function useEvaluateAction(
         // Bumping the run counter kills a running sweep: its status must say so.
         stopGraphPaint(true);
         setResult(hit.result);
-        setResultTag(params.tag ?? null);
+        setResultTag(params.tag ?? null, params.replacement === true);
         setStopped(null);
         setStatus('done');
         setError(null);
@@ -200,7 +201,7 @@ function useEvaluateAction(
     setStatus('reconstructing');
     setError(null);
     setResult(null);
-    setResultTag(params.tag ?? null);
+    setResultTag(params.tag ?? null, params.replacement === true);
     setStopped(null);
     setProgress(null);
     setReconstructProgress(null);
@@ -223,6 +224,18 @@ function useStop(
   }, [cancel, resultRef, resultTagRef, statusRef, setStopped]);
 }
 
+function useResultTag() {
+  const [resultTag, setResultTagState] = useState<string | null>(null);
+  const [resultReplacement, setResultReplacement] = useState(false);
+  const resultTagRef = useRef<string | null>(null);
+  const setResultTag = useCallback((value: string | null, replacement = false) => {
+    resultTagRef.current = value;
+    setResultTagState(value);
+    setResultReplacement(replacement);
+  }, []);
+  return { resultTag, resultReplacement, resultTagRef, setResultTag };
+}
+
 export function useSingleEval(env: {
   runRef: React.RefObject<number>;
   clientRef: React.RefObject<EvalWorkerClient | null>;
@@ -240,12 +253,7 @@ export function useSingleEval(env: {
     setStatusState(value);
   }, []);
   const [result, setResultState] = useState<EvalResult | null>(null);
-  const [resultTag, setResultTagState] = useState<string | null>(null);
-  const resultTagRef = useRef<string | null>(null);
-  const setResultTag = useCallback((value: string | null) => {
-    resultTagRef.current = value;
-    setResultTagState(value);
-  }, []);
+  const { resultTag, resultReplacement, resultTagRef, setResultTag } = useResultTag();
   const [progress, setProgress] = useState<SearchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconstructProgress, setReconstructProgress] = useState<{ turn: number; target: number } | null>(null);
@@ -285,7 +293,7 @@ export function useSingleEval(env: {
   }, [cancel, setStatus, setResult]);
 
   return {
-    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    status, result, resultTag, resultReplacement, progress, error, reconstructProgress, stopped,
     evaluate, cancel, stop, markStale, reset,
   };
 }

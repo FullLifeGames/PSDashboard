@@ -164,6 +164,18 @@ describe('useEvaluation single position', () => {
     expect(script.calls).toHaveLength(1);
   });
 
+  test('the replacement mark of a run lands with its tag and the next run without the mark clears it', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, sleepClause: true, acquire: async () => position(1), tag: 'variation:2', replacement: true }));
+    expect(result.current.resultTag).toBe('variation:2');
+    expect(result.current.resultReplacement).toBe(true);
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(result.current.resultReplacement).toBe(true);
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, sleepClause: true, acquire: async () => position(1), tag: 'variation:2' }));
+    expect(result.current.resultReplacement).toBe(false);
+  });
+
   test('a single evaluation hands its played action to the search as keepPlayed', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());

@@ -102,14 +102,15 @@ export function rowValueTexts(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null |
   return { p1: of(analysis.p1), p2: of(analysis.p2) };
 }
 
-/** Names the position of the run's tag (`main:10`, `variation:10`), never the pointer's; no tag: the screen's. */
+/** Names the run's position, never the pointer's; on an open replacement it names the turn the frame shows. */
 export function resultPositionLabel(
-  resultTag: string | null, screen: { viewTurn: number; viewingVariation: boolean },
+  resultTag: string | null, screen: { viewTurn: number; viewingVariation: boolean }, replacement = false,
 ): string {
   const match = resultTag === null ? null : /^(main|variation):(\d+)$/.exec(resultTag);
   const turn = match ? Number(match[2]) : screen.viewTurn;
   const variation = match ? match[1] === 'variation' : screen.viewingVariation;
-  return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
+  const line = variation ? 'variation' : 'main line';
+  return match && replacement ? `Replacement after turn ${turn - 1} · ${line}` : `Turn ${turn} · ${line}`;
 }
 
 /** Over 1 the chip reads as the two win chances it spans; the title keeps the real number on the score scale. */

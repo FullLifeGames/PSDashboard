@@ -49,6 +49,7 @@ export interface EvalViewInputs {
   executing: boolean;
   branchPreparing: boolean;
   playOutActive: boolean;
+  replacementPending: boolean;
   smogonPending: boolean;
   acquire: Pick<Acquire, 'acquireBranchPosition' | 'acquireReplayPosition' | 'makeReplayAcquire' | 'makeSweepAcquireAll'>;
   sources: TeamBuildSources;
@@ -99,7 +100,7 @@ export const turnCacheKey = (replayId: string, turn: number, snapshotCount: numb
 export type EvaluateOptions = Pick<EvaluateParams, 'onResult'>;
 
 function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
-  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores, tip, playOutActive } = inputs;
+  const { replayData, snapshots, evalIsDoubles, evaluation, liveTip, viewingVariation, serializedAtView, viewTurn, setsFingerprint, evalViewKey, acquire, setVariationScores, tip, playOutActive, replacementPending } = inputs;
   const { effectiveTera, effectiveSleepClause, effectiveRuleset } = format;
   // While a run is active, the live sim is the position wherever the pointer stands (a frame report can move it).
   const runAtTip = playOutActive && tip !== null ? tip : null;
@@ -108,7 +109,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
     if (!replayData) return;
     const onResult = typeof options?.onResult === 'function' ? options.onResult : undefined;
     if (liveTip || runAtTip) {
-      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: runAtTip?.key ?? evalViewKey, onResult });
+      evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: acquire.acquireBranchPosition, tag: runAtTip?.key ?? evalViewKey, replacement: replacementPending, onResult });
     } else if (viewingVariation && serializedAtView) {
       const stored = serializedAtView;
       evaluation.evaluate({ cacheKey: null, tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, acquire: async () => stored, tag: evalViewKey, onResult });
@@ -125,7 +126,7 @@ function useEvaluateAction(inputs: EvalViewInputs, format: EvalFormat) {
         keepPlayed: keptPlayed(playedOn(snapshots, viewTurn, evalIsDoubles, logRules(replayData.log))),
       });
     }
-  }, [replayData, snapshots, evalIsDoubles, liveTip, runAtTip, viewingVariation, serializedAtView, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
+  }, [replayData, snapshots, evalIsDoubles, liveTip, runAtTip, viewingVariation, serializedAtView, replacementPending, evaluation, effectiveTera, effectiveSleepClause, effectiveRuleset, acquire.acquireBranchPosition, acquire.acquireReplayPosition, viewTurn, setsFingerprint, evalViewKey]);
 
   // The score belongs to the position the run STARTED at: the tag guard keeps it out of a later turn's slot.
   const scored = runAtTip ?? { key: evalViewKey, turn: viewTurn, variation: viewingVariation };
