@@ -34,8 +34,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function mountLoaded(kind: ReplayKind, link?: (id: string) => string) {
+async function mountLoaded(kind: ReplayKind, link?: (id: string) => string, formatid?: string) {
   const replay = replayData(kind);
+  if (formatid) replay.formatid = formatid;
   stubReplayFetch([replay]);
   const latest = { current: null as AppController | null };
   render(<Workspace latestRef={latest} />);
@@ -65,9 +66,25 @@ describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
     const { app } = await mountLoaded(kind);
     expect(screen.queryByRole('combobox')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    await userEvent.selectOptions(within(screen.getByText('Tera')).getByRole('combobox'), 'revealed');
+    await userEvent.selectOptions(within(await screen.findByText('Tera')).getByRole('combobox'), 'revealed');
     await waitFor(() => expect(app().ctx.evaluation.prefs.tera).toBe('revealed'));
     expect(screen.queryByText('Tera', { selector: '.ps-eval-controls *' })).toBeNull();
+  });
+
+  test.each([
+    ['singles', 'gen9championsou'],
+    ['doubles', 'gen9championsou'],
+    ['vgc', 'gen9championsvgc2026regmc'],
+    ['singles', 'gen9monotype'],
+    ['doubles', 'gen92v2doubles'],
+    ['singles', 'gen6ou'],
+    ['doubles', 'gen6doublesou'],
+  ] as const)('%s, %s: the format offers no Tera, so the menu holds no Tera row', async (kind, formatid) => {
+    await mountLoaded(kind, undefined, formatid);
+    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
+    expect(screen.getByText('Animate branch turns')).toBeInTheDocument();
+    await act(async () => { await import('../../../src/lib/tera-offer'); await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(screen.queryByText('Tera')).toBeNull();
   });
 
   test.each([['singles'], ['doubles']] as const)('%s: an added engine puts its Engine select in the menu, hides Depth and Samples, and the way back restores them', async kind => {
@@ -80,7 +97,7 @@ describe('ReplayWorkspace: Depth and Samples in the Setup menu', () => {
     expect(engine).toHaveValue('url:http://localhost:8765/');
     expect(screen.queryByText('Depth')).toBeNull();
     expect(screen.queryByText('Samples')).toBeNull();
-    expect(within(screen.getByText('Tera')).getByRole('combobox')).toBeEnabled();
+    expect(within(await screen.findByText('Tera')).getByRole('combobox')).toBeEnabled();
     expect(engine.closest('.ps-eval-controls')).toBeNull();
     await userEvent.selectOptions(engine, 'ps-dashboard');
     await waitFor(() => expect(app().ctx.engines.selected.source).toBe('builtin'));
