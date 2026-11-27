@@ -2,12 +2,16 @@ import { readFileSync } from 'node:fs';
 import type { Battle } from '@pkmn/sim';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import type { ReplayData } from '@fulllifegames/replay-core';
+import { TIER_THRESHOLDS } from '../src/analysis';
 import { classifyChild, foldClassWeights, planCellEvents, type CellEvent } from '../src/cell-blend';
+import { isPivotMove } from '../src/pivot-moves';
 import { createMatchupCache } from '../src/eval-function';
 import { advancePositionWithLog, createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
 import { configureSimFast, resetSimFastForTests, SIM_FAST_DEFAULT, simFastCounters } from '../src/forward/sim-fast/state';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { mctsTreeSearch } from '../src/mcts';
+import { searchOrchestrated } from '../src/orchestrator';
+import { createLocalExecutor } from '../src/search';
 import { drawPair } from '../src/pair/draw';
 import { pairCellSample, PAIR_DRAW_BUDGET } from '../src/pair/sampler';
 import { cellKey } from '../src/rank';
@@ -17,13 +21,14 @@ import { SEARCH_SEEDS } from './seed-streams';
 import { classChildren } from '../src/search/outcome-children';
 import { serializeLiveBattle } from '../src/serialize';
 import type { CellBlend } from '../src/types';
-import { clicksAccepted, isCharge, isDelayed, outfitBoard, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
-import { battleOf } from './power-oracle';
+import { clicksAccepted, dexOfRules, isCharge, isDelayed, outfitBoard, SWEEP_CASES, sweepBoard, sweepClicks, sweepMoves, type DexMove } from './dice-sweep-support';
+import { mon, type Rules } from './dice-fixtures';
+import { battleOf, fingerprint } from './power-oracle';
 import { set } from './move-oracle';
 import { doublesRoot, pairSet } from './pair-battles';
 import { reconstruct } from './arrival-turn';
 import {
-  expectedClasses, FAST, hasChanceEntry, MIN_MASS, playedChances, rootOf, row, toleranceOf, weightProblems,
+  entriesOf, expectedClasses, FAST, hasChanceEntry, MIN_MASS, playedChances, rootOf, row, toleranceOf, weightProblems,
 } from './secondary-classes-support';
 
 await loadSimMods('gen9championsou');
@@ -35,14 +40,31 @@ const joined = (problems: string[]): string => problems.join(' | ');
 
 interface Cell { board: Battle; root: SimPosition; p1: string; p2: string; events: CellEvent[]; want: Map<string, number> }
 
-function cellOf(rules: Parameters<typeof toleranceOf>[0], move: DexMove): { cell?: Cell; problem?: string } {
-  const board = sweepBoard(rules, move.id, 'singles', '1,2,3,4', false, FAST);
-  if (!clicksAccepted(board, sweepClicks('singles', move.target))) return {};
-  const played = playedChances(board, sweepClicks('singles', move.target), ['p2a']).get('p2a');
+type Foe = 'splash' | 'switch' | 'pivot';
+
+const statusPivotOf = (rules: Rules): string => dexOfRules(rules).moves.all()
+  .find(move => move.exists && move.category === 'Status' && move.gen <= dexOfRules(rules).gen && !move.isNonstandard && isPivotMove(dexOfRules(rules), move.id))!.id;
+
+// Vaporeon is slower than Pikachu and faster than Snorlax; Blissey waits on the bench.
+function benchBoard(rules: Rules, attacker: string, attackerMove: string, foeMoves: string[]): Battle {
+  return battleOf(rules.singles, [mon(rules, { species: attacker, moves: [attackerMove], gender: 'M' })],
+    [mon(rules, { species: 'Vaporeon', moves: foeMoves }), mon(rules, { species: 'Blissey', moves: ['splash'] })]);
+}
+
+const everyBody = (board: Battle) => board.sides.flatMap(side => side.pokemon);
+
+function cellOf(rules: Rules, move: DexMove, foe: Foe = 'splash'): { cell?: Cell; problem?: string } {
+  const pivot = foe === 'pivot' ? statusPivotOf(rules) : 'splash';
+  const board = foe === 'splash' ? sweepBoard(rules, move.id, 'singles', '1,2,3,4', false, FAST) : benchBoard(rules, FAST, move.id, [pivot]);
+  const clicks = foe === 'switch' ? { p1: 'move 1', p2: 'switch 2' } : sweepClicks('singles', move.target);
+  if (!clicksAccepted(board, clicks)) return {};
+  const played = playedChances(board, clicks, ['p2a']).get('p2a');
   if (!played) return {};
-  const [p1, p2] = [`move ${move.id}`, 'move splash'];
+  const [p1, p2] = [`move ${move.id}`, foe === 'switch' ? 'switch 2' : foe === 'pivot' ? `move ${pivot} > switch 2` : 'move splash'];
+  const before = fingerprint(board, everyBody(board), move.id);
   const plan = planCellEvents(board, p1, p2);
-  if (plan.kind === 'fail') return {};
+  if (fingerprint(board, everyBody(board), move.id) !== before) return { problem: `${move.id}: the plan changed the live battle` };
+  if (plan.kind === 'fail') return foe !== 'splash' && cellOf(rules, move).cell ? { problem: `${move.id}: no class plan against ${foe}, where Splash has one` } : {};
   if (plan.kind === 'none') return played.length > 0 ? { problem: `${move.id}: ${played.length} secondary die(s) and no class plan` } : {};
   const [event] = plan.events;
   if (plan.events.length !== 1 || event.event.killFraction > 0) return {};
@@ -51,14 +73,16 @@ function cellOf(rules: Parameters<typeof toleranceOf>[0], move: DexMove): { cell
 
 const classMap = (blend: CellBlend | undefined): Map<string, number> => new Map((blend?.classes ?? []).map(cls => [cls.key, cls.weight]));
 
+const AGAINST: Record<Foe, string> = { splash: '', switch: ', against a switch to the bench', pivot: ', against a slower status pivot pair' };
+
 describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules, name }) => {
   const { moves } = sweepMoves(rules, move => hasChanceEntry(move) && !isDelayed(move) && !isCharge(move) && !move.multihit);
   const tolerance = toleranceOf(rules);
-  function over(path: (cell: Cell) => Map<string, number> | string): { problems: string[]; read: number } {
+  function over(path: (cell: Cell) => Map<string, number> | string, foe: Foe): { problems: string[]; read: number } {
     const problems: string[] = [];
     let read = 0;
     for (const move of moves) {
-      const { cell, problem } = cellOf(rules, move);
+      const { cell, problem } = cellOf(rules, move, foe);
       if (problem) problems.push(problem);
       if (!cell) continue;
       read++;
@@ -79,34 +103,83 @@ describe.each(SINGLES)('the class weights of the singles paths: $name', ({ rules
     return;
   }
 
-  row('fold')(`${name}: the fold of the plan splits a hit as the chances do`, () => {
-    const { problems, read } = over(cell => foldClassWeights(cell.events, 'p1'));
-    expect(joined(problems)).toBe('');
-    expect(read).toBeGreaterThan(0);
-  });
-
-  row('sampler')(`${name}: the matrix cell sampler blends the classes at the chances`, () => {
-    const { problems, read } = over(cell => {
-      const sample = sampleCell(cell.root, 0, cell.p1, cell.p2, 3, cache, true);
-      return sample.blend ? classMap(sample.blend) : `no blend (diagnostic ${JSON.stringify(sample.diagnostic?.missing)})`;
+  for (const foe of ['splash', 'switch', 'pivot'] as const) {
+    const where = AGAINST[foe];
+    row('fold')(`${name}: the fold of the plan splits a hit as the chances do${where}`, () => {
+      const { problems, read } = over(cell => foldClassWeights(cell.events, 'p1'), foe);
+      expect(joined(problems)).toBe('');
+      expect(read).toBeGreaterThan(0);
     });
-    expect(joined(problems)).toBe('');
-    expect(read).toBeGreaterThan(0);
-  });
 
-  row('children')(`${name}: the class children carry the chances, and every class is reached`, () => {
-    const { problems, read } = over(cell => {
-      const children = classChildren(cell.root, cell.p1, cell.p2, { baseSeeds: SEARCH_SEEDS, forcedCap: 16 });
-      if (!children) return 'no class path';
-      const shares = new Map<string, number>();
-      for (const entry of [...children.children, ...children.missing]) shares.set(entry.key.replace(/^p1:/, ''), entry.share);
-      const open = children.missing.filter(entry => entry.share >= MIN_MASS);
-      if (open.length > 0) return `classes never reached: ${open.map(entry => entry.key)}`;
-      return shares;
+    row('sampler')(`${name}: the matrix cell sampler blends the classes at the chances${where}`, () => {
+      const { problems, read } = over(cell => {
+        const sample = sampleCell(cell.root, 0, cell.p1, cell.p2, 3, cache, true);
+        return sample.blend ? classMap(sample.blend) : `no blend (diagnostic ${JSON.stringify(sample.diagnostic?.missing)})`;
+      }, foe);
+      expect(joined(problems)).toBe('');
+      expect(read).toBeGreaterThan(0);
     });
-    expect(joined(problems)).toBe('');
-    expect(read).toBeGreaterThan(0);
-  });
+
+    row('children')(`${name}: the class children carry the chances, and every class is reached${where}`, () => {
+      const { problems, read } = over(cell => {
+        const children = classChildren(cell.root, cell.p1, cell.p2, { baseSeeds: SEARCH_SEEDS, forcedCap: 16 });
+        if (!children) return 'no class path';
+        const shares = new Map<string, number>();
+        for (const entry of [...children.children, ...children.missing]) shares.set(entry.key.replace(/^p1:/, ''), entry.share);
+        const open = children.missing.filter(entry => entry.share >= MIN_MASS);
+        if (open.length > 0) return `classes never reached: ${open.map(entry => entry.key)}`;
+        return shares;
+      }, foe);
+      expect(joined(problems)).toBe('');
+      expect(read).toBeGreaterThan(0);
+    });
+  }
+});
+
+const ATTACK = 'flamethrower';
+
+const hitBody = (log: readonly string[]): string => log.find(line => line.startsWith('|-damage|p2a:') && !line.includes('[from]'))!.split('|')[2];
+const movesFirst = (log: readonly string[]): 'p1' | 'p2' => (log.findIndex(line => line.startsWith('|move|p2a:')) < log.findIndex(line => line.startsWith('|move|p1a:')) ? 'p2' : 'p1');
+
+describe.each(SINGLES.filter(entry => entry.rules.generation >= 3))('a pivot pair on the other side: $name', ({ rules, name }) => {
+  const dex = dexOfRules(rules);
+  const { moves } = sweepMoves(rules, move => isPivotMove(dex, move.id), false, true);
+  const chance = (entriesOf(dex.moves.get(ATTACK))[0].chance ?? 0) / 100;
+  const want = expectedClasses(1, [{ effectId: 'brn', chance }]);
+
+  for (const [speed, attacker] of [['slower', FAST], ['faster', 'Snorlax']] as const) {
+    test(`${name}: every pivot move with p2 ${speed}, the plan prices the hit on the body the simulator hits`, () => {
+      const problems: string[] = [];
+      for (const move of moves) {
+        const board = benchBoard(rules, attacker, ATTACK, [move.id]);
+        const [p1, p2] = [`move ${ATTACK}`, `move ${move.id} > switch 2`];
+        const before = fingerprint(board, everyBody(board), ATTACK);
+        const plan = planCellEvents(board, p1, p2);
+        if (fingerprint(board, everyBody(board), ATTACK) !== before) problems.push(`${move.id}: the plan changed the live battle`);
+        const root = rootOf(board);
+        const { log } = advancePositionWithLog(root, p1, p2, '1,2,3,4');
+        const first = movesFirst(log);
+        // A pivot that carries something to the incoming body (Baton Pass, Shed Tail) is read as before.
+        if (first === 'p2' && (move as { selfSwitch?: unknown }).selfSwitch !== true) {
+          if (plan.kind !== 'fail') problems.push(`${move.id}: first, carrying its state to the next body, and the plan reads ${plan.kind}`);
+          continue;
+        }
+        if (plan.kind !== 'events') {
+          problems.push(`${move.id}: ${first} first, the plan reads ${plan.kind}`);
+          continue;
+        }
+        const attack = plan.events.find(event => event.side === 'p1');
+        if (!attack || attack.defenderIdent !== hitBody(log)) problems.push(`${move.id}: the plan hits ${attack?.defenderIdent}, the simulator ${hitBody(log)}`);
+        if (plan.events.some(event => event.side === 'p2' && event.secondary?.length)) problems.push(`${move.id}: a secondary on the pivot user's own move`);
+        problems.push(...weightProblems(foldClassWeights(plan.events, first), want, toleranceOf(rules)).map(text => `${move.id}: ${text}`));
+        const sample = sampleCell(root, 0, p1, p2, 3, cache, true);
+        if (!sample.blend) problems.push(`${move.id}: no blend`);
+        else problems.push(...weightProblems(classMap(sample.blend), want, toleranceOf(rules)).map(text => `${move.id}: sampler ${text}`));
+      }
+      expect(joined(problems)).toBe('');
+      expect(moves.length).toBeGreaterThan(0);
+    });
+  }
 });
 
 const aimOf = (move: DexMove): string => (['normal', 'any', 'adjacentFoe'].includes(move.target) ? ' 1' : '');
@@ -422,5 +495,29 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
     const rock = pairCellSample(eyes(), ...ROCKSLIDE, 3, cache);
     expect((rock as { draws?: number }).draws ?? 0).toBeLessThanOrEqual(PAIR_DRAW_BUDGET);
     expect(rock).toMatchObject({ kind: 'sample', via: 'plan' });
+  });
+});
+
+describe('scene: draft turn 36, Freeze-Dry into Chilly Reception to Dragapult (singles)', () => {
+  const t36 = JSON.parse(readFileSync(new URL('./fixtures/draft-t36.json', import.meta.url), 'utf-8')) as
+    { settings: { tera: false; sleepClause: boolean; ruleset: 'standard' }; serialized: string };
+  const { ruleset } = t36.settings;
+  const root = createRootPosition(t36.serialized, ruleset);
+  const dragapult = positionBattle(root).sides[1].pokemon.findIndex(body => body.species.name === 'Dragapult') + 1;
+  const [freezeDry, chilly] = ['move freezedry', `move chillyreception > switch ${dragapult}`];
+
+  row('scene-219')('the cell weighs the 10 percent freeze at its Dex chance, not at the one draw it drew', () => {
+    const sample = sampleCell(root, 0, freezeDry, chilly, 3, cache, true);
+    const frozen = sample.blend?.classes.find(cls => cls.key === 'hit-nokill+frz');
+    expect(dragapult).toBeGreaterThan(0);
+    expect(frozen?.weight).toBeCloseTo(0.1, 6);
+  });
+
+  row('scene-219')('the row reads no inaccuracy against the best reply of the matrix', { timeout: 120000 }, async () => {
+    const settings = { depth: 1 as const, samples: 3 as const, mode: 'matrix' as const, prove: false, tera: false as const, sleepClause: t36.settings.sleepClause, ruleset };
+    const rows = (await searchOrchestrated(createLocalExecutor(t36.serialized, ruleset), settings)).perSide.p2;
+    const row = rows.find(entry => entry.choice === chilly)!;
+    expect(row, 'the row is in the matrix').toBeDefined();
+    expect(Math.max(...rows.map(entry => entry.ev)) - row.ev).toBeLessThan(TIER_THRESHOLDS.inaccuracy);
   });
 });
