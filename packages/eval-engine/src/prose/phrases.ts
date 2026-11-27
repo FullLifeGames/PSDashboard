@@ -76,6 +76,8 @@ export const choiceNoun = (label: string): string =>
 /** The engine's stand-in label names what it graded, not what happened, so a sentence says this instead. */
 export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
 
+export const GAME_ENDED_WORDS = 'cut off by the end of the game, so the log shows no choice';
+
 export const cameInstead = (name: string, side: SideAnalysis): string =>
   side.neverActed ? `${name} was ${NEVER_ACTED_WORDS}` : `${phrase(side.played!.label)} came instead`;
 
