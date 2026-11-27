@@ -124,7 +124,11 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
     const now = latest.current;
     const current = settledRef.current;
     const fill = fillResultRef.current;
-    if (!now.hardMode || !now.simState || current.key !== now.key || fill?.key !== now.key) return;
+    if (!now.hardMode) {
+      if (current.key === now.key && current.reads !== 'waiting') commit({ ...current, reads: 'waiting' });
+      return;
+    }
+    if (!now.simState || current.key !== now.key || fill?.key !== now.key) return;
     const state = now.simState;
     const opponent: Side = side === 'p1' ? 'p2' : 'p1';
     const choices = now.getChoices();
@@ -171,7 +175,7 @@ function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], com
     }
     const back = current.picks[opponent].map((pick, index) => (pick && current.marks[opponent][index] && !sameChoice(current.choices[opponent][index], pick) ? pick : null));
     if (now.liveTip) back.forEach((pick, index) => { if (pick) now.setChoice(opponent, pick, index); });
-    commit({ ...current, marks, deferred, choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
+    commit({ ...current, marks, deferred, reads: 'waiting', choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
     return own;
   };
 }

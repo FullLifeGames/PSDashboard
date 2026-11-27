@@ -36,10 +36,7 @@ describe('useDockFill.hard', () => {
     return { choices, setChoice, hook, land, wired };
   }
 
-  function setup(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
-    const { choices, setChoice, hook, land } = setupWired(kind, hardMode, touched);
-    return { choices, setChoice, hook, land };
-  }
+  const setup = setupWired;
 
   const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...(targetLoc === undefined ? {} : { targetLoc }) });
 
@@ -197,12 +194,11 @@ describe('useDockFill.hard', () => {
       expect(both.hook.result.current.engine.p2.some(Boolean)).toBe(false);
     });
 
-    test.each(['singles', 'doubles'] as const)('%s: a pick after the fill moves the read between answered and unranked, an unranked one writes nothing, both sides read both', kind => {
-      const { setChoice, hook, land } = setup(kind, true);
+    test.each(['singles', 'doubles'] as const)('%s: a pick after the fill moves the read between answered and unranked, an unranked one writes nothing, a pick made with the setting off leaves no read, both sides read both', kind => {
+      const { setChoice, hook, land, wired } = setupWired(kind, true);
       land(result[kind]());
       const slot = kind === 'doubles' ? 1 : 0;
       const answered = kind === 'singles' ? ranked(kind) : move('protect', 'Protect');
-      setChoice.mockClear();
       act(() => hook.result.current.onUserChoice('p1', slot, answered));
       expect(hook.result.current.reads).toBe('answered');
       setChoice.mockClear();
@@ -210,8 +206,13 @@ describe('useDockFill.hard', () => {
       expect(hook.result.current.reads).toBe('unranked');
       expect(setChoice).not.toHaveBeenCalled();
       expect(hook.result.current.engine.p2).toEqual(Array(kind === 'doubles' ? 2 : 1).fill(true));
+      const off = (action: () => void) => { wired.evaluation = evaluationOf(false); hook.rerender(); act(action); wired.evaluation = evaluationOf(true); hook.rerender(); };
+      off(() => hook.result.current.onUserChoice('p1', slot, answered));
+      expect(hook.result.current.reads).toBe('waiting');
       act(() => hook.result.current.onUserChoice('p1', slot, answered));
-      expect(hook.result.current.reads).toBe('answered');
+      off(() => hook.result.current.restore('p1', slot));
+      expect(hook.result.current.reads).toBe('waiting');
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
       act(() => hook.result.current.onUserChoice('p2', 0, move('knockoff', 'Knock Off')));
       expect(hook.result.current.reads).toBe('both');
     });
