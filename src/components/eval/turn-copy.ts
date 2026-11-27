@@ -160,9 +160,12 @@ export function readsReply(opponentReads: boolean | undefined, rowLines: RowLine
 export function readsWorstLabel(reads: WorstReply | null, row: RankedChoice): { label: string; title?: string } | null {
   if (!row.punishedBy) return null;
   if (!reads || reads.reply.label === row.punishedBy) return { label: row.punishedBy };
+  const lead = 'The reply the opponent plays when it reads this move';
   return {
     label: reads.reply.label,
-    title: `The reply the opponent plays when it reads this move. The lowest cell of the row, ${row.punishedBy}, rests on a thinly searched cell.`,
+    title: reads.basis === 'cell'
+      ? `${lead}. The lowest cell of the row, ${row.punishedBy}, rests on a thinly searched cell.`
+      : `${lead}: its best choice, because the row's lowest cell, ${row.punishedBy}, matches no ranked reply.`,
   };
 }
 

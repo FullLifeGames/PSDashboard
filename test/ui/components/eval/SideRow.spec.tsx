@@ -343,6 +343,23 @@ describe('SideRow: the reply the click meets', () => {
     expect(screen.getByText('· worst vs Leech Seed')).not.toHaveAttribute('title');
   });
 
+  test.each(['singles', 'doubles'] as const)('%s: on, a floor no ranked reply holds gives way to the opponent\'s best row, and the title says so, not that a cell is thin', kind => {
+    const base = evalResult(kind);
+    const matrix = base.matrix!;
+    const cells = matrix.p1Labels.map(() => matrix.p2Labels.map(() => ({ visits: 3, verified: false })));
+    const floor = 'Struggle';
+    const best = { ...base.perSide.p1[0], punishedBy: floor };
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1, { punishedBy: 'Gone Away' });
+    const props = { name: 'Alice', side: misplayedSide('mistake', { best, safe: best, played }), rowLines: { result: { ...base, matrix: { ...matrix, cells } }, side: 'p1' as const } };
+    const reply = base.perSide.p2.find(row => row.choice !== 'wait')!.label;
+    const { rerender } = render(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} opponentReads />);
+    const title = screen.getByText(`· worst vs ${reply}`).getAttribute('title');
+    expect(title).toBe(`The reply the opponent plays when it reads this move: its best choice, because the row's lowest cell, ${floor}, matches no ranked reply.`);
+    expect(title).not.toMatch(/thinly/);
+  });
+
   test('singles: on, when the floor is the reply the click plays, "worst vs" reads as off and carries no title', () => {
     const { floor, ...props } = worstVs('singles', false);
     const { rerender } = render(<SideRow {...props} opponentReads />);
