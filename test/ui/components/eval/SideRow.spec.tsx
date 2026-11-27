@@ -302,3 +302,53 @@ describe('SideRow', () => {
     expect(document.body.textContent).not.toMatch(/knocked out before it moved/);
   });
 });
+
+describe('SideRow: the reply the click meets', () => {
+  test.each([
+    ['singles', 'Earthquake', '→ Rotom-Wash'],
+    ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', 'Taunt → Amoonguss + Wood Hammer → Incineroar'],
+  ] as const)('%s: with the result in hand the click titles name the reply the setting plays, and only while it is on', (kind, label, reply) => {
+    const result = evalResult(kind);
+    const best = result.perSide.p1[0];
+    const rowLines = { result, side: 'p1' as const };
+    const named = `Play this turn in a variation; the opponent reads your move and answers with ${reply}.`;
+    const general = 'Play this turn in a variation; the opponent plays its top choice.';
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ best, played: best })} onExplore={vi.fn()} opponentReads rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: '✓ the engine\'s move ↗' })).toHaveAttribute('title', named);
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1);
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best, played })} onExplore={vi.fn()} opponentReads rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: `${label} ↗` })).toHaveAttribute('title', named);
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best, played })} onExplore={vi.fn()} rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: `${label} ↗` })).toHaveAttribute('title', general);
+  });
+
+  const worstVs = (kind: 'singles' | 'doubles', thinLast: boolean) => {
+    const base = evalResult(kind);
+    const matrix = base.matrix!;
+    const last = matrix.p2Labels.length - 1;
+    const cells = matrix.p1Labels.map((_, i) => matrix.p2Labels.map((__, j) => (thinLast && i === 0 && j === last ? { visits: 3, verified: false } : { visits: 20, verified: true })));
+    const best = { ...base.perSide.p1[0], punishedBy: matrix.p2Labels[last] };
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1, { punishedBy: 'Leech Seed' });
+    return { name: 'Alice', side: misplayedSide('mistake', { best, safe: best, played }), rowLines: { result: { ...base, matrix: { ...matrix, cells } }, side: 'p1' as const }, floor: best.punishedBy };
+  };
+
+  test('doubles: on, "worst vs" beside the better line names the reply the click plays where the row\'s floor rests on a thin cell', () => {
+    const { floor, ...props } = worstVs('doubles', true);
+    const { rerender } = render(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} opponentReads />);
+    expect(screen.getByText('· worst vs Tailwind + Grassy Glide → Incineroar')).toHaveAttribute('title',
+      `The reply the opponent plays when it reads this move. The lowest cell of the row, ${floor}, rests on a thinly searched cell.`);
+    expect(screen.queryByText(`· worst vs ${floor}`)).toBeNull();
+    expect(screen.getByText('· worst vs Leech Seed')).not.toHaveAttribute('title');
+  });
+
+  test('singles: on, when the floor is the reply the click plays, "worst vs" reads as off and carries no title', () => {
+    const { floor, ...props } = worstVs('singles', false);
+    const { rerender } = render(<SideRow {...props} opponentReads />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    expect(screen.getByText('· worst vs Leech Seed')).toBeInTheDocument();
+  });
+});
