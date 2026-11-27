@@ -119,24 +119,8 @@ function massOf(blend: CellBlend, eventKey: string, effect: string): number {
   }, 0);
 }
 
-function coverageOf(blend: CellBlend, accuracy: number, dice: (slot: string) => readonly { effectId: string; chance: number }[]): number | string {
-  const covers: number[] = [];
-  for (const cls of blend.classes) {
-    let raw = 1;
-    for (const segment of cls.key.split('|')) {
-      const [event, outcome] = [segment.slice(0, segment.indexOf('=')), segment.slice(segment.indexOf('=') + 1)];
-      const [kind, ...tokens] = outcome.split('+');
-      if (kind === 'miss') raw *= 1 - accuracy;
-      else if (kind === 'hit-nokill') {
-        raw *= accuracy;
-        for (const die of dice(event.slice(event.indexOf('>') + 1))) raw *= die.effectId.split('+').every(part => tokens.includes(part)) ? die.chance : 1 - die.chance;
-      } else return `an event of the class ${cls.key} is no miss or hit-nokill`;
-    }
-    covers.push(raw / cls.weight);
-  }
-  const cover = covers[0];
-  return covers.every(entry => Math.abs(entry - cover) < 1e-6) ? cover : `the classes read different coverages (${covers.map(entry => entry.toFixed(4)).join(', ')})`;
-}
+// The plan stops at coverage 0.95 and prices the rest on the nearest class (sampler.ts), so no effect is off by more.
+const FLAT_BOUND = 0.05 + 1e-9;
 
 describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules, name }) => {
   const { moves } = sweepMoves(rules, move => hasChanceEntry(move) && !isDelayed(move) && !isCharge(move) && !move.multihit
@@ -174,18 +158,12 @@ describe.each(DOUBLES)('the pair plan reads the secondary dice: $name', ({ rules
       const total = blend.classes.reduce((sum, cls) => sum + cls.weight, 0);
       if (Math.abs(total - 1) > 1e-6) problems.push(`${move.id}: the weights sum to ${total}`);
       const accuracy = typeof move.accuracy === 'number' ? move.accuracy / 100 : 1;
-      for (const entry of played.filter(candidate => candidate.chance >= 0.2)) {
-        const mass = massOf(blend, `p1a:${move.id}>p2a`, entry.effectId);
-        const chance = accuracy * entry.chance;
-        const gap = Math.abs(mass - chance);
-        if (gap <= 0.07) continue;
-        // A plan below coverage `c` divides its classes by `c` (sampler.ts `blended`): an effect's mass is off by
-        // at most max(chance, 1 - chance) * (1 - c) / c.
-        const slots = new Set(blend.classes.flatMap(cls => cls.key.split('|').map(segment => segment.slice(segment.indexOf('>') + 1, segment.indexOf('=')))));
-        const dice = new Map([...slots].map(slot => [slot, playedChances(board, clicks, [slot]).get(slot) ?? []]));
-        const cover = coverageOf(blend, accuracy, slot => dice.get(slot) ?? []);
-        const bound = typeof cover === 'number' ? Math.max(chance, 1 - chance) * (1 - cover) / cover + 1e-9 : 0.07;
-        if (gap > bound) problems.push(`${move.id} ${entry.effectId}: mass ${mass.toFixed(3)}, chance ${chance.toFixed(3)}, ${typeof cover === 'number' ? `coverage ${cover.toFixed(3)}, bound ${bound.toFixed(3)}` : cover}`);
+      for (const slot of ['p2a', 'p2b']) {
+        for (const entry of (playedChances(board, clicks, [slot]).get(slot) ?? []).filter(candidate => candidate.chance >= 0.2)) {
+          const mass = massOf(blend, `p1a:${move.id}>${slot}`, entry.effectId);
+          const chance = accuracy * entry.chance;
+          if (Math.abs(mass - chance) > FLAT_BOUND) problems.push(`${move.id} ${slot} ${entry.effectId}: mass ${mass.toFixed(3)}, chance ${chance.toFixed(3)}`);
+        }
       }
     }
     expect(joined(problems)).toBe('');
@@ -409,9 +387,22 @@ describe('scene: a doubles cell with secondary dice (the pair plan)', () => {
     expect(cell).toMatchObject({ kind: 'sample', via: 'plan', reason: null });
     const blend = (cell as { sample: { blend?: CellBlend } }).sample.blend!;
     expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
-    // The cell's own seeds leave the plan at coverage 0.84 (the sampler accepts 0.8 at least), so the p2a mass
-    // reads 0.3226; the bound is 0.06.
-    for (const target of ['p2a', 'p2b']) expect(Math.abs(massOf(blend, `p1a:rockslide>${target}`, 'flinch') - 0.9 * 0.3)).toBeLessThan(0.06);
+    for (const target of ['p2a', 'p2b']) expect(Math.abs(massOf(blend, `p1a:rockslide>${target}`, 'flinch') - 0.9 * 0.3)).toBeLessThanOrEqual(FLAT_BOUND);
+  });
+
+  row('scene-lavaplume-doubles')('Lava Plume (Gen 7, a burn of 30 percent on three bodies): each burn at its chance, no class weight divided', () => {
+    const { rules } = DOUBLES.find(entry => entry.name === 'Gen 7 doubles')!;
+    const board = outfitBoard(rules, 'doubles', { species: FAST, moves: ['lavaplume'] }, { species: 'Vaporeon' });
+    const cell = pairCellSample(rootOf(board), 'move lavaplume, move splash', 'move splash, move splash', 3, cache);
+    expect(cell).toMatchObject({ kind: 'sample', via: 'plan', reason: null });
+    const blend = (cell as { sample: { blend?: CellBlend } }).sample.blend!;
+    expect(blend.classes.reduce((sum, cls) => sum + cls.weight, 0)).toBeCloseTo(1, 9);
+    for (const target of ['p2a', 'p2b', 'p1b']) expect(Math.abs(massOf(blend, `p1a:lavaplume>${target}`, 'brn') - 0.3)).toBeLessThanOrEqual(FLAT_BOUND);
+    for (const cls of blend.classes) {
+      const dexWeight = cls.key.split('|').reduce((product, segment) => product * (tokensOf(segment).includes('brn') ? 0.3 : 0.7), 1);
+      expect(cls.weight - dexWeight, cls.key).toBeLessThanOrEqual(FLAT_BOUND);
+      expect(cls.weight - dexWeight, cls.key).toBeGreaterThanOrEqual(-1e-9);
+    }
   });
 
   row('script-doubles')('a script answers the flinch die of one hit: yes cuts that target, no does not', () => {
