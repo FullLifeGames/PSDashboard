@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   autoTurnSettings, heldDecided,
   type EvalPreferences, type EvalResult, type RankedChoice, type ReadRecommendation, type TurnAnalysis, type GameReport, type LeadAnalysis,
@@ -95,12 +95,59 @@ interface TurnViewProps {
   doubles?: boolean;
   openTurn?: number | null;
   opponentReads?: boolean;
+  selectTurn?: SelectTurn;
+  reviewAnalyses?: (TurnAnalysis | null)[] | null;
+  reviewOpen?: boolean;
+  onReviewToggle?: (open: boolean) => void;
 }
 
 const backToMainTitle = (): string =>
   `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
 
-function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn, leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads }: TurnViewProps) {
+function useRevealCard(shown: number | null) {
+  const ref = useRef<HTMLDivElement>(null);
+  const wanted = useRef<number | null>(null);
+  useEffect(() => {
+    if (wanted.current === null || wanted.current !== shown) return;
+    wanted.current = null;
+    ref.current?.scrollIntoView({ block: 'nearest' });
+  }, [shown]);
+  const request = (turn: number) => {
+    if (turn === shown) ref.current?.scrollIntoView({ block: 'nearest' });
+    else wanted.current = turn;
+  };
+  return [ref, request] as const;
+}
+
+function TurnCards({ leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads, graph, selectTurn, reviewAnalyses, reviewOpen, onReviewToggle }: TurnViewProps) {
+  const shown = leadAnalysis ? 0 : analysis?.turn ?? null;
+  const [cardRef, reveal] = useRevealCard(shown);
+  return (
+    <>
+      <div ref={cardRef}>
+        {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
+        {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
+        {!leadAnalysis && analysis && (
+          <EvalTurnAnalysis
+            analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
+            result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
+            open={analysis.turn === openTurn} opponentReads={opponentReads}
+          />
+        )}
+      </div>
+      {gameReviewEnabled() && reviewAnalyses && linesHost && (
+        <GameReviewPanel
+          analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles} host={linesHost}
+          currentTurn={shown} open={reviewOpen} onToggle={onReviewToggle}
+          onSelectTurn={turn => { reveal(turn); selectTurn?.(turn); }}
+        />
+      )}
+    </>
+  );
+}
+
+function TurnView(props: TurnViewProps) {
+  const { report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn } = props;
   return (
     <>
       {report && (
@@ -133,15 +180,7 @@ function TurnView({ report, onBackToReport, onBackToMain, result, currentTurn, g
       {!result && hasAnalyzeTurn && (
         <div style={{ marginTop: 4 }}>{analyzeTurn}</div>
       )}
-      {leadAnalysis && <EvalLeadAnalysis leads={leadAnalysis} playerNames={playerNames} />}
-      {!leadAnalysis && analysis && <ReplacementNote analysis={analysis} graph={graph} playerNames={playerNames} />}
-      {!leadAnalysis && analysis && (
-        <EvalTurnAnalysis
-          analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onPickChoice} onPickPair={onPickPair}
-          result={graph.results[analysis.turn - 1] ?? null} linesHost={linesHost} doubles={doubles}
-          open={analysis.turn === openTurn} opponentReads={opponentReads}
-        />
-      )}
+      <TurnCards {...props} />
     </>
   );
 }
@@ -159,9 +198,6 @@ export interface GameGraphSectionProps extends TurnViewProps {
   variation?: VariationSeries | null;
   graphMaxTurn?: number;
   showReportView: boolean;
-  reviewAnalyses?: (TurnAnalysis | null)[] | null;
-  reviewOpen?: boolean;
-  onReviewToggle?: (open: boolean) => void;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
 }

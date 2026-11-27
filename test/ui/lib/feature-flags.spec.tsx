@@ -116,6 +116,13 @@ describe.each(['singles', 'doubles'] as const)('%s: the Game review flag off', k
     expect(container.innerHTML).not.toMatch(/Game review/);
   });
 
+  test('the turn view draws no review, no toggle and no row mark either', () => {
+    const { container } = render(<GameGraphSection {...props({ showReportView: false, analysis: turnAnalysis(4, { p1: misplayedSide('mistake') }), currentTurn: 4 })} />);
+    expect(screen.queryByRole('button', { name: /Game review/ })).toBeNull();
+    expect(container.querySelector('.ps-eval-review')).toBeNull();
+    expect(container.innerHTML).not.toMatch(/Game review/);
+  });
+
   test('the title of "Back to the main line" does not name the review', () => {
     const { container } = render(<GameGraphSection {...props({ showReportView: false, report: null, onBackToMain: vi.fn(), currentLine: 'variation' })} />);
     const back = screen.getByRole('button', { name: 'Back to the main line' });

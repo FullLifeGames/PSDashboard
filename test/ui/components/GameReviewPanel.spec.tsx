@@ -62,9 +62,9 @@ describe('GameReviewPanel, singles', () => {
     expect(plays).toHaveLength(2);
     expect(plays[0]).toHaveAttribute('title', expect.stringContaining('Hydro Pump: no crit (96%)'));
     await userEvent.click(plays[0]);
-    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20);
+    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20, 'review');
     await userEvent.click(plays[1]);
-    expect(onPlay).toHaveBeenLastCalledWith(playedLine, 20);
+    expect(onPlay).toHaveBeenLastCalledWith(playedLine, 20, 'review');
   });
 
   test('a click on the turn opens it', async () => {
@@ -103,7 +103,7 @@ describe('GameReviewPanel, doubles', () => {
     const group = screen.getByRole('group', { name: 'pixelfrost' });
     expect(within(group).getByText(/then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost: Fake Out → Zamazenta-Crowned \+ Protect/)).toBeInTheDocument();
     await userEvent.click(within(group).getByRole('button', { name: '▶ Play' }));
-    expect(onPlay).toHaveBeenCalledWith(doublesLine, 4);
+    expect(onPlay).toHaveBeenCalledWith(doublesLine, 4, 'review');
     expect(screen.getByText('Mstr_Hawk: no inaccuracy, mistake or blunder.')).toBeInTheDocument();
   });
 

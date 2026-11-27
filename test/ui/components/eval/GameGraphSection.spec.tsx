@@ -5,7 +5,10 @@ import { configureSearchBudget, parseSearchBudget, type EvalPreferences } from '
 import { GameGraphSection, type GameGraphSectionProps } from '../../../../src/components/eval/GameGraphSection';
 import { evalGraph, evalResult, gameReport } from '../../fixtures/eval-result';
 import { leadAnalysis, turnAnalysis, misplayedSide } from '../../fixtures/analysis';
-import type { TurnAnalysis } from '@fulllifegames/eval-engine';
+import { doublesLine, playedLine, singlesLine } from '../../fixtures/lines';
+import { rankedChoice } from '../../fixtures/eval-result';
+import { lineAnchor } from '../../../../src/lib/line-view';
+import type { EvalLine, TurnAnalysis } from '@fulllifegames/eval-engine';
 
 const names: [string, string] = ['Alice', 'Bob'];
 const hintTitle = (mode: string) => `Analyze game makes a quick depth-1 pass over every turn, then re-evaluates each turn with ${mode}, starting with the swings worth reporting. Tera applies to every turn.`;
@@ -216,13 +219,83 @@ describe('GameGraphSection.review', () => {
       expect(screen.getByRole('button', { name: 'T4' })).toBeInTheDocument();
     });
 
-    test('the graph marks the listed turns in the report view and in the turn view; the turn view lists nothing', () => {
+    test('the graph marks the listed turns in the report view and in the turn view', () => {
       const { container, rerender } = render(<GameGraphSection {...props()} />);
       expect(container.querySelectorAll('circle[data-review-mark="p1"]')).toHaveLength(1);
       expect(container.querySelectorAll('rect[data-review-mark="p2"]')).toHaveLength(1);
       rerender(<GameGraphSection {...props({ showReportView: false, analysis: turnAnalysis(3) })} />);
-      expect(screen.queryByText('Game review · what the engine would have played')).toBeNull();
       expect(container.querySelectorAll('[data-review-mark]')).toHaveLength(2);
+    });
+
+    describe.each([['singles', false], ['doubles', true]] as const)('%s: the review in the turn view', (kind, doubles) => {
+      const graded = analyses.map(analysis => analysis);
+      graded[3] = turnAnalysis(4, doubles
+        ? { p1: misplayedSide('mistake'), p2: { ...misplayedSide('blunder'), playedRaw: { kind: 'move', name: 'Stone Edge' } } }
+        : { p1: misplayedSide('mistake') });
+      const turnView = (turn: number, extra: Partial<GameGraphSectionProps> = {}) => props({
+        showReportView: false, graph: evalGraph(kind), doubles, currentTurn: turn, analysis: graded[turn - 1], reviewAnalyses: graded, ...extra,
+      });
+      const rowOf = (turn: number) => screen.getAllByRole('button', { name: `T${turn}` }).map(button => button.closest('.ps-eval-review-row')!);
+
+      test('stands under the card with the rows of the shown turn marked', async () => {
+        const { container } = render(<GameGraphSection {...turnView(4)} />);
+        const card = container.querySelector('.ps-eval-analysis')!;
+        const review = container.querySelector('.ps-eval-review')!;
+        expect(card.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const fold = screen.getByRole('button', { name: /Game review/ });
+        expect(fold).toHaveAttribute('aria-expanded', 'false');
+        await userEvent.click(fold);
+        expect(rowOf(4)).toHaveLength(doubles ? 2 : 1);
+        for (const row of rowOf(4)) expect(row).toHaveAttribute('aria-current', 'true');
+        expect(rowOf(4)[0].querySelector('button')).toHaveAttribute('title', "This turn's analysis is open above");
+        expect(rowOf(7)[0]).not.toHaveAttribute('aria-current');
+        expect(rowOf(7)[0].querySelector('button')).toHaveAttribute('title', "Open this turn's analysis");
+      });
+
+      test('a click on another row selects its turn and brings the card into view once the turn has landed', async () => {
+        const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+        onTestFinished(() => scroll.mockRestore());
+        const wired = turnView(4);
+        const { container, rerender } = render(<GameGraphSection {...wired} />);
+        await userEvent.click(screen.getByRole('button', { name: /Game review/ }));
+        await userEvent.click(screen.getByRole('button', { name: 'T7' }));
+        expect(wired.selectTurn).toHaveBeenCalledWith(7);
+        expect(scroll).not.toHaveBeenCalled();
+        rerender(<GameGraphSection {...turnView(7, { selectTurn: wired.selectTurn })} />);
+        expect(scroll).toHaveBeenCalledTimes(1);
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+        expect((scroll.mock.contexts[0] as Element).contains(container.querySelector('.ps-eval-analysis'))).toBe(true);
+        rerender(<GameGraphSection {...turnView(9, { selectTurn: wired.selectTurn })} />);
+        expect(scroll).toHaveBeenCalledTimes(1);
+      });
+
+      test('the question to replace a variation shows once, under the clicked review button, with the card\'s Lines open', async () => {
+        const line: EvalLine = doubles ? doublesLine : singlesLine;
+        const lines: EvalLine[] = doubles ? [doublesLine] : [singlesLine, playedLine];
+        const topped = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index + 1}`, label, 0.2 - index * 0.05));
+        const result = {
+          ...evalResult(kind), lines,
+          perSide: doubles ? { p1: topped([doublesLine.label]), p2: topped(['Sucker Punch → Terapagos + Protect']) } : { p1: topped(['Draining Kiss']), p2: topped(['Hydro Pump', 'Hyper Voice']) },
+        };
+        const best = rankedChoice('move 1', line.label, 0.3);
+        const withLines = turnAnalysis(4, doubles ? { p1: { ...misplayedSide('mistake'), best } } : { p2: { ...misplayedSide('mistake'), best } });
+        const graph = evalGraph(kind);
+        graph.results[3] = result;
+        const confirm = { anchor: lineAnchor(line, 4, 'review'), message: 'Play this line from turn 4: replace the existing variation?', proceed: vi.fn(), cancel: vi.fn() };
+        const { container } = render(<GameGraphSection {...turnView(4, { graph, analysis: withLines, reviewAnalyses: [null, null, null, withLines], linesHost: { rules: { gen: 9, mod: undefined }, onPlay: vi.fn(), confirm } })} />);
+        await userEvent.click(screen.getByRole('button', { name: 'Lines' }));
+        await userEvent.click(screen.getByRole('button', { name: /Game review/ }));
+        expect(screen.getAllByRole('alertdialog')).toHaveLength(1);
+        expect(container.querySelector('.ps-eval-review')!.contains(screen.getByRole('alertdialog'))).toBe(true);
+      });
+    });
+
+    test('at turn 0 the review stands under the lead card and marks no row', async () => {
+      const { container } = render(<GameGraphSection {...props({ showReportView: false, currentTurn: 0, analysis: null, leadAnalysis: leadAnalysis() })} />);
+      await userEvent.click(screen.getByRole('button', { name: /Game review/ }));
+      expect(screen.getByText('Team preview')).toBeInTheDocument();
+      expect(container.querySelectorAll('.ps-eval-review-row[aria-current]')).toHaveLength(0);
+      expect(screen.getByRole('button', { name: 'T4' })).toBeInTheDocument();
     });
 
     test('no analyses, no marks and no panel; no host, marks without the panel', () => {

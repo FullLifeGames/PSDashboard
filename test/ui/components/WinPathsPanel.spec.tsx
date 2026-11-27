@@ -98,7 +98,7 @@ describe('WinPathsPanel, singles', () => {
   });
 
   test('the replace question stands under the step that was clicked', async () => {
-    const confirm = { anchor: `23|p2|Hydro Pump|`, message: 'Play this line from turn 23: replace the existing variation from turn 5 (3 turns)?', proceed: vi.fn(), cancel: vi.fn() };
+    const confirm = { anchor: `lines|23|p2|Hydro Pump|`, message: 'Play this line from turn 23: replace the existing variation from turn 5 (3 turns)?', proceed: vi.fn(), cancel: vi.fn() };
     const host = hostOf(run(ALL), {}, { confirm });
     render(<WinPathsPanel host={host} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(screen.queryByText(confirm.message)).toBeNull();
