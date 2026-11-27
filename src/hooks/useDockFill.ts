@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { BranchSimState, BranchSlotChoice, EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { fitsBeside, pickFillParts, rowOfChoices, sameChoice } from '../lib/dock-fill';
-import { worstReply } from '../lib/worst-reply';
+import { answersTo, fitsBeside, handSide, pickFillParts, sameChoice } from '../lib/dock-fill';
 import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
 import type { useBranch } from './useBranch';
@@ -112,18 +111,6 @@ function useOnUserChoice({ settledRef, commit }: Pick<FillMarks, 'settledRef' | 
 }
 
 type FillMarks = ReturnType<typeof useFillMarks>;
-
-function handSide(touched: Record<Side, (BranchSlotChoice | null)[]>): Side | null {
-  const set = (['p1', 'p2'] as const).filter(side => touched[side].some(Boolean));
-  return set.length === 1 ? set[0] : null;
-}
-
-function answersTo(result: EvalResult, state: BranchSimState, hand: Side, picks: (BranchSlotChoice | null)[], touched: (BranchSlotChoice | null)[]): RankedChoice[] | null {
-  const opponent: Side = hand === 'p1' ? 'p2' : 'p1';
-  const row = rowOfChoices(hand, result.perSide[hand], state, picks, touched);
-  const reply = row ? worstReply(result, hand, row)?.reply : undefined;
-  return reply ? [reply, ...result.perSide[opponent]] : null;
-}
 
 type LatestFill = MutableRefObject<{
   key: string; eligible: boolean; simState: BranchSimState | null; getChoices: DockFillInputs['getChoices']; setChoice: DockFillInputs['setChoice'];
