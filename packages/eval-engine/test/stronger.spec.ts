@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { proveForcedWin } from '../src/endgame/prover';
+import { ForcedWinProver, proveForcedWin } from '../src/endgame/prover';
+import { createRootPosition } from '../src/forward-model';
+import { searchOptions } from '../src/search/options';
 import { forcedWinInput } from '../src/search/forced-win-apply';
 import { strongerStep } from '../src/endgame/win-paths/stronger';
 import { mon, playLine, REQUEST, serializedBoard, won, type Board, playLineOn } from './win-paths-support';
@@ -33,6 +35,14 @@ const COIN: Board = {
   p2: [mon('Pikachu', ['Hydro Pump'])],
   prepare: battle => { battle.sides[0].pokemon[0].hp = 1; battle.sides[1].pokemon[0].hp = 1; },
 };
+
+function cellsOfFirst(serialized: string, side: 'p1' | 'p2', first: string, depth: number): number {
+  const root = createRootPosition(serialized);
+  const own = searchOptions(root, side, { tera: false }).find(option => option.choice === first)!;
+  const prover = new ForcedWinProver(side, { tera: false }, { states: 1000, cells: 1000, depth }, { states: 0, cells: 0 }, { floor: 0, plan: true });
+  prover.candidateProof(root, own);
+  return prover.cells;
+}
 
 const proof = (serialized: string, rootOrder: string[]) => proveForcedWin(serialized, { side: 'p1', rootOrder, tera: false });
 
@@ -85,6 +95,17 @@ describe('a stronger play, singles', () => {
     }
   }, 120_000);
 
+  test('a played choice whose proof the budget cut reports no mass', async () => {
+    const { serialized } = await serializedBoard(FOURTH_WITH_BENCH);
+    const order = ['move seismictoss', 'move splash', 'move growl', 'move harden'];
+    const whole = strongerStep(serialized, REQUEST('p1', { rootOrder: order, played: 'move splash' }));
+    expect(whole.played, 'with the whole budget the second proof ends and reads 0').toBe(0);
+    const cells = cellsOfFirst(serialized, 'p1', 'move seismictoss', 3);
+    const cut = strongerStep(serialized, REQUEST('p1', { rootOrder: order, played: 'move splash', budget: { cells } }));
+    expect(cut.chance, 'the first proof ended inside the budget').toBe(1);
+    expect(cut.played, 'the cap cut the played choice: no mass, not 0').toBeUndefined();
+  }, 120_000);
+
   test('a budget the proof cannot finish in stops it', async () => {
     const { serialized } = await serializedBoard(FOURTH);
     const step = strongerStep(serialized, REQUEST('p1', { rootOrder: RANKING, budget: { cells: 1 } }));
@@ -114,6 +135,17 @@ describe('a stronger play, doubles', () => {
     expect(step.spent.cells).toBeGreaterThanOrEqual(4);
     expect(step.line!.steps[0].p2.choice).toMatch(/^move (splash|growl), move (splash|growl)$/);
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, step.line!, seed), 'p1')).toBe(true);
+  }, 240_000);
+
+  test('a played pair whose proof the budget cut reports no mass', async () => {
+    const { serialized } = await serializedBoard(DOUBLES);
+    const order = ['move earthquake, move splash', 'move splash, move splash'];
+    const whole = strongerStep(serialized, REQUEST('p1', { rootOrder: order, played: order[1] }));
+    expect(whole.played, 'with the whole budget the second proof ends and reads 0').toBe(0);
+    const cells = cellsOfFirst(serialized, 'p1', order[0], 3);
+    const cut = strongerStep(serialized, REQUEST('p1', { rootOrder: order, played: order[1], budget: { cells } }));
+    expect(cut.chance, 'the first proof ended inside the budget').toBe(1);
+    expect(cut.played, 'the cap cut the played pair: no mass, not 0').toBeUndefined();
   }, 240_000);
 
   test('Champions VGC 2682637901 t6: the proof wins through Aqua Jet, a strike the search never listed, and the line opens with it', async () => {

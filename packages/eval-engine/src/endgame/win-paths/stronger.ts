@@ -54,7 +54,7 @@ function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: Wi
   for (const candidate of candidatesOf(root, request.side, request)) {
     if (prover.capped) break;
     const proof = prover.candidateProof(root, candidate);
-    if (candidate.choice === request.played) played = proof.proven.mass;
+    if (candidate.choice === request.played && !prover.capped) played = proof.proven.mass;
     if (proof.plan && proof.proven.mass > (best?.mass ?? 0)) best = { mass: proof.proven.mass, plan: proof.plan };
   }
   return { best, played };
