@@ -1,4 +1,4 @@
-import type { EvalMatrix, EvalResult, RankedChoice, TurnAnalysis } from '@fulllifegames/eval-engine';
+import { standsIn, type EvalMatrix, type EvalResult, type RankedChoice, type TurnAnalysis } from '@fulllifegames/eval-engine';
 import { worstReply } from './worst-reply';
 
 export type MatrixCellAt = readonly [row: number, column: number];
@@ -29,11 +29,11 @@ function worstCell(result: EvalResult, matrix: EvalMatrix, side: 'p1' | 'p2', pl
   return side === 'p1' ? [own, reply] : [reply, own];
 }
 
-/** The marks of one turn; no played choice when `playedTracking` is false or a side was knocked out before it moved. */
+/** The marks of one turn; no played choice when `playedTracking` is false or a side's played line is a stand-in. */
 export function matrixMarks(result: EvalResult, matrix: EvalMatrix, analysis: TurnAnalysis): MatrixMarks {
   const tracked = analysis.playedTracking !== false;
-  const p1Played = tracked && !analysis.p1.neverActed ? analysis.p1.played : null;
-  const p2Played = tracked && !analysis.p2.neverActed ? analysis.p2.played : null;
+  const p1Played = tracked && !standsIn(analysis.p1) ? analysis.p1.played : null;
+  const p2Played = tracked && !standsIn(analysis.p2) ? analysis.p2.played : null;
   return {
     playedRow: indexOnAxis(matrix.p1Choices, matrix.p1Labels, p1Played),
     playedColumn: indexOnAxis(matrix.p2Choices, matrix.p2Labels, p2Played),

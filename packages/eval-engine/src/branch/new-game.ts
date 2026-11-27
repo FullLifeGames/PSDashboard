@@ -1,6 +1,6 @@
 import { PRNG, TeamValidator, Teams } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
-import { dexOfFormat, simFormats, toId } from '@fulllifegames/replay-core';
+import { dexOfFormat, firstAllowedAbility, simFormats, toId } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../forward/sim-mods.ts';
 import { DEFAULT_GAME_SEED } from './game-seed.ts';
 import { openStreams, type SessionStreams } from './runtime-session.ts';
@@ -103,23 +103,15 @@ function refuseUnknownSpecies(format: ReturnType<ReturnType<typeof simFormats>['
   if (refusal) throw new Error(refusal);
 }
 
-// The Dex's slot order (0, 1, hidden, special), without gaps or repeats.
-function abilitiesInSlotOrder(species: { abilities: object }): string[] {
-  const slots = species.abilities as Record<string, string | undefined>;
-  const names = ['0', '1', 'H', 'S'].map(slot => slots[slot]).filter((name): name is string => !!name);
-  return names.filter((name, index) => names.indexOf(name) === index);
-}
-
 // A blank plays as no ability in the simulator; the fill is the first Dex slot the validator allows (`checkAbility`),
 // so Evasion Abilities Clause or a banned Commander skips slot 0. Generations 1 and 2 and unknown species fill nothing.
 function blankAbilityFill(dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, set: PokemonSet): string | null {
   if (set.ability || dex.gen < 3) return null;
   const species = dex.species.get(set.species);
   if (!species.exists) return null;
-  const own = abilitiesInSlotOrder(species);
   const named = { ...set, name: set.name || species.name };
-  const allowed = own.find(name => !validator.checkAbility(named, dex.abilities.get(name), {}));
-  return allowed ?? own[0] ?? null;
+  const refused = (id: string) => !!validator.checkAbility(named, dex.abilities.get(id), {});
+  return firstAllowedAbility(dex, species.name, refused, ['0', '1', 'H', 'S']) || null;
 }
 
 const filledAbilities = (dex: ReturnType<typeof dexOfFormat>, validator: TeamValidator, team: PokemonSet[]): PokemonSet[] =>

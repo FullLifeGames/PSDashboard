@@ -298,6 +298,66 @@ describe('per-class continuation', () => {
   });
 });
 
+describe('an endgame pool that spreads keeps its value unless a played tree reads on the sampler side', () => {
+  const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
+  const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };
+  const mk = (cells: MctsTreeStats['cells'], living: { p1: number; p2: number }): MctsTreeStats => ({
+    p1Options: options(['Safe', 'Sack']), p2Options: options(['X', 'Y']),
+    p1N: [40, 2], p1W: [-30, 1], p2N: [40, 2], p2W: [-30, 1],
+    visits: 42, depth: 2, rootValue: 0.5, cells, result: emptyResult, living,
+  });
+  const cell = (visits: number, mean: number, classKey?: string) => ({
+    key: cellKey(0, 0), visits, total: mean * (visits + 1) + 0.1, value: -0.1, ended: false,
+    ...(classKey ? { classKey } : {}),
+  });
+  const SAMPLER = 0.6674;
+  const MISS = 0.6173;
+  const blend = { firstLeaf: -0.1, classes: [
+    { key: 'hit-kill', weight: 0.9, leafSum: SAMPLER, count: 1, hasFirst: false, ended: false },
+    { key: 'miss', weight: 0.1, leafSum: MISS, count: 1, hasFirst: false, ended: false },
+  ] };
+  const read = (trees: MctsTreeStats[], withBlend = true) => mergeMctsTrees(trees, new Map([[cellKey(0, 0), {
+    i: 0, j: 0, value: SAMPLER, ended: false, ...(withBlend ? { blend } : {}),
+  }]])).matrix!.values[0][0];
+  const pooled = (list: [number, number][]) =>
+    list.reduce((sum, [visits, mean]) => sum + mean * (visits + 1), 0) / list.reduce((sum, [visits]) => sum + visits + 1, 0);
+  const SCENE: [number, number][] = [[11, 0.52], [586, -0.6], [547, -0.78], [4, 0.73]];
+  const sceneTrees = (living: { p1: number; p2: number }, list = SCENE, classKey: string | undefined = 'hit-kill') =>
+    list.map(([visits, mean]) => mk([cell(visits, mean, classKey)], living));
+
+  test('every tree that played the cell reads below the sampler: the pool stays', () => {
+    expect(read(sceneTrees({ p1: 2, p2: 2 }))).toBeCloseTo(0.9 * pooled(SCENE) + 0.1 * MISS, 10);
+  });
+
+  test('a spread pool whose played trees bracket the sampler stays with the sampler', () => {
+    const bracket: [number, number][] = [[300, -0.6], [280, 0.9], [270, 0.5], [4, 0.73]];
+    expect(read(sceneTrees({ p1: 2, p2: 2 }, bracket))).toBeCloseTo(0.9 * SAMPLER + 0.1 * MISS, 10);
+  });
+
+  test('the same pool with three living on one side reads the sampler', () => {
+    expect(read(sceneTrees({ p1: 3, p2: 2 }))).toBeCloseTo(0.9 * SAMPLER + 0.1 * MISS, 10);
+    expect(read(sceneTrees({ p1: 2, p2: 3 }))).toBeCloseTo(0.9 * SAMPLER + 0.1 * MISS, 10);
+  });
+
+  test('a thin endgame pool under 100 visits reads the sampler', () => {
+    const thin: [number, number][] = [[11, 0.2], [8, -0.6], [5, -0.8]];
+    expect(read(sceneTrees({ p1: 2, p2: 2 }, thin))).toBeCloseTo(0.9 * SAMPLER + 0.1 * MISS, 10);
+  });
+
+  test('a sampler that reads the game decided stays with the sampler although every tree reads below it', () => {
+    const decided: [number, number][] = [[335, 0.96], [300, 0.26], [250, 0.5]];
+    const value = mergeMctsTrees(sceneTrees({ p1: 2, p2: 2 }, decided, undefined), new Map([[cellKey(0, 0), { i: 0, j: 0, value: 1, ended: false }]]));
+    expect(value.matrix!.values[0][0]).toBeCloseTo(1, 10);
+  });
+
+  test('a cell without classes follows the same rule against its own sampler value', () => {
+    const below = sceneTrees({ p1: 2, p2: 2 }, SCENE, undefined);
+    expect(read(below, false)).toBeCloseTo(pooled(SCENE), 2);
+    const bracket: [number, number][] = [[300, -0.6], [280, 0.9], [270, 0.5]];
+    expect(read(sceneTrees({ p1: 2, p2: 2 }, bracket, undefined), false)).toBeCloseTo(SAMPLER, 10);
+  });
+});
+
 describe('row completion for the verify step', () => {
   const options = (labels: string[]) => labels.map(label => ({ choice: label, label }));
   const emptyResult = { score: 0, interval: 0, depthCompleted: 2, perSide: { p1: [], p2: [] } };

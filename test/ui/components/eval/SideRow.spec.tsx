@@ -251,6 +251,47 @@ describe('SideRow', () => {
     expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
   });
 
+  describe.each([
+    ['Doubles OU 2663093831 t7', 'fell', 'Orthworm', 'Protect', 'Iron Defense + Protect', 'Orthworm was knocked out before it moved, so the log shows no choice'],
+    ['Champions VGC 2682637901 t6', 'ended', 'Volcarona', 'Aqua Jet', 'Quiver Dance + Aqua Jet', 'Volcarona was cut off by the end of the game, so the log shows no choice'],
+  ] as const)('%s: a slot with no logged action (%s)', (_scene, reason, name, moved, filled, words) => {
+    const pair = rankedChoice('move 1, move 2', filled, 0.47, 0.2);
+    const other = rankedChoice('move 3, move 4', 'Fake Out → Rillaboom + Spore → Tornadus', 0.47);
+    const sideOf = (extra: Partial<SideAnalysis> = {}) => sideAnalysis({
+      playedRaw: null, playedSlots: [null, { kind: 'move', name: moved }], played: pair, best: pair, safe: pair, playedPartial: true,
+      noChoiceSlots: [{ slot: 0, reason }], ...extra,
+    });
+
+    test('the card names the move that was played, says why the other slot shows none, and never names the stand-in', () => {
+      render(<SideRow name="Alice" side={sideOf({ best: other, safe: other })} names={[name, 'Partner']} />);
+      expect(screen.getByText(/^played /)).toHaveTextContent(`played ${moved} (${winPctText(0.47)})`);
+      expect(screen.getByText(`· ${words}`)).toBeInTheDocument();
+      expect(screen.queryByText('· partner unseen')).toBeNull();
+      expect(document.body.textContent).not.toContain(filled);
+    });
+
+    test('the stand-in earns no tick and no floor note: its row is the engine\'s pricing', () => {
+      render(<SideRow name="Alice" side={sideOf()} names={[name, 'Partner']} />);
+      expect(screen.queryByText(/the engine's move/)).toBeNull();
+      expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: ${filled} (${winPctText(0.47)})`);
+      expect(screen.queryByText(/risked/)).toBeNull();
+    });
+
+    test('without the names of the bodies the slot reads by its place', () => {
+      render(<SideRow name="Alice" side={sideOf()} />);
+      expect(screen.getByText(`· ${words.replace(name, 'Slot A')}`)).toBeInTheDocument();
+    });
+  });
+
+  test('a slot the log shows nothing for and gives no reason stays "partner unseen"; a side with no played slot prints the reasons alone', () => {
+    const pair = rankedChoice('move 1, move 2', 'Quiver Dance + Aqua Jet', 0.47);
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [null, { kind: 'move', name: 'Aqua Jet' }], played: pair, best: pair, playedPartial: true })} />);
+    expect(screen.getByText('· partner unseen')).toBeInTheDocument();
+    rerender(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [null, null], played: null, best: pair, safe: pair, regret: null, noChoiceSlots: [{ slot: 0, reason: 'fell' }] })} names={['Raichu']} />);
+    expect(screen.getByText('Raichu was knocked out before it moved, so the log shows no choice')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/played |unseen|never surfaced/);
+  });
+
   test('doubles: the stand-in is a singles reading (a slot choice never makes one), so a side with slots keeps its card', () => {
     const slot = { kind: 'move' as const, name: 'Fake Out' };
     const pair = rankedChoice('move 1, move 2', 'Fake Out → Rillaboom + Protect', 0.2);

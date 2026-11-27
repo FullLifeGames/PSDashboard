@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { beforeAll, describe, expect, test } from 'vitest';
 import { Dex, TeamValidator } from '@pkmn/sim';
 import type { PokemonSet } from '@pkmn/sim';
+import { buildTeamsFromReplay } from '@fulllifegames/replay-core';
 import { checkGameTeams, loadSimMods, startGameLog } from '../src/index';
 import { SWEEPS_FULL } from './dice-fixtures';
 import { playableFormatIds } from './new-game-teams';
@@ -107,6 +108,38 @@ describe('the ability a new game fills', () => {
       const start = await startGameLog({ format: id, p1Team: [mine], p2Team: [mine], fillAbilities: true });
       if (start.teams.p1[0].ability !== ability) failures.push(`${id} ${species}: the saved team holds "${start.teams.p1[0].ability}", not "${ability}"`);
       if (start.bodies.p1[0].ability !== ability.toLowerCase().replace(/[^a-z0-9]/g, '')) failures.push(`${id} ${species}: the battle plays "${start.bodies.p1[0].ability}"`);
+    }
+    expect(failures).toEqual([]);
+  }, 120_000);
+});
+
+describe('the new game and the replay build default to the same ability', () => {
+  const FORMATS: Array<[string, 'singles' | 'doubles']> = [
+    ['gen9ou', 'singles'], ['gen9doublesou', 'doubles'], ['gen9customgame', 'singles'], ['gen9doublescustomgame', 'doubles'],
+    ['gen9championsou', 'singles'], ['gen9championsvgc2026regmc', 'doubles'], ['gen4ou', 'singles'],
+  ];
+  const SPECIES = ['Garchomp', 'Dugtrio', 'Tatsugiri', 'Gengar', 'Chansey', 'Ninetales', 'Aegislash'];
+
+  function replayDefault(formatId: string, kind: 'singles' | 'doubles', species: string): string | undefined {
+    const format = Dex.formats.get(formatId);
+    const doubles = kind === 'doubles';
+    const lead = (side: string, name: string) => [`|switch|${side}a: ${name}|${name}, M|100/100`, ...(doubles ? [`|switch|${side}b: Ditto|Ditto|100/100`] : [])];
+    const log = [
+      `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', `|gen|${dexOf(formatId).gen}`, `|tier|${format.name}`, '|poke|p1|Chansey, F|', `|poke|p2|${species}, M|`,
+      ...(doubles ? ['|poke|p2|Ditto|'] : []), '|start', ...lead('p1', 'Chansey'), ...lead('p2', species), '|turn|1',
+    ].join('\n');
+    return buildTeamsFromReplay(log).p2Team.find(set => set.species === species)?.ability;
+  }
+
+  test.each(FORMATS)('%s (%s): the fill is the build default for every sampled species', async (formatId, kind) => {
+    const dex = dexOf(formatId);
+    const failures: string[] = [];
+    for (const species of SPECIES) {
+      const entry = dex.species.get(species);
+      if (!entry.exists || entry.gen > dex.gen) continue;
+      const filled = (await filledFor(formatId, [entry.name])).get(entry.name);
+      const built = replayDefault(formatId, kind, entry.name);
+      if (filled && filled !== built) failures.push(`${formatId} ${entry.name}: the new game fills "${filled}", the build plays "${built}"`);
     }
     expect(failures).toEqual([]);
   }, 120_000);

@@ -96,6 +96,22 @@ describe('every clause on a partial side names the hidden slot', () => {
       .toMatch(/\(Partner's action hidden; graded on the visible slot\.\)$/);
   });
 
+  test.each([
+    ['fell', 'Its partner was knocked out before it moved, so the log shows no choice'],
+    ['ended', 'Its partner was cut off by the end of the game, so the log shows no choice'],
+  ] as const)('a partner with no logged action because it %s says why, never "hidden" (2663093831 t7 and 2682637901 t6 shapes)', (reason, words) => {
+    const played = choice('move protect, move bodypress 1', 'Protect + Body Press→Calyrex-Ice', 0.1);
+    const best = choice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Calyrex-Ice', 0.25);
+    const named = side({
+      played, best, safe: best, regret: 0.25, tier: 'mistake', playedPartial: true,
+      playedSlots: [null, { kind: 'move', name: 'Body Press' }], noChoiceSlots: [{ slot: 0, reason }],
+    });
+    const note = new RegExp(`\\(${words}; graded on the visible slot\\.\\)$`);
+    expect(sideClause('Alpha', named, quiet)).toMatch(note);
+    expect(sideClause('Alpha', named, quiet)).not.toContain('hidden');
+    expect(sideClause('Alpha', { ...named, noChoiceSlots: undefined }, quiet)).toContain("Partner's action hidden");
+  });
+
   test('guard: the sack clause stays without the note (the hidden slot is the fed body itself)', () => {
     const sack = sackClause('Alpha', side({ playedPartial: true, sacrifice: { name: 'TeraTurtle', hpFraction: 0.5, stayed: true, verified: true } }));
     expect(sack).not.toContain('hidden');

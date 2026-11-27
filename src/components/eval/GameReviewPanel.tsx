@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { differsSentences, lineAnchor, type LinesHost } from '../../lib/line-view';
+import { CardToggle } from './CardToggle';
 import { LineConfirm } from './LineConfirm';
 import { WinPathsPanel } from './WinPathsPanel';
-import { endgameRow, gameReview, reviewBlocks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
+import { endgameRow, gameReview, reviewBlocks, reviewCountText, reviewMarks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
@@ -12,6 +13,9 @@ interface GameReviewPanelProps {
   doubles: boolean;
   host: LinesHost;
   onSelectTurn?: (turn: number) => void;
+  currentTurn?: number | null;
+  open?: boolean;
+  onToggle?: (next: boolean) => void;
 }
 
 const GRADE_COLORS: Record<ReviewGrade, string> = { inaccuracy: '#b6a46a', mistake: '#f3a6a6', blunder: '#ff7a7a' };
@@ -24,23 +28,23 @@ function ReviewLine({ line, turn, onPlay, confirm }: { line: ReviewLineView; tur
         <span className="text">{line.text}</span>
         <span className="text" style={{ color: '#778' }}>{line.end}</span>
         {onPlay && (
-          <button type="button" className="ps-btn ps-eval-inline-btn" title={line.block.tooltip} onClick={() => onPlay(line.block.line, turn)}>
+          <button type="button" className="ps-btn ps-eval-inline-btn" title={line.block.tooltip} onClick={() => onPlay(line.block.line, turn, 'review')}>
             ▶ Play
           </button>
         )}
       </div>
       {line.block.endNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.endNote}</span></div>}
       {line.block.worstNote && <div className="ps-eval-review-line"><span className="text" style={{ color: '#778' }}>{line.block.worstNote}</span></div>}
-      {confirm && confirm.anchor === lineAnchor(line.block.line, turn) && <LineConfirm confirm={confirm} />}
+      {confirm && confirm.anchor === lineAnchor(line.block.line, turn, 'review') && <LineConfirm confirm={confirm} />}
     </>
   );
 }
 
-function ReviewRow({ row, onPlay, confirm, onSelectTurn }: { row: ReviewRowView; onPlay: LinesHost['onPlay']; confirm?: LinesHost['confirm']; onSelectTurn?: (turn: number) => void }) {
+function ReviewRow({ row, onPlay, confirm, onSelectTurn, current }: { row: ReviewRowView; onPlay: LinesHost['onPlay']; confirm?: LinesHost['confirm']; onSelectTurn?: (turn: number) => void; current: boolean }) {
   return (
-    <div className="ps-eval-review-row">
+    <div className="ps-eval-review-row" aria-current={current || undefined}>
       <div className="ps-eval-review-head">
-        <button type="button" className="ps-btn ps-eval-inline-btn" title="Open this turn's analysis" onClick={() => onSelectTurn?.(row.turn)}>
+        <button type="button" className="ps-btn ps-eval-inline-btn" title={current ? "This turn's analysis is open above" : "Open this turn's analysis"} onClick={() => onSelectTurn?.(row.turn)}>
           T{row.turn}
         </button>
         <span style={{ color: GRADE_COLORS[row.grade] }} title={row.lossTitle}>{row.grade} · {row.loss}</span>
@@ -54,13 +58,13 @@ function ReviewRow({ row, onPlay, confirm, onSelectTurn }: { row: ReviewRowView;
   );
 }
 
-function ReviewSide({ view, onPlay, confirm, onSelectTurn }: { view: ReviewSideView; onPlay: LinesHost['onPlay']; confirm?: LinesHost['confirm']; onSelectTurn?: (turn: number) => void }) {
+function ReviewSide({ view, onPlay, confirm, onSelectTurn, currentTurn }: { view: ReviewSideView; onPlay: LinesHost['onPlay']; confirm?: LinesHost['confirm']; onSelectTurn?: (turn: number) => void; currentTurn?: number | null }) {
   return (
     <div className="ps-eval-review-side" role="group" aria-label={view.player}>
       <div className="name">{view.player}</div>
       {view.rows.length === 0
         ? <span className="ps-eval-line" style={{ marginTop: 0 }}>{view.player}: no inaccuracy, mistake or blunder.</span>
-        : view.rows.map(row => <ReviewRow key={row.key} row={row} onPlay={onPlay} confirm={confirm} onSelectTurn={onSelectTurn} />)}
+        : view.rows.map(row => <ReviewRow key={row.key} row={row} onPlay={onPlay} confirm={confirm} onSelectTurn={onSelectTurn} current={row.turn === currentTurn} />)}
     </div>
   );
 }
@@ -97,19 +101,29 @@ function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['ear
   );
 }
 
-export function GameReviewPanel({ analyses, results, playerNames, doubles, host, onSelectTurn }: GameReviewPanelProps) {
+const REVIEW_TITLE = "The turns where a player lost ground, with the engine's line and the played line. Stays open or closed while this game is loaded.";
+
+export function GameReviewPanel({ analyses, results, playerNames, doubles, host, onSelectTurn, currentTurn, open, onToggle }: GameReviewPanelProps) {
   const sides = useMemo(
     () => gameReview({ analyses, results, playerNames, doubles, host }),
     [analyses, results, playerNames, doubles, host],
   );
+  const count = useMemo(() => reviewMarks(analyses).length, [analyses]);
   const endgame = useMemo(() => endgameRow(host.winPaths?.endgame, playerNames), [host.winPaths?.endgame, playerNames]);
+  const label = (
+    <>
+      <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      <span className="ps-eval-review-count"> · {reviewCountText(count)}</span>
+    </>
+  );
   return (
     <div className="ps-eval-review">
-      <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      <CardToggle label={label} lazy open={open} onToggle={onToggle} title={REVIEW_TITLE} bodyClassName="ps-eval-review-body">
+        {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} currentTurn={currentTurn} />)}
+        {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
+        {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
+      </CardToggle>
       {host.earlyLines && <EarlyLinesProgress progress={host.earlyLines} />}
-      {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
-      {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
-      {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
     </div>
   );
 }

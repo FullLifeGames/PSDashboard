@@ -1,5 +1,5 @@
 import {
-  diffChoices, formatLine, playedSetupMove, type EvalResult, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
+  diffChoices, formatLine, hiddenSlots, playedSetupMove, standsIn, type EvalResult, type SideAnalysis, type RankedChoice, winDeltaText, winPctText,
 } from '@fulllifegames/eval-engine';
 import { gradedTier } from './game-review';
 import { rowLineTail } from '../../lib/row-line';
@@ -11,15 +11,16 @@ type Explore = ((choice: RankedChoice) => void) | undefined;
 interface RowProps {
   name: string;
   side: SideAnalysis;
+  names?: readonly string[];
   onExplore?: (choice: RankedChoice) => void;
   lostGround?: boolean;
   opponentReads?: boolean;
   rowLines?: { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
 }
 
-function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
-  const { acted, playedText } = playedTextFor(side);
-  const playedGamble = !side.neverActed && side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
+function PlayedCell({ name, side, names }: Pick<RowProps, 'name' | 'side' | 'names'>) {
+  const { acted, playedText, noChoice } = playedTextFor(side, names);
+  const playedGamble = !standsIn(side) && side.played !== null && side.played.ev - side.played.worstCase >= RISK_DISPLAY_GAP;
   return (
     <>
       <span style={{ color: '#aab' }} title={side.played ? evTitle(name) : undefined}>{acted ? 'played ' : ''}{playedText}</span>
@@ -31,7 +32,15 @@ function PlayedCell({ name, side }: Pick<RowProps, 'name' | 'side'>) {
           · risked {winPctText(side.played.worstCase, side.faintedFraction)}{side.played.punishedBy ? ` vs ${side.played.punishedBy}` : ''}
         </span>
       )}
-      {side.playedPartial && (
+      {noChoice && (
+        <span
+          style={{ color: '#778' }}
+          title="The engine priced the turn with the best stand-in for this slot; the chance above is that row's, not a choice the log shows."
+        >
+          · {noChoice}
+        </span>
+      )}
+      {side.playedPartial && hiddenSlots(side) > 0 && (
         <span
           style={{ color: '#778' }}
           title="One slot's choice was never visible (flinched or asleep); graded in the player's favor against the best combo the observed action allows."
@@ -49,7 +58,7 @@ function EngineCell({ name, side, regretful, onExplore, opponentReads }: RowProp
   const best = side.best;
   const explore = onExplore && (() => onExplore(best));
     // A stand-in for a choice the log does not show earns no tick.
-  if (!side.played || side.neverActed) {
+  if (!side.played || standsIn(side)) {
     return (
       <span style={{ color: '#778' }} title={evTitle(name)}>
         engine: <ExplorableLabel label={engine.label} color="#778" onClick={explore} opponentReads={opponentReads} />
@@ -233,16 +242,16 @@ function HindsightRow({ line }: { line: string }) {
   );
 }
 
-export function SideRow({ name, side, onExplore, lostGround, opponentReads, rowLines }: RowProps) {
+export function SideRow({ name, side, names, onExplore, lostGround, opponentReads, rowLines }: RowProps) {
   const regretful = side.tier === 'mistake' || side.tier === 'blunder';
   const setupMove = playedSetupMove(side);
-  const difference = regretful && side.played && side.best ? diffChoices(side.played, side.best) : null;
+  const difference = regretful && side.played && side.best && !side.noChoiceSlots?.length ? diffChoices(side.played, side.best) : null;
 
   return (
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
-        <PlayedCell name={name} side={side} />
+        <PlayedCell name={name} side={side} names={names} />
         <EngineCell name={name} side={side} regretful={regretful} onExplore={onExplore} opponentReads={opponentReads} />
         <VerdictCell name={name} side={side} regretful={regretful} setupMove={setupMove} lostGround={lostGround} />
       </div>

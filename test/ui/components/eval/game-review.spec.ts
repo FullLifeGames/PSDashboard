@@ -8,7 +8,7 @@ import {
   type TurnAnalysis,
   lostGround,
 } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
+import { gameReview, gradedTier, reviewCountText, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
@@ -70,6 +70,13 @@ describe('reviewMarks: the graph marks follow the list', () => {
     expect(reviewMarks(null)).toEqual([]);
     expect(reviewMarks([])).toEqual([]);
   });
+
+  test('the closed fold counts the marks: none, one, and a doubles turn graded on both sides twice', () => {
+    const both = turnAnalysis(4, { p1: misplayedSide('blunder'), p2: gradedP2('inaccuracy') });
+    expect(reviewCountText(reviewMarks([turnAnalysis(1)]).length)).toBe('no graded turn');
+    expect(reviewCountText(reviewMarks([turnAnalysis(3, { p1: misplayedSide('mistake') })]).length)).toBe('1 graded turn');
+    expect(reviewCountText(reviewMarks([both, turnAnalysis(5, { p2: gradedP2('mistake') })]).length)).toBe('3 graded turns');
+  });
 });
 
 describe('gameReview, singles', () => {
@@ -111,6 +118,24 @@ describe('gameReview, singles', () => {
     expect(row.playedText).toBe(`knocked out before it moved, so the log shows no choice · staying in ${winPctText(-0.24)}`);
     expect(row.playedText).not.toMatch(/stayed in|played/);
     expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
+  });
+
+  test.each([
+    ['Doubles OU 2663093831 t7', 'fell', 'Orthworm', 'Protect', 'Iron Defense + Protect', 'Orthworm was knocked out before it moved, so the log shows no choice'],
+    ['Champions VGC 2682637901 t6', 'ended', 'Volcarona', 'Aqua Jet', 'Quiver Dance + Aqua Jet', 'Volcarona was cut off by the end of the game, so the log shows no choice'],
+  ] as const)('%s: a doubles row names the move that was played and why the other slot shows none (%s)', (_scene, reason, name, moved, filled, words) => {
+    const pair = rankedChoice('move 1, move 2', filled, -0.24);
+    const best = rankedChoice('move 3, move 4', 'Fake Out → Rillaboom + Spore → Tornadus', 0.1);
+    const side: SideAnalysis = {
+      playedRaw: null, playedSlots: [null, { kind: 'move', name: moved }], played: pair, best, safe: best, regret: 0.34, tier: 'mistake',
+      playedPartial: true, noChoiceSlots: [{ slot: 0, reason }],
+    };
+    const slotted = { rules: host.rules, snapshot: { p1: { pokemon: [{ name, isActive: true, slot: 0 }, { name: 'Partner', isActive: true, slot: 1 }] }, p2: { pokemon: [] } } } as unknown as LinesHost;
+    const rows = (target: LinesHost) => gameReview({ analyses: [turnAnalysis(7, { p1: side })], results: [null], playerNames: DOUBLES_NAMES, doubles: true, host: target })[0].rows;
+    expect(rows(slotted)[0].playedText).toBe(`played ${moved} ${winPctText(-0.24)} · ${words}`);
+    expect(rows(host)[0].playedText).toBe(`played ${moved} ${winPctText(-0.24)} · ${words.replace(name, 'Slot A')}`);
+    expect(rows(slotted)[0].playedText).not.toContain(filled);
+    expect(rows(slotted)[0].engine).toBe(`Fake Out → Rillaboom + Spore → Tornadus ${winPctText(0.1)}`);
   });
 
   test('the lines of the row: the engine\'s line and the played line, each with its own text and block', () => {

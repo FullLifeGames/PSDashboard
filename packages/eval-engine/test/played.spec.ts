@@ -173,6 +173,34 @@ describe('doubles played-action parsing', () => {
   });
 });
 
+describe('doubles: a slot that logged no action', () => {
+  test('the game ends before a slot moves: the slot is marked ended, beside the fell mark of the body that fell', () => {
+    const played = parsePlayedActionsDoubles([
+      '|move|p1b: Berry Weiss|Aqua Jet|p2a: Raichu',
+      '|-damage|p2a: Raichu|0 fnt',
+      '|faint|p2a: Raichu',
+      '|',
+      '|win|PsychedelicDawgII',
+    ]);
+    expect(played.ended).toEqual({ p1: [true, false], p2: [false, true] });
+    expect(played.fell?.p2?.map(mark => mark !== null)).toEqual([true, false]);
+    expect(played.p1Slots).toEqual([null, expect.objectContaining({ name: 'Aqua Jet' })]);
+  });
+
+  test('a tie ends the game the same way', () => {
+    const played = parsePlayedActionsDoubles(['|move|p1a: A|Explosion|p2a: B', '|faint|p1a: A', '|faint|p2a: B', '|tie']);
+    expect(played.ended).toEqual({ p1: [false, true], p2: [false, true] });
+  });
+
+  test('a slot that moved, fainted or lost its action to a cant is never ended, and a game that goes on has no mark', () => {
+    const over = parsePlayedActionsDoubles([
+      '|move|p1a: A|Protect|p1a: A', '|cant|p1b: B|flinch', '|move|p2a: C|Fake Out|p1a: A', '|faint|p2b: D', '|win|X',
+    ]);
+    expect(over.ended).toBeUndefined();
+    expect(parsePlayedActionsDoubles(['|move|p1b: B|Protect|p1b: B', '|faint|p2b: D', '|turn|4']).ended).toBeUndefined();
+  });
+});
+
 describe('mega evolution tracking', () => {
   test('doubles: |-mega| marks the slot and the move carries the flag', () => {
     const played = parsePlayedActionsDoubles([

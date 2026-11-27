@@ -5,9 +5,9 @@ import {
 } from './types.ts';
 import { bestWindowPayoff } from './sack-gates.ts';
 import { beatsSafeCell, clickedCells } from './clicked-cell.ts';
+import { standsIn } from './played-match.ts';
 
-// An untiered deviation that gave up a mistake-sized floor, from a not-yet-lost position: garbage time makes every move
-// a "gamble". Gambles can only EARN the paid-off credit; with no verdict to soften, the risk labels stay off.
+// A not-yet-lost, untiered deviation that gave up a mistake-sized floor is a gamble: it can only EARN credit, no label.
 function isGamble(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tiered: boolean): boolean {
   const ownBefore = key === 'p1' ? params.scoreBefore : -params.scoreBefore;
   return !tiered && side.played !== null && side.best !== null && side.safe !== null
@@ -28,8 +28,7 @@ function isInaccuracyRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalys
     && params.playedOutcome !== null;
 }
 
-// Tiered turns look PAYOFF_WINDOW turns ahead, gambles at the immediate outcome only (the window credits follow-ups).
-// True when the read clearly FAILED, which keeps every risk label off.
+// True when the read clearly FAILED (every risk label off); tiered turns look PAYOFF_WINDOW ahead, gambles at once.
 function bookRiskPayoff(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, tiered: boolean): boolean {
   if (!(params.playedOutcome !== null && side.safe)) return false;
   const chain = tiered
@@ -94,7 +93,7 @@ function readMatches(read: ReadRecommendation | null | undefined, played: Ranked
 
 /** Marks the side's risk fields in place (riskPayoff, riskPayoffTurn, riskPaidOff, riskUnpunished, riskWasRead). */
 export function markRisk(params: AnalyzeTurnParams, key: Side, side: SideAnalysis, opponent: SideAnalysis): void {
-  if (side.sacrifice || side.neverActed) return;
+  if (side.sacrifice || standsIn(side)) return;
   const tiered = side.tier === 'mistake' || side.tier === 'blunder';
   const gamble = isGamble(params, key, side, tiered) || isInaccuracyRisk(params, key, side);
   if (!tiered && !gamble) {

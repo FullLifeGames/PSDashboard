@@ -71,6 +71,11 @@ export interface TurnSensitivity {
   p2?: SensitivityProbe[];
 }
 
+export interface NoChoiceSlot {
+  slot: number;
+  reason: 'fell' | 'ended';
+}
+
 /** One side's grading and narrative signals for one turn. */
 export interface SideAnalysis {
   /** The fainted share this record was read at (an echo of the param); percent texts print at it, no grade reads it. */
@@ -83,6 +88,8 @@ export interface SideAnalysis {
   neverActed?: boolean;
   /** Doubles: the per-slot actions this side actually took. */
   playedSlots?: (PlayedAction | null)[];
+  /** Doubles: the slots with no logged action and why; `played` fills them with a stand-in, never a play. */
+  noChoiceSlots?: NoChoiceSlot[];
   played: RankedChoice | null;
   /** The top choice by equilibrium EV, the grading reference. */
   best: RankedChoice | null;

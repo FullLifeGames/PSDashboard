@@ -31,6 +31,16 @@ async function readRows(review: Locator) {
   })));
 }
 
+async function expectCardTopInView(card: Locator) {
+  await expect.poll(() => card.evaluate(element => {
+    let top = 0;
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) { top = Math.max(top, parent.getBoundingClientRect().top); break; }
+    }
+    return element.getBoundingClientRect().top - top;
+  }), 'the card starts inside the view').toBeGreaterThanOrEqual(-0.5);
+}
+
 const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
@@ -47,6 +57,11 @@ for (const game of GAMES) {
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
     await expect(review).toContainText('Game review · what the engine would have played');
+    const fold = review.getByRole('button', { name: /Game review/ });
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(review.locator('.ps-eval-review-row')).toHaveCount(0);
+    await expect(fold).toContainText(/· \d+ graded turns?/);
+    await fold.click();
     lap('report shown');
 
     const rows = await readRows(review);
@@ -55,12 +70,27 @@ for (const game of GAMES) {
     await expect(panel.locator('.ps-eval-graph circle[data-review-mark="p1"]')).toHaveCount(p1Rows);
     await expect(panel.locator('.ps-eval-graph rect[data-review-mark="p2"]')).toHaveCount(rows.length - p1Rows);
 
-    const first = rows[0];
-    await review.locator('.ps-eval-review-row').first().getByRole('button', { name: `T${first.turn}` }).click();
-    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${first.turn}`, { timeout: 30_000 });
+    const last = rows[rows.length - 1];
+    await review.locator('.ps-eval-review-row').last().getByRole('button', { name: `T${last.turn}`, exact: true }).click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${last.turn}`, { timeout: 30_000 });
+    await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+    await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
     await expect(panel.locator('.ps-eval-graph [data-review-mark]')).toHaveCount(rows.length);
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${last.turn}`);
+    const second = rows.find(row => row.turn !== last.turn);
+    if (second) {
+      await review.getByRole('button', { name: `T${second.turn}`, exact: true }).first().click();
+      await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${second.turn}`, { timeout: 30_000 });
+      await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+      await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
+      await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${second.turn}`);
+      await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    }
     await panel.getByRole('button', { name: /Game report/ }).click();
     await expect(review).toBeVisible();
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await expect(review.locator('.ps-eval-review-row[aria-current]')).toHaveCount(0);
     guard.assertClean();
     console.log(`${game.id}: worker requests up to the report and a turn: ${guard.requests().join(', ') || 'none'}`);
 
@@ -91,6 +121,7 @@ for (const game of GAMES) {
 
     await panel.getByRole('button', { name: 'Back to the main line' }).click();
     await expect(review).toBeVisible();
+    await expect(fold).toHaveAttribute('aria-expanded', 'true');
     await expect(panel.getByRole('button', { name: /← Game report/ })).toHaveCount(0);
     await review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') }).first().getByRole('button', { name: '▶ Play' }).first().click();
     const question = review.getByRole('alertdialog');
@@ -118,6 +149,7 @@ test('singles in Auto: the graded early turns get their lines after the report, 
   const progress = review.getByText(/Finding lines for graded turns: \d+ of \d+/);
   await expect(progress).toBeVisible({ timeout: 60_000 });
   await expect(progress).toBeHidden({ timeout: 900_000 });
+  await review.getByRole('button', { name: /Game review/ }).click();
 
   const rows = await review.locator('.ps-eval-review-row').evaluateAll(entries => entries.map(row => ({
     turn: Number((row.querySelector('button')?.textContent ?? '').replace(/^T/, '')),
@@ -142,4 +174,38 @@ test('singles in Auto: the graded early turns get their lines after the report, 
   await expect(history).toContainText(/\d+ turns?/, { timeout: 240_000 });
   await openVariationHistory(page);
   expect(await history.locator('strong').allTextContents(), `the history starts at turn ${playable!.turn}`).toContain(`Turn ${playable!.turn}`);
+});
+
+test('VGC at 390 px: three review rows show their cards in view, the review stays open and marks the row', async ({ page }) => {
+  test.setTimeout(900_000);
+  const replay = fixture('gen9vgc2026regi-2630452654');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { guard } = await openReplayAnalysis(page, replay, { mode: 'auto', depth: 1, samples: 1 }, { seed: evalStoreFileName(replay.id, { mode: 'auto', depth: 1, samples: 1 }) });
+  const panel = page.locator('.ps-main-right .ps-eval-panel');
+  await panel.getByRole('button', { name: 'Analyze game' }).click();
+  await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 }));
+  const review = panel.locator('.ps-eval-review');
+  await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
+  const fold = review.getByRole('button', { name: /Game review/ });
+  await fold.click();
+  const edges = await fold.evaluate(button => {
+    const range = document.createRange();
+    range.selectNodeContents(button);
+    const lines = [...range.getClientRects()].filter(rect => rect.width > 0);
+    return { wrapped: new Set(lines.map(rect => Math.round(rect.top))).size, first: lines[0].left, last: lines[lines.length - 1].left };
+  });
+  expect(edges.wrapped, 'the label wraps at 390 px').toBeGreaterThan(1);
+  expect(edges.last, 'the second line of the label starts at the left edge').toBeCloseTo(edges.first, 0);
+  const turns = [...new Set((await readRows(review)).map(row => row.turn))].slice(-3).reverse();
+  expect(turns.length, 'the game holds graded turns').toBeGreaterThanOrEqual(1);
+  for (const turn of turns) {
+    await review.getByRole('button', { name: `T${turn}`, exact: true }).first().click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 30_000 });
+    await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+    await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
+    await expect(review).toBeVisible();
+    await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${turn}`);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow').toBe(true);
+  }
+  guard.assertClean();
 });
