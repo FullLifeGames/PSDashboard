@@ -108,23 +108,23 @@ const showHead = (box: HTMLElement | null) => box?.querySelector('.ps-eval-analy
 
 type Wanted = MutableRefObject<number | null>;
 
-function useRevealCard(shown: number | null, wanted: Wanted) {
+function useRevealCard(shown: number | null, wantedRef: Wanted) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (wanted.current === null || wanted.current !== shown) return;
-    wanted.current = null;
+    if (wantedRef.current === null || wantedRef.current !== shown) return;
+    wantedRef.current = null;
     showHead(ref.current);
-  }, [shown]);
+  }, [shown, wantedRef]);
   const request = (turn: number) => {
     if (turn === shown) showHead(ref.current);
-    else wanted.current = turn;
+    else wantedRef.current = turn;
   };
   return [ref, request] as const;
 }
 
-function TurnCards({ leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads, graph, selectTurn, reviewAnalyses, reviewOpen, onReviewToggle, wanted }: TurnViewProps & { wanted: Wanted }) {
+function TurnCards({ leadAnalysis, analysis, playerNames, reads, onPickChoice, onPickPair, linesHost, doubles, openTurn, opponentReads, graph, selectTurn, reviewAnalyses, reviewOpen, onReviewToggle, wantedRef }: TurnViewProps & { wantedRef: Wanted }) {
   const shown = leadAnalysis ? 0 : analysis?.turn ?? null;
-  const [cardRef, reveal] = useRevealCard(shown, wanted);
+  const [cardRef, reveal] = useRevealCard(shown, wantedRef);
   return (
     <>
       <div ref={cardRef}>
@@ -149,7 +149,7 @@ function TurnCards({ leadAnalysis, analysis, playerNames, reads, onPickChoice, o
   );
 }
 
-function TurnView(props: TurnViewProps & { wanted: Wanted }) {
+function TurnView(props: TurnViewProps & { wantedRef: Wanted }) {
   const { report, onBackToReport, onBackToMain, result, currentTurn, graph, analyzeTurn, hasAnalyzeTurn } = props;
   return (
     <>
@@ -248,7 +248,7 @@ function GraphView(props: GameGraphSectionProps) {
   );
 }
 
-function ReportOverview({ report, wanted, ...props }: GameGraphSectionProps & { report: GameReport; wanted: Wanted }) {
+function ReportOverview({ report, wantedRef, ...props }: GameGraphSectionProps & { report: GameReport; wantedRef: Wanted }) {
   const { graph, playerNames, selectTurn, reportLeads, reviewAnalyses, linesHost, doubles } = props;
   return (
     <>
@@ -262,7 +262,7 @@ function ReportOverview({ report, wanted, ...props }: GameGraphSectionProps & { 
       {gameReviewEnabled() && reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
-          host={linesHost} onSelectTurn={turn => { wanted.current = turn; selectTurn?.(turn); }} open={props.reviewOpen} onToggle={props.onReviewToggle}
+          host={linesHost} onSelectTurn={turn => { wantedRef.current = turn; selectTurn?.(turn); }} open={props.reviewOpen} onToggle={props.onReviewToggle}
         />
       )}
     </>
@@ -274,7 +274,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
     onAnalyzeGame, onCancel, running, smogonPending, hasGraph, prefs, graph,
     variation, showReportView, report, analysis, doubles,
   } = props;
-  const wanted = useRef<number | null>(null);
+  const wantedRef = useRef<number | null>(null);
   return (
     <div style={{ margin: '6px 0' }}>
       <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} title={graphTitle(prefs, doubles)} />
@@ -294,8 +294,8 @@ export function GameGraphSection(props: GameGraphSectionProps) {
           Click a point for that turn's analysis; its movement lights up on the line.
         </div>
       )}
-      {showReportView && report && <ReportOverview {...props} report={report} wanted={wanted} />}
-      {!showReportView && <TurnView {...props} opponentReads={!!prefs.hardMode} wanted={wanted} />}
+      {showReportView && report && <ReportOverview {...props} report={report} wantedRef={wantedRef} />}
+      {!showReportView && <TurnView {...props} opponentReads={!!prefs.hardMode} wantedRef={wantedRef} />}
     </div>
   );
 }
