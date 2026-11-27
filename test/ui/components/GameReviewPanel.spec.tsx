@@ -37,7 +37,7 @@ function singlesGame() {
 describe('GameReviewPanel, singles', () => {
   test('the title, one list per player and the graded turns only', () => {
     const { analyses, results } = singlesGame();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText('Game review · what the engine would have played')).toBeInTheDocument();
     const tzon = screen.getByRole('group', { name: 'Tzon' });
     const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
@@ -52,7 +52,7 @@ describe('GameReviewPanel, singles', () => {
   test('a row shows the played and the engine value, and the engine and played line each with its play button', async () => {
     const { analyses, results } = singlesGame();
     const onPlay = vi.fn();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host(onPlay)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host(onPlay)} />);
     const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
     expect(within(pepito).getByText('played Hyper Voice 53%')).toBeInTheDocument();
     expect(within(pepito).getAllByText('engine Hydro Pump 55%')).toHaveLength(2);
@@ -62,33 +62,33 @@ describe('GameReviewPanel, singles', () => {
     expect(plays).toHaveLength(2);
     expect(plays[0]).toHaveAttribute('title', expect.stringContaining('Hydro Pump: no crit (96%)'));
     await userEvent.click(plays[0]);
-    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20);
+    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20, 'review');
     await userEvent.click(plays[1]);
-    expect(onPlay).toHaveBeenLastCalledWith(playedLine, 20);
+    expect(onPlay).toHaveBeenLastCalledWith(playedLine, 20, 'review');
   });
 
   test('a click on the turn opens it', async () => {
     const { analyses, results } = singlesGame();
     const onSelectTurn = vi.fn();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} onSelectTurn={onSelectTurn} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} onSelectTurn={onSelectTurn} />);
     await userEvent.click(screen.getByRole('button', { name: 'T21' }));
     expect(onSelectTurn).toHaveBeenCalledWith(21);
   });
 
   test('a graded turn without a line keeps its row and says so; without a play handler the lines show without buttons', () => {
     const { analyses, results } = singlesGame();
-    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const { rerender } = render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     const t21 = screen.getByRole('button', { name: 'T21' }).closest('.ps-eval-review-row') as HTMLElement;
     expect(within(t21).getByText('no line')).toBeInTheDocument();
     expect(within(t21).queryByRole('button', { name: '▶ Play' })).toBeNull();
-    rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ rules: { gen: 9, mod: undefined } }} />);
+    rerender(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ rules: { gen: 9, mod: undefined } }} />);
     expect(screen.queryByRole('button', { name: '▶ Play' })).toBeNull();
     expect(screen.getByText("Hyper Voice vs Draining Kiss (Tzon's top choice)")).toBeInTheDocument();
   });
 
   test('a player with no graded turn says so; a game with none says it once per player', () => {
     const analyses = [turnAnalysis(1), turnAnalysis(2), turnAnalysis(3)];
-    render(<GameReviewPanel analyses={analyses} results={[]} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    render(<GameReviewPanel open analyses={analyses} results={[]} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText('Tzon: no inaccuracy, mistake or blunder.')).toBeInTheDocument();
     expect(screen.getByText('Pepitopalotin: no inaccuracy, mistake or blunder.')).toBeInTheDocument();
   });
@@ -99,23 +99,23 @@ describe('GameReviewPanel, doubles', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
     const results: (EvalResult | null)[] = [null, null, null, withLines('doubles', [doublesLine])];
     const onPlay = vi.fn();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={host(onPlay)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={host(onPlay)} />);
     const group = screen.getByRole('group', { name: 'pixelfrost' });
     expect(within(group).getByText(/then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost: Fake Out → Zamazenta-Crowned \+ Protect/)).toBeInTheDocument();
     await userEvent.click(within(group).getByRole('button', { name: '▶ Play' }));
-    expect(onPlay).toHaveBeenCalledWith(doublesLine, 4);
+    expect(onPlay).toHaveBeenCalledWith(doublesLine, 4, 'review');
     expect(screen.getByText('Mstr_Hawk: no inaccuracy, mistake or blunder.')).toBeInTheDocument();
   });
 
   test('a line is labelled "engine line:" or "played line:", so the head\'s "engine" is not repeated by its line', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
-    render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
+    render(<GameReviewPanel open analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
     expect(screen.getByText('engine line:')).toBeInTheDocument();
   });
 
   test('a line that stops before a replacement says why under its row', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
-    render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [{ ...doublesLine, awaits: 'p1' }])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
+    render(<GameReviewPanel open analyses={analyses} results={[null, null, null, withLines('doubles', [{ ...doublesLine, awaits: 'p1' }])]} playerNames={DOUBLES_NAMES} doubles host={host(vi.fn())} />);
     expect(screen.getByText(`The line stops before ${DOUBLES_NAMES[0]} sends in a replacement. Its end is the board before the switch-in.`)).toBeInTheDocument();
   });
 });
@@ -129,7 +129,7 @@ describe('GameReviewPanel, the Endgame row', () => {
   test('singles: one row for the player who lost, named by the first turn of the endgame; a click searches that turn', async () => {
     const { analyses, results } = singlesGame();
     const lined = endgameHost();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
     await userEvent.click(button);
@@ -138,22 +138,22 @@ describe('GameReviewPanel, the Endgame row', () => {
   });
 
   test('doubles: the same row for the loser of a doubles game', () => {
-    render(<GameReviewPanel analyses={[null, null, null, null]} results={[null, null, null, null]} playerNames={DOUBLES_NAMES} doubles host={endgameHost({ endgame: { loser: 'p1', turns: [8] } })} />);
+    render(<GameReviewPanel open analyses={[null, null, null, null]} results={[null, null, null, null]} playerNames={DOUBLES_NAMES} doubles host={endgameHost({ endgame: { loser: 'p1', turns: [8] } })} />);
     expect(screen.getByRole('button', { name: 'Endgame · T8 · How could pixelfrost have won?' })).toBeInTheDocument();
   });
 
   test('no row for a game that never reached its endgame, one without a loser or a host without the job', () => {
     const { analyses, results } = singlesGame();
-    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ endgame: null })} />);
+    const { rerender } = render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ endgame: null })} />);
     expect(screen.queryByRole('group', { name: 'Endgame' })).toBeNull();
-    rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    rerender(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.queryByRole('group', { name: 'Endgame' })).toBeNull();
   });
 
   test('with a search open the row closes it, and the panel stands under the row', async () => {
     const { analyses, results } = singlesGame();
     const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'review' } });
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     expect(within(group).getByRole('region', { name: 'How could Pepitopalotin have won?' })).toBeInTheDocument();
     const button = within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' });
@@ -165,7 +165,7 @@ describe('GameReviewPanel, the Endgame row', () => {
   test('a search the turn card opened shows no panel under the review, and the row stays an open question', () => {
     const { analyses, results } = singlesGame();
     const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'card' } });
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     expect(within(group).queryByRole('region')).toBeNull();
     expect(within(group).getByRole('button', { name: 'Endgame · T23 · How could Pepitopalotin have won?' })).toHaveAttribute('aria-expanded', 'false');
@@ -173,7 +173,7 @@ describe('GameReviewPanel, the Endgame row', () => {
 
   test('while the sets load the row is disabled and says why', () => {
     const { analyses, results } = singlesGame();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ unavailable: 'Waiting for Smogon data.' })} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={endgameHost({ unavailable: 'Waiting for Smogon data.' })} />);
     const button = screen.getByRole('button', { name: /^Endgame/ });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Waiting for Smogon data.');
@@ -185,7 +185,7 @@ describe('GameReviewPanel, both numbers', () => {
 
   test('singles: every line ends at its value, and the sentence stands once under the review', () => {
     const { analyses, results } = singlesGame();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     const pepito = screen.getByRole('group', { name: 'Pepitopalotin' });
     expect(within(pepito).getByText(`ends at ${winPctText(singlesLine.end, singlesLine.endFainted)}`)).toBeInTheDocument();
     expect(within(pepito).getByText(`ends at ${winPctText(playedLine.end, playedLine.endFainted)}`)).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe('GameReviewPanel, both numbers', () => {
 
   test('doubles: the pair line ends at its value, with the same sentence once', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
-    render(<GameReviewPanel analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host()} />);
+    render(<GameReviewPanel open analyses={analyses} results={[null, null, null, withLines('doubles', [doublesLine])]} playerNames={DOUBLES_NAMES} doubles host={host()} />);
     expect(screen.getByText(`ends at ${winPctText(doublesLine.end, doublesLine.endFainted)}`)).toBeInTheDocument();
     expect(screen.getAllByText(SENTENCE)).toHaveLength(1);
   });
@@ -208,9 +208,9 @@ describe('GameReviewPanel, both numbers', () => {
     analyses[19] = turnAnalysis(20, { p2: same });
     const results: (EvalResult | null)[] = analyses.map(() => null);
     results[19] = withLines('singles', [singlesLine, playedLine]);
-    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const { rerender } = render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.queryByText(SENTENCE)).toBeNull();
-    rerender(<GameReviewPanel analyses={analyses} results={[]} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    rerender(<GameReviewPanel open analyses={analyses} results={[]} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.queryByText(SENTENCE)).toBeNull();
   });
 });
@@ -222,7 +222,7 @@ describe('GameReviewPanel, the early-lines progress line', () => {
   test.each([['singles', false, SINGLES_NAMES], ['doubles', true, DOUBLES_NAMES]] as const)('%s: the line and its Stop stand under the title while the stage runs', async (_kind, doubles, names) => {
     const { analyses, results } = singlesGame();
     const stop = vi.fn();
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={names} doubles={doubles} host={{ ...host(), earlyLines: { done: 2, total: 6, stop } }} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={names} doubles={doubles} host={{ ...host(), earlyLines: { done: 2, total: 6, stop } }} />);
     expect(screen.getByText(PROGRESS)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
     expect(stop).toHaveBeenCalledTimes(1);
@@ -230,10 +230,10 @@ describe('GameReviewPanel, the early-lines progress line', () => {
 
   test('no line and no button when the stage is not running', () => {
     const { analyses, results } = singlesGame();
-    const { rerender } = render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const { rerender } = render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.queryByText(/Finding lines/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
-    rerender(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ ...host(), earlyLines: null }} />);
+    rerender(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={{ ...host(), earlyLines: null }} />);
     expect(screen.queryByText(/Finding lines/)).toBeNull();
   });
 });

@@ -4,15 +4,15 @@ import userEvent from '@testing-library/user-event';
 import type { EvalLine, EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { GameReviewPanel } from '../../../src/components/eval/GameReviewPanel';
 import { LinesSection } from '../../../src/components/eval/LinesSection';
-import { lineAnchor, type LinesHost } from '../../../src/lib/line-view';
+import { lineAnchor, type LinePlace, type LinesHost } from '../../../src/lib/line-view';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { doublesLine, DOUBLES_NAMES, playedLine, singlesLine, SINGLES_NAMES } from '../fixtures/lines';
 
 const MESSAGE = 'Play this line from turn 20: replace the existing variation from turn 12 (3 turns)?';
 const withLines = (kind: 'singles' | 'doubles', lines: EvalLine[]): EvalResult => ({ ...evalResult(kind), lines });
-const hostWith = (line: EvalLine, turn: number, proceed = vi.fn(), cancel = vi.fn()): LinesHost => ({
-  rules: { gen: 9, mod: undefined }, onPlay: vi.fn(), confirm: { anchor: lineAnchor(line, turn), message: MESSAGE, proceed, cancel },
+const hostWith = (line: EvalLine, turn: number, proceed = vi.fn(), cancel = vi.fn(), place: LinePlace = 'lines'): LinesHost => ({
+  rules: { gen: 9, mod: undefined }, onPlay: vi.fn(), confirm: { anchor: lineAnchor(line, turn, place), message: MESSAGE, proceed, cancel },
 });
 
 describe('the replace question of ▶ Play', () => {
@@ -48,7 +48,7 @@ describe('the replace question of ▶ Play', () => {
     analyses[19] = turnAnalysis(20, { p2: { playedRaw: { kind: 'move', name: 'Hyper Voice' }, played, best, safe: best, regret: 0.34, tier: 'blunder' } });
     const results: (EvalResult | null)[] = analyses.map(() => null);
     results[19] = withLines('singles', [singlesLine, playedLine]);
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={hostWith(singlesLine, 20)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={hostWith(singlesLine, 20, vi.fn(), vi.fn(), 'review')} />);
     const banner = screen.getByRole('alertdialog');
     const row = banner.closest('.ps-eval-review-row') as HTMLElement;
     expect(within(row).getByRole('button', { name: 'T20' })).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('the replace question of ▶ Play', () => {
   test('Game review, doubles: the same under the doubles row', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
     const results: (EvalResult | null)[] = [null, null, null, withLines('doubles', [doublesLine])];
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={hostWith(doublesLine, 4)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={hostWith(doublesLine, 4, vi.fn(), vi.fn(), 'review')} />);
     expect(screen.getByRole('alertdialog').closest('.ps-eval-review-row')).toHaveTextContent('T4');
   });
 });

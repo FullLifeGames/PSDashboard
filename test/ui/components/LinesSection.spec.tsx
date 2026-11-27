@@ -34,7 +34,7 @@ describe('LinesSection', () => {
     const button = screen.getByRole('button', { name: '▶ Play' });
     expect(button).toHaveAttribute('title', expect.stringContaining('Hydro Pump: no crit (96%)'));
     await userEvent.click(button);
-    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20);
+    expect(onPlay).toHaveBeenCalledWith(singlesLine, 20, 'lines');
   });
 
   test('doubles: one row per player and step, a replacement as its own row', () => {

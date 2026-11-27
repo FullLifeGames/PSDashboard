@@ -1,7 +1,7 @@
-import { lostGround, replacementWords, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
+import { lostGround, replacementWords, winPctText, type EvalLine, type EvalResult, type RankedChoice, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
-import { cardLines, engineChoice, neverActedOf, neverActedText, inaccuracyView, regretView, rowValueTexts } from './turn-copy';
+import { cardLines, engineChoice, neverActedOf, neverActedText, inaccuracyView, noChoiceText, playedSlotsLabel, regretView, rowValueTexts } from './turn-copy';
 
 
 type Side = 'p1' | 'p2';
@@ -61,6 +61,10 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
   return gradedSides(analyses).map(({ analysis, side }) => ({ turn: analysis.turn, side }));
 }
 
+export function reviewCountText(marks: number): string {
+  return marks === 0 ? 'no graded turn' : `${marks} graded ${marks === 1 ? 'turn' : 'turns'}`;
+}
+
 function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
   const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);
@@ -101,6 +105,14 @@ function rowLines(args: ReviewArgs, analysis: TurnAnalysis, side: Side): ReviewL
   }));
 }
 
+function playedLine(side: SideAnalysis, played: RankedChoice, args: ReviewArgs, analysis: TurnAnalysis, key: Side): string {
+  if (side.neverActed) return neverActedText(side);
+  const value = winPctText(played.ev, side.faintedFraction);
+  if (!side.noChoiceSlots?.length) return `played ${played.label} ${value}`;
+  const names = activeNamesAt(args.host.snapshotAt?.(analysis.turn) ?? args.host.snapshot)?.[key];
+  return `played ${playedSlotsLabel(side)} ${value} · ${noChoiceText(side.noChoiceSlots, names)}`;
+}
+
 function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: ReviewGrade): ReviewRowView {
   const sideAnalysis = analysis[side];
   const name = args.playerNames[SIDE_INDEX[side]];
@@ -111,7 +123,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   return {
     key: `${analysis.turn}-${side}`, turn: analysis.turn, side, grade,
     played: `${played.label} ${winPctText(played.ev, share)}`,
-    playedText: sideAnalysis.neverActed ? neverActedText(sideAnalysis) : `played ${played.label} ${winPctText(played.ev, share)}`,
+    playedText: playedLine(sideAnalysis, played, args, analysis, side),
     engine: `${engine.label} ${winPctText(engine.value, share)}`,
     engineWord: engine.word,
     loss: loss.text,

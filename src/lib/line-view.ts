@@ -36,13 +36,15 @@ export interface LineConfirm {
   cancel: () => void;
 }
 
-export const lineAnchor = (line: EvalLine, turn: number): string => `${turn}|${line.side}|${line.label}|${line.for.join('+')}${line.versus ? `|${line.versus}` : ''}`;
+export type LinePlace = 'lines' | 'review';
+
+export const lineAnchor = (line: EvalLine, turn: number, place: LinePlace = 'lines'): string => `${place}|${turn}|${line.side}|${line.label}|${line.for.join('+')}${line.versus ? `|${line.versus}` : ''}`;
 
 export interface LinesHost {
   rules: GameRules;
   snapshot?: TurnSnapshot | null;
   snapshotAt?: (turn: number) => TurnSnapshot | null;
-  onPlay?: (line: EvalLine, turn: number) => void;
+  onPlay?: (line: EvalLine, turn: number, place?: LinePlace) => void;
   confirm?: LineConfirm | null;
   winPaths?: WinPathsHost;
   earlyLines?: { done: number; total: number; stop: () => void } | null;

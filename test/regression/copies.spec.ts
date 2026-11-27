@@ -1,18 +1,26 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, describe } from 'vitest';
-import { NEVER_ACTED_WORDS as ROW_WORDS, neverActedText } from '../../src/components/eval/turn-copy';
+import { GAME_ENDED_WORDS as ROW_ENDED_WORDS, NEVER_ACTED_WORDS as ROW_WORDS, neverActedText, noChoiceText } from '../../src/components/eval/turn-copy';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 // The app copies the engine's phrase (barrel access only); this spec reads the engine's source and holds the two equal.
 const phrases = readFileSync(new URL('../../packages/eval-engine/src/prose/phrases.ts', import.meta.url), 'utf-8');
 const engineWords = /export const NEVER_ACTED_WORDS =\s*'([^']+)'/.exec(phrases)?.[1];
+const engineEndedWords = /export const GAME_ENDED_WORDS =\s*'([^']+)'/.exec(phrases)?.[1];
 
 test('the app row and the engine sentences use one wording for a side knocked out before it moved', () => {
   expect(engineWords).toBeDefined();
   expect(ROW_WORDS).toBe(engineWords);
   expect(neverActedText({ played: null })).toBe(engineWords);
   expect(neverActedText({ played: { ev: 0 } })).toMatch(new RegExp(`^${engineWords} · staying in \\d+%$`));
+});
+
+test('the app row and the engine note use one wording for a doubles slot with no logged action', () => {
+  expect(engineEndedWords).toBeDefined();
+  expect(ROW_ENDED_WORDS).toBe(engineEndedWords);
+  expect(noChoiceText([{ slot: 0, reason: 'fell' }], ['Orthworm'])).toBe(`Orthworm was ${engineWords}`);
+  expect(noChoiceText([{ slot: 1, reason: 'ended' }])).toBe(`Slot B was ${engineEndedWords}`);
 });
 
 const read = (relative: string) => readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8');

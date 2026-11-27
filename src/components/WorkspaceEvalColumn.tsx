@@ -78,6 +78,7 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   return (
     <EvalPanel
       linesHost={linesHost}
+      gameId={replayData.id}
       playerNames={[replayData.players[0], replayData.players[1]]}
       status={liveEvalView ? liveEvalStatus : 'idle'}
       result={analyzedResult}

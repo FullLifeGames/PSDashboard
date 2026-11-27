@@ -50,7 +50,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
           <span style={{ color: '#9ab' }} title={block.reply.off ? REPLY_OFF_TOP_TITLE : undefined}>{`vs ${block.reply.label} (${block.reply.rank})`}</span>
         )}
         {onPlay && (
-          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn)}>
+          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn, 'lines')}>
             ▶ Play
           </button>
         )}

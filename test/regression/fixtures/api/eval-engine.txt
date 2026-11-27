@@ -92,6 +92,7 @@ type MoveUser
 type NearDecidedSweep
 type NewGameBody
 type NewGameStart
+type NoChoiceSlot
 type OnRequestJob
 type OnRequestResult
 type OnRequestStep
@@ -236,6 +237,7 @@ value formatLine
 value formatRead
 value heldDecided
 value hiddenPowerFacts
+value hiddenSlots
 value loadSimMods
 value loadSimModsFor
 value loggedDice
@@ -308,6 +310,7 @@ value snapshotMoveTypes
 value snapshotSimFacts
 value solveEndgame
 value speciesAfterTeraClick
+value standsIn
 value startGameLog
 value starvedSupportCells
 value summarizeAlignment

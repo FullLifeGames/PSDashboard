@@ -30,7 +30,7 @@ Chess-style analysis for Pokémon Showdown replays. Load a replay, scrub to any 
 
 Two features exist in the code and ship behind a flag that is off in every build, the nightly and the release included. Both return in 1.2.1.
 
-- **Game review.** A section under the game report that lists each player's graded turns with the engine's line and the played line, marks them on the graph (a circle for player 1, a square for player 2) and adds an `Endgame` row for the player who lost an endgame. Flag: `VITE_FEATURE_GAME_REVIEW=1`.
+- **Game review.** A closed section under the game report and under each turn's card that lists each player's graded turns with the engine's line and the played line, marks them on the graph (a circle for player 1, a square for player 2) and adds an `Endgame` row for the player who lost an endgame. A click on a row's turn shows that turn's card above the review, which stays open and marks the row; the section stays open or closed while the game is loaded. Flag: `VITE_FEATURE_GAME_REVIEW=1`.
 - **Opponent reads my move.** A checkbox in the `Setup` menu: the opponent answers each move you play with the reply the search rates lowest for it, where it otherwise answers with its top choice. The turn dock then shows the note `Opponent reads your move` with a `Turn off` button. Flag: `VITE_FEATURE_OPPONENT_READS=1`. A setting that an earlier nightly stored is ignored while the flag is off.
 
 `src/lib/feature-flags.ts` owns both flags; [ARCHITECTURE.md](./ARCHITECTURE.md) names it.
