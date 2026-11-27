@@ -151,11 +151,11 @@ describe('the saved files in the repository', () => {
     expect([...names].sort()).toEqual([...wanted].sort());
   });
 
-  it('holds one win-paths answer in each file whose capture runs the job, and none in the others', () => {
+  it('holds the loser\'s win-paths answer and one answer per proof turn in each file whose capture runs the job, and none in the others', () => {
     for (const capture of EVAL_STORE_CAPTURES) {
       const name = evalStoreFileName(capture.replay, capture.settings, capture.turns);
       const parsed = parseEvalStoreFile(readFileSync(join(dir, name), 'utf-8'), name);
-      expect(parsed.records.filter(isWinPathsRecord), name).toHaveLength(capture.winPaths ? 1 : 0);
+      expect(parsed.records.filter(isWinPathsRecord), name).toHaveLength(capture.winPaths ? 1 + (capture.proofTurns?.length ?? 0) : 0);
     }
   });
 
