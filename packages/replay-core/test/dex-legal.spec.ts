@@ -228,4 +228,11 @@ describe('the default ability is one the format\'s validator accepts', () => {
     expect(firstAllowedAbility(dex, 'Garchomp', id => id === 'sandveil')).toBe('Rough Skin');
     expect(firstAllowedAbility(dex, 'Garchomp', id => id !== 'roughskin')).toBe('Rough Skin');
   });
+
+  test('the special slot S counts only where the caller names it (Rockruff: Own Tempo)', () => {
+    const dex = rulesDex(9);
+    const skipsHidden = (id: string) => id !== 'owntempo';
+    expect(firstAllowedAbility(dex, 'Rockruff', skipsHidden)).toBe('Keen Eye');
+    expect(firstAllowedAbility(dex, 'Rockruff', skipsHidden, ['0', '1', 'H', 'S'])).toBe('Own Tempo');
+  });
 });
