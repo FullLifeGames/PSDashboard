@@ -4,6 +4,7 @@ import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
 import { exploreTitle } from './turn-copy';
 import { rowLineTail } from '../../lib/row-line';
+import { floorReplyUnlisted } from '../../lib/unlisted-floor';
 
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
@@ -36,10 +37,12 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   );
 }
 
-function choiceTooltip(choice: RankedChoice, clickable: boolean, faintedFraction?: number | null, opponentReads = false): string {
+function choiceTooltip(
+  choice: RankedChoice, clickable: boolean, unlisted: boolean, faintedFraction?: number | null, opponentReads = false,
+): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
-    (choice.punishedBy ? ` (worst reply: ${choice.punishedBy})` : '') +
+    (choice.punishedBy ? ` (worst reply: ${choice.punishedBy}${unlisted ? ', which the matrix dialog does not list' : ''})` : '') +
     '. Choices are ranked by their value against balanced play.' +
     (clickable ? ' ' + exploreTitle(opponentReads) : '');
 }
@@ -60,7 +63,7 @@ function ChoiceList({
   return (
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
-        const tooltip = choiceTooltip(choice, !!onPickChoice, faintedFraction, opponentReads);
+        const tooltip = choiceTooltip(choice, !!onPickChoice, floorReplyUnlisted(result, side, choice), faintedFraction, opponentReads);
         const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice, !!opponentReads)} />;
         return onPickChoice ? (
           <button

@@ -83,6 +83,26 @@ describe('EvalResultBlock', () => {
   });
 });
 
+describe('EvalResultBlock: a floor whose reply the matrix lists no column for', () => {
+  const unlisted = 'Tera + Precipice Blades + Sleep Powder → Calyrex-Shadow';
+  const titleOf = (result: ReturnType<typeof evalResult>) => {
+    render(<EvalResultBlock result={result} status="done" playerNames={names} />);
+    return document.querySelector('.ps-eval-choice')!.getAttribute('title')!;
+  };
+  test.each([['singles'], ['doubles']] as const)('a reply that is a column of the table reads as before (%s)', kind => {
+    const base = evalResult(kind);
+    const listed = base.matrix!.p2Labels[0];
+    const result = evalResult(kind, { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: listed }, ...base.perSide.p1.slice(1)] } });
+    expect(titleOf(result)).toContain(`(worst reply: ${listed})`);
+  });
+
+  test('doubles: a reply the table does not list is named as such', () => {
+    const base = evalResult('doubles');
+    const result = evalResult('doubles', { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: unlisted }, ...base.perSide.p1.slice(1)] } });
+    expect(titleOf(result)).toContain(`(worst reply: ${unlisted}, which the matrix dialog does not list)`);
+  });
+});
+
 describe('EvalResultBlock: the row\'s "then ..." follows the Lines section', () => {
   const pick = (label: string, slots = 1) => ({ choice: label.toLowerCase(), label, slots: Array.from({ length: slots }, () => null) });
   test.each([
