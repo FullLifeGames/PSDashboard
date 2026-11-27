@@ -49,7 +49,7 @@ describe('Setup menu with the flag off', () => {
     expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Animate branch turns']);
     expect(screen.getByRole('button', { name: 'Edit Player' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import/Export Sets' })).toBeInTheDocument();
-    expect(document.body.innerHTML).not.toMatch(/Opponent reads|reads my move/);
+    expect(document.body.innerHTML).not.toMatch(/Opponent reads|reads my move|each move you pick/);
   });
 });
 
@@ -72,22 +72,6 @@ describe('the titles that name the reply rule', () => {
   test('the click title says the opponent plays its top choice, whatever the setting passed', () => {
     expect(exploreTitle(true)).toBe('Play this turn in a variation; the opponent plays its top choice.');
     expect(exploreTitle(false)).toBe('Play this turn in a variation; the opponent plays its top choice.');
-  });
-});
-
-describe('the Setup checkbox with its flag on and the Game review flag off', () => {
-  beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
-
-  test('its title leaves the Game review out', async () => {
-    vi.stubEnv('VITE_FEATURE_OPPONENT_READS', '1');
-    vi.stubEnv('VITE_FEATURE_GAME_REVIEW', '');
-    render(
-      <SetupMenu animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />,
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    const title = screen.getByRole('checkbox', { name: 'Opponent reads my move' }).closest('label')?.getAttribute('title');
-    expect(title).toContain('in the turn dock, and in a turn\'s lines. Off, it plays its own top choice');
-    expect(title).not.toMatch(/Game review/);
   });
 });
 

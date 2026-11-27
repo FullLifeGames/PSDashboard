@@ -129,15 +129,16 @@ describe('the "Opponent reads my move" checkbox in the Setup menu', () => {
     expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('its title says what the opponent does, where, and that grades stay', async () => {
-    menu(false);
+  test.each([[false], [true]])('a visible note under the box says what the opponent does and what stays (setting %s), and the label has no title', async flag => {
+    menu(flag);
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    expect(screen.getByRole('checkbox', { name: 'Opponent reads my move' }).closest('label')).toHaveAttribute(
-      'title',
-      'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
-      + 'when you click an engine move, in the turn dock, and in a turn\'s lines and the Game review. '
-      + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.',
-    );
+    const box = screen.getByRole('checkbox', { name: 'Opponent reads my move' });
+    const note = 'In a variation, each move you pick meets the reply that hurts it most, and Lines shows each line against that reply. '
+      + 'The engine\'s suggestion, the grades and the win chances stay.';
+    expect(screen.getByText(note)).toHaveClass('ps-setup-note');
+    expect(box.closest('label')).not.toHaveAttribute('title');
+    expect(box.closest('label')?.nextElementSibling).toBe(screen.getByText(note));
+    expect(box).toHaveAccessibleDescription(note);
   });
 });
 
