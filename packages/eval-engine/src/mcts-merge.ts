@@ -51,11 +51,12 @@ function pooledCells(trees: MctsTreeStats[]): Map<number, PooledCell> {
 
 function poolContinuation(
   trees: MctsTreeStats[], key: number, classKey?: string, acceptUnkeyed = false,
-): { value: number; visits: number; trees: number; disagreement: number } {
+): { value: number; visits: number; trees: number; disagreement: number; means: number[] } {
   let total = 0;
   let weight = 0;
   let visits = 0;
   const entries: { mean: number; weight: number }[] = [];
+  const means: number[] = [];
   for (const tree of trees) {
     const own = cellContribution(tree.cells.find(entry => entry.key === key), classKey, acceptUnkeyed);
     if (!own) continue;
@@ -63,15 +64,20 @@ function poolContinuation(
     weight += own.weight;
     visits += own.visits;
     entries.push({ mean: own.mean, weight: own.weight });
+    if (own.visits >= VERIFY_MIN_VISITS) means.push(own.mean);
   }
-  return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries) };
+  return { value: weight > 0 ? total / weight : NaN, visits, trees: entries.length, disagreement: weightedDisagreement(entries), means };
 }
 
 const VERIFY_MIN_CLASS_TREES = 2;
 
-function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean): boolean {
-  if (pool.visits < VERIFY_MIN_VISITS || pool.trees < minTrees || pool.disagreement > VERIFY_DISAGREEMENT) return false;
-  return Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR || (endgame && pool.visits >= VERIFY_ENDGAME_MIN_VISITS);
+function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean, sampler: number): boolean {
+  if (pool.visits < VERIFY_MIN_VISITS || pool.trees < minTrees) return false;
+  const rich = endgame && pool.visits >= VERIFY_ENDGAME_MIN_VISITS;
+  if (pool.disagreement > VERIFY_DISAGREEMENT) {
+    return rich && pool.means.length > 0 && (sampler < Math.min(...pool.means) || sampler > Math.max(...pool.means));
+  }
+  return Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR || rich;
 }
 
 // The sampler prices the ROOT chance split; a tree's depth counts only where the pool played the cell out and agrees.
@@ -79,7 +85,8 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
   const endgame = endgameOf(trees);
   if (!cell.blend) {
     const pool = poolContinuation(trees, key);
-    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length), endgame) ? pooledValue : cell.deepened ?? cell.value;
+    const sampler = cell.deepened ?? cell.value;
+    return deepPool(pool, Math.min(VERIFY_MIN_TREES, trees.length), endgame, sampler) ? pooledValue : sampler;
   }
   const { blend } = cell;
   const classMean = (cls: CellBlendClass) => {
@@ -96,7 +103,8 @@ function verifiedValue(trees: MctsTreeStats[], key: number, cell: EvalCellValue,
       continue;
     }
     const pool = poolContinuation(trees, key, cls.key, open.length === 1);
-    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES, endgame) ? pool.value : classMean(cls));
+    const sampler = classMean(cls);
+    value += cls.weight * (deepPool(pool, VERIFY_MIN_CLASS_TREES, endgame, sampler) ? pool.value : sampler);
   }
   return value;
 }
