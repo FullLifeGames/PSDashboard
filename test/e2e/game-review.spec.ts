@@ -60,14 +60,14 @@ for (const game of GAMES) {
     await expect(panel.locator('.ps-eval-graph circle[data-review-mark="p1"]')).toHaveCount(p1Rows);
     await expect(panel.locator('.ps-eval-graph rect[data-review-mark="p2"]')).toHaveCount(rows.length - p1Rows);
 
-    const first = rows[0];
-    await review.locator('.ps-eval-review-row').first().getByRole('button', { name: `T${first.turn}` }).click();
-    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${first.turn}`, { timeout: 30_000 });
+    const last = rows[rows.length - 1];
+    await review.locator('.ps-eval-review-row').last().getByRole('button', { name: `T${last.turn}`, exact: true }).click();
+    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${last.turn}`, { timeout: 30_000 });
     await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
     await expect(panel.locator('.ps-eval-graph [data-review-mark]')).toHaveCount(rows.length);
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
-    await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${first.turn}`);
-    const second = rows.find(row => row.turn !== first.turn);
+    await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${last.turn}`);
+    const second = rows.find(row => row.turn !== last.turn);
     if (second) {
       await review.getByRole('button', { name: `T${second.turn}`, exact: true }).first().click();
       await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${second.turn}`, { timeout: 30_000 });
@@ -175,7 +175,7 @@ test('VGC at 390 px: three review rows show their cards in view, the review stay
   const review = panel.locator('.ps-eval-review');
   await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
   await review.getByRole('button', { name: /Game review/ }).click();
-  const turns = [...new Set((await readRows(review)).map(row => row.turn))].slice(0, 3);
+  const turns = [...new Set((await readRows(review)).map(row => row.turn))].slice(-3).reverse();
   expect(turns.length, 'the game holds graded turns').toBeGreaterThanOrEqual(1);
   for (const turn of turns) {
     await review.getByRole('button', { name: `T${turn}`, exact: true }).first().click();
