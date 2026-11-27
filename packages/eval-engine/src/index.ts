@@ -132,7 +132,7 @@ export { chanceRolled } from './turn-analysis/luck.ts';
 export { lostGround, shownAttribution } from './turn-analysis/risk.ts';
 export { worstAnswer } from './turn-analysis/worst-answer.ts';
 export type { WorstAnswer } from './turn-analysis/worst-answer.ts';
-export { resolveTeraPreference, teraKey } from './tera.ts';
+export { resolveTeraPreference, teraBanned, teraKey } from './tera.ts';
 export type { TeraPreference } from './tera.ts';
 export { AUTO_MCTS_FAINTED_FRACTION } from './types.ts';
 export type {

@@ -35,7 +35,7 @@ export function useEvaluation() {
   }, []);
 
   const {
-    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    status, result, resultTag, resultReplacement, progress, error, reconstructProgress, stopped,
     evaluate, cancel, stop, markStale, reset,
   } = useSingleEval({ runRef, clientRef, cacheRef, prefsRef, engineOverrideRef, stopGraphPaint });
 
@@ -49,7 +49,7 @@ export function useEvaluation() {
 
   return {
     prefs, setPrefs, setEngineOverride, searchLines, attachLines,
-    status, result, resultTag, progress, error, reconstructProgress, stopped,
+    status, result, resultTag, resultReplacement, progress, error, reconstructProgress, stopped,
     evaluate, markStale, reset, cancel, stop,
     graph, runGraphSweep, clearGraph, dropGraphFrom,
   };

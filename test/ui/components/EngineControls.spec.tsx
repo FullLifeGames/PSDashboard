@@ -6,24 +6,15 @@ import { BUILTIN_ENGINE, type EngineEntry } from '../../../src/lib/engines/regis
 
 const bot: EngineEntry = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' };
 
-function wired(engines: EngineEntry[], selected = engines[0]) {
-  return { engines, selected, running: false, onSelect: vi.fn(), onAdd: vi.fn(), onRemove: vi.fn() };
+function wired(engines: EngineEntry[]) {
+  return { engines, onAdd: vi.fn(), onRemove: vi.fn() };
 }
 
-describe('the engine controls (the dropdown appears once another engine is integrated)', () => {
-  test('with the own engine alone there is no dropdown, only the way to add one', () => {
-    render(<EngineControls {...wired([BUILTIN_ENGINE])} />);
-    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
+describe('the engine controls (the header keeps only the way to add an engine)', () => {
+  test.each([['the built-in engine alone', [BUILTIN_ENGINE]], ['an added engine', [BUILTIN_ENGINE, bot]]])('with %s the header draws the add button and no select', (_scene, engines) => {
+    render(<EngineControls {...wired(engines)} />);
+    expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.getByRole('button', { name: '+ engine' })).toBeInTheDocument();
-  });
-
-  test('a second engine brings the dropdown; a pick reaches the handler', async () => {
-    const props = wired([BUILTIN_ENGINE, bot]);
-    render(<EngineControls {...props} />);
-    const select = screen.getByRole('combobox', { name: 'Engine' });
-    expect(select).toHaveValue('ps-dashboard');
-    await userEvent.selectOptions(select, 'url:http://localhost:8765/');
-    expect(props.onSelect).toHaveBeenCalledWith('url:http://localhost:8765/');
   });
 
   test('the add dialog takes a name and an address, refuses a bad address, and lists added engines for removal', async () => {

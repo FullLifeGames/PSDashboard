@@ -1,4 +1,4 @@
-import { regretText, TIER_THRESHOLDS, type EvalLine, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type LeadSideAnalysis, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 
@@ -102,33 +102,53 @@ export function rowValueTexts(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null |
   return { p1: of(analysis.p1), p2: of(analysis.p2) };
 }
 
-/** Names the position of the run's tag (`main:10`, `variation:10`), never the pointer's; no tag: the screen's. */
+/** Names the run's position, never the pointer's; on an open replacement it names the turn the frame shows. */
 export function resultPositionLabel(
-  resultTag: string | null, screen: { viewTurn: number; viewingVariation: boolean },
+  resultTag: string | null, screen: { viewTurn: number; viewingVariation: boolean }, replacement = false,
 ): string {
   const match = resultTag === null ? null : /^(main|variation):(\d+)$/.exec(resultTag);
   const turn = match ? Number(match[2]) : screen.viewTurn;
   const variation = match ? match[1] === 'variation' : screen.viewingVariation;
-  return `Turn ${turn} · ${variation ? 'variation' : 'main line'}`;
+  const line = variation ? 'variation' : 'main line';
+  return match && replacement ? `Replacement after turn ${turn - 1} · ${line}` : `Turn ${turn} · ${line}`;
 }
 
-/** Over 1 the chip reads as the two win chances it spans; the title keeps the real number on the score scale. */
+const chanceGapText = (better: number, played: number, faintedFraction?: number | null): string =>
+  `−${Math.max(0, winPercent(better, faintedFraction) - winPercent(played, faintedFraction))}%`;
+
+/** Up to a regret of 1 the chip is the gap of the two chances the card prints; over 1 it names both. */
 export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
-  const from = side.bestNull?.alternative?.ev ?? side.best?.ev;
+  const from = side.best ? comparisonTarget(side, side.best).value : undefined;
   const to = side.played?.ev;
   if (from === undefined || to === undefined) {
     return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
   }
-  const text = regretText(regret, from, to, side.faintedFraction);
-  return text === winDeltaText(-regret)
-    ? { text, title: `${name} gave up this much win probability vs the engine's best.` }
-    : {
-      text,
-      title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
-        `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
-    };
+  const spanned = regretText(regret, from, to, side.faintedFraction);
+  if (spanned === winDeltaText(-regret)) {
+    return { text: chanceGapText(from, to, side.faintedFraction), title: `${name} gave up this much win probability vs the engine's best.` };
+  }
+  return {
+    text: spanned,
+    title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
+      `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
+  };
 }
 
 export const exploreTitle = (opponentReads = false): string => opponentReads && opponentReadsEnabled()
   ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
   : 'Play this turn in a variation; the opponent plays its top choice.';
+
+export function inaccuracyView(side: Pick<SideAnalysis, 'best' | 'played' | 'faintedFraction' | 'regret'>): { text: string; title: string } {
+  const regret = side.regret ?? 0;
+  const { best, played } = side;
+  const text = best && played ? chanceGapText(best.ev, played.ev, side.faintedFraction) : winDeltaText(-regret);
+  const lead = best ? `${best.label} was a touch better: a minor imprecision, not a mistake.` : 'A minor imprecision, not a mistake.';
+  return {
+    text,
+    title: `${lead} The size is the gap of the two win chances shown; the grade rests on a regret of ${regret.toFixed(2)} on the score scale (${TIER_THRESHOLDS.inaccuracy.toFixed(2)} or more).`,
+  };
+}
+
+export function leadGradeSize(side: Pick<LeadSideAnalysis, 'best' | 'played' | 'regret'>): string {
+  return side.best && side.played ? chanceGapText(side.best.ev, side.played.ev) : winDeltaText(-(side.regret ?? 0));
+}

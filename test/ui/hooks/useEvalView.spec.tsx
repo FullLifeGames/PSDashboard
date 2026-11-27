@@ -38,7 +38,7 @@ function inputs(evaluation: Evaluation, overrides: Partial<EvalViewInputs> = {})
     replayData, snapshots, evaluation, replayGameType: 'singles', evalIsDoubles: false, viewTurn: 3, viewLine: 'main',
     viewingVariation: false, liveTip: false, liveEvalView: false, evalViewKey: 'main:3', serializedAtView: null,
     liveEvalStatus: 'idle', tip: null, tipEvalStatus: 'idle', analysisTurn: 3, analyzableTurns: 6, branching: false, executing: false, branchPreparing: false,
-    playOutActive: false, smogonPending: false,
+    playOutActive: false, replacementPending: false, smogonPending: false,
     acquire: { acquireBranchPosition: vi.fn(), acquireReplayPosition: vi.fn(), makeReplayAcquire: vi.fn(), makeSweepAcquireAll: vi.fn(() => vi.fn()) },
     sources, bringOnlyLists: null, setsFingerprint: 'fp1', sensitivityTargetsFor: vi.fn(() => []), editedP1Info: null, editedP2Info: null,
     historyLength: 0, setVariationScores: vi.fn(),
@@ -378,5 +378,40 @@ describe('useEvalView', () => {
       const updater = setVariationScores.mock.calls[0][0] as (previous: (number | null)[]) => (number | null)[];
       expect(updater([0.1, null, null])).toEqual([0.1, null, null, 0.42]);
     });
+  });
+});
+
+describe('useEvalView replacement mark', () => {
+  test('Evaluate marks a run that starts while the live sim waits for a replacement; no other position carries the mark', () => {
+    const { evaluation, spies } = evaluationOf();
+    const { result, rerender } = renderHook((props: EvalViewInputs) => useEvalView(props), {
+      initialProps: inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3', replacementPending: true }),
+    });
+    act(() => result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0]).toMatchObject({ tag: 'variation:3', replacement: true });
+    rerender(inputs(evaluation, { liveTip: true, liveEvalView: true, evalViewKey: 'variation:3' }));
+    act(() => result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0].replacement ?? false).toBe(false);
+    rerender(inputs(evaluation, { viewingVariation: true, liveEvalView: true, serializedAtView: '{"turn":3}', evalViewKey: 'variation:3', replacementPending: true }));
+    act(() => result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0].replacement ?? false).toBe(false);
+    rerender(inputs(evaluation, { replacementPending: true }));
+    act(() => result.current.handleEvaluate());
+    expect(spies.evaluate.mock.calls.at(-1)![0].replacement ?? false).toBe(false);
+  });
+});
+
+describe('useEvalView Tera Auto', () => {
+  test.each([
+    ['singles', 'gen9ou', 'singles', true],
+    ['doubles', 'gen9doublesou', 'doubles', true],
+    ['vgc', 'gen9vgc2025regi', 'doubles', true],
+    ['a Custom Game', 'gen9customgame', 'singles', false],
+    ['a Terastal Clause format', 'gen9monotype', 'singles', false],
+  ] as const)('Tera Auto in a new game of %s follows the format; the replay of the same log stays off', (_kind, formatid, replayGameType, allowed) => {
+    const { evaluation } = evaluationOf();
+    const tera = (id: string) => renderHook(() => useEvalView(inputs(evaluation, { replayData: { ...replayData, id, formatid }, replayGameType }))).result.current.effectiveTera;
+    expect(tera('newgame-abcdefghij')).toBe(allowed);
+    expect(tera('gen9ou-1234567890')).toBe(false);
   });
 });

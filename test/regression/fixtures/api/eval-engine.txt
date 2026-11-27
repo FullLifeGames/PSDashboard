@@ -315,6 +315,7 @@ value summarizeTurn
 value switchChoiceKey
 value switchOptionKey
 value takeSimFastReport
+value teraBanned
 value teraKey
 value tieName
 value unansweredSeenKey

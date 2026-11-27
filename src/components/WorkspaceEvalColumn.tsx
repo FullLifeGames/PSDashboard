@@ -58,7 +58,7 @@ function stoppedDepth(stopped: StoppedRun | null, shown: { live: boolean; status
 
 function EvalSection({ app, replayData }: WorkspaceColumnProps) {
   const { evaluation } = app.ctx;
-  const { replayGen, replayGameType } = app.ctx.meta;
+  const { replayGameType } = app.ctx.meta;
   const { liveEvalStatus, evalResultMatchesView } = app.board;
   const {
     viewTurn, viewingVariation, liveEvalView, liveSimTurn, analyzableTurns, analysisTurn,
@@ -98,11 +98,10 @@ function EvalSection({ app, replayData }: WorkspaceColumnProps) {
       onPickChoice={clickable ? handleExploreChoice : undefined}
       onPickPair={clickable ? handlePickPair : undefined}
       showAuto={liveEvalView}
-      showTera={replayGen === 9}
       graph={evaluation.graph}
       onAnalyzeGame={handleAnalyzeGame}
       ended={endedFor(atVariationEnd, app.ctx.branch.simState)}
-      positionLabel={liveEvalView ? resultPositionLabel(reads.resultTag, { viewTurn, viewingVariation: reads.viewingVariation }) : null}
+      positionLabel={liveEvalView ? resultPositionLabel(reads.resultTag, { viewTurn, viewingVariation: reads.viewingVariation }, evaluation.resultReplacement) : null}
       playOutProgress={playOut?.active ? { startTurn: playOut.startTurn, turns: playOut.turns, atTurn: liveSimTurn, fast: fastPlayOut, stopping: !!playOut.stopping, game: app.ctx.newGame.record !== null } : null}
       graphMaxTurn={analyzableTurns}
       analysisTurn={analysisTurn}

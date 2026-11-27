@@ -164,6 +164,18 @@ describe('useEvaluation single position', () => {
     expect(script.calls).toHaveLength(1);
   });
 
+  test('the replacement mark of a run lands with its tag and the next run without the mark clears it', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, sleepClause: true, acquire: async () => position(1), tag: 'variation:2', replacement: true }));
+    expect(result.current.resultTag).toBe('variation:2');
+    expect(result.current.resultReplacement).toBe(true);
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    expect(result.current.resultReplacement).toBe(true);
+    act(() => result.current.evaluate({ cacheKey: null, tera: false, sleepClause: true, acquire: async () => position(1), tag: 'variation:2' }));
+    expect(result.current.resultReplacement).toBe(false);
+  });
+
   test('a single evaluation hands its played action to the search as keepPlayed', async () => {
     const played = parsePlayedActions(['|move|p1a: Chomp|Earthquake|p2a: Rotom', '|turn|2'], logRules(''));
     const { result } = renderHook(() => useEvaluation());
@@ -300,6 +312,25 @@ describe('useEvaluation whole-game sweep', () => {
     expect(graph.notice).toBeNull();
     expect(graph.progress).toBeNull();
     expect(script.calls).toHaveLength(3);
+  });
+
+  test('only a sweep over the whole game marks the graph as swept; a later one-turn analysis keeps the mark, a new game length drops it', async () => {
+    const { result } = renderHook(() => useEvaluation());
+    act(() => result.current.setPrefs(matrixPrefs));
+    const run = async (extra: object) => {
+      act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(turn - 1)), ...extra }));
+      await waitFor(() => expect(result.current.graph.running).toBe(true));
+      await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    };
+    await run({ from: 2, to: 3 });
+    expect(result.current.graph.scores).toEqual([null, 0.1, 0.2]);
+    expect(result.current.graph.gameSwept).toBeFalsy();
+    await run({});
+    expect(result.current.graph.gameSwept).toBe(true);
+    await run({ from: 2, to: 3 });
+    expect(result.current.graph.gameSwept).toBe(true);
+    await run({ turns: 4, from: 3, to: 4 });
+    expect(result.current.graph.gameSwept).toBeFalsy();
   });
 
   test('a singles sweep hands the played action to the search as keepPlayed; a turn without one passes nothing', async () => {

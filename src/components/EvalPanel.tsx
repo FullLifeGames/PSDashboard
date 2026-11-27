@@ -32,7 +32,6 @@ interface EvalPanelProps {
   /** Smogon usage/sets still loading: a sweep started now builds teams without the guessed fills. */
   smogonPending?: boolean;
   showAuto: boolean;
-  showTera: boolean;
   engines?: EngineChoice;
   graph: EvalGraphState;
   /** The gold curve's scores (`scores[turn − 1]`) and the fainted share of the variation's own board before each. */
@@ -104,7 +103,6 @@ function PanelHeader({ running, ...props }: EvalPanelProps & { running: boolean 
         onPrefsChange={props.onPrefsChange}
         running={running}
         showAuto={props.showAuto}
-        showTera={props.showTera}
         onEvaluate={props.ended ? undefined : props.onEvaluate}
         onCancel={props.onCancel}
         result={props.result}

@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { EvalPanel } from '../../../src/components/EvalPanel';
@@ -17,7 +17,7 @@ type Props = Parameters<typeof EvalPanel>[0];
 function props(overrides: Partial<Props> = {}): Props {
   return {
     playerNames: names, status: 'idle', result: null, progress: null, reconstructProgress: null, error: null, prefs,
-    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, showTera: true, graph: emptyGraph(), currentTurn: 1, analysis: null,
+    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, graph: emptyGraph(), currentTurn: 1, analysis: null,
     ...overrides,
   };
 }
@@ -32,13 +32,12 @@ describe('EvalPanel', () => {
     expect(screen.queryByText('Game graph')).toBeNull();
     expect(screen.getByText('Turn 3 · variation')).toBeInTheDocument();
     expect(screen.getByText('depth 1 · 1 sample')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Auto' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Follow' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Re-evaluate' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Earthquake/ }));
     expect(onPickChoice).toHaveBeenCalledWith('p1', result.perSide.p1[0], result.perSide.p2[0], result);
     expect(screen.queryByText('Depth')).toBeNull();
-    await userEvent.selectOptions(within(screen.getByText('Tera')).getByRole('combobox'), 'on');
-    expect(wired.onPrefsChange).toHaveBeenCalledWith({ ...prefs, tera: 'on' });
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
   test.each([['singles'], ['doubles']] as const)('the ranked rows (%s) name the reply by the hardMode preference', kind => {

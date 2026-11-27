@@ -5,6 +5,7 @@ import { SetupMenu } from '../../../src/components/SetupMenu';
 import { UI_SCALE_STORAGE_KEY } from '../../../src/lib/ui-scale-setting';
 import { getUiScaleState, startUiScale } from '../../../src/lib/ui-scale-store';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
+import { BUILTIN_ENGINE, type EngineEntry } from '../../../src/lib/engines/registry';
 
 describe('SetupMenu.size', () => {
   let stop: (() => void) | null = null;
@@ -145,7 +146,7 @@ const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: fal
 type Search = NonNullable<Parameters<typeof SetupMenu>[0]['search']>;
 
 async function openMenu(overrides: Partial<Search> = {}) {
-  const search: Search = { prefs, onPrefsChange: vi.fn(), running: false, external: false, ...overrides };
+  const search: Search = { prefs, onPrefsChange: vi.fn(), running: false, external: false, showTera: true, ...overrides };
   const view = render(
     <SetupMenu
       animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()}
@@ -219,5 +220,83 @@ describe('Depth and Samples in the Setup menu', () => {
     render(<SetupMenu animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />);
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
     expect(screen.queryByText('Depth')).toBeNull();
+  });
+});
+
+describe('Tera in the Setup menu', () => {
+  const TERA_TITLE = 'Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. '
+    + 'Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format.';
+
+  test('the row stands below Depth and Samples with its title, and a pick writes the preference', async () => {
+    const { search } = await openMenu();
+    const rows = [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')].map(row => row.firstChild?.textContent?.trim());
+    expect(rows).toEqual(['Depth', 'Samples', 'Tera']);
+    expect(screen.getByText('Tera')).toHaveAttribute('title', TERA_TITLE);
+    expect([...select('Tera').querySelectorAll('option')].map(option => [option.value, option.textContent])).toEqual([['auto', 'Auto'], ['on', 'On'], ['off', 'Off'], ['revealed', 'Revealed']]);
+    expect(select('Tera')).toHaveValue('auto');
+    await userEvent.selectOptions(select('Tera'), 'revealed');
+    expect(search.onPrefsChange).toHaveBeenLastCalledWith({ ...prefs, tera: 'revealed' });
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('a format without Tera draws no row', async () => {
+    await openMenu({ showTera: false });
+    expect(screen.queryByText('Tera')).toBeNull();
+    expect(screen.getByText('Depth')).toBeInTheDocument();
+  });
+
+  test('another engine still gets the row, since the request carries the Tera setting, and no Depth', async () => {
+    await openMenu({ external: true });
+    expect(select('Tera')).toBeEnabled();
+    expect(screen.queryByText('Depth')).toBeNull();
+  });
+
+  test('the row locks while a search runs', async () => {
+    await openMenu({ running: true });
+    expect(select('Tera')).toBeDisabled();
+  });
+});
+
+describe('the Engine select in the Setup menu', () => {
+  const bot: EngineEntry = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' };
+  const choice = (selected: EngineEntry, engines: EngineEntry[] = [BUILTIN_ENGINE, bot]) => ({ engines, selected, select: vi.fn() });
+  const engineSelect = () => screen.getByRole('combobox', { name: 'Engine' });
+  const rowNames = () => [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')].map(row => row.firstChild?.textContent?.trim());
+
+  test('the built-in engine alone leaves no row, so the menu has no dead select', async () => {
+    await openMenu({ engines: choice(BUILTIN_ENGINE, [BUILTIN_ENGINE]) });
+    expect(screen.queryByRole('combobox', { name: 'Engine' })).toBeNull();
+    expect(rowNames()).toEqual(['Depth', 'Samples', 'Tera']);
+  });
+
+  test('a second engine adds the row above Depth; a pick reaches the handler and keeps the menu open', async () => {
+    const engines = choice(BUILTIN_ENGINE);
+    await openMenu({ engines });
+    expect(rowNames()).toEqual(['Engine', 'Depth', 'Samples', 'Tera']);
+    expect(engineSelect()).toHaveValue('ps-dashboard');
+    expect([...engineSelect().querySelectorAll('option')].map(option => option.textContent)).toEqual(['PS Dashboard', 'My bot']);
+    await userEvent.selectOptions(engineSelect(), bot.id);
+    expect(engines.select).toHaveBeenCalledWith(bot.id);
+    expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('an added engine keeps the row, so the user can return, and the title names the engine in use', async () => {
+    await openMenu({ external: true, engines: choice(bot) });
+    expect(engineSelect()).toHaveValue(bot.id);
+    expect(engineSelect().closest('label')).toHaveAttribute('title', expect.stringContaining('Estimate from My bot.'));
+    expect(rowNames()).toEqual(['Engine', 'Tera']);
+  });
+
+  test('the built-in engine in the title says it plays the turns in the simulator', async () => {
+    await openMenu({ engines: choice(BUILTIN_ENGINE) });
+    expect(engineSelect().closest('label')).toHaveAttribute(
+      'title',
+      expect.stringContaining("Which engine evaluates: the dashboard's own search or another one (ENGINES.md). Built-in engine: it plays the turns in the simulator."),
+    );
+  });
+
+  test('the row locks while a search runs', async () => {
+    await openMenu({ running: true, engines: choice(BUILTIN_ENGINE) });
+    expect(engineSelect()).toBeDisabled();
   });
 });

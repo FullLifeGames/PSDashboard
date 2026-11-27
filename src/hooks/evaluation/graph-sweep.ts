@@ -46,6 +46,7 @@ export interface EvalGraphState {
   replacements?: (ReplacementEvalData[] | null)[];
   /** p1-view score with the biggest roll's die turned over; null = no named roll or no copy, absent = no full sweep. */
   rollFlip?: RollFlip | null;
+  gameSwept?: boolean;
   /** Why the line is short, when it is: the single pass reached only part of the game (a diverging reconstruction). */
   notice: string | null;
   running: boolean;
@@ -54,7 +55,7 @@ export interface EvalGraphState {
   stopped?: { done: number; total: number } | null;
 }
 
-export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements' | 'rollFlip'>;
+export type GraphData = Pick<EvalGraphState, 'scores' | 'results' | 'settings' | 'faintedFractions' | 'played' | 'playedOutcome' | 'verified' | 'sensitivity' | 'evalErrors' | 'lead' | 'replacements' | 'rollFlip' | 'gameSwept'>;
 
 const emptyGraphState = (): EvalGraphState => ({
   scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], lead: null, replacements: [],
@@ -217,7 +218,7 @@ export function useGraphState() {
     const trimmed = <D extends GraphData>(data: D): D => ({
       ...data, scores: kept(data.scores), results: kept(data.results), settings: kept(data.settings), faintedFractions: kept(data.faintedFractions),
       played: kept(data.played), playedOutcome: kept(data.playedOutcome), verified: kept(data.verified), sensitivity: kept(data.sensitivity),
-      evalErrors: kept(data.evalErrors), replacements: kept(data.replacements ?? []), rollFlip: null,
+      evalErrors: kept(data.evalErrors), replacements: kept(data.replacements ?? []), rollFlip: null, gameSwept: false,
     });
     if (graphDataRef.current) graphDataRef.current = trimmed(graphDataRef.current);
     setGraph(prev => (prev.running ? prev : trimmed(prev)));
@@ -244,12 +245,14 @@ export function useGraphSweepRunner(env: {
     const from = Math.max(1, params.from ?? 1);
     const to = Math.min(params.turns, params.to ?? params.turns);
     const data = buildSweepData(params, graphDataRef.current);
+    const previous = graphDataRef.current;
+    const gameSwept = (from === 1 && to === params.turns) || (previous?.gameSwept === true && previous.scores.length === params.turns);
     const snapshot = () => {
       const out = {
         scores: [...data.scores], results: [...data.results], settings: [...data.turnSettings],
         faintedFractions: [...data.faintedFractions], played: [...data.played],
         playedOutcome: [...data.playedOutcome], verified: [...data.verified], sensitivity: [...data.sensitivity],
-        evalErrors: [...data.evalErrors], lead: data.lead, replacements: [...data.replacements], rollFlip: data.rollFlip,
+        evalErrors: [...data.evalErrors], lead: data.lead, replacements: [...data.replacements], rollFlip: data.rollFlip, gameSwept,
         notice: data.notice,
       };
       graphDataRef.current = out;

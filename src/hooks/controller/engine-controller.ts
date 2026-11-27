@@ -75,7 +75,7 @@ function useEvalViewLayer(
   acquireLayer: ReturnType<typeof useAcquireLayer>,
 ) {
   const { replayData, snapshots } = ctx.replay;
-  const { branching, executing, history } = ctx.branch;
+  const { branching, executing, history, simState } = ctx.branch;
   const { evaluation, teamSources } = ctx;
   const { replayGameType, evalIsDoubles, bringOnlyLists, bringWorlds } = ctx.meta;
   const { setsFingerprint, sensitivityTargetsFor, editedP1Info, editedP2Info } = ctx.knowledge;
@@ -91,7 +91,7 @@ function useEvalViewLayer(
     replayData, snapshots, evaluation, replayGameType, evalIsDoubles,
     viewTurn, viewLine, viewingVariation, liveTip, liveEvalView, evalViewKey, serializedAtView,
     liveEvalStatus: board.liveEvalStatus, tip, tipEvalStatus: board.tipEvalStatus, analysisTurn, analyzableTurns, branching, executing, branchPreparing,
-    playOutActive: playOut?.active ?? false, smogonPending,
+    playOutActive: playOut?.active ?? false, replacementPending: !!simState && (simState.p1ForceSwitch || simState.p2ForceSwitch), smogonPending,
     acquire: {
       acquireBranchPosition: acquire.acquireBranchPosition,
       acquireReplayPosition: acquire.acquireReplayPosition,

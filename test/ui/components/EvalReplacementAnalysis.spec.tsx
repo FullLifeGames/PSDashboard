@@ -85,7 +85,7 @@ describe('the replacement note on the turn card', () => {
   };
   const props = (graph: ReturnType<typeof evalGraph>, extra: Record<string, unknown> = {}) => ({
     status: 'done', result: null, error: null, progress: null, prefs: { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' },
-    onPrefsChange: () => {}, onCancel: () => {}, showAuto: false, showTera: true, graph, currentTurn: 2, analysis: turnAnalysis(2),
+    onPrefsChange: () => {}, onCancel: () => {}, showAuto: false, graph, currentTurn: 2, analysis: turnAnalysis(2),
     playerNames: names, analysisTurn: 2, graphMaxTurn: 3, onAnalyzeGame: () => {}, ...extra,
   }) as unknown as Parameters<typeof EvalPanel>[0];
   const data = record({ turn: 1, result: resultOf([rankedChoice('switch 4', '→ A', 0.5), rankedChoice('switch 2', '→ B', 0.2)], WAIT), played: { p1: ['B'], p2: [] } });

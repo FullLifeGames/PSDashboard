@@ -6,10 +6,6 @@ const LABEL_STYLE = { display: 'flex', alignItems: 'center', gap: 4, fontSize: 1
 
 interface EngineControlsProps {
   engines: EngineEntry[];
-  selected: EngineEntry;
-  running: boolean;
-  note?: string;
-  onSelect: (id: string) => void;
   onAdd: (name: string, url: string) => void;
   onRemove: (id: string) => void;
 }
@@ -58,18 +54,10 @@ function AddEngineDialog({ engines, onAdd, onRemove, onClose }: Pick<EngineContr
   );
 }
 
-export function EngineControls({ engines, selected, running, note, onSelect, onAdd, onRemove }: EngineControlsProps) {
+export function EngineControls({ engines, onAdd, onRemove }: EngineControlsProps) {
   const [adding, setAdding] = useState(false);
   return (
     <>
-      {engines.length > 1 && (
-        <label style={LABEL_STYLE} title={`Which engine evaluates: the dashboard's own search or another one (ENGINES.md).${note ? ` ${note}` : ''}`}>
-          Engine
-          <select aria-label="Engine" value={selected.id} disabled={running} onChange={event => onSelect(event.target.value)}>
-            {engines.map(engine => <option key={engine.id} value={engine.id}>{engine.name}</option>)}
-          </select>
-        </label>
-      )}
       <button type="button" className="ps-support-link" style={{ fontSize: 10 }} onClick={() => setAdding(true)}>+ engine</button>
       {adding && <AddEngineDialog engines={engines} onAdd={onAdd} onRemove={onRemove} onClose={() => setAdding(false)} />}
     </>

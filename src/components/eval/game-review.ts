@@ -1,7 +1,7 @@
-import { lostGround, replacementWords, winDeltaText, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
+import { lostGround, replacementWords, winPctText, type EvalLine, type EvalResult, type SideAnalysis, type TurnAnalysis, type VerdictTier } from '@fulllifegames/eval-engine';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
 import { activeNamesAt, lineBlocks, ranksOf, type LineBlockView, type LineReply, type LinesHost } from '../../lib/line-view';
-import { cardLines, engineChoice, neverActedOf, neverActedText, regretView, rowValueTexts } from './turn-copy';
+import { cardLines, engineChoice, neverActedOf, neverActedText, inaccuracyView, regretView, rowValueTexts } from './turn-copy';
 
 
 type Side = 'p1' | 'p2';
@@ -106,7 +106,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
   const name = args.playerNames[SIDE_INDEX[side]];
   const played = sideAnalysis.played!;
   const engine = engineChoice(sideAnalysis)!;
-  const loss = regretView(name, sideAnalysis, sideAnalysis.regret ?? 0);
+  const loss = grade === 'inaccuracy' ? inaccuracyView(sideAnalysis) : regretView(name, sideAnalysis, sideAnalysis.regret ?? 0);
   const share = sideAnalysis.faintedFraction;
   return {
     key: `${analysis.turn}-${side}`, turn: analysis.turn, side, grade,
@@ -114,7 +114,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
     playedText: sideAnalysis.neverActed ? neverActedText(sideAnalysis) : `played ${played.label} ${winPctText(played.ev, share)}`,
     engine: `${engine.label} ${winPctText(engine.value, share)}`,
     engineWord: engine.word,
-    loss: grade === 'inaccuracy' ? winDeltaText(-(sideAnalysis.regret ?? 0)) : loss.text,
+    loss: loss.text,
     lossTitle: loss.title,
     lines: rowLines(args, analysis, side),
   };

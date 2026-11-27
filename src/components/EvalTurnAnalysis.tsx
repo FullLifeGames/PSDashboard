@@ -11,7 +11,7 @@ import { MatrixDialogButton } from './eval/MatrixDialog';
 import { WinPathsEntry } from './eval/WinPathsEntry';
 import type { LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
-import { evTitle } from './eval/turn-copy';
+import { evTitle, leadGradeSize } from './eval/turn-copy';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 export { MiniBar } from './eval/analysis-bits';
@@ -142,12 +142,12 @@ function LeadGrade({ side }: { side: LeadSideAnalysis }) {
     <>
       {bad && side.best && (
         <span style={{ color: tier === 'blunder' ? '#ff7a7a' : '#f3a6a6' }}>
-          {tier} · {winDeltaText(-(side.regret ?? 0))} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
+          {tier} · {leadGradeSize(side)} · better: {stripLead(side.best.label)} ({winPctText(side.best.ev)})
         </span>
       )}
       {tier === 'inaccuracy' && side.best && (
         <span style={{ color: '#b6a46a' }}>
-          · inaccuracy ({winDeltaText(-(side.regret ?? 0))}): {stripLead(side.best.label)} was a touch better
+          · inaccuracy ({leadGradeSize(side)}): {stripLead(side.best.label)} was a touch better
         </span>
       )}
     </>

@@ -12,7 +12,7 @@ const hintTitle = (mode: string) => `Analyze game makes a quick depth-1 pass ove
 const headingTitle = () => screen.getByText('Game graph').getAttribute('title');
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 const emptyGraph = () => evalGraph('singles', {
-  scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [],
+  scores: [], results: [], settings: [], faintedFractions: [], played: [], playedOutcome: [], verified: [], sensitivity: [], evalErrors: [], gameSwept: false,
 });
 
 function props(overrides: Partial<GameGraphSectionProps> = {}): GameGraphSectionProps {
@@ -48,11 +48,29 @@ describe('GameGraphSection', () => {
     expect(wired.onCancel).toHaveBeenCalledTimes(1);
     expect(headingTitle()).toBe(hintTitle('auto (matrix early, MCTS late)'));
 
-    rerender(<GameGraphSection {...wired} hasGraph smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
+    rerender(<GameGraphSection {...wired} hasGraph graph={evalGraph()} smogonPending prefs={{ ...prefs, mode: 'mcts' }} />);
     const analyze = screen.getByRole('button', { name: 'Re-analyze' });
     expect(analyze).toBeDisabled();
     expect(analyze).toHaveAttribute('title', expect.stringMatching(/^Waiting for Smogon data/));
     expect(headingTitle()).toBe(hintTitle('MCTS'));
+  });
+
+  test.each([['singles'], ['doubles']] as const)('%s: one analyzed turn keeps the header at Analyze game, a swept game reads Re-analyze', kind => {
+    const oneTurn = evalGraph(kind, { scores: [null, 0.2, null], results: [null, evalResult(kind), null], gameSwept: false });
+    const { rerender } = render(<GameGraphSection {...props({ graph: oneTurn })} />);
+    expect(screen.getByRole('button', { name: 'Analyze game' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Re-analyze' })).toBeNull();
+    expect(screen.getByRole('img', { name: /Evaluation over 3 turns/ })).toBeInTheDocument();
+    rerender(<GameGraphSection {...props({ graph: { ...oneTurn, gameSwept: true } })} />);
+    expect(screen.getByRole('button', { name: 'Re-analyze' })).toBeInTheDocument();
+  });
+
+  test('a running sweep names its progress only once it has one: no count before the first turn, the count after', () => {
+    const { rerender } = render(<GameGraphSection {...props({ graph: evalGraph('singles', { running: true, progress: null }) })} />);
+    expect(screen.getByText('analyzing…')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/turn 0\/\?|\/\?/);
+    rerender(<GameGraphSection {...props({ graph: evalGraph('singles', { running: true, progress: { done: 3, total: 12 } }) })} />);
+    expect(screen.getByText('analyzing… turn 3/12')).toBeInTheDocument();
   });
 
   test('a sweep that a single evaluation stopped says where it stopped and offers Analyze again', () => {

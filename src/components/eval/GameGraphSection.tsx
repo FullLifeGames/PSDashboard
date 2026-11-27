@@ -17,14 +17,13 @@ import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
 
-function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, hasGraph, title }: {
+function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, title }: {
   title: string;
   onAnalyzeGame?: () => void;
   graph: EvalGraphState;
   onCancel: () => void;
   running: boolean;
   smogonPending?: boolean;
-  hasGraph: boolean;
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: '#aabbcc' }}>
@@ -32,7 +31,7 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
       {onAnalyzeGame && (graph.running ? (
         <>
           <span style={{ color: '#fd6' }}>
-            analyzing… turn {graph.progress?.done ?? 0}/{graph.progress?.total ?? '?'}
+            analyzing…{graph.progress ? ` turn ${graph.progress.done}/${graph.progress.total}` : ''}
           </span>
           <button type="button" className="ps-btn" onClick={onCancel} style={{ padding: '1px 6px', fontSize: 10 }}>
             Cancel
@@ -50,7 +49,7 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, h
               : "Evaluate every turn of the game in the background; the line dips where the game swung. The selected turn's analysis, ranked choices, and matrix follow automatically."}
             style={{ padding: '1px 6px', fontSize: 10 }}
           >
-            {hasGraph ? 'Re-analyze' : 'Analyze game'}
+            {graph.gameSwept ? 'Re-analyze' : 'Analyze game'}
           </button>
           {graph.stopped && (
             <span role="status" style={{ color: '#e6b36a' }}>
@@ -236,7 +235,7 @@ export function GameGraphSection(props: GameGraphSectionProps) {
   } = props;
   return (
     <div style={{ margin: '6px 0' }}>
-      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} hasGraph={hasGraph} title={graphTitle(prefs, doubles)} />
+      <GraphHeader onAnalyzeGame={onAnalyzeGame} graph={graph} onCancel={onCancel} running={running} smogonPending={smogonPending} title={graphTitle(prefs, doubles)} />
       {graph.notice && (
         <div role="status" style={{ fontSize: 10, color: '#e6b36a', marginTop: 2, maxWidth: 520 }}>
           ⚠ {graph.notice}

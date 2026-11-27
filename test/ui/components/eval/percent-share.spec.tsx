@@ -48,7 +48,7 @@ describe('graph and panel read one number', () => {
   const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
   const base = () => ({
     playerNames: names, status: 'done' as const, progress: null, reconstructProgress: null, error: null, prefs,
-    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, showTera: true, report: null,
+    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, report: null,
   });
 
   test('the bar of the analyzed turn and that turn\'s graph tooltip show the same percent', () => {
@@ -88,7 +88,7 @@ describe('the rendered graph and the bar read one number', () => {
   const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
   const panel = (graph: ReturnType<typeof evalGraph>, turn: number) => ({
     playerNames: names, status: 'done' as const, progress: null, reconstructProgress: null, error: null, prefs,
-    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, showTera: true, report: null,
+    onPrefsChange: vi.fn(), onCancel: vi.fn(), showAuto: false, report: null,
     graph, result: graph.results[turn - 1], currentTurn: turn, analysisTurn: turn,
     analysis: turnAnalysis(turn, { faintedFraction: graph.faintedFractions[turn - 1] ?? undefined }),
   });

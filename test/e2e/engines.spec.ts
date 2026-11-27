@@ -5,7 +5,7 @@ test.beforeAll(installReplayEmbedCache);
 
 type Request = { protocol: string; options: { p1: { id: string; label: string }[]; p2: { id: string; label: string }[] }; state: string };
 
-test('an engine added by address evaluates the position, and the dropdown and the panel name it', async ({ page }) => {
+test('an engine added by address evaluates the position, and the Engine select in the Setup menu and the panel name it', async ({ page }) => {
   test.setTimeout(180_000);
   await routeOfflineFixtures(page);
   const asked: Request[] = [];
@@ -23,12 +23,15 @@ test('an engine added by address evaluates the position, and the dropdown and th
   await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
   await startVariationAt(page, 1);
 
+  await page.getByRole('button', { name: 'Setup' }).click();
   await expect(page.getByRole('combobox', { name: 'Engine' })).toHaveCount(0);
   await page.getByRole('button', { name: '+ engine' }).click();
   await page.getByRole('textbox', { name: 'Name' }).fill('Test engine');
   await page.getByRole('textbox', { name: 'Address' }).fill(new URL('/__test-engine/', page.url()).toString());
   await page.getByRole('button', { name: 'Add engine' }).click();
+  await page.getByRole('button', { name: 'Setup' }).click();
   await expect(page.getByRole('combobox', { name: 'Engine' })).toHaveValue(/__test-engine/);
+  await expect(page.locator('.ps-eval-controls').getByRole('combobox')).toHaveCount(0);
   await expect(page.locator('span[title="Estimate from Test engine."]')).toHaveText('Evaluation');
 
   await page.getByRole('button', { name: /^(Re-)?[Ee]valuate$/ }).click();
@@ -39,6 +42,7 @@ test('an engine added by address evaluates the position, and the dropdown and th
   const panel = page.locator('.ps-panel', { has: page.locator('span[title="Estimate from Test engine."]') });
   await expect(panel).toContainText(`1.${asked[0].options.p1[0].label}`);
 
+  await page.getByRole('button', { name: 'Setup' }).click();
   await page.getByRole('combobox', { name: 'Engine' }).selectOption('ps-dashboard');
   await expect(page.locator('span[title="Built-in engine: it plays the turns in the simulator."]')).toHaveText('Evaluation');
 });

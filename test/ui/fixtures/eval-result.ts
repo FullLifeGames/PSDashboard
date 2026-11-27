@@ -66,6 +66,7 @@ export function evalGraph(kind: FormatKind = 'singles', overrides: Partial<EvalG
     sensitivity: scores.map(() => null),
     evalErrors: scores.map(() => null),
     lead: null,
+    gameSwept: true,
     notice: null,
     running: false,
     progress: null,

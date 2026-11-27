@@ -1,6 +1,7 @@
 import type { EvalPreferences, EvalResult } from '@fulllifegames/eval-engine';
 import type { EvalStatus } from '../../hooks/useEvaluation';
 import type { EngineChoice } from '../../hooks/useEngineChoice';
+import { BUILTIN_ENGINE, engineNote } from '../../lib/engines/registry';
 import { EngineControls } from './EngineControls';
 
 interface PrefsProps {
@@ -10,27 +11,6 @@ interface PrefsProps {
 }
 
 const LABEL_STYLE = { display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#aabbcc' } as const;
-
-function TeraSelect({ prefs, onPrefsChange, running }: PrefsProps) {
-  return (
-    <label
-      title="Auto: off when the game never terastallized; in draft/custom formats only the Pokémon that terastallized keep the option. Revealed: force that per-Pokémon restriction for any format."
-      style={LABEL_STYLE}
-    >
-      Tera
-      <select
-        value={prefs.tera}
-        onChange={event => onPrefsChange({ ...prefs, tera: event.target.value as EvalPreferences['tera'] })}
-        disabled={running}
-      >
-        <option value="auto">Auto</option>
-        <option value="on">On</option>
-        <option value="off">Off</option>
-        <option value="revealed">Revealed</option>
-      </select>
-    </label>
-  );
-}
 
 function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
   running: boolean;
@@ -50,34 +30,33 @@ function EvaluateButton({ running, onEvaluate, onCancel, result, status }: {
   );
 }
 
-export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
+export function EvalControls({ prefs, onPrefsChange, running, showAuto, onEvaluate, onCancel, result, status, engines }: PrefsProps & {
   showAuto: boolean;
   engines?: EngineChoice;
-  showTera: boolean;
   onEvaluate?: () => void;
   onCancel: () => void;
   result: EvalResult | null;
   status: EvalStatus;
 }) {
-  const external = !!engines && engines.selected.source !== 'builtin';
-  const engineNote = external ? `Estimate from ${engines.selected.name}.` : 'Built-in engine: it plays the turns in the simulator.';
   return (
     <div className="ps-eval-controls">
-      <span className="ps-eval-controls-title" title={engineNote}>Evaluation</span>
-      {engines && <EngineControls engines={engines.engines} selected={engines.selected} running={running} note={engineNote} onSelect={engines.select} onAdd={engines.add} onRemove={engines.remove} />}
-      {showTera && <TeraSelect prefs={prefs} onPrefsChange={onPrefsChange} running={running} />}
+      <span className="ps-eval-controls-title" title={engineNote(engines?.selected ?? BUILTIN_ENGINE)}>Evaluation</span>
+      {engines && <EngineControls engines={engines.engines} onAdd={engines.add} onRemove={engines.remove} />}
       {showAuto && (
-        <label style={LABEL_STYLE}>
+        <label
+          title="After your first Evaluate in a variation, each position you play or step to evaluates by itself. The engine walk and Play line switch this on. Stays on across sessions."
+          style={LABEL_STYLE}
+        >
           <input
             type="checkbox"
             checked={prefs.auto}
             onChange={event => onPrefsChange({ ...prefs, auto: event.target.checked })}
           />
-          Auto
+          Follow
         </label>
       )}
       <label
-        title="Evaluation as a companion: Analyze game starts by itself when a replay loads, and new variation positions evaluate without the Evaluate button. Stays on across sessions."
+        title="Analyze game starts by itself when a replay loads, and the newest position of a variation evaluates without a click. Stays on across sessions."
         style={LABEL_STYLE}
       >
         <input
@@ -85,7 +64,7 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, showTera
           checked={prefs.autoAnalyze}
           onChange={event => onPrefsChange({ ...prefs, autoAnalyze: event.target.checked })}
         />
-        Always on
+        On load
       </label>
       {onEvaluate && <EvaluateButton running={running} onEvaluate={onEvaluate} onCancel={onCancel} result={result} status={status} />}
     </div>
