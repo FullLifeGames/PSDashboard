@@ -21,7 +21,7 @@ const ROWS: Record<FixtureId, Row> = {
   'smogtours-gen6ou-653785': { plays: 194, log: '14309:-1595011329', records: '2168:818953523' },
   'smogtours-gen6ou-655336': { plays: 92, log: '14086:452960982', records: '2341:-2010242956' },
   'gen9championsou-2628340185': { plays: 171, log: '13124:-552174195', records: '2080:887372144' },
-  'smogtours-gen9doublesou-912045': { plays: 94, log: '11258:2102416859', records: '863:-177670543' },
+  'smogtours-gen9doublesou-912045': { plays: 68, log: '11907:-130188070', records: '949:-3176020' },
   'gen9doublesou-2663093831': { plays: 101, log: '15815:-827094750', records: '1213:-1283217296' },
   'gen9vgc2026regi-2630685175': { plays: 79, log: '12129:1170636370', records: '866:495371160' },
   'gen9vgc2026regi-2629703929': { plays: 34, log: '8039:-1875511929', records: '1036:-1509701834' },
