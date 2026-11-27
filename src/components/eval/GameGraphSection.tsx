@@ -104,16 +104,18 @@ interface TurnViewProps {
 const backToMainTitle = (): string =>
   `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
 
+const showHead = (box: HTMLElement | null) => box?.querySelector('.ps-eval-analysis-row')?.scrollIntoView({ block: 'nearest' });
+
 function useRevealCard(shown: number | null) {
   const ref = useRef<HTMLDivElement>(null);
   const wanted = useRef<number | null>(null);
   useEffect(() => {
     if (wanted.current === null || wanted.current !== shown) return;
     wanted.current = null;
-    ref.current?.scrollIntoView({ block: 'nearest' });
+    showHead(ref.current);
   }, [shown]);
   const request = (turn: number) => {
-    if (turn === shown) ref.current?.scrollIntoView({ block: 'nearest' });
+    if (turn === shown) showHead(ref.current);
     else wanted.current = turn;
   };
   return [ref, request] as const;

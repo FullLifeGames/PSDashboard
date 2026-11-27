@@ -80,6 +80,7 @@ for (const game of GAMES) {
     await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     await panel.getByRole('button', { name: 'Analyze game' }).click();
     await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
+    await review.getByRole('button', { name: /Game review/ }).click();
     await review.getByRole('button', { name: /^Endgame · T\d+/ }).click();
     await expect(win.locator('[data-step]')).toHaveCount(3, { timeout: 30_000 });
     expect(await win.locator('.ps-winpaths-step-title').allTextContents(), 'the reload shows the stored paths').toEqual(titles);

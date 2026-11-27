@@ -63,7 +63,7 @@ for (const game of GAMES) {
     const first = rows[0];
     await review.locator('.ps-eval-review-row').first().getByRole('button', { name: `T${first.turn}` }).click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${first.turn}`, { timeout: 30_000 });
-    await expect(panel.locator('.ps-eval-analysis')).toBeInViewport();
+    await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
     await expect(panel.locator('.ps-eval-graph [data-review-mark]')).toHaveCount(rows.length);
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
     await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${first.turn}`);
@@ -71,7 +71,7 @@ for (const game of GAMES) {
     if (second) {
       await review.getByRole('button', { name: `T${second.turn}`, exact: true }).first().click();
       await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${second.turn}`, { timeout: 30_000 });
-      await expect(panel.locator('.ps-eval-analysis')).toBeInViewport();
+      await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
       await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${second.turn}`);
       await expect(fold).toHaveAttribute('aria-expanded', 'true');
     }
@@ -180,7 +180,7 @@ test('VGC at 390 px: three review rows show their cards in view, the review stay
   for (const turn of turns) {
     await review.getByRole('button', { name: `T${turn}`, exact: true }).first().click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 30_000 });
-    await expect(panel.locator('.ps-eval-analysis')).toBeInViewport();
+    await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
     await expect(review).toBeVisible();
     await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${turn}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow').toBe(true);

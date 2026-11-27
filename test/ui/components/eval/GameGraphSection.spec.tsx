@@ -256,7 +256,7 @@ describe('GameGraphSection.review', () => {
         const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
         onTestFinished(() => scroll.mockRestore());
         const wired = turnView(4);
-        const { container, rerender } = render(<GameGraphSection {...wired} />);
+        const { rerender } = render(<GameGraphSection {...wired} />);
         await userEvent.click(screen.getByRole('button', { name: /Game review/ }));
         await userEvent.click(screen.getByRole('button', { name: 'T7' }));
         expect(wired.selectTurn).toHaveBeenCalledWith(7);
@@ -264,7 +264,7 @@ describe('GameGraphSection.review', () => {
         rerender(<GameGraphSection {...turnView(7, { selectTurn: wired.selectTurn })} />);
         expect(scroll).toHaveBeenCalledTimes(1);
         expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
-        expect((scroll.mock.contexts[0] as Element).contains(container.querySelector('.ps-eval-analysis'))).toBe(true);
+        expect((scroll.mock.contexts[0] as Element).matches('.ps-eval-analysis > .ps-eval-analysis-row')).toBe(true);
         rerender(<GameGraphSection {...turnView(9, { selectTurn: wired.selectTurn })} />);
         expect(scroll).toHaveBeenCalledTimes(1);
       });
