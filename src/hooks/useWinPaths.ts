@@ -7,7 +7,7 @@ import { endgameTurns, loserOf, offeredTurns } from '../lib/endgame-scope';
 import { winPathsRequest } from '../lib/win-paths-request';
 import { loadStoredWinPaths, saveStoredWinPaths, winPathsStoreKey } from '../lib/eval-cache-store';
 import { turnCacheKey } from './useEvalView';
-import type { WinPathsFrom, WinPathsHost, WinPathsRun } from '../lib/win-paths-host';
+import type { WinPathsFrom, WinPathsHost, WinPathsQuestion, WinPathsRun, WinPathsSide } from '../lib/win-paths-host';
 
 interface Held { replayId: string; call: number; run: WinPathsRun }
 
@@ -86,25 +86,30 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
     setHeld(null);
   }, []);
 
-  const show = useCallback((turn: number, from: WinPathsFrom) => {
-    if (!offered) return;
+  const proofAt = useCallback((turn: number) => {
+    const forced = graph.results[turn - 1]?.forcedWin;
+    return forced ? { side: forced.side, turns: forced.turns } : null;
+  }, [graph.results]);
+
+  const show = useCallback((turn: number, from: WinPathsFrom, question: WinPathsQuestion = 'lost') => {
+    const side = question === 'proof' ? proofAt(turn)?.side : offered?.loser;
+    if (!side) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     const call = ++calls.current;
-    const { loser: side } = offered;
     const update = (change: (run: WinPathsRun) => WinPathsRun) => setHeld(current => (current && current.call === call ? { ...current, run: change(current.run) } : current));
-    setHeld({ replayId, call, run: { turn, side, steps: [], status: 'positioning', from } });
+    setHeld({ replayId, call, run: { turn, side, steps: [], status: 'positioning', from, question } });
     const request = winPathsRequest({
       side, turn, result: graph.results[turn - 1], analysis: analyses?.[turn - 1],
-      tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset,
+      tera: effectiveTera, sleepClause: effectiveSleepClause, ruleset: effectiveRuleset, proof: question === 'proof',
     });
     const key = winPathsStoreKey(turnCacheKey(replayId, turn, snapshots.length, setsFingerprint), effectiveRuleset, request);
     void answer(key, request, effectiveRuleset, { controller, update, client: () => (clientRef.current ??= new EvalWorkerClient()), position: makeReplayAcquire(turn) });
-  }, [offered, replayId, snapshots.length, setsFingerprint, graph.results, analyses, effectiveTera, effectiveSleepClause, effectiveRuleset, makeReplayAcquire]);
+  }, [offered, proofAt, replayId, snapshots.length, setsFingerprint, graph.results, analyses, effectiveTera, effectiveSleepClause, effectiveRuleset, makeReplayAcquire]);
 
-  const playedLabel = useCallback((turn: number) => (offered ? analyses?.[turn - 1]?.[offered.loser].played?.label ?? null : null), [offered, analyses]);
-  const playedNeverActed = useCallback((turn: number) => (offered ? analyses?.[turn - 1]?.[offered.loser].neverActed === true : false), [offered, analyses]);
+  const playedLabel = useCallback((turn: number, side: WinPathsSide) => analyses?.[turn - 1]?.[side].played?.label ?? null, [analyses]);
+  const playedNeverActed = useCallback((turn: number, side: WinPathsSide) => analyses?.[turn - 1]?.[side].neverActed === true, [analyses]);
   const run = held && held.replayId === replayId ? held.run : null;
-  return useMemo(() => ({ endgame, offered, run, unavailable, playedLabel, playedNeverActed, show, hide }), [endgame, offered, run, unavailable, playedLabel, playedNeverActed, show, hide]);
+  return useMemo(() => ({ endgame, offered, run, unavailable, proofAt, playedLabel, playedNeverActed, show, hide }), [endgame, offered, run, unavailable, proofAt, playedLabel, playedNeverActed, show, hide]);
 }

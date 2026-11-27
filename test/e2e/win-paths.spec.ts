@@ -100,3 +100,38 @@ for (const game of GAMES) {
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
   });
 }
+
+const PROOF_GAMES = [
+  { kind: 'singles (Gen 6 OU 649664), turn 24', replay: GAMES[0].replay, turn: 24 },
+  { kind: 'VGC 2629703929 (doubles), turn 13', replay: GAMES[2].replay, turn: 13 },
+];
+
+for (const game of PROOF_GAMES) {
+  test(`${game.kind}: the card's "How does X win from here?" shows the proof's line, and ▶ Play plays it to the win`, async ({ page }) => {
+    test.setTimeout(900_000);
+    const replay = game.replay();
+    const { guard } = await openReplayAnalysis(page, replay, SETTINGS, { seed: evalStoreFileName(replay.id, SETTINGS) });
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.getByRole('button', { name: 'Analyze game' }).click();
+    await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
+    await panel.locator(`svg rect[data-turn="${game.turn}"]`).first().click({ force: true });
+    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${game.turn}`, { timeout: 60_000 });
+
+    const toggle = panel.getByRole('button', { name: /^How does .+ win from here\?$/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const player = /How does (.+) win from here\?/.exec(await toggle.innerText())![1];
+    await toggle.click();
+    const win = panel.getByRole('region', { name: `How does ${player} win?` });
+    await guard.race(expect(win.locator('[data-step]')).toHaveCount(1, { timeout: 60_000 }));
+    await expect(win.locator('.ps-winpaths-step-title')).toHaveText('The proof\'s line');
+    await expect(win.locator('.ps-winpaths-headline')).toContainText(/ wins within \d+ turns? in \d+(\.\d)? % of the dice whatever .+ plays/);
+    await expect(win.getByRole('group', { name: 'Endgame turn' })).toHaveCount(0);
+    guard.assertClean();
+    guard.pause();
+
+    await win.getByRole('button', { name: '▶ Play' }).click();
+    await expect(variationPanel(page)).toContainText(/\d+ turns?/, { timeout: 240_000 });
+    await expect(page.locator('.ps-branch-ended').first()).toContainText(`${player} wins this variation.`, { timeout: 120_000 });
+  });
+}
+
