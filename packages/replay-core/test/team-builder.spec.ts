@@ -410,6 +410,37 @@ describe('a Throat Spray the log never showed is not built', () => {
   });
 });
 
+describe('a White Herb the log never showed is not built', () => {
+  const stats: SmogonUsageStats = {
+    format: 'gen9test', month: '2026-06', source: 'test',
+    pokemon: {
+      gholdengo: {
+        species: 'Gholdengo', rawCount: 100, abilities: [], moves: [], spreads: [],
+        items: [{ value: 'White Herb', probability: 0.6, sourceDetail: 'test' }, { value: 'Assault Vest', probability: 0.3, sourceDetail: 'test' }],
+      },
+    },
+  };
+  const makeItRain = (kind: 'singles' | 'doubles') => {
+    const doubles = kind === 'doubles';
+    return [
+      `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Blissey, F|', '|poke|p2|Gholdengo|', '|start',
+      '|switch|p1a: Blissey|Blissey, F|100/100', ...(doubles ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+      '|switch|p2a: Gholdengo|Gholdengo|100/100', ...(doubles ? ['|switch|p2b: Chansey|Chansey, F|100/100'] : []), '|turn|1',
+      '|move|p2a: Gholdengo|Make It Rain|p1a: Blissey', '|-damage|p1a: Blissey|70/100', ...(doubles ? ['|-damage|p1b: Chansey|70/100'] : []), '|-unboost|p2a: Gholdengo|spa|1',
+      '|move|p1a: Blissey|Soft-Boiled|p1a: Blissey', '|-heal|p1a: Blissey|100/100|[from] move: Soft-Boiled', '|turn|2',
+    ].join('\n');
+  };
+  const gholdengo = (log: string) => buildTeamsFromReplay(log, { usageStats: stats }).p2Team.find(set => set.species === 'Gholdengo');
+
+  test('singles: Make It Rain lowered Special Attack and no White Herb line followed', () => {
+    expect(gholdengo(makeItRain('singles'))?.item).toBe('Assault Vest');
+  });
+
+  test('doubles: Make It Rain lowered Special Attack and no White Herb line followed', () => {
+    expect(gholdengo(makeItRain('doubles'))?.item).toBe('Assault Vest');
+  });
+});
+
 describe('a Protective Pads the log tells is built', () => {
   const helmetLines = (kind: 'singles' | 'doubles') => {
     const doubles = kind === 'doubles';
