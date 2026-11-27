@@ -55,7 +55,7 @@ function DepthRows({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, '
   const samplesId = useId();
   return (
     <>
-      <label className="ps-setup-row" htmlFor={depthId}>
+      <label className="ps-setup-row" htmlFor={depthId} title={autoTitle(readSearchBudget())}>
         Depth
         <select
           id={depthId}
@@ -67,7 +67,6 @@ function DepthRows({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, '
             else onPrefsChange({ ...prefs, mode: 'matrix', depth: parseInt(value, 10) as EvalPreferences['depth'] });
           }}
           disabled={running}
-          title={autoTitle(readSearchBudget())}
         >
           <option value="1">1</option>
           <option value="2">2</option>

@@ -192,7 +192,7 @@ describe('Depth and Samples in the Setup menu', () => {
     localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=8,iterations=1200,singles-tree-from=0.5,doubles-tree-from=0.25,doubles-early-samples=5');
     onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
     await openMenu({ prefs: { ...prefs, mode: 'auto' } });
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
+    expect(screen.getByText('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
   });
 
   test('both selects lock while a search runs, and a pick keeps the menu open', async () => {
@@ -254,6 +254,20 @@ describe('Tera in the Setup menu', () => {
   test('the row locks while a search runs', async () => {
     await openMenu({ running: true });
     expect(select('Tera')).toBeDisabled();
+  });
+});
+
+describe('the titles of the search rows', () => {
+  const bot: EngineEntry = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' };
+
+  test('each row carries its title on its label and no select carries one, so the hover reads the same across the row', async () => {
+    await openMenu({ engines: { engines: [BUILTIN_ENGINE, bot], selected: BUILTIN_ENGINE, select: vi.fn() } });
+    const rows = [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')];
+    expect(rows.map(row => row.firstChild?.textContent?.trim())).toEqual(['Engine', 'Depth', 'Samples', 'Tera']);
+    for (const row of rows) {
+      expect(row).toHaveAttribute('title', expect.stringMatching(/\S/));
+      expect(row.querySelector('select')).not.toHaveAttribute('title');
+    }
   });
 });
 
