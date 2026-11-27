@@ -23,6 +23,8 @@ export interface WinPathsRequest {
   sleepClause?: boolean;
   ruleset?: StaticRuleset;
   budget?: Partial<WinBudget>;
+  /** Proof mode: the stronger step alone, trying `choice` (a sure strike the search's list lacks) first. */
+  proof?: { choice?: string };
   /** The chance below which a luck path is not searched (default 1 in 1,000). */
   floor?: number;
 }
