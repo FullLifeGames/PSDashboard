@@ -113,6 +113,24 @@ describe('gameReview, singles', () => {
     expect(row.engine).toBe(`Hydro Pump ${winPctText(0.1)}`);
   });
 
+  test.each([
+    ['Doubles OU 2663093831 t7', 'fell', 'Orthworm', 'Protect', 'Iron Defense + Protect', 'Orthworm was knocked out before it moved, so the log shows no choice'],
+    ['Champions VGC 2682637901 t6', 'ended', 'Volcarona', 'Aqua Jet', 'Quiver Dance + Aqua Jet', 'Volcarona was cut off by the end of the game, so the log shows no choice'],
+  ] as const)('%s: a doubles row names the move that was played and why the other slot shows none (%s)', (_scene, reason, name, moved, filled, words) => {
+    const pair = rankedChoice('move 1, move 2', filled, -0.24);
+    const best = rankedChoice('move 3, move 4', 'Fake Out → Rillaboom + Spore → Tornadus', 0.1);
+    const side: SideAnalysis = {
+      playedRaw: null, playedSlots: [null, { kind: 'move', name: moved }], played: pair, best, safe: best, regret: 0.34, tier: 'mistake',
+      playedPartial: true, noChoiceSlots: [{ slot: 0, reason }],
+    };
+    const slotted = { rules: host.rules, snapshot: { p1: { pokemon: [{ name, isActive: true, slot: 0 }, { name: 'Partner', isActive: true, slot: 1 }] }, p2: { pokemon: [] } } } as unknown as LinesHost;
+    const rows = (target: LinesHost) => gameReview({ analyses: [turnAnalysis(7, { p1: side })], results: [null], playerNames: DOUBLES_NAMES, doubles: true, host: target })[0].rows;
+    expect(rows(slotted)[0].playedText).toBe(`played ${moved} ${winPctText(-0.24)} · ${words}`);
+    expect(rows(host)[0].playedText).toBe(`played ${moved} ${winPctText(-0.24)} · ${words.replace(name, 'Slot A')}`);
+    expect(rows(slotted)[0].playedText).not.toContain(filled);
+    expect(rows(slotted)[0].engine).toBe(`Fake Out → Rillaboom + Spore → Tornadus ${winPctText(0.1)}`);
+  });
+
   test('the lines of the row: the engine\'s line and the played line, each with its own text and block', () => {
     const lines = view[1].rows[0].lines;
     expect(lines.map(line => line.role)).toEqual(['engine', 'played']);

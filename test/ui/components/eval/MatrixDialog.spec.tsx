@@ -129,6 +129,21 @@ describe('MatrixDialogButton', () => {
     expect(screen.queryByTitle(/worst reply to Bob's/)).toBeNull();
   });
 
+  test.each([
+    ['Doubles OU 2663093831 t7', 'fell'],
+    ['Champions VGC 2682637901 t6', 'ended'],
+  ] as const)('%s: a doubles side with a slot that showed no choice has no played row and no worst cell, and the other side keeps both (%s)', async (_scene, reason) => {
+    const { result, analysis } = doubles();
+    const patched: TurnAnalysis = { ...analysis, p1: { ...analysis.p1, noChoiceSlots: [{ slot: 0, reason }] } };
+    renderButton({ result, analysis: patched });
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    const table = screen.getByRole('table');
+    expect(headerOf(table, 'Fake Out → Rillaboom 5 + Spore → Tornadus 5')).not.toHaveTextContent(/played/);
+    expect(headerOf(table, 'Tailwind 9 + Grassy Glide → Incineroar 9')).toHaveTextContent(/played/);
+    expect(within(table).queryAllByText('played')).toHaveLength(1);
+    expect(within(table).getAllByText(/worst/)).toHaveLength(1);
+  });
+
   test('a played pair that is also the engine pair, and a cell that is worst for both, mark once each', async () => {
     const result = evalResult('singles');
     const [earthquake] = result.perSide.p1;

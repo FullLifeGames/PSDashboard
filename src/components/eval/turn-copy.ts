@@ -1,4 +1,4 @@
-import { regretText, TIER_THRESHOLDS, type EvalLine, type LeadSideAnalysis, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 
@@ -26,28 +26,40 @@ function playedRawLabel(side: SideAnalysis): string | undefined {
     : side.playedRaw?.name;
 }
 
-function playedSlotsLabel(side: SideAnalysis): string | undefined {
+export function playedSlotsLabel(side: SideAnalysis): string | undefined {
   return side.playedSlots
     ?.filter((action): action is NonNullable<typeof action> => action !== null)
     .map(action => (action.kind === 'switch' ? `→ ${action.species ?? action.name}` : action.name))
     .join(' + ');
 }
 
-/** A deliberate copy of `NEVER_ACTED_WORDS` in `prose/phrases.ts`; `copies.spec.ts` compares the two. */
+/** Deliberate copies of `NEVER_ACTED_WORDS` and `GAME_ENDED_WORDS` (prose/phrases.ts); copies.spec.ts compares them. */
 export const NEVER_ACTED_WORDS = 'knocked out before it moved, so the log shows no choice';
+export const GAME_ENDED_WORDS = 'cut off by the end of the game, so the log shows no choice';
 
 export function neverActedText(side: { played: { ev: number } | null; faintedFraction?: number }): string {
   return `${NEVER_ACTED_WORDS}${side.played ? ` · staying in ${winPctText(side.played.ev, side.faintedFraction)}` : ''}`;
+}
+
+export function noChoiceText(slots: readonly NoChoiceSlot[], names?: readonly string[]): string {
+  return slots
+    .map(({ slot, reason }) => `${names?.[slot] || `Slot ${String.fromCharCode(65 + slot)}`} was ${reason === 'fell' ? NEVER_ACTED_WORDS : GAME_ENDED_WORDS}`)
+    .join(' · ');
 }
 
 export function neverActedOf(analysis: Pick<TurnAnalysis, 'p1' | 'p2'> | null | undefined): { p1: boolean; p2: boolean } | undefined {
   return analysis ? { p1: analysis.p1.neverActed === true, p2: analysis.p2.neverActed === true } : undefined;
 }
 
-export function playedTextFor(side: SideAnalysis): { acted: boolean; playedText: string } {
+export function playedTextFor(side: SideAnalysis, names?: readonly string[]): { acted: boolean; playedText: string; noChoice?: string } {
   if (side.neverActed) return { acted: false, playedText: neverActedText(side) };
   const playedRawName = playedRawLabel(side);
   const slotText = playedSlotsLabel(side);
+  if (side.noChoiceSlots?.length) {
+    const noChoice = noChoiceText(side.noChoiceSlots, names);
+    if (!slotText) return { acted: false, playedText: noChoice };
+    return { acted: true, playedText: `${slotText}${side.played ? ` (${winPctText(side.played.ev, side.faintedFraction)})` : ''}`, noChoice };
+  }
   const acted = Boolean(side.played || slotText || side.playedRaw);
   const playedText = side.played
     ? `${side.played.label} (${winPctText(side.played.ev, side.faintedFraction)})`
