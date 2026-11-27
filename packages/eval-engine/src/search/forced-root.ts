@@ -1,6 +1,6 @@
 import { positionBattle, type SimPosition } from '../forward-model.ts';
 import type { EvalResult, EvalSettings } from '../types.ts';
-import { FORCED_ROOT_LEVEL, recordTurnCell, turnSettings, type DeepeningState } from './deepening.ts';
+import { FORCED_ROOT_LEVEL, liveCells, recordTurnCell, turnSettings, type DeepeningState } from './deepening.ts';
 import type { Matrix, SearchCallbacks } from './matrix.ts';
 
 /** A forced root (an open replacement request): each cell is deepened once by the engine's search of its board. */
@@ -23,8 +23,7 @@ export interface ForcedRootState extends DeepeningState {
 /** Forced root level 2: each switch-in's child gets the engine's search of its turn, all or none; true if stopped. */
 export function deepenForcedRoot(state: ForcedRootState, search: (serialized: string, settings: EvalSettings) => EvalResult): boolean {
   const { matrix } = state;
-  const cells: [number, number][] = [];
-  matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!matrix.ended[i][j]) cells.push([i, j]); }));
+  const cells = liveCells(matrix);
   const settings = turnSettings(state.settings);
   const subs: EvalResult[] = [];
   state.callbacks?.onProgress?.({ done: 0, total: cells.length, depth: FORCED_ROOT_LEVEL });

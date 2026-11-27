@@ -9,7 +9,9 @@ import type {
 } from './types.ts';
 import { applyForcedWin, forcedWinInput } from './search/forced-win-apply.ts';
 import { attachRootPayload, koOddsMapsFor, type RootPayload } from './search/root-payload.ts';
-import { FORCED_ROOT_LEVEL, recordDeepenedCell, recordTurnCell, turnSettings, type DeepeningState } from './search/deepening.ts';
+import {
+  FORCED_ROOT_LEVEL, liveCells, recordDeepenedCell, recordDeepenedLevel, recordTurnCell, turnSettings, type DeepeningState,
+} from './search/deepening.ts';
 
 // Pure (no @pkmn/sim imports), so it runs on the main thread and fans the sim work out to workers.
 
@@ -81,8 +83,28 @@ interface Orchestration extends DeepeningState {
   ranked: Ranked;
 }
 
+async function deepenWholeLevelAsync(state: Orchestration, depth: number): Promise<boolean> {
+  const cells = liveCells(state.matrix);
+  if (state.callbacks?.shouldStop?.()) return true;
+  let done = 0;
+  state.callbacks?.onProgress?.({ done, total: cells.length, depth });
+  const subs = await Promise.all(cells.map(async ([i, j]) => {
+    const sub = await state.executor.subSearch({
+      i, j, p1Choice: state.p1[i].choice, p2Choice: state.p2[j].choice,
+      settings: { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined },
+    });
+    done += 1;
+    state.callbacks?.onProgress?.({ done, total: cells.length, depth });
+    return sub;
+  }));
+  if (state.callbacks?.shouldStop?.()) return true;
+  recordDeepenedLevel(state, cells, subs, depth);
+  return false;
+}
+
 // Mirrors searchPosition: expansion iterates, because deepening a cell shifts a row's worst case onto shallow siblings.
 async function deepenLevelAsync(state: Orchestration, depth: number): Promise<boolean> {
+  if (depth === 2) return deepenWholeLevelAsync(state, depth);
   const expandedThisLevel = new Set<number>();
   const budget = TOP_EXPANSION * 2;
   let used = 0;
@@ -110,8 +132,7 @@ async function deepenLevelAsync(state: Orchestration, depth: number): Promise<bo
 
 // Mirrors searchPosition: level 2 of a forced root; values are booked together, so a stop leaves the arrival values.
 async function deepenForcedRootAsync(state: Orchestration): Promise<boolean> {
-  const cells: [number, number][] = [];
-  state.matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!state.matrix.ended[i][j]) cells.push([i, j]); }));
+  const cells = liveCells(state.matrix);
   if (state.callbacks?.shouldStop?.()) return true;
   let done = 0;
   const settings = turnSettings(state.settings);
