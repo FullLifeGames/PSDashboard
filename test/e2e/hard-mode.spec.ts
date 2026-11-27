@@ -3,7 +3,9 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { installReplayEmbedCache, routeOfflineFixtures } from './helpers';
+import { evalStoreFileName, type SearchGuard } from './eval-store';
+import { openReplayAnalysis } from './eval-store-seed';
+import { installReplayEmbedCache } from './helpers';
 import { variationPanel } from './dock-helpers';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -44,19 +46,12 @@ const partsOf = (label: string, names: Names): string[] => label.split(' + ')
   })
   .filter(part => part !== '');
 
-async function openPage(page: Page, replay: ReplayData, hardMode: boolean): Promise<void> {
+const SETTINGS = { mode: 'matrix', depth: 1, samples: 1 };
+
+async function openPage(page: Page, replay: ReplayData, hardMode: boolean, turns: number[]): Promise<SearchGuard> {
   page.setDefaultTimeout(30_000);
-  await routeOfflineFixtures(page);
-  await page.addInitScript(on => {
-    localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
-    localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ depth: 1, samples: 1, mode: 'matrix', auto: false, tera: 'auto', ...(on ? { hardMode: true } : {}) }));
-  }, hardMode);
-  await page.goto('/');
-  // registered last, so it answers before routeOfflineFixtures' default replay
-  await page.route('**/replay.pokemonshowdown.com/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(replay) }));
-  await page.locator('input[type="text"]').first().fill(replay.id);
-  await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();
-  await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  const { guard } = await openReplayAnalysis(page, replay, SETTINGS, { seed: evalStoreFileName(replay.id, SETTINGS, turns), prefs: hardMode ? { hardMode: true } : {} });
+  return guard;
 }
 
 // Closes the menu again, so the pickers under it stay clickable.
@@ -84,13 +79,13 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number): Promise<v
   throw new Error(`the card of turn ${turn} did not open within 150 s`);
 }
 
-async function evaluateTurn(page: Page, turn: number): Promise<Offer> {
+async function evaluateTurn(page: Page, guard: SearchGuard, turn: number): Promise<Offer> {
   const panel = page.locator('.ps-main-right .ps-eval-panel');
   await page.locator('input[type="range"]').fill(String(turn));
   const analyze = panel.getByRole('button', { name: /^Analyze this position/ });
   await expect(analyze).toBeEnabled({ timeout: 60_000 });
   await analyze.click();
-  await settleOnTurn(page, panel, turn);
+  await guard.race(settleOnTurn(page, panel, turn));
   const label = async (column: number): Promise<string> =>
     ((await panel.locator('.ps-eval-column').nth(column).locator('.ps-eval-choice-main > span').nth(1).textContent()) ?? '').trim();
   const own = await label(0);
@@ -103,10 +98,14 @@ async function evaluateTurn(page: Page, turn: number): Promise<Offer> {
   });
   expect(cells.length, `the matrix holds cells of the row ${own} (${titles.length} titles)`).toBeGreaterThan(0);
   const lowest = Math.min(...cells.map(cell => cell.pct));
+  guard.assertClean();
   return { own, best, hurtMost: cells.filter(cell => cell.pct === lowest).map(cell => cell.reply) };
 }
 
-async function clickEngineMove(page: Page, turn: number): Promise<string> {
+// The variation's tip is a new position: its evaluation runs live, and the guard stands down from the click.
+async function clickEngineMove(page: Page, guard: SearchGuard, turn: number): Promise<string> {
+  guard.assertClean();
+  guard.pause();
   const panel = page.locator('.ps-main-right .ps-eval-panel');
   await panel.locator('.ps-eval-column').first().locator('button.ps-eval-choice').first().click();
   await expect(page.getByText(/Variation tip: Turn/)).toBeVisible({ timeout: 90_000 });
@@ -122,18 +121,18 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   const onContext = await browser.newContext();
   contexts.push(onContext);
   const on = await onContext.newPage();
-  await openPage(on, replay, true);
+  const onGuard = await openPage(on, replay, true, turns);
   await withSetupBox(on, box => expect(box).toBeChecked());
   let turn = turns[0];
-  let offer = await evaluateTurn(on, turn);
+  let offer = await evaluateTurn(on, onGuard, turn);
   for (const candidate of turns.slice(1)) {
     if (!offer.hurtMost.includes(offer.best)) break;
     turn = candidate;
-    offer = await evaluateTurn(on, turn);
+    offer = await evaluateTurn(on, onGuard, turn);
   }
   expect(offer.hurtMost.length, 'the matrix names a reply that hurts the clicked move most').toBeGreaterThan(0);
   const worstParts = offer.hurtMost.map(partsIn);
-  const hardText = await clickEngineMove(on, turn);
+  const hardText = await clickEngineMove(on, onGuard, turn);
   await expect(on.getByText('Opponent reads your move')).toBeVisible();
   await expect(on.getByRole('button', { name: 'Turn off' })).toBeVisible();
   expect(worstParts.some(parts => parts.every(part => hardText.includes(part))), `the history names the reply that hurts most (${offer.hurtMost.join(' | ')}); it reads: ${hardText.replace(/\s+/g, ' ').slice(0, 600)}`).toBe(true);
@@ -146,11 +145,11 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   const offContext = await browser.newContext();
   contexts.push(offContext);
   const off = await offContext.newPage();
-  await openPage(off, replay, false);
+  const offGuard = await openPage(off, replay, false, turns);
   await withSetupBox(off, box => expect(box).not.toBeChecked());
-  const second = await evaluateTurn(off, turn);
+  const second = await evaluateTurn(off, offGuard, turn);
   expect(second.own).toBe(offer.own);
-  const offText = await clickEngineMove(off, turn);
+  const offText = await clickEngineMove(off, offGuard, turn);
   await expect(off.getByText('Opponent reads your move')).toHaveCount(0);
   for (const part of partsIn(second.best)) expect(offText, `the best row's ${part} is played`).toContain(part);
 }

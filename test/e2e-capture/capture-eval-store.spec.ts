@@ -3,8 +3,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
-import { EVAL_STORE_CAPTURES, EVAL_STORE_DIR, evalStoreFileName, serializeEvalStoreFile, type EvalStoreFile, type EvalStoreRecord } from '../e2e/eval-store';
-import { currentTag, openReplayAnalysis, readEvalStore } from '../e2e/eval-store-seed';
+import { EVAL_STORE_CAPTURES, EVAL_STORE_DIR, evalStoreFileName, serializeEvalStoreFile, type EvalStoreFile, type EvalStoreRecord, type WinPathsRecord } from '../e2e/eval-store';
+import { currentTag, openReplayAnalysis, readEvalStore, readWinPathsRecords } from '../e2e/eval-store-seed';
 import { installReplayEmbedCache } from '../e2e/helpers';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
     const replay = readReplay(capture.replay);
     await openReplayAnalysis(page, replay, capture.settings);
     const panel = page.locator('.ps-main-right .ps-eval-panel');
-    let records: EvalStoreRecord[];
+    let records: (EvalStoreRecord | WinPathsRecord)[];
     if (capture.turns) {
       // A doubles turn saves its second record seconds after its first: wait for the next position's record too.
       for (const turn of capture.turns) {
@@ -78,6 +78,15 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
       const stage = panel.locator('.ps-eval-review').getByText(/Finding lines for graded turns: \d+ of \d+/);
       if (await stage.waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false)) await stage.waitFor({ state: 'hidden', timeout: 1_200_000 });
       records = await settledRecords(page, replay.id);
+      if (capture.winPaths) {
+        const winner = replay.log.match(/\|win\|(.+)/)![1].trim();
+        const loser = replay.players.find(name => name !== winner)!;
+        const review = panel.locator('.ps-eval-review');
+        await review.getByRole('button', { name: new RegExp(`^Endgame · T\\d+ · How could ${loser} have won\\?$`) }).click();
+        await expect(review.getByRole('region', { name: `How could ${loser} have won?` }).locator('[data-step]')).toHaveCount(3, { timeout: 1_200_000 });
+        await expect.poll(async () => (await readWinPathsRecords(page, replay.id)).length, { message: 'the win-paths record', timeout: 60_000 }).toBe(1);
+        records = [...records, ...await readWinPathsRecords(page, replay.id)];
+      }
     }
     expect(records.length, 'the analysis saved records').toBeGreaterThan(0);
     for (const record of records) expect(findNonFinite(record, record.key), 'a saved record that JSON cannot hold').toBeNull();

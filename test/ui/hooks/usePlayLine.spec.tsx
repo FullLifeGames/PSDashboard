@@ -95,7 +95,7 @@ describe('useLinesHost', () => {
     const snapshots = [{ turn: 1 }, { turn: 2 }, { turn: 3 }];
     const app = {
       ...stub.app,
-      ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots } },
+      ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots }, knowledge: { setsFingerprint: '' } },
       board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2, analyzableTurns: 3 } },
       // the host mounts the win-path hook, which reads the analyses, the position source and the effective rules
       analysis: { gameAnalyses: null },
