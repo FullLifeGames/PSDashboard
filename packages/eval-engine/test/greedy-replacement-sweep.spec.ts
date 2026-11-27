@@ -162,7 +162,6 @@ describe.each(RULES)('$name: the static pick names every replacement the simulat
       const benchOf = (battle: Battle, side: 'p1' | 'p2'): number =>
         battle.sides[side === 'p1' ? 0 : 1].pokemon.filter(pokemon => !pokemon.isActive && !pokemon.fainted).length;
 
-      // A trial copy must not call back into the battle it was copied from: the clone lever copies own functions by reference.
       test.each(['pivot', 'hazard', 'held', 'knock-out'] as const)('every %s entry: picks with the copy lever as without it and leaves its board as it was', kind => {
         const wrong: string[] = [];
         let scenes = 0;
