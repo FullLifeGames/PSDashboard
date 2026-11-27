@@ -10,6 +10,7 @@ export interface SearchSelectsProps {
   running: boolean;
   external: boolean;
   showTera: boolean;
+  teraPending?: boolean;
   engines?: Pick<EngineChoice, 'engines' | 'selected' | 'select'>;
 }
 
@@ -25,13 +26,15 @@ function autoTitle(budget: SearchBudget): string {
     `The MCTS search runs ${budget.trees} trees of ${budget.iterations} iterations each.`;
 }
 
-function TeraRow({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, 'prefs' | 'onPrefsChange' | 'running'>) {
+const PENDING_TERA_TITLE = 'Locked until the format check answers whether this format allows Tera.';
+
+function TeraRow({ prefs, onPrefsChange, running, pending }: Pick<SearchSelectsProps, 'prefs' | 'onPrefsChange' | 'running'> & { pending: boolean }) {
   const teraId = useId();
   return (
     <label
       className="ps-setup-row"
       htmlFor={teraId}
-      title="Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format."
+      title={pending ? PENDING_TERA_TITLE : "Auto: in a new game on wherever the format allows Tera, in a replay off until someone terastallizes. Draft and custom formats keep the option only for the Pokémon that terastallized. Revealed: force that restriction for any format."}
     >
       Tera
       <select
@@ -39,7 +42,7 @@ function TeraRow({ prefs, onPrefsChange, running }: Pick<SearchSelectsProps, 'pr
         className="ps-setup-row-select"
         value={prefs.tera}
         onChange={event => onPrefsChange({ ...prefs, tera: event.target.value as EvalPreferences['tera'] })}
-        disabled={running}
+        disabled={running || pending}
       >
         <option value="auto">Auto</option>
         <option value="on">On</option>
@@ -121,12 +124,12 @@ function EngineRow({ engines, running }: { engines: NonNullable<SearchSelectsPro
   );
 }
 
-export function SearchSelects({ external, showTera, engines, ...rows }: SearchSelectsProps) {
+export function SearchSelects({ external, showTera, teraPending = false, engines, ...rows }: SearchSelectsProps) {
   return (
     <>
       {engines && engines.engines.length > 1 && <EngineRow engines={engines} running={rows.running} />}
       {!external && <DepthRows {...rows} />}
-      {showTera && <TeraRow {...rows} />}
+      {(showTera || teraPending) && <TeraRow {...rows} pending={teraPending} />}
     </>
   );
 }
