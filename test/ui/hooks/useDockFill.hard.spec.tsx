@@ -160,6 +160,74 @@ describe('useDockFill.hard', () => {
     });
   });
 
+  describe('useDockFill, Hard mode: where the read stands', () => {
+    const result = { singles, doubles } as const;
+    const unranked = (kind: FormatKind) => (kind === 'singles' ? move('splash', 'Splash') : move('splash', 'Splash', 1));
+    const ranked = (kind: FormatKind) => (kind === 'singles' ? move('swordsdance', 'Swords Dance') : move('flareblitz', 'Flare Blitz', 1));
+
+    test.each(['singles', 'doubles'] as const)('%s: before and after the fill with no pick of the user the read waits; off or unset it is null', kind => {
+      const on = setup(kind, true);
+      expect(on.hook.result.current.reads).toBe('waiting');
+      on.land(result[kind]());
+      expect(on.hook.result.current.reads).toBe('waiting');
+      for (const hardMode of [false, undefined]) {
+        const off = setup(kind, hardMode, { p1: [ranked(kind), ...(kind === 'doubles' ? [null] : [])] });
+        expect(off.hook.result.current.reads).toBeNull();
+        off.land(result[kind]());
+        expect(off.hook.result.current.reads).toBeNull();
+      }
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: a pick with a ranked row at the fill reads answered, a pick with none reads unranked and leaves the opponent on the fill', kind => {
+      const slots = (pick: BranchSlotChoice) => ({ p1: [pick, ...(kind === 'doubles' ? [null] : [])] });
+      const answered = setup(kind, true, slots(ranked(kind)));
+      answered.land(result[kind]());
+      expect(answered.hook.result.current.reads).toBe('answered');
+      const none = setup(kind, true, slots(unranked(kind)));
+      none.land(result[kind]());
+      expect(none.hook.result.current.reads).toBe('unranked');
+      expect(none.hook.result.current.engine.p2).toEqual(Array(kind === 'doubles' ? 2 : 1).fill(true));
+      expect(none.setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: kind === 'singles' ? 'leechseed' : 'grassyglide' }), 0);
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: picks on both sides at the fill read both', kind => {
+      const both = setup(kind, true, { p1: [ranked(kind), ...(kind === 'doubles' ? [null] : [])], p2: [move('knockoff', 'Knock Off'), ...(kind === 'doubles' ? [null] : [])] });
+      both.land(result[kind]());
+      expect(both.hook.result.current.reads).toBe('both');
+      expect(both.hook.result.current.engine.p2.some(Boolean)).toBe(false);
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: a pick after the fill moves the read between answered and unranked, an unranked one writes nothing, both sides read both', kind => {
+      const { setChoice, hook, land } = setup(kind, true);
+      land(result[kind]());
+      const slot = kind === 'doubles' ? 1 : 0;
+      const answered = kind === 'singles' ? ranked(kind) : move('protect', 'Protect');
+      setChoice.mockClear();
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
+      expect(hook.result.current.reads).toBe('answered');
+      setChoice.mockClear();
+      act(() => hook.result.current.onUserChoice('p1', slot, move('splash', 'Splash')));
+      expect(hook.result.current.reads).toBe('unranked');
+      expect(setChoice).not.toHaveBeenCalled();
+      expect(hook.result.current.engine.p2).toEqual(Array(kind === 'doubles' ? 2 : 1).fill(true));
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
+      expect(hook.result.current.reads).toBe('answered');
+      act(() => hook.result.current.onUserChoice('p2', 0, move('knockoff', 'Knock Off')));
+      expect(hook.result.current.reads).toBe('both');
+    });
+
+    test('a hypothetical move without a pick leaves the read as it was; turning the setting off reads null', () => {
+      const wired = setupWired('singles', true);
+      wired.land(singles());
+      act(() => wired.hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+      act(() => wired.hook.result.current.onUserChoice('p1', 0));
+      expect(wired.hook.result.current.reads).toBe('answered');
+      wired.wired.evaluation = evaluationOf(false);
+      wired.hook.rerender();
+      expect(wired.hook.result.current.reads).toBeNull();
+    });
+  });
+
   describe('useDockFill: Back to the engine\'s pick', () => {
     const turnOff = (wired: { evaluation: Evaluation }, hook: { rerender: () => void }) => { wired.evaluation = evaluationOf(false); hook.rerender(); };
 

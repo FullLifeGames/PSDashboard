@@ -8,6 +8,8 @@ import { worstReply } from './worst-reply';
 type Side = 'p1' | 'p2';
 type Choices = (BranchSlotChoice | null)[];
 
+export type DockReads = 'waiting' | 'answered' | 'unranked' | 'both';
+
 
 /** Maps an engine line onto one side's slots; null when a part does not resolve against the pickers. */
 export function slotChoicesOf(state: BranchSimState, side: Side, ranked: RankedChoice): Choices | null {
