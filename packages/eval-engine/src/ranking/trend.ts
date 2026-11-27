@@ -58,12 +58,10 @@ function applyRowShift(matrix: ValueMatrix, side: 'p1' | 'p2', row: TieRow, shif
   }
   const ownShift = side === 'p1' ? shift : -shift;
   row.entry.ev += ownShift;
-  row.entry.expected += ownShift;
-  row.entry.worstCase += ownShift;
   return true;
 }
 
-/** Folds the one-ply trend of the tied rows into their values; the equilibrium is deliberately not re-solved. */
+/** Folds the one-ply trend of the tied rows into their `ev`; floors and the equilibrium stay unsolved. */
 export function applyTrendExtrapolation(
   matrix: ValueMatrix,
   result: EvalResult,

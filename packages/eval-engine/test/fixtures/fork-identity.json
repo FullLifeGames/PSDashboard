@@ -1134,15 +1134,15 @@
         {
           "choice": "move willowisp",
           "ev": -0.03404452904397534,
-          "expected": 0.16389506597509154,
-          "worstCase": -0.034113277539797315,
+          "expected": 0.14498023133648089,
+          "worstCase": -0.05302811217840797,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 4",
           "ev": -0.05414707390821053,
-          "expected": 0.10005875538029613,
-          "worstCase": -0.054193591527587626,
+          "expected": 0.11820430719786007,
+          "worstCase": -0.03604803971002368,
           "punishedBy": "Spikes"
         },
         {
@@ -1213,15 +1213,15 @@
         {
           "choice": "move gyroball",
           "ev": 0.09057577023172286,
-          "expected": -0.00010784189586775239,
-          "worstCase": -0.11448039018899347,
+          "expected": -0.06422745605102474,
+          "worstCase": -0.17860000434415046,
           "punishedBy": "U-turn → Corviknight"
         },
         {
           "choice": "move spikes",
           "ev": 0.054239430024761746,
-          "expected": 0.10553409903007979,
-          "worstCase": 0.054193591527587626,
+          "expected": 0.08738854721251585,
+          "worstCase": 0.03604803971002368,
           "punishedBy": "U-turn → Kyurem"
         },
         {
@@ -2531,8 +2531,8 @@
         {
           "choice": "move tackle 2",
           "ev": 0.8900024999999999,
-          "expected": 0.9,
-          "worstCase": 0.89,
+          "expected": 0.89,
+          "worstCase": 0.88,
           "punishedBy": "Ember"
         },
         {

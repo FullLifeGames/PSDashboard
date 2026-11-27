@@ -167,7 +167,7 @@ The search mode the user picks in the `Setup` menu (`EvalPreferences.mode` and `
 ### Turn verdicts
 
 **Safe line**:
-The choice with the best worst case on a turn (`side.safe`). The card calls its worst case the guarantee and compares the played choice with it; "safe" does not mean "better".
+The choice with the best worst case on a turn (`side.safe`). The card calls its worst case the guarantee and compares the played choice with it; "safe" does not mean "better". The worst case is the lowest cell of the choice's row in the matrix dialog; in doubles it can sit below the table, when the floor names an added answer that the dialog says it does not list.
 
 **Worst reply**:
 The opponent's reply that hurts a move most: the lowest value of the move's row among the cells the search trusts (`worstAnswer` in the engine, `worstReply` in `src/lib/worst-reply.ts`), with the row's own floor and then the opponent's best row as fallbacks. "Opponent reads my move" plays it (while the flag of that setting is off, as in 1.2.0, nothing does), and the matrix dialog marks it as the "worst" cell of the played choice.
