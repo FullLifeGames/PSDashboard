@@ -71,11 +71,13 @@ function poolContinuation(
 
 const VERIFY_MIN_CLASS_TREES = 2;
 
+// A sampler at the depth floor read the game out: no tree mean can bracket it, so it stays.
 function deepPool(pool: ReturnType<typeof poolContinuation>, minTrees: number, endgame: boolean, sampler: number): boolean {
   if (pool.visits < VERIFY_MIN_VISITS || pool.trees < minTrees) return false;
   const rich = endgame && pool.visits >= VERIFY_ENDGAME_MIN_VISITS;
   if (pool.disagreement > VERIFY_DISAGREEMENT) {
-    return rich && pool.means.length > 0 && (sampler < Math.min(...pool.means) || sampler > Math.max(...pool.means));
+    if (!rich || Math.abs(sampler) >= VERIFY_DEPTH_FLOOR || pool.means.length === 0) return false;
+    return sampler < Math.min(...pool.means) || sampler > Math.max(...pool.means);
   }
   return Math.abs(pool.value) >= VERIFY_DEPTH_FLOOR || rich;
 }

@@ -344,6 +344,12 @@ describe('an endgame pool that spreads keeps its value unless a played tree read
     expect(read(sceneTrees({ p1: 2, p2: 2 }, thin))).toBeCloseTo(0.9 * SAMPLER + 0.1 * MISS, 10);
   });
 
+  test('a sampler that reads the game decided stays with the sampler although every tree reads below it', () => {
+    const decided: [number, number][] = [[335, 0.96], [300, 0.26], [250, 0.5]];
+    const value = mergeMctsTrees(sceneTrees({ p1: 2, p2: 2 }, decided, undefined), new Map([[cellKey(0, 0), { i: 0, j: 0, value: 1, ended: false }]]));
+    expect(value.matrix!.values[0][0]).toBeCloseTo(1, 10);
+  });
+
   test('a cell without classes follows the same rule against its own sampler value', () => {
     const below = sceneTrees({ p1: 2, p2: 2 }, SCENE, undefined);
     expect(read(below, false)).toBeCloseTo(pooled(SCENE), 2);
