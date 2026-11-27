@@ -45,10 +45,10 @@ type Foe = 'splash' | 'switch' | 'pivot';
 const statusPivotOf = (rules: Rules): string => dexOfRules(rules).moves.all()
   .find(move => move.exists && move.category === 'Status' && move.gen <= dexOfRules(rules).gen && !move.isNonstandard && isPivotMove(dexOfRules(rules), move.id))!.id;
 
-// Vaporeon is slower than Pikachu and faster than Snorlax; Blissey waits on the bench.
+// Chansey (too weak to kill with a pivot) is slower than Pikachu and faster than Snorlax; Blissey waits on the bench.
 function benchBoard(rules: Rules, attacker: string, attackerMove: string, foeMoves: string[]): Battle {
   return battleOf(rules.singles, [mon(rules, { species: attacker, moves: [attackerMove], gender: 'M' })],
-    [mon(rules, { species: 'Vaporeon', moves: foeMoves }), mon(rules, { species: 'Blissey', moves: ['splash'] })]);
+    [mon(rules, { species: 'Chansey', moves: foeMoves }), mon(rules, { species: 'Blissey', moves: ['splash'] })]);
 }
 
 const everyBody = (board: Battle) => board.sides.flatMap(side => side.pokemon);

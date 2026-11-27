@@ -2,12 +2,11 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { boundaryEvent, randomCallMoves, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
+import { eventDefender, moveIdOf, type EventDefender } from './cell-defender.ts';
 import { stopsHits } from './dex-facts/protect.ts';
 import { dieTokens, eventSecondaries, hitClasses, hitKey, type EventSecondary, type SecondaryDie } from './search/secondary-classes.ts';
 import type { KoOddsInfo } from './types.ts';
-import { hazardConditions, sideIndex, type RulesDex } from '@fulllifegames/replay-core';
-
-/** A cell's priceable binary events: value channel only, and every guard fails closed to the raw seed average. */
+import { sideIndex, type RulesDex } from '@fulllifegames/replay-core';
 
 export interface CellEvent {
   side: 'p1' | 'p2';
@@ -31,12 +30,6 @@ export const BOUNDARY_DRAW_BUDGET = 16;
 
 type DexMove = ReturnType<Battle['dex']['moves']['get']>;
 
-function moveIdOf(choice: string): string | null {
-  const head = choice.split(' > ')[0].trim();
-  const tokens = head.split(/\s+/);
-  return tokens[0] === 'move' && tokens[1] ? tokens[1] : null;
-}
-
 const clicksTera = (choice: string) => choice.split(' > ')[0].trim().split(/\s+/).includes('terastallize');
 
 function attackerPrevented(attacker: Pokemon): boolean {
@@ -51,21 +44,6 @@ function defenderShielded(defender: Pokemon): boolean {
   return defender.ability === 'disguise' || defender.ability === 'iceface';
 }
 
-function eventDefender(battle: Battle, oppIndex: 0 | 1, oppChoice: string): Pokemon | null {
-  const switchMatch = /^switch\s+(\d+)/.exec(oppChoice.trim());
-  if (switchMatch) {
-    const oppSide = battle.sides[oppIndex];
-    if (Object.keys(oppSide.sideConditions ?? {}).some(id => hazardConditions(battle.dex).has(id))) return null;
-    const incoming = oppSide.pokemon[Number(switchMatch[1]) - 1];
-    if (!incoming || incoming.fainted) return null;
-    return incoming;
-  }
-  if (oppChoice.includes(' > ')) return null;
-  const active = battle.sides[oppIndex].active[0];
-  if (!active || active.fainted) return null;
-  return active;
-}
-
 type SideEventPlan = { kind: 'fail' } | { kind: 'skip' } | { kind: 'event'; event: CellEvent };
 
 function unpricedMovePlan(dex: RulesDex, move: DexMove): SideEventPlan {
@@ -76,8 +54,8 @@ function unpricedMovePlan(dex: RulesDex, move: DexMove): SideEventPlan {
   return { kind: 'skip' };
 }
 
-function pricedEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, defender: Pokemon, oppChoice: string, event: BoundaryEvent): SideEventPlan {
-  const secondary = /^switch\s+\d+/.test(oppChoice.trim()) ? undefined : eventSecondaries(battle, `${side}a`, moveId, defender);
+function pricedEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, { body: defender, incoming }: EventDefender, event: BoundaryEvent): SideEventPlan {
+  const secondary = incoming ? undefined : eventSecondaries(battle, `${side}a`, moveId, defender);
   if (secondary === null) return { kind: 'fail' };
   const priced = !!secondary?.length && event.killFraction < 1;
   if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1) || priced) {
@@ -97,18 +75,17 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppCho
   if (!attacker || attacker.fainted) return { kind: 'fail' };
   if (attackerPrevented(attacker)) return { kind: 'fail' };
 
-  const defender = eventDefender(battle, oppIndex, oppChoice);
-  if (!defender) return { kind: 'fail' };
-  if (defenderShielded(defender)) return { kind: 'fail' };
+  const found = eventDefender(battle, oppIndex, oppChoice, [attacker, moveId]);
+  if (!found || defenderShielded(found.body)) return { kind: 'fail' };
 
-  const event = boundaryEvent(battle, attacker, defender, moveId, { attacker: clicksTera(choice), defender: clicksTera(oppChoice) });
+  const event = boundaryEvent(battle, attacker, found.body, moveId, { attacker: clicksTera(choice), defender: !found.incoming && clicksTera(oppChoice) });
   const move = battle.dex.moves.get(moveId);
   if (event === null) return unpricedMovePlan(battle.dex, move);
   if (move.category === 'Status') {
     const [p1Choice, p2Choice] = side === 'p1' ? [choice, oppChoice] : [oppChoice, choice];
     if (!accuracyRollReached(battle, side, move.id, p1Choice, p2Choice)) return { kind: 'skip' };
   }
-  return pricedEvent(battle, side, move.id, defender, oppChoice, event);
+  return pricedEvent(battle, side, move.id, found, event);
 }
 
 export function planCellEvents(battle: Battle, p1Choice: string, p2Choice: string): CellEventPlan {
@@ -283,7 +260,6 @@ export function drawnClassWeight(events: CellEvent[], classKey: string, first: '
   return weight === undefined ? null : weight;
 }
 
-/** Singles kill odds per option against the opposing active; null unless a kill exists and is not sure. */
 export function koOddsForOptions(battle: Battle, side: 'p1' | 'p2', choices: string[]): (KoOddsInfo | null)[] {
   if (battle.gameType === 'doubles') return pairKoOdds(battle, side, choices);
   const own = sideIndex(side);
