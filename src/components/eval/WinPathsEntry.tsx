@@ -12,9 +12,9 @@ interface WinPathsEntryProps {
 /** Open only while the open search is the card's own, for this turn; a search the Game review opened shows there. */
 export function WinPathsEntry({ turn, host, playerNames, doubles }: WinPathsEntryProps) {
   const { winPaths } = host;
-  const { endgame } = winPaths ?? {};
-  if (!winPaths || !endgame || !endgame.turns.includes(turn)) return null;
-  const player = playerNames[endgame.loser === 'p1' ? 0 : 1];
+  const { offered } = winPaths ?? {};
+  if (!winPaths || !offered || !offered.turns.includes(turn)) return null;
+  const player = playerNames[offered.loser === 'p1' ? 0 : 1];
   const open = winPaths.run?.turn === turn && winPaths.run.from === 'card';
   return (
     <div className="ps-eval-lines ps-winpaths-entry">

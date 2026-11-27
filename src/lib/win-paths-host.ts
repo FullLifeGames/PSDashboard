@@ -8,14 +8,14 @@ export interface WinPathsRun {
   turn: number;
   side: WinPathsSide;
   steps: WinStep[];
-  /** `failed` means the job itself broke. */
   status: 'positioning' | 'searching' | 'done' | 'failed';
   from: WinPathsFrom;
 }
 
 export interface WinPathsHost {
-  /** Null without a loser or an endgame; the turns are those where the loser has three bodies or fewer at the start. */
+  /** Endgame turns (three bodies or fewer) for the Game review; `offered` adds turns the loser reads behind. */
   endgame: { loser: WinPathsSide; turns: number[] } | null;
+  offered: { loser: WinPathsSide; turns: number[] } | null;
   run: WinPathsRun | null;
   /** Why the search cannot start now (the sets are still loading); null when it can. */
   unavailable: string | null;

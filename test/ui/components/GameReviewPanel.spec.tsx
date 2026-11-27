@@ -122,7 +122,7 @@ describe('GameReviewPanel, doubles', () => {
 
 const endgameHost = (extra: Partial<WinPathsHost> = {}): LinesHost & { winPaths: WinPathsHost } => ({
   rules: { gen: 9, mod: undefined },
-  winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
+  winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, offered: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
 });
 
 describe('GameReviewPanel, the Endgame row', () => {

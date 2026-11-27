@@ -48,8 +48,8 @@ export function WinPathsPanel({ host, playerNames, doubles, picker = true, from 
   const { winPaths } = host;
   const [clicked, setClicked] = useState<string | null>(null);
   const run = winPaths?.run;
-  if (!winPaths || !run || run.from !== from || !winPaths.endgame) return null;
-  const { turns } = winPaths.endgame;
+  if (!winPaths || !run || run.from !== from) return null;
+  const turns = winPaths.endgame?.turns ?? [];
   const player = playerNames[run.side === 'p1' ? 0 : 1];
   const views = winStepViews(run.steps, { turn: run.turn, playerNames, doubles, host, side: run.side, playedLabel: winPaths.playedLabel(run.turn), playedNeverActed: winPaths.playedNeverActed?.(run.turn) });
   const note = sequenceNote(views);

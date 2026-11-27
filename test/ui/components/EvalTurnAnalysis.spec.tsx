@@ -211,7 +211,7 @@ describe('EvalTurnAnalysis, a doubles slot with no logged action', () => {
 });
 
 describe('EvalTurnAnalysis, the endgame entry', () => {
-  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, offered: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
 
   test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {
     const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([4, 5]) };
@@ -233,7 +233,7 @@ describe.each([
 ] as const)('EvalTurnAnalysis, closed sections, %s', (_kind, doubles, result) => {
   const rules = { gen: 9, mod: undefined };
   const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from });
-  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, offered: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
 
   test('the Lines section sits closed under a toggle: aria-controls its body, a click or the keyboard opens it, every turn starts closed', async () => {
     const host = { rules, onPlay: vi.fn() };

@@ -14,7 +14,7 @@ const line = (base: EvalLine = singlesLine): EvalLine => ({ ...base, for: [] });
 
 function hostOf(run: WinPathsRun | null, extra: Partial<WinPathsHost> = {}, base: Partial<LinesHost> = {}): LinesHost & { winPaths: WinPathsHost } {
   const winPaths: WinPathsHost = {
-    endgame: { loser: 'p2', turns: [23, 24, 25] }, run, unavailable: null, playedLabel: () => 'Hydro Pump', show: vi.fn(), hide: vi.fn(), ...extra,
+    endgame: { loser: 'p2', turns: [23, 24, 25] }, offered: { loser: 'p2', turns: [10, 23, 24, 25] }, run, unavailable: null, playedLabel: () => 'Hydro Pump', show: vi.fn(), hide: vi.fn(), ...extra,
   };
   return { rules: { gen: 9, mod: undefined }, onPlay: vi.fn(), winPaths, ...base };
 }
@@ -112,7 +112,7 @@ describe('WinPathsPanel, singles', () => {
 describe('WinPathsPanel, doubles', () => {
   test('a line of doubles reads one row per player and step, and the sentence says the rolls were sampled', () => {
     const doubles = [step('stronger', 'found', { chance: 0.25, line: line(doublesLine) }), step('luck', 'found', { chance: 0.4, line: line(doublesLine) })];
-    render(<WinPathsPanel host={hostOf({ turn: 8, side: 'p1', steps: doubles, status: 'done', from: 'review' }, { endgame: { loser: 'p1', turns: [8] }, playedLabel: () => null })} playerNames={DOUBLES_NAMES} doubles />);
+    render(<WinPathsPanel host={hostOf({ turn: 8, side: 'p1', steps: doubles, status: 'done', from: 'review' }, { endgame: { loser: 'p1', turns: [8] }, offered: { loser: 'p1', turns: [8] }, playedLabel: () => null })} playerNames={DOUBLES_NAMES} doubles />);
     expect(screen.getByRole('region', { name: 'How could pixelfrost have won?' })).toBeInTheDocument();
     expect(screen.getByText(/wins within 3 turns in 25 % of the dice whatever Mstr_Hawk plays \(over sampled rolls\)\./)).toBeInTheDocument();
     const first = document.querySelector('[data-step="stronger"]') as HTMLElement;
@@ -136,9 +136,9 @@ describe('WinPathsEntry (the turn card)', () => {
   });
 
   test('a turn of another endgame turn\'s search, a turn outside the endgame and a game without a loser show nothing', () => {
-    const { container, rerender } = render(<WinPathsEntry turn={10} host={hostOf(null)} playerNames={SINGLES_NAMES} doubles={false} />);
+    const { container, rerender } = render(<WinPathsEntry turn={11} host={hostOf(null)} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(container).toBeEmptyDOMElement();
-    rerender(<WinPathsEntry turn={24} host={hostOf(null, { endgame: null })} playerNames={SINGLES_NAMES} doubles={false} />);
+    rerender(<WinPathsEntry turn={24} host={hostOf(null, { endgame: null, offered: null })} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(container).toBeEmptyDOMElement();
     rerender(<WinPathsEntry turn={24} host={{ rules: { gen: 9, mod: undefined } }} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(container).toBeEmptyDOMElement();
@@ -148,6 +148,21 @@ describe('WinPathsEntry (the turn card)', () => {
     rerender(<WinPathsEntry turn={24} host={hostOf(run(ALL, 'done', 24, 'review'))} playerNames={SINGLES_NAMES} doubles={false} />);
     expect(screen.getByRole('button', { name: 'How could Pepitopalotin have won from here?' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();
+  });
+
+  test.each([['singles', SINGLES_NAMES, false, 'Pepitopalotin'], ['doubles', DOUBLES_NAMES, true, 'Mstr_Hawk']] as const)('%s: a turn behind the bar outside the endgame offers the question too, with or without any endgame turn', async (_type, names, doubles, loser) => {
+    const label = `How could ${loser} have won from here?`;
+    const host = hostOf(null);
+    const { rerender } = render(<WinPathsEntry turn={10} host={host} playerNames={names} doubles={doubles} />);
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    expect(host.winPaths.show).toHaveBeenCalledWith(10, 'card');
+    const calm = hostOf(null, { endgame: null, offered: { loser: 'p2', turns: [10] } });
+    rerender(<WinPathsEntry turn={10} host={calm} playerNames={names} doubles={doubles} />);
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    expect(calm.winPaths.show).toHaveBeenCalledWith(10, 'card');
+    rerender(<WinPathsEntry turn={10} host={hostOf(run(ALL, 'done', 10, 'card'), { endgame: null, offered: { loser: 'p2', turns: [10] } })} playerNames={names} doubles={doubles} />);
+    expect(screen.getByRole('region', { name: `How could ${loser} have won?` })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Endgame turn' })).toBeNull();
   });
 
   test('while the sets still load, the question is disabled and says why', () => {

@@ -5,6 +5,8 @@ import { logWinner } from './game-end';
 
 type Side = 'p1' | 'p2';
 
+export const WIN_PATHS_BEHIND = 0.3;
+
 /** Bodies standing at a turn's start, both sides: those brought (`|teamsize|`, VGC four of six), else the snapshot. */
 export function livingBodies(snapshots: readonly TurnSnapshot[], turn: number): number | null {
   const at = snapshots[Math.min(turn - 1, snapshots.length - 1)];
@@ -28,4 +30,13 @@ export function loserOf(log: string, players: readonly string[]): Side | null {
   const winner = logWinner(log);
   const at = winner === null ? -1 : players.indexOf(winner);
   return at === 0 ? 'p2' : at === 1 ? 'p1' : null;
+}
+
+/** The endgame turns plus every turn whose result reads the loser 0.3 (`WIN_PATHS_BEHIND`) or more behind, sorted. */
+export function offeredTurns(endgame: readonly number[], results: readonly ({ score: number } | null | undefined)[], loser: Side): number[] {
+  const offered = new Set(endgame);
+  results.forEach((result, index) => {
+    if (result && (loser === 'p1' ? result.score : -result.score) <= -WIN_PATHS_BEHIND) offered.add(index + 1);
+  });
+  return [...offered].sort((a, b) => a - b);
 }

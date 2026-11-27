@@ -3,7 +3,7 @@ import type { StaticRuleset, WinPathsRequest } from '@fulllifegames/eval-engine'
 import type { ReplayData } from '@fulllifegames/replay-core';
 import type { AppController } from './useAppController';
 import { EvalWorkerClient } from '../lib/eval/worker-client';
-import { endgameTurns, loserOf } from '../lib/endgame-scope';
+import { endgameTurns, loserOf, offeredTurns } from '../lib/endgame-scope';
 import { winPathsRequest } from '../lib/win-paths-request';
 import { loadStoredWinPaths, saveStoredWinPaths, winPathsStoreKey } from '../lib/eval-cache-store';
 import { turnCacheKey } from './useEvalView';
@@ -11,14 +11,17 @@ import type { WinPathsFrom, WinPathsHost, WinPathsRun } from '../lib/win-paths-h
 
 interface Held { replayId: string; call: number; run: WinPathsRun }
 
-function useEndgame(app: AppController, replayData: ReplayData): WinPathsHost['endgame'] {
+function useTurnScope(app: AppController, replayData: ReplayData): Pick<WinPathsHost, 'endgame' | 'offered'> {
   const { snapshots } = app.ctx.replay;
   const { analyzableTurns } = app.board.timeline;
+  const { results } = app.ctx.evaluation.graph;
   const loser = useMemo(() => loserOf(replayData.log, replayData.players), [replayData.log, replayData.players]);
   return useMemo(() => {
-    const turns = loser ? endgameTurns(snapshots, analyzableTurns) : [];
-    return loser && turns.length > 0 ? { loser, turns } : null;
-  }, [loser, snapshots, analyzableTurns]);
+    if (!loser) return { endgame: null, offered: null };
+    const turns = endgameTurns(snapshots, analyzableTurns);
+    const offered = offeredTurns(turns, results, loser);
+    return { endgame: turns.length > 0 ? { loser, turns } : null, offered: offered.length > 0 ? { loser, turns: offered } : null };
+  }, [loser, snapshots, analyzableTurns, results]);
 }
 
 interface Answering {
@@ -52,7 +55,7 @@ async function answer(key: string, request: WinPathsRequest, ruleset: StaticRule
 
 /** The win-path job of the Game review and the turn card: one search at a time, on its own worker. */
 export function useWinPaths(app: AppController, replayData: ReplayData): WinPathsHost {
-  const endgame = useEndgame(app, replayData);
+  const { endgame, offered } = useTurnScope(app, replayData);
   const { graph } = app.ctx.evaluation;
   const { snapshots } = app.ctx.replay;
   const { setsFingerprint } = app.ctx.knowledge;
@@ -84,12 +87,12 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
   }, []);
 
   const show = useCallback((turn: number, from: WinPathsFrom) => {
-    if (!endgame) return;
+    if (!offered) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     const call = ++calls.current;
-    const { loser: side } = endgame;
+    const { loser: side } = offered;
     const update = (change: (run: WinPathsRun) => WinPathsRun) => setHeld(current => (current && current.call === call ? { ...current, run: change(current.run) } : current));
     setHeld({ replayId, call, run: { turn, side, steps: [], status: 'positioning', from } });
     const request = winPathsRequest({
@@ -98,10 +101,10 @@ export function useWinPaths(app: AppController, replayData: ReplayData): WinPath
     });
     const key = winPathsStoreKey(turnCacheKey(replayId, turn, snapshots.length, setsFingerprint), effectiveRuleset, request);
     void answer(key, request, effectiveRuleset, { controller, update, client: () => (clientRef.current ??= new EvalWorkerClient()), position: makeReplayAcquire(turn) });
-  }, [endgame, replayId, snapshots.length, setsFingerprint, graph.results, analyses, effectiveTera, effectiveSleepClause, effectiveRuleset, makeReplayAcquire]);
+  }, [offered, replayId, snapshots.length, setsFingerprint, graph.results, analyses, effectiveTera, effectiveSleepClause, effectiveRuleset, makeReplayAcquire]);
 
-  const playedLabel = useCallback((turn: number) => (endgame ? analyses?.[turn - 1]?.[endgame.loser].played?.label ?? null : null), [endgame, analyses]);
-  const playedNeverActed = useCallback((turn: number) => (endgame ? analyses?.[turn - 1]?.[endgame.loser].neverActed === true : false), [endgame, analyses]);
+  const playedLabel = useCallback((turn: number) => (offered ? analyses?.[turn - 1]?.[offered.loser].played?.label ?? null : null), [offered, analyses]);
+  const playedNeverActed = useCallback((turn: number) => (offered ? analyses?.[turn - 1]?.[offered.loser].neverActed === true : false), [offered, analyses]);
   const run = held && held.replayId === replayId ? held.run : null;
-  return useMemo(() => ({ endgame, run, unavailable, playedLabel, playedNeverActed, show, hide }), [endgame, run, unavailable, playedLabel, playedNeverActed, show, hide]);
+  return useMemo(() => ({ endgame, offered, run, unavailable, playedLabel, playedNeverActed, show, hide }), [endgame, offered, run, unavailable, playedLabel, playedNeverActed, show, hide]);
 }

@@ -45,10 +45,10 @@ const result: EvalResult = { ...evalResult('singles'), perSide: {
   p2: [rankedChoice('move bulletpunch', 'Bullet Punch', -0.2), rankedChoice('move highjumpkick', 'High Jump Kick', -0.4)],
 } };
 
-function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string>; ranking?: EvalResult; fingerprint?: string } = {}): AppController {
+function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string>; ranking?: EvalResult; results?: (EvalResult | null)[]; fingerprint?: string } = {}): AppController {
   const analyses = [null, null, turnAnalysis(3, { p2: { ...misplayedSide('mistake'), played: rankedChoice('move highjumpkick', 'High Jump Kick', -0.4), ...(extra.neverActed ? { neverActed: true } : {}) } }), null];
   return {
-    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, knowledge: { setsFingerprint: extra.fingerprint ?? 'fp' }, evaluation: { graph: { results: [null, null, extra.ranking ?? result, null] } } },
+    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, knowledge: { setsFingerprint: extra.fingerprint ?? 'fp' }, evaluation: { graph: { results: extra.results ?? [null, null, extra.ranking ?? result, null] } } },
     board: { timeline: { analyzableTurns: 4 } },
     analysis: { gameAnalyses: analyses },
     engine: {
@@ -71,6 +71,32 @@ describe('useWinPaths', () => {
     expect(hook.current.endgame).toEqual({ loser: 'p1', turns: [3, 4] });
     expect(hook.current.run).toBeNull();
     expect(hook.current.unavailable).toBeNull();
+  });
+
+  test.each([['singles', 'singles' as const], ['doubles', 'doubles' as const]])('%s: the card offers the loser\'s turns 0.3 or more behind as well as the endgame turns, the review keeps the endgame turns', (_type, kind) => {
+    const results = [evalResult(kind, { score: -0.4 }), evalResult(kind, { score: -0.29 }), null, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ results }), REPLAY('g13')));
+    expect(hook.current.endgame).toEqual({ loser: 'p1', turns: [3, 4] });
+    expect(hook.current.offered).toEqual({ loser: 'p1', turns: [1, 3, 4] });
+  });
+
+  test('a game that fell behind but never reached its endgame offers those turns, and show searches one for the loser', async () => {
+    const results = [null, evalResult('singles', { score: -0.4 }), null, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ snapshots: SNAPSHOTS.slice(0, 2), results }), REPLAY('g14')));
+    expect(hook.current.endgame).toBeNull();
+    expect(hook.current.offered).toEqual({ loser: 'p1', turns: [2] });
+    act(() => hook.current.show(2, 'card'));
+    await flush();
+    expect(hook.current.run).toMatchObject({ turn: 2, side: 'p1', from: 'card' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].request).toMatchObject({ side: 'p1', turn: 2 });
+  });
+
+  test('a loser who never fell behind and never reached its endgame, and a game with no loser, offer nothing', () => {
+    const level = renderHook(() => useWinPaths(app({ snapshots: SNAPSHOTS.slice(0, 2), results: [null, evalResult('singles', { score: -0.1 }), null, null] }), REPLAY('g15')));
+    expect(level.result.current.offered).toBeNull();
+    const tie = renderHook(() => useWinPaths(app({ results: [evalResult('singles', { score: -0.9 }), null, null, null] }), { ...REPLAY('g16'), log: '|turn|4\n|tie' }));
+    expect(tie.result.current.offered).toBeNull();
   });
 
   test('a loser knocked out before it moved is named so: its played choice is a stand-in', () => {
