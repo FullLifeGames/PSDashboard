@@ -16,7 +16,7 @@ test('the replay frame builds when jQuery arrives after graphics.js', async ({ p
   await page.route('**/play.pokemonshowdown.com/js/lib/jquery-1.11.0.min.js', async route => {
     await graphics;
     await new Promise(resolve => setTimeout(resolve, 500));
-    await route.continue();
+    await route.fallback();
   });
   await page.goto('/');
   await page.locator('button', { hasText: /^(Load|Game)( ▾)?$/ }).click();

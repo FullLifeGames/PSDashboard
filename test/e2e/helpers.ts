@@ -1,5 +1,5 @@
 import { expect, type Frame, type Locator, type Page } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { ReplayData } from '@fulllifegames/replay-core';
@@ -37,7 +37,6 @@ export async function expectReplayTurn(
   frame: Frame,
   turn: number,
 ) {
-  // The embed script loads from play.pokemonshowdown.com and can take a while: wait for `Replays.battle` first.
   await expect.poll(async () => frame.evaluate(() =>
     !!(window as ReplayWindow).Replays?.battle
   ), { timeout: 30_000 }).toBe(true);
@@ -83,6 +82,12 @@ async function openChip(page: Page, chip: Locator, { timeout }: TrayOptions = {}
   if ((await chip.getAttribute('aria-expanded', { timeout })) !== 'true') await chip.click({ timeout });
   await expect(chip).toHaveAttribute('aria-expanded', 'true', { timeout });
   return dockTray(page);
+}
+
+/** A new game's lead turn is a variation until it joins the main line; a tray opened meanwhile closes. */
+export async function expectGameOnMainLine(page: Page): Promise<void> {
+  await expect(page.locator('.ps-dock-chip').first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole('button', { name: 'Discard variation' })).toHaveCount(0, { timeout: 60_000 });
 }
 
 export function openTray(page: Page, slot: DockSlotKey, options?: TrayOptions): Promise<Locator> {
@@ -200,26 +205,39 @@ export async function waitForExactPickers(page: Page, turn?: number) {
   await expect(page.locator('.ps-dock-status').getByText('Choices from the reconstructed position')).toBeVisible({ timeout: 90_000 });
 }
 
-let replayEmbedCache: Buffer | null = null;
+const CLIENT_DIR = fixturePath('showdown-client');
+const CLIENT_TYPES: Record<string, string> = { '.js': 'application/javascript', '.css': 'text/css' };
+const IMAGE = /\.(png|gif|jpe?g|webp)$/i;
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=', 'base64');
+const clientFiles = new Map<string, Buffer>();
 
+function clientFile(pathname: string): Buffer | null {
+  const file = join(CLIENT_DIR, `${pathname}.fixture`);
+  if (!file.startsWith(CLIENT_DIR) || !existsSync(file) || !statSync(file).isFile()) return null;
+  if (!clientFiles.has(pathname)) clientFiles.set(pathname, readFileSync(file));
+  return clientFiles.get(pathname)!;
+}
+
+/** Stops the run when the recorded copy of Showdown's client is missing. */
 export async function installReplayEmbedCache(): Promise<void> {
-  try {
-    const response = await fetch('https://play.pokemonshowdown.com/js/replay-embed.js');
-    if (response.ok) replayEmbedCache = Buffer.from(await response.arrayBuffer());
-  } catch {
-    // Fall through: tests then hit the CDN directly.
-  }
+  if (!clientFile('/js/replay-embed.js')) throw new Error('test/e2e/fixtures/showdown-client is missing: run node scripts/capture-showdown-client.mjs');
+}
+
+async function routeShowdownClient(page: Page): Promise<void> {
+  await page.route('**/play.pokemonshowdown.com/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const body = clientFile(pathname);
+    if (body) await route.fulfill({ status: 200, contentType: CLIENT_TYPES[pathname.slice(pathname.lastIndexOf('.'))] ?? 'application/octet-stream', body });
+    else if (IMAGE.test(pathname)) await route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL });
+    else await route.fulfill({ status: 404, body: '' });
+  });
 }
 
 /** Registered after the offline routes, so it wins. */
 export async function routeSlowReplayEmbed(page: Page, delayMs: number): Promise<void> {
   await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
     await new Promise(resolve => setTimeout(resolve, delayMs));
-    if (replayEmbedCache) {
-      await route.fulfill({ status: 200, contentType: 'application/javascript', body: replayEmbedCache });
-      return;
-    }
-    await route.continue().catch(() => {});
+    await route.fulfill({ status: 200, contentType: CLIENT_TYPES['.js'], body: clientFile('/js/replay-embed.js')! });
   });
 }
 
@@ -233,17 +251,7 @@ export const dockReplays: ReplayData[] = [
 ].map(name => JSON.parse(readFileSync(fixturePath(name), 'utf-8')) as ReplayData);
 
 export async function routeOfflineFixtures(page: Page): Promise<void> {
-  await page.route('**/play.pokemonshowdown.com/js/replay-embed.js*', async (route) => {
-    if (replayEmbedCache) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/javascript',
-        body: replayEmbedCache,
-      });
-      return;
-    }
-    await route.continue().catch(() => {});
-  });
+  await routeShowdownClient(page);
   await page.route('**/replay.pokemonshowdown.com/**', (route) => {
     const url = route.request().url();
     const replay = url.includes(vgcReplay.id) ? vgcReplay
