@@ -141,6 +141,7 @@ button.ps-eval-choice:hover,
   font-family: inherit;
   font-size: 11px;
   padding: 0;
+  text-align: start;
 }
 .ps-eval-analysis-toggle:hover {
   color: #cde;

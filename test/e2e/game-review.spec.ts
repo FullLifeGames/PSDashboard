@@ -174,7 +174,16 @@ test('VGC at 390 px: three review rows show their cards in view, the review stay
   await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 600_000 }));
   const review = panel.locator('.ps-eval-review');
   await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
-  await review.getByRole('button', { name: /Game review/ }).click();
+  const fold = review.getByRole('button', { name: /Game review/ });
+  await fold.click();
+  const edges = await fold.evaluate(button => {
+    const range = document.createRange();
+    range.selectNodeContents(button);
+    const lines = [...range.getClientRects()].filter(rect => rect.width > 0);
+    return { wrapped: new Set(lines.map(rect => Math.round(rect.top))).size, first: lines[0].left, last: lines[lines.length - 1].left };
+  });
+  expect(edges.wrapped, 'the label wraps at 390 px').toBeGreaterThan(1);
+  expect(edges.last, 'the second line of the label starts at the left edge').toBeCloseTo(edges.first, 0);
   const turns = [...new Set((await readRows(review)).map(row => row.turn))].slice(-3).reverse();
   expect(turns.length, 'the game holds graded turns').toBeGreaterThanOrEqual(1);
   for (const turn of turns) {
