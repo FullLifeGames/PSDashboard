@@ -9,7 +9,7 @@ import { battleRuleset } from '../forward/ruleset.ts';
 import { drawPair } from '../pair/draw.ts';
 import { forkBattle, toPosition } from '../forward/position.ts';
 import { applyChoice, resolveForcedSwitches } from '../forward/switches.ts';
-import { flipTurn, recordTurn, type FlipTurn } from '../dice/flip.ts';
+import { flipTurn, recordTurn, type FlipDie, type FlipTurn } from '../dice/flip.ts';
 import { tieName, type ForcedDie } from '../dice/types.ts';
 import { boardFacts } from './board-facts.ts';
 
@@ -79,22 +79,45 @@ function cellTurn(root: SimPosition, p1Choice: string, p2Choice: string, seed: P
 
 interface PricedGroup { children: { position: SimPosition; share: number; ended: boolean; turned?: true }[]; unpriced: boolean; spread: boolean }
 
+type Deciding = { die: FlipDie; battle: Battle; drawn: ReadonlySet<string> };
+
+function nestedChildren(turn: FlipTurn, deciding: readonly Deciding[], entry: Deciding, share: number): { battle: Battle; share: number }[] | null {
+  const settled = new Set([entry.die.key, ...deciding.map(other => other.die.key)]);
+  const derived: FlipTurn = { ...turn, held: [...(turn.held ?? []), { name: entry.die.name, result: { happens: !entry.die.drew } }] };
+  const inner = recordTurn(derived);
+  const flips = inner.dice.filter(die => !settled.has(die.key)).flatMap(die => {
+    const flipped = flipTurn(derived, inner, die);
+    return flipped.took && boardFacts(flipped.battle) !== boardFacts(inner.battle) ? [{ die, battle: flipped.battle, drawn: flipped.drawn }] : [];
+  });
+  if (flips.length === 0) return null;
+  const held = flips.reduce((product, flip) => product * flip.die.held, 1);
+  const others = (flip: (typeof flips)[number]): number => flips.reduce((product, other) => (other !== flip && flip.drawn.has(other.die.key) ? product * other.die.held : product), flip.die.other);
+  return [{ battle: inner.battle, share: share * held }, ...flips.map(flip => ({ battle: flip.battle, share: share * others(flip) }))];
+}
+
 // Only the dice the group cannot price stay certain (damage roll, crit, hit count); each other chance die flips once.
 // A die drawn more than once, or a draw that lands on no child's facts, leaves the group unpriced.
 function pricedGroup(turn: FlipTurn, draws: Draw[], spread: boolean): PricedGroup {
   const recorded = recordTurn(turn);
   const base = boardFacts(recorded.battle);
-  const deciding = recorded.dice.flatMap(die => {
+  const deciding: Deciding[] = recorded.dice.flatMap(die => {
     const flipped = flipTurn(turn, recorded, die);
     return flipped.took && boardFacts(flipped.battle) !== base ? [{ die, battle: flipped.battle, drawn: flipped.drawn }] : [];
   });
   const held = deciding.reduce((product, entry) => product * entry.die.held, 1);
   const children: PricedGroup['children'] = [{ position: toPosition(recorded.battle), share: held, ended: recorded.battle.ended }];
   // A flipped branch is worth its die's other answer times the chances of the other deciding dice it drew again.
-  const flippedShare = (entry: (typeof deciding)[number]): number =>
+  const flippedShare = (entry: Deciding): number =>
     deciding.reduce((product, other) => (other !== entry && entry.drawn.has(other.die.key) ? product * other.die.held : product), entry.die.other);
-  for (const entry of deciding) children.push({ position: toPosition(entry.battle), share: flippedShare(entry), ended: entry.battle.ended, turned: true });
-  const facts = new Set([base, ...deciding.map(entry => boardFacts(entry.battle))]);
+  const facts = new Set([base]);
+  for (const entry of deciding) {
+    facts.add(boardFacts(entry.battle));
+    const nested = nestedChildren(turn, deciding, entry, flippedShare(entry)) ?? [{ battle: entry.battle, share: flippedShare(entry) }];
+    for (const child of nested) {
+      facts.add(boardFacts(child.battle));
+      children.push({ position: toPosition(child.battle), share: child.share, ended: child.battle.ended, turned: true });
+    }
+  }
   const unexplained = draws.some(draw => !facts.has(boardFacts(positionBattle(draw.position))));
   return { children, unpriced: unexplained || recorded.repeated.length > 0, spread: spread || deciding.length > 0 };
 }
@@ -119,8 +142,12 @@ const weighed = (children: Raw, scale = 1): EndgameChild[] => {
 
 function splitOf(turnAt: (seed: PRNGSeed) => FlipTurn, seeds: PRNGSeed[], group: Group): Raw | null {
   const open = group.draws.findIndex(draw => !draw.ended);
-  const priced = pricedGroup(turnAt(seeds[open >= 0 ? open : group.index]), group.draws, true);
-  return priced.unpriced ? null : priced.children;
+  const first = open >= 0 ? open : group.index;
+  for (const index of [first, ...[...group.draws.keys()].filter(other => other !== first)]) {
+    const priced = pricedGroup(turnAt(seeds[index]), group.draws, true);
+    if (!priced.unpriced) return priced.children;
+  }
+  return null;
 }
 
 const once = <T>(read: () => T): (() => T) => {
@@ -139,7 +166,7 @@ function plainChildren(root: SimPosition, battle: Battle, rootHp: number, p1Choi
       const group = plainGroup(seeds.map(seed => drawChild(root, rootHp, p1Choice, p2Choice, seed, { scripts: new Map([[`${first}:tie`, { first }]]) })));
       if (group.unpriced) return { children: [{ position: group.pick.position, share: 1, ended: group.pick.ended }], unpriced: true, spread: true, split: once(() => splitOf(turnAt, seeds, group)) };
       const priced = pricedGroup(turnAt(seeds[group.index]), group.draws, group.spread);
-      return { ...priced, split: () => (priced.unpriced ? null : priced.children) };
+      return { ...priced, split: priced.unpriced ? once(() => splitOf(turnAt, seeds, group)) : () => priced.children };
     });
     const delaySplit = once(() => {
       const parts = orders.map(order => order.split());

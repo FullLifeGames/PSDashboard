@@ -2,10 +2,11 @@ import { describe, expect, test } from 'vitest';
 import { rollsStall } from '../src/dex-facts/protect';
 import { loadSimMods } from '../src/forward/sim-mods';
 import type { Battle } from '@pkmn/sim';
-import { mon, playClicks, seedOf, type Mode, type Rules } from './dice-fixtures';
+import { mon, playClicks, seedOf, sweepSelection, type Mode, type Rules } from './dice-fixtures';
+import { endgameChildren } from '../src/endgame/children';
 import { dexOfRules, SWEEP_CASES, sweepMoves } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
-import { delayBoard, foeClick, ownClick, proofOf, strikeOf } from './forced-win-delay-support';
+import { chancesOf, delayBoard, foeClick, missOf, ownClick, PP_LISTS, proofOf, stalledCell, strikeOf, WELL_UNDER_100 } from './forced-win-delay-support';
 
 // `DICE_SWEEPS=full` plays every stalling move of a rule set; a plain run plays the sample of `sweepSelection`.
 await loadSimMods('gen9championsou');
@@ -100,6 +101,38 @@ describe.each(WITH_STALL)('a repeated stall is a delay, $name', ({ rules, mode }
       const rates = [1, 2].map(slot => winRate(seed => kind.build(rules, mode, seed), own, foeClick(slot)));
       expect(proof.mass, `the rollouts win ${rates.join(' and ')}`).toBeLessThanOrEqual(Math.min(...rates) + 0.1);
     });
+  });
+});
+
+describe.each(WITH_STALL.filter(({ rules }) => has(rules, ['protect'])))('a repeated Protect against a move that can miss, $name', ({ rules, mode }) => {
+  const miss = missOf(rules, mode, WELL_UNDER_100);
+
+  test('the rule set has a move under 100 % that knocks a 1 HP body out', () => {
+    expect(miss, 'a move that can miss').not.toBeNull();
+  });
+
+  test('the second Protect: every cell whose draws disagree is priced through its dice, and a hit is the failure times the recorded chance', () => {
+    for (const pp of sweepSelection(PP_LISTS, 'pool')) {
+      const cell = stalledCell(rules, mode, miss!, 'protect', pp);
+      const children = endgameChildren(cell.root, cell.own, cell.foe);
+      if (!children.unpriced) continue;
+      const read = children.delaySplit?.();
+      expect(read, `own PP ${pp.own}, foe PP ${pp.foe}: the recorded dice explain every draw`).toBeTruthy();
+      const { hold, hit } = chancesOf(cell);
+      expect(read!.reduce((total, child) => total + child.share, 0)).toBeLessThanOrEqual(1 + 1e-12);
+      expect(read!.filter(child => child.ended).reduce((total, child) => total + child.share, 0), `own PP ${pp.own}, foe PP ${pp.foe}`).toBeCloseTo((1 - hold) * hit, 12);
+    }
+  });
+
+  test('a foe at 1 HP whose Protect PP the attacker\'s PP passes: the proof claims no more than the rollouts win', () => {
+    const build = (seed: string): Battle => {
+      const battle = delayBoard(rules, mode, miss!.id, { stall: 'protect' }, seed);
+      battle.sides[1].active[0]!.moveSlots[0].pp = 4;
+      return battle;
+    };
+    const proof = proofOf(build('1,2,3,4'), rules);
+    const rates = [1, 2].map(slot => winRate(build, miss!.click, foeClick(slot)));
+    expect(proof.mass, `the rollouts win ${rates.join(' and ')}`).toBeLessThanOrEqual(Math.min(...rates) + 0.1);
   });
 });
 
