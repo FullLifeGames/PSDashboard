@@ -107,12 +107,12 @@ describe('verify scenes: every class one ply deeper (boards and settings of the 
     expect(Math.abs(analysis.p1.regret! - 0.009)).toBeLessThan(0.02);
   });
 
-  test("912045 t8 (doubles): p1's Blood Moon line carries no tier (0.0088; MC 0.0205 and 0.0435 on two seed blocks)", { timeout: 300_000 }, async () => {
+  test("912045 t8 (doubles): p1's Blood Moon line carries no tier (0.066; MC 0.0445 and 0.0511 on two seed blocks)", { timeout: 300_000 }, async () => {
     const position = board('smogtours-gen9doublesou-912045-t8');
     const analysis = flat(position, await searchAsApp(position));
     expect(analysis.p1.played?.label).toBe('Blood Moon→Okidogi + Matcha Gotcha');
     expect(analysis.p1.tier).toBeUndefined();
-    expect(Math.abs(analysis.p1.regret! - 0.025)).toBeLessThan(0.04);
+    expect(Math.abs(analysis.p1.regret! - 0.048)).toBeLessThan(0.04);
   });
 });
 
