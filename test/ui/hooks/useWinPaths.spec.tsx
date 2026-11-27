@@ -4,6 +4,8 @@ import type { EvalResult, WinPaths, WinPathsRequest, WinStep } from '@fulllifega
 import type { PokemonSnapshot, ReplayData, TurnSnapshot } from '@fulllifegames/replay-core';
 import type { AppController } from '../../../src/hooks/useAppController';
 import { useWinPaths } from '../../../src/hooks/useWinPaths';
+import { turnCacheKey } from '../../../src/hooks/useEvalView';
+import { winPathsStoreKey, type StoredWinPaths } from '../../../src/lib/eval-cache-store';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 
@@ -22,6 +24,15 @@ vi.mock('../../../src/lib/eval/worker-client', () => ({
   },
 }));
 
+const stored = new Map<string, StoredWinPaths>();
+const saved: StoredWinPaths[] = [];
+const loaded: string[] = [];
+vi.mock('../../../src/lib/eval-cache-store', async importOriginal => ({
+  ...await importOriginal<typeof import('../../../src/lib/eval-cache-store')>(),
+  loadStoredWinPaths: vi.fn(async (key: string) => { loaded.push(key); return stored.get(key) ?? null; }),
+  saveStoredWinPaths: vi.fn(async (value: StoredWinPaths) => { saved.push(value); }),
+}));
+
 const mon = (fainted: boolean): PokemonSnapshot => ({ name: 'x', speciesForme: 'x', hp: fainted ? 0 : 100, maxhp: 100, hpPercent: fainted ? 0 : 100, status: '', fainted, isActive: false, boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 50, gender: '' });
 const side = (id: 'p1' | 'p2', fallen: number) => ({ name: id, id, pokemon: Array.from({ length: 6 }, (_, index) => mon(index < fallen)), sideConditions: {} });
 const snapshot = (turn: number, fallen1: number, fallen2: number): TurnSnapshot => ({ turn, p1: side('p1', fallen1), p2: side('p2', fallen2), field: { weather: '', terrain: '', pseudoWeather: {} }, log: [] });
@@ -34,10 +45,10 @@ const result: EvalResult = { ...evalResult('singles'), perSide: {
   p2: [rankedChoice('move bulletpunch', 'Bullet Punch', -0.2), rankedChoice('move highjumpkick', 'High Jump Kick', -0.4)],
 } };
 
-function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string> } = {}): AppController {
+function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string>; ranking?: EvalResult; fingerprint?: string } = {}): AppController {
   const analyses = [null, null, turnAnalysis(3, { p2: { ...misplayedSide('mistake'), played: rankedChoice('move highjumpkick', 'High Jump Kick', -0.4), ...(extra.neverActed ? { neverActed: true } : {}) } }), null];
   return {
-    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, evaluation: { graph: { results: [null, null, result, null] } } },
+    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, knowledge: { setsFingerprint: extra.fingerprint ?? 'fp' }, evaluation: { graph: { results: [null, null, extra.ranking ?? result, null] } } },
     board: { timeline: { analyzableTurns: 4 } },
     analysis: { gameAnalyses: analyses },
     engine: {
@@ -51,7 +62,7 @@ function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?:
 const step = (kind: WinStep['kind'], status: WinStep['status'] = 'found'): WinStep => ({ kind, status, spent: { cells: 1, turns: 1 } });
 const flush = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-beforeEach(() => { calls.length = 0; disposed.mockClear(); });
+beforeEach(() => { calls.length = 0; disposed.mockClear(); stored.clear(); saved.length = 0; loaded.length = 0; });
 afterEach(() => vi.clearAllMocks());
 
 describe('useWinPaths', () => {
@@ -178,5 +189,68 @@ describe('useWinPaths', () => {
     unmount();
     expect(calls[0].signal.aborted).toBe(true);
     expect(disposed).toHaveBeenCalledTimes(1);
+  });
+});
+
+const doublesResult: EvalResult = { ...evalResult('doubles'), perSide: {
+  p1: [rankedChoice('move scald 1, move protect', 'Scald, Protect', 0.3)],
+  p2: [rankedChoice('move bulletpunch 1, move protect', 'Bullet Punch, Protect', -0.2), rankedChoice('move highjumpkick 1, move protect', 'High Jump Kick, Protect', -0.4)],
+} };
+
+describe('useWinPaths keeps a finished answer', () => {
+  const answer = (turn: number): WinPaths => ({ side: 'p2', turn, steps: [step('stronger'), step('luck', 'none')] });
+  const keyOf = (id: string, request: WinPathsRequest, fingerprint = 'fp') => winPathsStoreKey(turnCacheKey(id, request.turn, SNAPSHOTS.length, fingerprint), 'standard', request);
+
+  test.each([['singles', undefined], ['doubles', doublesResult]])('a stored %s answer shows its steps and reads done without rebuilding the position or asking the worker', async (_type, ranking) => {
+    const probe = vi.fn(() => Promise.resolve('{"position":true}'));
+    const { result: hook } = renderHook(() => useWinPaths(app({ ranking, acquire: probe }), REPLAY('g20', 'BKC')));
+    act(() => hook.current.show(3, 'review'));
+    await flush();
+    const request = calls[0].request;
+    calls[0].fail(new Error('cancelled'));
+    calls.length = 0;
+    probe.mockClear();
+    stored.set(keyOf('g20', request), { key: keyOf('g20', request), kind: 'winPaths', paths: answer(3), savedAt: 1 });
+    act(() => hook.current.show(3, 'card'));
+    await flush();
+    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', from: 'card', status: 'done', steps: [{ kind: 'stronger' }, { kind: 'luck' }] });
+    expect(probe).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  test.each([['singles', undefined], ['doubles', doublesResult]])('a finished %s search saves its answer under the turn\'s key', async (_type, ranking) => {
+    const { result: hook } = renderHook(() => useWinPaths(app({ ranking }), REPLAY('g21', 'BKC')));
+    act(() => hook.current.show(3, 'review'));
+    await flush();
+    await act(async () => { calls[0].finish(answer(3)); });
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ key: keyOf('g21', calls[0].request), kind: 'winPaths', paths: answer(3) });
+    expect(hook.current.run?.status).toBe('done');
+  });
+
+  test('a failed or a stopped search saves nothing', async () => {
+    const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g22', 'BKC')));
+    act(() => hook.current.show(3, 'review'));
+    await flush();
+    await act(async () => { calls[0].fail(new Error('the worker broke')); });
+    act(() => hook.current.show(3, 'review'));
+    await flush();
+    act(() => hook.current.hide());
+    await act(async () => { calls[1].fail(new Error('cancelled')); });
+    expect(saved).toHaveLength(0);
+  });
+
+  test('another sets fingerprint reads another key and so finds nothing', async () => {
+    const first = renderHook(() => useWinPaths(app(), REPLAY('g23', 'BKC')));
+    act(() => first.result.current.show(3, 'review'));
+    await flush();
+    const key = keyOf('g23', calls[0].request);
+    stored.set(key, { key, kind: 'winPaths', paths: answer(3), savedAt: 1 });
+    const other = renderHook(() => useWinPaths(app({ fingerprint: 'fp2' }), REPLAY('g23', 'BKC')));
+    act(() => other.result.current.show(3, 'review'));
+    await flush();
+    expect(other.result.current.run?.status).toBe('searching');
+    expect(loaded).toContain(keyOf('g23', calls[0].request, 'fp2'));
+    expect(loaded.at(-1)).not.toBe(key);
   });
 });
