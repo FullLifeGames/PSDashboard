@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
+import { Battle, State, Teams, toID } from '@pkmn/sim';
+import type { PokemonSet } from '@pkmn/sim';
+import { searchOrchestrated } from '../src/orchestrator';
+import { createLocalExecutor, searchPosition } from '../src/search';
+import type { EvalResult, EvalSettings } from '../src/types';
 import {
   applyTrendExtrapolation, applyTrendTiebreak, cellKey, rankFromMatrix, selectTieProbeCells,
   solveMatrixGame, toResult, TIE_EPSILON, TREND_MARGIN, type ValueMatrix,
@@ -210,7 +216,7 @@ describe('horizon-trend extrapolation (2b)', () => {
     expect(matrix.values[2][0]).toBe(-0.5);
     expect(result.perSide.p1.map(choice => choice.choice)).toEqual(['p1c1', 'p1c0', 'p1c2']);
     expect(result.perSide.p1[0].ev - result.perSide.p1[1].ev).toBeCloseTo(0.05, 10);
-    expect(result.perSide.p1[0].worstCase).toBeCloseTo(0.125, 10);
+    expect(result.perSide.p1[0].worstCase).toBe(0.1);
     // The solved score stays: re-solving lets the opponent re-weight toward the corrected row's punishers.
     expect(result.score).toBe(scoreBefore);
   });
@@ -292,4 +298,84 @@ describe('horizon-trend extrapolation (2b)', () => {
     expect(applyTrendExtrapolation(matrix, result, new Map([[cellKey(0, 0), -0.5]]), 0.5)).toBe(false);
     expect(matrix.values[0][0]).toBe(0.3);
   });
+});
+
+describe('the floor of a trend-corrected row stays its lowest cell', () => {
+  function expectFloorsInTable(result: EvalResult): number {
+    const table = result.matrix!;
+    let rows = 0;
+    for (const side of ['p1', 'p2'] as const) {
+      const choices = side === 'p1' ? table.p1Choices : table.p2Choices;
+      const labels = side === 'p1' ? table.p2Labels : table.p1Labels;
+      for (const row of result.perSide[side]) {
+        const index = choices.indexOf(row.choice);
+        const line = side === 'p1' ? table.values[index] : table.values.map(values => -values[index]);
+        const floor = Math.min(...line);
+        expect(row.worstCase, `${side} ${row.label}`).toBe(floor);
+        expect(row.punishedBy, `${side} ${row.label}`).toBe(labels[line.indexOf(floor)]);
+        rows++;
+      }
+    }
+    return rows;
+  }
+
+  test('both sides: tied rows keep floor and punisher while ev takes the shift', () => {
+    const matrix: ValueMatrix = {
+      p1Options: [{ choice: 'p1c0', label: 'P1 0' }, { choice: 'p1c1', label: 'P1 1' }],
+      p2Options: [{ choice: 'p2c0', label: 'P2 0' }, { choice: 'p2c1', label: 'P2 1' }],
+      values: [[0.1, 0.1], [0.1, 0.1]],
+      ended: [[false, false], [false, false]],
+    };
+    const result = toResult(rankFromMatrix(matrix, 0), 1);
+    const before = new Map(['p1', 'p2'].flatMap(side =>
+      result.perSide[side as 'p1' | 'p2'].map(row => [`${side} ${row.choice}`, { ...row }] as const)));
+    const trends = new Map([
+      [cellKey(0, 0), -0.2], [cellKey(0, 1), -0.2], [cellKey(1, 0), +0.2], [cellKey(1, 1), 0],
+    ]);
+    expect(applyTrendExtrapolation(matrix, result, trends, 0.5)).toBe(true);
+    expectFloorsInTable(result);
+    for (const side of ['p1', 'p2'] as const) {
+      const moved = result.perSide[side].filter(row => row.ev !== before.get(`${side} ${row.choice}`)!.ev);
+      expect(moved.length, side).toBeGreaterThan(0);
+      for (const row of result.perSide[side]) {
+        expect(row.expected, `${side} ${row.choice}`).toBe(before.get(`${side} ${row.choice}`)!.expected);
+      }
+    }
+  });
+
+  const position = JSON.parse(readFileSync(
+    new URL('./fixtures/positions/smogtours-gen6ou-649664-t14-g1.json', import.meta.url), 'utf-8')) as {
+    serialized: string; tera: boolean; sleepClause: boolean; ruleset: EvalSettings['ruleset']; keepPlayed: EvalSettings['keepPlayed'];
+  };
+  const settings: EvalSettings = {
+    depth: 1, samples: 1, mode: 'matrix', tera: position.tera, sleepClause: position.sleepClause,
+    ruleset: position.ruleset, keepPlayed: position.keepPlayed, prove: false,
+  };
+
+  test('singles matrix turn, sync and orchestrated: every row reads a cell of the table', async () => {
+    const sync = searchPosition(position.serialized, settings);
+    expect(expectFloorsInTable(sync)).toBeGreaterThan(0);
+    const orchestrated = await searchOrchestrated(createLocalExecutor(position.serialized, position.ruleset), settings);
+    expectFloorsInTable(orchestrated);
+    expect(orchestrated.perSide).toEqual(sync.perSide);
+  }, 120_000);
+
+  test('doubles lead matrix: every lead row reads a cell of the table', () => {
+    const set = (name: string, species: string, moves: string[]): PokemonSet => ({
+      name, species, item: '', ability: 'No Ability', moves, nature: 'Hardy',
+      evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+      ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
+    });
+    const team = (moves: string[]) => Teams.pack([
+      set('A', 'Machamp', moves), set('B', 'Snorlax', moves), set('C', 'Blissey', moves), set('D', 'Chansey', moves),
+    ]);
+    const preview = new Battle({
+      formatid: toID('gen9doublescustomgame'), seed: '1,2,3,4',
+      p1: { name: 'Alpha', team: team(['Karate Chop', 'Growl']) },
+      p2: { name: 'Beta', team: team(['Tackle', 'Growl']) },
+    });
+    const result = searchPosition(JSON.stringify(State.serializeBattle(preview)), { depth: 1, samples: 1, tera: false });
+    expect(result.perSide.p1[0].label).toMatch(/^Lead /);
+    expect(expectFloorsInTable(result)).toBeGreaterThan(0);
+  }, 120_000);
 });
