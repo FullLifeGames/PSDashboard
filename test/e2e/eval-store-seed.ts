@@ -80,7 +80,7 @@ export interface OpenedReplay {
 }
 
 export async function openReplayAnalysis(
-  page: Page, replay: ReplayData, settings: AnalysisSettings, options: { seed?: string } = {},
+  page: Page, replay: ReplayData, settings: AnalysisSettings, options: { seed?: string; prefs?: Record<string, unknown> } = {},
 ): Promise<OpenedReplay> {
   const guard = createSearchGuard(options.seed ?? 'no saved file');
   const seeded = options.seed !== undefined && !evalStoreLive();
@@ -90,7 +90,7 @@ export async function openReplayAnalysis(
   await page.evaluate(prefs => {
     localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
     localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ ...prefs, auto: false, tera: 'auto' }));
-  }, { depth: settings.depth, samples: settings.samples, mode: settings.mode });
+  }, { depth: settings.depth, samples: settings.samples, mode: settings.mode, ...options.prefs });
   if (seeded) await seedEvalStore(page, options.seed!);
   await page.reload();
   // Registered last, so it answers before routeOfflineFixtures' default replay.
