@@ -197,6 +197,19 @@ describe('EvalLeadAnalysis', () => {
   });
 });
 
+describe('EvalTurnAnalysis, a doubles slot with no logged action', () => {
+  test.each([['fell', 'Orthworm was knocked out before it moved, so the log shows no choice'], ['ended', 'Orthworm was cut off by the end of the game, so the log shows no choice']] as const)(
+    'the card names the body of the slot from the turn\'s snapshot (%s)', (reason, words) => {
+      const pair = rankedChoice('move 1, move 2', 'Iron Defense + Protect', 0.2);
+      const side = sideAnalysis({ playedRaw: null, playedSlots: [null, { kind: 'move', name: 'Protect' }], played: pair, best: pair, safe: pair, playedPartial: true, noChoiceSlots: [{ slot: 0, reason }] });
+      const snapshot = { p1: { pokemon: [{ name: 'Orthworm', isActive: true, slot: 0 }, { name: 'Dragonite', isActive: true, slot: 1 }] }, p2: { pokemon: [] } };
+      const host = { rules: { gen: 9, mod: undefined }, snapshot } as unknown as Parameters<typeof EvalTurnAnalysis>[0]['linesHost'];
+      render(<EvalTurnAnalysis analysis={turnAnalysis(7, { p1: side })} playerNames={names} linesHost={host} doubles />);
+      expect(screen.getByText(`· ${words}`)).toBeInTheDocument();
+      expect(screen.getAllByText(/^played /)[0]).toHaveTextContent(`played Protect (${winPctText(0.2)})`);
+    });
+});
+
 describe('EvalTurnAnalysis, the endgame entry', () => {
   const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
 
