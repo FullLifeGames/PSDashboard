@@ -32,7 +32,8 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   const { prefs, setPrefs } = app.ctx.evaluation;
-  const showTera = useFormatOffersTera(inferReplayFormatId(replayData), true);
+  const teraProbe = useFormatOffersTera(inferReplayFormatId(replayData), true);
+  const teraPending = teraProbe.pending && isGameId(replayData.id) && prefs.tera === 'auto';
   return (
     <AppTopBar
       replayData={replayData}
@@ -51,7 +52,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
       search={{
-        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin', showTera, engines: app.ctx.engines,
+        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin', showTera: teraProbe.offers, teraPending, engines: app.ctx.engines,
         running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
       }}
       embed={embed}

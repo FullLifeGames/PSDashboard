@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-/** Whether the simulator lets a format Terastallize; false until the lazy probe answers or while `wanted` is off. */
-export function useFormatOffersTera(formatId: string, wanted: boolean): boolean {
+/** Whether the simulator lets a format Terastallize, and whether the lazy probe still owes its answer. */
+export function useFormatOffersTera(formatId: string, wanted: boolean): { offers: boolean; pending: boolean } {
   const [answer, setAnswer] = useState<{ formatId: string; offers: boolean } | null>(null);
   useEffect(() => {
     if (!wanted) return undefined;
@@ -11,5 +11,6 @@ export function useFormatOffersTera(formatId: string, wanted: boolean): boolean 
     });
     return () => { current = false; };
   }, [formatId, wanted]);
-  return wanted && answer?.formatId === formatId && answer.offers;
+  const answered = answer?.formatId === formatId;
+  return { offers: wanted && answered && answer.offers, pending: wanted && !answered };
 }
