@@ -55,7 +55,7 @@ describe('the callers of the simulator', () => {
       'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts',
       'eval-engine:calc/typeless.ts', 'eval-engine:damage-calc.ts', 'eval-engine:score/move-facts.ts',
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
-      'replay-core:inference/trigger-evidence.ts',
+      'replay-core:inference/trigger-evidence.ts', 'replay-core:inference/spent-items.ts', 'replay-core:inference/contact-tell.ts',
       // Held to the simulator by replay-core's field-item-triggers-sweep.spec.ts.
       'replay-core:inference/field-item-triggers.ts',
       // Held to the simulator by replay-core's hit-power-census.spec.ts and hit-power-played.spec.ts.

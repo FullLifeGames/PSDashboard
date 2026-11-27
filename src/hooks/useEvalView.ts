@@ -5,6 +5,7 @@ import {
   type GameRules, type OpponentTeamInfo, type ReplayData, type TurnSnapshot, formatEnforcesSleepClause,
   getBranchSimulatorFormat, inferReplayFormatId, logRules, replayRuleset,
 } from '@fulllifegames/replay-core';
+import { useFormatOffersTera } from './useFormatOffersTera';
 import { resolveAutoTurnSettings, type TurnEvalSettings, useEvaluation } from './useEvaluation';
 import type { EvaluateParams } from './evaluation/single-eval';
 import type { useEvalAcquire } from './useEvalAcquire';
@@ -65,12 +66,12 @@ export interface EvalViewInputs {
 
 function useEvalFormat(inputs: EvalViewInputs) {
   const { replayData, evaluation, replayGameType } = inputs;
-  // Tera 'auto': a new game follows its format; a replay stays off until someone terastallized (draft: per species).
+  const formatId = replayData ? inferReplayFormatId(replayData) : '';
+  const newGame = !!replayData && isGameId(replayData.id);
+  const newGameOffersTera = useFormatOffersTera(formatId, newGame && evaluation.prefs.tera === 'auto');
   const effectiveTera = useMemo(
-    () => (replayData
-      ? resolveTeraPreference(evaluation.prefs.tera, inferReplayFormatId(replayData), replayData.log, { newGame: isGameId(replayData.id) })
-      : false),
-    [replayData, evaluation.prefs.tera],
+    () => (replayData ? resolveTeraPreference(evaluation.prefs.tera, formatId, replayData.log, { newGameOffersTera }) : false),
+    [replayData, formatId, evaluation.prefs.tera, newGameOffersTera],
   );
   // Serialization strips custom rules, so the eval candidate filter needs a Sleep Clause flag from the branch format.
   const effectiveSleepClause = useMemo(
