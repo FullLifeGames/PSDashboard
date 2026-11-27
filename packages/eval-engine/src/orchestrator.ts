@@ -168,13 +168,10 @@ async function applyTrendLayersAsync(state: Orchestration, result: EvalResult, s
     });
     for (const [key, drawTrends] of trends) state.trendMap.set(key, meanTrend(drawTrends));
   }
-  // 2b, mirroring searchPosition: corrected values (no re-solve) before
-  // the ordering-only tiebreak runs on what remains tied.
   applyTrendExtrapolation(state.matrix, result, state.trendMap);
   applyTrendTiebreak(state.matrix, result, state.trendMap);
 }
 
-// Mirrors the sync search's `deepenRoot`: a forced root's turn after each replacement, then one deepening per depth.
 async function deepenRootAsync(
   state: Orchestration, forced: boolean, payload: RootPayload, first: EvalResult,
 ): Promise<{ result: EvalResult; stopped: boolean }> {
