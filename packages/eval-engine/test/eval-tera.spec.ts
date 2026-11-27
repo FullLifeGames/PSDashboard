@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { simFormats } from '@fulllifegames/replay-core';
 import { parseRevealedTeraSpecies, resolveTeraPreference, teraKey } from '../src/tera';
+import { teraBanned } from '../src/tera-offer';
 import { loadSimMods } from '../src/forward/sim-mods';
 
 const draftLog = [
@@ -52,38 +53,43 @@ describe('tera allowance', () => {
 
 describe('tera auto in a new game', () => {
   const quiet = draftLog.replace('|-terastallize|p2a: 61 Alphonse|Water\n', '');
-  const newGame = { newGame: true };
+  const newGame = (format: string) => ({ newGameOffersTera: !teraBanned(format) });
 
   test.each([
     ['singles', 'gen9ou'],
     ['doubles', 'gen9doublesou'],
     ['vgc', 'gen9vgc2025regi'],
   ])('%s: a ladder format allows Tera before anyone terastallized, and its replay keeps the log rule', (_kind, format) => {
-    expect(resolveTeraPreference('auto', format, quiet, newGame)).toBe(true);
+    expect(resolveTeraPreference('auto', format, quiet, newGame(format))).toBe(true);
     expect(resolveTeraPreference('auto', format, quiet)).toBe(false);
-    expect(resolveTeraPreference('revealed', format, quiet, newGame)).toBe(false);
-    expect(resolveTeraPreference('off', format, quiet, newGame)).toBe(false);
+    expect(resolveTeraPreference('revealed', format, quiet, newGame(format))).toBe(false);
+    expect(resolveTeraPreference('off', format, quiet, newGame(format))).toBe(false);
   });
 
   test('a new game whose log shows a Tera follows the log as a replay does', () => {
-    expect(resolveTeraPreference('auto', 'gen9ou', draftLog, newGame)).toBe(true);
-    expect(resolveTeraPreference('auto', 'gen9customgame', draftLog, newGame)).toEqual({ p1: [], p2: ['Rhydon'] });
+    expect(resolveTeraPreference('auto', 'gen9ou', draftLog, newGame('gen9ou'))).toBe(true);
+    expect(resolveTeraPreference('auto', 'gen9customgame', draftLog, newGame('gen9customgame'))).toEqual({ p1: [], p2: ['Rhydon'] });
   });
 
   test.each(['gen9customgame', 'gen9doublescustomgame', 'gen9draft'])('a new %s game keeps Tera off under Auto', format => {
-    expect(resolveTeraPreference('auto', format, quiet, newGame)).toBe(false);
+    expect(resolveTeraPreference('auto', format, quiet, { newGameOffersTera: true })).toBe(false);
   });
 
-  test('a format whose rule table holds the Terastal Clause, and a generation without Tera, stay off', () => {
+  test('a new game whose format the caller did not clear stays off', () => {
+    expect(resolveTeraPreference('auto', 'gen9ou', quiet, {})).toBe(false);
+    expect(resolveTeraPreference('auto', 'gen9ou', quiet, { newGameOffersTera: false })).toBe(false);
+  });
+
+  test('a format whose rule table holds the Terastal Clause, and a generation without Tera, are banned', () => {
     expect(simFormats().getRuleTable(simFormats().get('gen9monotype')).has('terastalclause')).toBe(true);
     for (const format of ['gen9monotype', 'gen9ou@@@Terastal Clause', 'gen9doublesou@@@terastalclause', 'gen8ou', 'gen8vgc2022', 'gen7ou']) {
-      expect(resolveTeraPreference('auto', format, quiet, newGame)).toBe(false);
+      expect(teraBanned(format)).toBe(true);
     }
   });
 
-  test.each(['gen9championsou', 'gen9championsvgc2026regmc'])('%s: the mod offers no Tera, so Auto stays off', async format => {
+  test.each(['gen9championsou', 'gen9championsvgc2026regmc'])('%s: the mod offers no Tera, so it is banned', async format => {
     await loadSimMods(format);
-    expect(resolveTeraPreference('auto', format, quiet, newGame)).toBe(false);
+    expect(teraBanned(format)).toBe(true);
   });
 
   test('every registered format answers as its rule table says: on for a generation 9 format without the clause', () => {
@@ -91,7 +97,7 @@ describe('tera auto in a new game', () => {
     for (const format of simFormats().all()) {
       if (format.mod !== 'gen9' || /draft|customgame/.test(format.id)) continue;
       const allowed = !simFormats().getRuleTable(format).has('terastalclause');
-      if (resolveTeraPreference('auto', format.id, quiet, newGame) !== allowed) wrong.push(format.id);
+      if (resolveTeraPreference('auto', format.id, quiet, newGame(format.id)) !== allowed) wrong.push(format.id);
     }
     expect(wrong).toEqual([]);
   });

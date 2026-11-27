@@ -31,14 +31,16 @@ const BY_STAND_IN: Row[] = [
   { id: 'smogtours-gen6ou-653785', turn: 23 }, { id: 'gen9vgc2026regi-2629703929', turn: 9 }, { id: 'gen9championsvgc2026regmc-2695803506', turn: 1 },
 ];
 const BY_HIT_DIE: Row[] = [{ id: 'gen9championsou-2628340185', turn: 13 }];
-const BY_BUILD: Row[] = [{ id: 'gen9doublesou-2663093831', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 9 }, { id: 'gen9doublesou-2663093831', turn: 10 }];
+const BY_BUILD: Row[] = [
+  { id: 'gen9doublesou-2663093831', turn: 8 }, { id: 'gen9doublesou-2663093831', turn: 9 }, { id: 'gen9doublesou-2663093831', turn: 10 },
+  { id: 'smogtours-gen9doublesou-912045', turn: 9 },
+];
 const RESOLVED = [...BY_FORCING, ...BY_FAINT_STEP, ...BY_STAND_IN, ...BY_HIT_DIE, ...BY_BUILD];
 
 interface Residual extends Row { cause: string; stays: string | null }
 const RESIDUALS: Residual[] = [
   { id: 'smogtours-gen6ou-648453', turn: 4, cause: 'damage model: the simulator keeps Rotom alive that the log\'s hit knocked out (no step of the roll kills it)', stays: null },
   { id: 'gen9championsou-2628340185', turn: 23, cause: 'damage model: the log shows the Shadow Sneak of Aegislash leaving Floette at 1/100, the roll of the simulator knocks Floette out first (no unlogged choice: the move of Aegislash is in the log)', stays: 'moveCount p1:floette:moonblast log=1 sim=0' },
-  { id: 'smogtours-gen9doublesou-912045', turn: 9, cause: 'build: an item (Throat Spray) the log disproves', stays: 'secondaries p1:ursaluna:boost:spa:1 log=0 sim=1' },
   { id: 'smogtours-gen9doublesou-912045', turn: 1, cause: 'damage model: the simulator deals half of the log\'s damage to Rillaboom', stays: 'faint log-only p2:rillaboom' },
   { id: 'gen9vgc2026regi-2630685175', turn: 3, cause: 'unlogged aim: a charge move\'s |move| line names no target (the aim sits in |-anim|)', stays: null },
   { id: 'gen9vgc2026regi-2630685175', turn: 9, cause: 'damage model and a premature end: the log\'s crit leaves Zamazenta alive, a forced crit ends the game in the simulator (ruling Q2: the fallback takes this turn)', stays: null },
@@ -143,10 +145,10 @@ describe.each(['singles', 'doubles', 'vgc'] as GameType[])('the rebuild plays th
 });
 
 describe('the counts of the drift line', () => {
-  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 2, VGC 2)', () => {
+  test('the named rows that miss the log: the residuals (singles 2, Doubles OU 1, VGC 2)', () => {
     const imperfect = [...RESOLVED, ...RESIDUALS].filter(row => !isPerfectAlignment(recordOf(row).actual));
     const byType = (type: GameType) => imperfect.filter(row => typeOf(row.id) === type).length;
-    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 2, vgc: 2, total: 6 });
+    expect({ singles: byType('singles'), doubles: byType('doubles'), vgc: byType('vgc'), total: imperfect.length }).toEqual({ singles: 2, doubles: 1, vgc: 2, total: 5 });
   });
 
   test('the seeded turns of the twelve replays: only 2630685175 turn 3, a named residual', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { logRules } from '@fulllifegames/replay-core';
 import { configureSearchBudget, parsePlayedActions, parseSearchBudget, replacementRounds, type EvalResult } from '@fulllifegames/eval-engine';
 import { useEvalView, type EvalViewInputs } from '../../../src/hooks/useEvalView';
@@ -408,10 +408,11 @@ describe('useEvalView Tera Auto', () => {
     ['vgc', 'gen9vgc2025regi', 'doubles', true],
     ['a Custom Game', 'gen9customgame', 'singles', false],
     ['a Terastal Clause format', 'gen9monotype', 'singles', false],
-  ] as const)('Tera Auto in a new game of %s follows the format; the replay of the same log stays off', (_kind, formatid, replayGameType, allowed) => {
+  ] as const)('Tera Auto in a new game of %s follows the format; the replay of the same log stays off', async (_kind, formatid, replayGameType, allowed) => {
     const { evaluation } = evaluationOf();
-    const tera = (id: string) => renderHook(() => useEvalView(inputs(evaluation, { replayData: { ...replayData, id, formatid }, replayGameType }))).result.current.effectiveTera;
-    expect(tera('newgame-abcdefghij')).toBe(allowed);
-    expect(tera('gen9ou-1234567890')).toBe(false);
+    const tera = (id: string) => renderHook(() => useEvalView(inputs(evaluation, { replayData: { ...replayData, id, formatid }, replayGameType }))).result;
+    const game = tera('newgame-abcdefghij');
+    await waitFor(() => expect(game.current.effectiveTera).toBe(allowed));
+    expect(tera('gen9ou-1234567890').current.effectiveTera).toBe(false);
   });
 });
