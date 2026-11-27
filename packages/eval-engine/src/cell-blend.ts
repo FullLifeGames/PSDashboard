@@ -2,7 +2,7 @@ import type { Battle, Pokemon } from '@pkmn/sim';
 import { boundaryEvent, randomCallMoves, type BoundaryEvent } from './ko-odds.ts';
 import { pairKoOdds } from './pair/odds.ts';
 import { accuracyRollReached } from './search/event-reach.ts';
-import { eventDefender, moveIdOf, type EventDefender } from './cell-defender.ts';
+import { eventDefender, moveIdOf } from './cell-defender.ts';
 import { stopsHits } from './dex-facts/protect.ts';
 import { dieTokens, eventSecondaries, hitClasses, hitKey, type EventSecondary, type SecondaryDie } from './search/secondary-classes.ts';
 import type { KoOddsInfo } from './types.ts';
@@ -14,7 +14,7 @@ export interface CellEvent {
   /** Protocol ident of the event's defender, e.g. "p2a: Medicham" (nickname). */
   defenderIdent: string;
   event: BoundaryEvent;
-  /** Secondary entries against this defender (search/secondary-classes.ts); absent when it is not on the field yet. */
+  /** Secondary entries against this defender, read with it in the slot (search/secondary-classes.ts). */
   secondary?: EventSecondary[];
 }
 
@@ -54,8 +54,8 @@ function unpricedMovePlan(dex: RulesDex, move: DexMove): SideEventPlan {
   return { kind: 'skip' };
 }
 
-function pricedEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, { body: defender, incoming }: EventDefender, event: BoundaryEvent): SideEventPlan {
-  const secondary = incoming ? undefined : eventSecondaries(battle, `${side}a`, moveId, defender);
+function pricedEvent(battle: Battle, side: 'p1' | 'p2', moveId: string, defender: Pokemon, event: BoundaryEvent): SideEventPlan {
+  const secondary = eventSecondaries(battle, `${side}a`, moveId, defender);
   if (secondary === null) return { kind: 'fail' };
   const priced = !!secondary?.length && event.killFraction < 1;
   if (event.accuracy < 1 || (event.killFraction > 0 && event.killFraction < 1) || priced) {
@@ -85,7 +85,7 @@ function planSideEvent(battle: Battle, side: 'p1' | 'p2', choice: string, oppCho
     const [p1Choice, p2Choice] = side === 'p1' ? [choice, oppChoice] : [oppChoice, choice];
     if (!accuracyRollReached(battle, side, move.id, p1Choice, p2Choice)) return { kind: 'skip' };
   }
-  return pricedEvent(battle, side, move.id, found, event);
+  return pricedEvent(battle, side, move.id, found.body, event);
 }
 
 export function planCellEvents(battle: Battle, p1Choice: string, p2Choice: string): CellEventPlan {

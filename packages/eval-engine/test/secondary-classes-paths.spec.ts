@@ -182,6 +182,28 @@ describe.each(SINGLES.filter(entry => entry.rules.generation >= 3))('a pivot pai
   }
 });
 
+describe('a switch to a body whose own rules remove the secondary', () => {
+  const { rules } = SINGLES.find(entry => entry.name === 'Gen 9 singles')!;
+  const planAgainst = (extra: { ability?: string; item?: string }) => {
+    const board = battleOf(rules.singles, [mon(rules, { species: FAST, moves: [ATTACK], gender: 'M' })],
+      [mon(rules, { species: 'Chansey', moves: ['splash'] }), { ...mon(rules, { species: 'Blissey', moves: ['splash'] }), ...extra }]);
+    const before = fingerprint(board, everyBody(board), ATTACK);
+    const plan = planCellEvents(board, `move ${ATTACK}`, 'switch 2');
+    expect(fingerprint(board, everyBody(board), ATTACK)).toBe(before);
+    return plan;
+  };
+
+  test('a plain bench body takes the burn at its Dex chance', () => {
+    const plan = planAgainst({});
+    expect(plan.kind).toBe('events');
+    expect((plan as { events: CellEvent[] }).events[0].secondary).toEqual([expect.objectContaining({ effectId: 'brn', chance: 0.1 })]);
+  });
+
+  test.each([{ ability: 'Shield Dust' }, { item: 'Covert Cloak' }])('%o on the bench body: the burn is no class', extra => {
+    expect(planAgainst(extra).kind).toBe('none');
+  });
+});
+
 const aimOf = (move: DexMove): string => (['normal', 'any', 'adjacentFoe'].includes(move.target) ? ' 1' : '');
 const tokensOf = (segment: string): string[] => segment.slice(segment.indexOf('=') + 1).split('+').slice(1);
 

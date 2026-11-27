@@ -22,11 +22,12 @@ export function truncates(dex: Battle['dex'], effectId: string): boolean {
   return !!condition.exists && condition.duration === 1 && typeof condition.onBeforeMove === 'function';
 }
 
-/** The entries a damaging move draws against `defender`; null when the simulator refuses (cell stays seed-priced). */
+/** The entries a damaging move draws against `defender` (a bench body read in its slot); null on refusal. */
 export function eventSecondaries(battle: Battle, userSlot: string, moveId: string, defender: Pokemon): EventSecondary[] | null {
   if (battle.dex.moves.get(moveId).category === 'Status') return [];
+  const incoming = defender.isActive ? undefined : defender.side.pokemon.indexOf(defender);
   try {
-    return secondaryChances(battle, userSlot, moveId, defender.getSlot()).map(entry => ({ ...entry, truncates: truncates(battle.dex, entry.effectId) }));
+    return secondaryChances(battle, userSlot, moveId, incoming === undefined ? defender.getSlot() : `${defender.side.id}a`, incoming).map(entry => ({ ...entry, truncates: truncates(battle.dex, entry.effectId) }));
   } catch {
     return null;
   }
