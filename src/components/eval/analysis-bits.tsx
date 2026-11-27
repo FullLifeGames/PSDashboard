@@ -47,7 +47,7 @@ export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
 }) {
   if (!side.best) return null;
   const best = side.best;
-  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, best, !!opponentReads) : best.line;
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, best) : best.line;
   return (
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">

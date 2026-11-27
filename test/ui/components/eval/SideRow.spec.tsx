@@ -56,7 +56,7 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
+  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s usual line, with the opponent-reads setting on too', (kind, label) => {
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
     const line = (steps: [string, string][], extra = {}) => ({
       side: 'p1' as const, label, choice: 'move earthquake', for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50, ...extra,
@@ -71,7 +71,8 @@ describe('SideRow', () => {
     expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
     expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
     rerender(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} opponentReads />);
-    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
+    expect(screen.queryByText('then Rock Slide · Taunt')).toBeNull();
     rerender(<SideRow name="Alice" side={side} rowLines={{ result: evalResult('singles'), side: 'p1' }} />);
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });

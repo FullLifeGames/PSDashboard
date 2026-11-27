@@ -16,7 +16,7 @@ describe('rowLineTail', () => {
 
   test('singles: the row reads the later steps of its line, not the principal variation', () => {
     const result = evalResult('singles', { lines: [usual] });
-    const tail = rowLineTail(result, 'p1', row, false);
+    const tail = rowLineTail(result, 'p1', row);
     expect(tail && formatLine(tail)).toBe('Roost · Encore → Roost · Encore');
   });
 
@@ -28,7 +28,7 @@ describe('rowLineTail', () => {
       { p1: waiting(2), p2: pick('pass + → Zamazenta', 2), replacement: 'p2', dice: [] },
       step('Flare Blitz → Rillaboom + Rage Powder', 'Taunt → Amoonguss + Wood Hammer → Incineroar'),
     ]);
-    const tail = rowLineTail(evalResult('doubles', { lines: [line] }), 'p1', best, false);
+    const tail = rowLineTail(evalResult('doubles', { lines: [line] }), 'p1', best);
     expect(tail && formatLine(tail)).toBe('replaces: → Zamazenta, Flare Blitz → Rillaboom + Rage Powder · Taunt → Amoonguss + Wood Hammer → Incineroar');
   });
 
@@ -37,35 +37,34 @@ describe('rowLineTail', () => {
     const line = lineOf('p1', 'U-turn', [
       step('U-turn', 'Protect'), { p1: pick('→ Keldeo'), p2: waiting(), replacement: 'p1', dice: [] }, step('Hydro Pump', 'Scald'),
     ]);
-    const tail = rowLineTail(evalResult('singles', { lines: [line] }), 'p1', pair, false);
+    const tail = rowLineTail(evalResult('singles', { lines: [line] }), 'p1', pair);
     expect(tail && formatLine(tail)).toBe('Hydro Pump · Scald');
   });
 
-  test('Hard mode: the worst line of the row, as the Lines section shows it', () => {
+  test('a worst line beside the usual one never reaches the tail, so the tail continues the line its percentage belongs to', () => {
     const worst = lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'Fake Out'), step('Dragon Claw', 'Protect')], { versus: 'worst' });
-    const result = evalResult('singles', { lines: [usual, worst] });
-    expect(formatLine(rowLineTail(result, 'p1', row, true)!)).toBe('Dragon Claw · Protect');
-    expect(formatLine(rowLineTail(result, 'p1', row, false)!)).toBe('Roost · Encore → Roost · Encore');
+    const result = evalResult('singles', { lines: [worst, usual] });
+    expect(formatLine(rowLineTail(result, 'p1', row)!)).toBe('Roost · Encore → Roost · Encore');
   });
 
   test('a result without lines (a matrix result, an old stored result): the principal variation as before', () => {
-    expect(rowLineTail(evalResult('singles'), 'p1', row, false)).toEqual(pv);
-    expect(rowLineTail(null, 'p1', row, false)).toEqual(pv);
+    expect(rowLineTail(evalResult('singles'), 'p1', row)).toEqual(pv);
+    expect(rowLineTail(null, 'p1', row)).toEqual(pv);
   });
 
   test('lines present but none for the row, or only the first step: no tail', () => {
     const other = lineOf('p1', 'Roost', [step('Roost', 'Encore'), step('Roost', 'Encore')]);
-    expect(rowLineTail(evalResult('singles', { lines: [other] }), 'p1', row, false)).toEqual([]);
-    expect(rowLineTail(evalResult('singles', { lines: [lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'Encore')])] }), 'p1', row, false)).toEqual([]);
-    expect(rowLineTail(evalResult('singles', { lines: [{ ...usual, side: 'p2' }] }), 'p1', row, false)).toEqual([]);
+    expect(rowLineTail(evalResult('singles', { lines: [other] }), 'p1', row)).toEqual([]);
+    expect(rowLineTail(evalResult('singles', { lines: [lineOf('p1', 'Dragon Dance', [step('Dragon Dance', 'Encore')])] }), 'p1', row)).toEqual([]);
+    expect(rowLineTail(evalResult('singles', { lines: [{ ...usual, side: 'p2' }] }), 'p1', row)).toEqual([]);
   });
 
   test('a row whose only line is the played one shows no tail', () => {
     const quiet = rankedChoice('move roost', 'Roost', 0.2);
     const played = lineOf('p1', 'Roost', [step('Roost', 'Encore'), step('Roost', 'Encore')], { for: ['played'] });
-    expect(rowLineTail(evalResult('singles', { lines: [played] }), 'p1', quiet, false)).toEqual([]);
+    expect(rowLineTail(evalResult('singles', { lines: [played] }), 'p1', quiet)).toEqual([]);
     const both = { ...played, for: ['engine', 'played'] as EvalLine['for'] };
-    expect(formatLine(rowLineTail(evalResult('singles', { lines: [both] }), 'p1', quiet, false)!)).toBe('Roost · Encore');
+    expect(formatLine(rowLineTail(evalResult('singles', { lines: [both] }), 'p1', quiet)!)).toBe('Roost · Encore');
   });
 
   test.each(['singles', 'doubles'] as const)('%s: both sides\' best rows carry a tail on a tree result, though only P1\'s row holds the line', game => {
@@ -76,8 +75,8 @@ describe('rowLineTail', () => {
       lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Dragon Claw', 'Protect')]),
     ];
     const result = evalResult(game, { lines });
-    expect(formatLine(rowLineTail(result, 'p1', p1, false)!)).toBe('Roost · Encore');
-    expect(formatLine(rowLineTail(result, 'p2', p2, false)!)).toBe('Dragon Claw · Protect');
+    expect(formatLine(rowLineTail(result, 'p1', p1)!)).toBe('Roost · Encore');
+    expect(formatLine(rowLineTail(result, 'p2', p2)!)).toBe('Dragon Claw · Protect');
   });
 
   test('doubles replacement card: the waiting row carries no tail, the choosing row the steps after its replacement', () => {
@@ -88,30 +87,29 @@ describe('rowLineTail', () => {
       lineOf('p2', '→ Zamazenta', [{ p1: waiting(2), p2: pick('pass + → Zamazenta', 2), replacement: 'p2', dice: [] }, step('Protect + Protect', 'Tailwind + Protect')], { choice: 'switch 3' }),
     ];
     const result = evalResult('doubles', { lines });
-    expect(rowLineTail(result, 'p1', wait, false)).toEqual([]);
-    expect(formatLine(rowLineTail(result, 'p2', choosing, false)!)).toBe('Protect + Protect · Tailwind + Protect');
+    expect(rowLineTail(result, 'p1', wait)).toEqual([]);
+    expect(formatLine(rowLineTail(result, 'p2', choosing)!)).toBe('Protect + Protect · Tailwind + Protect');
   });
 
   test('a result without lines whose row line crosses a replacement: the matrix line reads it as the Lines section does', () => {
     const crossing = rankedChoice('switch 4', '→ Iron Valiant', 0.3, {
       line: [{ p1: '(waiting)', p2: '→ Dragonite', replacement: 'p2' }, { p1: 'Power Gem', p2: 'Dragon Dance' }],
     });
-    const tail = rowLineTail(evalResult('singles'), 'p2', crossing, false);
+    const tail = rowLineTail(evalResult('singles'), 'p2', crossing);
     expect(tail && formatLine(tail)).toBe('replaces: → Dragonite, Power Gem · Dragon Dance');
   });
 
   test('a result without lines (singles at depth 2): the waiting row shows no tail, a normal row keeps its line', () => {
     const wait = rankedChoice('wait', '(waiting)', 0.3, { line: pv });
-    expect(rowLineTail(evalResult('singles'), 'p1', wait, false)).toEqual([]);
-    expect(rowLineTail(evalResult('singles'), 'p2', row, false)).toEqual(pv);
+    expect(rowLineTail(evalResult('singles'), 'p1', wait)).toEqual([]);
+    expect(rowLineTail(evalResult('singles'), 'p2', row)).toEqual(pv);
   });
 
-  test('Hard mode: the worst line reaches the second player\'s best row as it reaches the first player\'s', () => {
+  test('a worst line beside the usual one never reaches the second player\'s best row either', () => {
     const best = rankedChoice('move encore', 'Encore', 0.2);
     const usual2 = lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Roost', 'Encore')]);
     const worst2 = lineOf('p2', 'Encore', [step('Dragon Dance', 'Encore'), step('Dragon Claw', 'Protect')], { versus: 'worst' });
-    const result = evalResult('singles', { lines: [usual2, worst2] });
-    expect(formatLine(rowLineTail(result, 'p2', best, true)!)).toBe('Dragon Claw · Protect');
-    expect(formatLine(rowLineTail(result, 'p2', best, false)!)).toBe('Roost · Encore');
+    const result = evalResult('singles', { lines: [worst2, usual2] });
+    expect(formatLine(rowLineTail(result, 'p2', best)!)).toBe('Roost · Encore');
   });
 });

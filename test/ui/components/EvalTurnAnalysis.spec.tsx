@@ -330,12 +330,13 @@ describe.each([
   const best = rankedChoice(base.perSide.p1[0].choice, label, 0.35, { line: [{ p1: 'Stone Edge', p2: 'Protect' }] });
   const analysis = turnAnalysis(4, { playedTracking: tracked, p1: misplayedSide('mistake', { best, safe: best }) });
 
-  test('the row reads the result\'s line; Hard mode reads the worst line', () => {
+  test('the row reads the result\'s usual line, with the opponent-reads setting on too', () => {
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} />);
     expect(screen.getByText('then Roost · Encore')).toBeInTheDocument();
     expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} opponentReads />);
-    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    expect(screen.getByText('then Roost · Encore')).toBeInTheDocument();
+    expect(screen.queryByText('then Rock Slide · Taunt')).toBeNull();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={null} />);
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });

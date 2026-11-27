@@ -190,7 +190,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore, oppon
   onExplore: Explore;
 }) {
   const { asSafe, target, swapped, value } = comparisonTarget(side, best);
-  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, target, !!opponentReads) : target.line;
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, target) : target.line;
   return (
     <>
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>

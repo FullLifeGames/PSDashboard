@@ -289,4 +289,31 @@ describe('Hard mode in the Lines section', () => {
     render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={hard()} />);
     expect(screen.getByText(`vs ${pair} (the reply the search rates lowest for this choice, ${winPctText(0.2)} in its cell)`)).toBeInTheDocument();
   });
+
+  const MARKER = 'Opponent reads your move: each line meets the reply that hurts its choice most.';
+
+  test.each([
+    ['singles', () => render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />)],
+    ['doubles', () => render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={hard()} />)],
+  ])('%s, on: the body opens with the marker line, once', (_kind, draw) => {
+    const { container } = draw();
+    const body = container.querySelector('.ps-eval-lines-body')!;
+    expect(body.firstElementChild).toHaveTextContent(MARKER);
+    expect(body.firstElementChild).toHaveClass('ps-eval-line');
+    expect(screen.getAllByText(MARKER)).toHaveLength(1);
+  });
+
+  test.each([
+    ['singles', () => render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />)],
+    ['doubles', () => render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={host()} />)],
+  ])('%s, off: no marker line', (_kind, draw) => {
+    draw();
+    expect(screen.queryByText(/Opponent reads your move/)).toBeNull();
+  });
+
+  test('on, and a turn without lines: the no-line sentence alone', () => {
+    const { container } = render(<LinesSection turn={20} result={withLines([])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.queryByText(/Opponent reads your move/)).toBeNull();
+    expect(container.querySelector('.ps-eval-lines-body')?.children).toHaveLength(1);
+  });
 });

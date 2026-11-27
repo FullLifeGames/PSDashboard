@@ -64,7 +64,7 @@ function ChoiceList({
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
         const tooltip = choiceTooltip(choice, !!onPickChoice, floorReplyUnlisted(result, side, choice), faintedFraction, opponentReads);
-        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice, !!opponentReads)} />;
+        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice)} />;
         return onPickChoice ? (
           <button
             key={choice.choice}

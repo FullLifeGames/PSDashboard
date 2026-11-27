@@ -4,7 +4,7 @@ import { gameReviewEnabled } from '../../lib/feature-flags';
 import { LineConfirm } from './LineConfirm';
 import { cardLines, neverActedOf, rowValueTexts } from './turn-copy';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
-import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, READS_LINES_NOTE, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -89,6 +89,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
   const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), neverActed: neverActedOf(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
     <div className="ps-eval-lines-body">
+      {host.hardMode && <span className="ps-eval-line">{READS_LINES_NOTE}</span>}
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
       {differsSentences(blocks).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
     </div>
