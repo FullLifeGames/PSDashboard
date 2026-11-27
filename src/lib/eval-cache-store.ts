@@ -169,6 +169,21 @@ export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<strin
   });
 }
 
+export async function loadStoredWinPathsByPrefix(prefix: string): Promise<StoredWinPaths[] | null> {
+  const db = await openDb();
+  if (!db) return null;
+  return new Promise(resolve => {
+    try {
+      const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(range);
+      request.onsuccess = () => resolve((request.result as (StoredEval | StoredWinPaths)[]).filter((value): value is StoredWinPaths => 'kind' in value));
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 async function put(value: StoredEval | StoredWinPaths): Promise<void> {
   const db = await openDb();
   if (!db) return;

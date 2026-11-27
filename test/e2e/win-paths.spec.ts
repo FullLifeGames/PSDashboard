@@ -8,8 +8,8 @@ import { openReplayAnalysis } from './eval-store-seed';
 import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
-// The game's sweep reads saved engine results (scripts/capture-eval-store.mjs; EVAL_STORE=live runs it live);
-// the row's own search is an on-request job that stores nothing, so it runs live in every game type.
+// The game's sweep and the job's finished answer read saved engine results (scripts/capture-eval-store.mjs;
+// EVAL_STORE=live runs both live, and the reload half then reads the answer the live job saved).
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (dir: string, name: string) => JSON.parse(readFileSync(join(here, dir, `${name}.json`), 'utf-8')) as ReplayData;
 const engineFixture = (name: string) => read('../../packages/eval-engine/test/fixtures', name);
@@ -48,14 +48,14 @@ for (const game of GAMES) {
     await expect(entry).toBeVisible();
     await expect(review.getByRole('button', { name: /How could .* have won\?/ })).toHaveCount(1);
     guard.assertClean();
-    guard.pause();
     await entry.click();
     const win = review.getByRole('region', { name: `How could ${loser} have won?` });
     await expect(win).toBeVisible();
 
     const steps = win.locator('[data-step]');
-    await expect(steps).toHaveCount(3, { timeout: 400_000 });
-    expect(await steps.locator('.ps-winpaths-step-title').allTextContents()).toEqual(['1 · A stronger play', '2 · Luck', `3 · A mistake by ${winner}`]);
+    await guard.race(expect(steps).toHaveCount(3, { timeout: 400_000 }));
+    const titles = ['1 · A stronger play', '2 · Luck', `3 · A mistake by ${winner}`];
+    expect(await steps.locator('.ps-winpaths-step-title').allTextContents()).toEqual(titles);
     const sentences = /^(None within 3 turns\.|None within 3 turns at 1 in 1,000 or better\.|Stopped at the search limit; nothing found so far\.)$/;
     const summary: string[] = [];
     for (const kind of ['stronger', 'luck', 'mistake']) {
@@ -73,6 +73,17 @@ for (const game of GAMES) {
     await expect(win).toHaveCount(0);
     await review.getByRole('button', { name: /^Endgame · T\d+/ }).click();
     await expect(win.locator('[data-step]')).toHaveCount(3, { timeout: 30_000 });
+    guard.assertClean();
+
+    await page.reload();
+    await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await panel.getByRole('button', { name: 'Analyze game' }).click();
+    await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
+    await review.getByRole('button', { name: /^Endgame · T\d+/ }).click();
+    await expect(win.locator('[data-step]')).toHaveCount(3, { timeout: 30_000 });
+    expect(await win.locator('.ps-winpaths-step-title').allTextContents(), 'the reload shows the stored paths').toEqual(titles);
+    guard.assertClean();
+    guard.pause();
 
     const luck = win.locator('[data-step="luck"]');
     const play = luck.getByRole('button', { name: '▶ Play' });

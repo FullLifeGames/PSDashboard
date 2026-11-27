@@ -89,7 +89,7 @@ describe('win-paths store keys and records', () => {
     expect(await store.loadStoredWinPaths(key.replace(/^v\d+/, 'v0'))).toBeNull();
   });
 
-  test('the prefix read of a replay leaves its win-paths records out, so its map holds results only', async () => {
+  test('the prefix read of a replay leaves its win-paths records out, and their own prefix read returns only them', async () => {
     const rows = stubIndexedDb();
     const store = await import('../../src/lib/eval-cache-store');
     const evalKey = store.evalStoreKey('r:7:abc', 1, 1, 'matrix', true);
@@ -98,5 +98,6 @@ describe('win-paths store keys and records', () => {
     await store.saveStoredWinPaths({ key, kind: 'winPaths', paths, savedAt: 5 });
     const map = await store.loadStoredEvalsByPrefix(store.evalStorePrefix('r'));
     expect([...map!.keys()]).toEqual([evalKey]);
+    expect((await store.loadStoredWinPathsByPrefix(store.evalStorePrefix('r')))!.map(record => record.key)).toEqual([key]);
   });
 });
