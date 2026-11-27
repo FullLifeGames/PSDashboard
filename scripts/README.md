@@ -15,6 +15,7 @@
 | `calibration-jobs.mjs` | Job records and the merge check of a CI run (library) | `run-calibration.mjs` |
 | `calibration-lib.mjs` | Aggregation over calibration dumps (library) | `run-calibration.mjs`, `paired-calibration.mjs`, `subset-calibration.mjs`, `dossier-decided-losses.mjs` |
 | `capture-eval-store.mjs` | Captures the saved engine results the browser specs seed | `npm run capture:eval-store` |
+| `capture-showdown-client.mjs` | Records the scripts and styles of Showdown's replay client that the browser specs serve | `npm run capture:showdown-client` |
 | `comment-counts.mjs` | The comment ratchets of `comment-ratchet.json`; the shape check of workflows and stylesheets | `npm run lint` |
 | `comment-lib.mjs` | The one reader of comments (library) | `comment-counts.mjs`, `comment-only-diff.mjs`, `eslint.comments.mjs` |
 | `comment-only-diff.mjs` | Proves that an edit moved comments and whitespace only | a person |
@@ -464,6 +465,14 @@ npm run capture:eval-store -- [--dev-port <n>] [--only <replay id or file name>]
 ```
 
 Captures the saved engine results the browser specs seed (`test/e2e/eval-store.ts`, `test/e2e-capture/`). It runs `run-e2e.mjs` with `playwright.capture.config.ts` and one worker: the analysis of every capture runs once in the browser on a dev server with the feature flags on, and the IndexedDB records land in `test/e2e/fixtures/eval-store/`. Run it when a spec says "fixture stale", then commit the files. The port defaults to `PS_DEV_PORT`, else 5177; `--only` limits the run to one capture (it sets `EVAL_STORE_ONLY`). Exit 2 for an unknown argument.
+
+### capture-showdown-client.mjs
+
+```sh
+npm run capture:showdown-client [-- --check]
+```
+
+Records the files of Showdown's replay client under `test/e2e/fixtures/showdown-client/` (each file ends in `.fixture`, so lint and knip leave them alone): `replay-embed.js`, every script and style it names (read from its `linkStyle` and `requireScript` calls), and the teambuilder table cut to the generations up to 8 and the three mods, as the app's own worker cuts it (1.4 of 15.8 MB). The browser specs serve these files through `routeOfflineFixtures` (`test/e2e/helpers.ts`) and answer every image of the host with one transparent pixel, so a run needs no access to `play.pokemonshowdown.com`. The script deletes the folder before it writes, so a file the embed no longer loads leaves with the next capture; run it when `--check` reports that the copy differs from the live client (exit 1, the paths that differ; nothing is written), and commit the files. The files are Showdown's public client files with their own headers: the client is AGPLv3, its battle engine MIT, `battle.css` GPLv2, Font Awesome OFL and MIT, jQuery MIT.
 
 ### merge-playwright-reports.mjs
 
