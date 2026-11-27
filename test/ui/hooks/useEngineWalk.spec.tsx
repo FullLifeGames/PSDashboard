@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
-import type { EvalResult } from '@fulllifegames/eval-engine';
+import { act, render, renderHook } from '@testing-library/react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
 import { useEngineWalk, type EngineWalkInputs } from '../../../src/hooks/useEngineWalk';
 import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
@@ -157,6 +158,58 @@ describe('useEngineWalk', () => {
     rerender({ ...wired, evaluation: evaluationOf({ status: 'done', result: evalResult('singles', { perSide: forced.perSide }), resultTag: 'variation:3' }).evaluation });
     expect(wired.handleSetChoice).not.toHaveBeenCalled();
   });
+});
+
+describe('useEngineWalk, a click right after a commit that left the walk\'s effect due', () => {
+  const picks: Record<'singles' | 'doubles', { own: RankedChoice; reply: RankedChoice }> = {
+    singles: { own: rankedChoice('move earthquake', 'Earthquake', 0.3), reply: rankedChoice('move leechseed', 'Leech Seed', -0.3) },
+    doubles: {
+      own: rankedChoice('move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus', 0.3),
+      reply: rankedChoice('move woodhammer 1, move taunt 1', 'B', -0.3),
+    },
+  };
+  interface Stage { tick: number; click: boolean; atTip: boolean }
+
+  function playedTurns(kind: 'singles' | 'doubles', tickAtClick: number) {
+    const executeTurn = vi.fn(async () => {});
+    const handleSetChoice = vi.fn();
+    const getBattle = () => ({ ended: false }) as unknown as ReturnType<EngineWalkInputs['getBattle']>;
+    const tipState = simState(kind);
+    const evaluation = evaluationOf().evaluation;
+    const setBranchDivergence = vi.fn();
+    function Harness({ stage }: { stage: Stage }) {
+      const [preparing, setPreparing] = useState(false);
+      const handleEvaluate = useMemo(() => () => { void stage.tick; }, [stage.tick]);
+      const walk = useEngineWalk({
+        ...inputs(), simState: stage.atTip ? tipState : null, liveTip: stage.atTip, branching: stage.atTip,
+        branchPreparing: stage.atTip ? false : preparing, evaluation, getBattle, executeTurn, handleEvaluate, handleSetChoice,
+        requestDeviation: () => setPreparing(true), setBranchDivergence,
+      });
+      const clicked = useRef(false);
+      useLayoutEffect(() => {
+        if (!stage.click || clicked.current) return;
+        clicked.current = true;
+        walk.handleExploreChoice('p1', picks[kind].own, picks[kind].reply);
+      });
+      return null;
+    }
+    const view = render(<Harness stage={{ tick: 0, click: false, atTip: false }} />);
+    act(() => view.rerender(<Harness stage={{ tick: tickAtClick, click: true, atTip: false }} />));
+    act(() => view.rerender(<Harness stage={{ tick: tickAtClick, click: true, atTip: true }} />));
+    return { executeTurn, handleSetChoice };
+  }
+
+  for (const kind of ['singles', 'doubles'] as const) {
+    test(`${kind}: the pick plays once the tip stands, with no commit due at the click`, () => {
+      expect(playedTurns(kind, 0).executeTurn).toHaveBeenCalledTimes(1);
+    });
+
+    test(`${kind}: the pick still plays once the tip stands when the commit before the click left the effect due`, () => {
+      const played = playedTurns(kind, 1);
+      expect(played.handleSetChoice).toHaveBeenCalledWith('p1', expect.objectContaining({ kind: 'move' }), 0);
+      expect(played.executeTurn).toHaveBeenCalledTimes(1);
+    });
+  }
 });
 
 describe('useEngineWalk, Hard mode', () => {
