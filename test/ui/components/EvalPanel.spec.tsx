@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { EvalPreferences } from '@fulllifegames/eval-engine';
 import { EvalPanel } from '../../../src/components/EvalPanel';
 import { evalGraph, evalResult, gameReport } from '../fixtures/eval-result';
-import { turnAnalysis } from '../fixtures/analysis';
+import { misplayedSide, turnAnalysis } from '../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
 const prefs: EvalPreferences = { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
@@ -170,6 +170,41 @@ describe('EvalPanel', () => {
       rerender(<EvalPanel {...replay()} />);
       expect(screen.getByRole('button', { name: '← Game report' })).toBeInTheDocument();
       expect(screen.getByText('Turn 3')).toBeInTheDocument();
+    });
+  });
+
+  describe.each([['singles', false], ['doubles', true]])('%s: the Game review fold', (_kind, doubles) => {
+    const graph = evalGraph(doubles ? 'doubles' : 'singles');
+    const report = gameReport({ keyMoments: [turnAnalysis(6, { attribution: 'chance', swing: -0.4 })] });
+    const reviewAnalyses = Array.from({ length: 10 }, (_, index) => turnAnalysis(index + 1));
+    reviewAnalyses[3] = turnAnalysis(4, { p1: misplayedSide('mistake') });
+    const replay = (extra: Partial<Props> = {}) => props({
+      graph, report, analysis: turnAnalysis(3), onSelectTurn: vi.fn(), onAnalyzeGame: vi.fn(), result: graph.results[2], resultSettings: graph.settings[2],
+      currentTurn: 3, analysisTurn: 3, graphMaxTurn: 12, doubles, reviewAnalyses, linesHost: { rules: { gen: 9, mod: undefined } }, gameId: 'game-1', ...extra,
+    });
+    const fold = () => screen.getByRole('button', { name: /Game review/ });
+
+    test('the fold starts closed and stays open across the turn view and back', async () => {
+      render(<EvalPanel {...replay()} />);
+      expect(fold()).toHaveAttribute('aria-expanded', 'false');
+      await userEvent.click(fold());
+      await userEvent.click(screen.getByRole('button', { name: /^T6(?!\d)/ }));
+      await userEvent.click(screen.getByRole('button', { name: '← Game report' }));
+      expect(fold()).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: 'T4' })).toBeInTheDocument();
+    });
+
+    test('the fold stays open through a variation and a new report; another game closes it', async () => {
+      const { rerender } = render(<EvalPanel {...replay()} />);
+      await userEvent.click(fold());
+      rerender(<EvalPanel {...replay({ report: null, currentLine: 'variation', variation: { startTurn: 3, scores: [null, 0.4] }, reviewAnalyses: null })} />);
+      rerender(<EvalPanel {...replay()} />);
+      expect(fold()).toHaveAttribute('aria-expanded', 'true');
+      rerender(<EvalPanel {...replay({ report: gameReport({ keyMoments: [] }) })} />);
+      expect(fold()).toHaveAttribute('aria-expanded', 'true');
+      rerender(<EvalPanel {...replay({ gameId: 'game-2' })} />);
+      expect(fold()).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('button', { name: 'T4' })).toBeNull();
     });
   });
 

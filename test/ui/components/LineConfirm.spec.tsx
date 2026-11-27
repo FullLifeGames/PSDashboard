@@ -48,7 +48,7 @@ describe('the replace question of ▶ Play', () => {
     analyses[19] = turnAnalysis(20, { p2: { playedRaw: { kind: 'move', name: 'Hyper Voice' }, played, best, safe: best, regret: 0.34, tier: 'blunder' } });
     const results: (EvalResult | null)[] = analyses.map(() => null);
     results[19] = withLines('singles', [singlesLine, playedLine]);
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={hostWith(singlesLine, 20)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={hostWith(singlesLine, 20)} />);
     const banner = screen.getByRole('alertdialog');
     const row = banner.closest('.ps-eval-review-row') as HTMLElement;
     expect(within(row).getByRole('button', { name: 'T20' })).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('the replace question of ▶ Play', () => {
   test('Game review, doubles: the same under the doubles row', () => {
     const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.37) } })];
     const results: (EvalResult | null)[] = [null, null, null, withLines('doubles', [doublesLine])];
-    render(<GameReviewPanel analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={hostWith(doublesLine, 4)} />);
+    render(<GameReviewPanel open analyses={analyses} results={results} playerNames={DOUBLES_NAMES} doubles host={hostWith(doublesLine, 4)} />);
     expect(screen.getByRole('alertdialog').closest('.ps-eval-review-row')).toHaveTextContent('T4');
   });
 });

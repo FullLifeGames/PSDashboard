@@ -182,12 +182,38 @@ describe('GameGraphSection.review', () => {
   }
 
   describe('GameGraphSection: the Game review', () => {
-    test('the report view lists the graded turns under the report; a click on a turn selects it', async () => {
-      const wired = props();
+    test.each([['singles', false], ['doubles', true]] as const)('%s: the report view carries the review closed with its count; a click opens it and a click on a turn selects it', async (kind, doubles) => {
+      const wired = props({ graph: evalGraph(kind), doubles });
       render(<GameGraphSection {...wired} />);
-      expect(screen.getByText('Game review · what the engine would have played')).toBeInTheDocument();
+      const toggle = screen.getByRole('button', { name: /Game review · what the engine would have played/ });
+      expect(toggle).toHaveTextContent('· 2 graded turns');
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle).toHaveAttribute('title', "The turns where a player lost ground, with the engine's line and the played line. Stays open or closed while this game is loaded.");
+      expect(screen.queryByRole('button', { name: 'T7' })).toBeNull();
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: 'T4' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'T7' }));
       expect(wired.selectTurn).toHaveBeenCalledWith(7);
+    });
+
+    test('the count reads none and one in the closed fold', () => {
+      const { rerender } = render(<GameGraphSection {...props({ reviewAnalyses: [turnAnalysis(1)] })} />);
+      expect(screen.getByRole('button', { name: /Game review/ })).toHaveTextContent('· no graded turn');
+      rerender(<GameGraphSection {...props({ reviewAnalyses: [turnAnalysis(4, { p1: misplayedSide('mistake') })] })} />);
+      expect(screen.getByRole('button', { name: /Game review/ })).toHaveTextContent('· 1 graded turn');
+    });
+
+    test.each([['singles', false], ['doubles', true]] as const)('%s: the early-lines progress and Stop show with the fold closed and open', async (kind, doubles) => {
+      const stop = vi.fn();
+      const linesHost = { rules: { gen: 9, mod: undefined }, earlyLines: { done: 2, total: 5, stop } };
+      render(<GameGraphSection {...props({ graph: evalGraph(kind), doubles, linesHost })} />);
+      expect(screen.getByRole('status')).toHaveTextContent('Finding lines for graded turns: 2 of 5');
+      await userEvent.click(screen.getByRole('button', { name: 'Stop' }));
+      expect(stop).toHaveBeenCalledTimes(1);
+      await userEvent.click(screen.getByRole('button', { name: /Game review/ }));
+      expect(screen.getByRole('status')).toHaveTextContent('Finding lines for graded turns: 2 of 5');
+      expect(screen.getByRole('button', { name: 'T4' })).toBeInTheDocument();
     });
 
     test('the graph marks the listed turns in the report view and in the turn view; the turn view lists nothing', () => {

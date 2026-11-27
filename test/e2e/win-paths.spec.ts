@@ -43,6 +43,7 @@ for (const game of GAMES) {
     await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
+    await review.getByRole('button', { name: /Game review/ }).click();
 
     const entry = review.getByRole('button', { name: new RegExp(`^Endgame · T\\d+ · How could ${loser} have won\\?$`) });
     await expect(entry).toBeVisible();

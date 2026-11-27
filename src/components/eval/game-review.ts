@@ -61,6 +61,10 @@ export function reviewMarks(analyses: readonly (TurnAnalysis | null)[] | null | 
   return gradedSides(analyses).map(({ analysis, side }) => ({ turn: analysis.turn, side }));
 }
 
+export function reviewCountText(marks: number): string {
+  return marks === 0 ? 'no graded turn' : `${marks} graded ${marks === 1 ? 'turn' : 'turns'}`;
+}
+
 function lineText(line: EvalLine, playerNames: [string, string], doubles: boolean, reply: LineReply | null): string {
   const other: Side = line.side === 'p1' ? 'p2' : 'p1';
   const ranked = (label: string, index: number): string => (index === 0 && reply ? `${label} (${reply.rank})` : label);

@@ -8,7 +8,7 @@ import {
   type TurnAnalysis,
   lostGround,
 } from '@fulllifegames/eval-engine';
-import { gameReview, gradedTier, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
+import { gameReview, gradedTier, reviewCountText, reviewDiffers, reviewMarks, gradedSides } from '../../../../src/components/eval/game-review';
 import type { LinesHost } from '../../../../src/lib/line-view';
 import { misplayedSide, sideAnalysis, turnAnalysis } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
@@ -69,6 +69,13 @@ describe('reviewMarks: the graph marks follow the list', () => {
   test('no analyses, no marks', () => {
     expect(reviewMarks(null)).toEqual([]);
     expect(reviewMarks([])).toEqual([]);
+  });
+
+  test('the closed fold counts the marks: none, one, and a doubles turn graded on both sides twice', () => {
+    const both = turnAnalysis(4, { p1: misplayedSide('blunder'), p2: gradedP2('inaccuracy') });
+    expect(reviewCountText(reviewMarks([turnAnalysis(1)]).length)).toBe('no graded turn');
+    expect(reviewCountText(reviewMarks([turnAnalysis(3, { p1: misplayedSide('mistake') })]).length)).toBe('1 graded turn');
+    expect(reviewCountText(reviewMarks([both, turnAnalysis(5, { p2: gradedP2('mistake') })]).length)).toBe('3 graded turns');
   });
 });
 

@@ -47,6 +47,11 @@ for (const game of GAMES) {
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
     await expect(review).toContainText('Game review · what the engine would have played');
+    const fold = review.getByRole('button', { name: /Game review/ });
+    await expect(fold).toHaveAttribute('aria-expanded', 'false');
+    await expect(review.locator('.ps-eval-review-row')).toHaveCount(0);
+    await expect(fold).toContainText(/· \d+ graded turns?/);
+    await fold.click();
     lap('report shown');
 
     const rows = await readRows(review);
@@ -118,6 +123,7 @@ test('singles in Auto: the graded early turns get their lines after the report, 
   const progress = review.getByText(/Finding lines for graded turns: \d+ of \d+/);
   await expect(progress).toBeVisible({ timeout: 60_000 });
   await expect(progress).toBeHidden({ timeout: 900_000 });
+  await review.getByRole('button', { name: /Game review/ }).click();
 
   const rows = await review.locator('.ps-eval-review-row').evaluateAll(entries => entries.map(row => ({
     turn: Number((row.querySelector('button')?.textContent ?? '').replace(/^T/, '')),

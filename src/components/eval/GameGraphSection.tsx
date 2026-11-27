@@ -160,6 +160,8 @@ export interface GameGraphSectionProps extends TurnViewProps {
   graphMaxTurn?: number;
   showReportView: boolean;
   reviewAnalyses?: (TurnAnalysis | null)[] | null;
+  reviewOpen?: boolean;
+  onReviewToggle?: (open: boolean) => void;
   /** The card's fainted share per swept turn (any engine mode); the sweep's own record exists in auto only. */
   faintedShares?: (number | null)[];
 }
@@ -221,7 +223,7 @@ function ReportOverview({ report, ...props }: GameGraphSectionProps & { report: 
       {gameReviewEnabled() && reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
-          host={linesHost} onSelectTurn={selectTurn}
+          host={linesHost} onSelectTurn={selectTurn} open={props.reviewOpen} onToggle={props.onReviewToggle}
         />
       )}
     </>

@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
 import { differsSentences, lineAnchor, type LinesHost } from '../../lib/line-view';
+import { CardToggle } from './CardToggle';
 import { LineConfirm } from './LineConfirm';
 import { WinPathsPanel } from './WinPathsPanel';
-import { endgameRow, gameReview, reviewBlocks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
+import { endgameRow, gameReview, reviewBlocks, reviewCountText, reviewMarks, type EndgameRowView, type ReviewGrade, type ReviewLineView, type ReviewRowView, type ReviewSideView } from './game-review';
 
 interface GameReviewPanelProps {
   analyses: readonly (TurnAnalysis | null)[];
@@ -12,6 +13,8 @@ interface GameReviewPanelProps {
   doubles: boolean;
   host: LinesHost;
   onSelectTurn?: (turn: number) => void;
+  open?: boolean;
+  onToggle?: (next: boolean) => void;
 }
 
 const GRADE_COLORS: Record<ReviewGrade, string> = { inaccuracy: '#b6a46a', mistake: '#f3a6a6', blunder: '#ff7a7a' };
@@ -97,19 +100,29 @@ function EarlyLinesProgress({ progress }: { progress: NonNullable<LinesHost['ear
   );
 }
 
-export function GameReviewPanel({ analyses, results, playerNames, doubles, host, onSelectTurn }: GameReviewPanelProps) {
+const REVIEW_TITLE = "The turns where a player lost ground, with the engine's line and the played line. Stays open or closed while this game is loaded.";
+
+export function GameReviewPanel({ analyses, results, playerNames, doubles, host, onSelectTurn, open, onToggle }: GameReviewPanelProps) {
   const sides = useMemo(
     () => gameReview({ analyses, results, playerNames, doubles, host }),
     [analyses, results, playerNames, doubles, host],
   );
+  const count = useMemo(() => reviewMarks(analyses).length, [analyses]);
   const endgame = useMemo(() => endgameRow(host.winPaths?.endgame, playerNames), [host.winPaths?.endgame, playerNames]);
+  const label = (
+    <>
+      <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      <span className="ps-eval-review-count"> · {reviewCountText(count)}</span>
+    </>
+  );
   return (
     <div className="ps-eval-review">
-      <span className="ps-eval-lines-title">Game review · what the engine would have played</span>
+      <CardToggle label={label} lazy open={open} onToggle={onToggle} title={REVIEW_TITLE} bodyClassName="ps-eval-review-body">
+        {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
+        {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
+        {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
+      </CardToggle>
       {host.earlyLines && <EarlyLinesProgress progress={host.earlyLines} />}
-      {sides.map(view => <ReviewSide key={view.side} view={view} onPlay={host.onPlay} confirm={host.confirm} onSelectTurn={onSelectTurn} />)}
-      {differsSentences(reviewBlocks(sides)).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
-      {endgame && <EndgameEntry row={endgame} host={host} playerNames={playerNames} doubles={doubles} />}
     </div>
   );
 }
