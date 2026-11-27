@@ -130,6 +130,22 @@ describe('a stronger play on the corpus', () => {
     expect(won(await playLineOn((await rebuild()).runtime, step.line!), 'p2')).toBe(true);
   }, 300_000);
 
+  test('562428 t22: BKC\'s Shadow Ball wins in every roll within three turns through the replacement after Dragapult\'s faint, and the foe\'s step answers none', async () => {
+    const name = 'smogtours-gen8ou-562428';
+    const rebuild = () => reconstruct(name, 22, fixture(name));
+    const serialized = serializeLiveBattle((await rebuild()).runtime.battleStream.battle!);
+    const ranking = searchPosition(serialized, { depth: 1, samples: 1, mode: 'matrix', ruleset: 'standard', tera: true });
+    const ask = (side: 'p1' | 'p2') => strongerStep(serialized, REQUEST(side, { turns: 3, tera: true, ruleset: 'standard', rootOrder: ranking.perSide[side].map(row => row.choice) }));
+    const step = ask('p1');
+    expect(step.status).toBe('found');
+    expect(step.chance).toBe(1);
+    expect(step.line!.label).toBe('Shadow Ball');
+    expect(step.line!.steps).toHaveLength(3);
+    expect(step.spent.cells).toBeLessThan(600);
+    expect(won(await playLineOn((await rebuild()).runtime, step.line!), 'p1')).toBe(true);
+    expect(ask('p2').status).toBe('none');
+  }, 300_000);
+
   test('Champions VGC 2695803506 t10: juacox300 (doubles 1 v 1), every legal reply of Delphox-Mega is answered inside the budget', async () => {
     const name = 'gen9championsvgc2026regmc-2695803506';
     const { runtime } = await reconstruct(`champions/${name}`, 10, fixture(name));
