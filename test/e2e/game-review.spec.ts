@@ -31,6 +31,16 @@ async function readRows(review: Locator) {
   })));
 }
 
+async function expectCardTopInView(card: Locator) {
+  await expect.poll(() => card.evaluate(element => {
+    let top = 0;
+    for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+      if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) { top = Math.max(top, parent.getBoundingClientRect().top); break; }
+    }
+    return element.getBoundingClientRect().top - top;
+  }), 'the card starts inside the view').toBeGreaterThanOrEqual(-0.5);
+}
+
 const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
@@ -64,6 +74,7 @@ for (const game of GAMES) {
     await review.locator('.ps-eval-review-row').last().getByRole('button', { name: `T${last.turn}`, exact: true }).click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${last.turn}`, { timeout: 30_000 });
     await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+    await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
     await expect(panel.locator('.ps-eval-graph [data-review-mark]')).toHaveCount(rows.length);
     await expect(fold).toHaveAttribute('aria-expanded', 'true');
     await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${last.turn}`);
@@ -72,6 +83,7 @@ for (const game of GAMES) {
       await review.getByRole('button', { name: `T${second.turn}`, exact: true }).first().click();
       await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${second.turn}`, { timeout: 30_000 });
       await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+      await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
       await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${second.turn}`);
       await expect(fold).toHaveAttribute('aria-expanded', 'true');
     }
@@ -190,6 +202,7 @@ test('VGC at 390 px: three review rows show their cards in view, the review stay
     await review.getByRole('button', { name: `T${turn}`, exact: true }).first().click();
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 30_000 });
     await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+    await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
     await expect(review).toBeVisible();
     await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${turn}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow').toBe(true);

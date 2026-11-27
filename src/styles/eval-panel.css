@@ -198,6 +198,7 @@ button.ps-eval-choice:hover,
   gap: 6px;
   font-size: 11px;
 }
+.ps-eval-analysis > .ps-eval-analysis-row { scroll-margin-top: 6px; }
 .ps-eval-progress {
   height: 6px;
   background: #223;
