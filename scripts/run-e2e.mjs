@@ -98,8 +98,8 @@ async function assertPortFree() {
   }
 }
 
-// The e2e specs run with both on; a flag already in the environment wins, the feedback run keeps the shipped build.
-const FEATURE_FLAGS = ['VITE_FEATURE_GAME_REVIEW', 'VITE_FEATURE_OPPONENT_READS'];
+// The e2e specs run with the flag on; one already in the environment wins, the feedback run keeps the shipped build.
+const FEATURE_FLAGS = ['VITE_FEATURE_OPPONENT_READS'];
 function serverEnv() {
   const feedback = playwrightArgs.some(arg => arg.includes('playwright.feedback.config'));
   if (feedback) return process.env;

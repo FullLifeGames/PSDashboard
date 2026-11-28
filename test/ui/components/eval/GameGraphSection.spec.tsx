@@ -241,6 +241,13 @@ describe('GameGraphSection.review', () => {
       expect(container.querySelectorAll('[data-review-mark]')).toHaveLength(2);
     });
 
+    test.each([['singles', false], ['doubles', true]] as const)('%s: the report view draws the review, its marks and the legend', (kind, doubles) => {
+      const { container } = render(<GameGraphSection {...props({ graph: evalGraph(kind), doubles })} />);
+      expect(screen.getByRole('button', { name: /Game review · what the engine would have played/ })).toBeInTheDocument();
+      expect(container.querySelectorAll('[data-review-mark]')).toHaveLength(2);
+      expect(screen.getByTestId('graph-marks-legend')).toBeInTheDocument();
+    });
+
     describe.each([['singles', false], ['doubles', true]] as const)('%s: the review in the turn view', (kind, doubles) => {
       const graded = analyses.map(analysis => analysis);
       graded[3] = turnAnalysis(4, doubles

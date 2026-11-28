@@ -1,6 +1,5 @@
 import { Fragment } from 'react';
 import type { EvalResult, TurnAnalysis } from '@fulllifegames/eval-engine';
-import { gameReviewEnabled } from '../../lib/feature-flags';
 import { LineConfirm } from './LineConfirm';
 import { cardLines, neverActedOf, rowValueTexts } from './turn-copy';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
@@ -70,7 +69,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
 // A matrix turn ran no tree, so it cannot have kept lines.
 function noLineSentence(result: EvalResult, coming: ReturnType<NonNullable<LinesHost['lineComing']>> = null): string {
   if (result.engine) return `No line: ${result.engine.name} sends none.`;
-  if (coming === 'stage') return `No line yet: the app searches this turn after the game report${gameReviewEnabled() ? ' (the review shows the progress)' : ''}.`;
+  if (coming === 'stage') return `No line yet: the app searches this turn after the game report (the review shows the progress).`;
   if (coming === 'sweep') return 'No line yet: the game analysis is still running. If the report grades this turn, its lines follow the report.';
   if (result.matrix && !result.matrix.cells) return 'No line on this turn: the matrix pass keeps none. Analyze the position with MCTS to get lines.';
   return 'No line on this turn: the search kept none for these choices.';

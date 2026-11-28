@@ -9,7 +9,6 @@ import { GameReviewPanel } from './GameReviewPanel';
 import { reviewMarks } from './game-review';
 import { EvalGraph } from '../EvalGraph';
 import { REVIEW_COLORS } from '../../lib/eval-graph-view';
-import { gameReviewEnabled } from '../../lib/feature-flags';
 import { EvalLeadAnalysis, EvalTurnAnalysis } from '../EvalTurnAnalysis';
 import { EvalReplacementAnalysis } from './EvalReplacementAnalysis';
 import type { LinesHost } from '../../lib/line-view';
@@ -110,7 +109,7 @@ interface TurnViewProps {
 }
 
 const backToMainTitle = (): string =>
-  `The game report${gameReviewEnabled() ? ' and the Game review show' : ' shows'} on the main line. Same as Main line in the Line selector`;
+  `The game report and the Game review show on the main line. Same as Main line in the Line selector`;
 
 const showHead = (box: HTMLElement | null) => box?.querySelector('.ps-eval-analysis-row')?.scrollIntoView({ block: 'nearest' });
 
@@ -146,7 +145,7 @@ function TurnCards({ leadAnalysis, analysis, playerNames, reads, onPickChoice, o
           />
         )}
       </div>
-      {gameReviewEnabled() && reviewAnalyses && linesHost && (
+      {reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles} host={linesHost}
           currentTurn={shown} open={reviewOpen} onToggle={onReviewToggle}
@@ -233,7 +232,7 @@ function GraphMarksLegend({ marks, playerNames }: { marks: ReturnType<typeof rev
 
 function GraphView(props: GameGraphSectionProps) {
   const { graph, playerNames, currentTurn, currentLine, selectTurn, reportLeads, variation, graphMaxTurn, reviewAnalyses } = props;
-  const marks = useMemo(() => (gameReviewEnabled() ? reviewMarks(reviewAnalyses) : []), [reviewAnalyses]);
+  const marks = useMemo(() => reviewMarks(reviewAnalyses), [reviewAnalyses]);
   return (
     <>
       <EvalGraph
@@ -268,7 +267,7 @@ function ReportOverview({ report, wantedRef, ...props }: GameGraphSectionProps &
         leads={reportLeads}
         settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
       />
-      {gameReviewEnabled() && reviewAnalyses && linesHost && (
+      {reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
           host={linesHost} onSelectTurn={selectAndReveal} open={props.reviewOpen} onToggle={props.onReviewToggle}

@@ -456,7 +456,7 @@ npm run test:feedback -- [playwright arguments]
 Starts the Vite dev server on `127.0.0.1` with `--strictPort`, waits until the dependency pre-bundle is complete and stable (a cold cache would reload open pages and abort a running test's dynamic imports), runs `playwright test` with the remaining arguments and stops the server. It exits with Playwright's exit code.
 
 - The port is `--dev-port <n>` (or `--dev-port=<n>`), else `PS_DEV_PORT`, else 5174. The script passes it on as `PS_DEV_PORT`, so the Playwright config builds the same base URL. `test:feedback` uses 5176 and `capture-eval-store.mjs` 5177. A busy port stops the run with a message; find the owner, check its command line and stop it yourself.
-- The e2e server starts with `VITE_FEATURE_GAME_REVIEW=1` and `VITE_FEATURE_OPPONENT_READS=1` unless the environment sets them. A run with `playwright.feedback.config.ts` keeps the shipped build.
+- The e2e server starts with `VITE_FEATURE_OPPONENT_READS=1` unless the environment sets it. A run with `playwright.feedback.config.ts` keeps the shipped build.
 
 ### capture-eval-store.mjs
 
