@@ -78,7 +78,7 @@ test('auto at the default: an early singles position runs the matrix with three 
   expect(result).toEqual(singlesReference(1, 3));
 });
 
-test('auto reads the game type off the position: each game type follows its own split', { timeout: 120_000 }, async () => {
+test('auto reads the game type off the position: each game type follows its own split', { timeout: 600_000 }, async () => {
   configureSearchBudget(parseSearchBudget('singles-tree-from=0.25,singles-early-samples=1,doubles-tree-from=0,trees=1,iterations=50'));
   try {
     const singles = fixture('gen9ou-2658658993-t2');

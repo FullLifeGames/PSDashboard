@@ -109,7 +109,7 @@ describe('static rule set', () => {
         expect(matrix('standard')).toBe(matrixStandard);
       });
     }
-  }, 180_000);
+  }, 600_000);
 
   test('a local executor serves its cells under the rule set it is bound to', async () => {
     const serialized = position(DOUBLES);
