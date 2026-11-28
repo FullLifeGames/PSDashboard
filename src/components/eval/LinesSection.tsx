@@ -16,11 +16,13 @@ interface LinesSectionProps {
 }
 
 function SideText({ view }: { view: LineSideView }) {
+  const [first, ...rest] = view.text.split(' + ');
   return (
-    <>
-      <span className="side">{view.player}</span> {view.text}
+    <span className="ps-eval-line-side">
+      <span className="ps-eval-line-lead"><span className="side">{view.player}</span> {first}</span>
+      {rest.map((part, index) => <span key={`${index}-${part}`} className="ps-eval-line-part"> + {part}</span>)}
       {view.chips.map((chip, index) => <span key={`${index}-${chip}`} className="ps-lines-chip">{chip}</span>)}
-    </>
+    </span>
   );
 }
 
