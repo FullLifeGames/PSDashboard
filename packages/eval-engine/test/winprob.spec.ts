@@ -3,6 +3,8 @@ import { analyzeTurn } from '../src/analysis';
 import { formatRead, summarizeTurn } from '../src/summary';
 import type { EvalResult, RankedChoice } from '../src/types';
 import {
+  chanceGapPoints,
+  chanceGapText,
   DISPLAY_K,
   displayK,
   winPctText,
@@ -237,5 +239,18 @@ describe('win probability mapping', () => {
     expect(winPercent(-0.9999999999999999)).toBe(0);
     expect(winPercent(0.999)).toBeLessThan(100);
     expect(winPercent(0.999)).toBeGreaterThan(80);
+  });
+});
+
+describe('the gap of two printed chances', () => {
+  test.each([
+    ['singles', undefined, 0.35, 0.1, 11],
+    ['doubles, three of eight down', 0.5, 0.42, -0.1, 37],
+    ['a tie of two scores that print alike', undefined, 0.35, 0.349, 0],
+    ['a pair in the wrong order never goes negative', undefined, 0.1, 0.35, 0],
+  ] as const)('%s: the points are the difference of the two rounded percents', (_scene, share, better, played, points) => {
+    expect(chanceGapPoints(better, played, share)).toBe(points);
+    expect(chanceGapPoints(better, played, share)).toBe(Math.max(0, winPercent(better, share) - winPercent(played, share)));
+    expect(chanceGapText(better, played, share)).toBe(`−${points}%`);
   });
 });

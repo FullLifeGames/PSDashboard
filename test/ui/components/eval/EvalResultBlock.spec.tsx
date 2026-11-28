@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { winDeltaText, winPercent } from '@fulllifegames/eval-engine';
 import { EvalResultBlock } from '../../../../src/components/eval/EvalResultBlock';
+import { chanceGap } from '../../fixtures/analysis';
 import { evalResult, rankedChoice } from '../../fixtures/eval-result';
 
 const names: [string, string] = ['Alice', 'Bob'];
@@ -23,7 +24,7 @@ describe('EvalResultBlock', () => {
     expect(choices).toHaveLength(6);
     expect(choices[0].tagName).toBe('DIV');
     expect(choices[0]).toHaveTextContent(`1.Earthquake${winPercent(0.35)}%`);
-    expect(choices[1]).toHaveTextContent(`2.Swords Dance${winPercent(0.2)}%(${winDeltaText(0.2 - 0.35)})`);
+    expect(choices[1]).toHaveTextContent(`2.Swords Dance${winPercent(0.2)}%(${chanceGap(0.35, 0.2)})`);
     expect(choices[0]).toHaveAttribute('title', expect.stringContaining(`guaranteed at least ${winPercent(0.15)}%`));
     expect(choices[2]).toHaveAttribute('title', expect.stringContaining('(worst reply: Leech Seed)'));
     expect(choices[0]).not.toHaveAttribute('title', expect.stringContaining('Click to play'));
@@ -76,6 +77,23 @@ describe('EvalResultBlock', () => {
     rerender(<EvalResultBlock {...shared} opponentReads />);
     expect(first()).toContain(`(worst reply: ${reply})`);
     expect(first()).toContain(`the opponent reads your move and answers with ${reply}.`);
+  });
+
+  test.each([
+    ['singles', 'Earthquake', 'Dragon Claw', 'Swords Dance', undefined],
+    ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', 'Flare Blitz → Rillaboom + Rage Powder', 'Taunt → Amoonguss + Wood Hammer → Incineroar', 0.5],
+  ] as const)('%s: a row\'s bracket is the difference of the two printed chances, and a row printing the top row\'s chance has none', (kind, top, second, third, share) => {
+    const rows = [
+      rankedChoice('move 1', top, 0.35), rankedChoice('move 2', second, 0.349), rankedChoice('move 3', third, 0.1),
+    ];
+    const result = evalResult(kind, { perSide: { p1: rows, p2: [rankedChoice('move 9', 'Protect', -0.3)] }, matrix: undefined });
+    render(<EvalResultBlock result={result} status="done" playerNames={names} faintedFraction={share} />);
+    const choices = document.querySelectorAll('.ps-eval-choice');
+    expect(chanceGap(0.35, 0.349, share)).toBe('−0%');
+    expect(choices[1]).toHaveTextContent(`2.${second}${winPercent(0.349, share)}%`);
+    expect(choices[1].textContent).not.toContain('(');
+    expect(choices[2]).toHaveTextContent(`3.${third}${winPercent(0.1, share)}%(${chanceGap(0.35, 0.1, share)})`);
+    expect(chanceGap(0.35, 0.1, share)).not.toBe(winDeltaText(0.1 - 0.35));
   });
 
   test('a wide interval flags a toss-up; MCTS provenance and the follow-up line render; no matrix, no matrix button', () => {

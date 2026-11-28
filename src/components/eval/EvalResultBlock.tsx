@@ -1,4 +1,4 @@
-import { type EvalResult, type RankedChoice, formatLine, winDeltaText, winPercent } from '@fulllifegames/eval-engine';
+import { type EvalResult, type RankedChoice, chanceGapPoints, formatLine, winPercent } from '@fulllifegames/eval-engine';
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
@@ -16,7 +16,7 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
   tail?: { p1: string; p2: string }[];
 }) {
   const evPct = winPercent(choice.ev, faintedFraction);
-  const gap = best ? choice.ev - best.ev : 0;
+  const behind = best ? chanceGapPoints(best.ev, choice.ev, faintedFraction) : 0;
   return (
     <>
       <span className="ps-eval-choice-main">
@@ -25,7 +25,7 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', color: '#aab' }}>
           <MiniBar value={choice.ev} />
           {evPct}%
-          {index > 0 && gap < 0 && <span style={{ color: '#778' }}>({winDeltaText(gap)})</span>}
+          {index > 0 && behind > 0 && <span style={{ color: '#778' }}>(−{behind}%)</span>}
         </span>
       </span>
       {tail && tail.length > 0 && (

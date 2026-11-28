@@ -1,4 +1,4 @@
-import { regretText, TIER_THRESHOLDS, type EvalLine, type EvalResult, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
+import { chanceGapText, regretText, TIER_THRESHOLDS, type EvalLine, type EvalResult, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 import { worstReply, type WorstReply } from '../../lib/worst-reply';
@@ -125,9 +125,6 @@ export function resultPositionLabel(
   const line = variation ? 'variation' : 'main line';
   return match && replacement ? `Replacement after turn ${turn - 1} · ${line}` : `Turn ${turn} · ${line}`;
 }
-
-const chanceGapText = (better: number, played: number, faintedFraction?: number | null): string =>
-  `−${Math.max(0, winPercent(better, faintedFraction) - winPercent(played, faintedFraction))}%`;
 
 /** The chip is the gap of the grade's own pair, in a read's frame too; over a regret of 1 it names both chances. */
 export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {

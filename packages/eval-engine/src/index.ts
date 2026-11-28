@@ -145,4 +145,4 @@ export type {
   EvalLine, LineChoice, LineDie, LineRequest, LinesInput, LineStep, RowLines, TreeLineStep,
 } from './types.ts';
 export type { StaticRuleset } from './score/weights.ts';
-export { winProbability, winPercent, winPctText, winDeltaText } from './winprob.ts';
+export { winProbability, winPercent, winPctText, winDeltaText, chanceGapPoints, chanceGapText } from './winprob.ts';

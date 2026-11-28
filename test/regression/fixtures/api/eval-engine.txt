@@ -202,6 +202,8 @@ value captureSerializedPosition
 value cellKey
 value chainCount
 value chainResults
+value chanceGapPoints
+value chanceGapText
 value chanceRolled
 value checkEngine
 value checkGameTeams
