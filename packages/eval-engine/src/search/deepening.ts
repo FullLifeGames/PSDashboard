@@ -2,6 +2,7 @@ import { cellKey, reblendValue, type PvStep, type ValueMatrix } from '../rank.ts
 import { WAITING_LABEL } from '../forward/assignments.ts';
 import type { SimPosition } from '../forward/position.ts';
 import type { CellBlend, EvalResult, EvalSettings } from '../types.ts';
+import type { SearchCallbacks } from './matrix.ts';
 
 /** The deepening bookkeeping the sync search and the orchestrator share; pure, no sim imports. */
 
@@ -46,6 +47,39 @@ export function recordDeepenedCell(
       ...(subTopP1?.line ?? []),
     ]);
   }
+}
+
+/** Every cell whose first-seed child has not ended, row by row. */
+export function liveCells(matrix: Pick<ValueMatrix, 'values' | 'ended'>): [number, number][] {
+  const cells: [number, number][] = [];
+  matrix.values.forEach((row, i) => row.forEach((_, j) => { if (!matrix.ended[i][j]) cells.push([i, j]); }));
+  return cells;
+}
+
+/** Books the sub-searches of a whole level together, so a stop before the last one leaves every cell as it was. */
+export function recordDeepenedLevel(
+  state: DeepeningState, cells: [number, number][], subs: EvalResult[], depth: number,
+): void {
+  const expandedThisLevel = new Set<number>();
+  cells.forEach(([i, j], index) => recordDeepenedCell(state, i, j, subs[index], depth, expandedThisLevel));
+}
+
+/** Level `depth` of a root: every live cell's sub-search, booked together; true if a stop came first. */
+export function deepenWholeLevel(
+  state: DeepeningState & { callbacks: SearchCallbacks | undefined },
+  depth: number,
+  search: (i: number, j: number) => EvalResult,
+): boolean {
+  const cells = liveCells(state.matrix);
+  const subs: EvalResult[] = [];
+  state.callbacks?.onProgress?.({ done: 0, total: cells.length, depth });
+  for (const [i, j] of cells) {
+    if (state.callbacks?.shouldStop?.()) return true;
+    subs.push(search(i, j));
+    state.callbacks?.onProgress?.({ done: subs.length, total: cells.length, depth });
+  }
+  recordDeepenedLevel(state, cells, subs, depth);
+  return false;
 }
 
 /** Settings of a forced root cell's turn search: depth 1, the root's draws, no prover, no played-turn hints. */

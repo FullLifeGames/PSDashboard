@@ -1,14 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { State } from '@pkmn/sim';
 import { describe, expect, test } from 'vitest';
-import { flipTurn, recordTurn, type FlipTurn } from '../src/dice/flip';
+import { flipTurn, recordTurn } from '../src/dice/flip';
 import { dieKey } from '../src/dice/types';
 import { endgameChildren } from '../src/endgame/children';
 import { createRootPosition, positionBattle, type SimPosition } from '../src/forward-model';
-import { forkBattle } from '../src/forward/position';
-import { applyChoice, resolveForcedSwitches } from '../src/forward/switches';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { cellSeeds } from '../src/search/root-quantile';
+import { CHAMPIONS, RULES } from './dice-fixtures';
+import { dexOfRules } from './dice-sweep-support';
+import { chancesOf, missOf, PP_LISTS, stalledCell, turnOf, WELL_UNDER_100 } from './forced-win-delay-support';
 import { set } from './move-oracle';
 import { battleOf } from './power-oracle';
 
@@ -22,18 +23,6 @@ async function afterFirstProtect(name: string): Promise<SimPosition> {
   const board = scene(name);
   const root = createRootPosition(board.serialized, board.ruleset);
   return endgameChildren(root, OWN, 'move protect', 6).children[0].position;
-}
-
-function turnOf(root: SimPosition, p1Choice: string, p2Choice: string, seedIndex = 0): FlipTurn {
-  const seed = cellSeeds(root, p1Choice, p2Choice)[seedIndex];
-  return {
-    fork: () => forkBattle(root, seed),
-    play: battle => {
-      applyChoice(battle, 'p1', p1Choice);
-      applyChoice(battle, 'p2', p2Choice);
-      resolveForcedSwitches(battle, seed, { p1: undefined, p2: undefined });
-    },
-  };
 }
 
 describe.each(SCENE_1)('Champions VGC 2682637901 turn 6, the second Protect against Heat Wave and Aqua Jet (%s)', name => {
@@ -85,5 +74,58 @@ describe('two dice that both fall in every branch keep the product of the other 
     const cell = endgameChildren(root, 'move tackle', 'move tackle', 6);
     expect(cell.children.map(child => child.share).sort((x, y) => x - y)).toEqual(expected.map(share => expect.closeTo(share, 12)));
     expect(positionBattle(root).gameType).toBe('singles');
+  });
+});
+
+const sum = (shares: number[]): number => shares.reduce((total, share) => total + share, 0);
+const sorted = (shares: number[]): number[] => [...shares].sort((a, b) => a - b);
+
+describe.each(['singles', 'doubles'] as const)('the second Protect against a move that can miss, a foe at 1 HP (%s)', mode => {
+  const rules = RULES.find(entry => entry.generation === 9 && entry !== CHAMPIONS)!;
+  const strike = missOf(rules, mode, WELL_UNDER_100)!;
+
+  test('from every base draw the split reads held, failed and hit, failed and missed, by the recorded chances', () => {
+    let split = 0;
+    for (const pp of PP_LISTS) {
+      const cell = stalledCell(rules, mode, strike, 'protect', pp);
+      const children = endgameChildren(cell.root, cell.own, cell.foe);
+      if (!children.unpriced) continue;
+      const read = children.delaySplit?.();
+      expect(read, `own PP ${pp.own}, foe PP ${pp.foe}: the recorded dice explain every draw`).toBeTruthy();
+      const { hold, hit } = chancesOf(cell);
+      expect(sorted(read!.map(child => child.share)), `own PP ${pp.own}, foe PP ${pp.foe}`)
+        .toEqual(sorted([hold, (1 - hold) * hit, (1 - hold) * (1 - hit)]).map(share => expect.closeTo(share, 12)));
+      expect(sum(read!.filter(child => child.ended).map(child => child.share))).toBeCloseTo((1 - hold) * hit, 12);
+      split++;
+    }
+    expect(split, 'cells whose draws disagree').toBeGreaterThan(0);
+  });
+});
+
+describe('a flipped miss that reaches a die the recorded turn never drew', () => {
+  const accuracy = (rules: typeof CHAMPIONS, id: string): number => (dexOfRules(rules).moves.get(id).accuracy as number) / 100;
+
+  test('Champions OU 2691886974 turn 22, singles: the Triple Axel miss lets the 90 % Draco Meteor roll, so its branch splits 0.9 and 0.1', async () => {
+    await loadSimMods('gen9championsou');
+    const board = scene('forced-win/tripleaxel-miss-gen9championsou-2691886974-t22');
+    const root = createRootPosition(board.serialized, board.ruleset);
+    const cell = endgameChildren(root, 'move tripleaxel', 'move dracometeor', 6);
+    const triple = accuracy(CHAMPIONS, 'tripleaxel');
+    const draco = accuracy(CHAMPIONS, 'dracometeor');
+    expect(cell.children.reduce((total, child) => total + child.share, 0)).toBeCloseTo(1, 12);
+    expect(sum(cell.children.filter(child => child.ended).map(child => child.share))).toBeCloseTo((1 - triple ** 3) * draco, 12);
+  });
+
+  test('Champions VGC 2679036012 turn 6, doubles: the High Horsepower miss lets Heat Wave roll its accuracy, so its branch splits', async () => {
+    await loadSimMods('gen9championsdoublescustomgame');
+    const board = scene('forced-win/highhorsepower-miss-gen9championsvgc2026regmbbo3-2679036012-t6');
+    const root = createRootPosition(board.serialized, board.ruleset);
+    const cell = endgameChildren(root, 'move highhorsepower 2, move psychocut 2', 'move heatwave', 6);
+    const turned = cell.children.filter(child => child.turned);
+    const miss = 1 - accuracy(CHAMPIONS, 'highhorsepower');
+    expect(turned.length).toBeGreaterThan(1);
+    expect(Math.max(...turned.map(child => child.share)), 'no answer of the branch carries the whole miss').toBeLessThan(miss);
+    expect(sum(turned.map(child => child.share))).toBeLessThanOrEqual(miss + 1e-12);
+    expect(sum(cell.children.map(child => child.share))).toBeLessThanOrEqual(1 + 1e-12);
   });
 });

@@ -1,4 +1,5 @@
 import type { Battle } from '@pkmn/sim';
+import { guarded } from '../sim-ask/guard.ts';
 import { secondaryDiceOf } from './offer.ts';
 import { secondaryEffectId } from './recognize.ts';
 import type { SecondaryEntry } from './types.ts';
@@ -20,12 +21,12 @@ export interface SecondaryChance {
 
 const reads = new WeakMap<Battle, Map<string, SecondaryChance[]>>();
 
-/** Entries with a chance under 1 after ModifyMove, ModifySecondaries; cached per battle, turn, user, move, target. */
-export function secondaryChances(battle: Battle, userSlot: string, moveId: string, targetSlot: string): SecondaryChance[] {
+/** Entries under chance 1 after ModifyMove, ModifySecondaries; cached per battle, turn, user, move, target, body in. */
+export function secondaryChances(battle: Battle, userSlot: string, moveId: string, targetSlot: string, incoming?: number): SecondaryChance[] {
   let cache = reads.get(battle);
   if (!cache) reads.set(battle, (cache = new Map()));
-  const key = `${battle.turn}|${userSlot}|${moveId}|${targetSlot}`;
+  const key = `${battle.turn}|${userSlot}|${moveId}|${targetSlot}|${incoming ?? ''}`;
   let found = cache.get(key);
-  if (!found) cache.set(key, (found = secondaryDiceOf(battle, userSlot, moveId, targetSlot).filter(entry => entry.chance < 1)));
+  if (!found) cache.set(key, (found = guarded(battle, [], () => secondaryDiceOf(battle, userSlot, moveId, targetSlot, incoming)).filter(entry => entry.chance < 1)));
   return found;
 }

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, describe } from 'vitest';
 import { Battle, State, Teams, toID, type PokemonSet } from '@pkmn/sim';
 import {
@@ -611,5 +612,41 @@ describe('kill odds for doubles options', () => {
       scoreAfter: -0.25,
     }), ['Alpha', 'Beta']);
     expect(summary).toContain('(True odds: Scald→Garchomp kills ~43% of the time.)');
+  });
+});
+
+describe('the defender of a pivot pair follows the queue', () => {
+  const pivotBoard = (trickRoom: boolean) => {
+    const battle = makeBattle(
+      [makeSet('Pika', 'Pikachu', ['Flamethrower'], 100)],
+      [makeSet('Snor', 'Snorlax', ['U-turn'], 100), makeSet('Bliss', 'Blissey', ['Splash'], 100)],
+    );
+    if (trickRoom) battle.field.addPseudoWeather('trickroom', battle.sides[0].active[0]!);
+    return battle;
+  };
+  const hitBody = (log: string[]) => log.find(line => line.startsWith('|-damage|p2a:') && !line.includes('[from]'))!.split('|')[2];
+
+  test.each([
+    { trickRoom: false, first: 'p1', defender: 'p2a: Snor' },
+    { trickRoom: true, first: 'p2', defender: 'p2a: Bliss' },
+  ])('singles, Trick Room $trickRoom: $first moves first, so the Flamethrower lands on $defender', ({ trickRoom, first, defender }) => {
+    const battle = pivotBoard(trickRoom);
+    const plan = planCellEvents(battle, 'move flamethrower', 'move uturn > switch 2');
+    expect(plan.kind).toBe('events');
+    const attack = (plan as { events: CellEvent[] }).events.find(entry => entry.side === 'p1')!;
+    const { log } = advancePositionWithLog(createRootPosition(serialize(battle)), 'move flamethrower', 'move uturn > switch 2', '1,2,3,4');
+    expect(log.findIndex(line => line.startsWith(`|move|${first}a:`))).toBeLessThan(log.findIndex(line => line.startsWith(`|move|${first === 'p1' ? 'p2' : 'p1'}a:`)));
+    expect(hitBody(log)).toBe(defender);
+    expect(attack.defenderIdent).toBe(defender);
+    expect(attack.secondary?.map(entry => entry.effectId)).toEqual(['brn']);
+  });
+
+  test('doubles: a slot that plays U-turn keeps its pair-plan value bit for bit', () => {
+    const scene = JSON.parse(readFileSync(new URL('./fixtures/verify-scenes/smogtours-gen9doublesou-912045-t8-r89.json', import.meta.url), 'utf-8')) as { serialized: string };
+    const state = JSON.parse(scene.serialized) as { sides: { pokemon: { moveSlots: { move: string; id: string }[] }[] }[] };
+    Object.assign(state.sides[1].pokemon[1].moveSlots[2], { move: 'U-turn', id: 'uturn' });
+    const root = createRootPosition(JSON.stringify(state));
+    const sample = sampleCell(root, 0, 'move bloodmoon 1, move lifedew', 'move sludgebomb 1, move uturn 1', 3, createMatchupCache(), true);
+    expect(sample.value).toBe(0.6940756423025269);
   });
 });

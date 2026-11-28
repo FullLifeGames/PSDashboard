@@ -1133,77 +1133,77 @@
       "p1": [
         {
           "choice": "move willowisp",
-          "ev": -0.03404452904397534,
+          "ev": -0.03404553758249981,
           "expected": 0.14498023133648089,
           "worstCase": -0.05302811217840797,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 4",
-          "ev": -0.05414707390821053,
-          "expected": 0.11820430719786007,
+          "ev": -0.054146606593471064,
+          "expected": 0.11988075234703614,
           "worstCase": -0.03604803971002368,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 5",
-          "ev": -0.05920159003456913,
-          "expected": 0.14753786147839726,
+          "ev": -0.059201866210223414,
+          "expected": 0.14838653904308324,
           "worstCase": -0.05927466296715689,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 2",
-          "ev": -0.0677871679651293,
-          "expected": 0.12964037303251483,
+          "ev": -0.06778558843500031,
+          "expected": 0.13232897619354705,
           "worstCase": -0.06785093488014193,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move dragondarts",
-          "ev": -0.0687230266377096,
+          "ev": -0.06872397195184085,
           "expected": 0.15641009841268622,
           "worstCase": -0.06879489423403284,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move uturn > switch 6",
-          "ev": -0.07442470218563443,
-          "expected": 0.08396861687389835,
-          "worstCase": -0.29237035098631536,
+          "ev": -0.07441656521788437,
+          "expected": 0.09327298175995027,
+          "worstCase": -0.2179354318979,
           "punishedBy": "Power Whip"
         },
         {
           "choice": "switch 4",
-          "ev": -0.09172274127255173,
+          "ev": -0.09172353954341952,
           "expected": 0.06889803579380374,
           "worstCase": -0.10180723368367783,
           "punishedBy": "Gyro Ball"
         },
         {
           "choice": "switch 5",
-          "ev": -0.118397625057561,
+          "ev": -0.11839866499053679,
           "expected": 0.10082086558765596,
           "worstCase": -0.11847531418191515,
           "punishedBy": "Spikes"
         },
         {
           "choice": "move protect",
-          "ev": -0.13044283086471253,
+          "ev": -0.13044394788330024,
           "expected": 0.10154092045692696,
           "worstCase": -0.13052568409304433,
           "punishedBy": "Spikes"
         },
         {
           "choice": "switch 2",
-          "ev": -0.13045572372639885,
+          "ev": -0.1304562107873817,
           "expected": 0.08315744313440206,
           "worstCase": -0.13052568409304433,
           "punishedBy": "Spikes"
         },
         {
           "choice": "switch 6",
-          "ev": -0.1304912578649213,
+          "ev": -0.1304901517758967,
           "expected": 0.031527362412240044,
           "worstCase": -0.28088570584689737,
           "punishedBy": "Power Whip"
@@ -1212,56 +1212,56 @@
       "p2": [
         {
           "choice": "move gyroball",
-          "ev": 0.09057577023172286,
+          "ev": 0.09058490468679503,
           "expected": -0.06422745605102474,
           "worstCase": -0.17860000434415046,
           "punishedBy": "U-turn → Corviknight"
         },
         {
           "choice": "move spikes",
-          "ev": 0.054239430024761746,
+          "ev": 0.054238202028839194,
           "expected": 0.08738854721251585,
           "worstCase": 0.03604803971002368,
           "punishedBy": "U-turn → Kyurem"
         },
         {
           "choice": "move powerwhip",
-          "ev": -0.08447877183581659,
-          "expected": -0.025991227219751813,
+          "ev": -0.09786773799102932,
+          "expected": -0.03654983868225814,
           "worstCase": -0.16112975526040735,
           "punishedBy": "Will-O-Wisp"
         },
         {
           "choice": "move protect",
-          "ev": -0.12647224038203023,
+          "ev": -0.12647224038203025,
           "expected": -0.12821575642403185,
           "worstCase": -0.14565527672412304,
           "punishedBy": "→ Corviknight"
         },
         {
           "choice": "switch 5",
-          "ev": -0.16590262018681004,
+          "ev": -0.16589821751529038,
           "expected": -0.16720935075869894,
           "worstCase": -0.2316522285929088,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 4",
-          "ev": -0.18271828199348972,
+          "ev": -0.18271914802478864,
           "expected": -0.17165272670571793,
           "worstCase": -0.289546818964342,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 2",
-          "ev": -0.20213483154841924,
+          "ev": -0.20213295956984367,
           "expected": -0.18173037990746232,
           "worstCase": -0.27119563045024386,
           "punishedBy": "Dragon Darts"
         },
         {
           "choice": "switch 6",
-          "ev": -0.2468059004061178,
+          "ev": -0.24680680887823808,
           "expected": -0.1968606433944583,
           "worstCase": -0.31576534759363684,
           "punishedBy": "U-turn → Chansey"

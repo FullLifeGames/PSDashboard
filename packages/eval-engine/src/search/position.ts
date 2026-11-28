@@ -18,7 +18,7 @@ import { deepenVerifiedCell, lightOptions, VERIFY_CHEAP, VERIFY_DEEPEN_COVER, VE
 import { isCombined } from './hints.ts';
 import { expandPivotPairs, searchOptions } from './options.ts';
 import { attachRootPayload, type RootPayload } from './root-payload.ts';
-import { FORCED_ROOT_LEVEL, recordDeepenedCell, withStaticPicks, type DeepeningState } from './deepening.ts';
+import { FORCED_ROOT_LEVEL, deepenWholeLevel, recordDeepenedCell, withStaticPicks, type DeepeningState } from './deepening.ts';
 import { deepenForcedRoot, isForcedRoot } from './forced-root.ts';
 import { forcedWinFor } from './forced-win.ts';
 import { rootOptions, rootPayload } from './root-setup.ts';
@@ -87,13 +87,13 @@ interface Deepening extends DeepeningState {
 }
 
 // keepPlayed is a root-position hint: child positions have their own choice space.
-function deepenCell(state: Deepening, i: number, j: number, depth: number, expandedThisLevel: Set<number>): void {
+function cellSubSearch(state: Deepening, i: number, j: number, depth: number): EvalResult {
   const child = state.matrix.children[i][j];
-  const sub = withStaticPicks(subSearch(child.serialized, { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, state.matchupCache), child);
-  recordDeepenedCell(state, i, j, sub, depth, expandedThisLevel);
+  return withStaticPicks(subSearch(child.serialized, { ...state.settings, depth: (depth - 1) as 1 | 2, samples: 1, keepPlayed: undefined }, state.matchupCache), child);
 }
 
-function deepenLevel(state: Deepening, depth: number): boolean {
+function deepenLevel(state: Deepening, depth: number, wholeLevel: boolean): boolean {
+  if (wholeLevel) return deepenWholeLevel(state, depth, (i, j) => cellSubSearch(state, i, j, depth));
   const expandedThisLevel = new Set<number>();
   const budget = TOP_EXPANSION * 2;
   let used = 0;
@@ -104,7 +104,7 @@ function deepenLevel(state: Deepening, depth: number): boolean {
 
     for (const [i, j] of wanted) {
       if (state.callbacks?.shouldStop?.()) return true;
-      deepenCell(state, i, j, depth, expandedThisLevel);
+      recordDeepenedCell(state, i, j, cellSubSearch(state, i, j, depth), depth, expandedThisLevel);
       used += 1;
       state.callbacks?.onProgress?.({ done: used, total: budget, depth });
     }
@@ -170,7 +170,7 @@ function deepenRoot(
   }
   for (let depth = firstLevel; depth <= settings.depth && !stopped; depth++) {
     if (callbacks?.shouldStop?.()) break;
-    if (deepenLevel(state, depth)) {
+    if (deepenLevel(state, depth, !restrictCandidates && depth === 2)) {
       stopped = true;
       break;
     }

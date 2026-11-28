@@ -14,9 +14,9 @@ import { eventSecondaries } from '../search/secondary-classes.ts';
 import type { PairScript } from './prng.ts';
 
 // The first natural draw names the events; the heaviest unseen outcome is drawn next, its event answered the other way.
-// It stops at coverage 0.95, after eight draws, or when no candidate carries 0.01 of mass; unpriced rules use the mean.
+// It stops at coverage 0.95, at the draw budget or when no candidate carries 0.01 of mass; unpriced rules use the mean.
 
-export const PAIR_DRAW_BUDGET = 8;
+export const PAIR_DRAW_BUDGET = 16;
 export const FALLBACK_DRAWS = BASE_DRAWS + 3;
 const COVER_TARGET = 0.95;
 const COVER_MIN = 0.8;
@@ -36,7 +36,7 @@ interface Found {
   key: string; weight: number; leafSum: number; count: number; ended: boolean; hasFirst: boolean; events: PairEvent[]; branch: Branch; child: SimPosition;
   draws: PairDraw[];
 }
-interface Candidate { id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome; tokens?: string[] }
+interface Candidate { parent: string; id: string; prior: number; branch: Branch; prefix: PairEvent[]; flipKey: string; outcome: PairOutcome; tokens?: string[] }
 interface Cell {
   root: SimPosition; p1Choice: string; p2Choice: string; samples: number; matchupCache: MatchupCache; tableFor: TableFor; entriesFor: EntriesFor; plainDraws?: number;
   /** The cell's own seed list, slot s where slot s of the fixed lists stood (the matrix's first draw is slot 0). */
@@ -110,7 +110,7 @@ function candidatesOf(found: Found): Candidate[] {
       const scripts = new Map(found.branch.scripts).set(event.key, alternative.script);
       const id = `${found.branch.seed}#${[...scripts].map(([key, script]) => `${key}=${JSON.stringify(script)}`).sort().join(';')}`;
       out.push({
-        id, prior, branch: { seed: found.branch.seed, scripts, from: index }, prefix: found.events.slice(0, index), flipKey: event.key,
+        parent: found.key, id, prior, branch: { seed: found.branch.seed, scripts, from: index }, prefix: found.events.slice(0, index), flipKey: event.key,
         outcome: alternative.outcome, ...(alternative.tokens ? { tokens: alternative.tokens } : {}),
       });
     }
@@ -176,9 +176,24 @@ function poolStates(cell: Cell, found: Map<string, Found>, natural: number): Map
   return states;
 }
 
-function blended(found: Map<string, Found>, first: PairDraw, cover: number, classGroups?: Map<string, StateGroup[]>): CellSample {
+function classWeights(found: Map<string, Found>, candidates: Map<string, Candidate>, tried: Set<string>, cover: number): Map<string, number> {
+  const open = new Map<string, number>();
+  let carried = 0;
+  for (const candidate of candidates.values()) {
+    if (tried.has(candidate.id)) continue;
+    open.set(candidate.parent, (open.get(candidate.parent) ?? 0) + candidate.prior);
+    carried += candidate.prior;
+  }
+  const unseen = Math.max(0, 1 - cover);
+  return new Map([...found.values()].map(entry => {
+    const share = carried > 0 ? (open.get(entry.key) ?? 0) / carried : entry.weight / cover;
+    return [entry.key, (entry.weight + unseen * share) / Math.max(1, cover)];
+  }));
+}
+
+function blended(found: Map<string, Found>, first: PairDraw, weights: Map<string, number>, classGroups?: Map<string, StateGroup[]>): CellSample {
   const classes: CellBlendClass[] = [...found.values()].map(entry => ({
-    key: entry.key, weight: entry.weight / cover, leafSum: entry.leafSum, count: entry.count, hasFirst: entry.hasFirst, ended: entry.ended,
+    key: entry.key, weight: weights.get(entry.key)!, leafSum: entry.leafSum, count: entry.count, hasFirst: entry.hasFirst, ended: entry.ended,
   }));
   const value = classes.reduce((sum, cls) => sum + cls.weight * (cls.leafSum / cls.count), 0);
   const classChildren = new Map([...found.values()].map(entry => [entry.key, entry.child]));
@@ -216,7 +231,7 @@ function plan(cell: Cell, first: PairDraw, firstPattern: Pattern): PairCell {
   const cover = coverage(found);
   if (cover < COVER_MIN || cover > COVER_MAX) return fallbackCell(cell, first, cover < COVER_MIN ? 'low-cover' : 'over-cover', draws);
   const states = cell.plainDraws ? poolStates(cell, found, base) : undefined;
-  return { kind: 'sample', sample: blended(found, first, cover, states), via: 'plan', reason: null, draws };
+  return { kind: 'sample', sample: blended(found, first, classWeights(found, candidates, tried, cover), states), via: 'plan', reason: null, draws };
 }
 
 export function pairCellSample(

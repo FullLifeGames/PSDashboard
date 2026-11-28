@@ -10,7 +10,11 @@ export interface FlipTurn {
   play(battle: Battle): void;
   /** The speed ties the turn is held to, by pair (`{ first }` puts one slot ahead); every play keeps that order. */
   ties?: readonly ForcedDie[];
+  /** Chance dice held to an answer; `happens` is what the draw itself reads, a status check's included. */
+  held?: readonly ForcedDie[];
 }
+
+const rawKeys = (dice: readonly ForcedDie[] | undefined): [string, true][] => (dice ?? []).map(die => [dieKey(die.name), true]);
 
 class HeldRecordingPRNG extends ForcedDicePRNG {
   readonly names = new Map<string, DieName>();
@@ -84,8 +88,10 @@ export function recordTurn(turn: FlipTurn): RecordedTurn {
   const logStart = battle.log.length;
   const inner = battle.prng;
   const watch = watchBattle(battle);
-  const held = turn.ties && turn.ties.length > 0;
-  const recording = held ? new HeldRecordingPRNG({ inner, watch, forced: turn.ties!, record: new Map() }) : new RecordingPRNG(inner, watch);
+  const forced = [...(turn.ties ?? []), ...(turn.held ?? [])];
+  const recording = forced.length > 0
+    ? new HeldRecordingPRNG({ inner, watch, forced, record: new Map(), actsOnTrue: new Map(rawKeys(turn.held)) })
+    : new RecordingPRNG(inner, watch);
   battle.prng = recording;
   try {
     turn.play(battle);
@@ -112,9 +118,8 @@ export function flipTurn(turn: FlipTurn, recorded: RecordedTurn, die: FlipDie): 
   const watch = watchBattle(battle);
   const forcing = new ForcedDicePRNG({
     inner, watch, record: recorded.record,
-    forced: [{ name: die.name, result: { happens: !die.drew } }, ...(turn.ties ?? [])],
-    // raw answers: "happens" is the draw's own true, for a status check too (its polarity is the handler's question)
-    actsOnTrue: new Map([[die.key, true]]),
+    forced: [{ name: die.name, result: { happens: !die.drew } }, ...(turn.ties ?? []), ...(turn.held ?? [])],
+    actsOnTrue: new Map([[die.key, true], ...rawKeys(turn.held)]),
   });
   battle.prng = forcing;
   try {
