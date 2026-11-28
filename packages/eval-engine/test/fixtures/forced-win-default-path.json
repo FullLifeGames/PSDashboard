@@ -37,8 +37,8 @@
   "turns": 4,
   "caveat": "sampled-rolls",
   "openValue": 0.6,
-  "states": 9,
-  "cells": 11
+  "states": 12,
+  "cells": 16
  },
  "scout-miss-gen9championsvgc2026regmbbo3-2682637901-t6": {
   "mass": 1,
@@ -60,7 +60,7 @@
   "turns": 0,
   "caveat": "none",
   "openValue": null,
-  "states": 63,
+  "states": 72,
   "cells": 100
  },
  "scout-miss-gen9doublesou-2661746817-t8": {

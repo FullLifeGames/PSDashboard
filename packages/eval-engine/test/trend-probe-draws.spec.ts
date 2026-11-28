@@ -30,7 +30,7 @@ const scene = (p1Moves: string[]): string => {
   return JSON.stringify(State.serializeBattle(battleOf('gen9customgame', p1, p2)));
 };
 const ROLLING = scene(['focusblast', 'substitute']);
-const SURE = scene(['shadowball', 'substitute']);
+const SURE = scene(['hex', 'substitute']);
 
 type Trend = (ctx: { root: ReturnType<typeof createRootPosition>; cache: ReturnType<typeof createMatchupCache>; p1Choice: string; p2Choice: string; value: number; first: ReturnType<typeof createRootPosition> }) => number;
 
@@ -80,9 +80,9 @@ describe('the trend probe reads the cell from its base draws', () => {
 
   test('a cell priced by one draw keeps the single-draw probe: its child is the cell', () => {
     const old = byHand(SURE, todaysProbe);
-    expect(old.probes).toEqual(['Shadow Ball x → Skarmory', 'Shadow Ball x → Skarmory']);
+    expect(old.probes).toEqual(['Hex x → Skarmory', 'Hex x → Skarmory']);
     expect(Math.abs(old.after[0] - old.before[0])).toBeGreaterThan(0.02);
-    const cell = sampleCell(createRootPosition(SURE), 0, 'move shadowball', 'switch 2', 3, createMatchupCache(), true);
+    const cell = sampleCell(createRootPosition(SURE), 0, 'move hex', 'switch 2', 3, createMatchupCache(), true);
     expect(cell.baseDraws).toBeUndefined();
     const searched = evs(searchPosition(SURE, SETTINGS));
     expect(searched).toHaveLength(old.after.length);
