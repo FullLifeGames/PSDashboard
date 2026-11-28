@@ -31,6 +31,13 @@ describe('EvalResultBlock', () => {
     expect(choices[3]).toHaveTextContent(`1.Leech Seed${winPercent(-0.3)}%`);
   });
 
+  test.each([['singles'], ['doubles']] as const)('the win-chance bar says in its hover text that the search\'s value and the lines\' table can sit a few points apart (%s)', kind => {
+    render(<EvalResultBlock result={evalResult(kind)} status="done" playerNames={names} doubles={kind === 'doubles'} />);
+    const sentence = "The bar shows the search's value for this position; the lines below show the checked table of choices, and the two can sit a few points apart.";
+    expect(screen.getByRole('img', { name: /^Advantage estimate:/ })).toHaveAttribute('title', expect.stringContaining(sentence));
+    expect(document.querySelector('.ps-eval-labels')).toHaveAttribute('title', expect.stringContaining(sentence));
+  });
+
   test('clicking a line hands the side, the line, and the other side\'s reply over; stale results are inert', async () => {
     const onPickChoice = vi.fn();
     const onPickPair = vi.fn();

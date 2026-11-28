@@ -6,6 +6,8 @@ import { exploreTitle, readsReply } from './turn-copy';
 import { rowLineTail } from '../../lib/row-line';
 import { floorReplyUnlisted } from '../../lib/unlisted-floor';
 
+const BAR_TITLE = "The bar shows the search's value for this position; the lines below show the checked table of choices, and the two can sit a few points apart.";
+
 // Displayed values are win probabilities ("52%") and point deltas ("−8%").
 
 type PickChoice = (side: 'p1' | 'p2', choice: RankedChoice, reply?: RankedChoice | null, from?: EvalResult | null) => void;
@@ -128,11 +130,11 @@ export function EvalResultBlock({ result, status, playerNames, positionLabel, re
       {positionLabel && (
         <div style={{ fontSize: 10, color: '#8fa3bd', marginBottom: 2 }}>{positionLabel}</div>
       )}
-      <div className="ps-eval-labels">
+      <div className="ps-eval-labels" title={BAR_TITLE}>
         <span className="ps-eval-bar-p1">{playerNames[0]} {p1Pct}%</span>
         <span className="ps-eval-bar-p2">{playerNames[1]} {100 - p1Pct}%</span>
       </div>
-      <div className="ps-eval-bar" role="img" aria-label={`Advantage estimate: ${playerNames[0]} ${p1Pct}%, ${playerNames[1]} ${100 - p1Pct}%`}>
+      <div className="ps-eval-bar" role="img" title={BAR_TITLE} aria-label={`Advantage estimate: ${playerNames[0]} ${p1Pct}%, ${playerNames[1]} ${100 - p1Pct}%`}>
         <div className="ps-eval-bar-fill" style={{ width: `${p1Pct}%` }} />
         <div className="ps-eval-bar-tick" />
       </div>
