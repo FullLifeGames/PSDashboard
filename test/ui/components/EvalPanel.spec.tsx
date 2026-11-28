@@ -45,7 +45,7 @@ describe('EvalPanel', () => {
     const { rerender } = render(<EvalPanel {...wired} />);
     expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent plays its top choice.'));
     rerender(<EvalPanel {...wired} prefs={{ ...prefs, hardMode: true }} />);
-    expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringContaining('the opponent reads your move and plays the reply'));
+    expect(document.querySelector('button.ps-eval-choice')).toHaveAttribute('title', expect.stringMatching(/the opponent reads your move and answers with .+\.$/));
   });
 
   test('at a finished variation the panel names the winner instead of a bar and empty lines, and offers no Evaluate', () => {

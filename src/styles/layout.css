@@ -134,6 +134,13 @@
   font-size: 11px;
   color: #aabbcc;
 }
+.ps-setup-note {
+  margin: -3px 0 0 20px;
+  max-width: 240px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #8899aa;
+}
 .ps-setup-size,
 .ps-setup-row {
   display: grid;

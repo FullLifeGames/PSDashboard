@@ -45,6 +45,26 @@ describe('LinesSection', () => {
     expect(within(container as HTMLElement).getByText('Behemoth Bash: KO (12 of 16 rolls)')).toBeInTheDocument();
   });
 
+  test('doubles: the side name and the start of a joint label share one group, the other parts follow, split at " + "', () => {
+    const { container } = render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={host()} />);
+    const [first, second] = [...container.querySelectorAll('.ps-eval-line-turn')];
+    const lead = first.querySelector('.ps-eval-line-lead');
+    expect(lead?.querySelector('.side')?.textContent).toBe('pixelfrost');
+    expect(lead?.textContent).toBe('pixelfrost Fake Out → Rillaboom');
+    expect([...first.querySelectorAll('.ps-eval-line-part')].map(part => part.textContent)).toEqual([' + Spore → Zamazenta']);
+    expect(second.querySelector('.ps-eval-line-lead')?.textContent).toBe('Mstr_Hawk Sucker Punch → Terapagos');
+    expect(first.textContent).toContain('pixelfrost Fake Out → Rillaboom + Spore → Zamazenta');
+  });
+
+  test('singles: a lone move is the lead of its side with no further part, and both sides share the row', () => {
+    const { container } = render(<LinesSection turn={20} result={withLines([singlesLine])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
+    const row = container.querySelector('.ps-eval-line-turn')!;
+    const leads = [...row.querySelectorAll('.ps-eval-line-lead')];
+    expect(leads).toHaveLength(2);
+    expect(leads.every(lead => lead.querySelector('.side') !== null)).toBe(true);
+    expect(row.querySelector('.ps-eval-line-part')).toBeNull();
+  });
+
   test('a line that leaves a draw to the seed carries the note', () => {
     render(<LinesSection turn={20} result={withLines([{ ...singlesLine, unforced: ['unnamed draw'] }])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />);
     expect(screen.getByText(/The click cannot force sleep turns, random targets and similar draws/)).toBeInTheDocument();
@@ -288,5 +308,32 @@ describe('Hard mode in the Lines section', () => {
     };
     render(<LinesSection turn={4} result={result} playerNames={DOUBLES_NAMES} doubles host={hard()} />);
     expect(screen.getByText(`vs ${pair} (the reply the search rates lowest for this choice, ${winPctText(0.2)} in its cell)`)).toBeInTheDocument();
+  });
+
+  const MARKER = 'Opponent reads your move: each line meets the reply that hurts its choice most.';
+
+  test.each([
+    ['singles', () => render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />)],
+    ['doubles', () => render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={hard()} />)],
+  ])('%s, on: the body opens with the marker line, once', (_kind, draw) => {
+    const { container } = draw();
+    const body = container.querySelector('.ps-eval-lines-body')!;
+    expect(body.firstElementChild).toHaveTextContent(MARKER);
+    expect(body.firstElementChild).toHaveClass('ps-eval-line');
+    expect(screen.getAllByText(MARKER)).toHaveLength(1);
+  });
+
+  test.each([
+    ['singles', () => render(<LinesSection turn={20} result={hurtBy([singlesLine, meetsSurf])} playerNames={SINGLES_NAMES} doubles={false} host={host()} />)],
+    ['doubles', () => render(<LinesSection turn={4} result={withLines([doublesLine])} playerNames={DOUBLES_NAMES} doubles host={host()} />)],
+  ])('%s, off: no marker line', (_kind, draw) => {
+    draw();
+    expect(screen.queryByText(/Opponent reads your move/)).toBeNull();
+  });
+
+  test('on, and a turn without lines: the no-line sentence alone', () => {
+    const { container } = render(<LinesSection turn={20} result={withLines([])} playerNames={SINGLES_NAMES} doubles={false} host={hard()} />);
+    expect(screen.queryByText(/Opponent reads your move/)).toBeNull();
+    expect(container.querySelector('.ps-eval-lines-body')?.children).toHaveLength(1);
   });
 });

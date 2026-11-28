@@ -327,7 +327,7 @@ describe('gameReview: the answer of each line', () => {
   });
 });
 
-describe('gameReview: Hard mode', () => {
+describe('gameReview: the opponent-reads setting', () => {
   const ranking = (labels: string[]) => labels.map((label, index) => rankedChoice(`move ${index}`, label, 0.2 - index * 0.05));
   const hard: LinesHost = { ...host, hardMode: true };
   const meetsSurf: EvalLine = { ...singlesLine, versus: 'worst', steps: [{ ...singlesLine.steps[0], p1: { choice: 'move 1', label: 'Surf', slots: [] } }, ...singlesLine.steps.slice(1)] };
@@ -344,24 +344,26 @@ describe('gameReview: Hard mode', () => {
     return gameReview({ analyses, results, playerNames: SINGLES_NAMES, doubles: false, host: on })[1].rows[0].lines;
   };
 
-  test('singles, on: the engine line is the worst line and its answer says why; off: the usual line, whatever the result holds', () => {
-    const [engine] = review([singlesLine, meetsSurf], hard);
-    expect(engine.text).toBe('Hydro Pump vs Surf (the reply the search rates lowest for this choice, 32% in its cell), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird');
-    const [usual] = review([singlesLine, meetsSurf], host);
-    expect(usual.text).toBe("Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird");
+  test('singles, on or off: the engine line is the usual line, whatever the result holds', () => {
+    const usual = "Hydro Pump vs Draining Kiss (Tzon's top choice), then Moonblast vs → Corviknight, then Moonblast vs Brave Bird";
+    expect(review([singlesLine, meetsSurf], hard)[0].text).toBe(usual);
+    expect(review([singlesLine, meetsSurf], host)[0].text).toBe(usual);
   });
 
-  test('the cell in the bracket is printed with the turn\'s fainted share, as the card prints its rows', () => {
-    const [engine] = review([singlesLine, meetsSurf], hard, 0.5);
-    expect(engine.text).toContain(`the reply the search rates lowest for this choice, ${winPctText(-0.4, 0.5)} in its cell)`);
-    expect(winPctText(-0.4, 0.5)).not.toBe(winPctText(-0.4));
-  });
-
-  test('singles, on, with no line against the reply: today\'s line and the sentence on the block', () => {
-    const lines = review([singlesLine], hard);
+  test('singles, on, with a worst line for one pair row only: both rows keep their usual line and no sentence', () => {
+    const lines = review([singlesLine, meetsSurf], hard);
     expect(lines).toHaveLength(1);
-    expect(lines[0].text).toContain("vs Draining Kiss (Tzon's top choice)");
-    expect(lines[0].block.worstNote).toBe('No line against Surf, the reply the search rates lowest for this choice. This line meets Draining Kiss.');
+    expect(lines[0].block.worstNote).toBeFalsy();
+    expect(lines[0].text).not.toMatch(/rates lowest|No line against/);
+  });
+
+  test('doubles, on: the pair keeps its usual line, as with the setting off', () => {
+    const analyses: (TurnAnalysis | null)[] = [null, null, null, turnAnalysis(4, { p1: { ...misplayedSide('mistake'), best: rankedChoice('move 1, move 2', doublesLine.label, 0.6) } })];
+    const worst: EvalLine = { ...doublesLine, versus: 'worst', steps: [doublesLine.steps[0], ...doublesLine.steps.slice(2)] };
+    const results: (EvalResult | null)[] = [null, null, null, { ...evalResult('doubles'), lines: [doublesLine, worst] }];
+    const textOf = (on: LinesHost) => gameReview({ analyses, results, playerNames: DOUBLES_NAMES, doubles: true, host: on })[0].rows[0].lines.map(line => line.text);
+    expect(textOf(hard)).toEqual(textOf(host));
+    expect(textOf(hard)).toHaveLength(1);
   });
 });
 

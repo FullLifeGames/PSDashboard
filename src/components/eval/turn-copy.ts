@@ -1,6 +1,7 @@
-import { regretText, TIER_THRESHOLDS, type EvalLine, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
+import { regretText, TIER_THRESHOLDS, type EvalLine, type EvalResult, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText, winPercent } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
+import { worstReply, type WorstReply } from '../../lib/worst-reply';
 
 /** The floor appears only as a labeled risk clause, and only when the row gave up mistake-sized safety. */
 export const RISK_DISPLAY_GAP = TIER_THRESHOLDS.mistake;
@@ -146,9 +147,27 @@ export function regretView(name: string, side: SideAnalysis, regret: number): { 
   };
 }
 
-export const exploreTitle = (opponentReads = false): string => opponentReads && opponentReadsEnabled()
-  ? 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.'
+export const exploreTitle = (opponentReads = false, reply?: string): string => opponentReads && opponentReadsEnabled()
+  ? `Play this turn in a variation; the opponent reads your move and ${reply ? `answers with ${reply}` : 'plays the reply the search rates lowest for it'}.`
   : 'Play this turn in a variation; the opponent plays its top choice.';
+
+type RowLines = { result: EvalResult | null | undefined; side: 'p1' | 'p2' };
+
+export function readsReply(opponentReads: boolean | undefined, rowLines: RowLines | undefined, row: RankedChoice): WorstReply | null {
+  return opponentReads && opponentReadsEnabled() && rowLines?.result ? worstReply(rowLines.result, rowLines.side, row) : null;
+}
+
+export function readsWorstLabel(reads: WorstReply | null, row: RankedChoice): { label: string; title?: string } | null {
+  if (!row.punishedBy) return null;
+  if (!reads || reads.reply.label === row.punishedBy) return { label: row.punishedBy };
+  const lead = 'The reply the opponent plays when it reads this move';
+  return {
+    label: reads.reply.label,
+    title: reads.basis === 'cell'
+      ? `${lead}. The lowest cell of the row, ${row.punishedBy}, rests on a thinly searched cell.`
+      : `${lead}: its best choice, because the row's lowest cell, ${row.punishedBy}, matches no ranked reply.`,
+  };
+}
 
 export function inaccuracyView(side: Pick<SideAnalysis, 'best' | 'played' | 'faintedFraction' | 'regret'>): { text: string; title: string } {
   const regret = side.regret ?? 0;

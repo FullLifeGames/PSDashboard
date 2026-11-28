@@ -239,6 +239,8 @@ export function rankWords(rank: number): string {
   return `${rank}${suffix} choice`;
 }
 
+export const READS_LINES_NOTE = 'Opponent reads your move: each line meets the reply that hurts its choice most.';
+
 const RATES_LOWEST = 'the reply the search rates lowest for this choice';
 
 /** The other side's choice in the line's first step, by ranking place; a line opening with a replacement meets none. */

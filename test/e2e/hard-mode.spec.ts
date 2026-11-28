@@ -133,7 +133,7 @@ async function runGame(contexts: BrowserContext[], browser: Browser, replay: Rep
   expect(offer.hurtMost.length, 'the matrix names a reply that hurts the clicked move most').toBeGreaterThan(0);
   const worstParts = offer.hurtMost.map(partsIn);
   const hardText = await clickEngineMove(on, onGuard, turn);
-  await expect(on.getByText('Opponent reads your move')).toBeVisible();
+  await expect(on.locator('.ps-dock-source').filter({ hasText: 'Opponent reads your move' })).toBeVisible();
   await expect(on.getByRole('button', { name: 'Turn off' })).toBeVisible();
   expect(worstParts.some(parts => parts.every(part => hardText.includes(part))), `the history names the reply that hurts most (${offer.hurtMost.join(' | ')}); it reads: ${hardText.replace(/\s+/g, ' ').slice(0, 600)}`).toBe(true);
   const bestOnly = partsIn(offer.best).filter(part => !worstParts.some(parts => parts.includes(part)) && !partsIn(offer.own).includes(part));

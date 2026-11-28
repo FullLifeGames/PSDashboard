@@ -246,6 +246,7 @@ button.ps-eval-choice:hover,
 .ps-eval-line-turn .t { color: #778; }
 .ps-eval-line-turn > span:not(.t) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; }
 .ps-eval-line-turn .ps-lines-chip { margin-left: 0; }
+.ps-eval-line-turn .ps-eval-line-side { display: contents; }
 .ps-eval-line-turn .side { color: #9fb2cc; }
 /* Inline in 10 px text, as ExplorableLabel's buttons; the full-size .ps-btn doubled every row. */
 .ps-eval-lines .ps-eval-inline-btn, .ps-eval-review .ps-eval-inline-btn { padding: 0 5px; font-size: 10px; line-height: 1.5; }
