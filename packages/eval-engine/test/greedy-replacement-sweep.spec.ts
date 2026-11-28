@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test } from 'vitest';
 import type { Battle, PokemonSet } from '@pkmn/sim';
 import { rulesDex } from '@fulllifegames/replay-core';
 import { loadSimMods } from '../src/forward/sim-mods';
 import { advancePositionWithLog, createRootPosition, legalChoices, positionBattle } from '../src/forward-model';
 import { forkBattle } from '../src/forward/position';
 import { applyChoice } from '../src/forward/switches';
+import { greedyReplacements } from '../src/endgame/win-paths/replacement';
+import { configureSimFast, resetSimFastForTests } from '../src/forward/sim-fast/state';
 import { serializeBattleStable } from '../src/forward/serialize';
 import { searchOrchestrated } from '../src/orchestrator';
 import { createLocalExecutor, searchPosition } from '../src/search';
@@ -151,6 +153,42 @@ describe.each(RULES)('$name: the static pick names every replacement the simulat
       expect(child.staticPicks).toHaveLength(1);
       expect(child.staticPicks![0].p1).toBeUndefined();
       expect(child.staticPicks![0].p2).toMatch(doubles ? /^→ Snorlax \+ → Snorlax$/ : /^→ Snorlax$/);
+    });
+
+    describe('the win paths\' greedy replacement', () => {
+      afterEach(resetSimFastForTests);
+
+      const stateOf = (battle: Battle): string => `${serializeBattleStable(battle)}|${battle.prng.getSeed()}`;
+      const benchOf = (battle: Battle, side: 'p1' | 'p2'): number =>
+        battle.sides[side === 'p1' ? 0 : 1].pokemon.filter(pokemon => !pokemon.isActive && !pokemon.fainted).length;
+
+      test.each(['pivot', 'hazard', 'held', 'knock-out'] as const)('every %s entry: picks with the copy lever as without it and leaves its board as it was', kind => {
+        const wrong: string[] = [];
+        let scenes = 0;
+        let choices = 0;
+        for (const entry of entries.filter(candidate => candidate.kind === kind)) {
+          for (const lethal of kind === 'knock-out' ? [false] : [false, true]) {
+            const scene = sceneOf(format, entry, doubles, lethal);
+            const move = picksOf(scene.battle, scene.tries);
+            if (!move) continue;
+            const stop = advancePositionWithLog(createRootPosition(serializeBattleStable(scene.battle)), move.p1, move.p2, SEED, { stopAtForcedSwitch: true });
+            if (!stop.pendingSwitch) continue;
+            const board = positionBattle(stop.child);
+            const before = stateOf(board);
+            const [withClone, without] = [['clone'], []].map(levers => {
+              configureSimFast(levers as ['clone'] | []);
+              try { return JSON.stringify(greedyReplacements(board)); } catch (error) { return `throws: ${(error as Error).message}`; }
+            });
+            scenes += 1;
+            if (SIDES.some(side => asks(board, side) && benchOf(board, side) > 1)) choices += 1;
+            if (withClone !== without) wrong.push(`${entry.name}: clone ${withClone}, off ${without}`);
+            if (stateOf(board) !== before) wrong.push(`${entry.name}: the board moved`);
+          }
+        }
+        expect(wrong).toEqual([]);
+        expect(scenes).toBeGreaterThan(0);
+        expect(choices).toBeGreaterThan(0);
+      });
     });
 
     test.each(['pivot', 'hazard', 'held', 'knock-out'] as const)('every %s entry', kind => {

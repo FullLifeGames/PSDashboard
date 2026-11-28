@@ -1,4 +1,4 @@
-import { createRootPosition, positionBattle, type ChoiceOption, type SimPosition } from '../../forward-model.ts';
+import { createRootPosition, legalChoices, positionBattle, type ChoiceOption, type SimPosition } from '../../forward-model.ts';
 import { searchOptions } from '../../search/options.ts';
 import { ForcedWinProver, type ProofPlan } from '../prover.ts';
 import { orderByOdds, orderByRanking, type Side } from '../prover-order.ts';
@@ -8,8 +8,7 @@ import { awaitsReplacement } from './luck-path.ts';
 import { greedyReplacements } from './replacement.ts';
 import type { WinPathsRequest, WinStep } from './types.ts';
 
-// The prover (`floor: 0`, `plan: true`) proves each own choice in ranking order; the best mass is the chance.
-// The line is a witness: the likeliest dice under which the proof's choices win; a missed position is re-proved.
+// Each own choice is proved in ranking order, the best mass is the chance; the line is a witness, re-proved if missed.
 
 const optionsOf = (request: WinPathsRequest) => ({ tera: request.tera, sleepClause: request.sleepClause, ruleset: request.ruleset });
 
@@ -42,7 +41,11 @@ function planChooser(side: Side, request: WinPathsRequest, rootPlan: ProofPlan, 
 function candidatesOf(root: SimPosition, side: Side, request: WinPathsRequest): ChoiceOption[] {
   const own = searchOptions(root, side, { tera: request.tera, sleepClause: request.sleepClause });
   const order = request.rootOrder ?? [];
-  return order.length > 0 ? orderByRanking(own, order) : orderByOdds(positionBattle(root), side, own);
+  const ranked = order.length > 0 ? orderByRanking(own, order) : orderByOdds(positionBattle(root), side, own);
+  const choice = request.proof?.choice;
+  if (!choice) return ranked;
+  const named = own.find(option => option.choice === choice) ?? legalChoices(root, side, { tera: request.tera }).find(option => option.choice === choice);
+  return named ? [named, ...ranked.filter(option => option.choice !== choice)] : ranked;
 }
 
 function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: WinPathsRequest): { best: { mass: number; plan: ProofPlan } | null; played?: number } {
@@ -51,7 +54,7 @@ function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: Wi
   for (const candidate of candidatesOf(root, request.side, request)) {
     if (prover.capped) break;
     const proof = prover.candidateProof(root, candidate);
-    if (candidate.choice === request.played) played = proof.proven.mass;
+    if (candidate.choice === request.played && !prover.capped) played = proof.proven.mass;
     if (proof.plan && proof.proven.mass > (best?.mass ?? 0)) best = { mass: proof.proven.mass, plan: proof.plan };
   }
   return { best, played };
@@ -68,7 +71,7 @@ export function strongerStep(serialized: string, request: WinPathsRequest, meter
   const { best, played } = proveCandidates(root, prover, request);
   meter.cells = prover.cells;
   const beside = played === undefined ? {} : { played };
-  if (!best || best.mass <= (played ?? 0)) return done({ status: prover.capped ? 'stopped' : 'none', ...(best ? { chance: best.mass } : {}), ...beside });
+  if (!best || (!request.proof && best.mass <= (played ?? 0))) return done({ status: prover.capped ? 'stopped' : 'none', ...(best ? { chance: best.mass } : {}), ...beside });
   const witness = luckUnder(serialized, { ...request, floor: 0 }, meter, planChooser(side, request, best.plan, meter, provers, turns));
   meter.cells = [...provers.values()].reduce((sum, item) => sum + item.cells, 0);
   return done({ status: 'found', chance: best.mass, ...beside, ...(witness.line ? { line: witness.line } : {}) });

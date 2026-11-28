@@ -40,12 +40,12 @@ async function settleOnTurn(page: Page, panel: Locator, turn: number) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await panel.locator(`svg rect[data-turn="${turn}"]`).first().click({ force: true });
     await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 60_000 });
-    if (await panel.locator('.ps-eval-lines').isVisible()) {
+    if (await panel.locator('.ps-eval-lines').first().isVisible()) {
       await page.waitForTimeout(1500);
-      if (await panel.locator('.ps-eval-lines').isVisible()) return;
+      if (await panel.locator('.ps-eval-lines').first().isVisible()) return;
     }
   }
-  await expect(panel.locator('.ps-eval-lines')).toBeVisible();
+  await expect(panel.locator('.ps-eval-lines').first()).toBeVisible();
 }
 
 async function openLines(panel: Locator) {

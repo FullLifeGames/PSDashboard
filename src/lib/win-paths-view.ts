@@ -1,10 +1,10 @@
 import type { WinStep } from '@fulllifegames/eval-engine';
 import { activeNamesAt, lineBlocks, rankWords, type LineBlockView, type LinesHost } from './line-view';
 
-
 type Side = 'p1' | 'p2';
 
 const TURNS = 3;
+const turnWords = (turns: number): string => `${turns} turn${turns === 1 ? '' : 's'}`;
 
 export type WinStepKind = WinStep['kind'];
 export interface WinStepView {
@@ -21,6 +21,8 @@ export interface WinPathsViewContext {
   doubles: boolean;
   host: LinesHost;
   side: Side;
+  question?: 'lost' | 'proof';
+  turns?: number;
   playedLabel: string | null;
   /** The loser was knocked out before it moved: `playedLabel` stands in for a choice the log does not show. */
   playedNeverActed?: boolean;
@@ -35,13 +37,15 @@ export function chanceText(chance: number): string {
 
 const NONE = `None within ${TURNS} turns.`;
 const NONE_LUCK = `None within ${TURNS} turns at 1 in 1,000 or better.`;
+const noProof = (turns: number): string => `The proof did not replay within ${turnWords(turns)}.`;
 const STOPPED = 'Stopped at the search limit; nothing found so far.';
 const FAILED = 'This step could not run.';
 
-function emptySentence(step: WinStep): string | null {
+function emptySentence(step: WinStep, ctx: WinPathsViewContext): string | null {
   if (step.status === 'found') return null;
   if (step.status === 'stopped') return STOPPED;
   if (step.status === 'failed') return FAILED;
+  if (ctx.question === 'proof') return noProof(ctx.turns ?? TURNS);
   return step.kind === 'luck' ? NONE_LUCK : NONE;
 }
 
@@ -75,19 +79,20 @@ export function showdownWords(label: string): string {
 
 function playedSentence(step: WinStep, ctx: WinPathsViewContext): string {
   if (step.played === undefined) return '';
-  const loser = ctx.playerNames[ctx.side === 'p1' ? 0 : 1];
+  const player = ctx.playerNames[ctx.side === 'p1' ? 0 : 1];
   const chance = chanceText(step.played);
   if (ctx.playedNeverActed) {
     const body = activeNamesAt(ctx.host.snapshotAt?.(ctx.turn) ?? ctx.host.snapshot)?.[ctx.side][0] || 'The Pokémon';
     return `${body} was knocked out before it moved, so the log shows no choice; staying in wins in ${chance} of the dice.`;
   }
-  return `What ${loser} played${ctx.playedLabel ? `, ${showdownWords(ctx.playedLabel)},` : ''} wins in ${chance} of the dice.`;
+  if (ctx.question === 'proof' && ctx.playedLabel !== null && ctx.playedLabel === step.line?.label) return `${player} played this choice.`;
+  return `What ${player} played${ctx.playedLabel ? `, ${showdownWords(ctx.playedLabel)},` : ''} wins in ${chance} of the dice.`;
 }
 
 function strongerHeadline(step: WinStep, ctx: WinPathsViewContext, opponent: string): string | null {
   const own = step.line?.label ?? 'This choice';
   const sampled = ctx.doubles ? ' (over sampled rolls)' : '';
-  const wins = step.chance === undefined ? '' : `${own} wins within ${TURNS} turns in ${chanceText(step.chance)} of the dice whatever ${opponent} plays${sampled}.`;
+  const wins = step.chance === undefined ? '' : `${own} wins within ${turnWords(ctx.turns ?? TURNS)} in ${chanceText(step.chance)} of the dice whatever ${opponent} plays${sampled}.`;
   return [wins, playedSentence(step, ctx)].filter(Boolean).join(' ') || null;
 }
 
@@ -98,6 +103,7 @@ function headlineOf(step: WinStep, ctx: WinPathsViewContext): string | null {
   return step.kind === 'mistake' ? mistakeHeadline(step, opponent, ctx.playerNames[ctx.side === 'p1' ? 0 : 1]) : strongerHeadline(step, ctx, opponent);
 }
 
+const PROOF_TITLE = 'The proof\'s line';
 const TITLES: Record<WinStepKind, (opponent: string) => string> = {
   stronger: () => '1 · A stronger play',
   luck: () => '2 · Luck',
@@ -115,6 +121,6 @@ export function winStepViews(steps: readonly WinStep[], ctx: WinPathsViewContext
     const [block] = step.status === 'found' && step.line
       ? lineBlocks([step.line], { turn: ctx.turn, playerNames: ctx.playerNames, doubles: ctx.doubles, rules: ctx.host.rules, actives: activeNamesAt(ctx.host.snapshotAt?.(ctx.turn) ?? ctx.host.snapshot) })
       : [];
-    return { kind: step.kind, title: TITLES[step.kind](opponent), headline: headlineOf(step, ctx), empty: emptySentence(step), block: block ?? null };
+    return { kind: step.kind, title: ctx.question === 'proof' ? PROOF_TITLE : TITLES[step.kind](opponent), headline: headlineOf(step, ctx), empty: emptySentence(step, ctx), block: block ?? null };
   });
 }
