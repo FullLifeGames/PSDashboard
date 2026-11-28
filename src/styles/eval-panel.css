@@ -19,6 +19,15 @@
   font-size: 13px;
   font-weight: bold;
 }
+.ps-eval-controls-engine {
+  margin-right: auto;
+  max-width: 9em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #aabbcc;
+}
 .ps-eval-labels {
   display: flex;
   justify-content: space-between;

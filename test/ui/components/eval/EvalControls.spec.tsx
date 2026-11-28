@@ -90,7 +90,7 @@ describe('EvalControls', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  test('another engine names itself in the heading title only; the header holds no Engine select, with the add link beside the title', () => {
+  test('another engine names itself in the heading title and beside it; the header holds no Engine select, with the add link after the name', () => {
     const bot = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' as const };
     const engines = { engines: [BUILTIN_ENGINE, bot], selected: bot, select: vi.fn(), add: vi.fn(), remove: vi.fn() };
     const { container } = render(<EvalControls {...props({ engines })} />);
@@ -98,6 +98,18 @@ describe('EvalControls', () => {
     expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Estimate from My bot.');
     expect(screen.queryByRole('combobox')).toBeNull();
     expect([...container.querySelector('.ps-eval-controls')!.children].map(child => child.textContent?.trim()))
-      .toEqual(['Evaluation', '+ engine', 'Follow', 'On load', 'Evaluate']);
+      .toEqual(['Evaluation', 'My bot', '+ engine', 'Follow', 'On load', 'Evaluate']);
+  });
+
+  test('the built-in engine puts no name beside the title, and an added engine in use puts its name there with the full note in its title', () => {
+    const bot = { id: 'url:http://localhost:8765/', name: 'Test engine', url: 'http://localhost:8765/', source: 'added' as const };
+    const choice = (selected: typeof bot | typeof BUILTIN_ENGINE) => ({ engines: [BUILTIN_ENGINE, bot], selected, select: vi.fn(), add: vi.fn(), remove: vi.fn() });
+    const { rerender } = render(<EvalControls {...props({ engines: choice(BUILTIN_ENGINE) })} />);
+    expect(screen.queryByText('PS Dashboard')).toBeNull();
+    expect(screen.queryByText('Test engine')).toBeNull();
+    rerender(<EvalControls {...props({ engines: choice(bot) })} />);
+    expect(screen.getByText('Test engine')).toHaveAttribute('title', 'Estimate from Test engine.');
+    rerender(<EvalControls {...props({ engines: undefined })} />);
+    expect(screen.queryByText('Test engine')).toBeNull();
   });
 });

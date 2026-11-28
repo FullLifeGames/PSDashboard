@@ -38,9 +38,13 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, onEvalua
   result: EvalResult | null;
   status: EvalStatus;
 }) {
+  const selected = engines?.selected ?? BUILTIN_ENGINE;
+  const named = selected.source === 'builtin' ? null : selected;
+  const note = engineNote(selected);
   return (
     <div className="ps-eval-controls">
-      <span className="ps-eval-controls-title" title={engineNote(engines?.selected ?? BUILTIN_ENGINE)}>Evaluation</span>
+      <span className="ps-eval-controls-title" title={note} style={named ? { marginRight: 0 } : undefined}>Evaluation</span>
+      {named && <span className="ps-eval-controls-engine" title={note}>{named.name}</span>}
       {engines && <EngineControls engines={engines.engines} onAdd={engines.add} onRemove={engines.remove} />}
       {showAuto && (
         <label
