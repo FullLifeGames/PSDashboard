@@ -49,7 +49,7 @@ function clashesWithTouched(touched: Choices, filled: Choices): boolean {
   });
 }
 
-function activeCount(state: BranchSimState, side: Side): number {
+export function activeCount(state: BranchSimState, side: Side): number {
   const slots = side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots;
   return slots?.length ?? 1;
 }
@@ -105,6 +105,16 @@ export function sameChoice(a: BranchSlotChoice | null | undefined, b: BranchSlot
     value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))) : value
   ));
   return keys(a) === keys(b);
+}
+
+export function backOnFill(target: Choices, marks: readonly boolean[], now: Choices): Choices {
+  return target.map((pick, index) => (pick && marks[index] && !sameChoice(now[index], pick) ? pick : null));
+}
+
+export const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
+
+export function engineFill(side: Side, ranked: RankedChoice[], state: BranchSimState): Choices {
+  return pickFillParts(side, ranked, state, new Array<BranchSlotChoice | null>(activeCount(state, side)).fill(null), []).filled;
 }
 
 export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {

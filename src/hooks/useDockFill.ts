@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { BranchSimState, BranchSlotChoice, EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { answersTo, fitsBeside, handSide, pickFillParts, sameChoice, type DockReads } from '../lib/dock-fill';
+import { activeCount, answersTo, backOnFill, engineFill, fitsBeside, handSide, pickFillParts, withSlot, type DockReads } from '../lib/dock-fill';
 import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
 import type { useBranch } from './useBranch';
@@ -69,10 +69,6 @@ interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices
 
 const NO_CHOICES: SideChoices = { p1: [], p2: [] };
 
-const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
-
-const slotCount = (state: BranchSimState, side: Side): number => (side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots)?.length ?? 1;
-
 function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; open: boolean; eligible: boolean } {
   const { simState, liveTip, branching, executing, branchPreparing, playOutActive, evalAvailable, evaluation } = inputs;
   // `historyLength` separates the position after a forced replacement from the turn before it.
@@ -133,7 +129,7 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
     const opponent: Side = side === 'p1' ? 'p2' : 'p1';
     const choices = now.getChoices();
     const userSlots = (key: Side): (BranchSlotChoice | null)[] => (
-      Array.from({ length: slotCount(state, key) }, (_, index) => (current.marks[key][index] ? null : choices[key][index] ?? null))
+      Array.from({ length: activeCount(state, key) }, (_, index) => (current.marks[key][index] ? null : choices[key][index] ?? null))
     );
     const touched = userSlots(side).map((choice, index) => (index === slot ? pick : choice));
     if (userSlots(opponent).some(Boolean)) {
@@ -143,9 +139,11 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
     const standing = (index: number) => choices[side][index] ?? current.choices[side][index] ?? null;
     const picks = touched.map((choice, index) => choice ?? (current.marks[side][index] ? standing(index) : null));
     const ranked = answersTo(fill.result, state, side, picks, touched);
-    const filled = ranked ? pickFillParts(opponent, ranked, state, Array.from({ length: slotCount(state, opponent) }, () => null), []).filled : [];
+    const filled = ranked ? engineFill(opponent, ranked, state) : [];
     if (filled.every(choice => choice === null)) {
-      commit({ ...current, reads: 'unranked' });
+      const back = backOnFill(engineFill(opponent, fill.result.perSide[opponent], state), current.marks[opponent], current.choices[opponent]);
+      if (now.liveTip) back.forEach((choice, index) => { if (choice) now.setChoice(opponent, choice, index); });
+      commit({ ...current, choices: { ...current.choices, [opponent]: current.choices[opponent].map((choice, index) => back[index] ?? choice) }, reads: 'unranked' });
       return;
     }
     if (now.liveTip) filled.forEach((choice, index) => { if (choice) now.setChoice(opponent, choice, index); });
@@ -173,7 +171,7 @@ function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], com
       refill(side, slot, own);
       return own;
     }
-    const back = current.picks[opponent].map((pick, index) => (pick && current.marks[opponent][index] && !sameChoice(current.choices[opponent][index], pick) ? pick : null));
+    const back = backOnFill(current.picks[opponent], current.marks[opponent], current.choices[opponent]);
     if (now.liveTip) back.forEach((pick, index) => { if (pick) now.setChoice(opponent, pick, index); });
     commit({ ...current, marks, deferred, reads: 'waiting', choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
     return own;
@@ -185,7 +183,7 @@ interface FillWrite { written: EngineMarks; wrote: SideChoices; deferred: SideCh
 function fillSides(now: LatestFill['current'], state: BranchSimState, result: EvalResult, held: HeldSlot | null): FillWrite {
   const choices = now.getChoices();
   const out: FillWrite = { written: { p1: [], p2: [] }, wrote: { p1: [], p2: [] }, deferred: { p1: [], p2: [] }, merged: { p1: [], p2: [] }, reads: 'waiting' };
-  const touchedOf = (side: Side): (BranchSlotChoice | null)[] => Array.from({ length: slotCount(state, side) }, (_, slot) => choices[side][slot] ?? null);
+  const touchedOf = (side: Side): (BranchSlotChoice | null)[] => Array.from({ length: activeCount(state, side) }, (_, slot) => choices[side][slot] ?? null);
   const touchedBy = { p1: touchedOf('p1'), p2: touchedOf('p2') };
   const hand = now.hardMode ? handSide(touchedBy) : null;
   if (now.hardMode && !hand && touchedBy.p1.some(Boolean) && touchedBy.p2.some(Boolean)) out.reads = 'both';
