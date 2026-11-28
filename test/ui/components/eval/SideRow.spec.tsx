@@ -122,8 +122,8 @@ describe('SideRow', () => {
 
   test('an unpunished risk, a paid-off read, a sack, and a deeper verification each get their note', () => {
     const { rerender } = render(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
-    expect(screen.getByText(`${chanceGap(0.15, 0.1)} regret · risk unpunished`)).toBeInTheDocument();
-    expect(screen.getByText(`${winPctText(0.15)} safe:`)).toBeInTheDocument();
+    expect(screen.getByText(`${chanceGap(0.35, 0.1)} regret · risk unpunished`)).toBeInTheDocument();
+    expect(screen.getByText(`at worst ${winPctText(0.15)} · safe:`)).toBeInTheDocument();
 
     rerender(<SideRow name="Alice" side={sideAnalysis({ riskPaidOff: true, riskPayoff: 0.12, safe: rankedChoice('move protect', 'Protect', 0.05) })} />);
     expect(screen.getByText(`read paid off · ${winDeltaText(0.12)}`)).toBeInTheDocument();
@@ -172,14 +172,14 @@ describe('SideRow', () => {
     const held = { against: 'Toxic', playedValue: 0.189, safeValue: 0.19 };
     const side = misplayedSide('mistake', { riskUnpunished: true, safeAgainstClick: held });
     const { rerender } = render(<SideRow name="Alice" side={side} />);
-    const chip = screen.getByText(`${chanceGap(0.15, 0.1)} regret · risk unpunished`);
+    const chip = screen.getByText(`${chanceGap(0.35, 0.1)} regret · risk unpunished`);
     expect(chip).toHaveAttribute(
       'title',
       'The floor assumes Leech Seed; the opponent chose Toxic instead, and against that the safe line did as well or better.',
     );
     expect(screen.queryByText(/read paid off/)).toBeNull();
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true })} />);
-    expect(screen.getByText(`${chanceGap(0.15, 0.1)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
+    expect(screen.getByText(`${chanceGap(0.35, 0.1)} regret · risk unpunished`).getAttribute('title')).toContain('so the read came true');
   });
 
   test('an inaccuracy whose read paid off shows the read alone; the review and the report list it the same way', () => {
@@ -229,8 +229,19 @@ describe('SideRow', () => {
     expect(screen.getByText(`${winPercent(0.3)}% better:`)).toBeInTheDocument();
     expect(screen.getByText(`mistake · ${chanceGap(0.3, 0.1)}`)).toBeInTheDocument();
     rerender(<SideRow name="Alice" side={misplayedSide('mistake', { riskUnpunished: true, safe: rankedChoice('move 4', 'Protect', 0.2, { worstCase: 0.18 }) })} />);
-    expect(screen.getByText(`${winPercent(0.18)}% safe:`)).toBeInTheDocument();
-    expect(screen.getByText(`${chanceGap(0.18, 0.1)} regret · risk unpunished`)).toBeInTheDocument();
+    expect(screen.getByText(`at worst ${winPercent(0.18)}% · safe:`)).toBeInTheDocument();
+    expect(screen.getByText(`${chanceGap(0.35, 0.1)} regret · risk unpunished`)).toBeInTheDocument();
+  });
+
+  test('doubles: a blunder beside an unpunished read prints the best pair\'s size and the safe row as a floor', () => {
+    const share = 0.25;
+    const best = rankedChoice('move weatherball 1, move protect', 'Weather Ball → Incineroar + Protect', 0.15, { worstCase: -0.28 });
+    const played = rankedChoice('move heatwave, move suckerpunch 1', 'Heat Wave + Sucker Punch → Incineroar', -0.3);
+    const side = misplayedSide('blunder', { riskUnpunished: true, safe: best, best, played, faintedFraction: share, regret: 0.45 });
+    expect(chanceGap(0.15, -0.3, share)).not.toBe(chanceGap(-0.28, -0.3, share));
+    render(<SideRow name="juacox300" side={side} />);
+    expect(screen.getByText(`${chanceGap(0.15, -0.3, share)} regret · risk unpunished`)).toBeInTheDocument();
+    expect(screen.getByText(`at worst ${winPercent(-0.28, share)}% · safe:`)).toBeInTheDocument();
   });
 
   test('singles: a body knocked out before it moved says so, names the stand-in\'s chance and the engine\'s move, and earns no tick', () => {

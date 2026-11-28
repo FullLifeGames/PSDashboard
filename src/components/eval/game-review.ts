@@ -123,7 +123,7 @@ function reviewRow(args: ReviewArgs, analysis: TurnAnalysis, side: Side, grade: 
     key: `${analysis.turn}-${side}`, turn: analysis.turn, side, grade,
     played: `${played.label} ${winPctText(played.ev, share)}`,
     playedText: playedLine(sideAnalysis, played, args, analysis, side),
-    engine: `${engine.label} ${winPctText(engine.value, share)}`,
+    engine: engine.word === 'safe' ? `${engine.label}, at worst ${winPctText(engine.value, share)}` : `${engine.label} ${winPctText(engine.value, share)}`,
     engineWord: engine.word,
     loss: loss.text,
     lossTitle: loss.title,

@@ -129,9 +129,9 @@ export function resultPositionLabel(
 const chanceGapText = (better: number, played: number, faintedFraction?: number | null): string =>
   `−${Math.max(0, winPercent(better, faintedFraction) - winPercent(played, faintedFraction))}%`;
 
-/** Up to a regret of 1 the chip is the gap of the two chances the card prints; over 1 it names both. */
+/** The chip is the gap of the grade's own pair, in a read's frame too; over a regret of 1 it names both chances. */
 export function regretView(name: string, side: SideAnalysis, regret: number): { text: string; title: string } {
-  const from = side.best ? comparisonTarget(side, side.best).value : undefined;
+  const from = side.best ? (side.bestNull?.alternative ?? side.best).ev : undefined;
   const to = side.played?.ev;
   if (from === undefined || to === undefined) {
     return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };

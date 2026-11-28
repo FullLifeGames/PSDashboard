@@ -207,7 +207,7 @@ function ComparisonRows({ name, side, played, best, difference, onExplore, oppon
       <div className="ps-eval-analysis-row" style={{ color: '#aab' }} title={evTitle(name)}>
         <MiniBar value={value} />
         <span style={{ whiteSpace: 'nowrap' }}>
-          {winPctText(value, side.faintedFraction)} {asSafe ? 'safe:' : 'better:'}
+          {asSafe ? `at worst ${winPctText(value, side.faintedFraction)} · safe:` : `${winPctText(value, side.faintedFraction)} better:`}
         </span>
         {swapped ? (
           <span>{swapped.label}</span>

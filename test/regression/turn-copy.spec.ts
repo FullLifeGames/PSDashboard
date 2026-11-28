@@ -70,14 +70,25 @@ describe('turn copy', () => {
     expect(view.text).not.toBe(winDeltaText(-regret));
   });
 
-  test('the chip reads the pair of the better row: a null-move alternative, a safe line, or the best', () => {
+  test('the chip reads the grade\'s own pair: the null-move alternative or the best, in a read\'s frame too', () => {
     const base = { tier: 'mistake', best: ranked('Earthquake', 0.35), played: ranked('Stone Edge', 0.1), regret: 0.25 } as const;
     expect(regretView('Alice', side(base), 0.25).text).toBe(gapText(0.35, 0.1));
     const alternative = ranked('Fire Blast', 0.3);
     expect(regretView('Alice', side({ ...base, bestNull: { alternative } as SideAnalysis['bestNull'] }), 0.25).text).toBe(gapText(0.3, 0.1));
     const safe = ranked('Protect', 0.2, 0.18);
-    expect(regretView('Alice', side({ ...base, riskUnpunished: true, safe }), 0.25).text).toBe(gapText(0.18, 0.1));
-    expect(regretView('Alice', side({ ...base, riskPaidOff: true, safe }), 0.25).text).toBe(gapText(0.18, 0.1));
+    expect(regretView('Alice', side({ ...base, riskUnpunished: true, safe }), 0.25).text).toBe(gapText(0.35, 0.1));
+    expect(regretView('Alice', side({ ...base, riskPaidOff: true, safe }), 0.25).text).toBe(gapText(0.35, 0.1));
+  });
+
+  test.each([
+    ['singles, gen6ou 655336 turn 15', 'mistake', 0.35, 0.1, 0.18, '−11%', '−3%'],
+    ['doubles, Champions VGC 2695803506 turn 6', 'blunder', 0.15, -0.3, -0.28, '−21%', '−1%'],
+  ] as const)('%s: a safe line whose floor sits near the played chance leaves the chip at the grade\'s pair', (_scene, tier, best, played, floor, size, floorGap) => {
+    const regret = best - played;
+    const safe = { ...ranked('Weather Ball', best), worstCase: floor };
+    const view = regretView('juacox300', side({ tier, riskUnpunished: true, safe, best: ranked('Weather Ball', best), played: ranked('Heat Wave', played), regret }), regret);
+    expect(gapText(floor, played)).toBe(floorGap);
+    expect(view.text).toBe(size);
   });
 
   test('a regret over 1 still names the two chances; without a pair the linear points stay', () => {

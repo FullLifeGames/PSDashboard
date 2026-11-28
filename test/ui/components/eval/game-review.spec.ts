@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   buildGameReport,
   winPctText,
+  winPercent,
   type EvalLine,
   type EvalResult,
   type SideAnalysis,
@@ -173,7 +174,8 @@ describe('gameReview: the engine of a row is the turn card\'s engine choice, and
     const safe = rankedChoice('move 3', 'Surf', 0.02);
     const row = rowOf(gradedP2('mistake', { riskUnpunished: true, safe }), [singlesLine, playedLine]);
     expect(row.engineWord).toBe('safe');
-    expect(row.engine).toBe(`Surf ${winPctText(0.02 - 0.2)}`);
+    expect(row.engine).toBe(`Surf, at worst ${winPctText(0.02 - 0.2)}`);
+    expect(row.loss).toBe(`−${winPercent(0.1) - winPercent(-0.24)}%`);
     expect(row.lines.map(line => line.role)).toEqual(['played']);
   });
 
@@ -207,6 +209,17 @@ describe('gameReview, doubles', () => {
     const passing = { ...doublesLine, steps: doublesLine.steps.map(step => (step.replacement ? { ...step, p2: { ...step.p2, label: '→ Zamazenta-Crowned + pass' } } : step)) };
     const again = gameReview({ analyses, results: [null, null, null, { ...results[3]!, lines: [passing] }], playerNames: DOUBLES_NAMES, doubles: true, host });
     expect(again[0].rows[0].lines[0].text).toContain('then Mstr_Hawk replaces: → Zamazenta-Crowned, then pixelfrost');
+  });
+
+  test('a blunder beside an unpunished read names the best pair\'s size and the safe line as a floor', () => {
+    const best = rankedChoice('move 1, move 2', 'Weather Ball → Incineroar + → Basculegion', 0.15, { worstCase: -0.28 });
+    const played = rankedChoice('move 3, move 4', 'Heat Wave + Sucker Punch → Incineroar', -0.3);
+    const side = { ...misplayedSide('blunder'), best, played, safe: best, riskUnpunished: true, regret: 0.45 };
+    const view = gameReview({ analyses: [turnAnalysis(6, { p1: side })], results: [null], playerNames: DOUBLES_NAMES, doubles: true, host });
+    const [row] = view[0].rows;
+    expect(row.loss).toBe(`−${winPercent(0.15) - winPercent(-0.3)}%`);
+    expect(row.engine).toBe(`Weather Ball → Incineroar + → Basculegion, at worst ${winPctText(-0.28)}`);
+    expect(row.engineWord).toBe('safe');
   });
 
   test('doubles: the engine line is the line of the card\'s engine pair, and another pair\'s line is dropped', () => {
