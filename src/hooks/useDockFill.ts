@@ -337,7 +337,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const landed = done ? settled : null;
   return {
     pending, busy: open && evaluation.graph.running && !done, waits,
-    ...landedView(landed, liveTip), picks: landed?.picks ?? NO_CHOICES, reads: inputs.evaluation.prefs.hardMode ? landed?.reads ?? 'waiting' : null,
+    ...landedView(landed, liveTip), picks: landed?.picks ?? NO_CHOICES, reads: inputs.evaluation.prefs.hardMode && liveTip ? landed?.reads ?? 'waiting' : null,
     queueExecute, onUserChoice, restore, holdTray, release, arm,
   };
 }

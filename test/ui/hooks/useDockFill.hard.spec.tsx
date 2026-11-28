@@ -513,6 +513,27 @@ describe('useDockFill at a replay turn: what the result writes', () => {
   });
 });
 
+describe('useDockFill at a replay turn: the setting reads in a variation only', () => {
+  const reading = (): Evaluation => {
+    const base = evaluationOf();
+    return { ...base, prefs: { ...base.prefs, hardMode: true } } as Evaluation;
+  };
+
+  test.each([
+    ['singles', singlesTurn, () => evalResult('singles')],
+    ['doubles', doublesTurn, doublesResult],
+  ] as const)('%s: with the setting on the dock names no read before, after the fill and after a pick', (_kind, turn, result) => {
+    const { wired, handleEvaluate } = replayInputs(turn(), { evaluation: reading() });
+    const hook = renderHook(() => useDockFill(wired));
+    expect(hook.result.current.reads).toBeNull();
+    act(() => hook.result.current.arm());
+    act(() => onResultOf(handleEvaluate)(result()));
+    expect(hook.result.current.reads).toBeNull();
+    act(() => hook.result.current.onUserChoice('p1', 0, move('protect', 'Protect')));
+    expect(hook.result.current.reads).toBeNull();
+  });
+});
+
 describe('useDockFill at a replay turn: Execute while the run is pending', () => {
   test('an Execute pressed before the result waits, then runs once with the logged choices under the fill', async () => {
     const { wired, handleEvaluate, executeTurn } = replayInputs(doublesTurn());
