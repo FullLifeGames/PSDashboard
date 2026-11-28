@@ -14,6 +14,7 @@ export interface EvalStoreCapture {
   /** The turns the spec analyzes with "Analyze this position" (a single turn's store key); absent: the game's sweep. */
   turns?: number[];
   winPaths?: true;
+  proofTurns?: number[];
 }
 
 const S_MCTS: EvalStoreSettings = { mode: 'mcts', depth: 1, samples: 1, tera: 'auto' };
@@ -33,9 +34,9 @@ export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'smogtours-gen9doublesou-912884', settings: S_MATRIX, turns: [5, 8, 11] },
   { replay: 'gen9vgc2026regi-2630452654', settings: S_MATRIX, turns: [4, 6, 3] },
   { replay: 'gen9championsou-2691703002', settings: S_MATRIX, turns: [8, 12, 5] },
-  { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX, winPaths: true },
+  { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX, winPaths: true, proofTurns: [24] },
   { replay: 'gen9championsvgc2026regmc-2695803506', settings: S_MATRIX, winPaths: true },
-  { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX, winPaths: true },
+  { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX, winPaths: true, proofTurns: [13] },
   { replay: 'smogtours-gen9doublesou-912045', settings: S_MATRIX, winPaths: true },
 ];
 

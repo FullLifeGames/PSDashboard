@@ -441,6 +441,7 @@ describe('the job names that branch protection reads', () => {
   const names = WORKFLOW.map(line => /^ {4}name:\s*(.+)$/.exec(line)?.[1]).filter((name): name is string => name !== undefined);
   const sweepParts = 'Full sweeps, the other specs, part ${{ matrix.part }} of 3';
   const engineJobs = 'Engine suite, speed layer ${{ matrix.speed-layer }}';
+  const liveJob = 'Live Showdown client, no required check';
 
   // GitHub matches a check by its whole name: a matrix job gives one context per entry, so the names stay.
   test('the jobs in parts and the required checks keep their names', () => {
@@ -452,11 +453,12 @@ describe('the job names that branch protection reads', () => {
       sweepParts,
       'Browser flows',
       'Production build smoke',
+      liveJob,
     ]);
   });
 
   test('the nine contexts branch protection must list', () => {
-    const contexts = names.filter(name => !name.startsWith('Browser flows, part')).flatMap(name => {
+    const contexts = names.filter(name => !name.startsWith('Browser flows, part') && name !== liveJob).flatMap(name => {
       if (name === sweepParts) return [1, 2, 3].map(part => name.replace('${{ matrix.part }}', String(part)));
       if (name === engineJobs) return ['forced off', 'forced on'].map(layer => name.replace('${{ matrix.speed-layer }}', layer));
       return [name];
@@ -500,6 +502,8 @@ describe('browser-flows-parts', () => {
   const parts = browser.split(/- part:/).slice(1).map(part => part.match(/test\/e2e\/[\w./-]+/g) ?? []);
   const listed = parts.flat();
   const aggregate = jobLines('browser-flows').join('\n');
+  const live = jobLines('showdown-client').join('\n');
+  const liveFiles = live.match(/test\/e2e\/[\w./-]+/g) ?? [];
 
   describe('the three parts of the browser flows', () => {
     test('the job is a matrix of three parts with a name per part, each under 30 minutes', () => {
@@ -510,11 +514,22 @@ describe('browser-flows-parts', () => {
       expect(browser).toMatch(/fail-fast: false/);
     });
 
-    test('every spec file of test/e2e sits in exactly one part', () => {
+    test('every spec file of test/e2e sits in exactly one part, or in the live job that no branch protection reads', () => {
+      const all = [...listed, ...liveFiles];
       expect(files.length).toBeGreaterThan(40);
-      expect(files.filter(file => !listed.includes(file)), 'spec files that no part runs; add them to the part with the least seconds in .github/workflows/test.yml').toEqual([]);
-      expect(listed.filter((file, index) => listed.indexOf(file) !== index), 'listed twice').toEqual([]);
-      expect(listed.filter(file => !files.includes(file)), 'listed files that are no spec file of test/e2e').toEqual([]);
+      expect(files.filter(file => !all.includes(file)), 'spec files that no job runs; add them to the part with the least seconds in .github/workflows/test.yml').toEqual([]);
+      expect(all.filter((file, index) => all.indexOf(file) !== index), 'listed twice').toEqual([]);
+      expect(all.filter(file => !files.includes(file)), 'listed files that are no spec file of test/e2e').toEqual([]);
+    });
+
+    test('the live comparison of Showdown\'s table runs in its own job, outside the required parts', () => {
+      expect(liveFiles).toEqual(['test/e2e/teambuilder-table.spec.ts']);
+      expect(listed).not.toContain('test/e2e/teambuilder-table.spec.ts');
+      expect(live).toMatch(/^ {4}name: Live Showdown client, no required check$/m);
+      expect(live).toMatch(/run: node scripts\/capture-showdown-client\.mjs --check$/m);
+      expect(live).toMatch(/run: npm run test:e2e -- test\/e2e\/teambuilder-table\.spec\.ts$/m);
+      expect(aggregate).not.toMatch(/showdown-client/);
+      expect(Number(/^ {4}timeout-minutes: (\d+)$/m.exec(live)?.[1])).toBeLessThanOrEqual(30);
     });
 
     test('each entry is a path filter that matches its own file and no other spec file', () => {

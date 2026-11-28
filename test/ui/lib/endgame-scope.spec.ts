@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { PokemonSnapshot, TurnSnapshot } from '@fulllifegames/replay-core';
-import { endgameTurns, livingBodies, loserOf } from '../../../src/lib/endgame-scope';
+import { endgameTurns, livingBodies, loserOf, offeredTurns, WIN_PATHS_BEHIND } from '../../../src/lib/endgame-scope';
 
 const mon = (fainted: boolean): PokemonSnapshot => ({ name: 'x', speciesForme: 'x', hp: fainted ? 0 : 100, maxhp: 100, hpPercent: fainted ? 0 : 100, status: '', fainted, isActive: false, boosts: {}, moves: [], ability: '', item: '', terastallized: '', level: 50, gender: '' });
 const side = (id: 'p1' | 'p2', fallen: number, size: number) => ({ name: id, id, pokemon: Array.from({ length: size }, (_, index) => mon(index < fallen)), sideConditions: {} });
@@ -44,3 +44,22 @@ describe('the endgame scope', () => {
     expect(loserOf('|win|someone else', ['BKC', 'devin'])).toBeNull();
   });
 });
+
+describe('the turns that offer the loser\'s question', () => {
+  const at = (...scores: (number | null)[]) => scores.map(score => (score === null ? null : { score }));
+
+  test('a turn where the loser reads the bar behind offers it, a turn just short of it does not', () => {
+    expect(WIN_PATHS_BEHIND).toBe(0.3);
+    expect(offeredTurns([], at(-0.3, -0.29, 0.5, -0.31), 'p1')).toEqual([1, 4]);
+  });
+
+  test('a p2 loser reads the score with the sign turned: p2 behind is a positive score', () => {
+    expect(offeredTurns([], at(0.3, 0.29, -0.5), 'p2')).toEqual([1]);
+  });
+
+  test('a turn without a result joins only through the endgame; the union is sorted and holds each turn once', () => {
+    expect(offeredTurns([2, 5], at(-0.4, null, -0.35, 0, null), 'p1')).toEqual([1, 2, 3, 5]);
+    expect(offeredTurns([], at(null, null), 'p1')).toEqual([]);
+  });
+});
+

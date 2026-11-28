@@ -45,10 +45,10 @@ const result: EvalResult = { ...evalResult('singles'), perSide: {
   p2: [rankedChoice('move bulletpunch', 'Bullet Punch', -0.2), rankedChoice('move highjumpkick', 'High Jump Kick', -0.4)],
 } };
 
-function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string>; ranking?: EvalResult; fingerprint?: string } = {}): AppController {
+function app(extra: { neverActed?: boolean; smogonPending?: boolean; snapshots?: TurnSnapshot[]; acquire?: () => Promise<string>; ranking?: EvalResult; results?: (EvalResult | null)[]; fingerprint?: string } = {}): AppController {
   const analyses = [null, null, turnAnalysis(3, { p2: { ...misplayedSide('mistake'), played: rankedChoice('move highjumpkick', 'High Jump Kick', -0.4), ...(extra.neverActed ? { neverActed: true } : {}) } }), null];
   return {
-    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, knowledge: { setsFingerprint: extra.fingerprint ?? 'fp' }, evaluation: { graph: { results: [null, null, extra.ranking ?? result, null] } } },
+    ctx: { replay: { snapshots: extra.snapshots ?? SNAPSHOTS }, knowledge: { setsFingerprint: extra.fingerprint ?? 'fp' }, evaluation: { graph: { results: extra.results ?? [null, null, extra.ranking ?? result, null] } } },
     board: { timeline: { analyzableTurns: 4 } },
     analysis: { gameAnalyses: analyses },
     engine: {
@@ -73,9 +73,35 @@ describe('useWinPaths', () => {
     expect(hook.current.unavailable).toBeNull();
   });
 
+  test.each([['singles', 'singles' as const], ['doubles', 'doubles' as const]])('%s: the card offers the loser\'s turns 0.3 or more behind as well as the endgame turns, the review keeps the endgame turns', (_type, kind) => {
+    const results = [evalResult(kind, { score: -0.4 }), evalResult(kind, { score: -0.29 }), null, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ results }), REPLAY('g13')));
+    expect(hook.current.endgame).toEqual({ loser: 'p1', turns: [3, 4] });
+    expect(hook.current.offered).toEqual({ loser: 'p1', turns: [1, 3, 4] });
+  });
+
+  test('a game that fell behind but never reached its endgame offers those turns, and show searches one for the loser', async () => {
+    const results = [null, evalResult('singles', { score: -0.4 }), null, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ snapshots: SNAPSHOTS.slice(0, 2), results }), REPLAY('g14')));
+    expect(hook.current.endgame).toBeNull();
+    expect(hook.current.offered).toEqual({ loser: 'p1', turns: [2] });
+    act(() => hook.current.show(2, 'card'));
+    await flush();
+    expect(hook.current.run).toMatchObject({ turn: 2, side: 'p1', from: 'card' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].request).toMatchObject({ side: 'p1', turn: 2 });
+  });
+
+  test('a loser who never fell behind and never reached its endgame, and a game with no loser, offer nothing', () => {
+    const level = renderHook(() => useWinPaths(app({ snapshots: SNAPSHOTS.slice(0, 2), results: [null, evalResult('singles', { score: -0.1 }), null, null] }), REPLAY('g15')));
+    expect(level.result.current.offered).toBeNull();
+    const tie = renderHook(() => useWinPaths(app({ results: [evalResult('singles', { score: -0.9 }), null, null, null] }), { ...REPLAY('g16'), log: '|turn|4\n|tie' }));
+    expect(tie.result.current.offered).toBeNull();
+  });
+
   test('a loser knocked out before it moved is named so: its played choice is a stand-in', () => {
     const { result: hook } = renderHook(() => useWinPaths(app({ neverActed: true }), REPLAY('g5', 'BKC')));
-    expect(hook.current.playedNeverActed?.(3)).toBe(true);
+    expect(hook.current.playedNeverActed?.(3, 'p2')).toBe(true);
   });
 
   test('a game with no winner, or one that never reached its endgame, has no endgame and show starts nothing', async () => {
@@ -93,7 +119,7 @@ describe('useWinPaths', () => {
     const { result: hook } = renderHook(() => useWinPaths(app(), REPLAY('g4', 'BKC')));
     expect(hook.current.endgame?.loser).toBe('p2');
     act(() => hook.current.show(3, 'review'));
-    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', steps: [], status: 'positioning', from: 'review' });
+    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p2', steps: [], status: 'positioning', from: 'review', question: 'lost' });
     await flush();
     expect(hook.current.run?.status).toBe('searching');
     expect(calls).toHaveLength(1);
@@ -103,8 +129,8 @@ describe('useWinPaths', () => {
       side: 'p2', turn: 3, rootOrder: ['move bulletpunch', 'move highjumpkick'], first: { p1: 'move scald', p2: 'move bulletpunch' },
       foeRanking: [{ choice: 'move scald', ev: 0.3 }, { choice: 'move hydropump', ev: 0.2 }], played: 'move highjumpkick', tera: true, sleepClause: true, ruleset: 'standard',
     });
-    expect(hook.current.playedLabel(3)).toBe('High Jump Kick');
-    expect(hook.current.playedNeverActed?.(3)).toBe(false);
+    expect(hook.current.playedLabel(3, 'p2')).toBe('High Jump Kick');
+    expect(hook.current.playedNeverActed?.(3, 'p2')).toBe(false);
     act(() => calls[0].onStep(step('stronger')));
     expect(hook.current.run?.steps.map(item => item.kind)).toEqual(['stronger']);
     act(() => calls[0].onStep(step('luck', 'none')));
@@ -189,6 +215,66 @@ describe('useWinPaths', () => {
     unmount();
     expect(calls[0].signal.aborted).toBe(true);
     expect(disposed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useWinPaths, the winner\'s line', () => {
+  const proofOf = (extra: Partial<NonNullable<EvalResult['forcedWin']>> = {}): NonNullable<EvalResult['forcedWin']> =>
+    ({ side: 'p1', turns: 2, mass: 0.8, caveat: 'none', engineScore: 1, states: 6, ...extra });
+
+  test.each([['singles', 'move scald'], ['doubles', 'move scald 1, move protect']])('%s: opening the line asks the worker for the proof\'s side, its turns, the prover\'s own root order and its sure strike, and stops a running loser\'s search', async (kind, choice) => {
+    const rows = (label: string, first: string, second: string) => [rankedChoice(first, label, 0.3), rankedChoice(second, 'Hydro Pump', 0.29)];
+    const own = rows('Scald', choice, kind === 'singles' ? 'move hydropump' : 'move hydropump 1, move protect');
+    const proved: EvalResult = { ...evalResult(kind as 'singles' | 'doubles'), perSide: { ...evalResult('singles').perSide, p1: own }, forcedWin: proofOf({ choice }) };
+    const results = [null, null, proved, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ results }), REPLAY('g30', 'BKC')));
+    expect(hook.current.proofAt(3)).toEqual({ side: 'p1', turns: 2 });
+    expect(hook.current.proofAt(2)).toBeNull();
+    act(() => hook.current.show(3, 'card'));
+    await flush();
+    act(() => hook.current.show(3, 'card', 'proof'));
+    await flush();
+    expect(calls).toHaveLength(2);
+    expect(calls[0].signal.aborted).toBe(true);
+    expect(calls[1].signal.aborted).toBe(false);
+    expect(hook.current.run).toMatchObject({ turn: 3, side: 'p1', from: 'card', question: 'proof', status: 'searching' });
+    expect(calls[1].request).toMatchObject({ side: 'p1', turn: 3, turns: 2, rootOrder: [own[1].choice, own[0].choice], proof: { choice }, tera: true, sleepClause: true, ruleset: 'standard' });
+    expect(calls[0].request.proof).toBeUndefined();
+    act(() => hook.current.show(3, 'card'));
+    await flush();
+    expect(calls[1].signal.aborted).toBe(true);
+    expect(hook.current.run).toMatchObject({ question: 'lost', side: 'p2' });
+  });
+
+  test('a proof without a sure strike asks with an empty proof, and a game without a loser still offers it', async () => {
+    const results = [null, null, { ...evalResult('singles'), forcedWin: proofOf({ side: 'p2', turns: 1 }) }, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ results }), { ...REPLAY('g31'), log: '|turn|4\n|tie' }));
+    expect(hook.current.offered).toBeNull();
+    act(() => hook.current.show(3, 'card', 'proof'));
+    await flush();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].request).toMatchObject({ side: 'p2', turns: 1, proof: {} });
+    expect(hook.current.playedLabel(3, 'p2')).toBe('High Jump Kick');
+    expect(hook.current.playedLabel(3, 'p1')).toBe('Earthquake');
+  });
+
+  test('a turn without a proof starts nothing, and a finished proof is kept under a key of its own', async () => {
+    const results = [null, null, { ...evalResult('singles'), forcedWin: proofOf() }, null];
+    const { result: hook } = renderHook(() => useWinPaths(app({ results }), REPLAY('g32', 'BKC')));
+    act(() => hook.current.show(2, 'card', 'proof'));
+    await flush();
+    expect(calls).toHaveLength(0);
+    expect(hook.current.run).toBeNull();
+    act(() => hook.current.show(3, 'card', 'proof'));
+    await flush();
+    await act(async () => { calls[0].finish({ side: 'p1', turn: 3, steps: [step('stronger')] }); });
+    act(() => hook.current.show(3, 'card'));
+    await flush();
+    expect(saved).toHaveLength(1);
+    const keyFor = (request: WinPathsRequest) => winPathsStoreKey(turnCacheKey('g32', 3, SNAPSHOTS.length, 'fp'), 'standard', request);
+    expect(saved[0].key).toBe(keyFor(calls[0].request));
+    expect(saved[0].key).not.toBe(keyFor(calls[1].request));
+    expect(calls[1].request.proof).toBeUndefined();
   });
 });
 

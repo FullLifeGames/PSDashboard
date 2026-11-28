@@ -122,7 +122,7 @@ describe('GameReviewPanel, doubles', () => {
 
 const endgameHost = (extra: Partial<WinPathsHost> = {}): LinesHost & { winPaths: WinPathsHost } => ({
   rules: { gen: 9, mod: undefined },
-  winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
+  winPaths: { endgame: { loser: 'p2', turns: [23, 24] }, offered: { loser: 'p2', turns: [23, 24] }, run: null, unavailable: null, playedLabel: () => null, proofAt: () => null, show: vi.fn(), hide: vi.fn(), ...extra },
 });
 
 describe('GameReviewPanel, the Endgame row', () => {
@@ -152,7 +152,7 @@ describe('GameReviewPanel, the Endgame row', () => {
 
   test('with a search open the row closes it, and the panel stands under the row', async () => {
     const { analyses, results } = singlesGame();
-    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'review' } });
+    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'review', question: 'lost' } });
     render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     expect(within(group).getByRole('region', { name: 'How could Pepitopalotin have won?' })).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe('GameReviewPanel, the Endgame row', () => {
 
   test('a search the turn card opened shows no panel under the review, and the row stays an open question', () => {
     const { analyses, results } = singlesGame();
-    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'card' } });
+    const lined = endgameHost({ run: { turn: 23, side: 'p2', steps: [], status: 'searching', from: 'card', question: 'lost' } });
     render(<GameReviewPanel open analyses={analyses} results={results} playerNames={SINGLES_NAMES} doubles={false} host={lined} />);
     const group = screen.getByRole('group', { name: 'Endgame' });
     expect(within(group).queryByRole('region')).toBeNull();

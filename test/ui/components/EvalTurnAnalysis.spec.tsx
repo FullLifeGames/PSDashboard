@@ -211,13 +211,13 @@ describe('EvalTurnAnalysis, a doubles slot with no logged action', () => {
 });
 
 describe('EvalTurnAnalysis, the endgame entry', () => {
-  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, offered: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, proofAt: () => null, show: vi.fn(), hide: vi.fn() });
 
   test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {
     const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([4, 5]) };
     render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
     await userEvent.click(screen.getByRole('button', { name: 'How could Bob have won from here?' }));
-    expect(host.winPaths.show).toHaveBeenCalledWith(4, 'card');
+    expect(host.winPaths.show).toHaveBeenCalledWith(4, 'card', 'lost');
   });
 
   test('a turn before the endgame has no such question', () => {
@@ -232,8 +232,8 @@ describe.each([
   ['doubles', true, { ...evalResult('doubles'), lines: [{ ...doublesLine, for: ['played' as const] }] }],
 ] as const)('EvalTurnAnalysis, closed sections, %s', (_kind, doubles, result) => {
   const rules = { gen: 9, mod: undefined };
-  const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from });
-  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from, question: 'lost' });
+  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, offered: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, proofAt: () => null, show: vi.fn(), hide: vi.fn() });
 
   test('the Lines section sits closed under a toggle: aria-controls its body, a click or the keyboard opens it, every turn starts closed', async () => {
     const host = { rules, onPlay: vi.fn() };
@@ -296,7 +296,7 @@ describe.each([
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();
     await userEvent.click(toggle);
-    expect(closed.winPaths.show).toHaveBeenCalledWith(4, 'card');
+    expect(closed.winPaths.show).toHaveBeenCalledWith(4, 'card', 'lost');
 
     const opened = { rules, winPaths: winPaths(winRun(4, 'card')) };
     rerender(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={opened} doubles={doubles} />);

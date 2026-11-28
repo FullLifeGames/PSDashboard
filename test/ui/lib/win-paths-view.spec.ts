@@ -103,3 +103,35 @@ describe('the win-path words', () => {
     expect(view.headline).toContain('60 %');
   });
 });
+
+describe('the words of the winner\'s line', () => {
+  const proof = (extra: Partial<WinPathsViewContext> = {}): WinPathsViewContext => ctx({ question: 'proof', turns: 2, ...extra });
+
+  test('the step is the proof\'s line, and the sentence counts the proof\'s turns: one, then four', () => {
+    const [one] = winStepViews([step('stronger', 'found', { chance: 1, line: line() })], proof({ turns: 1 }));
+    expect(one.title).toBe('The proof\'s line');
+    expect(one.headline).toBe('Hydro Pump wins within 1 turn in 100 % of the dice whatever Tzon plays.');
+    const [four] = winStepViews([step('stronger', 'found', { chance: 0.667, line: line() })], proof({ turns: 4 }));
+    expect(four.headline).toBe('Hydro Pump wins within 4 turns in 67 % of the dice whatever Tzon plays.');
+  });
+
+  test('in doubles the sentence says the rolls were sampled', () => {
+    const [view] = winStepViews([step('stronger', 'found', { chance: 0.667, line: { ...doublesLine, for: [] } })], proof({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1', turns: 4 }));
+    expect(view.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 4 turns in 67 % of the dice whatever Mstr_Hawk plays (over sampled rolls).');
+  });
+
+  test('a player who chose the line\'s first choice is told so; another choice keeps the sentence of the stronger play', () => {
+    const found = step('stronger', 'found', { chance: 1, played: 1, line: line() });
+    expect(winStepViews([found], proof({ playedLabel: 'Hydro Pump' }))[0].headline).toBe('Hydro Pump wins within 2 turns in 100 % of the dice whatever Tzon plays. Pepitopalotin played this choice.');
+    expect(winStepViews([found], proof({ playedLabel: 'Scald' }))[0].headline).toBe('Hydro Pump wins within 2 turns in 100 % of the dice whatever Tzon plays. What Pepitopalotin played, Scald, wins in 100 % of the dice.');
+    const never = winStepViews([found], proof({ playedLabel: 'stayed in (KO’d before acting)', playedNeverActed: true }))[0].headline;
+    expect(never).toContain('was knocked out before it moved');
+  });
+
+  test('a proof that did not replay, one that hit the limit and one that failed each have one sentence', () => {
+    const views = winStepViews([step('stronger', 'none'), step('stronger', 'stopped'), step('stronger', 'failed')], proof({ turns: 1 }));
+    expect(views.map(view => view.empty)).toEqual(['The proof did not replay within 1 turn.', 'Stopped at the search limit; nothing found so far.', 'This step could not run.']);
+    expect(winStepViews([step('stronger', 'none')], proof({ turns: 3 }))[0].empty).toBe('The proof did not replay within 3 turns.');
+  });
+});
+

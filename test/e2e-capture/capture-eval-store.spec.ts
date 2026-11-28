@@ -85,7 +85,14 @@ for (const capture of EVAL_STORE_CAPTURES.filter(entry => !only || entry.replay 
         await review.getByRole('button', { name: /Game review/ }).click();
         await review.getByRole('button', { name: new RegExp(`^Endgame · T\\d+ · How could ${loser} have won\\?$`) }).click();
         await expect(review.getByRole('region', { name: `How could ${loser} have won?` }).locator('[data-step]')).toHaveCount(3, { timeout: 1_200_000 });
-        await expect.poll(async () => (await readWinPathsRecords(page, replay.id)).length, { message: 'the win-paths record', timeout: 60_000 }).toBe(1);
+        const proofTurns = capture.proofTurns ?? [];
+        for (const turn of proofTurns) {
+          await panel.locator(`svg rect[data-turn="${turn}"]`).first().click({ force: true });
+          await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 60_000 });
+          await panel.getByRole('button', { name: /^How does .+ win from here\?$/ }).click();
+          await expect(panel.getByRole('region', { name: /^How does .+ win\?$/ }).locator('[data-step]')).toHaveCount(1, { timeout: 1_200_000 });
+        }
+        await expect.poll(async () => (await readWinPathsRecords(page, replay.id)).length, { message: 'the win-paths records', timeout: 60_000 }).toBe(1 + proofTurns.length);
         records = [...records, ...await readWinPathsRecords(page, replay.id)];
       }
     }

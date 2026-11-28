@@ -206,6 +206,16 @@ describe('the win-paths job', () => {
     expect(third.line).toBeUndefined();
   }, 240_000);
 
+  test('proof mode runs the stronger step alone and streams that one step', async () => {
+    const { serialized } = await serializedBoard(COIN);
+    const request = REQUEST('p1', { rootOrder: ['move highjumpkick'], proof: {} });
+    const seen: string[] = [];
+    const result = winPaths(serialized, request, step => seen.push(step.kind));
+    expect(seen).toEqual(['stronger']);
+    expect(result.steps).toEqual([strongerStep(serialized, request)]);
+    expect(result.steps[0].status).toBe('found');
+  }, 240_000);
+
   test('a step that throws leaves the others: it reads failed with the message, the rest run', async () => {
     const { serialized } = await serializedBoard(COIN);
     const seen: WinStep[] = [];
@@ -244,6 +254,16 @@ describe('the win-paths job, doubles', () => {
     for (const seed of ['1,2,3,4', '905,17,333,4096']) expect(won(await playLine(DOUBLES, stronger.line!, seed), 'p1')).toBe(true);
     expect(result.steps[1]).toEqual(luckPath(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
     expect(result.steps[2]).toEqual(mistakeStep(serialized, REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[0] })));
+  }, 240_000);
+
+  test('proof mode runs the stronger step alone and streams that one step', async () => {
+    const { serialized } = await serializedBoard(DOUBLES);
+    const request = REQUEST('p1', { rootOrder: DOUBLES_ORDER, played: DOUBLES_ORDER[1], proof: {} });
+    const seen: string[] = [];
+    const result = winPaths(serialized, request, step => seen.push(step.kind));
+    expect(seen).toEqual(['stronger']);
+    expect(result.steps).toEqual([strongerStep(serialized, request)]);
+    expect(result.steps[0]).toMatchObject({ status: 'found', played: 1 });
   }, 240_000);
 });
 

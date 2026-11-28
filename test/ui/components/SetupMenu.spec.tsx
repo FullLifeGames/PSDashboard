@@ -246,6 +246,19 @@ describe('Tera in the Setup menu', () => {
     expect(screen.getByText('Depth')).toBeInTheDocument();
   });
 
+  test('while the format check is pending the row stays drawn, locked, and its title says why', async () => {
+    await openMenu({ showTera: false, teraPending: true });
+    expect(select('Tera')).toBeDisabled();
+    expect(select('Tera')).toHaveValue('auto');
+    expect(screen.getByText('Tera')).toHaveAttribute('title', 'Locked until the format check answers whether this format allows Tera.');
+  });
+
+  test('the answer unlocks the row and brings back the usual title', async () => {
+    await openMenu({ showTera: true, teraPending: false });
+    expect(select('Tera')).toBeEnabled();
+    expect(screen.getByText('Tera')).toHaveAttribute('title', TERA_TITLE);
+  });
+
   test('another engine still gets the row, since the request carries the Tera setting, and no Depth', async () => {
     await openMenu({ external: true });
     expect(select('Tera')).toBeEnabled();
