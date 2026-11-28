@@ -106,6 +106,56 @@ describe('the solver reads a race with the Scarf the order names', () => {
   }
 });
 
+describe('a race is read at the Speed effects the log proves', () => {
+  type Side = 'p1' | 'p2';
+  const set = (species: string, nature: string, spe: number, item = ''): PokemonSet => ({
+    name: species, species, item, ability: '', moves: ['Hydro Steam'], nature,
+    evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe }, ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, level: 100, gender: '',
+  });
+  const knowledge = (known: string[]): Map<string, SpeedKnowledge> => new Map(known.map(key => [key, {
+    itemKnown: false, scarfRuledOut: false, spreadKnown: true, spreads: [],
+  }]));
+  const race = (first: [Side, string], second: [Side, string], extra: Partial<SpeedOrderObservation>): SpeedOrderObservation => ({
+    firstSide: first[0], firstSpecies: first[1], secondSide: second[0], secondSpecies: second[1], turn: 35, ...extra,
+  });
+
+  test('a loser under Protosynthesis Speed gives the winner Choice Scarf (925992 t35, singles)', () => {
+    // Zamazenta (412) knocked out Walking Wake, whose slowest Speed is 317 and 475 under Protosynthesis.
+    const sets = { p1: [set('Walking Wake', 'Hardy', 252)], p2: [set('Zamazenta', 'Jolly', 252, 'Light Clay')] };
+    const order = race(['p2', 'Zamazenta'], ['p1', 'Walking Wake'], { knockOut: true });
+    const plain = inferSpreads([], sets, 'gen9ou', [order], knowledge(['p1:walkingwake']));
+    expect(plain.get('p2:zamazenta')?.itemReason).toBeUndefined();
+    const solved = inferSpreads([], sets, 'gen9ou', [{ ...order, secondSpeed: [{ volatile: 'protosynthesis' }] }], knowledge(['p1:walkingwake']));
+    expect(solved.get('p2:zamazenta')).toMatchObject({ item: 'Choice Scarf', itemReason: 'moved-first' });
+    expect(solved.get('p1:walkingwake')?.itemReason).toBeUndefined();
+  });
+
+  test('a loser under Tailwind gives the winner Choice Scarf (VGC)', () => {
+    const sets = { p1: [set('Garchomp', 'Jolly', 252)], p2: [set('Kingambit', 'Hardy', 252)] };
+    const order = race(['p1', 'Garchomp'], ['p2', 'Kingambit'], {});
+    expect(inferSpreads([], sets, 'gen9doublesou', [order], knowledge(['p2:kingambit'])).get('p1:garchomp')?.itemReason).toBeUndefined();
+    const solved = inferSpreads([], sets, 'gen9doublesou', [{ ...order, secondSpeed: [{ sideConditions: ['tailwind'] }] }], knowledge(['p2:kingambit']));
+    expect(solved.get('p1:garchomp')).toMatchObject({ item: 'Choice Scarf', itemReason: 'moved-first' });
+  });
+
+  test('a winner under Tailwind that outruns a faster loser needs no Scarf (VGC)', () => {
+    const sets = { p1: [set('Ferrothorn', 'Jolly', 252)], p2: [set('Kingambit', 'Hardy', 252)] };
+    const order = race(['p1', 'Ferrothorn'], ['p2', 'Kingambit'], {});
+    expect(inferSpreads([], sets, 'gen9doublesou', [order], knowledge(['p2:kingambit'])).get('p1:ferrothorn')?.item).toBe('Choice Scarf');
+    const solved = inferSpreads([], sets, 'gen9doublesou', [{ ...order, firstSpeed: [{ sideConditions: ['tailwind'] }] }], knowledge(['p2:kingambit']));
+    expect(solved.get('p1:ferrothorn')?.itemReason).toBeUndefined();
+  });
+
+  test('a raised loser with a guessed Scarf keeps it', () => {
+    // Garchomp (333) beat Walking Wake: 317 plain, 475 under Protosynthesis. Read plain, the Scarf guess was refuted.
+    const sets = { p1: [set('Walking Wake', 'Hardy', 252, 'Choice Scarf')], p2: [set('Garchomp', 'Jolly', 252)] };
+    const order = race(['p2', 'Garchomp'], ['p1', 'Walking Wake'], { knockOut: true });
+    expect(inferSpreads([], sets, 'gen9ou', [order], knowledge(['p1:walkingwake'])).get('p1:walkingwake')?.itemReason).toBe('moved-second');
+    const solved = inferSpreads([], sets, 'gen9ou', [{ ...order, secondSpeed: [{ volatile: 'protosynthesis' }] }], knowledge(['p1:walkingwake']));
+    expect(solved.get('p1:walkingwake')?.itemReason).toBeUndefined();
+  });
+});
+
 describe('a knock-out order says the victim fell before acting', () => {
   // The victim's chosen move and its priority never show: a Trick Room or Roar it clicked would move last at any Speed.
   test('singles', () => {

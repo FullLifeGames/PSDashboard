@@ -16,8 +16,7 @@ const obsHeader = [
 
 describe('protocol parser fault tolerance', () => {
   test('a malformed event after a faint does not kill the whole parse', () => {
-    // Video-reconstructed logs can emit impossible orderings: a `|-fail|` for a mon that just fainted, which
-    // @pkmn/client resolves to null and crashes on.
+    // Video logs can emit impossible orderings: a `|-fail|` for a mon that just fainted, which @pkmn/client crashes on.
     const log = [
       '|player|p1|Alice|',
       '|player|p2|Bob|',
@@ -231,7 +230,7 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toEqual([{
       firstSide: 'p1', firstSpecies: 'Noivern',
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
-      turn: 2,
+      turn: 2, secondSpeed: [{ sideConditions: ['tailwind'] }],
     }]);
   });
 
@@ -519,8 +518,7 @@ describe('KO-before-acting speed evidence', () => {
   ].join('\n');
 
   test('a KO before the victim ever acted proves the attacker was faster', () => {
-    // The victim chose a move (a chosen switch would have resolved BEFORE
-    // the attack and left a line) and died before executing it.
+    // The victim chose a move (a chosen switch would have resolved BEFORE the attack and left a line) and died unmoved.
     const { speedOrders } = parseReplayLogWithObservations(koLog([
       '|move|p1a: Fast|Draco Meteor|p2a: Val',
       '|-damage|p2a: Val|0 fnt',
@@ -581,7 +579,7 @@ describe('KO-before-acting speed evidence', () => {
     expect(boostedVictim.speedOrders).toEqual([{
       firstSide: 'p1', firstSpecies: 'Noivern',
       secondSide: 'p2', secondSpecies: 'Iron Valiant',
-      turn: 1, knockOut: true,
+      turn: 1, knockOut: true, secondSpeed: [{}, { volatile: 'quarkdrive' }],
     }]);
     const boostedAttacker = parseReplayLogWithObservations(koLog([
       '|-activate|p1a: Fast|ability: Protosynthesis',
