@@ -3,7 +3,7 @@ import { statIds } from '../rules-dex.ts';
 import type { DamageObservation, ParadoxReading, StatId } from '../types.ts';
 import type { ClientIdent, ParserState } from './parser-state.ts';
 
-const PARADOX_VOLATILES = ['protosynthesis', 'quarkdrive'];
+export const PARADOX_VOLATILES = ['protosynthesis', 'quarkdrive'];
 const BOOSTABLE = statIds().filter(stat => stat !== 'hp') as StatId[];
 
 // The client keeps the line's suffix ('protosynthesisatk') as the `stat` of the volatile, not as a volatile of its own.

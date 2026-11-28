@@ -3,13 +3,13 @@ import { buildCalcPokemon, calcBaseStats, calcKnowsMove } from '../calc-build.ts
 import { calcGenerationFor, calcModOf, CHAMPIONS_MOD, type CalcGeneration } from '../calc-gen.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import { dexOfCalc, type RulesDex } from '../rules-dex.ts';
-import type { DamageObservation, PokemonEvs, SpeedOrderObservation } from '../types.ts';
+import type { DamageObservation, PokemonEvs, RaceSpeedEffects, SpeedOrderObservation } from '../types.ts';
 import { typedHiddenPowerId } from '../hidden-power.ts';
 import { calcIvs, coupleSpecial, evBudget, evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
 import type { CandidateRung, SpreadCandidate } from './ladder.ts';
 import type { ItemDecision, SpeedKnowledgeMap } from './scarf.ts';
 import type { ObservedMaxHp } from './max-hp.ts';
-import { raceSpeed } from './race-speed.ts';
+import { raceSpeed, type RacePick } from './race-speed.ts';
 import { defenderSideOf, fieldOf, forcedSpread, hitSideOf, moveOf, readObservation, type HitSide, type ReadObservation } from './observation-read.ts';
 import { abilityAtHit } from './ability-at-hit.ts';
 import { formeAbility } from './battle-forme.ts';
@@ -39,13 +39,17 @@ export interface RaceSide {
   forme?: string;
   held?: boolean;
   holder?: { side: 'p1' | 'p2'; species: string };
+  speed?: RaceSpeedEffects[];
+  pick?: RacePick;
 }
 
 export const firstOf = (order: ReadOrder): RaceSide => ({
   side: order.firstSide, species: order.firstSpecies, forme: order.firstForme, held: order.firstScarf, holder: order.firstHolder,
+  speed: order.firstSpeed, pick: 'max',
 });
 export const secondOf = (order: ReadOrder): RaceSide => ({
   side: order.secondSide, species: order.secondSpecies, forme: order.secondForme, held: order.secondScarf, holder: order.secondHolder,
+  speed: order.secondSpeed, pick: 'min',
 });
 
 export interface SolveContext {
@@ -271,7 +275,7 @@ export function racedWithScarf(ctx: SolveContext, mover: RaceSide): boolean {
 }
 
 function effectiveSpeed(ctx: SolveContext, mover: RaceSide, spread: SpreadCandidate): number {
-  return raceSpeed(dexOfCalc(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover));
+  return raceSpeed(dexOfCalc(ctx.gen), speedStat(ctx, mover.side, mover.species, spread, mover.forme), racedWithScarf(ctx, mover), mover.speed, mover.pick);
 }
 
 /** A knock-out on a victim whose set runs a move below priority 0 (Trick Room, Roar): it may have moved last. */

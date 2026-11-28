@@ -3,6 +3,7 @@ import type { GenerationNum } from '@pkmn/data';
 import { generationsFor } from '../format-generations.ts';
 import { toId } from '../ids.ts';
 import type { ItemReading } from './item-reading.ts';
+import { effectsOver, type SpeedPoint } from './speed-effects.ts';
 import type { DamageObservation, HiddenPowerEvidence, PokemonSnapshot, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
@@ -11,6 +12,8 @@ interface TurnMover {
   side: 'p1' | 'p2';
   species: string;
   ident: string;
+  mon: Pokemon | undefined;
+  seen: SpeedPoint;
   cleanFirst: boolean;
   cleanSecond: boolean;
 }
@@ -38,6 +41,7 @@ export interface PendingMove {
   /** Targets with an item or ability line before their damage line: a Focus Sash, Sturdy or Endure may hold the hit. */
   marked: Set<string>;
   speedClean: boolean;
+  seen: SpeedPoint;
   attackerSide: 'p1' | 'p2';
   attackerSpecies: string;
   effectiveness?: 'super' | 'resisted';
@@ -52,8 +56,8 @@ export interface ParserState {
   currentTurnLines: string[];
   singles: boolean;
   genNum: GenerationNum;
-  // Speed-order evidence: a turn's |move| lines prove speed order between opposite sides when nothing else explains it.
   speedTurn: number;
+  turnStart: SpeedPoint;
   turnMovers: TurnMover[];
   switchedThisTurn: Set<string>;
   actedThisTurn: Set<string>;
@@ -80,6 +84,7 @@ export function createParserState(format = ''): ParserState {
     singles: true,
     genNum: 9,
     speedTurn: 0,
+    turnStart: new Map(),
     turnMovers: [],
     switchedThisTurn: new Set<string>(),
     actedThisTurn: new Set<string>(),
@@ -94,7 +99,6 @@ export function createParserState(format = ''): ParserState {
 }
 
 // @pkmn/client 0.7.4 never charges Pressure's extra PP point: `getPressurePP` compares an ID with the name `Pressure`.
-// This copy compares IDs; the Pressure row of `low-pp-sweep.spec.ts` holds it to the simulator.
 // eslint-disable-next-line names/no-new-dex-name -- the client's own ability ID, held to the simulator by the Pressure rows of low-pp-sweep.spec.ts
 const PRESSURE = 'pressure';
 type PressurePP = number | [number, number];
@@ -156,10 +160,14 @@ export function flushSpeedOrder(state: ParserState) {
       if (first.side === second.side || !first.species || !second.species) continue;
       if (!first.cleanFirst || !second.cleanSecond) continue;
       if (state.reordered.has(first.ident) || state.reordered.has(second.ident)) continue;
+      const points = second.mon ? [state.turnStart.get(second.mon), first.seen.get(second.mon)] : [];
+      if (points.some(seen => seen?.lowered)) continue;
+      const secondSpeed = effectsOver(points);
       state.speedOrders.push({
         firstSide: first.side, firstSpecies: first.species,
         secondSide: second.side, secondSpecies: second.species,
         turn: state.speedTurn,
+        ...(secondSpeed ? { secondSpeed } : {}),
       });
     }
   }

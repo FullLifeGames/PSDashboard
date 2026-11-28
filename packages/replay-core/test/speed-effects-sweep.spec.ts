@@ -94,7 +94,6 @@ const play = (battle: Battle, view: SimView, own: string, foe = 'move splash'): 
   battle.makeChoices(p1, p2);
 };
 const team = (view: SimView, lead: Parameters<typeof mon>) => [mon(...lead), ...(view.doubles ? [mon('Blissey', ['splash'])] : [])];
-const smeargle = (item: string, moves: string[]) => mon('Smeargle', moves, { item, ability: 'Own Tempo' });
 const leadOf = (battle: Battle): Pokemon => battle.sides[0].active[0]!;
 const hasScarf = (dex: RulesDex) => dex.items.get('choicescarf').exists && dex.items.get('choicescarf').gen <= dex.gen;
 

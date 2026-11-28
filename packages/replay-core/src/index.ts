@@ -65,6 +65,6 @@ export type { PastedSet } from './team-paste.ts';
 export { applyTeamSheetToInfo } from './team-sheets.ts';
 export type {
   ReplayData, PokemonSnapshot, SideSnapshot, FieldSnapshot, TurnSnapshot, DamageObservation,
-  HiddenPowerEvidence, SpeedOrderObservation, KnowledgeSource, StatId, PokemonEvs, PokemonMoveInfo,
+  HiddenPowerEvidence, SpeedOrderObservation, RaceSpeedEffects, KnowledgeSource, StatId, PokemonEvs, PokemonMoveInfo,
   PokemonFieldInfo, PokemonEvsInfo, RevealedPokemonInfo, OpponentTeamInfo, LoggedHit, HitParty,
 } from './types.ts';

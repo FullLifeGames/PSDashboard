@@ -26,6 +26,7 @@ type PokemonSetAssumption
 type PokemonSnapshot
 type PokemonUsageStats
 type ProtectKind
+type RaceSpeedEffects
 type ReplayData
 type ReplayRuleset
 type RevealedPokemonInfo

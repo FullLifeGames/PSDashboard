@@ -1,5 +1,6 @@
 import type { Generation } from '@pkmn/data';
-import type { ClientIdent, ParserState } from './parser-state.ts';
+import { speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
+import { effectsOver } from './speed-effects.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
@@ -297,4 +298,33 @@ export function secondMoverContaminated(state: ParserState, ident: string, moveI
     return state.battle.gens.get(state.genNum).moves.get(moveId)?.category === 'Status';
   }
   return false;
+}
+
+// Earthquake and Explosion hit the partner too, so the target must stand on the other side.
+function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingMove): boolean {
+  return victim === lastMove.target && victim !== lastMove.attacker &&
+    victim.slice(0, 2) !== lastMove.attacker.slice(0, 2) &&
+    lastMove.speedClean && !state.actedThisTurn.has(victim) && !state.reordered.has(victim) &&
+    !speedContaminatedAt(state, victim, 'second') && !secondMoverContaminated(state, victim, null);
+}
+
+// A KO before the victim acted proves the attacker faster: a chosen switch would have resolved first and left a line.
+export function recordFaintSpeedEvidence(state: ParserState, line: string) {
+  const { lastMove, battle } = state;
+  if (!(line.startsWith('|faint|') && lastMove)) return;
+  const victim = line.split('|')[2] ?? '';
+  if (!faintProvesOrder(state, victim, lastMove)) return;
+  const victimMon = battle.getPokemon(victim as ClientIdent);
+  if (!victimMon) return;
+  const points = [state.turnStart.get(victimMon), lastMove.seen.get(victimMon)];
+  if (points.some(seen => seen?.lowered)) return;
+  const secondSpeed = effectsOver(points);
+  state.speedOrders.push({
+    firstSide: lastMove.attackerSide, firstSpecies: lastMove.attackerSpecies,
+    secondSide: victim.startsWith('p1') ? 'p1' : 'p2',
+    secondSpecies: victimMon.speciesForme,
+    turn: state.speedTurn,
+    knockOut: true,
+    ...(secondSpeed ? { secondSpeed } : {}),
+  });
 }

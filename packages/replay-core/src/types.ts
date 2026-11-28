@@ -182,9 +182,17 @@ export interface HiddenPowerEvidence {
   marker: 'super' | 'resisted' | 'immune' | 'neutral';
 }
 
+/** The Speed effects one mover stood under, as ids a twin battle of the simulator replays. */
+export interface RaceSpeedEffects {
+  /** The Speed stage above 0 (absent at 0 and in Generation 1). */
+  stage?: number;
+  volatile?: string;
+  sideConditions?: string[];
+}
+
 /** A same-turn move order the log PROVED (`first` before `second` at equal priority): a hard speed constraint. */
 export interface SpeedOrderObservation {
-  // Holds when no priority move, paralysis, Tailwind, Trick Room, speed stage or same-turn switch-in is in play.
+  // Kept only when no priority, Quick Claw, possible speed ability, same-turn switch-in, Trick Room or lowerer holds.
   firstSide: 'p1' | 'p2';
   firstSpecies: string;
   secondSide: 'p1' | 'p2';
@@ -198,6 +206,9 @@ export interface SpeedOrderObservation {
   /** The mover was transformed: it raced on this Pokémon's Speed with its own item (Transform copies stats). */
   firstCopied?: { side: 'p1' | 'p2'; species: string };
   secondCopied?: { side: 'p1' | 'p2'; species: string };
+  /** The mover's effects at the turn's start and at the first mover's action (one entry if equal); absent if none. */
+  firstSpeed?: RaceSpeedEffects[];
+  secondSpeed?: RaceSpeedEffects[];
 }
 
 /** Where a field's value comes from: the protocol, a guess, the user, an open team sheet, or nowhere. */

@@ -1,9 +1,9 @@
 import { dexOfCalc } from '../rules-dex.ts';
 import type { PokemonSet } from '@pkmn/sim';
 import type { PokemonEvs } from '../types.ts';
-import { keyOf, speedStat, weakRace, type ReadOrder, type SolveContext } from './fit.ts';
+import { firstOf, keyOf, secondOf, speedStat, weakRace, type RaceSide, type ReadOrder, type SolveContext } from './fit.ts';
 import { evsOfSet, onBudgetScale, statPointsOfEv, ZERO_EVS, type EvBudget } from './ev-budget.ts';
-import { raceSpeed, scarfedSpeed } from './race-speed.ts';
+import { raceSpeed } from './race-speed.ts';
 import type { SpreadCandidate } from './ladder.ts';
 import { toId } from '../ids.ts';
 
@@ -90,15 +90,19 @@ function scarfInAllowed(m: Mover): boolean {
   return !m.know.itemKnown && !m.know.scarfRuledOut && toId(m.set.item ?? '') !== 'choicescarf' && tempoSpecies(m);
 }
 
-function scarfIn(ctx: SolveContext, first: Mover, max: number, ref: number): [string, ItemDecision] | null {
-  return scarfInAllowed(first) && scarfedSpeed(dexOfCalc(ctx.gen), max) >= ref ? [first.key, 'holds'] : null;
+const racedAs = (ctx: SolveContext, mover: RaceSide, stat: number, scarf: boolean) =>
+  raceSpeed(dexOfCalc(ctx.gen), stat, scarf, mover.speed, mover.pick);
+
+function scarfIn(ctx: SolveContext, order: ReadOrder, first: Mover, max: number, ref: number): [string, ItemDecision] | null {
+  return scarfInAllowed(first) && racedAs(ctx, firstOf(order), max, true) >= ref ? [first.key, 'holds'] : null;
 }
 
-function decideAgainstGuessedScarf(ctx: SolveContext, first: Mover, second: Mover, max: number): [string, ItemDecision] | null {
-  const scarfRef = scarfedSpeed(dexOfCalc(ctx.gen), investedFloor(ctx, second));
-  if (max >= scarfRef) return null;
-  if (floor(ctx, second) <= max) return [second.key, 'lacks'];
-  return scarfIn(ctx, first, max, scarfRef);
+function decideAgainstGuessedScarf(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover, max: number): [string, ItemDecision] | null {
+  const scarfRef = racedAs(ctx, secondOf(order), investedFloor(ctx, second), true);
+  const fastest = racedAs(ctx, firstOf(order), max, false);
+  if (fastest >= scarfRef) return null;
+  if (racedAs(ctx, secondOf(order), floor(ctx, second), false) <= fastest) return [second.key, 'lacks'];
+  return scarfIn(ctx, order, first, max, scarfRef);
 }
 
 // A race read with the Scarf a mover held that turn decides nothing about that mover's set item.
@@ -106,9 +110,9 @@ function decide(ctx: SolveContext, order: ReadOrder, first: Mover, second: Mover
   const max = maxSpeed(ctx, first);
   if (max === 0 || order.firstScarf !== undefined || toId(first.set.item ?? '') === 'choicescarf') return null;
   const secondScarf = order.secondScarf ?? toId(second.set.item ?? '') === 'choicescarf';
-  if (secondScarf && order.secondScarf === undefined && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, first, second, max);
-  const ref = raceSpeed(dexOfCalc(ctx.gen), floor(ctx, second), secondScarf);
-  return max >= ref ? null : scarfIn(ctx, first, max, ref);
+  if (secondScarf && order.secondScarf === undefined && !second.know.itemKnown) return decideAgainstGuessedScarf(ctx, order, first, second, max);
+  const ref = racedAs(ctx, secondOf(order), floor(ctx, second), secondScarf);
+  return racedAs(ctx, firstOf(order), max, false) >= ref ? null : scarfIn(ctx, order, first, max, ref);
 }
 
 // A weak race never earns an item (the settling drops it first), nor does a copied race: its Speed is the copied one's.

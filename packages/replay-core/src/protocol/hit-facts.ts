@@ -34,8 +34,8 @@ export function forgetAbilityEnd(state: ParserState, line: string) {
   if (leaving) state.abilityEnded.delete(leaving);
 }
 
-// Gastro Acid and an active Neutralizing Gas (the client's `ngasActive`) take it; the solver asks the Dex who resists.
-function suppressed(state: ParserState, mon: Pokemon): boolean {
+/** Whether Gastro Acid or an active Neutralizing Gas (the client's `ngasActive`) takes the mover's ability. */
+export function abilitySuppressed(state: ParserState, mon: Pokemon): boolean {
   return state.abilityEnded.has(mon) || !!mon.volatiles.gastroacid || state.battle.ngasActive();
 }
 
@@ -102,8 +102,8 @@ export function hitFactsOf(state: ParserState, move: PendingMove, attacker: Poke
     ...(fallen ? { attackerFallen: parseInt(fallen, 10) } : {}),
     ...(attacker.ability ? { attackerAbility: attacker.ability } : {}),
     ...(defender.ability ? { defenderAbility: defender.ability } : {}),
-    ...(suppressed(state, attacker) ? { attackerSuppressed: true } : {}),
-    ...(suppressed(state, defender) ? { defenderSuppressed: true } : {}),
+    ...(abilitySuppressed(state, attacker) ? { attackerSuppressed: true } : {}),
+    ...(abilitySuppressed(state, defender) ? { defenderSuppressed: true } : {}),
     ...(attacker.ability && attacker.volatiles[attacker.ability] ? { attackerAbilityOn: true } : {}),
     ...(facts.length > 0 ? { fieldFacts: facts } : {}),
     ...partnerFactsOf(attacker, defender),

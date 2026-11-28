@@ -2,10 +2,11 @@ import type { Battle, Pokemon, Side, Field } from '@pkmn/client';
 import type { GenerationNum } from '@pkmn/data';
 import type { DamageObservation, PokemonSnapshot, SideSnapshot, FieldSnapshot } from '../types.ts';
 import { flushSpeedOrder, ppUsedOf, speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
-import { firstMoverContaminated, foreignAction, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
+import { firstMoverContaminated, foreignAction, recordFaintSpeedEvidence, secondMoverContaminated, switchTriggered } from './speed-evidence.ts';
 import { toId } from '../ids.ts';
 import { standingScreens } from '../dex-facts/index.ts';
 import { itemFieldsOf } from './item-reading.ts';
+import { speedPointOf, type SpeedPoint } from './speed-effects.ts';
 import { paradoxFieldsOf } from './paradox-reading.ts';
 import { forgetAbilityEnd, hitFactsOf } from './hit-facts.ts';
 import { survivedAtOne } from './survival-marker.ts';
@@ -107,13 +108,13 @@ function speedCleanliness(state: ParserState, ident: string, moveId: string): { 
 }
 
 function pendingMoveFor(
-  parts: string[], moveId: string, side: 'p1' | 'p2', speciesForme: string, cleanFirst: boolean,
+  parts: string[], moveId: string, side: 'p1' | 'p2', speciesForme: string, cleanFirst: boolean, seen: SpeedPoint,
 ): PendingMove | null {
   return parts[2] && parts[4]
     ? {
       attacker: parts[2], target: parts[4], moveId, moveName: parts[3] ?? '',
       spread: parts.slice(5).some(part => part.startsWith('[spread]')), crits: new Set<string>(), hits: new Map(), itemsBefore: new Map(), marked: new Set<string>(),
-      speedClean: cleanFirst, attackerSide: side, attackerSpecies: speciesForme,
+      speedClean: cleanFirst, seen, attackerSide: side, attackerSpecies: speciesForme,
     }
     : null;
 }
@@ -132,10 +133,11 @@ export function handleMove(state: ParserState, line: string) {
   const clean = speedCleanliness(state, ident, moveId);
   const cleanFirst = clean.cleanFirst && !switchTriggered(line);
   const speciesForme = mover?.speciesForme ?? '';
-  state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst && race);
+  const seen = speedPointOf(state);
+  state.lastMove = pendingMoveFor(parts, moveId, side, speciesForme, cleanFirst && race, seen);
   if (ident && race && !state.turnMovers.some(entry => entry.ident === ident)) {
     state.actedThisTurn.add(ident);
-    state.turnMovers.push({ side, species: speciesForme, ident, cleanFirst, cleanSecond: clean.cleanSecond });
+    state.turnMovers.push({ side, species: speciesForme, ident, mon: mover ?? undefined, seen, cleanFirst, cleanSecond: clean.cleanSecond });
   }
 }
 
@@ -154,33 +156,6 @@ export function handleCrit(state: ParserState, line: string) {
 export function isActionBoundary(line: string): boolean {
   return /^\|(?:-miss|-immune|-fail|-end|switch|drag|turn|upkeep|cant|faint)\|/.test(line) ||
     (line.startsWith('|-activate|') && line.includes('confusion'));
-}
-
-// Earthquake and Explosion hit the partner too, so the target must stand on the other side.
-function faintProvesOrder(state: ParserState, victim: string, lastMove: PendingMove): boolean {
-  return victim === lastMove.target && victim !== lastMove.attacker &&
-    victim.slice(0, 2) !== lastMove.attacker.slice(0, 2) &&
-    lastMove.speedClean && !state.actedThisTurn.has(victim) && !state.reordered.has(victim) &&
-    !speedContaminatedAt(state, victim, 'second') && !secondMoverContaminated(state, victim, null);
-}
-
-// A KO before the victim acted proves the attacker faster: a chosen switch would have resolved first and left a line.
-function recordFaintSpeedEvidence(state: ParserState, line: string) {
-  const { lastMove, battle } = state;
-  if (!(line.startsWith('|faint|') && lastMove)) return;
-  const victim = line.split('|')[2] ?? '';
-  if (faintProvesOrder(state, victim, lastMove)) {
-    const victimMon = battle.getPokemon(victim as ClientIdent);
-    if (victimMon) {
-      state.speedOrders.push({
-        firstSide: lastMove.attackerSide, firstSpecies: lastMove.attackerSpecies,
-        secondSide: victim.startsWith('p1') ? 'p1' : 'p2',
-        secondSpecies: victimMon.speciesForme,
-        turn: state.speedTurn,
-        knockOut: true,
-      });
-    }
-  }
 }
 
 function recordImmuneHiddenPower(state: ParserState, line: string) {
@@ -327,6 +302,7 @@ export function feedLine(state: ParserState, line: string) {
     state.currentTurnLines = [];
     flushSpeedOrder(state);
     state.speedTurn = turnNum;
+    state.turnStart = speedPointOf(state);
   }
 }
 

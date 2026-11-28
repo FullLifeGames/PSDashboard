@@ -11,7 +11,6 @@ import { originIn } from './battle-forme.ts';
 import { plausibleFor, scarfAllowed, type SpeedKnowledgeMap } from './scarf.ts';
 import { natureOf, type SpreadCandidate } from './ladder.ts';
 
-// Design: EVALUATION.md "Fitted spreads and inferred Scarf".
 
 type Side = 'p1' | 'p2';
 type Sets = { p1: PokemonSet[]; p2: PokemonSet[] };
@@ -87,7 +86,6 @@ function speedNatures(dex: RulesDex, prior: string, physical: boolean): string[]
   return [...new Set([lowered, neutral, raised])];
 }
 
-// A changed nature costs more than any EV move, so a Speed the prior's nature reaches keeps it.
 function cost(ctx: SolveContext, spread: SpreadCandidate, prior: SpreadCandidate): number {
   const stats = Object.keys(ZERO_EVS) as StatId[];
   return stats.reduce((sum, stat) => sum + Math.abs((spread.evs[stat] ?? 0) - (prior.evs[stat] ?? 0)), 0) +
@@ -137,7 +135,6 @@ function slowOptions(ctx: SolveContext, racer: Racer): Option[] {
   });
 }
 
-// The log's order refutes the published Speed IV before it asks for a Speed EV: cheaper than any legal Speed.
 function restoredOptions(ctx: SolveContext, racer: Racer): Option[] {
   if (!lowSpeedIv(ctx, racer)) return [];
   const entry = option(ctx, racer, { ...racer.prior, ivs: restoredIvs(racer) }, false);
@@ -170,8 +167,8 @@ function formeStat(ctx: SolveContext, side: Side, species: string, entry: Option
 function readings(ctx: SolveContext, order: ReadOrder): [Reading, Reading] {
   const reading = (mover: RaceSide): Reading => {
     const scarf = racedWithScarf(ctx, mover);
-    const { side, species, forme } = mover;
-    return entry => raceSpeed(dexOfCalc(ctx.gen), forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf);
+    const { side, species, forme, speed, pick } = mover;
+    return entry => raceSpeed(dexOfCalc(ctx.gen), forme ? formeStat(ctx, side, species, entry, forme) : entry.stat, scarf, speed, pick);
   };
   return [reading(firstOf(order)), reading(secondOf(order))];
 }
@@ -210,7 +207,6 @@ function fix(start: Map<string, Option[]>, bounds: Bound[], racers: Racer[]): Ma
   return new Map([...domains].map(([key, options]) => [key, options[0]]));
 }
 
-// Who keeps its Speed first: a known spread, then more own Speed evidence, then a first mover (the second yields).
 function keepingOrder(racers: Racer[], bounds: Bound[]): Racer[] {
   const evidence = (racer: Racer) => bounds.filter(bound => !bound.broken && (bound.first === racer || bound.second === racer)).length;
   const yielding = (racer: Racer) => bounds.filter(bound => bound.broken && bound.second === racer).length;
@@ -218,7 +214,6 @@ function keepingOrder(racers: Racer[], bounds: Bound[]): Racer[] {
     yielding(a) - yielding(b) || a.key.localeCompare(b.key));
 }
 
-// Both directions seen: only a tie explains the races of a cycle.
 function cyclic(races: Race[]): Set<Race> {
   const next = new Map<Racer, Racer[]>();
   for (const race of races) next.set(race.first, [...(next.get(race.first) ?? []), race.second]);
@@ -238,8 +233,6 @@ function cyclic(races: Race[]): Set<Race> {
   return new Set(races.filter(race => reaches(race.second, race.first)));
 }
 
-// Every race ends strict (no coin flip on an order the log showed) unless its priors tie it or it sits in a cycle.
-// When that fails, only the races that cannot end strict may tie; the rest stay strict while the rest settles.
 function solve(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[], tier: Tier): Map<string, Option> | null {
   const loops = cyclic(races);
   const strict = races.map(race => {
@@ -276,8 +269,6 @@ function withScarf(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Race
   return null;
 }
 
-// The weak races go before a Speed IV below 31 (a weak race may be no race, so it asks for nothing), and both
-// before a new Scarf.
 function settleComponent(ctx: SolveContext, knowledge: SpeedKnowledgeMap, racers: Racer[], races: Race[]): Map<string, Option> | null {
   const strong = races.filter(race => !race.weak);
   return solve(ctx, knowledge, racers, races, 'plausible') ??
