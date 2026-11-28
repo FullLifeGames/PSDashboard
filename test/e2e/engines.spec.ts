@@ -33,6 +33,7 @@ test('an engine added by address evaluates the position, and the Engine select i
   await expect(page.getByRole('combobox', { name: 'Engine' })).toHaveValue(/__test-engine/);
   await expect(page.locator('.ps-eval-controls').getByRole('combobox')).toHaveCount(0);
   await expect(page.locator('span[title="Estimate from Test engine."]')).toHaveText('Evaluation');
+  await expect(page.locator('span[title="Selected engine: Test engine. Estimate from Test engine."]')).toHaveText('Test engine');
 
   await page.getByRole('button', { name: /^(Re-)?[Ee]valuate$/ }).click();
   await expect.poll(() => asked.length, { timeout: 90_000 }).toBeGreaterThan(0);

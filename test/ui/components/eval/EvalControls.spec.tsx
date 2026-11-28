@@ -101,14 +101,17 @@ describe('EvalControls', () => {
       .toEqual(['Evaluation', 'My bot', '+ engine', 'Follow', 'On load', 'Evaluate']);
   });
 
-  test('the built-in engine puts no name beside the title, and an added engine in use puts its name there with the full note in its title', () => {
+  test('the built-in engine puts no name beside the title, and an added engine in use puts its name there, and no two elements share a title', () => {
     const bot = { id: 'url:http://localhost:8765/', name: 'Test engine', url: 'http://localhost:8765/', source: 'added' as const };
     const choice = (selected: typeof bot | typeof BUILTIN_ENGINE) => ({ engines: [BUILTIN_ENGINE, bot], selected, select: vi.fn(), add: vi.fn(), remove: vi.fn() });
     const { rerender } = render(<EvalControls {...props({ engines: choice(BUILTIN_ENGINE) })} />);
     expect(screen.queryByText('PS Dashboard')).toBeNull();
     expect(screen.queryByText('Test engine')).toBeNull();
     rerender(<EvalControls {...props({ engines: choice(bot) })} />);
-    expect(screen.getByText('Test engine')).toHaveAttribute('title', 'Estimate from Test engine.');
+    expect(screen.getByText('Test engine')).toHaveAttribute('title', 'Selected engine: Test engine. Estimate from Test engine.');
+    expect(screen.getByText('Evaluation')).toHaveAttribute('title', 'Estimate from Test engine.');
+    const titles = [...document.querySelectorAll('.ps-eval-controls [title]')].map(element => element.getAttribute('title'));
+    expect(new Set(titles).size).toBe(titles.length);
     rerender(<EvalControls {...props({ engines: undefined })} />);
     expect(screen.queryByText('Test engine')).toBeNull();
   });

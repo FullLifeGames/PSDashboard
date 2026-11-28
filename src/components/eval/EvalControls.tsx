@@ -44,7 +44,7 @@ export function EvalControls({ prefs, onPrefsChange, running, showAuto, onEvalua
   return (
     <div className="ps-eval-controls">
       <span className="ps-eval-controls-title" title={note} style={named ? { marginRight: 0 } : undefined}>Evaluation</span>
-      {named && <span className="ps-eval-controls-engine" title={note}>{named.name}</span>}
+      {named && <span className="ps-eval-controls-engine" title={`Selected engine: ${named.name}. ${note}`}>{named.name}</span>}
       {engines && <EngineControls engines={engines.engines} onAdd={engines.add} onRemove={engines.remove} />}
       {showAuto && (
         <label
