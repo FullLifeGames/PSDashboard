@@ -1,7 +1,7 @@
 import type { SideAnalysis } from '../analysis.ts';
 import type { KoOddsInfo } from '../types.ts';
 import { splitCombinedLabel } from '../turn-analysis/played-match.ts';
-import { winDeltaText, winPctText } from '../winprob.ts';
+import { chanceGapText, winDeltaText, winPctText } from '../winprob.ts';
 
 export const phrase = (label: string): string => {
   const slots = splitCombinedLabel(label);
@@ -93,12 +93,12 @@ export const displayBest = (side: SideAnalysis): { label: string; ev: number; sw
 /** Regret is best minus played ev on the [−1, 1] score scale, so it reaches 2; above this the card shows chances. */
 export const REGRET_SPAN_MIN = 1;
 
-/** A regret as text: points up to `REGRET_SPAN_MIN`, above it the two win chances the regret spans. */
+/** A grade's size as the card prints it: the gap of the two printed chances, above `REGRET_SPAN_MIN` both. */
 export const regretText = (regret: number, from: number, to: number, faintedFraction?: number | null): string =>
-  regret > REGRET_SPAN_MIN ? `${winPctText(from, faintedFraction)} to ${winPctText(to, faintedFraction)}` : winDeltaText(-regret);
+  regret > REGRET_SPAN_MIN ? `${winPctText(from, faintedFraction)} to ${winPctText(to, faintedFraction)}` : chanceGapText(from, to, faintedFraction);
 
 export const regretSpanFor = (side: SideAnalysis): { span?: { from: number; to: number; faintedFraction?: number } } =>
-  side.played && side.best && (side.regret ?? 0) > REGRET_SPAN_MIN
+  side.played && side.best
     ? { span: { from: displayBest(side).ev, to: side.played.ev, ...(side.faintedFraction === undefined ? {} : { faintedFraction: side.faintedFraction }) } }
     : {};
 

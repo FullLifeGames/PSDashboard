@@ -3,7 +3,7 @@ import {
 } from '@fulllifegames/eval-engine';
 import type { TurnEvalSettings } from '../hooks/useEvaluation';
 import { attributionBadge, leadTier } from './eval-badges';
-import { neverActedText } from './eval/turn-copy';
+import { leadGradeSize, neverActedText } from './eval/turn-copy';
 import { sideIndex } from '@fulllifegames/replay-core';
 
 interface EvalGameReportProps {
@@ -69,7 +69,7 @@ function LeadChips({ leads, playerNames, onSelectTurn }: { leads: LeadAnalysis; 
             <span style={{ color: tone }}>{playerNames[sideIndex(side)]}</span>
             <span style={{ color: '#aab' }}>led {lead.played ? strip(lead.played.label) : '?'}</span>
             <span style={{ color: '#778' }}>better: {lead.best ? strip(lead.best.label) : '?'}</span>
-            <span style={{ color: tone }}>{winDeltaText(-(lead.regret ?? 0))}</span>
+            <span style={{ color: tone }}>{leadGradeSize(lead)}</span>
           </button>
         );
       })}

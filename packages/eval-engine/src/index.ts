@@ -124,7 +124,7 @@ export type { StreakHistoryEntry, StreakOdds } from './streaks.ts';
 export { summarizeTurn, quietVoice, formatRead } from './summary.ts';
 export type { QuietVoice } from './prose/quiet.ts';
 export { formatLine, replacementWords } from './prose/line.ts';
-export { regretText, rollText } from './prose/phrases.ts';
+export { REGRET_SPAN_MIN, regretText, rollText } from './prose/phrases.ts';
 export { heldDecided } from './turn-analysis/decided-held.ts';
 export { forcedWinSpeaks } from './turn-analysis/forced-speech.ts';
 export { noteSpokenClaim, releaseBrokenClaims } from './turn-analysis/decided-signals.ts';

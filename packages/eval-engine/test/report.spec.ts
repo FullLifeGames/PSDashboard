@@ -136,7 +136,7 @@ describe('game report (multi-turn root cause)', () => {
       mk(5, -0.35, -0.5, { p2: misplay('Bite', 'Crunch', 0.25) }),
     ], names, 'p2');
     expect(report.misplays.map(entry => `${entry.turn}${entry.side}`)).toEqual(['1p1', '2p2', '3p1', '5p2']);
-    expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', tier: 'blunder', riskUnpunished: true });
+    expect(report.misplays[1]).toEqual({ turn: 2, side: 'p2', regret: 0.4, played: 'Growl', better: 'Protect', tier: 'blunder', riskUnpunished: true, span: { from: 0.1, to: -0.2 } });
     expect(report.tracked).toBe(true);
   });
 

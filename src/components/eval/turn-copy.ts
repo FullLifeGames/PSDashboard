@@ -1,4 +1,4 @@
-import { chanceGapText, regretText, TIER_THRESHOLDS, type EvalLine, type EvalResult, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
+import { chanceGapText, REGRET_SPAN_MIN, regretText, TIER_THRESHOLDS, type EvalLine, type EvalResult, type LeadSideAnalysis, type NoChoiceSlot, type SideAnalysis, type TurnAnalysis, type RankedChoice, winDeltaText, winPctText } from '@fulllifegames/eval-engine';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
 import type { RowValues } from '../../lib/line-view';
 import { worstReply, type WorstReply } from '../../lib/worst-reply';
@@ -133,12 +133,10 @@ export function regretView(name: string, side: SideAnalysis, regret: number): { 
   if (from === undefined || to === undefined) {
     return { text: winDeltaText(-regret), title: `${name} gave up this much win probability vs the engine's best.` };
   }
-  const spanned = regretText(regret, from, to, side.faintedFraction);
-  if (spanned === winDeltaText(-regret)) {
-    return { text: chanceGapText(from, to, side.faintedFraction), title: `${name} gave up this much win probability vs the engine's best.` };
-  }
+  const text = regretText(regret, from, to, side.faintedFraction);
+  if (regret <= REGRET_SPAN_MIN) return { text, title: `${name} gave up this much win probability vs the engine's best.` };
   return {
-    text: spanned,
+    text,
     title: `${name}'s win chance fell from ${winPctText(from, side.faintedFraction)} with the engine's line to ${winPctText(to, side.faintedFraction)} with the played choice ` +
       `(regret ${regret.toFixed(2)} on the score scale from −1 to 1).`,
   };

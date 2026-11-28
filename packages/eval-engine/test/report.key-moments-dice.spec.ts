@@ -4,6 +4,7 @@ import { buildGameReport } from '../src/report';
 import { seedPhrase } from '../src/win-reason';
 import { analyzeTurn, type TurnAnalysis } from '../src/analysis';
 import { forcedQualifier } from '../src/prose/phrases';
+import { winDeltaText } from '../src/winprob';
 import { summarizeTurn } from '../src/summary';
 import type { EvalResult, RankedChoice } from '../src/types';
 
@@ -206,20 +207,30 @@ const singlesMistake = side({
   played: choice('move stoneedge', 'Stone Edge', 0.1), best: choice('move earthquake', 'Earthquake', 0.4), regret: 0.3, tier: 'mistake',
 });
 
+const doublesMistake = side({
+  played: choice('move taunt 1, move bodypress 2', 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar', 0.1),
+  best: choice('move astralbarrage, move bodypress 1', 'Astral Barrage + Body Press→Calyrex-Ice', 0.4),
+  regret: 0.3, tier: 'mistake', faintedFraction: 0.5,
+});
+
 describe('a regret over 1 reads as the two win chances it spans', () => {
   test('the seed phrase (doubles, 2630685175 t8): "85% to 19%", no points, no dash', () => {
     const seed = seedPhrase(turn(8, doublesThrow, 0.9), 'p2');
     expect(seed).toBe('turn 8 (Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar, 85% to 19%; safer was Astral Barrage + Body Press→Calyrex-Ice)');
   });
 
-  test('singles: a regret under 1 keeps its points, the frame without the dash', () => {
-    expect(seedPhrase(turn(5, singlesMistake, 0.1), 'p2')).toBe('turn 5 (Stone Edge, −15%; safer was Earthquake)');
+  test.each([
+    ['singles', singlesMistake, 'turn 5 (Stone Edge, −13%; safer was Earthquake)'],
+    ['doubles, three of eight down', doublesMistake, 'turn 5 (Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar, −20%; safer was Astral Barrage + Body Press→Calyrex-Ice)'],
+  ] as const)('%s: a regret under 1 reads as the difference of the two printed chances, the size the card prints', (_scene, mistake, text) => {
+    expect(seedPhrase(turn(5, mistake, 0.1), 'p2')).toBe(text);
+    expect(seedPhrase(turn(5, mistake, 0.1), 'p2')).not.toBe(text.replace(/−\d+%/, winDeltaText(-(mistake.regret ?? 0))));
   });
 
-  test('the report misplay carries the span only above 1', () => {
-    const report = buildGameReport([turn(1, singlesMistake, 0.1), turn(2, doublesThrow, 0.9), turn(3, side({}), 0.9)], ['Alpha', 'Beta'], 'p1');
-    const byTurn = new Map(report.misplays.map(misplay => [misplay.turn, misplay]));
-    expect(byTurn.get(2)?.span).toEqual({ from: 0.92, to: -0.767 });
-    expect(byTurn.get(1)).not.toHaveProperty('span');
+  test('the report misplay carries the pair of the grade: the two values, and the share when the side has one', () => {
+    const spans = (...turns: TurnAnalysis[]) => buildGameReport(turns, ['Alpha', 'Beta'], 'p1').misplays.map(misplay => misplay.span);
+    expect(spans(turn(1, singlesMistake, 0.1), turn(2, doublesThrow, 0.9), turn(3, side({}), 0.9)))
+      .toEqual([{ from: 0.4, to: 0.1 }, { from: 0.92, to: -0.767 }]);
+    expect(spans(turn(1, doublesMistake, 0.1))).toEqual([{ from: 0.4, to: 0.1, faintedFraction: 0.5 }]);
   });
 });

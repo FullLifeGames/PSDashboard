@@ -38,7 +38,7 @@ interface GameMisplay {
   sacrifice?: boolean;
   /** The body fell before it moved; `played` is the engine's stand-in label, so the display gives its chance. */
   neverActed?: { ev: number; faintedFraction?: number };
-  /** A regret over 1 spans these two values (shown best, played). */
+  /** The two values the grade reads (shown best, played) and the share they print at. */
   span?: { from: number; to: number; faintedFraction?: number };
 }
 

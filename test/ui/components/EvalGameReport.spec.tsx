@@ -5,7 +5,7 @@ import { winDeltaText } from '@fulllifegames/eval-engine';
 import { EvalGameReport } from '../../../src/components/EvalGameReport';
 import type { TurnEvalSettings } from '../../../src/hooks/useEvaluation';
 import { gameReport, rankedChoice } from '../fixtures/eval-result';
-import { leadAnalysis, turnAnalysis } from '../fixtures/analysis';
+import { chanceGap, leadAnalysis, turnAnalysis } from '../fixtures/analysis';
 
 const names: [string, string] = ['Alice', 'Bob'];
 
@@ -40,7 +40,7 @@ describe('EvalGameReport', () => {
     const onSelectTurn = vi.fn();
     const report = gameReport({
       misplays: [
-        { turn: 3, side: 'p1', regret: 0.3, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake' },
+        { turn: 3, side: 'p1', regret: 0.3, played: 'Stone Edge', better: 'Earthquake', tier: 'mistake', span: { from: 0.4, to: 0.1 } },
         { turn: 5, side: 'p1', regret: 0.5, played: 'Swords Dance', better: 'Earthquake', tier: 'blunder', riskUnpunished: true },
         { turn: 6, side: 'p1', regret: 0.2, played: '→ Toxapex', better: 'Earthquake', sacrifice: true },
       ],
@@ -55,7 +55,7 @@ describe('EvalGameReport', () => {
     expect(mistake.getByText('Alice')).toBeInTheDocument();
     expect(mistake.getByText('Stone Edge')).toBeInTheDocument();
     expect(mistake.getByText('better: Earthquake')).toBeInTheDocument();
-    expect(mistake.getByText(winDeltaText(-0.3))).toBeInTheDocument();
+    expect(mistake.getByText(chanceGap(0.4, 0.1))).toBeInTheDocument();
     expect(mistake.getByText('d2')).toHaveAttribute('title', 'Evaluated at depth 2 · 3 samples · deepen from the turn view');
     await userEvent.click(chip(3));
     expect(onSelectTurn).toHaveBeenCalledWith(3);
@@ -80,7 +80,7 @@ describe('EvalGameReport', () => {
     expect(lead.getByText('Bob')).toBeInTheDocument();
     expect(lead.getByText('led Ferrothorn')).toBeInTheDocument();
     expect(lead.getByText('better: Rotom-Wash')).toBeInTheDocument();
-    expect(lead.getByText(winDeltaText(-0.3))).toBeInTheDocument();
+    expect(lead.getByText(chanceGap(-0.1, -0.4))).toBeInTheDocument();
     await userEvent.click(chip(0));
     expect(onSelectTurn).toHaveBeenCalledWith(0);
     expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -104,6 +104,17 @@ describe('EvalGameReport', () => {
     expect(within(chip(8)).getByText('85% to 19%')).toBeInTheDocument();
     expect(within(chip(8)).queryByText(/−84%/)).toBeNull();
     expect(within(chip(3)).getByText(winDeltaText(-0.3))).toBeInTheDocument();
+  });
+
+  test.each([
+    ['singles', undefined, 'Stone Edge'],
+    ['doubles, three of eight down', 0.5, 'Taunt→Calyrex-Ice + Body Press→Terapagos-Stellar'],
+  ] as const)('%s: a misplay under a regret of 1 prints the size its card prints, the difference of the two chances', (_scene, share, played) => {
+    const span = { from: 0.4, to: 0.1, ...(share === undefined ? {} : { faintedFraction: share }) };
+    const misplays = [{ turn: 5, side: 'p1' as const, regret: 0.3, played, better: 'Earthquake', tier: 'mistake' as const, span }];
+    render(<EvalGameReport report={gameReport({ misplays })} playerNames={names} />);
+    expect(within(chip(5)).getByText(chanceGap(0.4, 0.1, share))).toBeInTheDocument();
+    expect(chanceGap(0.4, 0.1, share)).not.toBe(winDeltaText(-0.3));
   });
 
   test('a misplay span prints at the turn\'s fainted share, the same map as the graph', () => {

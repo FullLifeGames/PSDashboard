@@ -67,11 +67,9 @@ export const winPercent = (score: number, faintedFraction?: number | null): numb
 /** Display text of an absolute value through winPercent ("52%"; higher is better for the named side). */
 export const winPctText = (value: number, faintedFraction?: number | null): string => `${winPercent(value, faintedFraction)}%`;
 
-/** The points between two printed chances (the better one first), never below 0: what a card, a row or a report prints as a size. */
 export const chanceGapPoints = (better: number, played: number, faintedFraction?: number | null): number =>
   Math.max(0, winPercent(better, faintedFraction) - winPercent(played, faintedFraction));
 
-/** The size of a gap between two printed chances ("−11%"). */
 export const chanceGapText = (better: number, played: number, faintedFraction?: number | null): string =>
   `−${chanceGapPoints(better, played, faintedFraction)}%`;
 
