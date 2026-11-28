@@ -1,5 +1,6 @@
 import {
-  type EvalResult, type TeraAllowance, type TurnSensitivity, type TurnVerification, searchBudgetTag, teraKey,
+  type EvalResult, type StaticRuleset, type TeraAllowance, type TurnSensitivity, type TurnVerification, type WinPaths, type WinPathsRequest,
+  searchBudgetTag, teraKey,
 } from '@fulllifegames/eval-engine';
 
 /** IndexedDB persistence of evaluation results, keyed by position and settings; a failure degrades to "no cache". */
@@ -22,8 +23,17 @@ export interface StoredEval {
   savedAt: number;
 }
 
+export interface StoredWinPaths {
+  key: string;
+  kind: 'winPaths';
+  paths: WinPaths;
+  savedAt: number;
+}
+
 // Bump when the engine's numbers change meaning: persisted results of another version never resurface.
 const EVAL_ENGINE_CACHE_VERSION = 80;
+
+const WIN_PATHS_STORE_VERSION = 1;
 
 const versionTag = (): string => {
   const tag = searchBudgetTag();
@@ -38,6 +48,20 @@ export function evalStoreKey(
   tera: TeraAllowance,
 ): string {
   return `${versionTag()}|${cacheKey}|d${depth}s${samples}m${mode}t${teraKey(tera)}`;
+}
+
+function digest(text: string): string {
+  let low = 0x811c9dc5;
+  let high = 0x01000193;
+  for (let index = 0; index < text.length; index++) {
+    low = Math.imul(low ^ text.charCodeAt(index), 0x01000193) >>> 0;
+    high = Math.imul(high ^ text.charCodeAt(index), 0x811c9dc5) >>> 0;
+  }
+  return `${low.toString(16).padStart(8, '0')}${high.toString(16).padStart(8, '0')}`;
+}
+
+export function winPathsStoreKey(cacheKey: string, ruleset: StaticRuleset, request: WinPathsRequest): string {
+  return `${versionTag()}|${cacheKey}|winpaths${WIN_PATHS_STORE_VERSION}:${digest(JSON.stringify([ruleset, request]))}`;
 }
 
 export function evalStorePrefix(replayId: string): string {
@@ -108,6 +132,23 @@ export async function loadStoredEval(key: string): Promise<StoredEval | null> {
   });
 }
 
+export async function loadStoredWinPaths(key: string): Promise<StoredWinPaths | null> {
+  const db = await openDb();
+  if (!db) return null;
+  return new Promise(resolve => {
+    try {
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(key);
+      request.onsuccess = () => {
+        const value = request.result as StoredWinPaths | undefined;
+        resolve(value && value.key === key && value.kind === 'winPaths' ? value : null);
+      };
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 /** One transaction for every stored eval of a replay; null when the store is unavailable (callers read singly). */
 export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<string, StoredEval> | null> {
   const db = await openDb();
@@ -118,7 +159,7 @@ export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<strin
       const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(range);
       request.onsuccess = () => {
         const map = new Map<string, StoredEval>();
-        for (const value of request.result as StoredEval[]) map.set(value.key, value);
+        for (const value of request.result as (StoredEval | StoredWinPaths)[]) if (!('kind' in value)) map.set(value.key, value);
         resolve(map);
       };
       request.onerror = () => resolve(null);
@@ -128,7 +169,22 @@ export async function loadStoredEvalsByPrefix(prefix: string): Promise<Map<strin
   });
 }
 
-export async function saveStoredEval(value: StoredEval): Promise<void> {
+export async function loadStoredWinPathsByPrefix(prefix: string): Promise<StoredWinPaths[] | null> {
+  const db = await openDb();
+  if (!db) return null;
+  return new Promise(resolve => {
+    try {
+      const range = IDBKeyRange.bound(prefix, `${prefix}\uffff`);
+      const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll(range);
+      request.onsuccess = () => resolve((request.result as (StoredEval | StoredWinPaths)[]).filter((value): value is StoredWinPaths => 'kind' in value));
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+async function put(value: StoredEval | StoredWinPaths): Promise<void> {
   const db = await openDb();
   if (!db) return;
   await new Promise<void>(resolve => {
@@ -143,3 +199,7 @@ export async function saveStoredEval(value: StoredEval): Promise<void> {
     }
   });
 }
+
+export const saveStoredEval = (value: StoredEval): Promise<void> => put(value);
+
+export const saveStoredWinPaths = (value: StoredWinPaths): Promise<void> => put(value);

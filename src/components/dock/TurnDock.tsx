@@ -141,7 +141,7 @@ export function TurnDock(props: TurnDockProps) {
   const backToEngine = backHandler(fill, openSlot, writeChoice);
   return (
     <div className="ps-dock" ref={attachDock} onKeyDown={onKeyDown} inert={stale} aria-busy={stale || undefined}>
-      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} opponentReads={opponentReads} onOpponentReadsChange={onOpponentReadsChange} />
+      <DockStatus source={source} acquiringExact={acquiringExact} executeError={executeError} model={model} diceOpen={!!open?.more} game={isGame} opponentReads={opponentReads} reads={fill?.reads} onOpponentReadsChange={onOpponentReadsChange} />
       <div className="ps-dock-anchor">
         {open && openSlot && (
           <SlotTray

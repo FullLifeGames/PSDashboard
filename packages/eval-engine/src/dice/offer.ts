@@ -137,9 +137,13 @@ function secondaryOffers(copy: Battle, user: Pokemon, move: ActiveMove, base: Ba
   })));
 }
 
-export function secondaryDiceOf(battle: Battle, userSlot: string, moveId: string, targetSlot: string): { effectId: string; chance: number }[] {
+export function secondaryDiceOf(battle: Battle, userSlot: string, moveId: string, targetSlot: string, incoming?: number): { effectId: string; chance: number }[] {
   const copy = copyOf(battle);
   copy.prng ??= battle.prng.clone();
+  if (incoming !== undefined) {
+    const side = copy.sides[targetSlot[1] === '1' ? 0 : 1];
+    copy.actions.switchIn(side.pokemon[incoming], targetSlot[2] === 'a' ? 0 : 1);
+  }
   const user = bodyAt(copy, userSlot);
   const target = bodyAt(copy, targetSlot);
   if (!user || !target || user.fainted || target.fainted) return [];

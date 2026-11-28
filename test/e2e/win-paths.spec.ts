@@ -8,8 +8,8 @@ import { openReplayAnalysis } from './eval-store-seed';
 import { installReplayEmbedCache } from './helpers';
 import { openVariationHistory, variationPanel } from './dock-helpers';
 
-// The game's sweep reads saved engine results (scripts/capture-eval-store.mjs; EVAL_STORE=live runs it live);
-// the row's own search is an on-request job that stores nothing, so it runs live in every game type.
+// The game's sweep and the job's finished answer read saved engine results (scripts/capture-eval-store.mjs;
+// EVAL_STORE=live runs both live, and the reload half then reads the answer the live job saved).
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (dir: string, name: string) => JSON.parse(readFileSync(join(here, dir, `${name}.json`), 'utf-8')) as ReplayData;
 const engineFixture = (name: string) => read('../../packages/eval-engine/test/fixtures', name);
@@ -43,19 +43,20 @@ for (const game of GAMES) {
     await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
     const review = panel.locator('.ps-eval-review');
     await guard.race(expect(review).toBeVisible({ timeout: 60_000 }));
+    await review.getByRole('button', { name: /Game review/ }).click();
 
     const entry = review.getByRole('button', { name: new RegExp(`^Endgame · T\\d+ · How could ${loser} have won\\?$`) });
     await expect(entry).toBeVisible();
     await expect(review.getByRole('button', { name: /How could .* have won\?/ })).toHaveCount(1);
     guard.assertClean();
-    guard.pause();
     await entry.click();
     const win = review.getByRole('region', { name: `How could ${loser} have won?` });
     await expect(win).toBeVisible();
 
     const steps = win.locator('[data-step]');
-    await expect(steps).toHaveCount(3, { timeout: 400_000 });
-    expect(await steps.locator('.ps-winpaths-step-title').allTextContents()).toEqual(['1 · A stronger play', '2 · Luck', `3 · A mistake by ${winner}`]);
+    await guard.race(expect(steps).toHaveCount(3, { timeout: 400_000 }));
+    const titles = ['1 · A stronger play', '2 · Luck', `3 · A mistake by ${winner}`];
+    expect(await steps.locator('.ps-winpaths-step-title').allTextContents()).toEqual(titles);
     const sentences = /^(None within 3 turns\.|None within 3 turns at 1 in 1,000 or better\.|Stopped at the search limit; nothing found so far\.)$/;
     const summary: string[] = [];
     for (const kind of ['stronger', 'luck', 'mistake']) {
@@ -73,6 +74,18 @@ for (const game of GAMES) {
     await expect(win).toHaveCount(0);
     await review.getByRole('button', { name: /^Endgame · T\d+/ }).click();
     await expect(win.locator('[data-step]')).toHaveCount(3, { timeout: 30_000 });
+    guard.assertClean();
+
+    await page.reload();
+    await expect(page.getByText(replay.players[0], { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await panel.getByRole('button', { name: 'Analyze game' }).click();
+    await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
+    await review.getByRole('button', { name: /Game review/ }).click();
+    await review.getByRole('button', { name: /^Endgame · T\d+/ }).click();
+    await expect(win.locator('[data-step]')).toHaveCount(3, { timeout: 30_000 });
+    expect(await win.locator('.ps-winpaths-step-title').allTextContents(), 'the reload shows the stored paths').toEqual(titles);
+    guard.assertClean();
+    guard.pause();
 
     const luck = win.locator('[data-step="luck"]');
     const play = luck.getByRole('button', { name: '▶ Play' });
@@ -87,3 +100,38 @@ for (const game of GAMES) {
     for (const mark of marked.filter(text => text !== '')) expect(named, `the tooltip lists ${mark}`).toContain(mark);
   });
 }
+
+const PROOF_GAMES = [
+  { kind: 'singles (Gen 6 OU 649664), turn 24', replay: GAMES[0].replay, turn: 24 },
+  { kind: 'VGC 2629703929 (doubles), turn 13', replay: GAMES[2].replay, turn: 13 },
+];
+
+for (const game of PROOF_GAMES) {
+  test(`${game.kind}: the card's "How does X win from here?" shows the proof's line, and ▶ Play plays it to the win`, async ({ page }) => {
+    test.setTimeout(900_000);
+    const replay = game.replay();
+    const { guard } = await openReplayAnalysis(page, replay, SETTINGS, { seed: evalStoreFileName(replay.id, SETTINGS) });
+    const panel = page.locator('.ps-main-right .ps-eval-panel');
+    await panel.getByRole('button', { name: 'Analyze game' }).click();
+    await guard.race(expect(panel.getByRole('button', { name: 'Re-analyze' })).toBeVisible({ timeout: 700_000 }));
+    await panel.locator(`svg rect[data-turn="${game.turn}"]`).first().click({ force: true });
+    await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${game.turn}`, { timeout: 60_000 });
+
+    const toggle = panel.getByRole('button', { name: /^How does .+ win from here\?$/ });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const player = /How does (.+) win from here\?/.exec(await toggle.innerText())![1];
+    await toggle.click();
+    const win = panel.getByRole('region', { name: `How does ${player} win?` });
+    await guard.race(expect(win.locator('[data-step]')).toHaveCount(1, { timeout: 60_000 }));
+    await expect(win.locator('.ps-winpaths-step-title')).toHaveText('The proof\'s line');
+    await expect(win.locator('.ps-winpaths-headline')).toContainText(/ wins within \d+ turns? in \d+(\.\d)? % of the dice whatever .+ plays/);
+    await expect(win.getByRole('group', { name: 'Endgame turn' })).toHaveCount(0);
+    guard.assertClean();
+    guard.pause();
+
+    await win.getByRole('button', { name: '▶ Play' }).click();
+    await expect(variationPanel(page)).toContainText(/\d+ turns?/, { timeout: 240_000 });
+    await expect(page.locator('.ps-branch-ended').first()).toContainText(`${player} wins this variation.`, { timeout: 120_000 });
+  });
+}
+

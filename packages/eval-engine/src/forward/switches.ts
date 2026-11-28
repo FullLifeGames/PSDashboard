@@ -141,6 +141,7 @@ export function resolveForcedSwitches(
   battle: Battle,
   seed: PRNGSeed,
   followUps: { p1?: string; p2?: string } = {},
+  chosen: { p1?: string; p2?: string } = {},
 ): StaticPick[] {
   const picks: StaticPick[] = [];
   for (let guard = 0; guard < 6; guard++) {
@@ -166,6 +167,7 @@ export function resolveForcedSwitches(
       const best = bestAssignment(side, mid, seed, switchAssignments(forcedCount, benchSlots), battleRuleset(battle));
       round[id] = assignmentLabel(side, best);
       applyChoice(battle, id, best);
+      chosen[id] = best;
     }
     if (round.p1 !== undefined || round.p2 !== undefined) picks.push({ ...answered, ...round });
   }

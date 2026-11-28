@@ -4,6 +4,7 @@ import * as championsMod from '@pkmn/mods/champions';
 import { registerChampionsDex, type RulesDex } from '../src/rules-dex';
 import { inferOpponentTeam } from '../src/opponent-inferrer';
 import { spentAfterOwnMove, spentByHit } from '../src/inference/spent-items';
+import { boostAnswers, foeBoostItems, standingItems } from '../src/inference/stat-items';
 
 if (!Dex.formats.get('gen9championscustomgame').exists) registerChampionsDex(championsMod as never, championsMod.Formats as never);
 
@@ -153,10 +154,92 @@ function hitScenes(doubles: boolean, spec: HitItem, rules: RuleSet, exists: bool
   return scenes;
 }
 
+function statScenes(doubles: boolean, rules: RuleSet, item: string, exists: boolean): Scene[] {
+  const pick = pickFor(doubles);
+  const aimed = aimedFor(doubles);
+  const foes = foesFor(doubles);
+  const gen = rules.gen;
+  const wall = (moves: string[] = ['splash']) => mk('Blissey', { moves });
+  const holder = (species: string, o: Partial<PokemonSet> = {}) => (itemName: string) =>
+    foes(mk(species, { item: exists ? itemName : '', moves: ['superpower', 'splash', 'substitute', 'agility', 'swordsdance'], level: 30, evs: {}, ...o }));
+  const scenes: Scene[] = [];
+  const add = (label: string, p1: PokemonSet, p2: (itemName: string) => PokemonSet[], turns: [string, string][], extra: Partial<Scene> = {}) =>
+    scenes.push({ label, holder: 'Snorlax', p1: foes(p1), p2, turns, ...extra });
+  const idle: [string, string] = [pick('move 1'), pick('move 2')];
+  const jammer = () => wall(['splash', 'embargo', 'magicroom', 'icywind', 'substitute']);
+  const klutz = holder('Lopunny', { ability: 'Klutz' });
+  const gas = { holder: 'Lopunny', conservative: 'Neutralizing Gas turns Klutz off and the simulator uses the item; a possible Klutz stays unjudged' };
+  const ignoring = (lead: PokemonSet, trigger: [string, string][], extra: Partial<Scene> = {}) => {
+    if (gen >= 4) add('Embargo on the holder', lead, holder('Snorlax'), [[pick(aimed(2, 1)), pick('move 2')], ...trigger], extra);
+    if (gen >= 5) add('Magic Room', lead, holder('Snorlax'), [[pick('move 3'), pick('move 2')], ...trigger], extra);
+  };
+
+  if (item === 'White Herb') {
+    const drops: [string, string][] = [[pick('move 1'), pick(aimed(1, 1))]];
+    add('Superpower lowers the holder', wall(), holder('Snorlax'), drops);
+    add('Intimidate at the lead', mk('Gyarados', { ability: 'Intimidate', moves: ['splash'] }), holder('Snorlax'), [idle]);
+    if (!exists) return scenes;
+    if (gen >= 4) {
+      add('Icy Wind from a foe', jammer(), holder('Snorlax'), [[pick('move 4'), pick('move 2')]]);
+      add('Klutz holder', wall(), klutz, drops, { holder: 'Lopunny' });
+      add('Klutz holder beside Neutralizing Gas', mk('Weezing', { ability: 'Neutralizing Gas' }), klutz, drops, gas);
+      ignoring(jammer(), drops);
+    }
+    if (gen >= 7) {
+      scenes.push({
+        label: 'Parting Shot lowers the holder and its user leaves', holder: 'Snorlax', p1: foes(wall(['partingshot'])).concat(mk('Chansey')),
+        p2: holder('Snorlax'), turns: [[pick(aimed(1, 1)), pick('move 2')]],
+      });
+    }
+    if (gen >= 5) add('Defiant holder: Intimidate lowers Attack and Defiant raises it', mk('Gyarados', { ability: 'Intimidate', moves: ['splash'] }), holder('Bisharp', { ability: 'Defiant' }), [idle], { holder: 'Bisharp' });
+  }
+  if (item === 'Mirror Herb') {
+    const lead = (moves: string[]) => mk('Snorlax', { moves });
+    const boost: [string, string][] = [[pick('move 1'), pick('move 2')]];
+    add('a foe raises Attack with Swords Dance', lead(['swordsdance', 'splash']), holder('Snorlax'), boost);
+    if (!exists) return scenes;
+    add('Klutz holder', lead(['swordsdance']), klutz, boost, { holder: 'Lopunny' });
+    add('Klutz holder beside Neutralizing Gas', mk('Weezing', { ability: 'Neutralizing Gas', moves: ['swordsdance'] }), klutz, boost, gas);
+    ignoring(mk('Snorlax', { moves: ['swordsdance', 'embargo', 'magicroom'] }), boost);
+    scenes.push({
+      label: 'the foe raised Attack before the holder came in', holder: 'Snorlax', p1: foes(lead(['swordsdance', 'splash'])),
+      p2: itemName => foes(mk('Chansey', { moves: ['splash', 'protect'] })).concat(mk('Snorlax', { item: exists ? itemName : '', moves: ['splash'] })),
+      turns: [boost[0], [pick('move 2'), pick(`switch ${doubles ? 3 : 2}`)]],
+    });
+    if (gen >= 9) {
+      add('an Opportunist foe copies the holder\'s Swords Dance', mk('Espathra', { ability: 'Opportunist', moves: ['splash'] }), holder('Snorlax'), [[pick('move 1'), pick('move 5')]]);
+    }
+    if (gen >= 6) {
+      add('Weakness Policy raises a foe', mk('Snorlax', { item: 'Weakness Policy', moves: ['splash'] }), holder('Machamp', { moves: ['machpunch', 'splash'] }), [[pick('move 1'), pick(aimed(1, 1))]], { holder: 'Machamp' });
+    }
+  }
+  if (item === 'Adrenaline Orb') {
+    const intimidator = () => mk('Gyarados', { ability: 'Intimidate', moves: ['splash'] });
+    const later = (extra: [string, string][], itemName: (name: string) => PokemonSet[]): Pick<Scene, 'p1' | 'p2' | 'turns'> => ({
+      p1: foes(jammer()).concat(intimidator()), p2: itemName, turns: [...extra, [pick(`switch ${doubles ? 3 : 2}`), pick('move 2')]],
+    });
+    add('Intimidate at the lead', intimidator(), holder('Snorlax'), [idle]);
+    if (!exists) return scenes;
+    add('Klutz holder', intimidator(), klutz, [idle], { holder: 'Lopunny' });
+    if (gen >= 5) add('Contrary holder: Intimidate raises Attack', intimidator(), holder('Serperior', { ability: 'Contrary' }), [idle], { holder: 'Serperior' });
+    add('Intimidate is blocked by Clear Body', intimidator(), holder('Metagross', { ability: 'Clear Body' }), [idle],
+      { holder: 'Metagross', conservative: 'a blocked Intimidate still spends the item, and the log shows no Attack change to read' });
+    const arriving = (label: string, before: [string, string][], who: (name: string) => PokemonSet[], extra: Partial<Scene> = {}) =>
+      scenes.push({ label, holder: 'Snorlax', ...later(before, who), ...extra });
+    arriving('Intimidate comes in later', [], holder('Snorlax'));
+    arriving('Embargo on the holder', [[pick(aimed(2, 1)), pick('move 2')]], holder('Snorlax'));
+    arriving('Magic Room', [[pick('move 3'), pick('move 2')]], holder('Snorlax'));
+    arriving('the holder stands behind a Substitute', [[pick('move 1'), pick('move 3')]], holder('Snorlax'));
+    arriving('the holder stands at +6 Speed', Array.from({ length: 3 }, () => [pick('move 1'), pick('move 4')] as [string, string]), holder('Snorlax'));
+  }
+  return scenes;
+}
+
 interface ItemSpec { item: string; scenes: (doubles: boolean, rules: RuleSet, exists: boolean) => Scene[] }
 const ITEM_SPECS: ItemSpec[] = [
   { item: 'Throat Spray', scenes: (doubles, _rules, exists) => ownMoveScenes(doubles, exists ? 'Throat Spray' : '') },
   ...HIT_ITEMS.map(spec => ({ item: spec.item, scenes: (doubles: boolean, rules: RuleSet, exists: boolean) => hitScenes(doubles, spec, rules, exists) })),
+  ...['White Herb', 'Mirror Herb', 'Adrenaline Orb'].map(item => ({ item, scenes: (doubles: boolean, rules: RuleSet, exists: boolean) => statScenes(doubles, rules, item, exists) })),
 ];
 
 const orderOf = (team: PokemonSet[]) => team.map((_, index) => index + 1).join('');
@@ -168,6 +251,7 @@ function play(rules: RuleSet, doubles: boolean, p1: PokemonSet[], p2: PokemonSet
   for (const [first, second] of turns) {
     const before = battle.turn;
     battle.makeChoices(first, second);
+    while (!battle.ended && battle.requestState === 'switch') battle.makeChoices('default', 'default');
     if (!battle.ended && battle.turn === before) throw new Error(`choice not taken in ${format}: "${first}" / "${second}"`);
   }
   const lines = battle.log;
@@ -194,14 +278,23 @@ describe('the Dex lists the items that spend themselves after their holder\'s ow
   });
 });
 
+describe('the Dex lists the items that answer a stat change', () => {
+  test.each(RULESETS)('$name', rules => {
+    const dex = dexOfRules(rules);
+    expect(standingItems(dex)).toEqual(rules.gen >= 3 ? ['whiteherb'] : []);
+    expect(foeBoostItems(dex)).toEqual(rules.gen >= 9 ? ['mirrorherb'] : []);
+    expect([...boostAnswers(dex)]).toEqual(rules.gen >= 7 ? [['adrenalineorb', ['Intimidate']]] : []);
+  });
+});
+
 describe('an item that a move spends and that printed no line is ruled out', () => {
   for (const rules of RULESETS) {
     for (const doubles of [false, true]) {
       test(`${rules.name}, ${doubles ? 'doubles' : 'singles'}: the rule matches the simulator in every scene`, () => {
         const dex = dexOfRules(rules);
         const problems: string[] = [];
-        let fired = 0;
         let rows = 0;
+        const firedBy: Record<string, number> = {};
         for (const { item, scenes } of ITEM_SPECS) {
           const entry = dex.items.get(item);
           const exists = entry.exists && entry.gen <= rules.gen;
@@ -218,7 +311,7 @@ describe('an item that a move spends and that printed no line is ruled out', () 
               continue;
             }
             const used = new RegExp(`^\\|-enditem\\|p2[ab]: ${scene.holder}\\|${item}(\\||$)`, 'm').test(seeded);
-            if (used && exists) fired++;
+            firedBy[item] = (firedBy[item] ?? 0) + Number(used && exists);
             if (ruledOut(seeded, scene.holder).includes(idOf(item))) problems.push(`${label}: rules out the item the holder has`);
             const ruled = ruledOut(inert, scene.holder).includes(idOf(item));
             const unjudged = scene.conservative && (!scene.ifFaints || new RegExp(`^\\|faint\\|p2[ab]: ${scene.holder}$`, 'm').test(seeded));
@@ -230,9 +323,10 @@ describe('an item that a move spends and that printed no line is ruled out', () 
           }
         }
         expect(problems).toEqual([]);
+        if (rules.gen >= 9) for (const item of ['White Herb', 'Mirror Herb', 'Adrenaline Orb']) expect(firedBy[item]).toBeGreaterThanOrEqual(3);
         if (rules.gen >= 8) {
           expect(rows).toBeGreaterThan(100);
-          expect(fired).toBeGreaterThan(30);
+          expect(Object.values(firedBy).reduce((sum, count) => sum + count, 0)).toBeGreaterThan(30);
         }
       });
     }

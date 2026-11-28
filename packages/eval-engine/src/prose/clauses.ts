@@ -1,8 +1,8 @@
-import { TIER_THRESHOLDS, diffChoices, playedSetupMove, type SideAnalysis } from '../analysis.ts';
+import { TIER_THRESHOLDS, diffChoices, hiddenSlots, playedSetupMove, type SideAnalysis } from '../analysis.ts';
 import type { RankedChoice } from '../types.ts';
 import { winDeltaText, winPctText } from '../winprob.ts';
 import { formatLine } from './line.ts';
-import { cameInstead, choiceNoun, conditionalNote, displayBest, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
+import { cameInstead, choiceNoun, conditionalNote, displayBest, GAME_ENDED_WORDS, NEVER_ACTED_WORDS, nullNote, oddsNote, oddsPart, phrase, phraseReplies, playedVerb } from './phrases.ts';
 
 function readClause(name: string, side: SideAnalysis, opponent: SideAnalysis, opponentName: string): string | null {
   if (!side.riskPaidOff || !side.played || !side.safe) return null;
@@ -33,8 +33,12 @@ export function heldRiskClause(name: string, side: SideAnalysis): string | null 
     `Against it the safe ${choiceNoun(side.safe.label)} ${versus}.${click}`;
 }
 
-const partialNote = (side: SideAnalysis, verb: 'graded' | 'credited'): string =>
-  side.playedPartial ? ` (Partner's action hidden; ${verb} on the visible slot.)` : '';
+function partialNote(side: SideAnalysis, verb: 'graded' | 'credited'): string {
+  if (!side.playedPartial) return '';
+  if (hiddenSlots(side) > 0) return ` (Partner's action hidden; ${verb} on the visible slot.)`;
+  const words = side.noChoiceSlots![0].reason === 'fell' ? NEVER_ACTED_WORDS : GAME_ENDED_WORDS;
+  return ` (Its partner was ${words}; ${verb} on the visible slot.)`;
+}
 
 /** `praised` false (the side lost ground) silences a paid-off read; no misplay clause takes its place. */
 export function sideClause(name: string, side: SideAnalysis, opponent: SideAnalysis, praised = true, opponentName = 'the opponent'): string | null {

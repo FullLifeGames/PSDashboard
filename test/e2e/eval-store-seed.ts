@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import type { ReplayData } from '@fulllifegames/replay-core';
 import {
-  EVAL_STORE_DIR, createSearchGuard, parseEvalStoreFile, seedRecords, type EvalStoreFile, type EvalStoreRecord, type SearchGuard,
+  EVAL_STORE_DIR, createSearchGuard, parseEvalStoreFile, seedRecords, type EvalStoreFile, type EvalStoreRecord, type SearchGuard, type WinPathsRecord,
 } from './eval-store';
 import { routeOfflineFixtures } from './helpers';
 
@@ -44,7 +44,7 @@ export async function seedEvalStore(page: Page, name: string): Promise<void> {
   const records = seedRecords(file, { tag: await currentTag(page), now: Date.now() });
   await page.evaluate(async ({ path, saved }) => {
     const store = await import(/* @vite-ignore */ path);
-    for (const record of saved) await store.saveStoredEval(record);
+    for (const record of saved) await (record.kind === 'winPaths' ? store.saveStoredWinPaths(record) : store.saveStoredEval(record));
   }, { path: STORE_MODULE, saved: records });
 }
 
@@ -54,6 +54,15 @@ export async function readEvalStore(page: Page, replayId: string): Promise<EvalS
     const map = await store.loadStoredEvalsByPrefix(store.evalStorePrefix(id));
     return map ? [...map.values()] : null;
   }, { path: STORE_MODULE, id: replayId }) as EvalStoreRecord[] | null;
+  if (!records) throw new Error('The browser has no IndexedDB store to read.');
+  return records;
+}
+
+export async function readWinPathsRecords(page: Page, replayId: string): Promise<WinPathsRecord[]> {
+  const records = await page.evaluate(async ({ path, id }) => {
+    const store = await import(/* @vite-ignore */ path);
+    return await store.loadStoredWinPathsByPrefix(store.evalStorePrefix(id));
+  }, { path: STORE_MODULE, id: replayId }) as WinPathsRecord[] | null;
   if (!records) throw new Error('The browser has no IndexedDB store to read.');
   return records;
 }
@@ -71,7 +80,7 @@ export interface OpenedReplay {
 }
 
 export async function openReplayAnalysis(
-  page: Page, replay: ReplayData, settings: AnalysisSettings, options: { seed?: string } = {},
+  page: Page, replay: ReplayData, settings: AnalysisSettings, options: { seed?: string; prefs?: Record<string, unknown> } = {},
 ): Promise<OpenedReplay> {
   const guard = createSearchGuard(options.seed ?? 'no saved file');
   const seeded = options.seed !== undefined && !evalStoreLive();
@@ -81,7 +90,7 @@ export async function openReplayAnalysis(
   await page.evaluate(prefs => {
     localStorage.setItem('ps-replay-interceptor:eval-pool', '2');
     localStorage.setItem('ps-replay-interceptor:eval-prefs', JSON.stringify({ ...prefs, auto: false, tera: 'auto' }));
-  }, { depth: settings.depth, samples: settings.samples, mode: settings.mode });
+  }, { depth: settings.depth, samples: settings.samples, mode: settings.mode, ...options.prefs });
   if (seeded) await seedEvalStore(page, options.seed!);
   await page.reload();
   // Registered last, so it answers before routeOfflineFixtures' default replay.

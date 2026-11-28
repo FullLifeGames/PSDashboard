@@ -1,12 +1,18 @@
 import { State, type Battle } from '@pkmn/sim';
-import { createRootPosition, type SimPosition } from '../src/forward-model';
+import { recordTurn, type FlipTurn } from '../src/dice/flip';
+import { createRootPosition, legalChoices, type SimPosition } from '../src/forward-model';
+import { forkBattle } from '../src/forward/position';
+import { applyChoice, resolveForcedSwitches } from '../src/forward/switches';
+import { cellSeeds } from '../src/search/root-quantile';
 import { proveForcedWin } from '../src/endgame/prover';
 import type { ForcedWinProof } from '../src/types';
-import { CHAMPIONS, mon, playClicks, type Mode, type Rules } from './dice-fixtures';
+import { CHAMPIONS, mon, playClicks, seedOf, type Mode, type Rules } from './dice-fixtures';
 import { dexOfRules } from './dice-sweep-support';
 import { battleOf } from './power-oracle';
 
 export const rulesetOf = (rules: Rules): 'champions' | 'standard' => (rules === CHAMPIONS ? 'champions' : 'standard');
+
+export const WELL_UNDER_100 = 91;
 
 export interface Strike { id: string; /** the attacker's clicks for it */ click: string }
 
@@ -52,20 +58,64 @@ const plainDamage = (move: DexMove): boolean => move.basePower > 0 && move.prior
 const playable = (dex: ReturnType<typeof dexOfRules>, move: DexMove): boolean => move.exists && !move.isZ && !move.isMax && move.gen <= dex.gen
   && (move.isNonstandard === null || move.isNonstandard === undefined || move.isNonstandard === 'Past');
 
-// Read from the Dex and tried on the simulator, never named.
-export function strikeOf(rules: Rules, mode: Mode, nonContact = true): Strike | null {
+function strikeBy(rules: Rules, mode: Mode, nonContact: boolean, accuracy: (move: DexMove) => boolean, tries: number): Strike | null {
   const dex = dexOfRules(rules);
   const candidates = dex.moves.all()
-    .filter(move => playable(dex, move) && move.accuracy === true && plainDamage(move) && ['normal', 'allAdjacentFoes'].includes(move.target) && (!nonContact || !move.flags['contact']))
+    .filter(move => playable(dex, move) && accuracy(move) && plainDamage(move) && ['normal', 'allAdjacentFoes'].includes(move.target) && (!nonContact || !move.flags['contact']))
     .sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const move of candidates.slice(0, 40)) {
-    const battle = delayBoard(rules, mode, move.id, { stall: 'splash' });
-    try {
-      playClicks(battle, { p1: ownClick(mode, move.target === 'normal', 1), p2: foeClick(2) });
-    } catch {
-      continue;
+    for (let index = 0; index < tries; index++) {
+      const battle = delayBoard(rules, mode, move.id, { stall: 'splash' }, index === 0 ? '1,2,3,4' : seedOf(index));
+      try {
+        playClicks(battle, { p1: ownClick(mode, move.target === 'normal', 1), p2: foeClick(2) });
+      } catch {
+        break;
+      }
+      if (battle.ended && battle.winner === battle.sides[0].name) return { id: move.id, click: ownClick(mode, move.target === 'normal', 1) };
     }
-    if (battle.ended && battle.winner === battle.sides[0].name) return { id: move.id, click: ownClick(mode, move.target === 'normal', 1) };
   }
   return null;
+}
+
+// Read from the Dex and tried on the simulator, never named.
+export const strikeOf = (rules: Rules, mode: Mode, nonContact = true): Strike | null => strikeBy(rules, mode, nonContact, move => move.accuracy === true, 1);
+
+export const missOf = (rules: Rules, mode: Mode, ceiling: number): Strike | null =>
+  strikeBy(rules, mode, true, move => typeof move.accuracy === 'number' && move.accuracy < ceiling, 8);
+
+export const PP_LISTS = Array.from({ length: 56 }, (_, index) => ({ own: 9 + (index % 8), foe: 2 + Math.floor(index / 8) }));
+
+export interface StalledCell { root: SimPosition; own: string; foe: string; splash: string }
+
+export function stalledCell(rules: Rules, mode: Mode, strike: Strike, stall: string, pp: { own: number; foe: number }): StalledCell {
+  const battle = delayBoard(rules, mode, strike.id, { stall });
+  battle.sides[0].active[0]!.moveSlots[0].pp = pp.own;
+  battle.sides[1].active[0]!.moveSlots[0].pp = pp.foe;
+  playClicks(battle, { p1: strike.click, p2: foeClick(1) });
+  const root = positionOf(battle, rules);
+  const clicks = (side: 'p1' | 'p2'): string[] => legalChoices(root, side, { tera: false }).map(option => option.choice);
+  const own = clicks('p1').find(choice => choice.startsWith(`move ${strike.id}`) && (mode === 'singles' || choice.endsWith('move splash')));
+  const foe = clicks('p2').find(choice => choice === `move ${stall}`);
+  const splash = clicks('p2').find(choice => choice === 'move splash');
+  if (!own || !foe || !splash) throw new Error(`no listed choice for ${strike.id} against ${stall}`);
+  return { root, own, foe, splash };
+}
+
+export function turnOf(root: SimPosition, p1Choice: string, p2Choice: string, seedIndex = 0): FlipTurn {
+  const seed = cellSeeds(root, p1Choice, p2Choice)[seedIndex];
+  return {
+    fork: () => forkBattle(root, seed),
+    play: battle => {
+      applyChoice(battle, 'p1', p1Choice);
+      applyChoice(battle, 'p2', p2Choice);
+      resolveForcedSwitches(battle, seed, { p1: undefined, p2: undefined });
+    },
+  };
+}
+
+export function chancesOf(cell: StalledCell): { hold: number; hit: number } {
+  const stall = recordTurn(turnOf(cell.root, cell.own, cell.foe)).dice.find(die => die.name.kind === 'stalling');
+  const hit = recordTurn(turnOf(cell.root, cell.own, cell.splash)).dice.find(die => die.name.kind === 'accuracy');
+  if (!stall || !hit) throw new Error('the cell records no stall die or no accuracy die');
+  return { hold: stall.chance, hit: hit.chance };
 }

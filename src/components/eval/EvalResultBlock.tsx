@@ -2,7 +2,7 @@ import { type EvalResult, type RankedChoice, formatLine, winDeltaText, winPercen
 import type { EvalStatus, TurnEvalSettings } from '../../hooks/useEvaluation';
 import { EvalMatrixView } from '../EvalMatrixView';
 import { MiniBar } from '../EvalTurnAnalysis';
-import { exploreTitle } from './turn-copy';
+import { exploreTitle, readsReply } from './turn-copy';
 import { rowLineTail } from '../../lib/row-line';
 import { floorReplyUnlisted } from '../../lib/unlisted-floor';
 
@@ -38,13 +38,13 @@ function ChoiceDetail({ choice, index, best, faintedFraction, tail }: {
 }
 
 function choiceTooltip(
-  choice: RankedChoice, clickable: boolean, unlisted: boolean, faintedFraction?: number | null, opponentReads = false,
+  choice: RankedChoice, clickable: boolean, unlisted: boolean, faintedFraction?: number | null, opponentReads = false, reply?: string,
 ): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
-    (choice.punishedBy ? ` (worst reply: ${choice.punishedBy}${unlisted ? ', which the matrix dialog does not list' : ''})` : '') +
+    (choice.punishedBy ? ` (worst reply: ${reply ?? choice.punishedBy}${unlisted ? ', which the matrix dialog does not list' : ''})` : '') +
     '. Choices are ranked by their value against balanced play.' +
-    (clickable ? ' ' + exploreTitle(opponentReads) : '');
+    (clickable ? ' ' + exploreTitle(opponentReads, reply) : '');
 }
 
 function ChoiceList({
@@ -63,8 +63,10 @@ function ChoiceList({
   return (
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
-        const tooltip = choiceTooltip(choice, !!onPickChoice, floorReplyUnlisted(result, side, choice), faintedFraction, opponentReads);
-        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice, !!opponentReads)} />;
+        const read = readsReply(opponentReads, { result, side }, choice)?.reply.label;
+        const unlisted = floorReplyUnlisted(result, side, { punishedBy: read ?? choice.punishedBy });
+        const tooltip = choiceTooltip(choice, !!onPickChoice, unlisted, faintedFraction, opponentReads, read);
+        const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice)} />;
         return onPickChoice ? (
           <button
             key={choice.choice}

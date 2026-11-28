@@ -96,6 +96,7 @@ value extractTeamSheets
 value fieldOf
 value fillUsageMoves
 value finalPlayedTurn
+value firstAllowedAbility
 value formatEnforcesSleepClause
 value formatRules
 value generatesTeam

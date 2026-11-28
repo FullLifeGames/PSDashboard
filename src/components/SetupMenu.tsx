@@ -1,11 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { gameReviewEnabled, opponentReadsEnabled } from '../lib/feature-flags';
+import { opponentReadsEnabled } from '../lib/feature-flags';
 import { SearchSelects, type SearchSelectsProps } from './SearchSelects';
 import { SizeSelect } from './SizeSelect';
 
-const opponentReadsTitle = (): string => 'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
-  + `when you click an engine move, in the turn dock, and in a turn's lines${gameReviewEnabled() ? ' and the Game review' : ''}. `
-  + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.';
+const OPPONENT_READS_NOTE = 'In a variation, each move you pick meets the reply that hurts it most, and Lines shows each line against that reply. '
+  + 'The engine\'s suggestion, the grades and the win chances stay.';
 
 interface SetupMenuProps {
   animateBranchTurns: boolean;
@@ -17,6 +16,19 @@ interface SetupMenuProps {
   onOpenSets: () => void;
   /** Left out, the menu draws none of the search rows. */
   search?: SearchSelectsProps;
+}
+
+function OpponentReadsBox({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
+  const noteId = useId();
+  return (
+    <>
+      <label className="ps-setup-check">
+        <input type="checkbox" checked={checked} aria-describedby={noteId} onChange={event => onChange(event.target.checked)} />
+        Opponent reads my move
+      </label>
+      <div id={noteId} className="ps-setup-note">{OPPONENT_READS_NOTE}</div>
+    </>
+  );
 }
 
 /** The "Opponent reads my move" box is drawn only with the flag `opponentReadsEnabled` (`src/lib/feature-flags.ts`). */
@@ -60,12 +72,7 @@ export function SetupMenu({ animateBranchTurns, onAnimateChange, opponentReads, 
             <input type="checkbox" checked={animateBranchTurns} onChange={event => onAnimateChange(event.target.checked)} />
             Animate branch turns
           </label>
-          {opponentReadsEnabled() && (
-            <label className="ps-setup-check" title={opponentReadsTitle()}>
-              <input type="checkbox" checked={opponentReads} onChange={event => onOpponentReadsChange(event.target.checked)} />
-              Opponent reads my move
-            </label>
-          )}
+          {opponentReadsEnabled() && <OpponentReadsBox checked={opponentReads} onChange={onOpponentReadsChange} />}
           {search && <SearchSelects {...search} />}
           <SizeSelect />
           <button type="button" className="ps-btn" onClick={pick(() => onEditSide('p1'))}>Edit Player</button>

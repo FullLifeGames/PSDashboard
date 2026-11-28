@@ -208,7 +208,7 @@ function foeStopsBerry(state: InferrerState, watch: ItemTriggerWatch, holder: st
   });
 }
 
-function ignoresItem(state: InferrerState, gates: TriggerGates, trigger: Trigger): boolean {
+export function ignoresItem(state: InferrerState, gates: TriggerGates, trigger: Pick<Trigger, 'holder' | 'ident'>): boolean {
   return gates.magicRoom || gates.embargoed.has(trigger.holder) || possibleAbilities(state, trigger.ident)?.has('klutz') !== false;
 }
 

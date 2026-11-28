@@ -6,64 +6,56 @@ import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import { evalResult, rankedChoice } from '../fixtures/eval-result';
 import { simState, type FormatKind } from '../fixtures/sim-state';
 
+function evaluationWith(hardMode: boolean | undefined) {
+  return {
+    status: 'idle', result: null, resultTag: null, setPrefs: vi.fn(),
+    prefs: { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...(hardMode === undefined ? {} : { hardMode }) },
+    graph: { running: false },
+  } as unknown as Evaluation;
+}
+
+function setupWired(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
+  const slots = kind === 'doubles' ? 2 : 1;
+  const choices: Choices = { p1: Array(slots).fill(null), p2: Array(slots).fill(null), ...touched };
+  const setChoice = vi.fn((side: 'p1' | 'p2', choice: BranchSlotChoice, slot = 0) => {
+    choices[side] = [...choices[side]];
+    choices[side][slot] = choice;
+  });
+  const handleEvaluate = vi.fn<(options?: { onResult?: (result: EvalResult) => void }) => void>();
+  const wired: DockFillInputs = {
+    simState: simState(kind), liveTip: true, branching: true, executing: false, branchPreparing: false, playOutActive: false,
+    evalAvailable: true, evaluation: evaluationWith(hardMode), liveEvalStatus: 'idle', evalViewKey: 'variation:3', historyLength: 1, sessionKey: 's1',
+    handleEvaluate, getChoices: () => choices, setChoice, executeTurn: vi.fn(async () => null),
+  };
+  const hook = renderHook(() => useDockFill(wired));
+  const land = (result: EvalResult) => act(() => handleEvaluate.mock.calls[0][0]!.onResult!(result));
+  return { choices, setChoice, hook, land, wired };
+}
+
+const setup = setupWired;
+
+// Earthquake is hurt most by the switch to Rotom-Wash, Swords Dance by Body Press.
+function singles(): EvalResult {
+  const base = evalResult('singles');
+  return { ...base, matrix: { ...base.matrix!, values: [[0.35, 0.25, 0.15], [0.25, 0.05, 0.15], [0, -0.1, -0.2]] } };
+}
+
+// R1 is hurt most by B, R2 by C, R3 by A.
+function doubles(): EvalResult {
+  const rows = (rows: [string, string][]) => rows.map(([choice, label], index) => rankedChoice(choice, label, 0.3 - 0.1 * index));
+  const p1 = rows([['move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus'], ['move flareblitz 1, move ragepowder', 'Flare Blitz → Rillaboom + Rage Powder'], ['move fakeout 1, move protect', 'Fake Out → Rillaboom + Protect']]);
+  const p2 = rows([['move grassyglide 1, move tailwind', 'A'], ['move woodhammer 1, move taunt 1', 'B'], ['move fakeout 1, move protect', 'C']]);
+  const base = evalResult('doubles');
+  return {
+    ...base, perSide: { p1, p2 },
+    matrix: {
+      p1Labels: p1.map(row => row.label), p2Labels: p2.map(row => row.label), p1Choices: p1.map(row => row.choice), p2Choices: p2.map(row => row.choice),
+      values: [[0.3, 0.1, 0.2], [0.2, 0.25, 0], [0.1, 0.4, 0.3]], mixes: { p1: [1, 0, 0], p2: [1, 0, 0] },
+    },
+  };
+}
+
 describe('useDockFill.hard', () => {
-  type Evaluation = ReturnType<typeof useEvaluation>;
-  type Choices = { p1: (BranchSlotChoice | null)[]; p2: (BranchSlotChoice | null)[] };
-
-  function evaluationOf(hardMode: boolean | undefined) {
-    return {
-      status: 'idle', result: null, resultTag: null, setPrefs: vi.fn(),
-      prefs: { depth: 1, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto', ...(hardMode === undefined ? {} : { hardMode }) },
-      graph: { running: false },
-    } as unknown as Evaluation;
-  }
-
-  function setupWired(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
-    const slots = kind === 'doubles' ? 2 : 1;
-    const choices: Choices = { p1: Array(slots).fill(null), p2: Array(slots).fill(null), ...touched };
-    const setChoice = vi.fn((side: 'p1' | 'p2', choice: BranchSlotChoice, slot = 0) => {
-      choices[side] = [...choices[side]];
-      choices[side][slot] = choice;
-    });
-    const handleEvaluate = vi.fn<(options?: { onResult?: (result: EvalResult) => void }) => void>();
-    const wired: DockFillInputs = {
-      simState: simState(kind), liveTip: true, branching: true, executing: false, branchPreparing: false, playOutActive: false,
-      evalAvailable: true, evaluation: evaluationOf(hardMode), liveEvalStatus: 'idle', evalViewKey: 'variation:3', historyLength: 1, sessionKey: 's1',
-      handleEvaluate, getChoices: () => choices, setChoice, executeTurn: vi.fn(async () => null),
-    };
-    const hook = renderHook(() => useDockFill(wired));
-    const land = (result: EvalResult) => act(() => handleEvaluate.mock.calls[0][0]!.onResult!(result));
-    return { choices, setChoice, hook, land, wired };
-  }
-
-  function setup(kind: FormatKind, hardMode: boolean | undefined, touched: Partial<Choices> = {}) {
-    const { choices, setChoice, hook, land } = setupWired(kind, hardMode, touched);
-    return { choices, setChoice, hook, land };
-  }
-
-  const move = (moveId: string, moveName: string, targetLoc?: number): BranchSlotChoice => ({ kind: 'move', moveId, moveName, ...(targetLoc === undefined ? {} : { targetLoc }) });
-
-  // Earthquake is hurt most by the switch to Rotom-Wash, Swords Dance by Body Press.
-  function singles(): EvalResult {
-    const base = evalResult('singles');
-    return { ...base, matrix: { ...base.matrix!, values: [[0.35, 0.25, 0.15], [0.25, 0.05, 0.15], [0, -0.1, -0.2]] } };
-  }
-
-  // R1 is hurt most by B, R2 by C, R3 by A.
-  function doubles(): EvalResult {
-    const rows = (rows: [string, string][]) => rows.map(([choice, label], index) => rankedChoice(choice, label, 0.3 - 0.1 * index));
-    const p1 = rows([['move fakeout 1, move spore 2', 'Fake Out → Rillaboom + Spore → Tornadus'], ['move flareblitz 1, move ragepowder', 'Flare Blitz → Rillaboom + Rage Powder'], ['move fakeout 1, move protect', 'Fake Out → Rillaboom + Protect']]);
-    const p2 = rows([['move grassyglide 1, move tailwind', 'A'], ['move woodhammer 1, move taunt 1', 'B'], ['move fakeout 1, move protect', 'C']]);
-    const base = evalResult('doubles');
-    return {
-      ...base, perSide: { p1, p2 },
-      matrix: {
-        p1Labels: p1.map(row => row.label), p2Labels: p2.map(row => row.label), p1Choices: p1.map(row => row.choice), p2Choices: p2.map(row => row.choice),
-        values: [[0.3, 0.1, 0.2], [0.2, 0.25, 0], [0.1, 0.4, 0.3]], mixes: { p1: [1, 0, 0], p2: [1, 0, 0] },
-      },
-    };
-  }
-
   describe('useDockFill, Hard mode: the fill', () => {
     test('singles, on: the user set a slot, so the opponent takes the reply that hurts it most, not its best row', () => {
       const { setChoice, hook, land } = setup('singles', true, { p1: [move('swordsdance', 'Swords Dance')] });
@@ -160,8 +152,97 @@ describe('useDockFill.hard', () => {
     });
   });
 
+  describe('useDockFill, Hard mode: where the read stands', () => {
+    const result = { singles, doubles } as const;
+    const unranked = (kind: FormatKind) => (kind === 'singles' ? move('splash', 'Splash') : move('splash', 'Splash', 1));
+    const ranked = (kind: FormatKind) => (kind === 'singles' ? move('swordsdance', 'Swords Dance') : move('flareblitz', 'Flare Blitz', 1));
+
+    test.each(['singles', 'doubles'] as const)('%s: before and after the fill with no pick of the user the read waits; off or unset it is null', kind => {
+      const on = setup(kind, true);
+      expect(on.hook.result.current.reads).toBe('waiting');
+      on.land(result[kind]());
+      expect(on.hook.result.current.reads).toBe('waiting');
+      for (const hardMode of [false, undefined]) {
+        const off = setup(kind, hardMode, { p1: [ranked(kind), ...(kind === 'doubles' ? [null] : [])] });
+        expect(off.hook.result.current.reads).toBeNull();
+        off.land(result[kind]());
+        expect(off.hook.result.current.reads).toBeNull();
+      }
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: a pick with a ranked row at the fill reads answered, a pick with none reads unranked and leaves the opponent on the fill', kind => {
+      const slots = (pick: BranchSlotChoice) => ({ p1: [pick, ...(kind === 'doubles' ? [null] : [])] });
+      const answered = setup(kind, true, slots(ranked(kind)));
+      answered.land(result[kind]());
+      expect(answered.hook.result.current.reads).toBe('answered');
+      const none = setup(kind, true, slots(unranked(kind)));
+      none.land(result[kind]());
+      expect(none.hook.result.current.reads).toBe('unranked');
+      expect(none.hook.result.current.engine.p2).toEqual(Array(kind === 'doubles' ? 2 : 1).fill(true));
+      expect(none.setChoice).toHaveBeenCalledWith('p2', expect.objectContaining({ moveId: kind === 'singles' ? 'leechseed' : 'grassyglide' }), 0);
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: a pick with no ranked row after a read puts the opponent\'s engine slots back on the fill, as the note says', kind => {
+      const { setChoice, hook, land, choices } = setupWired(kind, true);
+      land(result[kind]());
+      const first = kind === 'singles' ? ranked(kind) : move('fakeout', 'Fake Out', 1);
+      act(() => hook.result.current.onUserChoice('p1', 0, first));
+      expect(hook.result.current.reads).toBe('answered');
+      const fill = kind === 'singles' ? ['leechseed'] : ['grassyglide', 'tailwind'];
+      const read = choices.p2.map(choice => choice?.kind === 'move' ? choice.moveId : null);
+      expect(read).not.toEqual(fill);
+      act(() => hook.result.current.onUserChoice('p1', 0, unranked(kind)));
+      expect(hook.result.current.reads).toBe('unranked');
+      expect(choices.p2.map(choice => choice?.kind === 'move' ? choice.moveId : null)).toEqual(fill);
+      expect(hook.result.current.engine.p2).toEqual(Array(fill.length).fill(true));
+      setChoice.mockClear();
+      act(() => hook.result.current.onUserChoice('p1', 0, unranked(kind)));
+      expect(setChoice).not.toHaveBeenCalled();
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: picks on both sides at the fill read both', kind => {
+      const both = setup(kind, true, { p1: [ranked(kind), ...(kind === 'doubles' ? [null] : [])], p2: [move('knockoff', 'Knock Off'), ...(kind === 'doubles' ? [null] : [])] });
+      both.land(result[kind]());
+      expect(both.hook.result.current.reads).toBe('both');
+      expect(both.hook.result.current.engine.p2.some(Boolean)).toBe(false);
+    });
+
+    test.each(['singles', 'doubles'] as const)('%s: a pick after the fill moves the read between answered and unranked, an unranked one leaves the engine slots on the fill, a pick made with the setting off leaves no read, both sides read both', kind => {
+      const { setChoice, hook, land, wired } = setupWired(kind, true);
+      land(result[kind]());
+      const slot = kind === 'doubles' ? 1 : 0;
+      const answered = kind === 'singles' ? ranked(kind) : move('protect', 'Protect');
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
+      expect(hook.result.current.reads).toBe('answered');
+      setChoice.mockClear();
+      act(() => hook.result.current.onUserChoice('p1', slot, move('splash', 'Splash')));
+      expect(hook.result.current.reads).toBe('unranked');
+      expect(hook.result.current.engine.p2).toEqual(Array(kind === 'doubles' ? 2 : 1).fill(true));
+      const off = (action: () => void) => { wired.evaluation = evaluationWith(false); hook.rerender(); act(action); wired.evaluation = evaluationWith(true); hook.rerender(); };
+      off(() => hook.result.current.onUserChoice('p1', slot, answered));
+      expect(hook.result.current.reads).toBe('waiting');
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
+      off(() => hook.result.current.restore('p1', slot));
+      expect(hook.result.current.reads).toBe('waiting');
+      act(() => hook.result.current.onUserChoice('p1', slot, answered));
+      act(() => hook.result.current.onUserChoice('p2', 0, move('knockoff', 'Knock Off')));
+      expect(hook.result.current.reads).toBe('both');
+    });
+
+    test('a hypothetical move without a pick leaves the read as it was; turning the setting off reads null', () => {
+      const wired = setupWired('singles', true);
+      wired.land(singles());
+      act(() => wired.hook.result.current.onUserChoice('p1', 0, move('swordsdance', 'Swords Dance')));
+      act(() => wired.hook.result.current.onUserChoice('p1', 0));
+      expect(wired.hook.result.current.reads).toBe('answered');
+      wired.wired.evaluation = evaluationWith(false);
+      wired.hook.rerender();
+      expect(wired.hook.result.current.reads).toBeNull();
+    });
+  });
+
   describe('useDockFill: Back to the engine\'s pick', () => {
-    const turnOff = (wired: { evaluation: Evaluation }, hook: { rerender: () => void }) => { wired.evaluation = evaluationOf(false); hook.rerender(); };
+    const turnOff = (wired: { evaluation: Evaluation }, hook: { rerender: () => void }) => { wired.evaluation = evaluationWith(false); hook.rerender(); };
 
     test('singles, on: the engine\'s fill stays as `picks` whatever the user picks, and restore returns it', () => {
       const { setChoice, hook, land } = setup('singles', true);
@@ -441,6 +522,27 @@ describe('useDockFill at a replay turn: what the result writes', () => {
     act(() => onResultOf(handleEvaluate)(doublesResult()));
     act(() => result.current.onUserChoice('p2', 0));
     expect(result.current.engine.p2).toEqual([false, true]);
+  });
+});
+
+describe('useDockFill at a replay turn: the setting reads in a variation only', () => {
+  const reading = (): Evaluation => {
+    const base = evaluationOf();
+    return { ...base, prefs: { ...base.prefs, hardMode: true } } as Evaluation;
+  };
+
+  test.each([
+    ['singles', singlesTurn, () => evalResult('singles')],
+    ['doubles', doublesTurn, doublesResult],
+  ] as const)('%s: with the setting on the dock names no read before, after the fill and after a pick', (_kind, turn, result) => {
+    const { wired, handleEvaluate } = replayInputs(turn(), { evaluation: reading() });
+    const hook = renderHook(() => useDockFill(wired));
+    expect(hook.result.current.reads).toBeNull();
+    act(() => hook.result.current.arm());
+    act(() => onResultOf(handleEvaluate)(result()));
+    expect(hook.result.current.reads).toBeNull();
+    act(() => hook.result.current.onUserChoice('p1', 0, move('protect', 'Protect')));
+    expect(hook.result.current.reads).toBeNull();
   });
 });
 

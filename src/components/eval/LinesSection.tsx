@@ -4,7 +4,7 @@ import { gameReviewEnabled } from '../../lib/feature-flags';
 import { LineConfirm } from './LineConfirm';
 import { cardLines, neverActedOf, rowValueTexts } from './turn-copy';
 import { linesForMode, worstLookup } from '../../lib/worst-reply';
-import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
+import { activeNamesAt, differsSentences, lineAnchor, lineBlocks, ranksOf, READS_LINES_NOTE, REPLY_OFF_TOP_TITLE, type LineBlockView, type LinesHost, type LineSideView } from '../../lib/line-view';
 
 interface LinesSectionProps {
   turn: number;
@@ -16,11 +16,13 @@ interface LinesSectionProps {
 }
 
 function SideText({ view }: { view: LineSideView }) {
+  const [first, ...rest] = view.text.split(' + ');
   return (
-    <>
-      <span className="side">{view.player}</span> {view.text}
+    <span className="ps-eval-line-side">
+      <span className="ps-eval-line-lead"><span className="side">{view.player}</span> {first}</span>
+      {rest.map((part, index) => <span key={`${index}-${part}`} className="ps-eval-line-part"> + {part}</span>)}
       {view.chips.map((chip, index) => <span key={`${index}-${chip}`} className="ps-lines-chip">{chip}</span>)}
-    </>
+    </span>
   );
 }
 
@@ -50,7 +52,7 @@ function LineBlock({ block, turn, onPlay, confirm }: { block: LineBlockView; tur
           <span style={{ color: '#9ab' }} title={block.reply.off ? REPLY_OFF_TOP_TITLE : undefined}>{`vs ${block.reply.label} (${block.reply.rank})`}</span>
         )}
         {onPlay && (
-          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn)}>
+          <button type="button" className="ps-btn ps-eval-inline-btn" title={block.tooltip} onClick={() => onPlay(block.line, turn, 'lines')}>
             ▶ Play
           </button>
         )}
@@ -89,6 +91,7 @@ export function LinesSection({ turn, result, playerNames, doubles, host, analysi
   const blocks = lineBlocks(lines, { turn, playerNames, doubles, rules: host.rules, actives: activeNamesAt(host.snapshot), rowValues: rowValueTexts(analysis), neverActed: neverActedOf(analysis), ranks: ranksOf(result), ...(host.hardMode ? { worst: worstLookup(result, { p1: analysis?.p1.faintedFraction, p2: analysis?.p2.faintedFraction }) } : {}) });
   return (
     <div className="ps-eval-lines-body">
+      {host.hardMode && <span className="ps-eval-line">{READS_LINES_NOTE}</span>}
       {blocks.map(block => <LineBlock key={block.key} block={block} turn={turn} onPlay={host.onPlay} confirm={host.confirm} />)}
       {differsSentences(blocks).map(sentence => <span key={sentence} className="ps-eval-line">{sentence}</span>)}
     </div>

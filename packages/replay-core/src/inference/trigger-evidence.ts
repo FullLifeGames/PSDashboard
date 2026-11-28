@@ -7,6 +7,7 @@ import { newItemTriggerWatch, teamSizeOf, watchItemTriggers, type ItemTriggerWat
 import { toId } from '../ids.ts';
 import { terrainConditions } from '../dex-facts/index.ts';
 import { newFieldItemWatch, watchFieldItems, type FieldItemWatch } from './field-item-triggers.ts';
+import { newStatWatch, watchStatItems, type StatWatch } from './stat-item-triggers.ts';
 
 // Design: EVALUATION.md "Rule-outs".
 
@@ -36,13 +37,14 @@ export interface TriggerWatch {
   drops: Map<string, { moved: boolean }>;
   items: ItemTriggerWatch;
   field: FieldItemWatch;
+  stats: StatWatch;
 }
 
 function newWatch(state: InferrerState): TriggerWatch {
   return {
     gravity: false, magicRoom: false, weather: '', terrain: '', slots: new Map(), fainted: new Set(), teamSize: teamSizeOf(state, state.opponentSide),
     embargoed: new Set(), commanding: new Set(), neutralized: state.lines.some(line => namesEffect(line, 'Neutralizing Gas')),
-    entries: new Map(), drops: new Map(), items: newItemTriggerWatch(state), field: newFieldItemWatch(),
+    entries: new Map(), drops: new Map(), items: newItemTriggerWatch(state), field: newFieldItemWatch(), stats: newStatWatch(),
   };
 }
 
@@ -195,5 +197,6 @@ export function watchTriggerEvidence(state: InferrerState, line: LogLine) {
   const key = keyOf(arg(line, 1));
   if (key.startsWith(state.opponentSide)) onOpponentLine(state, watch, line, key);
   watchItemTriggers(state, watch.items, watch, line);
+  watchStatItems(state, watch.stats, watch, line);
   watchFieldItems(state, watch, line);
 }

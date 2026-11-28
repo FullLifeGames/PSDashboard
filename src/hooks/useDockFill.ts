@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { BranchSimState, BranchSlotChoice, EvalResult, RankedChoice } from '@fulllifegames/eval-engine';
-import { fitsBeside, pickFillParts, rowOfChoices, sameChoice } from '../lib/dock-fill';
-import { worstReply } from '../lib/worst-reply';
+import { activeCount, answersTo, backOnFill, engineFill, fitsBeside, handSide, pickFillParts, withSlot, type DockReads } from '../lib/dock-fill';
 import type { SideChoices } from '../lib/dock-seed';
 import type { EvaluateOptions } from './useEvalView';
 import type { useBranch } from './useBranch';
@@ -46,6 +45,7 @@ export interface DockFillView {
   busy: boolean;
   waits: boolean;
   engine: EngineMarks;
+  reads: DockReads | null;
   queueExecute: () => void;
   /** The slot is no longer the engine's; with Hard mode and a pick the opponent's engine slots take the worst reply. */
   onUserChoice: (side: Side, slot: number, pick?: BranchSlotChoice) => void;
@@ -65,13 +65,9 @@ export interface DockFillView {
 const NO_MARKS: EngineMarks = { p1: [], p2: [] };
 const RUNNING = new Set<Evaluation['status']>(['reconstructing', 'searching']);
 
-interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices; deferred: SideChoices; picks: SideChoices }
+interface Settled { key: string | null; marks: EngineMarks; choices: SideChoices; deferred: SideChoices; picks: SideChoices; reads: DockReads }
 
 const NO_CHOICES: SideChoices = { p1: [], p2: [] };
-
-const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
-
-const slotCount = (state: BranchSimState, side: Side): number => (side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots)?.length ?? 1;
 
 function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; open: boolean; eligible: boolean } {
   const { simState, liveTip, branching, executing, branchPreparing, playOutActive, evalAvailable, evaluation } = inputs;
@@ -84,7 +80,7 @@ function gate(inputs: DockFillInputs, armedKey: string | null): { key: string; o
 }
 
 function useFillMarks() {
-  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES, picks: NO_CHOICES });
+  const [settled, setSettled] = useState<Settled>({ key: null, marks: NO_MARKS, choices: NO_CHOICES, deferred: NO_CHOICES, picks: NO_CHOICES, reads: 'waiting' });
   const [queued, setQueued] = useState<string | null>(null);
   const settledRef = useRef(settled);
   const heldRef = useRef<HeldSlot | null>(null);
@@ -113,18 +109,6 @@ function useOnUserChoice({ settledRef, commit }: Pick<FillMarks, 'settledRef' | 
 
 type FillMarks = ReturnType<typeof useFillMarks>;
 
-function handSide(touched: Record<Side, (BranchSlotChoice | null)[]>): Side | null {
-  const set = (['p1', 'p2'] as const).filter(side => touched[side].some(Boolean));
-  return set.length === 1 ? set[0] : null;
-}
-
-function answersTo(result: EvalResult, state: BranchSimState, hand: Side, picks: (BranchSlotChoice | null)[], touched: (BranchSlotChoice | null)[]): RankedChoice[] | null {
-  const opponent: Side = hand === 'p1' ? 'p2' : 'p1';
-  const row = rowOfChoices(hand, result.perSide[hand], state, picks, touched);
-  const reply = row ? worstReply(result, hand, row)?.reply : undefined;
-  return reply ? [reply, ...result.perSide[opponent]] : null;
-}
-
 type LatestFill = MutableRefObject<{
   key: string; eligible: boolean; simState: BranchSimState | null; getChoices: DockFillInputs['getChoices']; setChoice: DockFillInputs['setChoice'];
   executeTurn: DockFillInputs['executeTurn']; queued: string | null; liveTip: boolean; hardMode: boolean;
@@ -136,26 +120,38 @@ function useRefill(latest: LatestFill, fillResultRef: FillResult, settledRef: Fi
     const now = latest.current;
     const current = settledRef.current;
     const fill = fillResultRef.current;
-    if (!now.hardMode || !now.simState || current.key !== now.key || fill?.key !== now.key) return;
+    if (!now.hardMode) {
+      if (current.key === now.key && current.reads !== 'waiting') commit({ ...current, reads: 'waiting' });
+      return;
+    }
+    if (!now.simState || current.key !== now.key || fill?.key !== now.key) return;
     const state = now.simState;
     const opponent: Side = side === 'p1' ? 'p2' : 'p1';
     const choices = now.getChoices();
     const userSlots = (key: Side): (BranchSlotChoice | null)[] => (
-      Array.from({ length: slotCount(state, key) }, (_, index) => (current.marks[key][index] ? null : choices[key][index] ?? null))
+      Array.from({ length: activeCount(state, key) }, (_, index) => (current.marks[key][index] ? null : choices[key][index] ?? null))
     );
     const touched = userSlots(side).map((choice, index) => (index === slot ? pick : choice));
-    if (userSlots(opponent).some(Boolean)) return;
+    if (userSlots(opponent).some(Boolean)) {
+      commit({ ...current, reads: 'both' });
+      return;
+    }
     const standing = (index: number) => choices[side][index] ?? current.choices[side][index] ?? null;
     const picks = touched.map((choice, index) => choice ?? (current.marks[side][index] ? standing(index) : null));
     const ranked = answersTo(fill.result, state, side, picks, touched);
-    if (!ranked) return;
-    const { filled } = pickFillParts(opponent, ranked, state, Array.from({ length: slotCount(state, opponent) }, () => null), []);
-    if (filled.every(choice => choice === null)) return;
+    const filled = ranked ? engineFill(opponent, ranked, state) : [];
+    if (filled.every(choice => choice === null)) {
+      const back = backOnFill(engineFill(opponent, fill.result.perSide[opponent], state), current.marks[opponent], current.choices[opponent]);
+      if (now.liveTip) back.forEach((choice, index) => { if (choice) now.setChoice(opponent, choice, index); });
+      commit({ ...current, choices: { ...current.choices, [opponent]: current.choices[opponent].map((choice, index) => back[index] ?? choice) }, reads: 'unranked' });
+      return;
+    }
     if (now.liveTip) filled.forEach((choice, index) => { if (choice) now.setChoice(opponent, choice, index); });
     commit({
       ...current,
       marks: { ...current.marks, [opponent]: Array.from({ length: filled.length }, (_, index) => filled[index] !== null || !!current.marks[opponent][index]) },
       choices: { ...current.choices, [opponent]: filled.map((choice, index) => choice ?? current.choices[opponent][index] ?? null) },
+      reads: 'answered',
     });
   };
 }
@@ -175,21 +171,22 @@ function useRestore(latest: LatestFill, settledRef: FillMarks['settledRef'], com
       refill(side, slot, own);
       return own;
     }
-    const back = current.picks[opponent].map((pick, index) => (pick && current.marks[opponent][index] && !sameChoice(current.choices[opponent][index], pick) ? pick : null));
+    const back = backOnFill(current.picks[opponent], current.marks[opponent], current.choices[opponent]);
     if (now.liveTip) back.forEach((pick, index) => { if (pick) now.setChoice(opponent, pick, index); });
-    commit({ ...current, marks, deferred, choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
+    commit({ ...current, marks, deferred, reads: 'waiting', choices: { ...choices, [opponent]: choices[opponent].map((pick, index) => back[index] ?? pick) } });
     return own;
   };
 }
 
-interface FillWrite { written: EngineMarks; wrote: SideChoices; deferred: SideChoices; merged: SideChoices }
+interface FillWrite { written: EngineMarks; wrote: SideChoices; deferred: SideChoices; merged: SideChoices; reads: DockReads }
 
 function fillSides(now: LatestFill['current'], state: BranchSimState, result: EvalResult, held: HeldSlot | null): FillWrite {
   const choices = now.getChoices();
-  const out: FillWrite = { written: { p1: [], p2: [] }, wrote: { p1: [], p2: [] }, deferred: { p1: [], p2: [] }, merged: { p1: [], p2: [] } };
-  const touchedOf = (side: Side): (BranchSlotChoice | null)[] => Array.from({ length: slotCount(state, side) }, (_, slot) => choices[side][slot] ?? null);
+  const out: FillWrite = { written: { p1: [], p2: [] }, wrote: { p1: [], p2: [] }, deferred: { p1: [], p2: [] }, merged: { p1: [], p2: [] }, reads: 'waiting' };
+  const touchedOf = (side: Side): (BranchSlotChoice | null)[] => Array.from({ length: activeCount(state, side) }, (_, slot) => choices[side][slot] ?? null);
   const touchedBy = { p1: touchedOf('p1'), p2: touchedOf('p2') };
   const hand = now.hardMode ? handSide(touchedBy) : null;
+  if (now.hardMode && !hand && touchedBy.p1.some(Boolean) && touchedBy.p2.some(Boolean)) out.reads = 'both';
   const ranking: Record<Side, RankedChoice[]> = { p1: result.perSide.p1, p2: result.perSide.p2 };
   for (const side of hand === 'p2' ? (['p2', 'p1'] as const) : (['p1', 'p2'] as const)) {
     const touched = touchedBy[side];
@@ -201,7 +198,11 @@ function fillSides(now: LatestFill['current'], state: BranchSimState, result: Ev
     out.merged[side] = filled.map((choice, slot) => touched[slot] ?? choice);
     if (now.liveTip) filled.forEach((choice, slot) => { if (choice) now.setChoice(side, choice, slot); });
     const opponent: Side = side === 'p1' ? 'p2' : 'p1';
-    if (side === hand) ranking[opponent] = answersTo(result, state, side, out.merged[side], touched) ?? ranking[opponent];
+    if (side === hand) {
+      const reply = answersTo(result, state, side, out.merged[side], touched);
+      out.reads = reply ? 'answered' : 'unranked';
+      ranking[opponent] = reply ?? ranking[opponent];
+    }
   }
   return out;
 }
@@ -221,10 +222,10 @@ function useFillApply(inputs: DockFillInputs, key: string, eligible: boolean, ma
     const now = latest.current;
     if (now.key !== runKey || !now.eligible || !now.simState || settledRef.current.key === runKey) return;
     const state = now.simState;
-    const { written, wrote, deferred, merged } = fillSides(now, state, result, heldRef.current);
+    const { written, wrote, deferred, merged, reads } = fillSides(now, state, result, heldRef.current);
     fillResultRef.current = { key: runKey, result };
     const picks = { p1: wrote.p1.map((choice, slot) => choice ?? deferred.p1[slot] ?? null), p2: wrote.p2.map((choice, slot) => choice ?? deferred.p2[slot] ?? null) };
-    commit({ key: runKey, marks: written, choices: wrote, deferred, picks });
+    commit({ key: runKey, marks: written, choices: wrote, deferred, picks, reads });
     if (now.queued === runKey) {
       unqueue();
       void now.executeTurn(merged);
@@ -334,7 +335,7 @@ export function useDockFill(inputs: DockFillInputs): DockFillView {
   const landed = done ? settled : null;
   return {
     pending, busy: open && evaluation.graph.running && !done, waits,
-    ...landedView(landed, liveTip), picks: landed?.picks ?? NO_CHOICES,
+    ...landedView(landed, liveTip), picks: landed?.picks ?? NO_CHOICES, reads: inputs.evaluation.prefs.hardMode && liveTip ? landed?.reads ?? 'waiting' : null,
     queueExecute, onUserChoice, restore, holdTray, release, arm,
   };
 }

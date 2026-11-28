@@ -36,13 +36,15 @@ export interface LineConfirm {
   cancel: () => void;
 }
 
-export const lineAnchor = (line: EvalLine, turn: number): string => `${turn}|${line.side}|${line.label}|${line.for.join('+')}${line.versus ? `|${line.versus}` : ''}`;
+export type LinePlace = 'lines' | 'review';
+
+export const lineAnchor = (line: EvalLine, turn: number, place: LinePlace = 'lines'): string => `${place}|${turn}|${line.side}|${line.label}|${line.for.join('+')}${line.versus ? `|${line.versus}` : ''}`;
 
 export interface LinesHost {
   rules: GameRules;
   snapshot?: TurnSnapshot | null;
   snapshotAt?: (turn: number) => TurnSnapshot | null;
-  onPlay?: (line: EvalLine, turn: number) => void;
+  onPlay?: (line: EvalLine, turn: number, place?: LinePlace) => void;
   confirm?: LineConfirm | null;
   winPaths?: WinPathsHost;
   earlyLines?: { done: number; total: number; stop: () => void } | null;
@@ -236,6 +238,8 @@ export function rankWords(rank: number): string {
   const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[rank % 10] ?? 'th';
   return `${rank}${suffix} choice`;
 }
+
+export const READS_LINES_NOTE = 'Opponent reads your move: each line meets the reply that hurts its choice most.';
 
 const RATES_LOWEST = 'the reply the search rates lowest for this choice';
 

@@ -13,12 +13,12 @@ export {
   decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
 } from './turn-analysis/types.ts';
 export type {
-  AnalyzeTurnParams, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity, TurnVerification,
-  VerdictTier,
+  AnalyzeTurnParams, NoChoiceSlot, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity,
+  TurnVerification, VerdictTier,
 } from './turn-analysis/types.ts';
 export {
   diffChoices, findConsistentOptions, findPlayedOption, matchPlayedChoice, matchPlayedSide,
-  phantomStayIn, playedSetupMove, splitCombinedLabel,
+  hiddenSlots, phantomStayIn, playedSetupMove, splitCombinedLabel, standsIn,
 } from './turn-analysis/played-match.ts';
 
 function analyzeSide(params: AnalyzeTurnParams, key: Side): SideAnalysis {

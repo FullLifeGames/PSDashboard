@@ -59,6 +59,7 @@ interface EvalPanelProps {
   playOutProgress?: PlayOutProgress | null;
   graphMaxTurn?: number;
   analysisTurn?: number | null;
+  gameId?: string;
 }
 
 function useReportView(report: GameReport | null | undefined, analysisTurn: number | null | undefined) {
@@ -84,6 +85,12 @@ function useReportView(report: GameReport | null | undefined, analysisTurn: numb
     if (analysisTurn !== null && analysisTurn !== undefined && report && !returned) setView('turn');
   }
   return { view, setView, startedFrom };
+}
+
+function useReviewFold(gameId: string | undefined) {
+  const [fold, setFold] = useState({ gameId, open: false });
+  if (fold.gameId !== gameId) setFold({ gameId, open: false });
+  return { reviewOpen: fold.gameId === gameId && fold.open, onReviewToggle: (open: boolean) => setFold({ gameId, open }) };
 }
 
 function EndedResultNotice({ winner, positionLabel }: { winner: string | null; positionLabel?: string | null }) {
@@ -161,6 +168,7 @@ export function EvalPanel(props: EvalPanelProps) {
   const hasGraph = graph.scores.some(score => score !== null);
 
   const { view, setView, startedFrom } = useReportView(report, analysisTurn);
+  const reviewFold = useReviewFold(props.gameId);
   const selectTurn = onSelectTurn
     ? (turn: number, line?: 'main' | 'variation') => {
       onSelectTurn(turn, line);
@@ -186,6 +194,7 @@ export function EvalPanel(props: EvalPanelProps) {
           running={running}
           hasGraph={hasGraph}
           selectTurn={selectTurn}
+          {...reviewFold}
           showReportView={showReportView}
           onBackToReport={() => setView('report')}
           onBackToMain={props.onBackToMain && (() => props.onBackToMain?.(startedFrom?.view === 'turn' ? startedFrom.turn : null))}

@@ -1,5 +1,6 @@
 import type { PickerSource } from '../../lib/picker-state';
 import { opponentReadsEnabled } from '../../lib/feature-flags';
+import type { DockReads } from '../../lib/dock-fill';
 import { DICE_WAIT_NOTE } from '../branch/DiceChips';
 import type { DockModel, DockSlotModel } from './dock-model';
 
@@ -16,13 +17,31 @@ export function EndedNotice({ winner, game = false, battle = false }: { winner: 
   );
 }
 
+const READS_TAIL: Record<DockReads, string> = {
+  waiting: 'its reply follows your pick',
+  answered: 'its engine slots answer your pick',
+  unranked: 'no ranked reply to this pick, so its slots keep the engine\'s choice',
+  both: 'both sides hold your picks',
+};
+
 const OPPONENT_READS_NOTE_TITLE = 'The opponent\'s engine picks answer yours with the reply the search rates lowest for your pick. Setup ▾ holds this setting.';
+
+function OpponentReadsNote({ reads, onTurnOff }: { reads?: DockReads | null; onTurnOff: () => void }) {
+  return (
+    <>
+      <span className="ps-dock-source" title={OPPONENT_READS_NOTE_TITLE}>Opponent reads your move{reads && `: ${READS_TAIL[reads]}`}</span>
+      <button type="button" className="ps-btn ps-dock-turn-off" onClick={onTurnOff}>
+        Turn off
+      </button>
+    </>
+  );
+}
 
 function forcePrompt(slot: DockSlotModel): string {
   return slot.fainted ? `${slot.name} fainted! Choose who to send in:` : `${slot.name} is switching out. Choose who to send in:`;
 }
 
-export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false, opponentReads = false, onOpponentReadsChange }: {
+export function DockStatus({ source, acquiringExact, executeError, model, diceOpen, game = false, opponentReads = false, reads, onOpponentReadsChange }: {
   source?: PickerSource;
   acquiringExact?: boolean;
   executeError: string | null;
@@ -30,20 +49,14 @@ export function DockStatus({ source, acquiringExact, executeError, model, diceOp
   diceOpen: boolean;
   game?: boolean;
   opponentReads?: boolean;
+  reads?: DockReads | null;
   onOpponentReadsChange?: (value: boolean) => void;
 }) {
   const slots = [...model.p1, ...model.p2];
   const waitingFor = [...(model.flags.p1Waits ? ['P2'] : []), ...(model.flags.p2Waits ? ['P1'] : [])];
   return (
     <div className="ps-dock-status">
-      {opponentReads && opponentReadsEnabled() && (
-        <>
-          <span className="ps-dock-source" title={OPPONENT_READS_NOTE_TITLE}>Opponent reads your move</span>
-          <button type="button" className="ps-btn ps-dock-turn-off" onClick={() => onOpponentReadsChange?.(false)}>
-            Turn off
-          </button>
-        </>
-      )}
+      {opponentReads && opponentReadsEnabled() && <OpponentReadsNote reads={reads} onTurnOff={() => onOpponentReadsChange?.(false)} />}
       {source === 'stored' && <span className="ps-dock-source">{game ? 'Choices from the game\'s position' : 'Choices from the reconstructed position'}</span>}
       {source === 'snapshot' && (
         <span className="ps-dock-source">

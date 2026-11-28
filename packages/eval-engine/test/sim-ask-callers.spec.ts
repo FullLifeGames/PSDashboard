@@ -55,7 +55,7 @@ describe('the callers of the simulator', () => {
       'eval-engine:branch/sleep-counter.ts', 'eval-engine:calc/body.ts', 'eval-engine:calc/fickle.ts',
       'eval-engine:calc/typeless.ts', 'eval-engine:damage-calc.ts', 'eval-engine:score/move-facts.ts',
       'replay-core:inference/item-evidence.ts', 'replay-core:inference/item-triggers.ts', 'replay-core:inference/rocks-tell.ts',
-      'replay-core:inference/trigger-evidence.ts', 'replay-core:inference/spent-items.ts', 'replay-core:inference/contact-tell.ts',
+      'replay-core:inference/trigger-evidence.ts', 'replay-core:inference/spent-items.ts', 'replay-core:inference/stat-items.ts', 'replay-core:inference/contact-tell.ts',
       // Held to the simulator by replay-core's field-item-triggers-sweep.spec.ts.
       'replay-core:inference/field-item-triggers.ts',
       // Held to the simulator by replay-core's hit-power-census.spec.ts and hit-power-played.spec.ts.
@@ -69,8 +69,9 @@ describe('the callers of the simulator', () => {
   test('the rebuild asks the queue for the priority of a stand-in and of a logged action', () => {
     // Both are held to the simulator by stand-in-priority-sweep.spec.ts.
     const rebuild = ['eval-engine:branch/action-bound.ts', 'eval-engine:branch/cant-stand-in.ts', 'eval-engine:branch/protocol-choices.ts'];
-    // forced-win-strike-sweep.spec.ts holds the prover's queue question to the simulator.
-    expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual([...rebuild, 'eval-engine:endgame/prover-strike.ts']);
+    // forced-win-strike-sweep.spec.ts holds the prover's queue question to the simulator, the pivot sweep of
+    // secondary-classes-paths.spec.ts the cell plan's.
+    expect(filesWith(/\b(?:actionPriority|queuePlace)\(/)).toEqual([...rebuild, 'eval-engine:cell-defender.ts', 'eval-engine:endgame/prover-strike.ts']);
     expect(filesWith(/\.moves\.get\([^)]*\)\.priority\b/).filter(name => rebuild.includes(name))).toEqual(['eval-engine:branch/action-bound.ts']);
   });
 });

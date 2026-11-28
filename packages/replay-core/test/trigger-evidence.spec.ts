@@ -220,3 +220,26 @@ describe('the terrain seeds and Room Service are used when the field changes', (
     expect(ruledOut(play([wall()], [surge('Leftovers'), zoroark], [turn]), 'Tapu Koko')).not.toContain('electricseed');
   });
 });
+
+describe('a pivot move leaves the items that wait for the end of a move their turn', () => {
+  const pivotLog = (kind: 'singles' | 'doubles', itemLines: string[]) => {
+    const doubles = kind === 'doubles';
+    return [
+      `|gametype|${kind}`, '|player|p1|Alice|', '|player|p2|Bob|', '|gen|9', '|tier|[Gen 9] OU', '|poke|p1|Incineroar, M|', '|poke|p1|Sinistcha|', '|poke|p2|Sneasler, F|', '|start',
+      '|switch|p1a: Incineroar|Incineroar, M|100/100', ...(doubles ? ['|switch|p1b: Chansey|Chansey, F|100/100'] : []),
+      '|switch|p2a: Sneasler|Sneasler, F|100/100', ...(doubles ? ['|switch|p2b: Chansey|Chansey, F|100/100'] : []), '|turn|1',
+      '|move|p1a: Incineroar|Parting Shot|p2a: Sneasler', '|-unboost|p2a: Sneasler|atk|1', '|-unboost|p2a: Sneasler|spa|1', '|',
+      '|switch|p1a: Sinistcha|Sinistcha|100/100|[from] Parting Shot', ...itemLines,
+      '|move|p2a: Sneasler|Close Combat|p1a: Sinistcha', '|-damage|p1a: Sinistcha|60/100', '|turn|2',
+    ].join('\n');
+  };
+  const spent = ['|-enditem|p2a: Sneasler|White Herb', '|-clearnegativeboost|p2a: Sneasler|[silent]'];
+
+  test.each(['singles', 'doubles'] as const)('%s: a White Herb that fires after the user left is not ruled out', kind => {
+    expect(ruledOut(pivotLog(kind, spent), 'Sneasler')).not.toContain('whiteherb');
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: no White Herb line after the next move rules the item out', kind => {
+    expect(ruledOut(pivotLog(kind, []), 'Sneasler')).toContain('whiteherb');
+  });
+});

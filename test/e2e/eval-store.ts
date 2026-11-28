@@ -13,6 +13,8 @@ export interface EvalStoreCapture {
   settings: EvalStoreSettings;
   /** The turns the spec analyzes with "Analyze this position" (a single turn's store key); absent: the game's sweep. */
   turns?: number[];
+  winPaths?: true;
+  proofTurns?: number[];
 }
 
 const S_MCTS: EvalStoreSettings = { mode: 'mcts', depth: 1, samples: 1, tera: 'auto' };
@@ -28,10 +30,14 @@ export const EVAL_STORE_CAPTURES: EvalStoreCapture[] = [
   { replay: 'gen9vgc2026regi-2630452654', settings: S_MCTS, turns: [4, 6] },
   { replay: 'gen9championsou-2691703002', settings: S_MCTS, turns: [8, 12] },
   { replay: 'gen9championsvgc2026regma-2625939941', settings: S_MCTS, turns: [3, 5] },
-  { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX },
-  { replay: 'gen9championsvgc2026regmc-2695803506', settings: S_MATRIX },
-  { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX },
-  { replay: 'smogtours-gen9doublesou-912045', settings: S_MATRIX },
+  { replay: 'smogtours-gen6ou-655336', settings: S_MATRIX, turns: [8, 12, 5] },
+  { replay: 'smogtours-gen9doublesou-912884', settings: S_MATRIX, turns: [5, 8, 11] },
+  { replay: 'gen9vgc2026regi-2630452654', settings: S_MATRIX, turns: [4, 6, 3] },
+  { replay: 'gen9championsou-2691703002', settings: S_MATRIX, turns: [8, 12, 5] },
+  { replay: 'smogtours-gen6ou-649664', settings: S_MATRIX, winPaths: true, proofTurns: [24] },
+  { replay: 'gen9championsvgc2026regmc-2695803506', settings: S_MATRIX, winPaths: true },
+  { replay: 'gen9vgc2026regi-2629703929', settings: S_MATRIX, winPaths: true, proofTurns: [13] },
+  { replay: 'smogtours-gen9doublesou-912045', settings: S_MATRIX, winPaths: true },
 ];
 
 export interface EvalStoreRecord {
@@ -45,6 +51,15 @@ export interface EvalStoreRecord {
   [field: string]: unknown;
 }
 
+export interface WinPathsRecord {
+  key: string;
+  kind: 'winPaths';
+  paths: { steps: unknown[] };
+  savedAt: number;
+}
+
+export const isWinPathsRecord = (record: { kind?: unknown }): record is WinPathsRecord => record.kind === 'winPaths';
+
 export interface EvalStoreFile {
   format: 1;
   replay: string;
@@ -52,7 +67,7 @@ export interface EvalStoreFile {
   cacheVersion: string;
   settings: EvalStoreSettings;
   turns?: number[];
-  records: EvalStoreRecord[];
+  records: (EvalStoreRecord | WinPathsRecord)[];
 }
 
 export const evalStoreFileName = (replay: string, settings: Pick<EvalStoreSettings, 'depth' | 'samples' | 'mode'>, turns?: readonly number[]): string =>
@@ -68,11 +83,16 @@ export function rewriteCacheVersion(key: string, tag: string): string {
   return key.replace(VERSION_PREFIX, tag);
 }
 
-function checkRecord(record: unknown, replay: string, index: number): EvalStoreRecord {
-  const entry = record as Partial<EvalStoreRecord> | null;
+function checkRecord(record: unknown, replay: string, index: number): EvalStoreRecord | WinPathsRecord {
+  const entry = record as Partial<EvalStoreRecord> & { paths?: { steps?: unknown } } | null;
   const bad = (why: string) => fix(`Saved record ${index} of ${replay} ${why}`);
   if (!entry || typeof entry !== 'object') throw bad('is not an object');
   if (typeof entry.key !== 'string') throw bad('has no key');
+  if (isWinPathsRecord(entry)) {
+    if (!Array.isArray(entry.paths?.steps) || entry.paths.steps.length === 0) throw bad('holds no win-paths steps');
+    if (!VERSION_PREFIX.test(entry.key) || !entry.key.includes(`|${replay}:`)) throw bad(`belongs to another replay (${entry.key.slice(0, 60)})`);
+    return entry as WinPathsRecord;
+  }
   if (!entry.result || typeof entry.result !== 'object') throw bad('has no result');
   if (typeof entry.depth !== 'number' || typeof entry.samples !== 'number') throw bad('has no depth or samples');
   if (typeof entry.mode !== 'string') throw bad('has no mode');
@@ -82,7 +102,7 @@ function checkRecord(record: unknown, replay: string, index: number): EvalStoreR
 }
 
 /** Times fresh: the app prunes records older than 30 days. */
-export function seedRecords(file: EvalStoreFile, options: { tag: string; now: number }): EvalStoreRecord[] {
+export function seedRecords(file: EvalStoreFile, options: { tag: string; now: number }): (EvalStoreRecord | WinPathsRecord)[] {
   if (file.format !== 1) throw fix(`The saved file of ${file.replay} has format ${String(file.format)}, this helper reads format 1`);
   if (!Array.isArray(file.records) || file.records.length === 0) throw fix(`The saved file of ${file.replay} holds no records`);
   return file.records.map((record, index) => {
