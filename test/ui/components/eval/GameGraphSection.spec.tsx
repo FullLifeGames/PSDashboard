@@ -76,6 +76,20 @@ describe('GameGraphSection', () => {
     expect(screen.getByText('analyzing… turn 3/12')).toBeInTheDocument();
   });
 
+  test.each([['singles', false], ['doubles', true]] as const)('%s: the counter starts at turn 1, and the later passes name the turns they check', (kind, doubles) => {
+    const shown = (progress: { done: number; total: number; task?: 'key' | 'rest' }) => {
+      const { unmount } = render(<GameGraphSection {...props({ doubles, graph: evalGraph(kind, { running: true, progress }) })} />);
+      const text = document.body.textContent ?? '';
+      unmount();
+      return text.match(/analyzing…[^C]*/)?.[0].trim();
+    };
+    expect(shown({ done: 0, total: 28 })).toBe('analyzing… turn 1/28');
+    expect(shown({ done: 11, total: 11 })).toBe('analyzing… turn 11/11');
+    expect(shown({ done: 0, total: 7, task: 'key' })).toBe('analyzing… key turns 1/7');
+    expect(shown({ done: 2, total: 7, task: 'key' })).toBe('analyzing… key turns 2/7');
+    expect(shown({ done: 2, total: 4, task: 'rest' })).toBe('analyzing… other turns 2/4');
+  });
+
   test('a sweep that a single evaluation stopped says where it stopped and offers Analyze again', () => {
     const stopped = evalGraph('singles', { running: false, stopped: { done: 1, total: 2 } });
     render(<GameGraphSection {...props({ graph: stopped })} />);

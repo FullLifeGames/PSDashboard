@@ -347,6 +347,27 @@ describe('useEvaluation whole-game sweep', () => {
     expect(settingsOf(0.1)?.keepPlayed).toBeUndefined();
   });
 
+  test.each([['singles', false], ['doubles', true]] as const)('%s: a deeper sweep names its three passes: the sketch of every turn, the key turns, the rest', async (_kind, doubles) => {
+    const seen: string[] = [];
+    const { result } = renderHook(() => {
+      const evaluation = useEvaluation();
+      const progress = evaluation.graph.progress;
+      const label = progress ? `${progress.task ?? 'turn'} ${progress.total}` : null;
+      if (label && seen[seen.length - 1] !== label) seen.push(label);
+      return evaluation;
+    });
+    script.evaluate = async serialized => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      return evalResult('singles', { score: scoreOf(serialized) });
+    };
+    act(() => result.current.setPrefs({ ...matrixPrefs, depth: 2 }));
+    const fainted = [0, 0, 3, 3, 3, 3];
+    act(() => result.current.runGraphSweep({ ...sweepParams(turn => async () => position(fainted[turn - 1])), turns: 6, doubles }));
+    await waitFor(() => expect(result.current.graph.running).toBe(true));
+    await waitFor(() => expect(result.current.graph.running).toBe(false), { timeout: 10_000 });
+    expect(seen).toEqual(['turn 6', 'key 2', 'rest 4']);
+  });
+
   test('a sweep hands the rule set to every turn it searches', async () => {
     const { result } = renderHook(() => useEvaluation());
     act(() => result.current.setPrefs(matrixPrefs));

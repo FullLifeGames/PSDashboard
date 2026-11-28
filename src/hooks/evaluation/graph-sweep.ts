@@ -7,7 +7,7 @@ import { EvalWorkerClient, type AppEvalSettings } from '../../lib/eval/worker-cl
 import { evalStoreKey, loadStoredEval, loadStoredEvalsByPrefix, saveStoredEval } from '../../lib/eval-cache-store';
 import { resolveAutoLeadSettings, type TurnEvalSettings } from './prefs';
 import type { CachedEval } from './single-eval';
-import type { GraphSweepParams, SweepData, SweepEnv, SweepSettings } from './sweep-types';
+import type { GraphSweepParams, SweepData, SweepEnv, SweepProgress, SweepSettings } from './sweep-types';
 import { sweepTurns } from './sweep-core';
 import { evaluateReplacements } from './sweep-replacements';
 import { evaluateRolledCopy } from './sweep-rolled';
@@ -50,7 +50,7 @@ export interface EvalGraphState {
   /** Why the line is short, when it is: the single pass reached only part of the game (a diverging reconstruction). */
   notice: string | null;
   running: boolean;
-  progress: { done: number; total: number } | null;
+  progress: SweepProgress | null;
   /** Set when a single evaluation took over mid-sweep; the status names where it stopped. Absent or null = nothing. */
   stopped?: { done: number; total: number } | null;
 }
@@ -181,10 +181,10 @@ async function runSweep(env: SweepEnv, opts: {
   if (rangeTurns.length > 2 && !isFast) {
     if (!(await perfSpan('pass1-sketch', () => sweepTurns(env, rangeTurns, fastSettings, false)))) return;
     const keyTurns = selectKeyTurns(env.data.scores).filter(turn => turn >= from && turn <= to);
-    if (keyTurns.length > 0 && !(await perfSpan('pass2-key-turns', () => sweepTurns(env, keyTurns, fullSettings, true)))) return;
+    if (keyTurns.length > 0 && !(await perfSpan('pass2-key-turns', () => sweepTurns(env, keyTurns, fullSettings, true, 'key')))) return;
     const keySet = new Set(keyTurns);
     const rest = rangeTurns.filter(turn => !keySet.has(turn));
-    if (rest.length > 0 && !(await perfSpan('pass3-rest', () => sweepTurns(env, rest, fullSettings, true)))) return;
+    if (rest.length > 0 && !(await perfSpan('pass3-rest', () => sweepTurns(env, rest, fullSettings, true, 'rest')))) return;
   } else if (!(await perfSpan('single-pass', () => sweepTurns(env, rangeTurns, fullSettings, true)))) {
     return;
   }
@@ -261,7 +261,7 @@ export function useGraphSweepRunner(env: {
     const total = Math.max(0, to - from + 1);
     setGraph({ ...snapshot(), running: true, progress: { done: 0, total }, stopped: null });
     let lastPaintAt = 0;
-    const paint = (progress: { done: number; total: number } | null, force = false) => {
+    const paint = (progress: SweepProgress | null, force = false) => {
       if (runRef.current !== runId) return;
       const at = Date.now();
       if (!force && at - lastPaintAt < 200) return;

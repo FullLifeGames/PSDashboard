@@ -17,6 +17,14 @@ import type { VariationSeries } from '../../lib/eval-graph-view';
 
 type SelectTurn = ((turn: number, line?: 'main' | 'variation') => void) | undefined;
 
+const PROGRESS_NAMES = { key: 'key turns', rest: 'other turns' } as const;
+
+const PROGRESS_TITLE = 'After the quick pass over every turn, the key turns (where the game swung) get the full search first, then the other turns.';
+
+function progressText({ done, total, task }: NonNullable<EvalGraphState['progress']>): string {
+  return `${task ? PROGRESS_NAMES[task] : 'turn'} ${Math.max(1, done)}/${total}`;
+}
+
 function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, title }: {
   title: string;
   onAnalyzeGame?: () => void;
@@ -30,8 +38,8 @@ function GraphHeader({ onAnalyzeGame, graph, onCancel, running, smogonPending, t
       <span style={{ fontWeight: 'bold', fontSize: 11, color: '#cde' }} title={title}>Game graph</span>
       {onAnalyzeGame && (graph.running ? (
         <>
-          <span style={{ color: '#fd6' }}>
-            analyzing…{graph.progress ? ` turn ${graph.progress.done}/${graph.progress.total}` : ''}
+          <span style={{ color: '#fd6' }} title={graph.progress?.task ? PROGRESS_TITLE : undefined}>
+            analyzing…{graph.progress ? ` ${progressText(graph.progress)}` : ''}
           </span>
           <button type="button" className="ps-btn" onClick={onCancel} style={{ padding: '1px 6px', fontSize: 10 }}>
             Cancel

@@ -88,12 +88,18 @@ export interface SweepEnv {
   /** The mode the USER configured (the cross-mode merge arbiter), even when this sweep runs an escalation override. */
   configuredMode: EvalPreferences['mode'];
   data: SweepData;
-  paint(progress: { done: number; total: number } | null, force?: boolean): void;
+  paint(progress: SweepProgress | null, force?: boolean): void;
   positionFor(turn: number): Promise<string>;
   /** The serialized open request of a replacement round, or null where the capture never reached it. */
   replacementPositionFor?(turn: number, ordinal: number): Promise<string | null>;
   /** The store's evals for this replay, read once at run start (null = read unavailable, single reads instead). */
   prefetched: Map<string, StoredEval> | null;
+}
+
+export interface SweepProgress {
+  done: number;
+  total: number;
+  task?: 'key' | 'rest';
 }
 
 export interface TurnEngine {

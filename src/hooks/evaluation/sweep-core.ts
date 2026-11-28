@@ -11,7 +11,7 @@ import type { CachedEval } from './single-eval';
 import {
   guardedStage,
   aborted, isCancelled, matchOrPhantom, recordEvalError,
-  type SweepEnv, type SweepSettings, type TurnEngine, type TurnStageArgs,
+  type SweepEnv, type SweepProgress, type SweepSettings, type TurnEngine, type TurnStageArgs,
 } from './sweep-types';
 import { probeSensitivity, verifyFlagged } from './sweep-verify';
 import { installCachedTurn } from './sweep-cached';
@@ -221,14 +221,15 @@ async function evalTurn(
 
 /** One pass over `turnList`; false = cancelled. `verify` only in final-verdict passes, never the fast shaping pass. */
 export async function sweepTurns(
-  env: SweepEnv, turnList: number[], settings: SweepSettings, verify: boolean,
+  env: SweepEnv, turnList: number[], settings: SweepSettings, verify: boolean, task?: SweepProgress['task'],
 ): Promise<boolean> {
   let completed = 0;
   const finishTurn = () => {
     completed += 1;
-    env.paint({ done: completed, total: turnList.length });
+    env.paint({ done: completed, total: turnList.length, task });
   };
+  env.paint({ done: 0, total: turnList.length, task }, true);
   if (!(await runInLanes(TURN_LANES, turnList.length, index => evalTurn(env, turnList[index], settings, verify, finishTurn)))) return false;
-  env.paint({ done: turnList.length, total: turnList.length }, true);
+  env.paint({ done: turnList.length, total: turnList.length, task }, true);
   return true;
 }
