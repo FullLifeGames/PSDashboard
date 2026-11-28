@@ -309,3 +309,71 @@ describe('the parser records the Speed effects the loser stood under', () => {
     expect(gen(2, ['|-status|p2a: Snor|par'])).toEqual([]);
   });
 });
+
+describe('the parser records the Speed effects the winner stood under', () => {
+  const duel = (kind: Kind, setup: string[], turn: string[], gen = 9) => {
+    const lead = kind === 'singles'
+      ? ['|switch|p1a: Zam|Zamazenta|100/100', '|switch|p2a: King|Kingambit, M|100/100']
+      : ['|switch|p1a: Zam|Zamazenta|100/100', '|switch|p1b: Gar|Garchomp, M|100/100', '|switch|p2a: King|Kingambit, M|100/100', '|switch|p2b: Gho|Gholdengo|100/100'];
+    return racesOf(sceneLog(kind, kind === 'singles' ? `[Gen ${gen}] OU` : '[Gen 9] Doubles OU', gen, [...lead, ...setup], turn));
+  };
+  const zamFirst = ['|move|p1a: Zam|Close Combat|p2a: King', '|-damage|p2a: King|50/100', '|move|p2a: King|Iron Head|p1a: Zam', '|-damage|p1a: Zam|60/100'];
+  const race = (extra: object = {}) => ({ firstSide: 'p1', firstSpecies: 'Zamazenta', secondSide: 'p2', secondSpecies: 'Kingambit', turn: 1, ...extra });
+
+  test.each(KINDS)('a Speed stage on the winner enters its race, and so does the stage of both movers: %s', kind => {
+    expect(duel(kind, ['|-boost|p1a: Zam|spe|2'], zamFirst)).toEqual([race({ firstSpeed: [{ stage: 2 }] })]);
+    expect(duel(kind, ['|-boost|p1a: Zam|spe|2', '|-boost|p2a: King|spe|1'], zamFirst))
+      .toEqual([race({ firstSpeed: [{ stage: 2 }], secondSpeed: [{ stage: 1 }] })]);
+  });
+
+  test.each(KINDS)('a winner that is paralysed or at a negative stage keeps its race with no effect: %s', kind => {
+    expect(duel(kind, ['|-status|p1a: Zam|par'], zamFirst)).toEqual([race()]);
+    expect(duel(kind, ['|-unboost|p1a: Zam|spe|1'], zamFirst)).toEqual([race()]);
+    expect(duel(kind, ['|-status|p1a: Zam|par', '|-boost|p1a: Zam|spe|1'], zamFirst)).toEqual([race({ firstSpeed: [{ stage: 1 }] })]);
+  });
+
+  test('a winner under its side\'s Tailwind keeps its race with the effect recorded (VGC)', () => {
+    expect(duel('doubles', ['|-sidestart|p1: Alice|move: Tailwind'], zamFirst)).toEqual([race({ firstSpeed: [{ sideConditions: ['tailwind'] }] })]);
+  });
+
+  test('a winner\'s partner sets Tailwind before the winner acted: two entries, read at the faster (VGC)', () => {
+    const races = duel('doubles', [], [
+      '|move|p1b: Gar|Tailwind|p1b: Gar', '|-sidestart|p1: Alice|move: Tailwind', ...zamFirst,
+    ]);
+    expect(races).toEqual([
+      { firstSide: 'p1', firstSpecies: 'Garchomp', secondSide: 'p2', secondSpecies: 'Kingambit', turn: 1 },
+      race({ firstSpeed: [{}, { sideConditions: ['tailwind'] }] }),
+    ]);
+  });
+
+  test('925992 t35 mirrored: a winner under Protosynthesis Speed keeps the race with the paradox, by a move and by a knock-out', () => {
+    const lead = ['|switch|p1a: Wake|Walking Wake|100/100', '|-activate|p1a: Wake|ability: Protosynthesis', '|-start|p1a: Wake|protosynthesisspe', '|switch|p2a: Zam|Zamazenta|100/100'];
+    const wake = (turn: string[]) => racesOf(sceneLog('singles', '[Gen 9] OU', 9, lead, turn));
+    const pairOf = { firstSide: 'p1', firstSpecies: 'Walking Wake', secondSide: 'p2', secondSpecies: 'Zamazenta', turn: 1, firstSpeed: [{ volatile: 'protosynthesis' }] };
+    expect(wake(['|move|p1a: Wake|Hydro Steam|p2a: Zam', '|-damage|p2a: Zam|50/100', '|move|p2a: Zam|Close Combat|p1a: Wake', '|-damage|p1a: Wake|60/100']))
+      .toEqual([pairOf]);
+    expect(wake(['|move|p1a: Wake|Hydro Steam|p2a: Zam', '|-damage|p2a: Zam|0 fnt', '|faint|p2a: Zam']))
+      .toEqual([{ ...pairOf, knockOut: true }]);
+  });
+
+  test('a winner whose paradox boosts Attack, or whose ability Neutralizing Gas holds down, records no Speed effect', () => {
+    const lead = (stat: string) => ['|switch|p1a: Wake|Walking Wake|100/100', '|-activate|p1a: Wake|ability: Protosynthesis', `|-start|p1a: Wake|protosynthesis${stat}`, '|switch|p2a: Wee|Weezing-Galar, M|100/100'];
+    const turn = ['|move|p1a: Wake|Hydro Steam|p2a: Wee', '|-damage|p2a: Wee|50/100', '|move|p2a: Wee|Sludge Bomb|p1a: Wake', '|-damage|p1a: Wake|60/100'];
+    const wake = (setup: string[]) => racesOf(sceneLog('singles', '[Gen 9] OU', 9, setup, turn));
+    const kept = { firstSide: 'p1', firstSpecies: 'Walking Wake', secondSide: 'p2', secondSpecies: 'Weezing-Galar', turn: 1 };
+    expect(wake(lead('atk'))).toEqual([kept]);
+    expect(wake([...lead('spe'), '|-ability|p2a: Wee|Neutralizing Gas'])).toEqual([kept]);
+  });
+
+  test('Trick Room still drops a race whose winner is raised', () => {
+    expect(duel('doubles', ['|-sidestart|p1: Alice|move: Tailwind', '|-fieldstart|move: Trick Room'], zamFirst)).toEqual([]);
+  });
+
+  test('Gen 2 records a stage on the winner and Gen 1, which keeps Speed in modifiedStats, drops the race', () => {
+    const gen = (n: number) => racesOf(sceneLog('singles', `[Gen ${n}] OU`, n, [
+      '|switch|p1a: Zap|Zapdos|100/100', '|switch|p2a: Snor|Snorlax, M|100/100', '|-boost|p1a: Zap|spe|1',
+    ], ['|move|p1a: Zap|Thunderbolt|p2a: Snor', '|-damage|p2a: Snor|50/100', '|move|p2a: Snor|Body Slam|p1a: Zap', '|-damage|p1a: Zap|60/100']));
+    expect(gen(2).map(race => race.firstSpeed)).toEqual([[{ stage: 1 }]]);
+    expect(gen(1)).toEqual([]);
+  });
+});

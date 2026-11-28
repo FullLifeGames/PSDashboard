@@ -187,7 +187,7 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toEqual([]);
   });
 
-  test('Tailwind spans exclude later turns but not the turn it went up', () => {
+  test('a Tailwind that goes up on the first mover\'s side enters the race of the turn it went up', () => {
     const { speedOrders } = parseReplayLogWithObservations(speedLog([
       '|move|p1a: Fast|Tailwind|p1a: Fast',
       '|-sidestart|p1: Alice|move: Tailwind',
@@ -197,8 +197,7 @@ describe('speed-order evidence', () => {
       '|move|p2a: Val|Moonblast|p1a: Fast',
       '|turn|3',
     ]));
-    expect(speedOrders).toHaveLength(1);
-    expect(speedOrders[0].turn).toBe(1);
+    expect(speedOrders.map(race => [race.turn, race.firstSpeed])).toEqual([[1, undefined], [2, [{ sideConditions: ['tailwind'] }]]]);
   });
 
   test('paralysis is directional: it excuses the slow, never the fast', () => {
@@ -264,7 +263,7 @@ describe('speed-order evidence', () => {
     expect(speedOrders).toEqual([]);
   });
 
-  test('speed stages void the evidence', () => {
+  test('a Speed stage on the first mover enters its race', () => {
     const { speedOrders } = parseReplayLogWithObservations(speedLog([
       '|move|p1a: Fast|Dragon Dance|p1a: Fast',
       '|-boost|p1a: Fast|atk|1',
@@ -275,8 +274,7 @@ describe('speed-order evidence', () => {
       '|move|p2a: Val|Moonblast|p1a: Fast',
       '|turn|3',
     ]));
-    expect(speedOrders).toHaveLength(1);
-    expect(speedOrders[0].turn).toBe(1);
+    expect(speedOrders.map(race => [race.turn, race.firstSpeed])).toEqual([[1, undefined], [2, [{ stage: 1 }]]]);
   });
 
   test('a Sleep Talk follow-up line is the same action, not a second mover', () => {
@@ -567,7 +565,7 @@ describe('KO-before-acting speed evidence', () => {
     expect(speedOrders[0].turn).toBe(1);
   });
 
-  test('a paradox booster is directional: it voids the fast, not the outrun', () => {
+  test('a paradox booster enters the race on the attacker as well as on the victim', () => {
     const boostedVictim = parseReplayLogWithObservations(koLog([
       '|-activate|p2a: Val|ability: Quark Drive',
       '|-start|p2a: Val|quarkdrivespe',
@@ -589,7 +587,11 @@ describe('KO-before-acting speed evidence', () => {
       '|faint|p2a: Val',
       '|turn|2',
     ]));
-    expect(boostedAttacker.speedOrders).toEqual([]);
+    expect(boostedAttacker.speedOrders).toEqual([{
+      firstSide: 'p1', firstSpecies: 'Noivern',
+      secondSide: 'p2', secondSpecies: 'Iron Valiant',
+      turn: 1, knockOut: true, firstSpeed: [{}, { volatile: 'protosynthesis' }],
+    }]);
   });
 });
 
