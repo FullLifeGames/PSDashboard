@@ -92,7 +92,7 @@ function playedSentence(step: WinStep, ctx: WinPathsViewContext): string {
 function strongerHeadline(step: WinStep, ctx: WinPathsViewContext, opponent: string): string | null {
   const own = step.line?.label ?? 'This choice';
   const sampled = ctx.doubles ? ' (over sampled rolls)' : '';
-  const wins = step.chance === undefined ? '' : `${own} wins within ${turnWords(ctx.turns ?? TURNS)} in ${chanceText(step.chance)} of the dice whatever ${opponent} plays${sampled}.`;
+  const wins = step.chance === undefined ? '' : `${own} wins within ${turnWords((ctx.question === 'proof' ? step.turns : undefined) ?? ctx.turns ?? TURNS)} in ${chanceText(step.chance)} of the dice whatever ${opponent} plays${sampled}.`;
   return [wins, playedSentence(step, ctx)].filter(Boolean).join(' ') || null;
 }
 

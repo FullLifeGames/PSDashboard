@@ -48,16 +48,31 @@ function candidatesOf(root: SimPosition, side: Side, request: WinPathsRequest): 
   return named ? [named, ...ranked.filter(option => option.choice !== choice)] : ranked;
 }
 
-function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: WinPathsRequest): { best: { mass: number; plan: ProofPlan } | null; played?: number } {
-  let best: { mass: number; plan: ProofPlan } | null = null;
+interface Choice { mass: number; turns: number; plan: ProofPlan }
+
+const sameMass = (a: number, b: number): boolean => Math.abs(a - b) < 1e-9;
+
+const choiceOf = (proof: ReturnType<ForcedWinProver['candidateProof']>): Choice | null =>
+  proof.plan && proof.proven.mass > 0 ? { mass: proof.proven.mass, turns: proof.proven.turns, plan: proof.plan } : null;
+
+const playedOpens = (played: Choice | null, best: Choice | null): boolean =>
+  !!played && !!best && (played.mass > best.mass || sameMass(played.mass, best.mass)) && played.turns <= best.turns;
+
+function proveCandidates(root: SimPosition, prover: ForcedWinProver, request: WinPathsRequest): { best: Choice | null; played?: number } {
+  let best: Choice | null = null;
+  let playedChoice: Choice | null = null;
   let played: number | undefined;
   for (const candidate of candidatesOf(root, request.side, request)) {
     if (prover.capped) break;
     const proof = prover.candidateProof(root, candidate);
-    if (candidate.choice === request.played && !prover.capped) played = proof.proven.mass;
-    if (proof.plan && proof.proven.mass > (best?.mass ?? 0)) best = { mass: proof.proven.mass, plan: proof.plan };
+    const found = choiceOf(proof);
+    if (candidate.choice === request.played && !prover.capped) {
+      played = proof.proven.mass;
+      playedChoice = found;
+    }
+    if (found && found.mass > (best?.mass ?? 0)) best = found;
   }
-  return { best, played };
+  return { best: request.proof && playedOpens(playedChoice, best) ? playedChoice : best, played };
 }
 
 export function strongerStep(serialized: string, request: WinPathsRequest, meter = new WinMeter(request.budget)): WinStep {
@@ -74,5 +89,5 @@ export function strongerStep(serialized: string, request: WinPathsRequest, meter
   if (!best || (!request.proof && best.mass <= (played ?? 0))) return done({ status: prover.capped ? 'stopped' : 'none', ...(best ? { chance: best.mass } : {}), ...beside });
   const witness = luckUnder(serialized, { ...request, floor: 0 }, meter, planChooser(side, request, best.plan, meter, provers, turns));
   meter.cells = [...provers.values()].reduce((sum, item) => sum + item.cells, 0);
-  return done({ status: 'found', chance: best.mass, ...beside, ...(witness.line ? { line: witness.line } : {}) });
+  return done({ status: 'found', chance: best.mass, turns: best.turns, ...beside, ...(witness.line ? { line: witness.line } : {}) });
 }

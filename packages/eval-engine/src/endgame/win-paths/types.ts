@@ -38,6 +38,7 @@ export interface WinStep {
   /** For `found`: the chance of the line's dice (`luck`) or the mass a proof gives (`stronger`). */
   chance?: number;
   played?: number;
+  turns?: number;
   deviation?: { turn: number; label: string; rank: number };
   /** For `failed`: the technical message, never a line of the app. */
   error?: string;

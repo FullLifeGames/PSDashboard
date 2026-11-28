@@ -120,6 +120,15 @@ describe('the words of the winner\'s line', () => {
     expect(view.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 4 turns in 67 % of the dice whatever Mstr_Hawk plays (over sampled rolls).');
   });
 
+  test('a line that opens with a faster win counts its own turns, in singles and doubles; the loser\'s step keeps its three', () => {
+    const [single] = winStepViews([step('stronger', 'found', { chance: 1, played: 1, turns: 1, line: line() })], proof({ turns: 4, playedLabel: 'Hydro Pump' }));
+    expect(single.headline).toBe('Hydro Pump wins within 1 turn in 100 % of the dice whatever Tzon plays. Pepitopalotin played this choice.');
+    const [pair] = winStepViews([step('stronger', 'found', { chance: 1, played: 1, turns: 2, line: { ...doublesLine, for: [] } })], proof({ playerNames: DOUBLES_NAMES, doubles: true, side: 'p1', turns: 4, playedLabel: 'Fake Out → Rillaboom + Spore → Zamazenta' }));
+    expect(pair.headline).toBe('Fake Out → Rillaboom + Spore → Zamazenta wins within 2 turns in 100 % of the dice whatever Mstr_Hawk plays (over sampled rolls). pixelfrost played this choice.');
+    const [lost] = winStepViews([step('stronger', 'found', { chance: 0.6, turns: 1, line: line() })], ctx());
+    expect(lost.headline).toContain('wins within 3 turns in 60 %');
+  });
+
   test('a player who chose the line\'s first choice is told so; another choice keeps the sentence of the stronger play', () => {
     const found = step('stronger', 'found', { chance: 1, played: 1, line: line() });
     expect(winStepViews([found], proof({ playedLabel: 'Hydro Pump' }))[0].headline).toBe('Hydro Pump wins within 2 turns in 100 % of the dice whatever Tzon plays. Pepitopalotin played this choice.');

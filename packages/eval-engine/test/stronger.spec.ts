@@ -169,6 +169,61 @@ describe('a stronger play, doubles', () => {
 
 await loadSimMods('gen9championsou');
 
+describe('a tie between the played choice and the proof\'s choice', () => {
+  const SINGLES: Board = {
+    format: 'gen9customgame',
+    p1: [mon('Pikachu', ['Seismic Toss', 'Night Shade', 'Dragon Rage'])],
+    p2: [mon('Snorlax', ['Tackle'])],
+    prepare: battle => { battle.sides[1].pokemon[0].hp = 50; },
+  };
+  const DOUBLES: Board = {
+    format: 'gen9doublescustomgame',
+    p1: [mon('Pikachu', ['Splash', 'Earthquake', 'Dragon Rage']), mon('Pidgeot', ['Splash', 'Seismic Toss'])],
+    p2: [mon('Pikachu', ['Splash', 'Growl']), mon('Pikachu', ['Splash', 'Growl'])],
+    prepare: battle => { battle.sides[1].pokemon[0].hp = 1; battle.sides[1].pokemon[1].hp = 1; },
+  };
+  const scenes = [
+    { game: 'singles', board: SINGLES, quick: 'move seismictoss', same: 'move nightshade', slow: 'move dragonrage' },
+    { game: 'doubles', board: DOUBLES, quick: 'move earthquake, move splash', same: 'move earthquake, move seismictoss 1', slow: 'move dragonrage 1, move splash' },
+  ];
+  const run = async (board: Board, order: string[], played: string, choice: string) => {
+    const { serialized } = await serializedBoard(board);
+    return strongerStep(serialized, REQUEST('p1', { rootOrder: order, played, proof: { choice } }));
+  };
+
+  test.each(scenes)('$game: a played choice that wins in fewer turns opens the line', async ({ board, quick, same, slow }) => {
+    const step = await run(board, [slow, same, quick], quick, slow);
+    expect(step.status).toBe('found');
+    expect(step.line!.choice).toBe(quick);
+    expect(step.chance).toBe(1);
+    expect(step.played).toBe(1);
+    expect(step.turns).toBe(1);
+  }, 240_000);
+
+  test.each(scenes)('$game: a played choice that wins in as many turns opens the line', async ({ board, quick, same, slow }) => {
+    const step = await run(board, [same, slow, quick], quick, same);
+    expect(step.status).toBe('found');
+    expect(step.line!.choice).toBe(quick);
+    expect(step.played).toBe(1);
+    expect(step.turns).toBe(1);
+  }, 240_000);
+
+  test.each(scenes)('$game: a proof choice that wins in fewer turns keeps the line', async ({ board, quick, same, slow }) => {
+    const step = await run(board, [quick, same, slow], slow, quick);
+    expect(step.status).toBe('found');
+    expect(step.line!.choice).toBe(quick);
+    expect(step.chance).toBe(1);
+    expect(step.played).toBe(1);
+    expect(step.turns).toBe(1);
+  }, 240_000);
+
+  test.each(scenes)('$game: a line that opens with the slower choice names its turns', async ({ board, quick, same, slow }) => {
+    const step = await run(board, [slow, same, quick], slow, slow);
+    expect(step.line!.choice).toBe(slow);
+    expect(step.turns).toBe(2);
+  }, 240_000);
+});
+
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`../../../test/e2e-feedback/fixtures/${name}.json`, import.meta.url), 'utf-8')) as ReplayData;
 
 describe('a stronger play on the corpus', () => {
