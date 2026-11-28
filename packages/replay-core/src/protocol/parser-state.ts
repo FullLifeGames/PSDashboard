@@ -3,7 +3,7 @@ import type { GenerationNum } from '@pkmn/data';
 import { generationsFor } from '../format-generations.ts';
 import { toId } from '../ids.ts';
 import type { ItemReading } from './item-reading.ts';
-import { effectsOver, type SpeedPoint } from './speed-effects.ts';
+import { effectsAcross, effectsOver, type SpeedPoint } from './speed-effects.ts';
 import type { DamageObservation, HiddenPowerEvidence, PokemonSnapshot, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
@@ -133,20 +133,14 @@ export function ppUsedOf(mon: Pokemon): PokemonSnapshot['ppUsed'] {
   }));
 }
 
-/** Whether a factor could explain the observed order: a raiser on the first mover or a lowerer on the second. */
+/** A factor the race cannot price: a lowerer on the second mover, in Generation 1 a stage on the first. */
 export function speedContaminatedAt(state: ParserState, ident: string, role: 'first' | 'second'): boolean {
   const { battle } = state;
   const mon = battle.getPokemon(ident as ClientIdent);
   if (!mon) return true;
   if ((battle.field.pseudoWeather as Record<string, unknown>)['trickroom']) return true;
   if (state.switchedThisTurn.has(ident)) return true;
-  if (role === 'first') {
-    const side = ident.startsWith('p1') ? battle.p1 : battle.p2;
-    const paradox = Object.keys((mon.volatiles ?? {}) as Record<string, unknown>)
-      .some(key => /^(protosynthesis|quarkdrive)/.test(key));
-    return paradox || (mon.boosts.spe ?? 0) > 0 ||
-      !!(side.sideConditions as Record<string, unknown>)['tailwind'];
-  }
+  if (role === 'first') return state.genNum === 1 && (mon.boosts.spe ?? 0) > 0;
   return mon.status === 'par' || (mon.boosts.spe ?? 0) < 0;
 }
 
@@ -162,11 +156,13 @@ export function flushSpeedOrder(state: ParserState) {
       if (state.reordered.has(first.ident) || state.reordered.has(second.ident)) continue;
       const points = second.mon ? [state.turnStart.get(second.mon), first.seen.get(second.mon)] : [];
       if (points.some(seen => seen?.lowered)) continue;
+      const firstSpeed = effectsAcross(state, first.mon, first.seen);
       const secondSpeed = effectsOver(points);
       state.speedOrders.push({
         firstSide: first.side, firstSpecies: first.species,
         secondSide: second.side, secondSpecies: second.species,
         turn: state.speedTurn,
+        ...(firstSpeed ? { firstSpeed } : {}),
         ...(secondSpeed ? { secondSpeed } : {}),
       });
     }

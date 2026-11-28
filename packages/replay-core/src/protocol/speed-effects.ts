@@ -49,3 +49,8 @@ export function effectsOver(points: (SpeedSeen | undefined)[]): RaceSpeedEffects
   }
   return entries.some(entry => Object.keys(entry).length > 0) ? entries : undefined;
 }
+
+/** The distinct entries `mon` stood under at the turn's start and at the point `seen` of an action. */
+export function effectsAcross(state: ParserState, mon: Pokemon | null | undefined, seen: SpeedPoint): RaceSpeedEffects[] | undefined {
+  return mon ? effectsOver([state.turnStart.get(mon), seen.get(mon)]) : undefined;
+}

@@ -1,6 +1,6 @@
 import type { Generation } from '@pkmn/data';
 import { speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
-import { effectsOver } from './speed-effects.ts';
+import { effectsAcross, effectsOver } from './speed-effects.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
@@ -318,6 +318,7 @@ export function recordFaintSpeedEvidence(state: ParserState, line: string) {
   if (!victimMon) return;
   const points = [state.turnStart.get(victimMon), lastMove.seen.get(victimMon)];
   if (points.some(seen => seen?.lowered)) return;
+  const firstSpeed = effectsAcross(state, battle.getPokemon(lastMove.attacker as ClientIdent), lastMove.seen);
   const secondSpeed = effectsOver(points);
   state.speedOrders.push({
     firstSide: lastMove.attackerSide, firstSpecies: lastMove.attackerSpecies,
@@ -325,6 +326,7 @@ export function recordFaintSpeedEvidence(state: ParserState, line: string) {
     secondSpecies: victimMon.speciesForme,
     turn: state.speedTurn,
     knockOut: true,
+    ...(firstSpeed ? { firstSpeed } : {}),
     ...(secondSpeed ? { secondSpeed } : {}),
   });
 }
