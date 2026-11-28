@@ -299,6 +299,22 @@ describe('GameGraphSection.review', () => {
         expect(scroll).toHaveBeenCalledTimes(1);
       });
 
+      test('a click on a key-turn row of the game report brings the card into view once the turn view has opened', async () => {
+        const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+        onTestFinished(() => scroll.mockRestore());
+        const report = gameReport({ keyMoments: [turnAnalysis(7, { attribution: 'chance', swing: -0.35 })] });
+        const wired = props({ graph: evalGraph(kind), doubles, reviewAnalyses: graded, report });
+        const { rerender } = render(<GameGraphSection {...wired} />);
+        await userEvent.click(screen.getByRole('button', { name: /^T7/ }));
+        expect(wired.selectTurn).toHaveBeenCalledWith(7);
+        expect(scroll).not.toHaveBeenCalled();
+        rerender(<GameGraphSection {...turnView(7, { selectTurn: wired.selectTurn })} />);
+        expect(scroll).toHaveBeenCalledTimes(1);
+        expect((scroll.mock.contexts[0] as Element).matches('.ps-eval-analysis > .ps-eval-analysis-row')).toBe(true);
+        rerender(<GameGraphSection {...turnView(9, { selectTurn: wired.selectTurn })} />);
+        expect(scroll).toHaveBeenCalledTimes(1);
+      });
+
       test('the question to replace a variation shows once, under the clicked review button, with the card\'s Lines open', async () => {
         const line: EvalLine = doubles ? doublesLine : singlesLine;
         const lines: EvalLine[] = doubles ? [doublesLine] : [singlesLine, playedLine];

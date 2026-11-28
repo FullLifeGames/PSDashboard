@@ -258,19 +258,20 @@ function GraphView(props: GameGraphSectionProps) {
 
 function ReportOverview({ report, wantedRef, ...props }: GameGraphSectionProps & { report: GameReport; wantedRef: Wanted }) {
   const { graph, playerNames, selectTurn, reportLeads, reviewAnalyses, linesHost, doubles } = props;
+  const selectAndReveal = (turn: number) => { wantedRef.current = turn; selectTurn?.(turn); };
   return (
     <>
       <EvalGameReport
         report={report}
         playerNames={playerNames}
-        onSelectTurn={selectTurn}
+        onSelectTurn={selectAndReveal}
         leads={reportLeads}
         settingsFor={turn => (turn >= 1 ? graph.settings[turn - 1] ?? null : null)}
       />
       {gameReviewEnabled() && reviewAnalyses && linesHost && (
         <GameReviewPanel
           analyses={reviewAnalyses} results={graph.results} playerNames={playerNames} doubles={!!doubles}
-          host={linesHost} onSelectTurn={turn => { wantedRef.current = turn; selectTurn?.(turn); }} open={props.reviewOpen} onToggle={props.onReviewToggle}
+          host={linesHost} onSelectTurn={selectAndReveal} open={props.reviewOpen} onToggle={props.onReviewToggle}
         />
       )}
     </>

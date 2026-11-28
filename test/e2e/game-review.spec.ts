@@ -41,6 +41,19 @@ async function expectCardTopInView(card: Locator) {
   }), 'the card starts inside the view').toBeGreaterThanOrEqual(-0.5);
 }
 
+async function openLastReportTurn(panel: Locator): Promise<boolean> {
+  const chips = panel.locator('.ps-eval-report-moment').filter({ hasText: /^T[1-9]/ });
+  if (await chips.count() === 0) return false;
+  const chip = chips.last();
+  const turn = Number(((await chip.locator('span').first().textContent()) ?? '').replace(/^T/, ''));
+  await chip.evaluate(element => element.scrollIntoView({ block: 'start' }));
+  await chip.click();
+  await expect(panel.locator('.ps-eval-analysis')).toContainText(`Turn ${turn}`, { timeout: 30_000 });
+  await expect(panel.locator('.ps-eval-analysis-row').first()).toBeInViewport({ ratio: 0.5 });
+  await expectCardTopInView(panel.locator('.ps-eval-analysis').first());
+  return true;
+}
+
 const bare = (text: string) => text.replace(/ \([^)]*\)/g, '').replace(/ → [^:]+(?=:)/, '').trim();
 
 for (const game of GAMES) {
@@ -93,6 +106,8 @@ for (const game of GAMES) {
     await expect(review.locator('.ps-eval-review-row[aria-current]')).toHaveCount(0);
     guard.assertClean();
     console.log(`${game.id}: worker requests up to the report and a turn: ${guard.requests().join(', ') || 'none'}`);
+    if (await openLastReportTurn(panel)) await panel.getByRole('button', { name: /Game report/ }).click();
+    await expect(review).toBeVisible();
 
     const withLine = review.locator('.ps-eval-review-row').filter({ has: page.locator('.ps-eval-review-line button') });
     const playable = await withLine.count();
@@ -176,7 +191,7 @@ test('singles in Auto: the graded early turns get their lines after the report, 
   expect(await history.locator('strong').allTextContents(), `the history starts at turn ${playable!.turn}`).toContain(`Turn ${playable!.turn}`);
 });
 
-test('VGC at 390 px: three review rows show their cards in view, the review stays open and marks the row', async ({ page }) => {
+test('VGC at 390 px: three review rows and a key-turn row of the report show their cards in view, the review stays open and marks the row', async ({ page }) => {
   test.setTimeout(900_000);
   const replay = fixture('gen9vgc2026regi-2630452654');
   await page.setViewportSize({ width: 390, height: 844 });
@@ -207,5 +222,7 @@ test('VGC at 390 px: three review rows show their cards in view, the review stay
     await expect(review.locator('.ps-eval-review-row[aria-current="true"]').first()).toContainText(`T${turn}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'no horizontal overflow').toBe(true);
   }
+  await panel.getByRole('button', { name: /Game report/ }).click();
+  expect(await openLastReportTurn(panel), 'the report lists a turn to open').toBe(true);
   guard.assertClean();
 });
