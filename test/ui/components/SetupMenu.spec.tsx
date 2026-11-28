@@ -129,15 +129,16 @@ describe('the "Opponent reads my move" checkbox in the Setup menu', () => {
     expect(screen.getByRole('button', { name: 'Setup' })).toHaveAttribute('aria-expanded', 'true');
   });
 
-  test('its title says what the opponent does, where, and that grades stay', async () => {
-    menu(false);
+  test.each([[false], [true]])('a visible note under the box says what the opponent does and what stays (setting %s), and the label has no title', async flag => {
+    menu(flag);
     await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    expect(screen.getByRole('checkbox', { name: 'Opponent reads my move' }).closest('label')).toHaveAttribute(
-      'title',
-      'In a variation the opponent answers each move you pick with the reply the search rates lowest for it, as if it had read your move: '
-      + 'when you click an engine move, in the turn dock, and in a turn\'s lines and the Game review. '
-      + 'Off, it plays its own top choice, which does not depend on your move. Grades and scores stay as they are. A change applies from your next pick.',
-    );
+    const box = screen.getByRole('checkbox', { name: 'Opponent reads my move' });
+    const note = 'In a variation, each move you pick meets the reply that hurts it most, and Lines shows each line against that reply. '
+      + 'The engine\'s suggestion, the grades and the win chances stay.';
+    expect(screen.getByText(note)).toHaveClass('ps-setup-note');
+    expect(box.closest('label')).not.toHaveAttribute('title');
+    expect(box.closest('label')?.nextElementSibling).toBe(screen.getByText(note));
+    expect(box).toHaveAccessibleDescription(note);
   });
 });
 
@@ -192,7 +193,7 @@ describe('Depth and Samples in the Setup menu', () => {
     localStorage.setItem('ps-replay-interceptor:search-budget', 'trees=8,iterations=1200,singles-tree-from=0.5,doubles-tree-from=0.25,doubles-early-samples=5');
     onTestFinished(() => localStorage.removeItem('ps-replay-interceptor:search-budget'));
     await openMenu({ prefs: { ...prefs, mode: 'auto' } });
-    expect(select('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
+    expect(screen.getByText('Depth')).toHaveAttribute('title', 'Auto picks the engine per turn. Singles: the depth-1 matrix with 3 samples until 50% of all Pokémon have fainted, then the MCTS tree. Doubles: the depth-1 matrix with 5 samples until 25% of all Pokémon have fainted, then the MCTS tree. The MCTS search runs 8 trees of 1200 iterations each.');
   });
 
   test('both selects lock while a search runs, and a pick keeps the menu open', async () => {
@@ -245,6 +246,19 @@ describe('Tera in the Setup menu', () => {
     expect(screen.getByText('Depth')).toBeInTheDocument();
   });
 
+  test('while the format check is pending the row stays drawn, locked, and its title says why', async () => {
+    await openMenu({ showTera: false, teraPending: true });
+    expect(select('Tera')).toBeDisabled();
+    expect(select('Tera')).toHaveValue('auto');
+    expect(screen.getByText('Tera')).toHaveAttribute('title', 'Locked until the format check answers whether this format allows Tera.');
+  });
+
+  test('the answer unlocks the row and brings back the usual title', async () => {
+    await openMenu({ showTera: true, teraPending: false });
+    expect(select('Tera')).toBeEnabled();
+    expect(screen.getByText('Tera')).toHaveAttribute('title', TERA_TITLE);
+  });
+
   test('another engine still gets the row, since the request carries the Tera setting, and no Depth', async () => {
     await openMenu({ external: true });
     expect(select('Tera')).toBeEnabled();
@@ -254,6 +268,20 @@ describe('Tera in the Setup menu', () => {
   test('the row locks while a search runs', async () => {
     await openMenu({ running: true });
     expect(select('Tera')).toBeDisabled();
+  });
+});
+
+describe('the titles of the search rows', () => {
+  const bot: EngineEntry = { id: 'url:http://localhost:8765/', name: 'My bot', url: 'http://localhost:8765/', source: 'added' };
+
+  test('each row carries its title on its label and no select carries one, so the hover reads the same across the row', async () => {
+    await openMenu({ engines: { engines: [BUILTIN_ENGINE, bot], selected: BUILTIN_ENGINE, select: vi.fn() } });
+    const rows = [...document.querySelectorAll('.ps-setup-panel .ps-setup-row')];
+    expect(rows.map(row => row.firstChild?.textContent?.trim())).toEqual(['Engine', 'Depth', 'Samples', 'Tera']);
+    for (const row of rows) {
+      expect(row).toHaveAttribute('title', expect.stringMatching(/\S/));
+      expect(row.querySelector('select')).not.toHaveAttribute('title');
+    }
   });
 });
 

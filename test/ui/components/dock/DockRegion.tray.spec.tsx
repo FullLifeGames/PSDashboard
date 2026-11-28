@@ -11,9 +11,9 @@ vi.mock('../../../../src/lib/pokemon-options', () => ({
   getMovePool: async (...args: unknown[]) => { poolCalls.list.push(args); return ['Dragon Claw', 'Fire Fang']; },
 }));
 
-interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string }; prefs?: { hardMode?: boolean }; setPrefs?: (prefs: object) => void }
+interface Where { sim: BranchSimState; historyLength: number; liveTip?: boolean; replayData?: { id: string; log: string }; prefs?: { hardMode?: boolean }; setPrefs?: (prefs: object) => void; reads?: string | null }
 
-function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, setPrefs = vi.fn() }: Where): AppController {
+function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, setPrefs = vi.fn(), reads }: Where): AppController {
   const noop = vi.fn();
   return {
     board: {
@@ -31,7 +31,7 @@ function appAt({ sim, historyLength, liveTip = true, replayData, prefs = {}, set
       positionPicker: null, dockSimState: sim, pickerSeed: null, pickerStale: false, playedAtView: undefined,
       getPickerBattle: undefined, pickerReplayLog: undefined,
       acquire: { exactAcquiringTurn: null },
-      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, picks: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, restore: () => null, holdTray: noop, release: noop, arm: noop },
+      dockFill: { pending: false, busy: false, waits: false, engine: { p1: [], p2: [] }, choices: null, deferred: { p1: [], p2: [] }, picks: { p1: [], p2: [] }, queueExecute: noop, onUserChoice: noop, restore: () => null, holdTray: noop, release: noop, arm: noop, ...(reads === undefined ? {} : { reads }) },
     },
     transients: { playOut: null, pendingConfirm: null, setPendingConfirm: noop },
     handleHypotheticalMove: noop, handleExecuteTurn: noop,
@@ -99,5 +99,23 @@ describe.each(['singles', 'doubles'] as const)('the "Opponent reads your move" n
     expect(screen.getByText('Opponent reads your move')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Turn off' }));
     expect(setPrefs).toHaveBeenCalledWith({ depth: 2, autoAnalyze: true, hardMode: false });
+  });
+
+  test.each([
+    ['waiting', 'Opponent reads your move: its reply follows your pick'],
+    ['answered', 'Opponent reads your move: its engine slots answer your pick'],
+    ['unranked', 'Opponent reads your move: no ranked reply to this pick, so its slots keep the engine\'s choice'],
+    ['both', 'Opponent reads your move: both sides hold your picks'],
+  ] as const)('the note ends with the tail of the read state %s and "Turn off" follows it', (reads, text) => {
+    const prefs = { hardMode: true };
+    render(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs, reads })} replayId="r1" />);
+    const note = screen.getByText(text);
+    expect(note).toHaveClass('ps-dock-source');
+    expect(note.nextElementSibling).toBe(screen.getByRole('button', { name: 'Turn off' }));
+  });
+
+  test('with the setting off the view\'s read shows nothing', () => {
+    render(<DockRegion app={appAt({ sim: simState(type), historyLength: 1, prefs: { hardMode: false }, reads: null })} replayId="r1" />);
+    expect(screen.queryByText(/Opponent reads your move/)).toBeNull();
   });
 });

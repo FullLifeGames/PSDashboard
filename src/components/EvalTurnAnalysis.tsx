@@ -9,7 +9,7 @@ import { CardToggle } from './eval/CardToggle';
 import { LinesSection } from './eval/LinesSection';
 import { MatrixDialogButton } from './eval/MatrixDialog';
 import { WinPathsEntry } from './eval/WinPathsEntry';
-import type { LinesHost } from '../lib/line-view';
+import { activeNamesAt, type LinesHost } from '../lib/line-view';
 import { SideRow } from './eval/SideRow';
 import { evTitle, leadGradeSize } from './eval/turn-copy';
 import { sideIndex } from '@fulllifegames/replay-core';
@@ -94,6 +94,7 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
   if (lines.turn !== analysis.turn) setLines({ turn: analysis.turn, open: false });
   if (open) return <OpenTurnAnalysis analysis={analysis} playerNames={playerNames} reads={reads} onExplore={onExplore} result={result} onPickPair={onPickPair} opponentReads={opponentReads} />;
   const badge = attributionBadge(analysis, playerNames);
+  const slotNames = activeNamesAt(linesHost?.snapshot);
   const exploreFor = (side: 'p1' | 'p2') =>
     onExplore && ((choice: RankedChoice) =>
       onExplore(side, choice, side === 'p1' ? analysis.p2.best : analysis.p1.best, result));
@@ -116,8 +117,8 @@ export function EvalTurnAnalysis({ analysis, playerNames, reads, onExplore, resu
         </>
       ) : (
         <>
-          <SideRow name={playerNames[0]} side={analysis.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
-          <SideRow name={playerNames[1]} side={analysis.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
+          <SideRow name={playerNames[0]} side={analysis.p1} names={slotNames?.p1} onExplore={exploreFor('p1')} lostGround={lostGround(analysis, 'p1')} opponentReads={opponentReads} rowLines={{ result, side: 'p1' }} />
+          <SideRow name={playerNames[1]} side={analysis.p2} names={slotNames?.p2} onExplore={exploreFor('p2')} lostGround={lostGround(analysis, 'p2')} opponentReads={opponentReads} rowLines={{ result, side: 'p2' }} />
         </>
       )}
       <ReadRows reads={reads} playerNames={playerNames} faintedFraction={analysis.faintedFraction} />

@@ -24,7 +24,7 @@ export function winPaths(
   runners: readonly WinStepRunner[] = WIN_STEPS,
 ): WinPaths {
   const steps: WinStep[] = [];
-  for (const runner of runners) {
+  for (const runner of request.proof ? runners.filter(item => item.kind === 'stronger') : runners) {
     const meter = new WinMeter(request.budget);
     let step: WinStep;
     try {

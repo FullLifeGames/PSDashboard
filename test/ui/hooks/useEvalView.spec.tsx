@@ -2,6 +2,7 @@ import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { logRules } from '@fulllifegames/replay-core';
 import { configureSearchBudget, parsePlayedActions, parseSearchBudget, replacementRounds, type EvalResult } from '@fulllifegames/eval-engine';
+import { useFormatOffersTera } from '../../../src/hooks/useFormatOffersTera';
 import { useEvalView, type EvalViewInputs } from '../../../src/hooks/useEvalView';
 import type { useEvaluation } from '../../../src/hooks/useEvaluation';
 import type { TeamBuildSources } from '../../../src/lib/eval-acquire';
@@ -414,5 +415,22 @@ describe('useEvalView Tera Auto', () => {
     const game = tera('newgame-abcdefghij');
     await waitFor(() => expect(game.current.effectiveTera).toBe(allowed));
     expect(tera('gen9ou-1234567890').current.effectiveTera).toBe(false);
+  });
+});
+
+describe('useFormatOffersTera', () => {
+  test.each([
+    ['singles', 'gen9ou', true],
+    ['doubles', 'gen9doublesou', true],
+    ['a Terastal Clause format', 'gen9monotype', false],
+  ] as const)('a new game of %s reads pending until the probe answers, then follows the format', async (_kind, formatid, offers) => {
+    const { result } = renderHook(() => useFormatOffersTera(formatid, true));
+    expect(result.current).toEqual({ offers: false, pending: true });
+    await waitFor(() => expect(result.current).toEqual({ offers, pending: false }));
+  });
+
+  test('a switch that is off never asks and is never pending', () => {
+    const { result } = renderHook(() => useFormatOffersTera('gen9ou', false));
+    expect(result.current).toEqual({ offers: false, pending: false });
   });
 });

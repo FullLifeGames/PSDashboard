@@ -116,7 +116,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 190px;
+  min-width: 220px;
   padding: 8px;
   background: #22324f;
   border: 1px solid var(--ps-border);
@@ -134,11 +134,18 @@
   font-size: 11px;
   color: #aabbcc;
 }
+.ps-setup-note {
+  margin: -3px 0 0 20px;
+  max-width: 240px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #8899aa;
+}
 .ps-setup-size,
 .ps-setup-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 5em minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   font-size: 11px;
   color: #aabbcc;
@@ -146,7 +153,8 @@
 .ps-setup-size-select,
 .ps-setup-row-select {
   font: inherit;
-  max-width: 230px;
+  width: 100%;
+  min-width: 0;
   padding: 2px 4px;
   color: var(--ps-text);
   background: var(--ps-bg-deep);

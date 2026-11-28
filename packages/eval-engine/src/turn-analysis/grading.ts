@@ -3,9 +3,9 @@ import type { RankedChoice } from '../types.ts';
 import type { PlayedAction, SackInfo } from '../played.ts';
 import {
   DECIDED_SCORE, REGRET_THRESHOLD, RISK_PAYOFF_MARGIN,
-  TIER_THRESHOLDS, type AnalyzeTurnParams, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
+  TIER_THRESHOLDS, type AnalyzeTurnParams, type NoChoiceSlot, type SensitivityProbe, type Side, type SideAnalysis, type VerdictTier,
 } from './types.ts';
-import { matchPlayedChoice, matchPlayedSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
+import { matchPlayedChoice, matchPlayedSlots, noChoiceSlots, phantomStayIn, setupMoveClicked } from './played-match.ts';
 import { rulesOfActives } from './rules.ts';
 import { turnRolledFor } from './luck.ts';
 import { praisedSack, sackGate, type SackGate, type SackGrade } from './sack-gates.ts';
@@ -18,6 +18,7 @@ interface PlayedMatch {
   playedPartial: boolean;
   /** The side was KO'd before it acted: `played` is the stay-in phantom. */
   neverActed: boolean;
+  noChoice: NoChoiceSlot[];
 }
 
 function matchPlayedForSide(
@@ -29,10 +30,13 @@ function matchPlayedForSide(
   let played: RankedChoice | null = null;
   let playedPartial = false;
   let neverActed = false;
+  let noChoice: NoChoiceSlot[] = [];
   if (playedSlots) {
-    const match = matchPlayedSlots(params.result.perSide[key], playedSlots, params.result.playedBounds?.[key]);
+    const options = params.result.perSide[key];
+    const match = matchPlayedSlots(options, playedSlots, params.result.playedBounds?.[key]);
     played = match.played;
     playedPartial = match.partial;
+    noChoice = noChoiceSlots(params.played, key, options[0]?.choice.split(',').length ?? 0);
   } else if (params.played) {
     played = matchPlayedChoice(params.result, key, playedRaw);
     if (!played) {
@@ -43,7 +47,7 @@ function matchPlayedForSide(
       }
     }
   }
-  return { played, playedPartial, neverActed };
+  return { played, playedPartial, neverActed, noChoice };
 }
 
 // Verification can only ACQUIT: a deep pass that confirms the gap keeps the shallow equilibrium regret.
@@ -144,6 +148,7 @@ export interface SideGrading {
   played: RankedChoice | null;
   playedPartial: boolean;
   neverActed: boolean;
+  noChoice: NoChoiceSlot[];
   options: RankedChoice[];
   /** The top choice by equilibrium EV, the grading reference. */
   best: RankedChoice | null;
@@ -172,7 +177,7 @@ function rolledForTurn(params: AnalyzeTurnParams, key: Side, played: RankedChoic
 export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
   const playedRaw = params.played?.[key] ?? null;
   const playedSlots = key === 'p1' ? params.played?.p1Slots : params.played?.p2Slots;
-  const { played, playedPartial, neverActed } = matchPlayedForSide(params, key, playedSlots, playedRaw);
+  const { played, playedPartial, neverActed, noChoice } = matchPlayedForSide(params, key, playedSlots, playedRaw);
   const options = params.result.perSide[key];
   const best = options[0] ?? null;
   const safe = options.length > 0
@@ -180,10 +185,12 @@ export function gradeSide(params: AnalyzeTurnParams, key: Side): SideGrading {
     : null;
   const { regret, verifiedAtDepth } = verifiedRegret(params, key, played, best);
   const sack = params.sacks?.[key];
-  const verdict = sideVerdict(params, key, { sack, played, safe, regret, neverActed, rolledFor: rolledForTurn(params, key, played) });
+  const verdict = sideVerdict(params, key, {
+    sack, played, safe, regret, neverActed: neverActed || noChoice.length > 0, rolledFor: rolledForTurn(params, key, played),
+  });
   const acquittal = sensitivityAcquittal(verdict.tier, params.sensitivity?.[key]);
   return {
-    playedRaw, playedSlots, played, playedPartial, neverActed, options, best, safe, regret, verifiedAtDepth,
+    playedRaw, playedSlots, played, playedPartial, neverActed, noChoice, options, best, safe, regret, verifiedAtDepth,
     tier: acquittal.tier, sack, sacrificed: verdict.sacrificed, feedVerified: verdict.feedVerified,
     sensitivity: acquittal.sensitivity,
   };
@@ -202,6 +209,7 @@ export function gradingFields(params: AnalyzeTurnParams, key: Side, g: SideGradi
     ...setupField(params, g),
     ...(params.played?.prevented?.[key] ? { prevented: params.played.prevented[key] } : {}),
     ...(g.playedSlots ? { playedSlots: g.playedSlots } : {}),
+    ...(g.noChoice.length > 0 ? { noChoiceSlots: g.noChoice } : {}),
     ...(g.neverActed ? { neverActed: g.neverActed } : {}),
     played: g.played,
     best: g.best,

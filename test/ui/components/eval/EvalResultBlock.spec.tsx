@@ -57,9 +57,25 @@ describe('EvalResultBlock', () => {
     expect(titles().length).toBeGreaterThan(0);
     for (const title of titles()) expect(title).toMatch(/Win probability .* Play this turn in a variation; the opponent plays its top choice\.$/);
     rerender(<EvalResultBlock {...shared} opponentReads />);
-    for (const title of titles()) expect(title).toMatch(/Win probability .* Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it\.$/);
+    for (const title of titles()) expect(title).toMatch(/Win probability .* Play this turn in a variation; the opponent reads your move and answers with .+\.$/);
     rerender(<EvalResultBlock {...shared} onPickChoice={undefined} opponentReads />);
     for (const row of document.querySelectorAll('.ps-eval-choice')) expect(row.getAttribute('title')).not.toMatch(/Play this turn/);
+  });
+
+  test.each([
+    ['singles', 0, '→ Rotom-Wash'],
+    ['doubles', 0, 'Taunt → Amoonguss + Wood Hammer → Incineroar'],
+  ] as const)('%s: on, a row with a floor names the reply the click plays as its worst reply; off, the floor', (kind, row, reply) => {
+    const base = evalResult(kind);
+    const floor = base.matrix!.p2Labels[0];
+    const perSide = { ...base.perSide, p1: [{ ...base.perSide.p1[row], punishedBy: floor }, ...base.perSide.p1.slice(1)] };
+    const shared = { result: { ...base, perSide }, playerNames: names, status: 'done' as const, onPickChoice: vi.fn() };
+    const first = () => document.querySelector('button.ps-eval-choice')!.getAttribute('title')!;
+    const { rerender } = render(<EvalResultBlock {...shared} />);
+    expect(first()).toContain(`(worst reply: ${floor})`);
+    rerender(<EvalResultBlock {...shared} opponentReads />);
+    expect(first()).toContain(`(worst reply: ${reply})`);
+    expect(first()).toContain(`the opponent reads your move and answers with ${reply}.`);
   });
 
   test('a wide interval flags a toss-up; MCTS provenance and the follow-up line render; no matrix, no matrix button', () => {
@@ -80,6 +96,26 @@ describe('EvalResultBlock', () => {
     render(<EvalResultBlock result={result} status="done" playerNames={names} resultSettings={{ depth: 1, samples: 1, mode: 'mcts' }} />);
     expect(screen.getByText('then → Keldeo → Hydro Pump · High Jump Kick')).toBeInTheDocument();
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
+  });
+});
+
+describe('EvalResultBlock: a floor whose reply the matrix lists no column for', () => {
+  const unlisted = 'Tera + Precipice Blades + Sleep Powder → Calyrex-Shadow';
+  const titleOf = (result: ReturnType<typeof evalResult>) => {
+    render(<EvalResultBlock result={result} status="done" playerNames={names} />);
+    return document.querySelector('.ps-eval-choice')!.getAttribute('title')!;
+  };
+  test.each([['singles'], ['doubles']] as const)('a reply that is a column of the table reads as before (%s)', kind => {
+    const base = evalResult(kind);
+    const listed = base.matrix!.p2Labels[0];
+    const result = evalResult(kind, { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: listed }, ...base.perSide.p1.slice(1)] } });
+    expect(titleOf(result)).toContain(`(worst reply: ${listed})`);
+  });
+
+  test('doubles: a reply the table does not list is named as such', () => {
+    const base = evalResult('doubles');
+    const result = evalResult('doubles', { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: unlisted }, ...base.perSide.p1.slice(1)] } });
+    expect(titleOf(result)).toContain(`(worst reply: ${unlisted}, which the matrix dialog does not list)`);
   });
 });
 

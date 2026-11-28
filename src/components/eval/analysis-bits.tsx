@@ -1,14 +1,14 @@
 import { type EvalResult, type SideAnalysis, type RankedChoice, formatLine, winPctText } from '@fulllifegames/eval-engine';
 import { rowLineTail } from '../../lib/row-line';
-import { evTitle, exploreTitle } from './turn-copy';
+import { evTitle, exploreTitle, readsReply } from './turn-copy';
 
-export function ExplorableLabel({ label, color = '#cde', onClick, opponentReads }: { label: string; color?: string; onClick?: () => void; opponentReads?: boolean }) {
+export function ExplorableLabel({ label, color = '#cde', onClick, opponentReads, reply }: { label: string; color?: string; onClick?: () => void; opponentReads?: boolean; reply?: string }) {
   if (!onClick) return <span style={{ color }}>{label}</span>;
   return (
     <button
       type="button"
       className="ps-btn ps-eval-inline-btn"
-      title={exploreTitle(opponentReads)}
+      title={exploreTitle(opponentReads, reply)}
       onClick={onClick}
       style={{ padding: '0 4px', fontSize: 10, color, whiteSpace: 'normal', textAlign: 'left' }}
     >
@@ -47,13 +47,14 @@ export function EngineRow({ name, side, onExplore, opponentReads, rowLines }: {
 }) {
   if (!side.best) return null;
   const best = side.best;
-  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, best, !!opponentReads) : best.line;
+  const tail = rowLines ? rowLineTail(rowLines.result, rowLines.side, best) : best.line;
+  const reply = readsReply(opponentReads, rowLines, best)?.reply.label;
   return (
     <div className="ps-eval-analysis-side">
       <div className="ps-eval-analysis-row">
         <span style={{ color: '#cde', fontWeight: 'bold' }}>{name}</span>
         <span style={{ color: '#aab' }} title={evTitle(name)}>
-          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} opponentReads={opponentReads} /> ({winPctText(best.ev, side.faintedFraction)})
+          engine: <ExplorableLabel label={best.label} onClick={onExplore && (() => onExplore(best))} opponentReads={opponentReads} reply={reply} /> ({winPctText(best.ev, side.faintedFraction)})
         </span>
         {tail && tail.length > 0 && (
           <span className="ps-eval-line">then {formatLine(tail)}</span>

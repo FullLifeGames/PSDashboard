@@ -54,6 +54,8 @@ export interface PlayedTurn {
   prevented?: { p1?: string; p2?: string };
   /** Per side and slot, the mark of a body that fell before acting (null: the slot did not); absent when none fell. */
   fell?: { p1?: (FellMark | null)[]; p2?: (FellMark | null)[] };
+  /** Doubles: per side and slot, true where the slot logged nothing before `|win|` or `|tie|`; absent when none. */
+  ended?: { p1?: boolean[]; p2?: boolean[] };
 }
 
 const sideOf = (pokemonRef: string): SideId | null => {
@@ -304,9 +306,14 @@ export function parsePlayedActionsDoubles(lines: string[]): PlayedTurn {
   }
 
   const marked = (['p1', 'p2'] as const).filter(side => fell[side].some(mark => mark !== null));
+  const over = turn.some(line => line.startsWith('|win|') || line === '|tie' || line.startsWith('|tie|'));
+  const unsettled = over ? (['p1', 'p2'] as const).filter(side => scan.settled[side].some(done => !done)) : [];
   return {
     p1: null, p2: null, p1Slots: scan.slots.p1, p2Slots: scan.slots.p2,
     ...(marked.length > 0 ? { fell: Object.fromEntries(marked.map(side => [side, fell[side]])) as NonNullable<PlayedTurn['fell']> } : {}),
+    ...(unsettled.length > 0
+      ? { ended: Object.fromEntries(unsettled.map(side => [side, scan.settled[side].map(done => !done)])) as NonNullable<PlayedTurn['ended']> }
+      : {}),
   };
 }
 

@@ -2,10 +2,10 @@
 // test/regression/fixtures/api/eval-engine.txt (UPDATE_API_SNAPSHOT=1).
 export {
   analyzeTurn, PAYOFF_WINDOW, REGRET_THRESHOLD, TIER_THRESHOLDS, decidedSeenKey, forcedWinSeenKey, unansweredSeenKey,
-  diffChoices, matchPlayedSide, phantomStayIn, playedSetupMove,
+  diffChoices, hiddenSlots, matchPlayedSide, phantomStayIn, playedSetupMove, standsIn,
 } from './analysis.ts';
 export type {
-  AnalyzeTurnParams, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity,
+  AnalyzeTurnParams, NoChoiceSlot, SensitivityProbe, SideAnalysis, TurnAnalysis, TurnAttribution, TurnSensitivity,
   TurnVerification, VerdictTier,
 } from './analysis.ts';
 export {

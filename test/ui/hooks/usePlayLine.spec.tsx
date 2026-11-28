@@ -60,6 +60,16 @@ describe('usePlayLine', () => {
     expect(result.current.confirm).toBeNull();
   });
 
+  test.each([['singles', singlesLine, 20], ['doubles', doublesLine, 4]] as const)('%s: the question names the place of the click, the card\'s Lines by default', (_kind, line, turn) => {
+    const stub = appWith({ startTurn: 12, length: 3 });
+    const { result } = renderHook(() => usePlayLine(stub.app));
+    act(() => result.current.onPlay(line, turn, 'review'));
+    expect(result.current.confirm!.anchor).toBe(lineAnchor(line, turn, 'review'));
+    expect(result.current.confirm!.anchor).not.toBe(lineAnchor(line, turn));
+    act(() => result.current.onPlay(line, turn));
+    expect(result.current.confirm!.anchor).toBe(lineAnchor(line, turn, 'lines'));
+  });
+
   test('Cancel closes the question and leaves the variation; a second click moves the question to its line', () => {
     const stub = appWith({ startTurn: 12, length: 3 });
     const { result } = renderHook(() => usePlayLine(stub.app));
@@ -95,7 +105,7 @@ describe('useLinesHost', () => {
     const snapshots = [{ turn: 1 }, { turn: 2 }, { turn: 3 }];
     const app = {
       ...stub.app,
-      ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots } },
+      ctx: { ...stub.app.ctx, evaluation: { ...stub.app.ctx.evaluation, graph: { results: [] } }, replay: { snapshots }, knowledge: { setsFingerprint: '' } },
       board: { ...stub.app.board, timeline: { ...stub.app.board.timeline, analysisTurn: 2, analyzableTurns: 3 } },
       // the host mounts the win-path hook, which reads the analyses, the position source and the effective rules
       analysis: { gameAnalyses: null },

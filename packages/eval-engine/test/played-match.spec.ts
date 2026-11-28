@@ -3,7 +3,9 @@ import { logRules, rulesDex } from '@fulllifegames/replay-core';
 import {
   matchPlayedSide,
   matchPlayedSlots,
+  noChoiceSlots,
   phantomStayIn,
+  standsIn,
   findConsistentOptions,
   findPlayedOption,
   setupMoveClicked,
@@ -17,7 +19,7 @@ import { searchOptions } from '../src/search/options';
 import { createMatchupCache } from '../src/eval-function';
 import { createLocalTreeExecutor, searchTreesOrchestrated } from '../src/tree-orchestrator';
 import type { StaticRuleset } from '../src/eval-function';
-import { playedSetupMove, type SideAnalysis } from '../src/analysis';
+import { analyzeTurn, playedSetupMove, type SideAnalysis } from '../src/analysis';
 
 const option = (choice: string, label: string, ev: number): RankedChoice => ({ choice, label, worstCase: ev, expected: ev, ev, punishedBy: 'Reply' });
 const move = (name: string, targetLoc: number | null = null): PlayedAction => ({ kind: 'move', name, tera: false, targetLoc });
@@ -63,6 +65,86 @@ describe('doubles: the slot that fell before it acted (replay 2710981835 turn 7)
     const played: PlayedTurn = { p1: null, p2: null, p1Slots: slots, p2Slots: undefined };
     expect(matchPlayedSide(result, 'p1', played)?.choice).toBe('switch 3, move flashcannon 1');
     expect(matchPlayedSide(result, 'p1', played, { p1: [bound, null] })?.choice).toBe('move dragonpulse 1, move flashcannon 1');
+  });
+});
+
+describe('doubles: the slots that show no choice in the log', () => {
+  const mark = { before: [], speedMoved: false, activations: [] };
+  const turn = (slots: (PlayedAction | null)[], extra: Partial<PlayedTurn> = {}): PlayedTurn => ({ p1: null, p2: null, p1Slots: slots, ...extra });
+
+  test('a body that fell before it acted: its slot is named with the reason, the slot that moved is not', () => {
+    expect(noChoiceSlots(turn([null, move('Protect')], { fell: { p1: [mark, null] } }), 'p1', 2)).toEqual([{ slot: 0, reason: 'fell' }]);
+    expect(noChoiceSlots(turn([move('Protect'), null], { fell: { p1: [null, mark] } }), 'p1', 2)).toEqual([{ slot: 1, reason: 'fell' }]);
+  });
+
+  test('a body the game ended before it moved is named too, and a fall beside it keeps its own reason', () => {
+    expect(noChoiceSlots(turn([null, move('Aqua Jet')], { ended: { p1: [true, false] } }), 'p1', 2)).toEqual([{ slot: 0, reason: 'ended' }]);
+    expect(noChoiceSlots(turn([null, null], { fell: { p1: [mark, null] }, ended: { p1: [false, true] } }), 'p1', 2))
+      .toEqual([{ slot: 0, reason: 'fell' }, { slot: 1, reason: 'ended' }]);
+  });
+
+  test('an empty slot is no body: a side of one body names the fallen slot alone, and an ambiguous one names none', () => {
+    expect(noChoiceSlots(turn([null, null], { fell: { p1: [null, mark] }, ended: { p1: [true, false] } }), 'p1', 1)).toEqual([{ slot: 1, reason: 'fell' }]);
+    expect(noChoiceSlots(turn([null, move('Protect')], { ended: { p1: [true, false] } }), 'p1', 1)).toEqual([]);
+    expect(noChoiceSlots(turn([null, null], { ended: { p1: [true, true] } }), 'p1', 1)).toEqual([]);
+  });
+
+  test('a slot with a cant, a hidden action or no mark is not named, and a side without slots has none', () => {
+    expect(noChoiceSlots(turn([null, move('Protect')]), 'p1', 2)).toEqual([]);
+    expect(noChoiceSlots(turn([move('Protect'), move('Surf')], { fell: { p1: [null, null] } }), 'p1', 2)).toEqual([]);
+    expect(noChoiceSlots({ p1: move('Surf'), p2: null }, 'p1', 1)).toEqual([]);
+    expect(noChoiceSlots(null, 'p1', 2)).toEqual([]);
+  });
+
+  test('a side stands in when its played line rests on a stand-in: the singles stand-in or a slot with no choice', () => {
+    expect(standsIn({ neverActed: true })).toBe(true);
+    expect(standsIn({ noChoiceSlots: [{ slot: 0, reason: 'ended' }] })).toBe(true);
+    expect(standsIn({ noChoiceSlots: [] })).toBe(false);
+    expect(standsIn({})).toBe(false);
+  });
+});
+
+describe('doubles: the grade of a side with a slot that showed no choice', () => {
+  const mark = { before: [{ slot: 'p2a', move: 'Flare Blitz' }], speedMoved: false, activations: [] };
+  const rows = (punisher: string): EvalResult => ({
+    score: 0, interval: 0, depthCompleted: 1,
+    perSide: {
+      p1: [option('move surf 1, move earthpower 1', 'Surf→Foe + Earth Power→Foe', 0.5), { ...option('move irondefense, move protect', 'Iron Defense + Protect', -0.2), punishedBy: punisher }],
+      p2: [option('move flareblitz 1, move stealthrock', 'Flare Blitz→Foe + Stealth Rock', 0.2), option('move icebeam 1, move stealthrock', 'Ice Beam→Foe + Stealth Rock', 0.1)],
+    },
+  });
+  const turnOf = (played: PlayedTurn) => analyzeTurn({
+    turn: 7, result: rows('Flare Blitz→Foe + Stealth Rock'), played, playedOutcome: null, scoreBefore: 0, scoreAfter: 0, playedTracking: true,
+  });
+  const foe = [move('Ice Beam', 1), move('Stealth Rock')];
+  const log = (extra: Partial<PlayedTurn>): PlayedTurn => ({ p1: null, p2: null, p1Slots: [null, move('Protect')], p2Slots: foe, ...extra });
+
+  test('the fallen slot is named, the moved slot is matched, and the grade stays the stay-in against the best', () => {
+    const plain = turnOf(log({}));
+    const fell = turnOf(log({ fell: { p1: [mark, null] } }));
+    expect(fell.p1.noChoiceSlots).toEqual([{ slot: 0, reason: 'fell' }]);
+    expect(plain.p1.noChoiceSlots).toBeUndefined();
+    expect(fell.p1.played?.choice).toBe('move irondefense, move protect');
+    expect(fell.p1.playedPartial).toBe(true);
+    expect([fell.p1.tier, fell.p1.regret, fell.p1.best?.choice]).toEqual([plain.p1.tier, plain.p1.regret, plain.p1.best?.choice]);
+    expect(fell.p1.tier).toBe('blunder');
+  });
+
+  test('a stand-in earns no risk framing: the unpunished risk of the plain turn is gone', () => {
+    expect(turnOf(log({})).p1.riskUnpunished).toBe(true);
+    expect(turnOf(log({ fell: { p1: [mark, null] } })).p1.riskUnpunished).toBeUndefined();
+    expect(turnOf(log({ ended: { p1: [true, false] } })).p1.riskUnpunished).toBeUndefined();
+  });
+
+  test('both bodies without an action: no played line, both slots named', () => {
+    const none = turnOf({ p1: null, p2: null, p1Slots: [null, null], p2Slots: foe, fell: { p1: [mark, null] }, ended: { p1: [false, true] } });
+    expect(none.p1.noChoiceSlots).toEqual([{ slot: 0, reason: 'fell' }, { slot: 1, reason: 'ended' }]);
+    expect(none.p1.played).toBeNull();
+    expect(none.p1.regret).toBeNull();
+  });
+
+  test('the foe side, whose two slots both moved, carries no mark', () => {
+    expect(turnOf(log({ fell: { p1: [mark, null] } })).p2.noChoiceSlots).toBeUndefined();
   });
 });
 

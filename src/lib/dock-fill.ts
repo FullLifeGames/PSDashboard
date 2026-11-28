@@ -1,11 +1,14 @@
 import {
-  evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSimState, type BranchSlotChoice, type RankedChoice,
+  evalChoiceToSlotChoices, requiredChoicesForActiveSlots, type BranchSimState, type BranchSlotChoice, type EvalResult, type RankedChoice,
 } from '@fulllifegames/eval-engine';
 
 import { stillOffered, type SideChoices } from './dock-seed';
+import { worstReply } from './worst-reply';
 
 type Side = 'p1' | 'p2';
 type Choices = (BranchSlotChoice | null)[];
+
+export type DockReads = 'waiting' | 'answered' | 'unranked' | 'both';
 
 
 /** Maps an engine line onto one side's slots; null when a part does not resolve against the pickers. */
@@ -46,7 +49,7 @@ function clashesWithTouched(touched: Choices, filled: Choices): boolean {
   });
 }
 
-function activeCount(state: BranchSimState, side: Side): number {
+export function activeCount(state: BranchSimState, side: Side): number {
   const slots = side === 'p1' ? state.p1ActiveSlots : state.p2ActiveSlots;
   return slots?.length ?? 1;
 }
@@ -84,12 +87,34 @@ export function rowOfChoices(side: Side, ranked: RankedChoice[], state: BranchSi
   return found?.row ?? null;
 }
 
+export function handSide(touched: Record<Side, (BranchSlotChoice | null)[]>): Side | null {
+  const set = (['p1', 'p2'] as const).filter(side => touched[side].some(Boolean));
+  return set.length === 1 ? set[0] : null;
+}
+
+export function answersTo(result: EvalResult, state: BranchSimState, hand: Side, picks: (BranchSlotChoice | null)[], touched: (BranchSlotChoice | null)[]): RankedChoice[] | null {
+  const opponent: Side = hand === 'p1' ? 'p2' : 'p1';
+  const row = rowOfChoices(hand, result.perSide[hand], state, picks, touched);
+  const reply = row ? worstReply(result, hand, row)?.reply : undefined;
+  return reply ? [reply, ...result.perSide[opponent]] : null;
+}
+
 export function sameChoice(a: BranchSlotChoice | null | undefined, b: BranchSlotChoice | null | undefined): boolean {
   if (!a || !b) return !a && !b;
   const keys = (choice: BranchSlotChoice) => JSON.stringify(choice, (_key, value: unknown) => (
     value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0))) : value
   ));
   return keys(a) === keys(b);
+}
+
+export function backOnFill(target: Choices, marks: readonly boolean[], now: Choices): Choices {
+  return target.map((pick, index) => (pick && marks[index] && !sameChoice(now[index], pick) ? pick : null));
+}
+
+export const withSlot = <T,>(list: readonly T[], slot: number, value: T): T[] => Array.from({ length: Math.max(list.length, slot + 1) }, (_, index) => (index === slot ? value : list[index]));
+
+export function engineFill(side: Side, ranked: RankedChoice[], state: BranchSimState): Choices {
+  return pickFillParts(side, ranked, state, new Array<BranchSlotChoice | null>(activeCount(state, side)).fill(null), []).filled;
 }
 
 export function pickFill(side: Side, ranked: RankedChoice[], state: BranchSimState, touched: Choices, held: readonly boolean[] = []): Choices {

@@ -49,7 +49,7 @@ describe('Setup menu with the flag off', () => {
     expect(screen.getAllByRole('checkbox').map(box => box.closest('label')?.textContent?.trim())).toEqual(['Animate branch turns']);
     expect(screen.getByRole('button', { name: 'Edit Player' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import/Export Sets' })).toBeInTheDocument();
-    expect(document.body.innerHTML).not.toMatch(/Opponent reads|reads my move/);
+    expect(document.body.innerHTML).not.toMatch(/Opponent reads|reads my move|each move you pick/);
   });
 });
 
@@ -75,22 +75,6 @@ describe('the titles that name the reply rule', () => {
   });
 });
 
-describe('the Setup checkbox with its flag on and the Game review flag off', () => {
-  beforeEach(() => vi.stubEnv('VITE_FEATURE_OPPONENT_READS', ''));
-
-  test('its title leaves the Game review out', async () => {
-    vi.stubEnv('VITE_FEATURE_OPPONENT_READS', '1');
-    vi.stubEnv('VITE_FEATURE_GAME_REVIEW', '');
-    render(
-      <SetupMenu animateBranchTurns={false} onAnimateChange={vi.fn()} opponentReads={false} onOpponentReadsChange={vi.fn()} onEditSide={vi.fn()} onOpenSets={vi.fn()} />,
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Setup' }));
-    const title = screen.getByRole('checkbox', { name: 'Opponent reads my move' }).closest('label')?.getAttribute('title');
-    expect(title).toContain('in the turn dock, and in a turn\'s lines. Off, it plays its own top choice');
-    expect(title).not.toMatch(/Game review/);
-  });
-});
-
 const names: [string, string] = ['Alice', 'Bob'];
 const prefs: EvalPreferences = { depth: 2, samples: 1, mode: 'matrix', auto: false, autoAnalyze: false, tera: 'auto' };
 
@@ -113,6 +97,13 @@ describe.each(['singles', 'doubles'] as const)('%s: the Game review flag off', k
     expect(container.querySelectorAll('[data-review-mark]')).toHaveLength(0);
     expect(screen.queryByTestId('graph-marks-legend')).toBeNull();
     expect(container.textContent).not.toMatch(/Game review/);
+    expect(container.innerHTML).not.toMatch(/Game review/);
+  });
+
+  test('the turn view draws no review, no toggle and no row mark either', () => {
+    const { container } = render(<GameGraphSection {...props({ showReportView: false, analysis: turnAnalysis(4, { p1: misplayedSide('mistake') }), currentTurn: 4 })} />);
+    expect(screen.queryByRole('button', { name: /Game review/ })).toBeNull();
+    expect(container.querySelector('.ps-eval-review')).toBeNull();
     expect(container.innerHTML).not.toMatch(/Game review/);
   });
 

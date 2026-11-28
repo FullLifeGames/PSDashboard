@@ -78,10 +78,12 @@ export function formatAbilityBans(log: string): ReadonlySet<string> {
   return bans;
 }
 
-/** The first of the species' slots 0, 1, H that `skip` lets pass; slot 0 when every slot is skipped, '' without one. */
-export function firstAllowedAbility(dex: GenDex, species: string, skip: (abilityId: string) => boolean): string {
+type AbilitySlot = '0' | '1' | 'H' | 'S';
+
+/** The first slot (default 0, 1, H) whose ability `skip` lets pass; slot 0 if none does, '' without one. */
+export function firstAllowedAbility(dex: GenDex, species: string, skip: (abilityId: string) => boolean, slotOrder: readonly AbilitySlot[] = ['0', '1', 'H']): string {
   const slots = (dex.species.get(species).abilities ?? {}) as unknown as Record<string, string | undefined>;
-  for (const slot of ['0', '1', 'H'] as const) {
+  for (const slot of slotOrder) {
     const ability = slots[slot];
     if (ability && !skip(toId(ability))) return ability;
   }

@@ -56,7 +56,7 @@ describe('SideRow', () => {
     expect(screen.queryByText(/\(waiting\)/)).toBeNull();
   });
 
-  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s line, in Hard mode from the worst line', (kind, label) => {
+  test.each([['singles', 'Earthquake'], ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus']])('the better line (%s) reads its later steps from the result\'s usual line, with the opponent-reads setting on too', (kind, label) => {
     const pick = (name: string) => ({ choice: name.toLowerCase(), label: name, slots: [null] });
     const line = (steps: [string, string][], extra = {}) => ({
       side: 'p1' as const, label, choice: 'move earthquake', for: ['engine' as const], end: 0.1, endFainted: 0, visits: 50, ...extra,
@@ -71,7 +71,8 @@ describe('SideRow', () => {
     expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
     expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
     rerender(<SideRow name="Alice" side={side} rowLines={{ result, side: 'p1' }} opponentReads />);
-    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    expect(screen.getByText('then Swords Dance · Fake Out')).toBeInTheDocument();
+    expect(screen.queryByText('then Rock Slide · Taunt')).toBeNull();
     rerender(<SideRow name="Alice" side={side} rowLines={{ result: evalResult('singles'), side: 'p1' }} />);
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });
@@ -251,6 +252,47 @@ describe('SideRow', () => {
     expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: Pain Split (${winPctText(0.11)})`);
   });
 
+  describe.each([
+    ['Doubles OU 2663093831 t7', 'fell', 'Orthworm', 'Protect', 'Iron Defense + Protect', 'Orthworm was knocked out before it moved, so the log shows no choice'],
+    ['Champions VGC 2682637901 t6', 'ended', 'Volcarona', 'Aqua Jet', 'Quiver Dance + Aqua Jet', 'Volcarona was cut off by the end of the game, so the log shows no choice'],
+  ] as const)('%s: a slot with no logged action (%s)', (_scene, reason, name, moved, filled, words) => {
+    const pair = rankedChoice('move 1, move 2', filled, 0.47, 0.2);
+    const other = rankedChoice('move 3, move 4', 'Fake Out → Rillaboom + Spore → Tornadus', 0.47);
+    const sideOf = (extra: Partial<SideAnalysis> = {}) => sideAnalysis({
+      playedRaw: null, playedSlots: [null, { kind: 'move', name: moved }], played: pair, best: pair, safe: pair, playedPartial: true,
+      noChoiceSlots: [{ slot: 0, reason }], ...extra,
+    });
+
+    test('the card names the move that was played, says why the other slot shows none, and never names the stand-in', () => {
+      render(<SideRow name="Alice" side={sideOf({ best: other, safe: other })} names={[name, 'Partner']} />);
+      expect(screen.getByText(/^played /)).toHaveTextContent(`played ${moved} (${winPctText(0.47)})`);
+      expect(screen.getByText(`· ${words}`)).toBeInTheDocument();
+      expect(screen.queryByText('· partner unseen')).toBeNull();
+      expect(document.body.textContent).not.toContain(filled);
+    });
+
+    test('the stand-in earns no tick and no floor note: its row is the engine\'s pricing', () => {
+      render(<SideRow name="Alice" side={sideOf()} names={[name, 'Partner']} />);
+      expect(screen.queryByText(/the engine's move/)).toBeNull();
+      expect(screen.getByText(/engine:/)).toHaveTextContent(`engine: ${filled} (${winPctText(0.47)})`);
+      expect(screen.queryByText(/risked/)).toBeNull();
+    });
+
+    test('without the names of the bodies the slot reads by its place', () => {
+      render(<SideRow name="Alice" side={sideOf()} />);
+      expect(screen.getByText(`· ${words.replace(name, 'Slot A')}`)).toBeInTheDocument();
+    });
+  });
+
+  test('a slot the log shows nothing for and gives no reason stays "partner unseen"; a side with no played slot prints the reasons alone', () => {
+    const pair = rankedChoice('move 1, move 2', 'Quiver Dance + Aqua Jet', 0.47);
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [null, { kind: 'move', name: 'Aqua Jet' }], played: pair, best: pair, playedPartial: true })} />);
+    expect(screen.getByText('· partner unseen')).toBeInTheDocument();
+    rerender(<SideRow name="Alice" side={sideAnalysis({ playedRaw: null, playedSlots: [null, null], played: null, best: pair, safe: pair, regret: null, noChoiceSlots: [{ slot: 0, reason: 'fell' }] })} names={['Raichu']} />);
+    expect(screen.getByText('Raichu was knocked out before it moved, so the log shows no choice')).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/played |unseen|never surfaced/);
+  });
+
   test('doubles: the stand-in is a singles reading (a slot choice never makes one), so a side with slots keeps its card', () => {
     const slot = { kind: 'move' as const, name: 'Fake Out' };
     const pair = rankedChoice('move 1, move 2', 'Fake Out → Rillaboom + Protect', 0.2);
@@ -258,5 +300,72 @@ describe('SideRow', () => {
     expect(screen.getByText(/^played /)).toHaveTextContent(`played Fake Out → Rillaboom + Protect (${winPctText(0.2)})`);
     expect(screen.getByText("✓ the engine's move")).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/knocked out before it moved/);
+  });
+});
+
+describe('SideRow: the reply the click meets', () => {
+  test.each([
+    ['singles', 'Earthquake', '→ Rotom-Wash'],
+    ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', 'Taunt → Amoonguss + Wood Hammer → Incineroar'],
+  ] as const)('%s: with the result in hand the click titles name the reply the setting plays, and only while it is on', (kind, label, reply) => {
+    const result = evalResult(kind);
+    const best = result.perSide.p1[0];
+    const rowLines = { result, side: 'p1' as const };
+    const named = `Play this turn in a variation; the opponent reads your move and answers with ${reply}.`;
+    const general = 'Play this turn in a variation; the opponent plays its top choice.';
+    const { rerender } = render(<SideRow name="Alice" side={sideAnalysis({ best, played: best })} onExplore={vi.fn()} opponentReads rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: '✓ the engine\'s move ↗' })).toHaveAttribute('title', named);
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1);
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best, played })} onExplore={vi.fn()} opponentReads rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: `${label} ↗` })).toHaveAttribute('title', named);
+    rerender(<SideRow name="Alice" side={misplayedSide('mistake', { best, safe: best, played })} onExplore={vi.fn()} rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: `${label} ↗` })).toHaveAttribute('title', general);
+  });
+
+  const worstVs = (kind: 'singles' | 'doubles', thinLast: boolean) => {
+    const base = evalResult(kind);
+    const matrix = base.matrix!;
+    const last = matrix.p2Labels.length - 1;
+    const cells = matrix.p1Labels.map((_, i) => matrix.p2Labels.map((__, j) => (thinLast && i === 0 && j === last ? { visits: 3, verified: false } : { visits: 20, verified: true })));
+    const best = { ...base.perSide.p1[0], punishedBy: matrix.p2Labels[last] };
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1, { punishedBy: 'Leech Seed' });
+    return { name: 'Alice', side: misplayedSide('mistake', { best, safe: best, played }), rowLines: { result: { ...base, matrix: { ...matrix, cells } }, side: 'p1' as const }, floor: best.punishedBy };
+  };
+
+  test('doubles: on, "worst vs" beside the better line names the reply the click plays where the row\'s floor rests on a thin cell', () => {
+    const { floor, ...props } = worstVs('doubles', true);
+    const { rerender } = render(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} opponentReads />);
+    expect(screen.getByText('· worst vs Tailwind + Grassy Glide → Incineroar')).toHaveAttribute('title',
+      `The reply the opponent plays when it reads this move. The lowest cell of the row, ${floor}, rests on a thinly searched cell.`);
+    expect(screen.queryByText(`· worst vs ${floor}`)).toBeNull();
+    expect(screen.getByText('· worst vs Leech Seed')).not.toHaveAttribute('title');
+  });
+
+  test.each(['singles', 'doubles'] as const)('%s: on, a floor no ranked reply holds gives way to the opponent\'s best row, and the title says so, not that a cell is thin', kind => {
+    const base = evalResult(kind);
+    const matrix = base.matrix!;
+    const cells = matrix.p1Labels.map(() => matrix.p2Labels.map(() => ({ visits: 3, verified: false })));
+    const floor = 'Struggle';
+    const best = { ...base.perSide.p1[0], punishedBy: floor };
+    const played = rankedChoice('move stoneedge', 'Stone Edge', 0.1, { punishedBy: 'Gone Away' });
+    const props = { name: 'Alice', side: misplayedSide('mistake', { best, safe: best, played }), rowLines: { result: { ...base, matrix: { ...matrix, cells } }, side: 'p1' as const } };
+    const reply = base.perSide.p2.find(row => row.choice !== 'wait')!.label;
+    const { rerender } = render(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} opponentReads />);
+    const title = screen.getByText(`· worst vs ${reply}`).getAttribute('title');
+    expect(title).toBe(`The reply the opponent plays when it reads this move: its best choice, because the row's lowest cell, ${floor}, matches no ranked reply.`);
+    expect(title).not.toMatch(/thinly/);
+  });
+
+  test('singles: on, when the floor is the reply the click plays, "worst vs" reads as off and carries no title', () => {
+    const { floor, ...props } = worstVs('singles', false);
+    const { rerender } = render(<SideRow {...props} opponentReads />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    rerender(<SideRow {...props} />);
+    expect(screen.getByText(`· worst vs ${floor}`)).not.toHaveAttribute('title');
+    expect(screen.getByText('· worst vs Leech Seed')).toBeInTheDocument();
   });
 });

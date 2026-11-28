@@ -26,6 +26,31 @@ describe('ExplorableLabel', () => {
   });
 });
 
+describe('ExplorableLabel: the reply the click meets', () => {
+  const title = (reply: string) => `Play this turn in a variation; the opponent reads your move and answers with ${reply}.`;
+  test('on, the title names the reply; off, or without a reply, it keeps the general sentence', () => {
+    const { rerender } = render(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads reply="Defog" />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', title('Defog'));
+    rerender(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads={false} reply="Defog" />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
+    rerender(<ExplorableLabel label="Earthquake" onClick={vi.fn()} opponentReads />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent reads your move and plays the reply the search rates lowest for it.');
+  });
+
+  test.each([
+    ['singles', 'Earthquake', '→ Rotom-Wash'],
+    ['doubles', 'Fake Out → Rillaboom + Spore → Tornadus', 'Taunt → Amoonguss + Wood Hammer → Incineroar'],
+  ] as const)('%s: an engine row with its result names the reply the click plays; off, the general sentence', (kind, label, reply) => {
+    const result = evalResult(kind);
+    const side = sideAnalysis({ best: result.perSide.p1[0], played: null });
+    const rowLines = { result, side: 'p1' as const };
+    const { rerender } = render(<EngineRow name="Alice" side={side} onExplore={vi.fn()} opponentReads rowLines={rowLines} />);
+    expect(screen.getByRole('button', { name: `${label} ↗` })).toHaveAttribute('title', title(reply));
+    rerender(<EngineRow name="Alice" side={side} onExplore={vi.fn()} rowLines={rowLines} />);
+    expect(screen.getByRole('button')).toHaveAttribute('title', 'Play this turn in a variation; the opponent plays its top choice.');
+  });
+});
+
 describe('MiniBar', () => {
   test('fills right of center for a positive value and left for a negative one, clamped to the range', () => {
     const { container, rerender } = render(<MiniBar value={0.5} />);

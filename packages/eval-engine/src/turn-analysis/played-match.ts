@@ -1,6 +1,6 @@
 import type { EvalResult, RankedChoice } from '../types.ts';
 import type { PlayedAction, PlayedBounds, PlayedTurn, SlotBound } from '../played.ts';
-import type { SideAnalysis } from './types.ts';
+import type { NoChoiceSlot, SideAnalysis } from './types.ts';
 import { dexOf, toId, type GameRules, type RulesDex } from '@fulllifegames/replay-core';
 import { setupMoves } from '../dex-facts/setup.ts';
 
@@ -113,6 +113,25 @@ export function matchPlayedSlots(
   return { played, partial: true };
 }
 
+export function noChoiceSlots(played: PlayedTurn | null | undefined, side: 'p1' | 'p2', bodies: number): NoChoiceSlot[] {
+  const slots = side === 'p1' ? played?.p1Slots : played?.p2Slots;
+  if (!slots) return [];
+  const missing = bodies - slots.filter(action => action !== null).length;
+  const fell = slots.flatMap((action, slot): NoChoiceSlot[] =>
+    action === null && played?.fell?.[side]?.[slot] ? [{ slot, reason: 'fell' }] : []);
+  const ended = slots.flatMap((action, slot): NoChoiceSlot[] =>
+    action === null && !played?.fell?.[side]?.[slot] && played?.ended?.[side]?.[slot] ? [{ slot, reason: 'ended' }] : []);
+  const named = missing - fell.length >= ended.length ? [...fell, ...ended] : fell;
+  return named.slice(0, Math.max(0, missing)).sort((a, b) => a.slot - b.slot);
+}
+
+export const hiddenSlots = (side: Pick<SideAnalysis, 'playedSlots' | 'noChoiceSlots'>): number =>
+  Math.max(0, (side.playedSlots?.filter(action => action === null).length ?? 1) - (side.noChoiceSlots?.length ?? 0));
+
+/** The played line rests on a stand-in: a singles body KO'd before it acted, or a doubles slot with no action. */
+export const standsIn = (side: Pick<SideAnalysis, 'neverActed' | 'noChoiceSlots'>): boolean =>
+  side.neverActed === true || (side.noChoiceSlots?.length ?? 0) > 0;
+
 const GIMMICK_NAMES: Record<string, string> = {
   mega: 'Mega Evolution',
   terastallize: 'Terastallization',
@@ -190,8 +209,7 @@ export function phantomStayIn(
   rules: GameRules | undefined,
   bound?: SlotBound | null,
 ): RankedChoice | null {
-  // A KO before acting proves a MOVE was chosen: the best-ranked priority-0 move stands in (a priority move preempts).
-  // Cant-family preventions get no phantom; an order bound (`ruledOutMoves`, action-bound.ts) replaces Dex priority.
+  // A KO before acting proves a MOVE was chosen: the best-ranked priority-0 move stands in; a cant gets no phantom.
   if (!played || played[side] !== null || !rules) return null;
   const dex = dexOf(rules);
   if (played.p1Slots || played.p2Slots) return null;

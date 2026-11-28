@@ -15,7 +15,8 @@ import { WorkspaceEvalColumn } from './WorkspaceEvalColumn';
 import type { AppController } from '../hooks/useAppController';
 import { useCallback, useMemo, useState } from 'react';
 import type { FrameSide } from '../hooks/useReplayFrame';
-import { logRules, type ReplayData } from '@fulllifegames/replay-core';
+import { inferReplayFormatId, logRules, type ReplayData } from '@fulllifegames/replay-core';
+import { useFormatOffersTera } from '../hooks/useFormatOffersTera';
 import { ReplayRulesContext } from '../lib/replay-rules';
 import { GuessedBodiesContext, guessedBodies } from '../lib/stand-in-mark';
 import { REPLAY_FRAME_HEIGHT } from '../lib/replay-html';
@@ -31,6 +32,8 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
   const { setEditorSide, setSetsPanelOpen, handleTeamLoad, teamPasteStatus, teamPasteError } = app.ctx.knowledge;
   const { loading, error, embed, loadReplay, loadReplayFile, loadedReplayUrl } = app.ctx.replay;
   const { prefs, setPrefs } = app.ctx.evaluation;
+  const teraProbe = useFormatOffersTera(inferReplayFormatId(replayData), true);
+  const teraPending = teraProbe.pending && isGameId(replayData.id) && prefs.tera === 'auto';
   return (
     <AppTopBar
       replayData={replayData}
@@ -49,7 +52,7 @@ function WorkspaceTopBar({ app, replayData, onNewGame }: WorkspaceProps) {
       onEditSide={setEditorSide}
       onOpenSets={() => setSetsPanelOpen(true)}
       search={{
-        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin', showTera: app.ctx.meta.replayGen === 9, engines: app.ctx.engines,
+        prefs, onPrefsChange: setPrefs, external: app.ctx.engines.selected.source !== 'builtin', showTera: teraProbe.offers, teraPending, engines: app.ctx.engines,
         running: app.board.liveEvalStatus === 'searching' || app.board.liveEvalStatus === 'reconstructing',
       }}
       embed={embed}

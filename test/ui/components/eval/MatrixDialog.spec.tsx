@@ -129,6 +129,21 @@ describe('MatrixDialogButton', () => {
     expect(screen.queryByTitle(/worst reply to Bob's/)).toBeNull();
   });
 
+  test.each([
+    ['Doubles OU 2663093831 t7', 'fell'],
+    ['Champions VGC 2682637901 t6', 'ended'],
+  ] as const)('%s: a doubles side with a slot that showed no choice has no played row and no worst cell, and the other side keeps both (%s)', async (_scene, reason) => {
+    const { result, analysis } = doubles();
+    const patched: TurnAnalysis = { ...analysis, p1: { ...analysis.p1, noChoiceSlots: [{ slot: 0, reason }] } };
+    renderButton({ result, analysis: patched });
+    await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+    const table = screen.getByRole('table');
+    expect(headerOf(table, 'Fake Out → Rillaboom 5 + Spore → Tornadus 5')).not.toHaveTextContent(/played/);
+    expect(headerOf(table, 'Tailwind 9 + Grassy Glide → Incineroar 9')).toHaveTextContent(/played/);
+    expect(within(table).queryAllByText('played')).toHaveLength(1);
+    expect(within(table).getAllByText(/worst/)).toHaveLength(1);
+  });
+
   test('a played pair that is also the engine pair, and a cell that is worst for both, mark once each', async () => {
     const result = evalResult('singles');
     const [earthquake] = result.perSide.p1;
@@ -247,5 +262,46 @@ describe('MatrixDialogButton', () => {
     renderButton(singles());
     await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
     expect(screen.getByText(/Cells: Alice's chance to win for that pair/)).toHaveTextContent(/Headers: how often the engine expects each choice/);
+  });
+
+  describe('a floor whose reply the table lists no column for', () => {
+    const unlisted = 'Tera + Precipice Blades + Sleep Powder → Calyrex-Shadow';
+    const withUnlisted = (scene: { result: EvalResult; analysis: TurnAnalysis }, side: 'p1' | 'p2', index: number) => {
+      const { result, analysis } = scene;
+      const rows = result.perSide[side].map((row, i) => (i === index ? { ...row, worstCase: -0.55, punishedBy: unlisted } : row));
+      return { result: { ...result, perSide: { ...result.perSide, [side]: rows } }, analysis };
+    };
+
+    test('doubles: one line per such row names the floor, the reply and the missing column', async () => {
+      const scene = doubles();
+      const row = scene.result.perSide.p1[2];
+      renderButton(withUnlisted(scene, 'p1', 2));
+      await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+      const notes = screen.getAllByText(/lists no column for that reply/);
+      expect(notes).toHaveLength(1);
+      expect(notes[0]).toHaveTextContent(
+        `Alice's ${row.label}: guaranteed at least ${winPercent(-0.55)}% against ${unlisted}. The table lists no column for that reply, so the floor sits below every cell of that choice.`);
+    });
+
+    test('doubles: a floor of the second side names its own player', async () => {
+      renderButton(withUnlisted(doubles(), 'p2', 1));
+      await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+      expect(screen.getByText(/lists no column for that reply/)).toHaveTextContent(/^Bob's Tailwind 1 \+/);
+    });
+
+    test('doubles: more than six such rows show six lines and a count of the rest', async () => {
+      const { result, analysis } = doubles();
+      const rows = result.perSide.p1.map(row => ({ ...row, punishedBy: unlisted }));
+      renderButton({ result: { ...result, perSide: { ...result.perSide, p1: rows } }, analysis });
+      await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+      expect(screen.getAllByText(/lists no column for that reply/)).toHaveLength(6);
+      expect(screen.getByText('6 more choices have a floor from a reply the table does not list.')).toBeInTheDocument();
+    });
+
+    test('singles: every floor names a column of the table, so no line appears', async () => {
+      renderButton(singles());
+      await userEvent.click(screen.getByRole('button', { name: 'Open matrix' }));
+      expect(screen.queryByText(/lists no column for that reply/)).toBeNull();
+    });
   });
 });

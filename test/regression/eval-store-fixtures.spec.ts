@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  CAPTURE_COMMAND, EVAL_STORE_CAPTURES, EVAL_STORE_DIR, createSearchGuard, evalStoreFileName, parseEvalStoreFile, rewriteCacheVersion, seedRecords, serializeEvalStoreFile,
+  CAPTURE_COMMAND, EVAL_STORE_CAPTURES, EVAL_STORE_DIR, createSearchGuard, evalStoreFileName, isWinPathsRecord, parseEvalStoreFile, rewriteCacheVersion, seedRecords, serializeEvalStoreFile,
   type EvalStoreFile,
 } from '../e2e/eval-store';
 
@@ -48,6 +48,14 @@ describe('seedRecords (the failure path: a record does not fit)', () => {
       delete broken[field];
       expect(() => seedRecords(file([broken as ReturnType<typeof record>]), options), field).toThrow(CAPTURE_COMMAND);
     }
+  });
+
+  it('rewrites the key of a win-paths answer like a result and names the capture command when it holds no steps', () => {
+    const answer = (extra: Record<string, unknown> = {}) => ({ key: 'v79|gen9ou-1:3:fp|winpaths1:00ff', kind: 'winPaths', paths: { side: 'p1', turn: 3, steps: [{ kind: 'stronger' }] }, savedAt: 0, ...extra });
+    const seeded = seedRecords(file([record('v79|gen9ou-1:1:fp|d1'), answer() as never]), options);
+    expect(seeded[1]).toMatchObject({ key: 'v80|gen9ou-1:3:fp|winpaths1:00ff', kind: 'winPaths', savedAt: options.now });
+    expect(() => seedRecords(file([answer({ paths: { steps: [] } }) as never]), options)).toThrow(CAPTURE_COMMAND);
+    expect(() => seedRecords(file([answer({ key: 'v79|gen9ou-2:3:fp|winpaths1:00ff' }) as never]), options)).toThrow(CAPTURE_COMMAND);
   });
 
   it('names the capture command for a file with no records or an unknown format', () => {
@@ -141,6 +149,14 @@ describe('the saved files in the repository', () => {
     const wanted = EVAL_STORE_CAPTURES.map(capture => evalStoreFileName(capture.replay, capture.settings, capture.turns));
     expect(new Set(wanted).size, 'two captures share a file name').toBe(wanted.length);
     expect([...names].sort()).toEqual([...wanted].sort());
+  });
+
+  it('holds the loser\'s win-paths answer and one answer per proof turn in each file whose capture runs the job, and none in the others', () => {
+    for (const capture of EVAL_STORE_CAPTURES) {
+      const name = evalStoreFileName(capture.replay, capture.settings, capture.turns);
+      const parsed = parseEvalStoreFile(readFileSync(join(dir, name), 'utf-8'), name);
+      expect(parsed.records.filter(isWinPathsRecord), name).toHaveLength(capture.winPaths ? 1 + (capture.proofTurns?.length ?? 0) : 0);
+    }
   });
 
   it('lives where the capture writes', () => {

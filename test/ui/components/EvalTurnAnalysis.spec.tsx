@@ -197,14 +197,27 @@ describe('EvalLeadAnalysis', () => {
   });
 });
 
+describe('EvalTurnAnalysis, a doubles slot with no logged action', () => {
+  test.each([['fell', 'Orthworm was knocked out before it moved, so the log shows no choice'], ['ended', 'Orthworm was cut off by the end of the game, so the log shows no choice']] as const)(
+    'the card names the body of the slot from the turn\'s snapshot (%s)', (reason, words) => {
+      const pair = rankedChoice('move 1, move 2', 'Iron Defense + Protect', 0.2);
+      const side = sideAnalysis({ playedRaw: null, playedSlots: [null, { kind: 'move', name: 'Protect' }], played: pair, best: pair, safe: pair, playedPartial: true, noChoiceSlots: [{ slot: 0, reason }] });
+      const snapshot = { p1: { pokemon: [{ name: 'Orthworm', isActive: true, slot: 0 }, { name: 'Dragonite', isActive: true, slot: 1 }] }, p2: { pokemon: [] } };
+      const host = { rules: { gen: 9, mod: undefined }, snapshot } as unknown as Parameters<typeof EvalTurnAnalysis>[0]['linesHost'];
+      render(<EvalTurnAnalysis analysis={turnAnalysis(7, { p1: side })} playerNames={names} linesHost={host} doubles />);
+      expect(screen.getByText(`· ${words}`)).toBeInTheDocument();
+      expect(screen.getAllByText(/^played /)[0]).toHaveTextContent(`played Protect (${winPctText(0.2)})`);
+    });
+});
+
 describe('EvalTurnAnalysis, the endgame entry', () => {
-  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winPaths = (turns: number[], run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns }, offered: { loser: 'p2' as const, turns }, run, unavailable: null, playedLabel: () => null, proofAt: () => null, show: vi.fn(), hide: vi.fn() });
 
   test.each([false, true])('an endgame turn of the card (doubles %s) asks how the player who lost could have won from here', async doubles => {
     const host = { rules: { gen: 9, mod: undefined }, winPaths: winPaths([4, 5]) };
     render(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={host} doubles={doubles} />);
     await userEvent.click(screen.getByRole('button', { name: 'How could Bob have won from here?' }));
-    expect(host.winPaths.show).toHaveBeenCalledWith(4, 'card');
+    expect(host.winPaths.show).toHaveBeenCalledWith(4, 'card', 'lost');
   });
 
   test('a turn before the endgame has no such question', () => {
@@ -219,8 +232,8 @@ describe.each([
   ['doubles', true, { ...evalResult('doubles'), lines: [{ ...doublesLine, for: ['played' as const] }] }],
 ] as const)('EvalTurnAnalysis, closed sections, %s', (_kind, doubles, result) => {
   const rules = { gen: 9, mod: undefined };
-  const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from });
-  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, show: vi.fn(), hide: vi.fn() });
+  const winRun = (turn: number, from: WinPathsRun['from']): WinPathsRun => ({ turn, side: 'p2', steps: [], status: 'done', from, question: 'lost' });
+  const winPaths = (run: WinPathsRun | null = null) => ({ endgame: { loser: 'p2' as const, turns: [4, 5] }, offered: { loser: 'p2' as const, turns: [4, 5] }, run, unavailable: null, playedLabel: () => null, proofAt: () => null, show: vi.fn(), hide: vi.fn() });
 
   test('the Lines section sits closed under a toggle: aria-controls its body, a click or the keyboard opens it, every turn starts closed', async () => {
     const host = { rules, onPlay: vi.fn() };
@@ -283,7 +296,7 @@ describe.each([
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('region')).toBeNull();
     await userEvent.click(toggle);
-    expect(closed.winPaths.show).toHaveBeenCalledWith(4, 'card');
+    expect(closed.winPaths.show).toHaveBeenCalledWith(4, 'card', 'lost');
 
     const opened = { rules, winPaths: winPaths(winRun(4, 'card')) };
     rerender(<EvalTurnAnalysis analysis={turnAnalysis(4)} playerNames={names} linesHost={opened} doubles={doubles} />);
@@ -317,12 +330,13 @@ describe.each([
   const best = rankedChoice(base.perSide.p1[0].choice, label, 0.35, { line: [{ p1: 'Stone Edge', p2: 'Protect' }] });
   const analysis = turnAnalysis(4, { playedTracking: tracked, p1: misplayedSide('mistake', { best, safe: best }) });
 
-  test('the row reads the result\'s line; Hard mode reads the worst line', () => {
+  test('the row reads the result\'s usual line, with the opponent-reads setting on too', () => {
     const { rerender } = render(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} />);
     expect(screen.getByText('then Roost · Encore')).toBeInTheDocument();
     expect(screen.queryByText('then Stone Edge · Protect')).toBeNull();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={result} opponentReads />);
-    expect(screen.getByText('then Rock Slide · Taunt')).toBeInTheDocument();
+    expect(screen.getByText('then Roost · Encore')).toBeInTheDocument();
+    expect(screen.queryByText('then Rock Slide · Taunt')).toBeNull();
     rerender(<EvalTurnAnalysis analysis={analysis} playerNames={names} result={null} />);
     expect(screen.getByText('then Stone Edge · Protect')).toBeInTheDocument();
   });

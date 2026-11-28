@@ -68,7 +68,7 @@ function useEvalFormat(inputs: EvalViewInputs) {
   const { replayData, evaluation, replayGameType } = inputs;
   const formatId = replayData ? inferReplayFormatId(replayData) : '';
   const newGame = !!replayData && isGameId(replayData.id);
-  const newGameOffersTera = useFormatOffersTera(formatId, newGame && evaluation.prefs.tera === 'auto');
+  const { offers: newGameOffersTera } = useFormatOffersTera(formatId, newGame && evaluation.prefs.tera === 'auto');
   const effectiveTera = useMemo(
     () => (replayData ? resolveTeraPreference(evaluation.prefs.tera, formatId, replayData.log, { newGameOffersTera }) : false),
     [replayData, formatId, evaluation.prefs.tera, newGameOffersTera],
