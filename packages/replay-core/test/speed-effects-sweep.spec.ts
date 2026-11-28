@@ -62,6 +62,10 @@ describe('every Speed handler of the Dex has a class, Past and Unobtainable ones
     expect(ids.filter(id => !CLASSES[id])).toEqual([]);
   });
 
+  test('Champions plays the Speed handlers of Generation 9, the Dex the parser reads its side conditions from', () => {
+    expect(handlerIds(asDex(SINGLES_VIEWS[9]), 'onModifySpe')).toEqual(handlerIds(asDex(SINGLES_VIEWS[8]), 'onModifySpe'));
+  });
+
   test('every class names a handler of some Dex', () => {
     const named = new Set(SINGLES_VIEWS.flatMap(view => handlerIds(asDex(view), 'onModifySpe')));
     expect(Object.keys(CLASSES).filter(id => !named.has(id))).toEqual([]);
