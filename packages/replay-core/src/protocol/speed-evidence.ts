@@ -1,6 +1,6 @@
 import type { Generation } from '@pkmn/data';
 import { speedContaminatedAt, type ClientIdent, type ParserState, type PendingMove } from './parser-state.ts';
-import { effectsAcross, effectsOver } from './speed-effects.ts';
+import { raceEffects } from './speed-effects.ts';
 import type { SpeedOrderObservation } from '../types.ts';
 import { toId } from '../ids.ts';
 
@@ -316,10 +316,9 @@ export function recordFaintSpeedEvidence(state: ParserState, line: string) {
   if (!faintProvesOrder(state, victim, lastMove)) return;
   const victimMon = battle.getPokemon(victim as ClientIdent);
   if (!victimMon) return;
-  const points = [state.turnStart.get(victimMon), lastMove.seen.get(victimMon)];
-  if (points.some(seen => seen?.lowered)) return;
-  const firstSpeed = effectsAcross(state, battle.getPokemon(lastMove.attacker as ClientIdent), lastMove.seen);
-  const secondSpeed = effectsOver(points);
+  const { effects: secondSpeed, lowered } = raceEffects(state, victimMon, lastMove.seen);
+  if (lowered) return;
+  const { effects: firstSpeed } = raceEffects(state, battle.getPokemon(lastMove.attacker as ClientIdent), lastMove.seen);
   state.speedOrders.push({
     firstSide: lastMove.attackerSide, firstSpecies: lastMove.attackerSpecies,
     secondSide: victim.startsWith('p1') ? 'p1' : 'p2',

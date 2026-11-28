@@ -40,17 +40,16 @@ export function speedPointOf(state: ParserState): SpeedPoint {
 
 const sameEffects = (a: RaceSpeedEffects, b: RaceSpeedEffects) => JSON.stringify(a) === JSON.stringify(b);
 
-/** The distinct entries a mover stood under at the points, in order; absent when none holds an effect. */
-export function effectsOver(points: (SpeedSeen | undefined)[]): RaceSpeedEffects[] | undefined {
+/** `mon`'s distinct effects at the turn's start and at `seen`, and whether it was lowered there. */
+export function raceEffects(state: ParserState, mon: Pokemon | null | undefined, seen: SpeedPoint): { effects?: RaceSpeedEffects[]; lowered: boolean } {
+  const points = mon ? [state.turnStart.get(mon), seen.get(mon)] : [];
   const entries: RaceSpeedEffects[] = [];
-  for (const seen of points) {
-    const effects = seen?.effects ?? {};
+  for (const point of points) {
+    const effects = point?.effects ?? {};
     if (!entries.some(entry => sameEffects(entry, effects))) entries.push(effects);
   }
-  return entries.some(entry => Object.keys(entry).length > 0) ? entries : undefined;
-}
-
-/** The distinct entries `mon` stood under at the turn's start and at the point `seen` of an action. */
-export function effectsAcross(state: ParserState, mon: Pokemon | null | undefined, seen: SpeedPoint): RaceSpeedEffects[] | undefined {
-  return mon ? effectsOver([state.turnStart.get(mon), seen.get(mon)]) : undefined;
+  return {
+    ...(entries.some(entry => Object.keys(entry).length > 0) ? { effects: entries } : {}),
+    lowered: points.some(point => point?.lowered),
+  };
 }

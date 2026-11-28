@@ -3,7 +3,7 @@ import type { GenerationNum } from '@pkmn/data';
 import { generationsFor } from '../format-generations.ts';
 import { toId } from '../ids.ts';
 import type { ItemReading } from './item-reading.ts';
-import { effectsAcross, effectsOver, type SpeedPoint } from './speed-effects.ts';
+import { raceEffects, type SpeedPoint } from './speed-effects.ts';
 import type { DamageObservation, HiddenPowerEvidence, PokemonSnapshot, SpeedOrderObservation, TurnSnapshot } from '../types.ts';
 
 export type ClientIdent = Parameters<Battle['getPokemon']>[0];
@@ -154,10 +154,9 @@ export function flushSpeedOrder(state: ParserState) {
       if (first.side === second.side || !first.species || !second.species) continue;
       if (!first.cleanFirst || !second.cleanSecond) continue;
       if (state.reordered.has(first.ident) || state.reordered.has(second.ident)) continue;
-      const points = second.mon ? [state.turnStart.get(second.mon), first.seen.get(second.mon)] : [];
-      if (points.some(seen => seen?.lowered)) continue;
-      const firstSpeed = effectsAcross(state, first.mon, first.seen);
-      const secondSpeed = effectsOver(points);
+      const { effects: secondSpeed, lowered } = raceEffects(state, second.mon, first.seen);
+      if (lowered) continue;
+      const { effects: firstSpeed } = raceEffects(state, first.mon, first.seen);
       state.speedOrders.push({
         firstSide: first.side, firstSpecies: first.species,
         secondSide: second.side, secondSpecies: second.species,
