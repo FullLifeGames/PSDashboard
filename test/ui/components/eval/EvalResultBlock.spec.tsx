@@ -66,7 +66,7 @@ describe('EvalResultBlock', () => {
   test.each([
     ['singles', 0, '→ Rotom-Wash'],
     ['doubles', 0, 'Taunt → Amoonguss + Wood Hammer → Incineroar'],
-  ] as const)('%s: on, a row with a floor names the reply the click plays as its worst reply; off, the floor', (kind, row, reply) => {
+  ] as const)('%s: a row with a floor names the floor\'s reply as its worst reply, with and without the box, and the click names the reply it plays', (kind, row, reply) => {
     const base = evalResult(kind);
     const floor = base.matrix!.p2Labels[0];
     const perSide = { ...base.perSide, p1: [{ ...base.perSide.p1[row], punishedBy: floor }, ...base.perSide.p1.slice(1)] };
@@ -75,7 +75,8 @@ describe('EvalResultBlock', () => {
     const { rerender } = render(<EvalResultBlock {...shared} />);
     expect(first()).toContain(`(worst reply: ${floor})`);
     rerender(<EvalResultBlock {...shared} opponentReads />);
-    expect(first()).toContain(`(worst reply: ${reply})`);
+    expect(first()).toContain(`(worst reply: ${floor})`);
+    expect(first()).not.toContain(`(worst reply: ${reply})`);
     expect(first()).toContain(`the opponent reads your move and answers with ${reply}.`);
   });
 
@@ -134,6 +135,15 @@ describe('EvalResultBlock: a floor whose reply the matrix lists no column for', 
     const base = evalResult('doubles');
     const result = evalResult('doubles', { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: unlisted }, ...base.perSide.p1.slice(1)] } });
     expect(titleOf(result)).toContain(`(worst reply: ${unlisted}, which the matrix dialog does not list)`);
+  });
+
+  test('doubles: with the box on, the floor keeps its unlisted reply while the click names the reply it plays', () => {
+    const base = evalResult('doubles');
+    const result = evalResult('doubles', { perSide: { ...base.perSide, p1: [{ ...base.perSide.p1[0], punishedBy: unlisted }, ...base.perSide.p1.slice(1)] } });
+    render(<EvalResultBlock result={result} status="done" playerNames={names} onPickChoice={vi.fn()} opponentReads />);
+    const title = document.querySelector('button.ps-eval-choice')!.getAttribute('title')!;
+    expect(title).toContain(`(worst reply: ${unlisted}, which the matrix dialog does not list)`);
+    expect(title).toMatch(/answers with .+\.$/);
   });
 });
 

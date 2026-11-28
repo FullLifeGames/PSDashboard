@@ -42,7 +42,7 @@ function choiceTooltip(
 ): string {
   return `Win probability ${winPercent(choice.ev, faintedFraction)}% vs balanced play; higher is better for this side` +
     ` · guaranteed at least ${winPercent(choice.worstCase, faintedFraction)}%` +
-    (choice.punishedBy ? ` (worst reply: ${reply ?? choice.punishedBy}${unlisted ? ', which the matrix dialog does not list' : ''})` : '') +
+    (choice.punishedBy ? ` (worst reply: ${choice.punishedBy}${unlisted ? ', which the matrix dialog does not list' : ''})` : '') +
     '. Choices are ranked by their value against balanced play.' +
     (clickable ? ' ' + exploreTitle(opponentReads, reply) : '');
 }
@@ -64,7 +64,7 @@ function ChoiceList({
     <div className="ps-eval-column">
       {choices.slice(0, 3).map((choice, index) => {
         const read = readsReply(opponentReads, { result, side }, choice)?.reply.label;
-        const unlisted = floorReplyUnlisted(result, side, { punishedBy: read ?? choice.punishedBy });
+        const unlisted = floorReplyUnlisted(result, side, choice);
         const tooltip = choiceTooltip(choice, !!onPickChoice, unlisted, faintedFraction, opponentReads, read);
         const detail = <ChoiceDetail choice={choice} index={index} best={best} faintedFraction={faintedFraction} tail={rowLineTail(result, side, choice)} />;
         return onPickChoice ? (
