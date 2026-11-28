@@ -93,6 +93,21 @@ async function withAnswers<T>(mode: 'off' | 'protect' | 'full', run: () => Promi
   }
 }
 
+const recordedRuns = new Map<string, Promise<{ result: EvalResult; record: Recording }>>();
+
+async function recorded(name: string, answers?: 'off'): Promise<{ result: EvalResult; record: Recording }> {
+  const key = `${name}|${answers ?? 'default'}|${JSON.stringify(searchBudget())}`;
+  if (!recordedRuns.has(key)) {
+    const run = async () => {
+      const { executor, record } = recordingExecutor(position(name));
+      const search = () => searchTreesOrchestrated(executor, settingsOf(name));
+      return { result: await (answers ? withAnswers(answers, search) : search()), record };
+    };
+    recordedRuns.set(key, run());
+  }
+  return structuredClone(await recordedRuns.get(key)!);
+}
+
 const withoutLines = <T extends { lines?: unknown }>(result: T): T => ({ ...result, lines: undefined });
 
 const settingsOf = (name: string, keepPlayed?: EvalSettings['keepPlayed']): EvalSettings => {
@@ -151,9 +166,8 @@ describe('tree orchestration through the executor', () => {
   test('runs every tree offset once and merges them in offset order, whatever order they finish in', { timeout: 600_000 }, async () => {
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
-      const inOrder = recordingExecutor(position(name));
       const late = recordingExecutor(position(name), true);
-      const expected = await searchTreesOrchestrated(inOrder.executor, settings);
+      const { result: expected } = await recorded(name);
       const result = await searchTreesOrchestrated(late.executor, settings);
       expect([...late.record.offsets].sort(), name).toEqual(Array.from({ length: searchBudget().trees }, (_, offset) => offset));
       expect(result, name).toEqual(expected);
@@ -164,8 +178,7 @@ describe('tree orchestration through the executor', () => {
     // The answer round adds rounds of its own where it finds an answer, so this contract runs with it off.
     for (const name of VERIFYING) {
       const settings = settingsOf(name);
-      const { executor, record } = recordingExecutor(position(name));
-      await withAnswers('off', () => searchTreesOrchestrated(executor, settings));
+      const { record } = await recorded(name, 'off');
       const doubles = name.includes('doubles');
       expect(record.rounds.filter(round => !round.jobs.some(job => job.plain)).length, name).toBe(doubles ? 2 : 1);
       const verify = verifyRound(record)!;
@@ -179,8 +192,7 @@ describe('tree orchestration through the executor', () => {
 
   test('the played row joins the verify set (singles: the same trees with and without the played turn)', { timeout: 600_000 }, async () => {
     const name = VERIFYING[0];
-    const without = recordingExecutor(position(name));
-    await searchTreesOrchestrated(without.executor, settingsOf(name));
+    const without = await recorded(name);
     const trees = without.record.trees;
     const visits = (i: number) => trees.reduce((sum, tree) => sum + tree.p1N[i], 0);
     const rare = trees[0].p1Options.map((option, i) => ({ option, i })).filter(entry => entry.option.label.startsWith('→ '))
@@ -215,8 +227,7 @@ describe('tree orchestration through the executor', () => {
     const shifted: string[] = [];
     for (const name of [...VERIFYING, 'smogtours-gen6ou-649664-t14-g1']) {
       const settings = settingsOf(name);
-      const { executor, record } = recordingExecutor(position(name));
-      const result = await withAnswers('off', () => searchTreesOrchestrated(executor, settings));
+      const { result, record } = await recorded(name, 'off');
       const values = verifyRound(record)!.values;
       const verified = mergeMctsTrees(record.trees, new Map(values.map(value => [cellKey(value.i, value.j), value])));
       const unverified = mergeMctsTrees(record.trees);

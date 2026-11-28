@@ -35,19 +35,25 @@ function reverseBench(serialized: string): string {
   return JSON.stringify(State.serializeBattle(battle));
 }
 
-const treeResults = new Map<string, Promise<EvalResult>>();
-const tree = (serialized: string, position: Position): Promise<EvalResult> => {
-  const settings = settingsOf(position, 'mcts');
+const memo = (results: Map<string, Promise<EvalResult>>, serialized: string, settings: EvalSettings, search: () => Promise<EvalResult>) => {
   const key = `${JSON.stringify(settings)}\u0000${serialized}`;
-  let result = treeResults.get(key);
+  let result = results.get(key);
   if (!result) {
-    result = searchTreesOrchestrated(createLocalTreeExecutor(serialized, position.ruleset), settings);
-    treeResults.set(key, result);
+    result = search();
+    results.set(key, result);
   }
   return result;
 };
-const matrix = (serialized: string, position: Position): Promise<EvalResult> =>
-  Promise.resolve(searchPosition(serialized, settingsOf(position, 'matrix')));
+const treeResults = new Map<string, Promise<EvalResult>>();
+const tree = (serialized: string, position: Position): Promise<EvalResult> => {
+  const settings = settingsOf(position, 'mcts');
+  return memo(treeResults, serialized, settings, () => searchTreesOrchestrated(createLocalTreeExecutor(serialized, position.ruleset), settings));
+};
+const matrixResults = new Map<string, Promise<EvalResult>>();
+const matrix = (serialized: string, position: Position): Promise<EvalResult> => {
+  const settings = settingsOf(position, 'matrix');
+  return memo(matrixResults, serialized, settings, () => Promise.resolve(searchPosition(serialized, settings)));
+};
 
 const ranking = (result: EvalResult) => ({
   score: result.score,

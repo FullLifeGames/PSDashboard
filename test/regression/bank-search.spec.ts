@@ -9,12 +9,19 @@ import { bankKeepPlayed, bankSampleCount, bankSearch, bankSettings } from './ban
 const fixture = (name: string) =>
   (JSON.parse(readFileSync(`packages/eval-engine/test/fixtures/positions/${name}.json`, 'utf-8')) as { serialized: string }).serialized;
 
+const references = new Map<string, ReturnType<typeof searchPosition>>();
+const singlesReference = (depth: number, samples: number) => {
+  const key = `${depth}|${samples}`;
+  if (!references.has(key)) references.set(key, searchPosition(fixture('gen9ou-2658658993-t2'), { depth, samples, tera: false }));
+  return references.get(key)!;
+};
+
 test('auto: below the threshold the bank runs the sync matrix search', async () => {
   const serialized = fixture('gen9ou-2658658993-t2');
   configureSearchBudget(parseSearchBudget('tree-from=0.25,early-samples=1'));
   try {
     const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
-    expect(result).toEqual(searchPosition(serialized, { depth: 1, samples: 1, tera: false }));
+    expect(result).toEqual(singlesReference(1, 1));
   } finally {
     configureSearchBudget(null);
   }
@@ -59,7 +66,7 @@ test('auto reads the budget: early depth and the tree threshold', async () => {
   configureSearchBudget(parseSearchBudget('tree-from=0.25,early-depth=2,early-samples=1'));
   try {
     const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
-    expect(result).toEqual(searchPosition(serialized, { depth: 2, samples: 1, tera: false }));
+    expect(result).toEqual(singlesReference(2, 1));
   } finally {
     configureSearchBudget(null);
   }
@@ -68,7 +75,7 @@ test('auto reads the budget: early depth and the tree threshold', async () => {
 test('auto at the default: an early singles position runs the matrix with three draws', async () => {
   const serialized = fixture('gen9ou-2658658993-t2');
   const result = await bankSearch({ serialized, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } });
-  expect(result).toEqual(searchPosition(serialized, { depth: 1, samples: 3, tera: false }));
+  expect(result).toEqual(singlesReference(1, 3));
 });
 
 test('auto reads the game type off the position: each game type follows its own split', { timeout: 120_000 }, async () => {
@@ -76,7 +83,7 @@ test('auto reads the game type off the position: each game type follows its own 
   try {
     const singles = fixture('gen9ou-2658658993-t2');
     expect(await bankSearch({ serialized: singles, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } }))
-      .toEqual(searchPosition(singles, { depth: 1, samples: 1, tera: false }));
+      .toEqual(singlesReference(1, 1));
     const doubles = fixture('gen9doublesou-2660802611-t2');
     expect(await bankSearch({ serialized: doubles, faintedFraction: 0, depth: 1, samples: 1, mode: 'auto', settings: { tera: false } }))
       .toEqual(await searchTreesOrchestrated(createLocalTreeExecutor(doubles), { depth: 1, samples: 1, mode: 'mcts', tera: false }));
